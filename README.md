@@ -2,6 +2,10 @@
 
 Monorepo for the `babylon.quarks` npm package and Babylon.js examples.
 
+## Live examples
+
+[GitHub Pages demo](https://soullnik.github.io/babylon.quarks-standalone/)
+
 ## Workspace structure
 
 - `packages/babylon.quarks` - publishable package
