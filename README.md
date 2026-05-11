@@ -2,6 +2,25 @@
 
 Monorepo for the `babylon.quarks` npm package and Babylon.js examples.
 
+## npm package
+
+- Package: [`babylon.quarks`](https://www.npmjs.com/package/babylon.quarks)
+- Install:
+
+```bash
+npm install babylon.quarks @babylonjs/core
+```
+
+## Get started
+
+Use the package in your Babylon.js app:
+
+```ts
+import {BatchedRenderer, ParticleSystem} from "babylon.quarks";
+```
+
+Then initialize `BatchedRenderer` with your Babylon scene and add one or more `ParticleSystem` instances.
+
 ## Live examples
 
 [GitHub Pages demo](https://soullnik.github.io/babylon.quarks-standalone/)
@@ -18,6 +37,8 @@ npm install
 npm run build
 npm run examples
 ```
+
+Open local examples at `http://localhost:8001` (Vite picks the next free port if `8000` is busy).
 
 ## Quality checks
 
