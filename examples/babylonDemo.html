@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>babylon.quarks – Particle System Demo</title>
+    <link rel="shortcut icon" href="./favicon.png"/>
+    <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+    <meta name="theme-color" content="#000000"/>
+    <meta name="description" content="babylon.quarks particle system demo for Babylon.js">
+    <style>
+        :root {
+            color-scheme: dark;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: Inter, Segoe UI, Roboto, sans-serif;
+            background: #070b16;
+            color: #eef2ff;
+        }
+
+        #renderer-canvas {
+            position: fixed;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+            touch-action: none;
+            display: block;
+        }
+
+        .hud {
+            position: fixed;
+            top: 14px;
+            left: 14px;
+            right: 14px;
+            z-index: 20;
+            border: 1px solid rgba(151, 172, 255, 0.25);
+            border-radius: 14px;
+            background: rgba(8, 12, 24, 0.72);
+            backdrop-filter: blur(10px);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 10px 12px;
+            flex-wrap: wrap;
+        }
+
+        .hud-left,
+        .hud-center,
+        .hud-right {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .ui-btn,
+        .ui-link,
+        .ui-select {
+            border-radius: 10px;
+            border: 1px solid #3f5593;
+            background: rgba(27, 41, 79, 0.55);
+            color: #eef2ff;
+            height: 34px;
+            padding: 0 12px;
+            font-size: 13px;
+        }
+
+        .ui-link {
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+        }
+
+        .ui-btn {
+            cursor: pointer;
+        }
+
+        .ui-btn:hover,
+        .ui-link:hover,
+        .ui-select:hover {
+            border-color: #6f90e9;
+            background: rgba(46, 70, 133, 0.65);
+        }
+
+        .ui-btn:active {
+            transform: translateY(1px);
+        }
+
+        .ui-title {
+            font-size: 14px;
+            font-weight: 600;
+            letter-spacing: 0.01em;
+            min-width: 220px;
+            text-align: center;
+        }
+
+        .pill {
+            border-radius: 999px;
+            border: 1px solid #3f5593;
+            padding: 6px 10px;
+            font-size: 12px;
+            color: #bbcaef;
+            background: rgba(16, 24, 46, 0.65);
+            white-space: nowrap;
+        }
+
+        .hint {
+            position: fixed;
+            left: 14px;
+            bottom: 14px;
+            z-index: 20;
+            border: 1px solid rgba(151, 172, 255, 0.2);
+            border-radius: 10px;
+            padding: 7px 10px;
+            font-size: 12px;
+            color: #aebfe8;
+            background: rgba(8, 12, 24, 0.6);
+            backdrop-filter: blur(8px);
+        }
+    </style>
+</head>
+<body id="home">
+    <canvas id="renderer-canvas"></canvas>
+    <header class="hud">
+        <div class="hud-left">
+            <a href="./" class="ui-link">Back</a>
+            <button id="previousBtn" class="ui-btn" type="button">Prev</button>
+            <button id="nextBtn" class="ui-btn" type="button">Next</button>
+        </div>
+        <div class="hud-center">
+            <span id="demo-name" class="ui-title">Loading...</span>
+            <select id="demo-select" class="ui-select" aria-label="Choose demo"></select>
+        </div>
+        <div class="hud-right">
+            <span class="pill">Particles: <span id="particleCount">0</span></span>
+            <span class="pill">FPS: <span id="fps">0</span></span>
+            <a id="source-link" href="https://github.com/Soullnik/babylon.quarks-standalone/blob/main/examples/babylonMain.js" target="_blank" class="ui-link">Source</a>
+        </div>
+    </header>
+    <div class="hint">Controls: Left/Right arrows switch demo</div>
+    <script type="module" src="./babylonMain.js"></script>
+</body>
+</html>

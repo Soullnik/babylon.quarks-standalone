@@ -1,0 +1,16 @@
+{
+  "name": "examples",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --port 8000",
+    "build": "vite build",
+    "preview": "vite preview --port 8000"
+  },
+  "dependencies": {
+    "@babylonjs/core": "^9.0.0",
+    "@babylonjs/loaders": "^9.6.2",
+    "babylon.quarks": "file:../packages/babylon.quarks"
+  }
+}
