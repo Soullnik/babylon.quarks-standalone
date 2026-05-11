@@ -22,6 +22,11 @@ varying vec4 vColor;
 varying vec3 vNormal;
 varying vec3 vWorldPos;
 
+#ifdef TILE_BLEND
+varying vec2 vUV2;
+varying float vTileBlend;
+#endif
+
 #ifdef SOFT_PARTICLES
 varying vec4 projPosition;
 varying float linearDepth;
@@ -54,9 +59,17 @@ void main() {
 
 #ifdef UV_TILE
     vec2 tc = vec2(tileCountX, tileCountY);
-    float tileU = mod(uvTile, tc.x) / tc.x;
-    float tileV = 1.0 - floor(uvTile / tc.x) / tc.y - 1.0 / tc.y;
+    float baseTile = floor(uvTile);
+    float tileU = mod(baseTile, tc.x) / tc.x;
+    float tileV = 1.0 - floor(baseTile / tc.x) / tc.y - 1.0 / tc.y;
     vUV = uv / tc + vec2(tileU, tileV);
+    #ifdef TILE_BLEND
+        float nextTile = ceil(uvTile);
+        float nextU = mod(nextTile, tc.x) / tc.x;
+        float nextV = 1.0 - floor(nextTile / tc.x) / tc.y - 1.0 / tc.y;
+        vUV2 = uv / tc + vec2(nextU, nextV);
+        vTileBlend = fract(uvTile);
+    #endif
 #else
     vUV = uv;
 #endif

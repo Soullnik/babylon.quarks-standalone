@@ -4,6 +4,8 @@ import {Matrix, Quaternion, Vector3} from '@babylonjs/core/Maths/math.vector';
 import {Mesh} from '@babylonjs/core/Meshes/mesh';
 import {QuarksLoader} from '../src/QuarksLoader';
 import {QuarksPrefab} from '../src/QuarksPrefab';
+import {ParticleEmitter} from '../src/ParticleEmitter';
+import {ParticleSystem} from '../src/ParticleSystem';
 
 describe('QuarksLoader matrix decomposition', () => {
     it('preserves translation, rotation and scale from matrix', () => {
@@ -161,6 +163,102 @@ describe('QuarksLoader matrix decomposition', () => {
         const prefab = root.getChildren().find((node) => node instanceof QuarksPrefab);
         expect(prefab).toBeInstanceOf(QuarksPrefab);
         expect((prefab as QuarksPrefab).animationData.length).toBe(1);
+
+        scene.dispose();
+        engine.dispose();
+    });
+
+    it('marks sub-emitter particle systems as onlyUsedByOther after UUID resolve', () => {
+        const engine = new NullEngine();
+        const scene = new Scene(engine);
+        const loader = new QuarksLoader(scene);
+
+        const root = loader.parse({
+            geometries: [{uuid: 'plane', type: 'PlaneGeometry', width: 1, height: 1}],
+            materials: [{uuid: 'mat', type: 'MeshBasicMaterial', transparent: true, blending: 1}],
+            object: {
+                uuid: 'root',
+                type: 'Group',
+                children: [
+                    {
+                        uuid: 'parent-emitter',
+                        type: 'ParticleEmitter',
+                        ps: {
+                            version: '2.0',
+                            autoDestroy: false,
+                            looping: true,
+                            prewarm: false,
+                            duration: 1,
+                            shape: {type: 'point'},
+                            startLife: {type: 'ConstantValue', value: 1},
+                            startSpeed: {type: 'ConstantValue', value: 0},
+                            startRotation: {type: 'ConstantValue', value: 0},
+                            startSize: {type: 'ConstantValue', value: 1},
+                            startColor: {type: 'ConstantColor', color: {r: 1, g: 1, b: 1, a: 1}},
+                            emissionOverTime: {type: 'ConstantValue', value: 0},
+                            emissionOverDistance: {type: 'ConstantValue', value: 0},
+                            emissionBursts: [],
+                            onlyUsedByOther: false,
+                            instancingGeometry: 'plane',
+                            renderOrder: 0,
+                            renderMode: 0,
+                            rendererEmitterSettings: {},
+                            material: 'mat',
+                            layers: 1,
+                            startTileIndex: {type: 'ConstantValue', value: 0},
+                            uTileCount: 1,
+                            vTileCount: 1,
+                            behaviors: [
+                                {
+                                    type: 'EmitSubParticleSystem',
+                                    useVelocityAsBasis: false,
+                                    subParticleSystem: 'sub-emitter',
+                                    mode: 2,
+                                    emitProbability: 1,
+                                },
+                            ],
+                            worldSpace: true,
+                        },
+                    },
+                    {
+                        uuid: 'sub-emitter',
+                        type: 'ParticleEmitter',
+                        ps: {
+                            version: '2.0',
+                            autoDestroy: false,
+                            looping: false,
+                            prewarm: false,
+                            duration: 1,
+                            shape: {type: 'point'},
+                            startLife: {type: 'ConstantValue', value: 1},
+                            startSpeed: {type: 'ConstantValue', value: 0},
+                            startRotation: {type: 'ConstantValue', value: 0},
+                            startSize: {type: 'ConstantValue', value: 1},
+                            startColor: {type: 'ConstantColor', color: {r: 1, g: 1, b: 1, a: 1}},
+                            emissionOverTime: {type: 'ConstantValue', value: 0},
+                            emissionOverDistance: {type: 'ConstantValue', value: 0},
+                            emissionBursts: [],
+                            onlyUsedByOther: false,
+                            instancingGeometry: 'plane',
+                            renderOrder: 0,
+                            renderMode: 0,
+                            rendererEmitterSettings: {},
+                            material: 'mat',
+                            layers: 1,
+                            startTileIndex: {type: 'ConstantValue', value: 0},
+                            uTileCount: 1,
+                            vTileCount: 1,
+                            behaviors: [],
+                            worldSpace: true,
+                        },
+                    },
+                ],
+            },
+        });
+
+        const subEmitter = root.getChildren().find((c) => (c as any)._quarksUUID === 'sub-emitter') as ParticleEmitter;
+        expect(subEmitter).toBeInstanceOf(ParticleEmitter);
+        expect((subEmitter.system as ParticleSystem).onlyUsedByOther).toBe(true);
 
         scene.dispose();
         engine.dispose();

@@ -50,7 +50,7 @@ export function initCustomBlendingBabylonDemo({scene, camera, batchRenderer, sys
         batchRenderer,
         systems,
         texture,
-        blendMode: Constants.ALPHA_ADD,
+        blendMode: Constants.ALPHA_ONEONE_ONEONE,
         position: new BVector3(-5, 0, 0),
         color: new Vector4(0.5, 0.5, 0.5, 1),
     });
@@ -59,7 +59,7 @@ export function initCustomBlendingBabylonDemo({scene, camera, batchRenderer, sys
         batchRenderer,
         systems,
         texture,
-        blendMode: Constants.ALPHA_COMBINE,
+        blendMode: Constants.ALPHA_MAX,
         position: new BVector3(0, 0, 0),
         color: new Vector4(0.5, 0.5, 0.5, 1),
     });
@@ -68,7 +68,7 @@ export function initCustomBlendingBabylonDemo({scene, camera, batchRenderer, sys
         batchRenderer,
         systems,
         texture,
-        blendMode: Constants.ALPHA_SUBTRACT,
+        blendMode: Constants.ALPHA_EXCLUSION,
         position: new BVector3(5, 0, 0),
         color: new Vector4(0.5, 0.5, 0.5, 1),
     });

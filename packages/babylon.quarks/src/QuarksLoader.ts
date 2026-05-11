@@ -487,7 +487,11 @@ export class QuarksLoader {
                         const subEmitter = system.behaviors[i] as EmitSubParticleSystem;
                         const targetUUID = subEmitter.subParticleSystem as any;
                         if (typeof targetUUID === 'string' && nodesMap[targetUUID]) {
-                            (subEmitter as any).subParticleSystem = nodesMap[targetUUID];
+                            const resolved = nodesMap[targetUUID];
+                            (subEmitter as any).subParticleSystem = resolved;
+                            if (resolved instanceof ParticleEmitter) {
+                                (resolved.system as ParticleSystem).onlyUsedByOther = true;
+                            }
                         }
                     }
                 }
