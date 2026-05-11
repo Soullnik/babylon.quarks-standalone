@@ -16,7 +16,8 @@
   "files": [
     "dist",
     "src",
-    "LICENSE"
+    "LICENSE",
+    "README.md"
   ],
   "scripts": {
     "clean": "rimraf dist",

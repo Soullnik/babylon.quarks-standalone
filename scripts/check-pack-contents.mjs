@@ -25,6 +25,7 @@ function assertRequiredFiles(packResult) {
     "dist/babylon.quarks.cjs",
     "dist/types/index.d.ts",
     "LICENSE",
+    "README.md",
   ];
 
   const missingFiles = requiredFiles.filter((filePath) => !filePaths.has(filePath));
