@@ -114,11 +114,13 @@ describe('QuarksPrefab', () => {
         const system = new ParticleSystem({scene, startLife: new ConstantValue(1), emissionOverTime: new ConstantValue(1)});
         const emitter = system.emitter as ParticleEmitter;
         const clip = {duration: 0.4, play: jest.fn(), stop: jest.fn(), pause: jest.fn(), setTime: jest.fn()};
+        const keepAliveClip = {duration: 1, play: jest.fn(), stop: jest.fn(), pause: jest.fn(), setTime: jest.fn()};
         const target = new TransformNode('loop-target', scene);
         const prefab = new QuarksPrefab('prefab-loop', scene);
 
         prefab.addParticleSystemAnimation(emitter, 0, 0.2, true);
         prefab.addThreeAnimation(target, clip, 0, 0.2, true);
+        prefab.addThreeAnimation(target, keepAliveClip, 0, 1, false);
         const restartSpy = jest.spyOn(system, 'restart');
 
         prefab.play();
