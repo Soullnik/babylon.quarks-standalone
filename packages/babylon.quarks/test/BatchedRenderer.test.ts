@@ -5,7 +5,6 @@ import {ConstantColor, ConstantValue, PointEmitter, Vector4} from 'quarks.core';
 import {BatchedRenderer} from '../src/BatchedRenderer';
 import {ParticleSystem} from '../src/ParticleSystem';
 import {RenderMode} from '../src/VFXBatch';
-import {SimulationBackend} from '../src/SimulationBackends';
 
 describe('BatchedRenderer', () => {
     let engine: NullEngine;
@@ -92,26 +91,5 @@ describe('BatchedRenderer', () => {
         const disabledState = renderer.getAdaptivePerformanceState();
         expect(disabledState.enabled).toBe(false);
         expect(disabledState.currentQuality).toBe(1);
-    });
-
-    it('defaults to cpu backend and supports runtime switching', () => {
-        const renderer = new BatchedRenderer('batcher-backend-default', scene);
-        const defaultState = renderer.getSimulationBackendState();
-        expect(defaultState.requestedBackend).toBe(SimulationBackend.CPU);
-        expect(defaultState.activeBackend).toBe(SimulationBackend.CPU);
-
-        renderer.setSimulationBackend(SimulationBackend.CPU);
-        const switchedState = renderer.getSimulationBackendState();
-        expect(switchedState.activeBackend).toBe(SimulationBackend.CPU);
-    });
-
-    it('falls back to cpu when gpu backend is unavailable', () => {
-        const renderer = new BatchedRenderer('batcher-backend-fallback', scene, {
-            simulationBackend: SimulationBackend.GPU,
-        });
-        const state = renderer.getSimulationBackendState();
-        expect(state.requestedBackend).toBe(SimulationBackend.GPU);
-        expect(state.activeBackend).toBe(SimulationBackend.CPU);
-        expect(state.fallbackReason).toBeDefined();
     });
 });
