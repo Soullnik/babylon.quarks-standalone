@@ -99,6 +99,9 @@ describe('BatchedRenderer', () => {
         const defaultState = renderer.getSimulationBackendState();
         expect(defaultState.requestedBackend).toBe(SimulationBackend.CPU);
         expect(defaultState.activeBackend).toBe(SimulationBackend.CPU);
+        const defaultDiagnostics = renderer.getSimulationBackendDiagnostics();
+        expect(defaultDiagnostics.supported).toBe(true);
+        expect(defaultDiagnostics.probeMode).toBe(false);
 
         renderer.setSimulationBackend(SimulationBackend.CPU);
         const switchedState = renderer.getSimulationBackendState();
@@ -113,5 +116,7 @@ describe('BatchedRenderer', () => {
         expect(state.requestedBackend).toBe(SimulationBackend.GPU);
         expect(state.activeBackend).toBe(SimulationBackend.CPU);
         expect(state.fallbackReason).toBeDefined();
+        const diagnostics = renderer.getSimulationBackendDiagnostics();
+        expect(diagnostics.probeMode).toBe(false);
     });
 });

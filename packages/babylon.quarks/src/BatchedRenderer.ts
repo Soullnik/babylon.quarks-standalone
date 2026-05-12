@@ -11,6 +11,7 @@ import {
     resolveSimulationBackend,
     SimulationBackend,
     SimulationBackendAdapter,
+    SimulationBackendDiagnostics,
     SimulationBackendState,
 } from './SimulationBackends';
 
@@ -199,6 +200,10 @@ export class BatchedRenderer extends TransformNode {
 
     getSimulationBackendState(): SimulationBackendState {
         return {...this.simulationBackendState};
+    }
+
+    getSimulationBackendDiagnostics(): SimulationBackendDiagnostics {
+        return this.simulationBackendAdapter.getDiagnostics();
     }
 
     private applyAdaptiveQuality() {

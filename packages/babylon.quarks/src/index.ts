@@ -17,7 +17,7 @@ export {QuarksLoader} from './QuarksLoader';
 export type {QuarksLoaderOptions} from './QuarksLoader';
 export {QuarksPrefab} from './QuarksPrefab';
 export {SimulationBackend} from './SimulationBackends';
-export type {SimulationBackendState} from './SimulationBackends';
+export type {SimulationBackendState, SimulationBackendDiagnostics} from './SimulationBackends';
 export {MeshSurfaceEmitter, MeshSurfaceEmitterPlugin} from './MeshSurfaceEmitter';
 export * from './shaders/';
 export * from './materials/';
