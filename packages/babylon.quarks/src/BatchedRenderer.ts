@@ -30,13 +30,42 @@ export interface VFXBatchSettings {
     layerMask: number;
 }
 
+export interface AdaptivePerformanceOptions {
+    targetFrameMs: number;
+    minQuality: number;
+    maxQuality: number;
+    decreaseStep: number;
+    increaseStep: number;
+}
+
+export interface AdaptivePerformanceState extends AdaptivePerformanceOptions {
+    enabled: boolean;
+    currentQuality: number;
+    lastFrameCpuMs: number;
+}
+
 export class BatchedRenderer extends TransformNode {
     batches: Array<VFXBatch> = [];
     systemToBatchIndex: Map<IParticleSystem, number> = new Map<IParticleSystem, number>();
     depthTexture: BaseTexture | null = null;
+    private adaptivePerformanceState: AdaptivePerformanceState = {
+        enabled: false,
+        targetFrameMs: 16.7,
+        minQuality: 0.35,
+        maxQuality: 1,
+        decreaseStep: 0.08,
+        increaseStep: 0.02,
+        currentQuality: 1,
+        lastFrameCpuMs: 0,
+    };
+    private lastAppliedQuality = Number.NaN;
 
     constructor(name: string, scene: Scene) {
         super(name, scene);
+    }
+
+    private static clamp(value: number, min: number, max: number): number {
+        return Math.max(min, Math.min(max, value));
     }
 
     private static equals(a: StoredBatchSettings, b: VFXBatchSettings): boolean {
@@ -62,6 +91,9 @@ export class BatchedRenderer extends TransformNode {
 
     addSystem(system: IParticleSystem) {
         (system as unknown as ParticleSystem)._renderer = this;
+        if (this.adaptivePerformanceState.enabled) {
+            (system as any).setQualityFactor?.(this.adaptivePerformanceState.currentQuality);
+        }
         const settings = (system as unknown as ParticleSystem).getRendererSettings();
         for (let i = 0; i < this.batches.length; i++) {
             if (BatchedRenderer.equals(this.batches[i].settings, settings)) {
@@ -115,12 +147,72 @@ export class BatchedRenderer extends TransformNode {
         }
     }
 
+    configureAdaptivePerformance(options: Partial<AdaptivePerformanceOptions> = {}) {
+        const state = this.adaptivePerformanceState;
+        const minQuality = BatchedRenderer.clamp(options.minQuality ?? state.minQuality, 0.05, 1);
+        const maxQuality = BatchedRenderer.clamp(options.maxQuality ?? state.maxQuality, minQuality, 1);
+        state.targetFrameMs = Math.max(options.targetFrameMs ?? state.targetFrameMs, 0.1);
+        state.minQuality = minQuality;
+        state.maxQuality = maxQuality;
+        state.decreaseStep = Math.max(options.decreaseStep ?? state.decreaseStep, 0.001);
+        state.increaseStep = Math.max(options.increaseStep ?? state.increaseStep, 0.001);
+        state.currentQuality = BatchedRenderer.clamp(state.currentQuality, state.minQuality, state.maxQuality);
+        state.enabled = true;
+        this.lastAppliedQuality = Number.NaN;
+    }
+
+    disableAdaptivePerformance(resetQuality = true) {
+        this.adaptivePerformanceState.enabled = false;
+        if (resetQuality) {
+            this.adaptivePerformanceState.currentQuality = this.adaptivePerformanceState.maxQuality;
+            this.applyAdaptiveQuality();
+        }
+    }
+
+    getAdaptivePerformanceState(): AdaptivePerformanceState {
+        return {...this.adaptivePerformanceState};
+    }
+
+    private applyAdaptiveQuality() {
+        const quality = this.adaptivePerformanceState.currentQuality;
+        if (quality === this.lastAppliedQuality) {
+            return;
+        }
+        for (const ps of this.systemToBatchIndex.keys()) {
+            (ps as any).setQualityFactor?.(quality);
+        }
+        this.lastAppliedQuality = quality;
+    }
+
     update(delta: number) {
+        const adaptiveState = this.adaptivePerformanceState;
+        const frameStart = adaptiveState.enabled ? performance.now() : 0;
+        if (adaptiveState.enabled) {
+            this.applyAdaptiveQuality();
+        }
         for (const ps of this.systemToBatchIndex.keys()) {
             (ps as any).update(delta);
         }
         for (let i = 0; i < this.batches.length; i++) {
             this.batches[i].update();
+        }
+        if (!adaptiveState.enabled) {
+            return;
+        }
+
+        adaptiveState.lastFrameCpuMs = performance.now() - frameStart;
+        if (adaptiveState.lastFrameCpuMs > adaptiveState.targetFrameMs) {
+            adaptiveState.currentQuality = BatchedRenderer.clamp(
+                adaptiveState.currentQuality - adaptiveState.decreaseStep,
+                adaptiveState.minQuality,
+                adaptiveState.maxQuality
+            );
+        } else {
+            adaptiveState.currentQuality = BatchedRenderer.clamp(
+                adaptiveState.currentQuality + adaptiveState.increaseStep,
+                adaptiveState.minQuality,
+                adaptiveState.maxQuality
+            );
         }
     }
 

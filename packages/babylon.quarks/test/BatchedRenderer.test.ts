@@ -59,4 +59,37 @@ describe('BatchedRenderer', () => {
 
         expect(renderer.batches.length).toBe(2);
     });
+
+    it('adapts quality factor when frame budget is exceeded', () => {
+        const renderer = new BatchedRenderer('batcher-adaptive', scene);
+        const a = createSystem();
+        const b = createSystem();
+        renderer.addSystem(a);
+        renderer.addSystem(b);
+
+        const qualitySpyA = jest.spyOn(a as any, 'setQualityFactor');
+        const qualitySpyB = jest.spyOn(b as any, 'setQualityFactor');
+        renderer.configureAdaptivePerformance({
+            targetFrameMs: 0.1,
+            minQuality: 0.4,
+            maxQuality: 1,
+            decreaseStep: 0.2,
+            increaseStep: 0.01,
+        });
+
+        renderer.update(1 / 60);
+        renderer.update(1 / 60);
+        const state = renderer.getAdaptivePerformanceState();
+
+        expect(state.enabled).toBe(true);
+        expect(state.currentQuality).toBeLessThan(1);
+        expect(state.currentQuality).toBeGreaterThanOrEqual(0.4);
+        expect(qualitySpyA).toHaveBeenCalled();
+        expect(qualitySpyB).toHaveBeenCalled();
+
+        renderer.disableAdaptivePerformance();
+        const disabledState = renderer.getAdaptivePerformanceState();
+        expect(disabledState.enabled).toBe(false);
+        expect(disabledState.currentQuality).toBe(1);
+    });
 });

@@ -206,6 +206,7 @@ export class ParticleSystem implements IParticleSystem {
     private listeners: {[event: string]: Array<(event: ParticleSystemEvent) => void>} = {};
     private readonly layerMaskProxy: {mask: number};
     private materialRef: any = null;
+    private qualityFactor = 1;
     /** @internal **/
     _renderer?: BatchedRenderer;
 
@@ -534,6 +535,10 @@ export class ParticleSystem implements IParticleSystem {
     play() { this.paused = false; }
     stop() { this.restart(); this.pause(); }
 
+    setQualityFactor(qualityFactor: number) {
+        this.qualityFactor = Math.max(0.1, Math.min(1, qualityFactor));
+    }
+
     private spawn(count: number, emissionState: EmissionState, matrix: Matrix4) {
         tempQ.setFromRotationMatrix(matrix);
         const translation = tempV;
@@ -777,6 +782,7 @@ export class ParticleSystem implements IParticleSystem {
         this.normalMatrix.getNormalMatrix(emitterMatrix);
         const emissionBursts = this.emissionBursts;
         const emissionBurstCount = emissionBursts.length;
+        const qualityFactor = this.qualityFactor;
 
         const totalSpawn = Math.ceil(emissionState.waitEmiting);
         this.spawn(totalSpawn, emissionState, emitterMatrix);
@@ -788,7 +794,8 @@ export class ParticleSystem implements IParticleSystem {
         ) {
             const burst = emissionBursts[emissionState.burstIndex];
             if (Math.random() < burst.probability) {
-                const count = burst.count.genValue(this.memory, this.time);
+                const rawCount = burst.count.genValue(this.memory, this.time);
+                const count = qualityFactor >= 0.999 ? rawCount : Math.floor(rawCount * qualityFactor);
                 emissionState.isBursting = true;
                 emissionState.burstParticleCount = count;
                 this.spawn(count, emissionState, emitterMatrix);
@@ -799,13 +806,13 @@ export class ParticleSystem implements IParticleSystem {
 
         if (!this.emitEnded) {
             const timeRatio = emissionState.time / this.duration;
-            emissionState.waitEmiting += delta * this.emissionOverTime.genValue(this.memory, timeRatio);
+            emissionState.waitEmiting += delta * this.emissionOverTime.genValue(this.memory, timeRatio) * qualityFactor;
 
             const previousWorldPos = emissionState.previousWorldPos;
             if (previousWorldPos !== undefined) {
                 this.temp.set(emitterMatrix.elements[12], emitterMatrix.elements[13], emitterMatrix.elements[14]);
                 emissionState.travelDistance += previousWorldPos.distanceTo(this.temp);
-                const emitPerMeter = this.emissionOverDistance.genValue(this.memory, timeRatio);
+                const emitPerMeter = this.emissionOverDistance.genValue(this.memory, timeRatio) * qualityFactor;
                 if (emissionState.travelDistance * emitPerMeter > 0) {
                     const count = Math.floor(emissionState.travelDistance * emitPerMeter);
                     emissionState.travelDistance -= count / emitPerMeter;

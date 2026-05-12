@@ -374,4 +374,37 @@ describe('ParticleSystem', () => {
         expect((restored.rendererEmitterSettings as any).speedFactor).toBe(0.75);
         expect(restored.getRendererSettings().instancingIndices).toBeInstanceOf(Uint16Array);
     });
+
+    it('should reduce emitted particles when quality factor is lowered', () => {
+        const highQuality = new ParticleSystem({
+            scene,
+            duration: 5,
+            looping: true,
+            startLife: new ConstantValue(2),
+            startSpeed: new ConstantValue(0),
+            startSize: new ConstantValue(1),
+            startColor: new ConstantColor(new Vector4(1, 1, 1, 1)),
+            emissionOverTime: new ConstantValue(100),
+            shape: new PointEmitter(),
+        });
+        const lowQuality = new ParticleSystem({
+            scene,
+            duration: 5,
+            looping: true,
+            startLife: new ConstantValue(2),
+            startSpeed: new ConstantValue(0),
+            startSize: new ConstantValue(1),
+            startColor: new ConstantColor(new Vector4(1, 1, 1, 1)),
+            emissionOverTime: new ConstantValue(100),
+            shape: new PointEmitter(),
+        });
+        lowQuality.setQualityFactor(0.25);
+
+        highQuality.emit(0.5, highQuality.emissionState, highQuality.emitter.matrixWorld);
+        highQuality.emit(0.5, highQuality.emissionState, highQuality.emitter.matrixWorld);
+        lowQuality.emit(0.5, lowQuality.emissionState, lowQuality.emitter.matrixWorld);
+        lowQuality.emit(0.5, lowQuality.emissionState, lowQuality.emitter.matrixWorld);
+
+        expect(lowQuality.particleNum).toBeLessThan(highQuality.particleNum);
+    });
 });
