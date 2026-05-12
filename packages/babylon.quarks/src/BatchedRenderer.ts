@@ -7,6 +7,13 @@ import {VFXBatch, RenderMode, StoredBatchSettings} from './VFXBatch';
 import {SpriteBatch} from './SpriteBatch';
 import {TrailBatch} from './TrailBatch';
 import {ParticleSystem} from './ParticleSystem';
+import {
+    resolveSimulationBackend,
+    SimulationBackend,
+    SimulationBackendAdapter,
+    SimulationBackendDiagnostics,
+    SimulationBackendState,
+} from './SimulationBackends';
 
 export interface VFXBatchSettings {
     instancingGeometry: Float32Array;
@@ -44,6 +51,10 @@ export interface AdaptivePerformanceState extends AdaptivePerformanceOptions {
     lastFrameCpuMs: number;
 }
 
+export interface BatchedRendererOptions {
+    simulationBackend?: SimulationBackend;
+}
+
 export class BatchedRenderer extends TransformNode {
     batches: Array<VFXBatch> = [];
     systemToBatchIndex: Map<IParticleSystem, number> = new Map<IParticleSystem, number>();
@@ -59,9 +70,17 @@ export class BatchedRenderer extends TransformNode {
         lastFrameCpuMs: 0,
     };
     private lastAppliedQuality = Number.NaN;
+    private simulationBackendAdapter: SimulationBackendAdapter;
+    private simulationBackendState: SimulationBackendState = {
+        requestedBackend: SimulationBackend.CPU,
+        activeBackend: SimulationBackend.CPU,
+    };
 
-    constructor(name: string, scene: Scene) {
+    constructor(name: string, scene: Scene, options: BatchedRendererOptions = {}) {
         super(name, scene);
+        const backendResolution = resolveSimulationBackend(scene, options.simulationBackend ?? SimulationBackend.CPU);
+        this.simulationBackendAdapter = backendResolution.adapter;
+        this.simulationBackendState = backendResolution.state;
     }
 
     private static clamp(value: number, min: number, max: number): number {
@@ -173,6 +192,20 @@ export class BatchedRenderer extends TransformNode {
         return {...this.adaptivePerformanceState};
     }
 
+    setSimulationBackend(simulationBackend: SimulationBackend) {
+        const backendResolution = resolveSimulationBackend(this.getScene(), simulationBackend);
+        this.simulationBackendAdapter = backendResolution.adapter;
+        this.simulationBackendState = backendResolution.state;
+    }
+
+    getSimulationBackendState(): SimulationBackendState {
+        return {...this.simulationBackendState};
+    }
+
+    getSimulationBackendDiagnostics(): SimulationBackendDiagnostics {
+        return this.simulationBackendAdapter.getDiagnostics();
+    }
+
     private applyAdaptiveQuality() {
         const quality = this.adaptivePerformanceState.currentQuality;
         if (quality === this.lastAppliedQuality) {
@@ -190,9 +223,7 @@ export class BatchedRenderer extends TransformNode {
         if (adaptiveState.enabled) {
             this.applyAdaptiveQuality();
         }
-        for (const ps of this.systemToBatchIndex.keys()) {
-            (ps as any).update(delta);
-        }
+        this.simulationBackendAdapter.updateSystems(this.systemToBatchIndex.keys(), delta);
         for (let i = 0; i < this.batches.length; i++) {
             this.batches[i].update();
         }
