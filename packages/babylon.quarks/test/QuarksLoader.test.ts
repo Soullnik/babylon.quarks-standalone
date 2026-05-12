@@ -412,4 +412,86 @@ describe('QuarksLoader matrix decomposition', () => {
         scene.dispose();
         engine.dispose();
     });
+
+    it('parses sphere and plain buffer geometry variants', () => {
+        const engine = new NullEngine();
+        const scene = new Scene(engine);
+        const loader = new QuarksLoader(scene);
+
+        const root = loader.parse({
+            geometries: [
+                {
+                    uuid: 'sphere-1',
+                    type: 'SphereGeometry',
+                    radius: 1,
+                    widthSegments: 8,
+                    heightSegments: 6,
+                    thetaStart: 0.25,
+                    thetaLength: Math.PI * 0.75,
+                },
+                {
+                    uuid: 'buffer-1',
+                    type: 'BufferGeometry',
+                    data: {
+                        attributes: {
+                            position: {array: [0, 0, 0, 1, 0, 0, 0, 1, 0]},
+                            uv: {array: [0, 0, 1, 0, 0, 1]},
+                            normal: {array: [0, 0, 1, 0, 0, 1, 0, 0, 1]},
+                        },
+                        index: {type: 'Uint32Array', array: [0, 1, 2]},
+                    },
+                },
+            ],
+            object: {
+                uuid: 'root',
+                type: 'Group',
+                children: [
+                    {uuid: 'mesh-sphere', type: 'Mesh', name: 'mesh-sphere', geometry: 'sphere-1'},
+                    {uuid: 'mesh-buffer', type: 'Mesh', name: 'mesh-buffer', geometry: 'buffer-1'},
+                ],
+            },
+        });
+
+        const sphereMesh = root.getChildren().find((node) => node.name === 'mesh-sphere') as Mesh;
+        const bufferMesh = root.getChildren().find((node) => node.name === 'mesh-buffer') as Mesh;
+        expect(sphereMesh.getTotalVertices()).toBeGreaterThan(0);
+        expect(sphereMesh.getIndices()?.length).toBeGreaterThan(0);
+        expect(bufferMesh.getTotalVertices()).toBe(3);
+        expect(bufferMesh.getIndices()?.length).toBe(3);
+
+        scene.dispose();
+        engine.dispose();
+    });
+
+    it('handles placeholder branches for missing particle system data and unknown types', () => {
+        const engine = new NullEngine();
+        const scene = new Scene(engine);
+        const loader = new QuarksLoader(scene);
+
+        const root = loader.parse({
+            object: {
+                uuid: 'root',
+                type: 'Group',
+                children: [
+                    {uuid: 'empty-emitter', type: 'ParticleEmitter', name: 'empty-emitter'},
+                    {uuid: 'rot-node', type: 'Object3D', name: 'rot-node', rotation: [0.1, 0.2, 0.3]},
+                    {uuid: 'quat-node', type: 'Object3D', name: 'quat-node', quaternion: [0, 0, 0, 1]},
+                    {uuid: 'mystery-node', type: 'SomeUnknownType', name: 'mystery-node'},
+                ],
+            },
+        });
+
+        const emptyEmitter = root.getChildren().find((node) => node.name === 'empty-emitter') as any;
+        const mystery = root.getChildren().find((node) => node.name === 'mystery-node') as any;
+        const rotNode = root.getChildren().find((node) => node.name === 'rot-node') as any;
+        const quatNode = root.getChildren().find((node) => node.name === 'quat-node') as any;
+
+        expect(emptyEmitter.quarksOriginalType).toBe('ParticleEmitter');
+        expect(mystery).toBeDefined();
+        expect(rotNode.rotation.x).toBeCloseTo(0.1, 5);
+        expect(quatNode.rotationQuaternion).not.toBeNull();
+
+        scene.dispose();
+        engine.dispose();
+    });
 });

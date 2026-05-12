@@ -97,4 +97,50 @@ describe('QuarksPrefab', () => {
         const json = prefab.toJSON();
         expect(json.animationData[0].clipUUID).toBe('clip-uuid');
     });
+
+    it('supports clip-only animations and removeAnimation bookkeeping', () => {
+        const prefab = new QuarksPrefab('prefab-clip-only', scene);
+        const target = new TransformNode('clip-target', scene);
+        const clip = {uuid: 'clip-main', duration: 2, play: jest.fn(), stop: jest.fn(), pause: jest.fn()};
+        prefab.addThreeAnimation(target, clip, 0.5, 0, false);
+        expect(prefab.getDuration()).toBe(2.5);
+
+        prefab.removeAnimation(0);
+        expect(prefab.animationData.length).toBe(0);
+        expect(prefab.getDuration()).toBe(0);
+    });
+
+    it('loops particle and three animations on active window exits', () => {
+        const system = new ParticleSystem({scene, startLife: new ConstantValue(1), emissionOverTime: new ConstantValue(1)});
+        const emitter = system.emitter as ParticleEmitter;
+        const clip = {duration: 0.4, play: jest.fn(), stop: jest.fn(), pause: jest.fn(), setTime: jest.fn()};
+        const target = new TransformNode('loop-target', scene);
+        const prefab = new QuarksPrefab('prefab-loop', scene);
+
+        prefab.addParticleSystemAnimation(emitter, 0, 0.2, true);
+        prefab.addThreeAnimation(target, clip, 0, 0.2, true);
+        const restartSpy = jest.spyOn(system, 'restart');
+
+        prefab.play();
+        prefab.update(0.05);
+        prefab.update(0.3);
+
+        expect(restartSpy).toHaveBeenCalled();
+        expect(clip.play).toHaveBeenCalledTimes(2);
+    });
+
+    it('pauses and stops three timeline clips when no particle target is active', () => {
+        const target = new TransformNode('pause-stop-target', scene);
+        const clip = {duration: 1, play: jest.fn(), stop: jest.fn(), pause: jest.fn(), setTime: jest.fn()};
+        const prefab = new QuarksPrefab('prefab-stop-three', scene);
+        prefab.addThreeAnimation(target, clip, 0, 1, false);
+
+        prefab.play();
+        prefab.pause();
+        expect(clip.pause).toHaveBeenCalled();
+
+        prefab.play();
+        prefab.stop();
+        expect(clip.stop).toHaveBeenCalled();
+    });
 });
