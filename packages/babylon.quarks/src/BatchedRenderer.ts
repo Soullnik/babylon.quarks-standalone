@@ -116,9 +116,9 @@ export class BatchedRenderer extends TransformNode {
     }
 
     update(delta: number) {
-        this.systemToBatchIndex.forEach((_value, ps) => {
+        for (const ps of this.systemToBatchIndex.keys()) {
             (ps as any).update(delta);
-        });
+        }
         for (let i = 0; i < this.batches.length; i++) {
             this.batches[i].update();
         }

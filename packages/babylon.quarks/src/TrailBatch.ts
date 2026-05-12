@@ -61,7 +61,7 @@ export class TrailBatch extends VFXBatch {
         this.mesh.setVerticesData(VertexBuffer.PositionKind, this.positionBuffer, true);
         this.mesh.setVerticesData(VertexBuffer.UVKind, this.uvBuffer, true);
         this.mesh.setVerticesData(VertexBuffer.ColorKind, this.colorBuffer, true, 4);
-        this.mesh.setIndices(Array.from(this.indexBuffer.subarray(0, 6)), null, true);
+        this.mesh.setIndices(this.indexBuffer.subarray(0, 6), null, true);
         const engine = this.scene.getEngine();
         this.previousVB = new VertexBuffer(engine, this.previousBuffer, 'previous', true, false, 3, false);
         this.nextVB = new VertexBuffer(engine, this.nextBuffer, 'next', true, false, 3, false);
@@ -185,34 +185,34 @@ export class TrailBatch extends VFXBatch {
             const vTileCount = this.settings.vTileCount;
             const tileWidth = 1 / uTileCount;
             const tileHeight = 1 / vTileCount;
+            const systemWorldSpace = system.worldSpace;
+            const objectScale = (Math.abs(scale.x) + Math.abs(scale.y) + Math.abs(scale.z)) / 3;
 
             for (let j = 0; j < particleNum; j++) {
                 const particle = particles[j] as TrailParticle;
+                const particleHistory = particle.previous;
+                const particleHistoryLength = particleHistory.length;
+                if (particleHistoryLength === 0) {
+                    continue;
+                }
                 const col = particle.uvTile % vTileCount;
                 const row = Math.floor(particle.uvTile / vTileCount + 0.001);
+                const particleMatrix = particle.parentMatrix as unknown as Matrix4 | undefined;
+                const matrixToUse = particleMatrix ?? system.emitter.matrixWorld;
 
-                const iter = particle.previous.values();
-                let curIter = iter.next();
-                let previous: RecordState = curIter.value as RecordState;
-                let current: RecordState = previous;
-                if (!curIter.done) curIter = iter.next();
-                let next: RecordState;
-                if (curIter.value !== undefined) {
-                    next = curIter.value as RecordState;
-                } else {
-                    next = current;
-                }
+                let previousNode = particleHistory.head;
+                let currentNode = previousNode;
+                let nextNode = currentNode?.next ?? currentNode;
 
-                for (let i = 0; i < particle.previous.length; i++, index += 2) {
+                for (let i = 0; i < particleHistoryLength; i++, index += 2) {
+                    const previous = previousNode!.data as RecordState;
+                    const current = currentNode!.data as RecordState;
+                    const next = nextNode!.data as RecordState;
                     let pos: Vector3;
-                    if (system.worldSpace) {
+                    if (systemWorldSpace) {
                         pos = current.position;
                     } else {
-                        if (particle.parentMatrix) {
-                            this.vector_.copy(current.position).applyMatrix4(particle.parentMatrix as unknown as Matrix4);
-                        } else {
-                            this.vector_.copy(current.position).applyMatrix4(system.emitter.matrixWorld);
-                        }
+                        this.vector_.copy(current.position).applyMatrix4(matrixToUse);
                         pos = this.vector_;
                     }
                     const pi = index * 3;
@@ -224,14 +224,10 @@ export class TrailBatch extends VFXBatch {
                     this.positionBuffer[pi + 5] = pos.z;
 
                     let prevPos: Vector3;
-                    if (system.worldSpace) {
+                    if (systemWorldSpace) {
                         prevPos = previous.position;
                     } else {
-                        if (particle.parentMatrix) {
-                            this.vector_.copy(previous.position).applyMatrix4(particle.parentMatrix as unknown as Matrix4);
-                        } else {
-                            this.vector_.copy(previous.position).applyMatrix4(system.emitter.matrixWorld);
-                        }
+                        this.vector_.copy(previous.position).applyMatrix4(matrixToUse);
                         prevPos = this.vector_;
                     }
                     this.previousBuffer[pi] = prevPos.x;
@@ -242,14 +238,10 @@ export class TrailBatch extends VFXBatch {
                     this.previousBuffer[pi + 5] = prevPos.z;
 
                     let nextPos: Vector3;
-                    if (system.worldSpace) {
+                    if (systemWorldSpace) {
                         nextPos = next.position;
                     } else {
-                        if (particle.parentMatrix) {
-                            this.vector_.copy(next.position).applyMatrix4(particle.parentMatrix as unknown as Matrix4);
-                        } else {
-                            this.vector_.copy(next.position).applyMatrix4(system.emitter.matrixWorld);
-                        }
+                        this.vector_.copy(next.position).applyMatrix4(matrixToUse);
                         nextPos = this.vector_;
                     }
                     this.nextBuffer[pi] = nextPos.x;
@@ -262,19 +254,18 @@ export class TrailBatch extends VFXBatch {
                     this.sideBuffer[index] = 1;
                     this.sideBuffer[index + 1] = -1;
 
-                    if (system.worldSpace || particle.parentMatrix) {
+                    if (systemWorldSpace || particle.parentMatrix) {
                         this.widthBuffer[index] = current.size;
                         this.widthBuffer[index + 1] = current.size;
                     } else {
-                        const objectScale = (Math.abs(scale.x) + Math.abs(scale.y) + Math.abs(scale.z)) / 3;
                         this.widthBuffer[index] = current.size * objectScale;
                         this.widthBuffer[index + 1] = current.size * objectScale;
                     }
 
                     const ui = index * 2;
-                    this.uvBuffer[ui] = (i / particle.previous.length + col) * tileWidth;
+                    this.uvBuffer[ui] = (i / particleHistoryLength + col) * tileWidth;
                     this.uvBuffer[ui + 1] = (vTileCount - row - 1) * tileHeight;
-                    this.uvBuffer[ui + 2] = (i / particle.previous.length + col) * tileWidth;
+                    this.uvBuffer[ui + 2] = (i / particleHistoryLength + col) * tileWidth;
                     this.uvBuffer[ui + 3] = (vTileCount - row) * tileHeight;
 
                     const cci = index * 4;
@@ -287,7 +278,7 @@ export class TrailBatch extends VFXBatch {
                     this.colorBuffer[cci + 6] = current.color.z;
                     this.colorBuffer[cci + 7] = current.color.w;
 
-                    if (i + 1 < particle.previous.length) {
+                    if (i + 1 < particleHistoryLength) {
                         this.indexBuffer[triangles * 3] = index;
                         this.indexBuffer[triangles * 3 + 1] = index + 1;
                         this.indexBuffer[triangles * 3 + 2] = index + 2;
@@ -298,14 +289,9 @@ export class TrailBatch extends VFXBatch {
                         triangles++;
                     }
 
-                    previous = current;
-                    current = next;
-                    if (!curIter.done) {
-                        curIter = iter.next();
-                        if (curIter.value !== undefined) {
-                            next = curIter.value as RecordState;
-                        }
-                    }
+                    previousNode = currentNode;
+                    currentNode = nextNode;
+                    nextNode = nextNode?.next ?? nextNode;
                 }
             }
         }
@@ -313,7 +299,7 @@ export class TrailBatch extends VFXBatch {
         if (index > 0 && triangles > 0) {
             this.mesh.updateVerticesData(VertexBuffer.PositionKind, this.positionBuffer);
             this.mesh.updateVerticesData(VertexBuffer.UVKind, this.uvBuffer);
-            this.mesh.updateIndices(Array.from(this.indexBuffer.subarray(0, triangles * 3)));
+            this.mesh.updateIndices(this.indexBuffer.subarray(0, triangles * 3));
             this.previousVB.update(this.previousBuffer);
             this.nextVB.update(this.nextBuffer);
             this.sideVB.update(this.sideBuffer);
