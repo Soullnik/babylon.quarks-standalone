@@ -125,7 +125,7 @@ describe('SpriteBatch', () => {
         const material = batch.mesh.material as ShaderMaterial;
         expect(velocityBuffer[0]).toBeCloseTo(0.003, 6);
         expect(velocityBuffer[3]).toBe(3);
-        expect(material.getFloat('speedFactor')).toBe(0.001);
+        expect((material as any)._floats.speedFactor).toBe(0.001);
 
         renderer.dispose();
         system.dispose();
