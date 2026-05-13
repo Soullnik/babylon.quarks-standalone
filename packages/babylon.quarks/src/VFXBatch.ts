@@ -81,7 +81,13 @@ export abstract class VFXBatch {
     }
 
     getVisibleSystems(): IParticleSystem[] {
-        return Array.from(this.systems).filter((system) => system.emitter.visible);
+        const visibleSystems: IParticleSystem[] = [];
+        for (const system of this.systems) {
+            if (system.emitter.visible) {
+                visibleSystems.push(system);
+            }
+        }
+        return visibleSystems;
     }
 
     applyDepthTexture(depthTexture: BaseTexture | null): void {

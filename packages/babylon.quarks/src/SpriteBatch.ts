@@ -111,6 +111,7 @@ export class SpriteBatch extends VFXBatch {
 
     rebuildMaterial(): void {
         const shaderName = `quarksParticle_${this.settings.renderMode}_${Date.now()}`;
+        this.lastStretchedSpeedFactor = Number.NaN;
         let vertexShader: string;
         let fragmentShader: string;
         const defines: string[] = [];
@@ -247,10 +248,14 @@ export class SpriteBatch extends VFXBatch {
     private quaternion3_ = new Quaternion();
     private rotationMat_ = new Matrix3();
     private rotationMat2_ = new Matrix3();
+    private lastStretchedSpeedFactor = Number.NaN;
 
     update(): void {
         let index = 0;
         let particleCount = 0;
+        const renderMode = this.settings.renderMode;
+        const isMeshRender = renderMode === RenderMode.Mesh;
+        const isStretchedRender = renderMode === RenderMode.StretchedBillBoard;
 
         const visibleSystems = this.getVisibleSystems();
         for (const system of visibleSystems) {
@@ -266,15 +271,19 @@ export class SpriteBatch extends VFXBatch {
             const rotation = this.quaternion2_;
             const translation = this.vector2_;
             const scale = this.vector3_;
+            const systemWorldSpace = system.worldSpace;
             system.emitter.matrixWorld.decompose(translation, rotation, scale);
             this.rotationMat_.setFromMatrix4(system.emitter.matrixWorld);
+            const absScaleX = Math.abs(scale.x);
+            const absScaleY = Math.abs(scale.y);
+            const absScaleZ = Math.abs(scale.z);
 
             for (let j = 0; j < particleNum; j++, index++) {
                 const particle = particles[j] as SpriteParticle;
 
-                if (this.settings.renderMode === RenderMode.Mesh) {
+                if (isMeshRender) {
                     let q: Quaternion;
-                    if (system.worldSpace) {
+                    if (systemWorldSpace) {
                         q = particle.rotation as Quaternion;
                     } else {
                         let parentQ: Quaternion;
@@ -296,7 +305,7 @@ export class SpriteBatch extends VFXBatch {
                 }
 
                 let vec: Vector3;
-                if (system.worldSpace) {
+                if (systemWorldSpace) {
                     vec = particle.position;
                 } else {
                     vec = this.vector_;
@@ -319,7 +328,7 @@ export class SpriteBatch extends VFXBatch {
                 this.colorBuffer[ci + 3] = particle.color.w;
 
                 const si = index * 3;
-                if (system.worldSpace) {
+                if (systemWorldSpace) {
                     this.sizeBuffer[si] = particle.size.x;
                     this.sizeBuffer[si + 1] = particle.size.y;
                     this.sizeBuffer[si + 2] = particle.size.z;
@@ -329,20 +338,20 @@ export class SpriteBatch extends VFXBatch {
                         this.sizeBuffer[si + 1] = particle.size.y;
                         this.sizeBuffer[si + 2] = particle.size.z;
                     } else {
-                        this.sizeBuffer[si] = particle.size.x * Math.abs(scale.x);
-                        this.sizeBuffer[si + 1] = particle.size.y * Math.abs(scale.y);
-                        this.sizeBuffer[si + 2] = particle.size.z * Math.abs(scale.z);
+                        this.sizeBuffer[si] = particle.size.x * absScaleX;
+                        this.sizeBuffer[si + 1] = particle.size.y * absScaleY;
+                        this.sizeBuffer[si + 2] = particle.size.z * absScaleZ;
                     }
                 }
 
                 this.uvTileBuffer[index] = particle.uvTile;
 
-                if (this.settings.renderMode === RenderMode.StretchedBillBoard && this.velocityBuffer) {
+                if (isStretchedRender && this.velocityBuffer) {
                     let speedFactor = (system.rendererEmitterSettings as StretchedBillBoardSettings).speedFactor;
                     if (speedFactor === 0) speedFactor = 0.001;
                     const lengthFactor = (system.rendererEmitterSettings as StretchedBillBoardSettings).lengthFactor;
                     let vel: Vector3;
-                    if (system.worldSpace) {
+                    if (systemWorldSpace) {
                         vel = particle.velocity;
                     } else {
                         vel = this.vector_;
@@ -362,9 +371,13 @@ export class SpriteBatch extends VFXBatch {
             }
         }
 
-        if (this.settings.renderMode === RenderMode.StretchedBillBoard && this.mesh.material instanceof ShaderMaterial && visibleSystems.length > 0) {
+        if (isStretchedRender && this.mesh.material instanceof ShaderMaterial && visibleSystems.length > 0) {
             const speedFactor = (visibleSystems[0].rendererEmitterSettings as StretchedBillBoardSettings).speedFactor ?? 1.0;
-            this.mesh.material.setFloat('speedFactor', speedFactor === 0 ? 0.001 : speedFactor);
+            const clampedSpeedFactor = speedFactor === 0 ? 0.001 : speedFactor;
+            if (clampedSpeedFactor !== this.lastStretchedSpeedFactor) {
+                this.mesh.material.setFloat('speedFactor', clampedSpeedFactor);
+                this.lastStretchedSpeedFactor = clampedSpeedFactor;
+            }
         }
 
         this.mesh.forcedInstanceCount = index;
@@ -376,7 +389,7 @@ export class SpriteBatch extends VFXBatch {
             this.colorVB.update(this.colorBuffer);
             this.uvTileVB.update(this.uvTileBuffer);
             this.rotationVB.update(this.rotationBuffer);
-            if (this.settings.renderMode === RenderMode.StretchedBillBoard && this.velocityVB && this.velocityBuffer) {
+            if (isStretchedRender && this.velocityVB && this.velocityBuffer) {
                 this.velocityVB.update(this.velocityBuffer);
             }
         }
