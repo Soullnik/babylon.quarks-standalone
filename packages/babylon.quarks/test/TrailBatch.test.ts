@@ -2,6 +2,7 @@ import {NullEngine} from '@babylonjs/core/Engines/nullEngine';
 import {Scene} from '@babylonjs/core/scene';
 import {Constants} from '@babylonjs/core/Engines/constants';
 import {ShaderMaterial} from '@babylonjs/core/Materials/shaderMaterial';
+import {RawTexture} from '@babylonjs/core/Materials/Textures/rawTexture';
 import {ConstantColor, ConstantValue, PointEmitter, Vector4} from 'quarks.core';
 import {BatchedRenderer} from '../src/BatchedRenderer';
 import {TrailBatch} from '../src/TrailBatch';
@@ -123,6 +124,43 @@ describe('TrailBatch', () => {
         expect(material.disableDepthWrite).toBe(false);
 
         renderer.dispose();
+        system.dispose();
+    });
+
+    it('includes USE_MAP define when trail uses a texture', () => {
+        const tex = RawTexture.CreateRGBTexture(new Uint8Array([255, 0, 0, 255]), 1, 1, scene);
+        const renderer = new BatchedRenderer('trail-texture', scene);
+        const system = createTrailSystem({texture: tex});
+        renderer.addSystem(system);
+        renderer.update(1 / 60);
+        const mat = getTrailBatch(renderer).mesh.material as ShaderMaterial;
+        expect((mat.options.defines as string[]).includes('USE_MAP')).toBe(true);
+        expect((mat as any)._textures.map).toBe(tex);
+        renderer.dispose();
+        system.dispose();
+        tex.dispose();
+    });
+
+    it('uses transparent blending mode for trail materials when configured', () => {
+        const renderer = new BatchedRenderer('trail-transparent', scene);
+        const system = createTrailSystem({transparent: true, blendMode: Constants.ALPHA_ADD});
+        renderer.addSystem(system);
+        renderer.update(1 / 60);
+        const mat = getTrailBatch(renderer).mesh.material as ShaderMaterial;
+        expect(mat.alphaMode).toBe(Constants.ALPHA_ADD);
+        renderer.dispose();
+        system.dispose();
+    });
+
+    it('disposes trail material safely', () => {
+        const renderer = new BatchedRenderer('trail-dispose', scene);
+        const system = createTrailSystem();
+        renderer.addSystem(system);
+        const batch = getTrailBatch(renderer);
+        const disposeSpy = jest.spyOn(batch.mesh.material!, 'dispose');
+        batch.dispose();
+        expect(disposeSpy).toHaveBeenCalled();
+        disposeSpy.mockRestore();
         system.dispose();
     });
 });

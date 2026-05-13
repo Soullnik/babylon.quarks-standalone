@@ -477,6 +477,7 @@ export class ParticleSystem implements IParticleSystem {
             layerMask?: number;
         } = {}
     ) {
+        /* istanbul ignore if -- rendererSettings is always assigned in the constructor before any code path can call this private method */
         if (!this.rendererSettings) {
             return;
         }

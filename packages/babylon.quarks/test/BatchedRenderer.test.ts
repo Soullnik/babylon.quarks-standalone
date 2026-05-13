@@ -1,10 +1,13 @@
 import {NullEngine} from '@babylonjs/core/Engines/nullEngine';
 import {Scene} from '@babylonjs/core/scene';
 import {Constants} from '@babylonjs/core/Engines/constants';
+import {RawTexture} from '@babylonjs/core/Materials/Textures/rawTexture';
 import {ConstantColor, ConstantValue, PointEmitter, Vector4} from 'quarks.core';
 import {BatchedRenderer} from '../src/BatchedRenderer';
 import {ParticleSystem} from '../src/ParticleSystem';
 import {RenderMode} from '../src/VFXBatch';
+import {TrailBatch} from '../src/TrailBatch';
+import {SpriteBatch} from '../src/SpriteBatch';
 
 describe('BatchedRenderer', () => {
     let engine: NullEngine;
@@ -91,5 +94,181 @@ describe('BatchedRenderer', () => {
         const disabledState = renderer.getAdaptivePerformanceState();
         expect(disabledState.enabled).toBe(false);
         expect(disabledState.currentQuality).toBe(1);
+    });
+
+    it('creates TrailBatch for trail render mode and updates', () => {
+        const renderer = new BatchedRenderer('batcher-trail', scene);
+        const system = new ParticleSystem({
+            scene,
+            duration: 2,
+            looping: true,
+            startLife: new ConstantValue(2),
+            startSpeed: new ConstantValue(0),
+            startSize: new ConstantValue(1),
+            startColor: new ConstantColor(new Vector4(1, 1, 1, 1)),
+            emissionOverTime: new ConstantValue(50),
+            shape: new PointEmitter(),
+            renderMode: RenderMode.Trail,
+            rendererEmitterSettings: {
+                startLength: new ConstantValue(6),
+                followLocalOrigin: false,
+            },
+        });
+        renderer.addSystem(system);
+        expect(renderer.batches[0]).toBeInstanceOf(TrailBatch);
+        renderer.update(1 / 60);
+        expect(renderer.batches.length).toBe(1);
+        renderer.dispose();
+        system.dispose();
+    });
+
+    it('throws for unsupported render mode when adding a system', () => {
+        const renderer = new BatchedRenderer('batcher-bad-mode', scene);
+        const system = createSystem();
+        (system as any).rendererSettings.renderMode = 99;
+        expect(() => renderer.addSystem(system)).toThrow(/Unsupported render mode/);
+        renderer.dispose();
+        system.dispose();
+    });
+
+    it('applies depth texture to new batches and via setDepthTexture', () => {
+        const depthTex = RawTexture.CreateLuminanceTexture(new Uint8Array([255]), 1, 1, scene);
+        const renderer = new BatchedRenderer('batcher-depth', scene);
+        const system = createSystem();
+        const onCreateSpy = jest.spyOn(SpriteBatch.prototype, 'applyDepthTexture');
+        renderer.depthTexture = depthTex;
+        renderer.addSystem(system);
+        expect(onCreateSpy).toHaveBeenCalledWith(depthTex);
+
+        const batch = renderer.batches[0];
+        const spy = jest.spyOn(batch, 'applyDepthTexture');
+        renderer.setDepthTexture(depthTex);
+        expect(spy).toHaveBeenCalledWith(depthTex);
+        spy.mockRestore();
+        onCreateSpy.mockRestore();
+
+        const system2 = createSystem();
+        system2.blending = Constants.ALPHA_SUBTRACT;
+        renderer.addSystem(system2);
+        const secondBatch = renderer.batches.find((b) => b !== batch);
+        expect(secondBatch).toBeDefined();
+        const spy2 = jest.spyOn(secondBatch!, 'applyDepthTexture');
+        renderer.setDepthTexture(depthTex);
+        expect(spy2).toHaveBeenCalledWith(depthTex);
+
+        renderer.dispose();
+        system.dispose();
+        system2.dispose();
+        depthTex.dispose();
+    });
+
+    it('applies depth texture when depth is set before first batch is created', () => {
+        const depthTex = RawTexture.CreateLuminanceTexture(new Uint8Array([128]), 1, 1, scene);
+        const renderer = new BatchedRenderer('batcher-depth-order', scene);
+        renderer.depthTexture = depthTex;
+        const system = createSystem();
+        const batchSpy = jest.spyOn(TrailBatch.prototype, 'applyDepthTexture');
+        const trail = new ParticleSystem({
+            scene,
+            duration: 1,
+            looping: true,
+            startLife: new ConstantValue(1),
+            startSpeed: new ConstantValue(0),
+            startSize: new ConstantValue(1),
+            startColor: new ConstantColor(new Vector4(1, 1, 1, 1)),
+            emissionOverTime: new ConstantValue(0),
+            shape: new PointEmitter(),
+            renderMode: RenderMode.Trail,
+            rendererEmitterSettings: {startLength: new ConstantValue(4), followLocalOrigin: false},
+        });
+        renderer.addSystem(trail);
+        expect(batchSpy).toHaveBeenCalledWith(depthTex);
+        batchSpy.mockRestore();
+        renderer.dispose();
+        trail.dispose();
+        depthTex.dispose();
+    });
+
+    it('increases adaptive quality when frame stays under budget', () => {
+        let tick = 0;
+        const nowSpy = jest.spyOn(performance, 'now').mockImplementation(() => {
+            tick += 1;
+            return tick === 1 ? 1000 : 1000.2;
+        });
+        const renderer = new BatchedRenderer('batcher-adaptive-up', scene);
+        const system = createSystem();
+        renderer.addSystem(system);
+        renderer.configureAdaptivePerformance({
+            targetFrameMs: 50,
+            minQuality: 0.5,
+            maxQuality: 1,
+            decreaseStep: 0.1,
+            increaseStep: 0.05,
+        });
+        (renderer as any).adaptivePerformanceState.currentQuality = 0.5;
+        renderer.update(1 / 60);
+        expect(renderer.getAdaptivePerformanceState().currentQuality).toBeGreaterThan(0.5);
+        nowSpy.mockRestore();
+        renderer.dispose();
+        system.dispose();
+    });
+
+    it('disableAdaptivePerformance without reset leaves quality unchanged', () => {
+        const renderer = new BatchedRenderer('batcher-adaptive-no-reset', scene);
+        const system = createSystem();
+        renderer.addSystem(system);
+        renderer.configureAdaptivePerformance({targetFrameMs: 0.1, minQuality: 0.2, maxQuality: 1});
+        const q = renderer.getAdaptivePerformanceState().currentQuality;
+        renderer.disableAdaptivePerformance(false);
+        expect(renderer.getAdaptivePerformanceState().enabled).toBe(false);
+        expect(renderer.getAdaptivePerformanceState().currentQuality).toBe(q);
+        renderer.dispose();
+        system.dispose();
+    });
+
+    it('skips redundant adaptive quality application when quality is unchanged', () => {
+        const renderer = new BatchedRenderer('batcher-adaptive-skip', scene);
+        const system = createSystem();
+        renderer.addSystem(system);
+        renderer.configureAdaptivePerformance({targetFrameMs: 500, minQuality: 1, maxQuality: 1});
+        const spy = jest.spyOn(system as any, 'setQualityFactor');
+        renderer.update(1 / 60);
+        spy.mockClear();
+        (renderer as any).lastAppliedQuality = (renderer as any).adaptivePerformanceState.currentQuality;
+        renderer.update(1 / 60);
+        expect(spy).not.toHaveBeenCalled();
+        spy.mockRestore();
+        renderer.dispose();
+        system.dispose();
+    });
+
+    it('configureAdaptivePerformance clamps inverted min/max and tiny target frame budgets', () => {
+        const renderer = new BatchedRenderer('cfg-edge', scene);
+        const system = new ParticleSystem({
+            scene,
+            startLife: new ConstantValue(1),
+            emissionOverTime: new ConstantValue(0),
+        });
+        renderer.addSystem(system);
+        renderer.configureAdaptivePerformance({
+            minQuality: 2,
+            maxQuality: 0.1,
+            targetFrameMs: 0.01,
+            decreaseStep: 0.0001,
+            increaseStep: 0.0001,
+        });
+        const st = renderer.getAdaptivePerformanceState();
+        expect(st.minQuality).toBeLessThanOrEqual(st.maxQuality);
+        expect(st.targetFrameMs).toBeGreaterThanOrEqual(0.1);
+        renderer.dispose();
+        system.dispose();
+    });
+
+    it('deleteSystem ignores systems that were never registered', () => {
+        const renderer = new BatchedRenderer('del-unknown', scene);
+        const orphan = new ParticleSystem({scene, startLife: new ConstantValue(1), emissionOverTime: new ConstantValue(0)});
+        renderer.deleteSystem(orphan);
+        renderer.dispose();
+        orphan.dispose();
     });
 });

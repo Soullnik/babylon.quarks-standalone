@@ -27,4 +27,11 @@ describe('ParticleMaterials', () => {
         expect(material.isParticleMeshPhysicsMaterial).toBe(true);
         expect(material.metallic).toBeCloseTo(0.75);
     });
+
+    it('supports optional scene and empty parameter objects', () => {
+        const std = new ParticleMeshStandardMaterial('std-min');
+        expect(std.isParticleMeshStandardMaterial).toBe(true);
+        const phys = new ParticleMeshPhysicsMaterial('phys-min');
+        expect(phys.isParticleMeshPhysicsMaterial).toBe(true);
+    });
 });

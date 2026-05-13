@@ -4,10 +4,14 @@ import {Scene} from '@babylonjs/core/scene';
 import {Matrix, Quaternion, Vector3} from '@babylonjs/core/Maths/math.vector';
 import {Mesh} from '@babylonjs/core/Meshes/mesh';
 import {Texture} from '@babylonjs/core/Materials/Textures/texture';
+import {loadPlugin} from 'quarks.core';
 import {QuarksLoader} from '../src/QuarksLoader';
 import {QuarksPrefab} from '../src/QuarksPrefab';
 import {ParticleEmitter} from '../src/ParticleEmitter';
 import {ParticleSystem} from '../src/ParticleSystem';
+import {MeshSurfaceEmitterPlugin} from '../src/MeshSurfaceEmitter';
+
+loadPlugin(MeshSurfaceEmitterPlugin);
 
 describe('QuarksLoader matrix decomposition', () => {
     it('preserves translation, rotation and scale from matrix', () => {
@@ -491,6 +495,142 @@ describe('QuarksLoader matrix decomposition', () => {
         expect(rotNode.rotation.x).toBeCloseTo(0.1, 5);
         expect(quatNode.rotationQuaternion).not.toBeNull();
 
+        scene.dispose();
+        engine.dispose();
+    });
+
+    it('skips mesh_surface link when referenced node is not a Mesh', () => {
+        const engine = new NullEngine();
+        const scene = new Scene(engine);
+        const loader = new QuarksLoader(scene);
+
+        const root = loader.parse({
+            geometries: [{uuid: 'plane', type: 'PlaneGeometry', width: 1, height: 1}],
+            materials: [{uuid: 'mat', type: 'MeshBasicMaterial', transparent: true, blending: 1}],
+            object: {
+                uuid: 'root',
+                type: 'Group',
+                children: [
+                    {uuid: 'surface-node', type: 'Object3D', name: 'surface-node'},
+                    {
+                        uuid: 'emitter-ms',
+                        type: 'ParticleEmitter',
+                        ps: {
+                            version: '2.0',
+                            autoDestroy: false,
+                            looping: true,
+                            prewarm: false,
+                            duration: 1,
+                            shape: {type: 'mesh_surface', mesh: 'surface-node'},
+                            startLife: {type: 'ConstantValue', value: 1},
+                            startSpeed: {type: 'ConstantValue', value: 0},
+                            startRotation: {type: 'ConstantValue', value: 0},
+                            startSize: {type: 'ConstantValue', value: 1},
+                            startColor: {type: 'ConstantColor', color: {r: 1, g: 1, b: 1, a: 1}},
+                            emissionOverTime: {type: 'ConstantValue', value: 0},
+                            emissionOverDistance: {type: 'ConstantValue', value: 0},
+                            emissionBursts: [],
+                            onlyUsedByOther: false,
+                            instancingGeometry: 'plane',
+                            renderOrder: 0,
+                            renderMode: 0,
+                            rendererEmitterSettings: {},
+                            material: 'mat',
+                            layers: 1,
+                            startTileIndex: {type: 'ConstantValue', value: 0},
+                            uTileCount: 1,
+                            vTileCount: 1,
+                            behaviors: [],
+                            worldSpace: true,
+                        },
+                    },
+                ],
+            },
+        });
+
+        const emitter = root.getChildren()[1] as ParticleEmitter;
+        expect(emitter).toBeInstanceOf(ParticleEmitter);
+        expect(((emitter.system as ParticleSystem).emitterShape as any).type).toBe('mesh_surface');
+        expect(((emitter.system as ParticleSystem).emitterShape as any).mesh).toBeUndefined();
+
+        scene.dispose();
+        engine.dispose();
+    });
+
+    it('records null textures when image asset is missing and maps unknown wrap modes', () => {
+        const engine = new NullEngine();
+        const scene = new Scene(engine);
+        const loader = new QuarksLoader(scene);
+
+        const root = loader.parse({
+            textures: [
+                {uuid: 'ghost-tex', image: 'missing-image'},
+                {
+                    uuid: 'wrap-unknown',
+                    image: 'img-1',
+                    wrap: [4242, 4242],
+                    repeat: [1, 1],
+                },
+            ],
+            images: [{uuid: 'img-1', url: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=='}],
+            object: {uuid: 'root', type: 'Group', children: []},
+        });
+
+        expect(root).toBeDefined();
+        scene.dispose();
+        engine.dispose();
+    });
+
+    it('links mesh_surface emitter to concrete Mesh instances', () => {
+        const engine = new NullEngine();
+        const scene = new Scene(engine);
+        const loader = new QuarksLoader(scene);
+        const root = loader.parse({
+            geometries: [{uuid: 'plane', type: 'PlaneGeometry', width: 1, height: 1}],
+            materials: [{uuid: 'mat', type: 'MeshBasicMaterial', transparent: true, blending: 1}],
+            object: {
+                uuid: 'root',
+                type: 'Group',
+                children: [
+                    {uuid: 'surf-mesh', type: 'Mesh', name: 'surf-mesh', geometry: 'plane', material: 'mat'},
+                    {
+                        uuid: 'em-linked',
+                        type: 'ParticleEmitter',
+                        ps: {
+                            version: '2.0',
+                            autoDestroy: false,
+                            looping: true,
+                            prewarm: false,
+                            duration: 1,
+                            shape: {type: 'mesh_surface', mesh: 'surf-mesh'},
+                            startLife: {type: 'ConstantValue', value: 1},
+                            startSpeed: {type: 'ConstantValue', value: 0},
+                            startRotation: {type: 'ConstantValue', value: 0},
+                            startSize: {type: 'ConstantValue', value: 1},
+                            startColor: {type: 'ConstantColor', color: {r: 1, g: 1, b: 1, a: 1}},
+                            emissionOverTime: {type: 'ConstantValue', value: 0},
+                            emissionOverDistance: {type: 'ConstantValue', value: 0},
+                            emissionBursts: [],
+                            onlyUsedByOther: false,
+                            instancingGeometry: 'plane',
+                            renderOrder: 0,
+                            renderMode: 0,
+                            rendererEmitterSettings: {},
+                            material: 'mat',
+                            layers: 1,
+                            startTileIndex: {type: 'ConstantValue', value: 0},
+                            uTileCount: 1,
+                            vTileCount: 1,
+                            behaviors: [],
+                            worldSpace: true,
+                        },
+                    },
+                ],
+            },
+        });
+        const emitter = root.getChildren()[1] as ParticleEmitter;
+        const mesh = root.getChildren()[0] as Mesh;
+        expect(((emitter.system as ParticleSystem).emitterShape as any).mesh).toBe(mesh);
         scene.dispose();
         engine.dispose();
     });

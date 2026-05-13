@@ -25,6 +25,7 @@
     "build:js": "cross-env NODE_ENV=production rollup -c",
     "build": "npm run clean && npm run build:types && npm run build:js",
     "test": "jest",
+    "test:coverage": "jest --coverage",
     "prettier": "prettier --write --ignore-unknown **/*.ts"
   },
   "repository": {

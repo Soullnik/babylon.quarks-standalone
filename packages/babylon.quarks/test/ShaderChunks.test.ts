@@ -8,4 +8,12 @@ describe('shader chunks registry', () => {
         expect(getShaderChunk('soft_fragment')).toBeDefined();
         expect(getShaderChunk('tile_vertex')).toBeDefined();
     });
+
+    it('is idempotent and returns undefined for unknown chunk names', () => {
+        registerShaderChunks();
+        const first = getRegisteredShaderChunks();
+        registerShaderChunks();
+        expect(getRegisteredShaderChunks()).toBe(first);
+        expect(getShaderChunk('__no_such_chunk__')).toBeUndefined();
+    });
 });

@@ -5,7 +5,19 @@
     "moduleFileExtensions": ["ts", "tsx", "js"],
     "coveragePathIgnorePatterns": ["/node_modules/", "/test/"],
     "extensionsToTreatAsEsm": [".ts"],
-    "collectCoverageFrom": ["src/**/*.{js,ts}"],
+    "collectCoverageFrom": [
+        "src/**/*.{js,ts}",
+        "!src/index.ts",
+        "!src/shaders/index.ts"
+    ],
+    "coverageThreshold": {
+        "global": {
+            "statements": 97,
+            "branches": 84,
+            "functions": 95,
+            "lines": 97
+        }
+    },
     "transformIgnorePatterns": [
         "/node_modules/(?!@babylonjs)"
     ],

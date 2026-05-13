@@ -1,5 +1,5 @@
-import {SceneLoader} from '@babylonjs/core/Loading/sceneLoader';
 import '@babylonjs/loaders';
+import {ImportMeshAsync} from '@babylonjs/core/Loading/sceneLoader';
 import {Mesh} from '@babylonjs/core/Meshes/mesh';
 import {VertexBuffer} from '@babylonjs/core/Buffers/buffer';
 import {Texture} from '@babylonjs/core/Materials/Textures/texture';
@@ -47,7 +47,7 @@ function getMeshTexture(mesh) {
 export async function initAlphaTestBabylonDemo({scene, camera, batchRenderer, systems}) {
     camera.setPosition(new BVector3(0, 7, 14));
 
-    const loaded = await SceneLoader.ImportMeshAsync('', '', 'leave.glb', scene);
+    const loaded = await ImportMeshAsync('leave.glb', scene, {meshNames: '', rootUrl: ''});
     const sourceMesh = loaded.meshes.find((node) => node instanceof Mesh && node.getTotalVertices() > 0);
     if (!(sourceMesh instanceof Mesh)) {
         return;

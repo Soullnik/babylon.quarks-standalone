@@ -49,6 +49,4 @@ export type {
 
 registerShaderChunks();
 loadPlugin(MeshSurfaceEmitterPlugin);
-// remove this line if you have pro license
-console.log('%c Particle system powered by babylon.quarks. https://quarks.art/', 'font-size: 14px; font-weight: bold;');
 

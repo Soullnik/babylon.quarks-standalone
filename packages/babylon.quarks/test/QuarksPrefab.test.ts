@@ -1,10 +1,12 @@
 import {NullEngine} from '@babylonjs/core/Engines/nullEngine';
 import {Scene} from '@babylonjs/core/scene';
+import {Mesh} from '@babylonjs/core/Meshes/mesh';
 import {TransformNode} from '@babylonjs/core/Meshes/transformNode';
 import {ConstantValue} from 'quarks.core';
 import {ParticleSystem} from '../src/ParticleSystem';
 import {ParticleEmitter} from '../src/ParticleEmitter';
 import {QuarksPrefab} from '../src/QuarksPrefab';
+import {BatchedRenderer} from '../src/BatchedRenderer';
 
 describe('QuarksPrefab', () => {
     let engine: NullEngine;
@@ -144,5 +146,86 @@ describe('QuarksPrefab', () => {
         prefab.play();
         prefab.stop();
         expect(clip.stop).toHaveBeenCalled();
+    });
+
+    it('adds particle systems to a registered batched renderer when particle animations activate', () => {
+        const renderer = new BatchedRenderer('prefab-br', scene);
+        const system = new ParticleSystem({scene, startLife: new ConstantValue(1), emissionOverTime: new ConstantValue(5)});
+        const emitter = system.emitter as ParticleEmitter;
+        const prefab = new QuarksPrefab('prefab-br-root', scene);
+        prefab.registerBatchedRenderer(renderer);
+        prefab.addParticleSystemAnimation(emitter, 0, 1, false);
+        const addSpy = jest.spyOn(renderer, 'addSystem');
+        prefab.play();
+        prefab.currentTime = -0.5;
+        prefab.update(0.6);
+        expect(addSpy).toHaveBeenCalledWith(system);
+        addSpy.mockRestore();
+        renderer.dispose();
+    });
+
+    it('play is idempotent and pause stops playback when already playing', () => {
+        const prefab = new QuarksPrefab('idempotent', scene);
+        prefab.play();
+        prefab.play();
+        expect(prefab.isPlaying).toBe(true);
+        prefab.pause();
+        prefab.pause();
+        expect(prefab.isPlaying).toBe(false);
+    });
+
+    it('stops playback when timeline exceeds total duration', () => {
+        const prefab = new QuarksPrefab('timeline-stop', scene);
+        const system = new ParticleSystem({scene, startLife: new ConstantValue(1), emissionOverTime: new ConstantValue(5)});
+        const emitter = system.emitter as ParticleEmitter;
+        prefab.addParticleSystemAnimation(emitter, 0, 0.2, false);
+        prefab.play();
+        prefab.update(1);
+        expect(prefab.isPlaying).toBe(false);
+    });
+
+    it('setTime drives three.js clip play, stop, and setTime while active', () => {
+        const prefab = new QuarksPrefab('settime-three', scene);
+        const target = new Mesh('st-mesh', scene);
+        const clip = {play: jest.fn(), stop: jest.fn(), pause: jest.fn(), setTime: jest.fn()};
+        prefab.addThreeAnimation(target, clip, 0, 1, false);
+        prefab.setTime(-0.1);
+        prefab.setTime(0.05);
+        expect(clip.play).toHaveBeenCalled();
+        prefab.setTime(1.5);
+        expect(clip.stop).toHaveBeenCalled();
+        prefab.setTime(0.4);
+        prefab.setTime(0.55);
+        expect(clip.setTime).toHaveBeenCalled();
+    });
+
+    it('resolveTimelineClip falls back to first clip when uuid is omitted', () => {
+        const prefab = QuarksPrefab.fromJSON({name: 'resolve', animationData: []}, scene);
+        const target: any = new Mesh('meta-mesh', scene);
+        const clip = {uuid: 'c1', duration: 1, play: jest.fn()};
+        target.metadata = {animations: [clip]};
+        (prefab as any)._tempAnimationJSON = [{type: 'three', targetUUID: String(target.uniqueId), duration: 1, loop: false}];
+        prefab.resolveReferences(target);
+        expect(prefab.animationData.length).toBe(1);
+    });
+
+    it('resolveTimelineClip selects clip by uuid on metadata.animationGroups', () => {
+        const prefab = QuarksPrefab.fromJSON({name: 'resolve2', animationData: []}, scene);
+        const target: any = new Mesh('meta-mesh2', scene);
+        const clip = {uuid: 'find-me', duration: 1, play: jest.fn()};
+        target.metadata = {animationGroups: [{uuid: 'other'}, clip]};
+        (prefab as any)._tempAnimationJSON = [
+            {type: 'three', targetUUID: String(target.uniqueId), clipUUID: 'find-me', duration: 1, loop: false},
+        ];
+        prefab.resolveReferences(target);
+        expect(prefab.animationData[0].clip).toBe(clip);
+    });
+
+    it('registerBatchedRenderer stores renderer reference for later activation', () => {
+        const prefab = new QuarksPrefab('reg', scene);
+        const renderer = new BatchedRenderer('reg-br', scene);
+        prefab.registerBatchedRenderer(renderer);
+        expect((prefab as any)._batchedRenderer).toBe(renderer);
+        renderer.dispose();
     });
 });
