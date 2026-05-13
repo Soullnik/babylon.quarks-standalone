@@ -12,6 +12,10 @@ import {initBillboardBabylonDemo} from './demos/billboard.babylon.js';
 import {initSoftParticleBabylonDemo} from './demos/softParticle.babylon.js';
 import {initCustomBlendingBabylonDemo} from './demos/customBlending.babylon.js';
 import {initFollowObjectBabylonDemo, updateFollowObjectBabylonDemo} from './demos/followObject.babylon.js';
+import {initPickUpBabylonDemo, updatePickUpBabylonDemo} from './demos/pickUp.babylon.js';
+import {initLevelUpBabylonDemo, updateLevelUpBabylonDemo} from './demos/levelUp.babylon.js';
+import {initElectricBallBabylonDemo, updateElectricBallBabylonDemo} from './demos/electricBall.babylon.js';
+import {initBlackHoleBabylonDemo} from './demos/blackhole.babylon.js';
 import {demoManifest} from './demoManifest.js';
 
 function updateMuzzleFlash(context, delta) {
@@ -50,6 +54,10 @@ const demoRuntimeMap = {
     SoftParticleDemo: {init: initSoftParticleBabylonDemo},
     CustomBlendingDemo: {init: initCustomBlendingBabylonDemo},
     FollowObjectDemo: {init: initFollowObjectBabylonDemo, onFrame: updateFollowObjectBabylonDemo},
+    PickUpDemo: {init: initPickUpBabylonDemo, onFrame: updatePickUpBabylonDemo},
+    LevelUpDemo: {init: initLevelUpBabylonDemo, onFrame: updateLevelUpBabylonDemo},
+    ElectricBallDemo: {init: initElectricBallBabylonDemo, onFrame: updateElectricBallBabylonDemo},
+    BlackHoleDemo: {init: initBlackHoleBabylonDemo},
 };
 
 export const babylonDemos = demoManifest.map((demo) => ({
