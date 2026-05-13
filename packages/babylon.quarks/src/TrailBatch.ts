@@ -27,6 +27,15 @@ export class TrailBatch extends VFXBatch {
     private sideVB!: VertexBuffer;
     private widthVB!: VertexBuffer;
 
+    private getTrailHistoryCount(particle: TrailParticle): number {
+        const trailAny = particle as any;
+        const fastHistoryCount = trailAny._trailHistoryCount;
+        if (typeof fastHistoryCount === 'number') {
+            return fastHistoryCount;
+        }
+        return particle.previous.length;
+    }
+
     constructor(settings: VFXBatchSettings, scene: Scene) {
         super(settings, scene);
         this.maxParticles = 10000;
@@ -61,7 +70,7 @@ export class TrailBatch extends VFXBatch {
         this.mesh.setVerticesData(VertexBuffer.PositionKind, this.positionBuffer, true);
         this.mesh.setVerticesData(VertexBuffer.UVKind, this.uvBuffer, true);
         this.mesh.setVerticesData(VertexBuffer.ColorKind, this.colorBuffer, true, 4);
-        this.mesh.setIndices(Array.from(this.indexBuffer.subarray(0, 6)), null, true);
+        this.mesh.setIndices(this.indexBuffer.subarray(0, 6), null, true);
         const engine = this.scene.getEngine();
         this.previousVB = new VertexBuffer(engine, this.previousBuffer, 'previous', true, false, 3, false);
         this.nextVB = new VertexBuffer(engine, this.nextBuffer, 'next', true, false, 3, false);
@@ -162,7 +171,7 @@ export class TrailBatch extends VFXBatch {
         const visibleSystems = this.getVisibleSystems();
         for (const system of visibleSystems) {
             for (let j = 0; j < system.particleNum; j++) {
-                particleCount += (system.particles[j] as TrailParticle).previous.length * 2;
+                particleCount += this.getTrailHistoryCount(system.particles[j] as TrailParticle) * 2;
             }
         }
         if (particleCount > this.maxParticles) {
@@ -185,109 +194,177 @@ export class TrailBatch extends VFXBatch {
             const vTileCount = this.settings.vTileCount;
             const tileWidth = 1 / uTileCount;
             const tileHeight = 1 / vTileCount;
+            const systemWorldSpace = system.worldSpace;
+            const objectScale = (Math.abs(scale.x) + Math.abs(scale.y) + Math.abs(scale.z)) / 3;
 
             for (let j = 0; j < particleNum; j++) {
                 const particle = particles[j] as TrailParticle;
+                const particleAny = particle as any;
+                const fastHistoryCount = particleAny._trailHistoryCount as number | undefined;
+                const fastHistoryCapacity = particleAny._trailHistoryCapacity as number | undefined;
+                const fastHistoryHead = particleAny._trailHistoryHead as number | undefined;
+                const fastHistoryPositions = particleAny._trailHistoryPositions as Float32Array | undefined;
+                const fastHistorySizes = particleAny._trailHistorySizes as Float32Array | undefined;
+                const fastHistoryColors = particleAny._trailHistoryColors as Float32Array | undefined;
+                const hasFastHistory =
+                    typeof fastHistoryCount === 'number' &&
+                    fastHistoryCount > 0 &&
+                    typeof fastHistoryCapacity === 'number' &&
+                    typeof fastHistoryHead === 'number' &&
+                    fastHistoryPositions instanceof Float32Array &&
+                    fastHistorySizes instanceof Float32Array &&
+                    fastHistoryColors instanceof Float32Array;
+                const historyCapacity = hasFastHistory ? (fastHistoryCapacity as number) : 0;
+                const historyHead = hasFastHistory ? (fastHistoryHead as number) : 0;
+                const historyPositions = fastHistoryPositions as Float32Array;
+                const historySizes = fastHistorySizes as Float32Array;
+                const historyColors = fastHistoryColors as Float32Array;
+                const particleHistory = particle.previous;
+                const particleHistoryLength = hasFastHistory ? fastHistoryCount : particleHistory.length;
+                if (particleHistoryLength === 0) {
+                    continue;
+                }
                 const col = particle.uvTile % vTileCount;
                 const row = Math.floor(particle.uvTile / vTileCount + 0.001);
+                const particleMatrix = particle.parentMatrix as unknown as Matrix4 | undefined;
+                const matrixToUse = particleMatrix ?? system.emitter.matrixWorld;
 
-                const iter = particle.previous.values();
-                let curIter = iter.next();
-                let previous: RecordState = curIter.value as RecordState;
-                let current: RecordState = previous;
-                if (!curIter.done) curIter = iter.next();
-                let next: RecordState;
-                if (curIter.value !== undefined) {
-                    next = curIter.value as RecordState;
-                } else {
-                    next = current;
-                }
+                let previousNode = particleHistory.head;
+                let currentNode = previousNode;
+                let nextNode = currentNode?.next ?? currentNode;
+                const oldestFastHistoryIndex = hasFastHistory
+                    ? (historyHead - particleHistoryLength + historyCapacity) % historyCapacity
+                    : 0;
 
-                for (let i = 0; i < particle.previous.length; i++, index += 2) {
-                    let pos: Vector3;
-                    if (system.worldSpace) {
-                        pos = current.position;
+                for (let i = 0; i < particleHistoryLength; i++, index += 2) {
+                    let currentX: number;
+                    let currentY: number;
+                    let currentZ: number;
+                    let currentSize: number;
+                    let currentColorX: number;
+                    let currentColorY: number;
+                    let currentColorZ: number;
+                    let currentColorW: number;
+                    let previousX: number;
+                    let previousY: number;
+                    let previousZ: number;
+                    let nextX: number;
+                    let nextY: number;
+                    let nextZ: number;
+
+                    if (hasFastHistory) {
+                        const currentHistoryIndex = (oldestFastHistoryIndex + i) % historyCapacity;
+                        const previousHistoryIndex = i === 0 ? currentHistoryIndex : (oldestFastHistoryIndex + i - 1) % historyCapacity;
+                        const nextHistoryIndex =
+                            i + 1 < particleHistoryLength
+                                ? (oldestFastHistoryIndex + i + 1) % historyCapacity
+                                : currentHistoryIndex;
+
+                        const currentPosIndex = currentHistoryIndex * 3;
+                        const previousPosIndex = previousHistoryIndex * 3;
+                        const nextPosIndex = nextHistoryIndex * 3;
+
+                        currentX = historyPositions[currentPosIndex];
+                        currentY = historyPositions[currentPosIndex + 1];
+                        currentZ = historyPositions[currentPosIndex + 2];
+                        previousX = historyPositions[previousPosIndex];
+                        previousY = historyPositions[previousPosIndex + 1];
+                        previousZ = historyPositions[previousPosIndex + 2];
+                        nextX = historyPositions[nextPosIndex];
+                        nextY = historyPositions[nextPosIndex + 1];
+                        nextZ = historyPositions[nextPosIndex + 2];
+
+                        currentSize = historySizes[currentHistoryIndex];
+                        const currentColorIndex = currentHistoryIndex * 4;
+                        currentColorX = historyColors[currentColorIndex];
+                        currentColorY = historyColors[currentColorIndex + 1];
+                        currentColorZ = historyColors[currentColorIndex + 2];
+                        currentColorW = historyColors[currentColorIndex + 3];
                     } else {
-                        if (particle.parentMatrix) {
-                            this.vector_.copy(current.position).applyMatrix4(particle.parentMatrix as unknown as Matrix4);
-                        } else {
-                            this.vector_.copy(current.position).applyMatrix4(system.emitter.matrixWorld);
-                        }
-                        pos = this.vector_;
+                        const previous = previousNode!.data as RecordState;
+                        const current = currentNode!.data as RecordState;
+                        const next = nextNode!.data as RecordState;
+                        currentX = current.position.x;
+                        currentY = current.position.y;
+                        currentZ = current.position.z;
+                        previousX = previous.position.x;
+                        previousY = previous.position.y;
+                        previousZ = previous.position.z;
+                        nextX = next.position.x;
+                        nextY = next.position.y;
+                        nextZ = next.position.z;
+                        currentSize = current.size;
+                        currentColorX = current.color.x;
+                        currentColorY = current.color.y;
+                        currentColorZ = current.color.z;
+                        currentColorW = current.color.w;
                     }
+
+                    if (!systemWorldSpace) {
+                        this.vector_.set(currentX, currentY, currentZ).applyMatrix4(matrixToUse);
+                        currentX = this.vector_.x;
+                        currentY = this.vector_.y;
+                        currentZ = this.vector_.z;
+                        this.vector_.set(previousX, previousY, previousZ).applyMatrix4(matrixToUse);
+                        previousX = this.vector_.x;
+                        previousY = this.vector_.y;
+                        previousZ = this.vector_.z;
+                        this.vector_.set(nextX, nextY, nextZ).applyMatrix4(matrixToUse);
+                        nextX = this.vector_.x;
+                        nextY = this.vector_.y;
+                        nextZ = this.vector_.z;
+                    }
+
                     const pi = index * 3;
-                    this.positionBuffer[pi] = pos.x;
-                    this.positionBuffer[pi + 1] = pos.y;
-                    this.positionBuffer[pi + 2] = pos.z;
-                    this.positionBuffer[pi + 3] = pos.x;
-                    this.positionBuffer[pi + 4] = pos.y;
-                    this.positionBuffer[pi + 5] = pos.z;
+                    this.positionBuffer[pi] = currentX;
+                    this.positionBuffer[pi + 1] = currentY;
+                    this.positionBuffer[pi + 2] = currentZ;
+                    this.positionBuffer[pi + 3] = currentX;
+                    this.positionBuffer[pi + 4] = currentY;
+                    this.positionBuffer[pi + 5] = currentZ;
 
-                    let prevPos: Vector3;
-                    if (system.worldSpace) {
-                        prevPos = previous.position;
-                    } else {
-                        if (particle.parentMatrix) {
-                            this.vector_.copy(previous.position).applyMatrix4(particle.parentMatrix as unknown as Matrix4);
-                        } else {
-                            this.vector_.copy(previous.position).applyMatrix4(system.emitter.matrixWorld);
-                        }
-                        prevPos = this.vector_;
-                    }
-                    this.previousBuffer[pi] = prevPos.x;
-                    this.previousBuffer[pi + 1] = prevPos.y;
-                    this.previousBuffer[pi + 2] = prevPos.z;
-                    this.previousBuffer[pi + 3] = prevPos.x;
-                    this.previousBuffer[pi + 4] = prevPos.y;
-                    this.previousBuffer[pi + 5] = prevPos.z;
+                    this.previousBuffer[pi] = previousX;
+                    this.previousBuffer[pi + 1] = previousY;
+                    this.previousBuffer[pi + 2] = previousZ;
+                    this.previousBuffer[pi + 3] = previousX;
+                    this.previousBuffer[pi + 4] = previousY;
+                    this.previousBuffer[pi + 5] = previousZ;
 
-                    let nextPos: Vector3;
-                    if (system.worldSpace) {
-                        nextPos = next.position;
-                    } else {
-                        if (particle.parentMatrix) {
-                            this.vector_.copy(next.position).applyMatrix4(particle.parentMatrix as unknown as Matrix4);
-                        } else {
-                            this.vector_.copy(next.position).applyMatrix4(system.emitter.matrixWorld);
-                        }
-                        nextPos = this.vector_;
-                    }
-                    this.nextBuffer[pi] = nextPos.x;
-                    this.nextBuffer[pi + 1] = nextPos.y;
-                    this.nextBuffer[pi + 2] = nextPos.z;
-                    this.nextBuffer[pi + 3] = nextPos.x;
-                    this.nextBuffer[pi + 4] = nextPos.y;
-                    this.nextBuffer[pi + 5] = nextPos.z;
+                    this.nextBuffer[pi] = nextX;
+                    this.nextBuffer[pi + 1] = nextY;
+                    this.nextBuffer[pi + 2] = nextZ;
+                    this.nextBuffer[pi + 3] = nextX;
+                    this.nextBuffer[pi + 4] = nextY;
+                    this.nextBuffer[pi + 5] = nextZ;
 
                     this.sideBuffer[index] = 1;
                     this.sideBuffer[index + 1] = -1;
 
-                    if (system.worldSpace || particle.parentMatrix) {
-                        this.widthBuffer[index] = current.size;
-                        this.widthBuffer[index + 1] = current.size;
+                    if (systemWorldSpace || particle.parentMatrix) {
+                        this.widthBuffer[index] = currentSize;
+                        this.widthBuffer[index + 1] = currentSize;
                     } else {
-                        const objectScale = (Math.abs(scale.x) + Math.abs(scale.y) + Math.abs(scale.z)) / 3;
-                        this.widthBuffer[index] = current.size * objectScale;
-                        this.widthBuffer[index + 1] = current.size * objectScale;
+                        this.widthBuffer[index] = currentSize * objectScale;
+                        this.widthBuffer[index + 1] = currentSize * objectScale;
                     }
 
                     const ui = index * 2;
-                    this.uvBuffer[ui] = (i / particle.previous.length + col) * tileWidth;
+                    this.uvBuffer[ui] = (i / particleHistoryLength + col) * tileWidth;
                     this.uvBuffer[ui + 1] = (vTileCount - row - 1) * tileHeight;
-                    this.uvBuffer[ui + 2] = (i / particle.previous.length + col) * tileWidth;
+                    this.uvBuffer[ui + 2] = (i / particleHistoryLength + col) * tileWidth;
                     this.uvBuffer[ui + 3] = (vTileCount - row) * tileHeight;
 
                     const cci = index * 4;
-                    this.colorBuffer[cci] = current.color.x;
-                    this.colorBuffer[cci + 1] = current.color.y;
-                    this.colorBuffer[cci + 2] = current.color.z;
-                    this.colorBuffer[cci + 3] = current.color.w;
-                    this.colorBuffer[cci + 4] = current.color.x;
-                    this.colorBuffer[cci + 5] = current.color.y;
-                    this.colorBuffer[cci + 6] = current.color.z;
-                    this.colorBuffer[cci + 7] = current.color.w;
+                    this.colorBuffer[cci] = currentColorX;
+                    this.colorBuffer[cci + 1] = currentColorY;
+                    this.colorBuffer[cci + 2] = currentColorZ;
+                    this.colorBuffer[cci + 3] = currentColorW;
+                    this.colorBuffer[cci + 4] = currentColorX;
+                    this.colorBuffer[cci + 5] = currentColorY;
+                    this.colorBuffer[cci + 6] = currentColorZ;
+                    this.colorBuffer[cci + 7] = currentColorW;
 
-                    if (i + 1 < particle.previous.length) {
+                    if (i + 1 < particleHistoryLength) {
                         this.indexBuffer[triangles * 3] = index;
                         this.indexBuffer[triangles * 3 + 1] = index + 1;
                         this.indexBuffer[triangles * 3 + 2] = index + 2;
@@ -298,13 +375,10 @@ export class TrailBatch extends VFXBatch {
                         triangles++;
                     }
 
-                    previous = current;
-                    current = next;
-                    if (!curIter.done) {
-                        curIter = iter.next();
-                        if (curIter.value !== undefined) {
-                            next = curIter.value as RecordState;
-                        }
+                    if (!hasFastHistory) {
+                        previousNode = currentNode;
+                        currentNode = nextNode;
+                        nextNode = nextNode?.next ?? nextNode;
                     }
                 }
             }
@@ -313,7 +387,7 @@ export class TrailBatch extends VFXBatch {
         if (index > 0 && triangles > 0) {
             this.mesh.updateVerticesData(VertexBuffer.PositionKind, this.positionBuffer);
             this.mesh.updateVerticesData(VertexBuffer.UVKind, this.uvBuffer);
-            this.mesh.updateIndices(Array.from(this.indexBuffer.subarray(0, triangles * 3)));
+            this.mesh.updateIndices(this.indexBuffer.subarray(0, triangles * 3));
             this.previousVB.update(this.previousBuffer);
             this.nextVB.update(this.nextBuffer);
             this.sideVB.update(this.sideBuffer);
