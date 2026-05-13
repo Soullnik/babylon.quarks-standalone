@@ -1,7 +1,9 @@
 import {NullEngine} from '@babylonjs/core/Engines/nullEngine';
+import {Constants} from '@babylonjs/core/Engines/constants';
 import {Scene} from '@babylonjs/core/scene';
 import {Matrix, Quaternion, Vector3} from '@babylonjs/core/Maths/math.vector';
 import {Mesh} from '@babylonjs/core/Meshes/mesh';
+import {Texture} from '@babylonjs/core/Materials/Textures/texture';
 import {QuarksLoader} from '../src/QuarksLoader';
 import {QuarksPrefab} from '../src/QuarksPrefab';
 import {ParticleEmitter} from '../src/ParticleEmitter';
@@ -292,6 +294,202 @@ describe('QuarksLoader matrix decomposition', () => {
         expect((mesh as Mesh).getTotalVertices()).toBeGreaterThan(0);
         expect(cameraNode.quarksOriginalType).toBe('PerspectiveCamera');
         expect(lightNode.quarksOriginalType).toBe('DirectionalLight');
+
+        scene.dispose();
+        engine.dispose();
+    });
+
+    it('loads JSON via fetch and parses into root transform', async () => {
+        const engine = new NullEngine();
+        const scene = new Scene(engine);
+        const loader = new QuarksLoader(scene);
+        const fetchSpy = jest.spyOn(global, 'fetch').mockResolvedValue({
+            json: async () => ({
+                object: {
+                    uuid: 'root',
+                    type: 'Group',
+                    children: [],
+                },
+            }),
+        } as any);
+
+        const root = await loader.load('https://example.com/assets/effect.json');
+        expect(root.name).toBe('Group');
+        expect(fetchSpy).toHaveBeenCalledWith('https://example.com/assets/effect.json');
+
+        fetchSpy.mockRestore();
+        scene.dispose();
+        engine.dispose();
+    });
+
+    it('parses interleaved buffer geometry, textures and material mapping', () => {
+        const engine = new NullEngine();
+        const scene = new Scene(engine);
+        const loader = new QuarksLoader(scene);
+
+        const toInt32Bits = (value: number) => new Int32Array(new Float32Array([value]).buffer)[0];
+        const interleavedFloats = [
+            0, 0, 0, 0, 0, 0, 0, 1,
+            1, 0, 0, 1, 0, 0, 0, 1,
+            0, 1, 0, 0, 1, 0, 0, 1,
+        ];
+        const packedInt32 = interleavedFloats.map(toInt32Bits);
+
+        const root = loader.parse({
+            images: [{uuid: 'img-1', url: 'textures/test.png'}],
+            textures: [
+                {
+                    uuid: 'tex-1',
+                    image: 'img-1',
+                    wrap: [1001, 1002],
+                    repeat: [2, 3],
+                    offset: [0.1, 0.2],
+                    rotation: 0.5,
+                },
+            ],
+            materials: [
+                {
+                    uuid: 'mat-1',
+                    map: 'tex-1',
+                    blending: 3,
+                    side: 1,
+                    depthTest: true,
+                    depthWrite: true,
+                    alphaTest: 0.25,
+                },
+            ],
+            geometries: [
+                {
+                    uuid: 'geo-1',
+                    type: 'BufferGeometry',
+                    data: {
+                        arrayBuffers: {ab1: packedInt32},
+                        interleavedBuffers: {ib1: {buffer: 'ab1', stride: 8}},
+                        attributes: {
+                            position: {isInterleavedBufferAttribute: true, data: 'ib1', offset: 0, itemSize: 3},
+                            uv: {isInterleavedBufferAttribute: true, data: 'ib1', offset: 3, itemSize: 2},
+                            normal: {isInterleavedBufferAttribute: true, data: 'ib1', offset: 5, itemSize: 3},
+                        },
+                        index: {type: 'Uint16Array', array: [0, 1, 2]},
+                    },
+                },
+            ],
+            object: {
+                uuid: 'root',
+                type: 'Group',
+                children: [
+                    {
+                        uuid: 'mesh-1',
+                        type: 'Mesh',
+                        name: 'interleaved-mesh',
+                        geometry: 'geo-1',
+                        material: ['mat-1'],
+                    },
+                ],
+            },
+        }, 'https://cdn.example.com/base/');
+
+        const mesh = root.getChildren().find((node) => node.name === 'interleaved-mesh') as Mesh;
+        expect(mesh).toBeInstanceOf(Mesh);
+        expect(mesh.getTotalVertices()).toBe(3);
+        expect(mesh.getIndices()?.length).toBe(3);
+        expect(mesh.material).toBeDefined();
+
+        const material = mesh.material as any;
+        expect(material.alphaMode).toBe(Constants.ALPHA_SUBTRACT);
+        expect(material.backFaceCulling).toBe(true);
+        expect(material.alphaCutOff).toBeCloseTo(0.25, 5);
+        expect(material.disableDepthWrite).toBe(false);
+        expect(material.diffuseTexture).toBeDefined();
+        expect(material.diffuseTexture.wrapU).toBe(Texture.CLAMP_ADDRESSMODE);
+        expect(material.diffuseTexture.wrapV).toBe(Texture.MIRROR_ADDRESSMODE);
+        expect(material.diffuseTexture.uScale).toBe(2);
+        expect(material.diffuseTexture.vScale).toBe(3);
+        expect(material.diffuseTexture.uOffset).toBeCloseTo(0.1, 5);
+        expect(material.diffuseTexture.vOffset).toBeCloseTo(0.2, 5);
+        expect(material.diffuseTexture.wAng).toBeCloseTo(0.5, 5);
+
+        scene.dispose();
+        engine.dispose();
+    });
+
+    it('parses sphere and plain buffer geometry variants', () => {
+        const engine = new NullEngine();
+        const scene = new Scene(engine);
+        const loader = new QuarksLoader(scene);
+
+        const root = loader.parse({
+            geometries: [
+                {
+                    uuid: 'sphere-1',
+                    type: 'SphereGeometry',
+                    radius: 1,
+                    widthSegments: 8,
+                    heightSegments: 6,
+                    thetaStart: 0.25,
+                    thetaLength: Math.PI * 0.75,
+                },
+                {
+                    uuid: 'buffer-1',
+                    type: 'BufferGeometry',
+                    data: {
+                        attributes: {
+                            position: {array: [0, 0, 0, 1, 0, 0, 0, 1, 0]},
+                            uv: {array: [0, 0, 1, 0, 0, 1]},
+                            normal: {array: [0, 0, 1, 0, 0, 1, 0, 0, 1]},
+                        },
+                        index: {type: 'Uint32Array', array: [0, 1, 2]},
+                    },
+                },
+            ],
+            object: {
+                uuid: 'root',
+                type: 'Group',
+                children: [
+                    {uuid: 'mesh-sphere', type: 'Mesh', name: 'mesh-sphere', geometry: 'sphere-1'},
+                    {uuid: 'mesh-buffer', type: 'Mesh', name: 'mesh-buffer', geometry: 'buffer-1'},
+                ],
+            },
+        });
+
+        const sphereMesh = root.getChildren().find((node) => node.name === 'mesh-sphere') as Mesh;
+        const bufferMesh = root.getChildren().find((node) => node.name === 'mesh-buffer') as Mesh;
+        expect(sphereMesh.getTotalVertices()).toBeGreaterThan(0);
+        expect(sphereMesh.getIndices()?.length).toBeGreaterThan(0);
+        expect(bufferMesh.getTotalVertices()).toBe(3);
+        expect(bufferMesh.getIndices()?.length).toBe(3);
+
+        scene.dispose();
+        engine.dispose();
+    });
+
+    it('handles placeholder branches for missing particle system data and unknown types', () => {
+        const engine = new NullEngine();
+        const scene = new Scene(engine);
+        const loader = new QuarksLoader(scene);
+
+        const root = loader.parse({
+            object: {
+                uuid: 'root',
+                type: 'Group',
+                children: [
+                    {uuid: 'empty-emitter', type: 'ParticleEmitter', name: 'empty-emitter'},
+                    {uuid: 'rot-node', type: 'Object3D', name: 'rot-node', rotation: [0.1, 0.2, 0.3]},
+                    {uuid: 'quat-node', type: 'Object3D', name: 'quat-node', quaternion: [0, 0, 0, 1]},
+                    {uuid: 'mystery-node', type: 'SomeUnknownType', name: 'mystery-node'},
+                ],
+            },
+        });
+
+        const emptyEmitter = root.getChildren().find((node) => node.name === 'empty-emitter') as any;
+        const mystery = root.getChildren().find((node) => node.name === 'mystery-node') as any;
+        const rotNode = root.getChildren().find((node) => node.name === 'rot-node') as any;
+        const quatNode = root.getChildren().find((node) => node.name === 'quat-node') as any;
+
+        expect(emptyEmitter.quarksOriginalType).toBe('ParticleEmitter');
+        expect(mystery).toBeDefined();
+        expect(rotNode.rotation.x).toBeCloseTo(0.1, 5);
+        expect(quatNode.rotationQuaternion).not.toBeNull();
 
         scene.dispose();
         engine.dispose();

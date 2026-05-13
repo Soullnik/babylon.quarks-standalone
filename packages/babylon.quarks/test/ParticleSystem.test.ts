@@ -18,6 +18,7 @@ import {Constants} from '@babylonjs/core/Engines/constants';
 import {StandardMaterial} from '@babylonjs/core/Materials/standardMaterial';
 import {ParticleSystem} from '../src/ParticleSystem';
 import {RenderMode} from '../src/VFXBatch';
+import {BatchedRenderer} from '../src/BatchedRenderer';
 
 let engine: NullEngine;
 let scene: Scene;
@@ -230,5 +231,147 @@ describe('ParticleSystem', () => {
         expect(ps.blending).toBe(Constants.ALPHA_SUBTRACT);
         expect(ps.softParticles).toBe(false);
         expect(ps.texture).toBeNull();
+    });
+
+    it('should stop by restarting state and pausing updates', () => {
+        const ps = new ParticleSystem({
+            scene,
+            duration: 3,
+            startLife: new ConstantValue(2),
+            startSpeed: new ConstantValue(1),
+            emissionOverTime: new ConstantValue(30),
+        });
+
+        ps.emit(0.1, ps.emissionState, ps.emitter.matrixWorld);
+        ps.emit(0.1, ps.emissionState, ps.emitter.matrixWorld);
+        expect(ps.particleNum).toBeGreaterThan(0);
+
+        ps.stop();
+
+        expect(ps.paused).toBe(true);
+        expect(ps.particleNum).toBe(0);
+        expect(ps.emissionState.time).toBe(0);
+        expect(ps.emissionState.waitEmiting).toBe(0);
+    });
+
+    it('should auto destroy when non-looping emission fully ends', () => {
+        const ps = new ParticleSystem({
+            scene,
+            autoDestroy: true,
+            looping: false,
+            duration: 0.05,
+            startLife: new ConstantValue(1),
+            emissionOverTime: new ConstantValue(0),
+        });
+
+        const disposeSpy = jest.spyOn(ps.emitter, 'dispose');
+        const destroyListener = jest.fn();
+        ps.addEventListener('destroy', destroyListener);
+
+        ps.update(0.1);
+        ps.update(0.1);
+        ps.update(0.1);
+
+        expect(disposeSpy).toHaveBeenCalled();
+        expect(destroyListener).toHaveBeenCalledTimes(1);
+    });
+
+    it('should ask renderer to rebuild batch when settings changed', () => {
+        const renderer = new BatchedRenderer('particle-renderer-update', scene);
+        const ps = new ParticleSystem({
+            scene,
+            emissionOverTime: new ConstantValue(0),
+            startLife: new ConstantValue(1),
+        });
+        renderer.addSystem(ps);
+
+        const rendererSpy = jest.spyOn(renderer, 'updateSystem');
+        ps.blending = Constants.ALPHA_SUBTRACT;
+
+        ps.update(1 / 60);
+        ps.update(1 / 60);
+
+        expect(rendererSpy).toHaveBeenCalledTimes(1);
+        renderer.dispose();
+    });
+
+    it('should update trail particles from local origin with parent matrix', () => {
+        const ps = new ParticleSystem({
+            scene,
+            onlyUsedByOther: true,
+            worldSpace: false,
+            duration: 2,
+            startLife: new ConstantValue(2),
+            startSpeed: new ConstantValue(0),
+            startSize: new ConstantValue(1),
+            startColor: new ConstantColor(new Vector4(1, 1, 1, 1)),
+            emissionOverTime: new ConstantValue(0),
+            shape: new PointEmitter(),
+            renderMode: RenderMode.Trail,
+            rendererEmitterSettings: {
+                startLength: new ConstantValue(8),
+                followLocalOrigin: true,
+            },
+        });
+
+        ps.emitter.position.set(3, 0, 0);
+        ps.emitter.computeWorldMatrix(true);
+        ps.emissionState.waitEmiting = 1;
+        ps.emit(0, ps.emissionState, ps.emitter.matrixWorld);
+        expect(ps.particleNum).toBe(1);
+
+        const particle = ps.particles[0] as any;
+        expect(particle.localPosition).toBeDefined();
+        expect(particle.parentMatrix).toBeDefined();
+
+        ps.update(1 / 60);
+        expect(particle.position.x).toBeCloseTo(3, 5);
+    });
+
+    it('should support removing listeners by callback and by event', () => {
+        const ps = new ParticleSystem({scene, emissionOverTime: new ConstantValue(0)});
+        const emitEndListener = jest.fn();
+
+        ps.addEventListener('emitEnd', emitEndListener);
+        ps.removeEventListener('emitEnd', emitEndListener);
+        ps.endEmit();
+        expect(emitEndListener).toHaveBeenCalledTimes(0);
+
+        ps.addEventListener('emitEnd', emitEndListener);
+        ps.removeAllEventListeners('emitEnd');
+        ps.endEmit();
+        expect(emitEndListener).toHaveBeenCalledTimes(0);
+    });
+
+    it('should restore stretched billboard from legacy speedFactor and packed geometry', () => {
+        const ps = new ParticleSystem({
+            scene,
+            renderMode: RenderMode.StretchedBillBoard,
+            startLife: new ConstantValue(1),
+            emissionOverTime: new ConstantValue(0),
+            rendererEmitterSettings: {
+                speedFactor: 2,
+                lengthFactor: 4,
+            },
+        });
+
+        const meta: any = {textures: {}, materials: {}, geometries: {}};
+        const json: any = ps.toJSON(meta);
+        json.rendererEmitterSettings = {};
+        json.speedFactor = 0.75;
+        const geometryId = json.instancingGeometry;
+        meta.geometries[geometryId] = {
+            data: {
+                attributes: {
+                    position: {array: [0, 0, 0, 1, 0, 0, 0, 1, 0]},
+                    uv: {array: [0, 0, 1, 0, 0, 1]},
+                },
+                index: {array: [0, 1, 2], type: 'Uint16Array'},
+            },
+        };
+
+        const restored = ParticleSystem.fromJSON(json, meta, {}, scene);
+        expect((restored.rendererEmitterSettings as any).speedFactor).toBe(0.75);
+        expect(restored.getRendererSettings().instancingIndices).toBeInstanceOf(Uint16Array);
     });
 });
