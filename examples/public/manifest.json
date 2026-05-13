@@ -1,9 +1,9 @@
 {
-  "short_name": "Three.quarks Editor",
-  "name": "Three.quarks Particle System Editor",
+  "short_name": "babylon.quarks",
+  "name": "babylon.quarks",
   "icons": [
     {
-      "src": "favicon.png"
+      "src": "favicon.ico"
     }
   ],
   "start_url": ".",

@@ -1,5 +1,19 @@
 import {demoManifest} from "./babylon/demoManifest.js";
 
+function loadHeroBackground() {
+    import("./indexHeroBackground.js")
+        .then(({mountIndexHeroBackground}) => {
+            mountIndexHeroBackground();
+        })
+        .catch((err) => {
+            console.warn("Hero background could not start:", err);
+        });
+}
+
+if (typeof window !== "undefined") {
+    window.requestAnimationFrame(() => loadHeroBackground());
+}
+
 const demosContainer = document.getElementById("demos");
 const searchInput = document.getElementById("search");
 const statsText = document.getElementById("stats");
