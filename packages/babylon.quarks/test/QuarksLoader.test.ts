@@ -635,7 +635,7 @@ describe('QuarksLoader matrix decomposition', () => {
         engine.dispose();
     });
 
-    it('synthesizes sequential indices for non-indexed BufferGeometry', () => {
+    it('synthesizes sequential indices for non-indexed BufferGeometry (Unity-style export)', () => {
         const engine = new NullEngine();
         const scene = new Scene(engine);
         const loader = new QuarksLoader(scene);
@@ -664,43 +664,68 @@ describe('QuarksLoader matrix decomposition', () => {
                 type: 'Group',
                 children: [
                     {
-                        uuid: 'emitter',
-                        type: 'ParticleEmitter',
-                        ps: {
-                            version: '3.0',
-                            autoDestroy: false,
-                            looping: true,
-                            prewarm: false,
-                            duration: 1,
-                            shape: {type: 'point'},
-                            startLife: {type: 'ConstantValue', value: 1},
-                            startSpeed: {type: 'ConstantValue', value: 0},
-                            startRotation: {type: 'ConstantValue', value: 0},
-                            startSize: {type: 'ConstantValue', value: 1},
-                            startColor: {type: 'ConstantColor', color: {r: 1, g: 1, b: 1, a: 1}},
-                            emissionOverTime: {type: 'ConstantValue', value: 0},
-                            emissionOverDistance: {type: 'ConstantValue', value: 0},
-                            emissionBursts: [],
-                            onlyUsedByOther: false,
-                            instancingGeometry: 'arc',
-                            renderOrder: 0,
-                            renderMode: 2,
-                            rendererEmitterSettings: {},
-                            material: 'mat',
-                            layers: 1,
-                            startTileIndex: {type: 'ConstantValue', value: 0},
-                            uTileCount: 1,
-                            vTileCount: 1,
-                            behaviors: [],
-                            worldSpace: true,
-                        },
+                        uuid: 'glow-parent',
+                        type: 'Group',
+                        name: 'GlowCircle',
+                        matrix: [
+                            1, 0, 0, 0, 0, -5.321248036699279e-8, -1.0000000532124804, 0, 0, 0.7500000399093601,
+                            -3.990936027524458e-8, 0, 0, 0, 0, 1,
+                        ],
+                        children: [
+                            {
+                                uuid: 'glow-emitter',
+                                type: 'ParticleEmitter',
+                                name: 'GlowCircleEmitter',
+                                ps: {
+                                    version: '3.0',
+                                    autoDestroy: false,
+                                    looping: true,
+                                    prewarm: false,
+                                    duration: 2,
+                                    shape: {type: 'point'},
+                                    startLife: {type: 'ConstantValue', value: 1},
+                                    startSpeed: {type: 'ConstantValue', value: 0},
+                                    startRotation: {
+                                        type: 'Euler',
+                                        angleX: {type: 'IntervalValue', a: 0, b: 0},
+                                        angleY: {type: 'IntervalValue', a: 0, b: 0},
+                                        angleZ: {type: 'IntervalValue', a: 0, b: 6.283185},
+                                        eulerOrder: 'XYZ',
+                                    },
+                                    startSize: {type: 'ConstantValue', value: 4.15},
+                                    startColor: {
+                                        type: 'ConstantColor',
+                                        color: {r: 1, g: 1, b: 0, a: 0.1764706},
+                                    },
+                                    emissionOverTime: {type: 'ConstantValue', value: 2},
+                                    emissionOverDistance: {type: 'ConstantValue', value: 0},
+                                    emissionBursts: [],
+                                    onlyUsedByOther: false,
+                                    instancingGeometry: 'arc',
+                                    renderOrder: 0,
+                                    renderMode: 2,
+                                    rendererEmitterSettings: {},
+                                    material: 'mat',
+                                    layers: 1,
+                                    startTileIndex: {type: 'ConstantValue', value: 0},
+                                    uTileCount: 1,
+                                    vTileCount: 1,
+                                    behaviors: [],
+                                    worldSpace: true,
+                                },
+                            },
+                        ],
                     },
                 ],
             },
         });
 
-        const emitter = root.getChildren()[0] as ParticleEmitter;
+        const glowGroup = root.getChildren()[0];
+        expect(glowGroup.name).toBe('GlowCircle');
+        const emitter = glowGroup.getChildren()[0] as ParticleEmitter;
+        expect(emitter.name).toBe('GlowCircleEmitter');
         const settings = (emitter.system as ParticleSystem).getRendererSettings();
+        expect(settings.instancingGeometry.length / 3).toBe(6);
         expect(settings.instancingIndices.length).toBe(6);
         expect(Array.from(settings.instancingIndices as Uint32Array)).toEqual([0, 1, 2, 3, 4, 5]);
 
