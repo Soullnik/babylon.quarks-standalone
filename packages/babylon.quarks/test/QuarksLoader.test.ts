@@ -634,4 +634,77 @@ describe('QuarksLoader matrix decomposition', () => {
         scene.dispose();
         engine.dispose();
     });
+
+    it('synthesizes sequential indices for non-indexed BufferGeometry', () => {
+        const engine = new NullEngine();
+        const scene = new Scene(engine);
+        const loader = new QuarksLoader(scene);
+
+        const positions = [0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 1, 1, 0];
+        const normals = [0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1];
+        const uvs = [0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1];
+
+        const root = loader.parse({
+            geometries: [
+                {
+                    uuid: 'arc',
+                    type: 'BufferGeometry',
+                    data: {
+                        attributes: {
+                            position: {itemSize: 3, type: 'Float32Array', array: positions},
+                            normal: {itemSize: 3, type: 'Float32Array', array: normals},
+                            uv: {itemSize: 2, type: 'Float32Array', array: uvs},
+                        },
+                    },
+                },
+            ],
+            materials: [{uuid: 'mat', type: 'MeshBasicMaterial', transparent: true, blending: 2}],
+            object: {
+                uuid: 'root',
+                type: 'Group',
+                children: [
+                    {
+                        uuid: 'emitter',
+                        type: 'ParticleEmitter',
+                        ps: {
+                            version: '3.0',
+                            autoDestroy: false,
+                            looping: true,
+                            prewarm: false,
+                            duration: 1,
+                            shape: {type: 'point'},
+                            startLife: {type: 'ConstantValue', value: 1},
+                            startSpeed: {type: 'ConstantValue', value: 0},
+                            startRotation: {type: 'ConstantValue', value: 0},
+                            startSize: {type: 'ConstantValue', value: 1},
+                            startColor: {type: 'ConstantColor', color: {r: 1, g: 1, b: 1, a: 1}},
+                            emissionOverTime: {type: 'ConstantValue', value: 0},
+                            emissionOverDistance: {type: 'ConstantValue', value: 0},
+                            emissionBursts: [],
+                            onlyUsedByOther: false,
+                            instancingGeometry: 'arc',
+                            renderOrder: 0,
+                            renderMode: 2,
+                            rendererEmitterSettings: {},
+                            material: 'mat',
+                            layers: 1,
+                            startTileIndex: {type: 'ConstantValue', value: 0},
+                            uTileCount: 1,
+                            vTileCount: 1,
+                            behaviors: [],
+                            worldSpace: true,
+                        },
+                    },
+                ],
+            },
+        });
+
+        const emitter = root.getChildren()[0] as ParticleEmitter;
+        const settings = (emitter.system as ParticleSystem).getRendererSettings();
+        expect(settings.instancingIndices.length).toBe(6);
+        expect(Array.from(settings.instancingIndices as Uint32Array)).toEqual([0, 1, 2, 3, 4, 5]);
+
+        scene.dispose();
+        engine.dispose();
+    });
 });

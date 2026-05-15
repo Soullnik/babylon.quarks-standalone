@@ -781,6 +781,60 @@ describe('ParticleSystem', () => {
         expect(ps.getRendererSettings().instancingGeometry.length).toBeGreaterThan(0);
     });
 
+    it('fromJSON synthesizes indices when geometry meta has positions but empty indices', () => {
+        const positions = new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 1, 1, 0]);
+        const meta: any = {
+            textures: {},
+            materials: {
+                mat: {transparent: true, alphaMode: Constants.ALPHA_ADD, depthTest: true, depthWrite: false, alphaTest: 0},
+            },
+            geometries: {
+                arc: {
+                    positions,
+                    indices: new Uint32Array(0),
+                    uvs: new Float32Array([0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1]),
+                    normals: new Float32Array(18),
+                },
+            },
+        };
+        const ps = ParticleSystem.fromJSON(
+            {
+                version: '3.0',
+                autoDestroy: false,
+                looping: true,
+                prewarm: false,
+                duration: 1,
+                shape: {type: 'point'},
+                startLife: {type: 'ConstantValue', value: 1},
+                startSpeed: {type: 'ConstantValue', value: 0},
+                startRotation: {type: 'ConstantValue', value: 0},
+                startSize: {type: 'ConstantValue', value: 1},
+                startColor: {type: 'ConstantColor', color: {r: 1, g: 1, b: 1, a: 1}},
+                emissionOverTime: {type: 'ConstantValue', value: 0},
+                emissionOverDistance: {type: 'ConstantValue', value: 0},
+                emissionBursts: [],
+                onlyUsedByOther: false,
+                instancingGeometry: 'arc',
+                renderOrder: 0,
+                renderMode: RenderMode.Mesh,
+                rendererEmitterSettings: {},
+                material: 'mat',
+                layers: 1,
+                startTileIndex: {type: 'ConstantValue', value: 0},
+                uTileCount: 1,
+                vTileCount: 1,
+                behaviors: [],
+                worldSpace: true,
+            } as any,
+            meta,
+            {},
+            scene
+        );
+        const indices = ps.getRendererSettings().instancingIndices as Uint32Array;
+        expect(indices.length).toBe(6);
+        expect(Array.from(indices)).toEqual([0, 1, 2, 3, 4, 5]);
+    });
+
     it('update clamps delta above 0.1 seconds', () => {
         const ps = new ParticleSystem({
             scene,

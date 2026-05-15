@@ -13,6 +13,7 @@ import {
 import {ParticleSystem} from './ParticleSystem';
 import {ParticleEmitter} from './ParticleEmitter';
 import {QuarksPrefab} from './QuarksPrefab';
+import {ensureTriangleIndices} from './geometryUtil';
 
 export interface QuarksLoaderOptions {
     baseUrl?: string;
@@ -218,6 +219,8 @@ export class QuarksLoader {
                 indices = new Uint32Array(data.index.array);
             }
         }
+
+        indices = ensureTriangleIndices(positions, indices);
 
         return {positions, indices, uvs, normals};
     }

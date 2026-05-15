@@ -54,6 +54,12 @@
             display: flex;
             align-items: center;
             gap: 8px;
+            min-width: 0;
+        }
+
+        .hud-center {
+            flex: 1 1 auto;
+            justify-content: center;
         }
 
         .ui-btn,
@@ -66,6 +72,11 @@
             height: 34px;
             padding: 0 12px;
             font-size: 13px;
+        }
+
+        .ui-select {
+            min-width: 0;
+            max-width: min(280px, 100%);
         }
 
         .ui-link {
@@ -98,7 +109,7 @@
             font-size: 14px;
             font-weight: 600;
             letter-spacing: 0.01em;
-            min-width: 220px;
+            min-width: 0;
             text-align: center;
         }
 
@@ -124,6 +135,81 @@
             color: #aebfe8;
             background: rgba(8, 12, 24, 0.6);
             backdrop-filter: blur(8px);
+            line-height: 1.45;
+        }
+
+        #json-file-input {
+            display: none;
+        }
+
+        .drop-overlay {
+            position: fixed;
+            inset: 0;
+            z-index: 30;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+            background: rgba(6, 10, 22, 0.72);
+            border: 2px dashed rgba(120, 165, 255, 0.55);
+            pointer-events: none;
+        }
+
+        .drop-overlay.is-visible {
+            display: flex;
+        }
+
+        .drop-overlay-inner {
+            border-radius: 16px;
+            padding: 22px 28px;
+            text-align: center;
+            background: rgba(12, 18, 38, 0.92);
+            border: 1px solid rgba(151, 172, 255, 0.35);
+            box-shadow: 0 18px 48px rgba(0, 0, 0, 0.35);
+        }
+
+        .drop-overlay-inner strong {
+            display: block;
+            font-size: 18px;
+            margin-bottom: 8px;
+        }
+
+        .drop-overlay-inner span {
+            font-size: 13px;
+            color: #aebfe8;
+        }
+
+        @media (max-width: 720px) {
+            .hud {
+                gap: 8px;
+                padding: 8px 10px;
+            }
+
+            .hud-center {
+                flex: 1 1 100%;
+                width: 100%;
+                order: 1;
+            }
+
+            .ui-title {
+                display: none;
+            }
+
+            .ui-select {
+                flex: 1;
+                width: 100%;
+                max-width: 100%;
+            }
+
+            .hud-right {
+                flex: 1 1 100%;
+                flex-wrap: wrap;
+            }
+
+            .hint {
+                right: 14px;
+                max-width: calc(100% - 28px);
+            }
         }
     </style>
 </head>
@@ -134,6 +220,8 @@
             <a href="./" class="ui-link">Back</a>
             <button id="previousBtn" class="ui-btn" type="button">Prev</button>
             <button id="nextBtn" class="ui-btn" type="button">Next</button>
+            <button id="openJsonBtn" class="ui-btn" type="button">Open JSON</button>
+            <input id="json-file-input" type="file" accept=".json,application/json" />
         </div>
         <div class="hud-center">
             <span id="demo-name" class="ui-title">Loading...</span>
@@ -150,10 +238,16 @@
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M1.763 0C.786 0 0 .786 0 1.763v20.474C0 23.214.786 24 1.763 24h20.474c.977 0 1.763-.786 1.763-1.763V1.763C24 .786 23.214 0 22.237 0H1.763zM5.13 5.323l13.837.019-.009 13.818h-3.464l.01-10.382h-3.46L12.04 19.17h-3.47L5.113 5.311z"/></svg>
                 npm
             </a>
-            <a id="source-link" href="https://github.com/Soullnik/babylon.quarks-standalone/blob/main/examples/babylonMain.js" target="_blank" rel="noopener noreferrer" class="ui-link">Source</a>
+            <a id="source-link" href="https://github.com/Soullnik/babylon.quarks-standalone/blob/main/examples/src/viewer.ts" target="_blank" rel="noopener noreferrer" class="ui-link">Source</a>
         </div>
     </header>
-    <div class="hint">Controls: Left/Right arrows switch demo</div>
-    <script type="module" src="./babylonMain.js"></script>
+    <div id="drop-overlay" class="drop-overlay" aria-hidden="true">
+        <div class="drop-overlay-inner">
+            <strong>Drop Quarks JSON</strong>
+            <span>Object3D export with particle emitters (.json)</span>
+        </div>
+    </div>
+    <div class="hint">Left/Right: switch demo · Drop a .json file or use Open JSON</div>
+    <script type="module" src="./src/viewer.ts"></script>
 </body>
 </html>

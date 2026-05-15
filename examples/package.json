@@ -6,7 +6,11 @@
   "scripts": {
     "dev": "vite --port 8000",
     "build": "vite build",
-    "preview": "vite preview --port 8000"
+    "preview": "vite preview --port 8000",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3"
   },
   "dependencies": {
     "@babylonjs/core": "^9.0.0",

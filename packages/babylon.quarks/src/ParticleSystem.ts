@@ -41,6 +41,7 @@ import {
 import {ParticleEmitter} from './ParticleEmitter';
 import {RenderMode} from './VFXBatch';
 import {BatchedRenderer, VFXBatchSettings} from './BatchedRenderer';
+import {ensureTriangleIndices} from './geometryUtil';
 
 export interface BurstParameters {
     time: number;
@@ -1142,13 +1143,18 @@ export class ParticleSystem implements IParticleSystem {
         uvs?: Float32Array;
         normals?: Float32Array;
     } {
-        if (entry?.positions && entry?.indices) {
+        if (entry?.positions) {
+            const positions =
+                entry.positions instanceof Float32Array ? entry.positions : new Float32Array(entry.positions);
+            const rawIndices =
+                entry.indices instanceof Uint16Array || entry.indices instanceof Uint32Array
+                    ? entry.indices
+                    : entry.indices
+                      ? new Uint32Array(entry.indices)
+                      : undefined;
             return {
-                positions: entry.positions instanceof Float32Array ? entry.positions : new Float32Array(entry.positions),
-                indices:
-                    entry.indices instanceof Uint16Array || entry.indices instanceof Uint32Array
-                        ? entry.indices
-                        : new Uint32Array(entry.indices),
+                positions,
+                indices: ensureTriangleIndices(positions, rawIndices),
                 uvs: entry.uvs
                     ? entry.uvs instanceof Float32Array
                         ? entry.uvs
@@ -1163,11 +1169,16 @@ export class ParticleSystem implements IParticleSystem {
         }
 
         const data = entry?.data ?? entry;
-        if (data?.attributes?.position?.array && data?.index?.array) {
-            const indexType = data.index.type === 'Uint16Array' ? Uint16Array : Uint32Array;
+        if (data?.attributes?.position?.array) {
+            const positions = new Float32Array(data.attributes.position.array);
+            let indices: Uint32Array | Uint16Array | undefined;
+            if (data.index?.array) {
+                const indexType = data.index.type === 'Uint16Array' ? Uint16Array : Uint32Array;
+                indices = new indexType(data.index.array);
+            }
             return {
-                positions: new Float32Array(data.attributes.position.array),
-                indices: new indexType(data.index.array),
+                positions,
+                indices: ensureTriangleIndices(positions, indices),
                 uvs: data.attributes.uv?.array ? new Float32Array(data.attributes.uv.array) : undefined,
                 normals: data.attributes.normal?.array ? new Float32Array(data.attributes.normal.array) : undefined,
             };
