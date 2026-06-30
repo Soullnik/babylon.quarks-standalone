@@ -1,11 +1,31 @@
 import {Node} from '@babylonjs/core/node';
 import {TransformNode} from '@babylonjs/core/Meshes/transformNode';
+import {Vector3} from '@babylonjs/core/Maths/math.vector';
 import {ParticleEmitter} from './ParticleEmitter';
 import {ParticleSystem} from './ParticleSystem';
 import {BatchedRenderer} from './BatchedRenderer';
 import {IParticleSystem} from 'quarks.core';
 
 export class QuarksUtil {
+    /**
+     * Scales a loaded effect (or any emitter subtree) by an explicit factor, e.g. 0.5 = half size.
+     * worldSpace systems bake scale into each particle at spawn time, so already-emitted particles
+     * won't resize retroactively; this restarts them by default so every particle reflects the new scale.
+     */
+    static resizeEffect(root: TransformNode, scale: number | Vector3, options: {restart?: boolean} = {}): void {
+        const scaleVector = typeof scale === 'number' ? new Vector3(scale, scale, scale) : scale;
+        root.scaling.copyFrom(scaleVector);
+
+        if (options.restart ?? true) {
+            QuarksUtil.runOnAllParticleEmitters(root, (emitter) => {
+                const system = emitter.system as ParticleSystem;
+                if (system.worldSpace) {
+                    system.restart();
+                }
+            });
+        }
+    }
+
     static runOnAllParticleEmitters(root: Node, callback: (emitter: ParticleEmitter) => void): void {
         QuarksUtil.traverseNode(root, (node) => {
             if (node instanceof ParticleEmitter) {

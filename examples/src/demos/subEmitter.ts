@@ -1,7 +1,7 @@
 import type { DemoContext } from '../types';
 import {Vector3 as BVector3} from '@babylonjs/core/Maths/math.vector';
 import type {TransformNode} from '@babylonjs/core/Meshes/transformNode';
-import {QuarksLoader, ParticleEmitter, ParticleSystem} from 'babylon.quarks';
+import {QuarksLoader, QuarksUtil, ParticleEmitter, ParticleSystem} from 'babylon.quarks';
 
 async function loadEffectAndAttach({
     scene,
@@ -25,7 +25,8 @@ async function loadEffectAndAttach({
     effect.parent = batchRenderer;
     effect.position.x = positionX;
     if (scale !== undefined) {
-        effect.scaling.setAll(scale);
+        // E.g. scale: 0.5 attaches the effect to a mesh half the size it was authored for.
+        QuarksUtil.resizeEffect(effect, scale);
     }
     const traverse = (node: TransformNode) => {
         if (node instanceof ParticleEmitter) {
