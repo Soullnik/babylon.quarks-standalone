@@ -165,4 +165,13 @@ export const demoManifest: DemoManifestEntry[] = [
         tags: ["loop", "sci-fi"],
         preview: {icon: "BH", gradient: "linear-gradient(135deg, #2a1a3d 0%, #6b3d9a 100%)"},
     },
+    {
+        key: "ScaleComparisonDemo",
+        name: "Scale Comparison",
+        module: "scaleComparison",
+        sourcePath: "examples/src/demos/scaleComparison.ts",
+        description: "Same effect at scale 1, 0.5 and 0.25 via QuarksUtil.resizeEffect, with 1-unit reference cubes.",
+        tags: ["resize", "scale"],
+        preview: {icon: "SC", gradient: "linear-gradient(135deg, #c4ff7d 0%, #3f8b2c 100%)"},
+    },
 ];
