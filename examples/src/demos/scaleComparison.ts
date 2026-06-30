@@ -12,7 +12,6 @@ import {
     SphereEmitter,
     RenderMode,
     ConstantColor,
-    QuarksUtil,
     Vector4,
 } from 'babylon.quarks';
 import {createSharedTexture, SHARED_ASSETS} from '../shared/common';
@@ -34,6 +33,9 @@ function addScaledSystem({
 }) {
     const root = new TransformNode(`scaleRoot_${scale}`, scene);
     root.position.x = positionX;
+    // Plain Babylon API instead of QuarksUtil.resizeEffect, set before the
+    // system starts emitting so every particle bakes in the right scale.
+    root.scaling.setAll(scale);
 
     // 1-unit reference cube so the particle size at each scale is easy to compare against.
     const marker = MeshBuilder.CreateBox(`marker_${scale}`, {size: 1}, scene);
@@ -63,10 +65,6 @@ function addScaledSystem({
     system.emitter.parent = root;
     batchRenderer.addSystem(system);
     systems.push(system);
-
-    // Same effect authored at scale 1; resizeEffect scales the root so identical
-    // particle systems read as 1x, 0.5x and 0.25x side by side.
-    QuarksUtil.resizeEffect(root, scale);
 }
 
 export function init({scene, camera, batchRenderer, systems}: DemoContext) {
