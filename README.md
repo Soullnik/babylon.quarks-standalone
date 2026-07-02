@@ -25,6 +25,13 @@ import {BatchedRenderer, ParticleSystem} from "babylon.quarks";
 
 Then initialize `BatchedRenderer` with your Babylon scene and add one or more `ParticleSystem` instances.
 
+For the Babylon.js Playground or plain `<script>` usage there is a UMD bundle exposed as the `BabylonQuarks` global — see the [package README](packages/babylon.quarks/README.md#use-in-the-babylonjs-playground) for a paste-ready Playground snippet:
+
+```js
+await BABYLON.Tools.LoadScriptAsync("https://cdn.jsdelivr.net/npm/babylon.quarks/dist/babylon.quarks.umd.min.js");
+const {BatchedRenderer, ParticleSystem} = BabylonQuarks;
+```
+
 ## Live examples
 
 [GitHub Pages demo](https://soullnik.github.io/babylon.quarks-standalone/)

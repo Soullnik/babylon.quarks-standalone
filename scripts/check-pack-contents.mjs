@@ -23,6 +23,7 @@ function assertRequiredFiles(packResult) {
   const requiredFiles = [
     "dist/babylon.quarks.esm.js",
     "dist/babylon.quarks.cjs",
+    "dist/babylon.quarks.umd.min.js",
     "dist/types/index.d.ts",
     "LICENSE",
     "README.md",
