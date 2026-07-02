@@ -50,13 +50,13 @@ export class SpriteBatch extends VFXBatch {
         this.mesh.alwaysSelectAsActiveMesh = true;
 
         const vertexData = new VertexData();
-        vertexData.positions = Array.from(this.settings.instancingGeometry);
-        vertexData.indices = Array.from(this.settings.instancingIndices);
+        vertexData.positions = this.settings.instancingGeometry;
+        vertexData.indices = this.settings.instancingIndices;
         if (this.settings.instancingUVs) {
-            vertexData.uvs = Array.from(this.settings.instancingUVs);
+            vertexData.uvs = this.settings.instancingUVs;
         }
         if (this.settings.instancingNormals) {
-            vertexData.normals = Array.from(this.settings.instancingNormals);
+            vertexData.normals = this.settings.instancingNormals;
         }
         vertexData.applyToMesh(this.mesh, false);
 

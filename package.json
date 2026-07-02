@@ -10,6 +10,7 @@
     "build": "npm run build --workspace=babylon.quarks",
     "build:examples": "npm run build --workspace=examples",
     "test": "npm run test --workspace=babylon.quarks",
+    "docs": "npm run docs --workspace=babylon.quarks",
     "capture:previews": "tsx ./scripts/capture-demo-previews.mts",
     "check:pack": "node ./scripts/check-pack-contents.mjs",
     "check": "npm run build && npm run test && npm run build:examples && npm run check:pack",
@@ -38,6 +39,7 @@
     "ts-jest": "^29.4.6",
     "tslib": "^2.8.1",
     "tsx": "^4.20.5",
+    "typedoc": "^0.28.19",
     "typescript": "^5.9.3",
     "vite": "^7.3.1"
   },

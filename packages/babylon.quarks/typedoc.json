@@ -1,0 +1,15 @@
+{
+    "$schema": "https://typedoc.org/schema.json",
+    "name": "babylon.quarks",
+    "entryPoints": ["src/index.ts"],
+    "out": "../../examples/dist/docs",
+    "excludePrivate": true,
+    "excludeInternal": true,
+    "includeVersion": true,
+    "hideGenerator": true,
+    "navigationLinks": {
+        "Demos": "https://soullnik.github.io/babylon.quarks-standalone/",
+        "GitHub": "https://github.com/Soullnik/babylon.quarks-standalone",
+        "npm": "https://www.npmjs.com/package/babylon.quarks"
+    }
+}
