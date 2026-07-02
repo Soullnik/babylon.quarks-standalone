@@ -34,7 +34,7 @@ const {BatchedRenderer, ParticleSystem} = BabylonQuarks;
 
 ## Live examples
 
-[GitHub Pages demo](https://soullnik.github.io/babylon.quarks-standalone/)
+[GitHub Pages demo](https://soullnik.github.io/babylon.quarks-standalone/) · [Particle benchmark](https://soullnik.github.io/babylon.quarks-standalone/benchmark.html) (babylon.quarks vs Babylon's built-in CPU/GPU particle systems)
 
 | | | | |
 |---|---|---|---|

@@ -25,6 +25,7 @@ export default defineConfig({
             input: {
                 index: resolve(__dirname, "index.html"),
                 babylon: resolve(__dirname, "babylonDemo.html"),
+                benchmark: resolve(__dirname, "benchmark.html"),
             },
         },
     },

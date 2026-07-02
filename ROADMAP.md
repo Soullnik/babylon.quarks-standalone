@@ -22,9 +22,9 @@ All shaders are GLSL registered via `Effect.ShadersStore` and used through `Shad
 
 Simulation is fully CPU-side (inherited from three.quarks). Babylon ships a built-in `GPUParticleSystem`, which is the main argument against this library in large scenes. The previously reverted "pluggable simulation backend API" idea is worth revisiting: a simulation backend abstraction with a compute-shader implementation on WebGPU would be the headline differentiator for a 1.0 release. Notably, Babylon's Node Particle Editor currently generates CPU-only systems — this is an open window.
 
-### 3. Public benchmarks
+### 3. Public benchmarks — page shipped
 
-The package claims "High-Performance" but publishes no comparison against Babylon's native `ParticleSystem` / `GPUParticleSystem`. A benchmark page in the examples app (particle count / FPS / CPU ms, batched vs native) is both an engineering task and the primary marketing asset.
+The examples app now has a benchmark page (`benchmark.html`, linked from the gallery toolbar) comparing `babylon.quarks` batched rendering against Babylon's native `ParticleSystem` and `GPUParticleSystem` on an equivalent scenario (cone emitters, additive billboards, color over life). It reports CPU frame ms, FPS, draw calls and active particle count, supports 1/4/16 emitters and 2k–50k particles, and has a "run full benchmark" sweep with copy-as-markdown results. Remaining: run the sweep on real hardware and publish the numbers in the README.
 
 ### 4. API cleanliness and tree-shaking
 
@@ -66,7 +66,7 @@ Channels, in order of expected impact:
 
 1. ~~README with previews and the quarks.art → `QuarksLoader` guide~~ (previews done; guide pending)
 2. ~~UMD build + Playground examples~~ (done; Playground links pending a release)
-3. Benchmark page
+3. ~~Benchmark page~~ (done; publish real-hardware numbers pending)
 4. WebGPU compatibility verification / statement
 5. TypeDoc on Pages
 6. GPU simulation backend — strategic goal, a good reason for v1.0
