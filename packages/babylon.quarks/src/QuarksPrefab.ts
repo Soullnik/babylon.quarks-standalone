@@ -4,7 +4,7 @@ import {Scene} from '@babylonjs/core/scene';
 import {ParticleEmitter} from './ParticleEmitter';
 import {BatchedRenderer} from './BatchedRenderer';
 
-interface QuarksTimelineClip {
+export interface QuarksTimelineClip {
     uuid?: string;
     duration?: number;
     play?: () => void;
@@ -13,7 +13,7 @@ interface QuarksTimelineClip {
     setTime?: (time: number) => void;
 }
 
-interface AnimationData extends IAnimationData {
+export interface AnimationData extends IAnimationData {
     type: 'three' | 'ps';
     target: TransformNode;
     loop: boolean;

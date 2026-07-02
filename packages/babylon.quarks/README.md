@@ -152,6 +152,7 @@ See the [examples app](https://github.com/Soullnik/babylon.quarks-standalone/tre
 
 ## Links
 
+- [API documentation](https://soullnik.github.io/babylon.quarks-standalone/docs/)
 - [npm package](https://www.npmjs.com/package/babylon.quarks)
 - [Source (monorepo)](https://github.com/Soullnik/babylon.quarks-standalone/tree/main/packages/babylon.quarks)
 - [Roadmap](https://github.com/Soullnik/babylon.quarks-standalone/blob/main/ROADMAP.md)

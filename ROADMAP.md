@@ -26,11 +26,12 @@ Simulation is fully CPU-side (inherited from three.quarks). Babylon ships a buil
 
 The examples app now has a benchmark page (`benchmark.html`, linked from the gallery toolbar) comparing `babylon.quarks` batched rendering against Babylon's native `ParticleSystem` and `GPUParticleSystem` on an equivalent scenario (cone emitters, additive billboards, color over life). It reports CPU frame ms, FPS, draw calls and active particle count, supports 1/4/16 emitters and 2k–50k particles, and has a "run full benchmark" sweep with copy-as-markdown results. Remaining: run the sweep on real hardware and publish the numbers in the README.
 
-### 4. API cleanliness and tree-shaking
+### 4. API cleanliness and tree-shaking — mostly done
 
-- `BatchedRenderer` bypasses typing in several places: `(ps as any).update(delta)`, `(ps as any).setQualityFactor?.()`, `system as unknown as ParticleSystem`. The `IParticleSystem` interface does not cover the actually-used contract; extend it.
-- `package.json` has no `sideEffects` field while `index.ts` has real side effects (`registerShaderChunks()`, `loadPlugin(...)`). Either declare `sideEffects` precisely or move registration into an explicit `init()` so bundlers can tree-shake.
-- Minor perf: `Array.from(Float32Array)` in `setupBuffers` copies typed arrays into plain arrays; Babylon accepts typed arrays directly.
+- ~~`BatchedRenderer` `as any` casts~~: replaced with typed `ParticleSystem` narrowing; public signatures unchanged.
+- ~~`Array.from(Float32Array)` copies~~: `SpriteBatch.setupBuffers` and `QuarksLoader.createMeshNode` now pass typed arrays to `VertexData` directly (JSON serialization keeps `Array.from`, as it must).
+- ~~Types referenced by the public API but not exported~~ (`AdaptivePerformanceOptions/State`, `ParticleSystemJSONParameters`, `BabylonMetaData`, `AnimationData`, `QuarksTimelineClip`, `BurstParametersJSON`) are now exported from the index.
+- Remaining: `sideEffects` is moot while the package ships a single bundle file — revisit if the build moves to `preserveModules`; registration could then move to an explicit `init()`.
 
 ### 5. UMD/CDN build for the Playground — done
 
@@ -39,7 +40,7 @@ The Babylon community lives in the Playground (playground.babylonjs.com). The pa
 ## Documentation & DX
 
 - README previews: done — both READMEs now show the demo gallery (previews were already captured by `npm run capture:previews`).
-- API documentation: generate TypeDoc and deploy next to the demos on GitHub Pages.
+- ~~API documentation~~: TypeDoc now builds in the Pages workflow and deploys to `/docs/` next to the demos, linked from the gallery toolbar and both READMEs.
 - Document the killer workflow front and center: author an effect in the [quarks.art](https://quarks.art/) editor (or export from Unity) → load the JSON with `QuarksLoader`. A step-by-step guide with screenshots.
 - Add CHANGELOG.md, CONTRIBUTING.md, GitHub repo topics and a social preview image.
 - Starter templates: StackBlitz/CodeSandbox (Vite + Babylon + quarks), plus an integration example with react-babylonjs / Reactylon.
@@ -68,5 +69,5 @@ Channels, in order of expected impact:
 2. ~~UMD build + Playground examples~~ (done; Playground links pending a release)
 3. ~~Benchmark page~~ (done; publish real-hardware numbers pending)
 4. ~~WebGPU compatibility verification / statement~~ (done; real-hardware visual pass pending)
-5. TypeDoc on Pages
+5. ~~TypeDoc on Pages~~ (done)
 6. GPU simulation backend — strategic goal, a good reason for v1.0

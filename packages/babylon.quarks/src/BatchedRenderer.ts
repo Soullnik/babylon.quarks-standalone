@@ -90,11 +90,12 @@ export class BatchedRenderer extends TransformNode {
     }
 
     addSystem(system: IParticleSystem) {
-        (system as unknown as ParticleSystem)._renderer = this;
+        const particleSystem = system as ParticleSystem;
+        particleSystem._renderer = this;
         if (this.adaptivePerformanceState.enabled) {
-            (system as any).setQualityFactor?.(this.adaptivePerformanceState.currentQuality);
+            particleSystem.setQualityFactor(this.adaptivePerformanceState.currentQuality);
         }
-        const settings = (system as unknown as ParticleSystem).getRendererSettings();
+        const settings = particleSystem.getRendererSettings();
         for (let i = 0; i < this.batches.length; i++) {
             if (BatchedRenderer.equals(this.batches[i].settings, settings)) {
                 this.batches[i].addSystem(system);
@@ -179,7 +180,7 @@ export class BatchedRenderer extends TransformNode {
             return;
         }
         for (const ps of this.systemToBatchIndex.keys()) {
-            (ps as any).setQualityFactor?.(quality);
+            (ps as ParticleSystem).setQualityFactor(quality);
         }
         this.lastAppliedQuality = quality;
     }
@@ -191,7 +192,7 @@ export class BatchedRenderer extends TransformNode {
             this.applyAdaptiveQuality();
         }
         for (const ps of this.systemToBatchIndex.keys()) {
-            (ps as any).update(delta);
+            (ps as ParticleSystem).update(delta);
         }
         for (let i = 0; i < this.batches.length; i++) {
             this.batches[i].update();

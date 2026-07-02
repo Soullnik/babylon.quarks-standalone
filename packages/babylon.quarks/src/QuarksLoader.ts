@@ -343,13 +343,13 @@ export class QuarksLoader {
         const geometry = this.getGeometry(meta, data.geometry);
         if (geometry && geometry.positions.length > 0 && geometry.indices.length > 0) {
             const vertexData = new VertexData();
-            vertexData.positions = Array.from(geometry.positions);
-            vertexData.indices = Array.from(geometry.indices);
+            vertexData.positions = geometry.positions;
+            vertexData.indices = geometry.indices;
             if (geometry.uvs && geometry.uvs.length > 0) {
-                vertexData.uvs = Array.from(geometry.uvs);
+                vertexData.uvs = geometry.uvs;
             }
             if (geometry.normals && geometry.normals.length > 0) {
-                vertexData.normals = Array.from(geometry.normals);
+                vertexData.normals = geometry.normals;
             }
             vertexData.applyToMesh(mesh, true);
         }
