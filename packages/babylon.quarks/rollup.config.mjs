@@ -5,29 +5,45 @@ import terser from '@rollup/plugin-terser';
 
 const production = process.env.NODE_ENV === 'production';
 
-export default {
-    input: 'src/index.ts',
-    output: [
-        {
-            file: 'dist/babylon.quarks.esm.js',
-            format: 'esm',
+const babylonExternal = ['@babylonjs/core', /^@babylonjs\/core\/.*/];
+
+const typescriptPlugin = () =>
+    typescript({
+        tsconfig: './tsconfig.json',
+        declaration: false,
+        declarationDir: undefined,
+    });
+
+export default [
+    {
+        input: 'src/index.ts',
+        output: [
+            {
+                file: 'dist/babylon.quarks.esm.js',
+                format: 'esm',
+                sourcemap: true,
+            },
+            {
+                file: 'dist/babylon.quarks.cjs',
+                format: 'cjs',
+                sourcemap: true,
+            },
+        ],
+        external: [...babylonExternal, 'quarks.core'],
+        plugins: [resolve(), commonjs(), typescriptPlugin(), production && terser()].filter(Boolean),
+    },
+    // Browser/CDN build for the Babylon.js Playground and <script> usage.
+    // quarks.core is bundled in; @babylonjs/core resolves to the global BABYLON.
+    {
+        input: 'src/index.ts',
+        output: {
+            file: 'dist/babylon.quarks.umd.min.js',
+            format: 'umd',
+            name: 'BabylonQuarks',
             sourcemap: true,
+            globals: (id) => (id.startsWith('@babylonjs/core') ? 'BABYLON' : id),
         },
-        {
-            file: 'dist/babylon.quarks.cjs',
-            format: 'cjs',
-            sourcemap: true,
-        },
-    ],
-    external: ['@babylonjs/core', /^@babylonjs\/core\/.*/, 'quarks.core'],
-    plugins: [
-        resolve(),
-        commonjs(),
-        typescript({
-            tsconfig: './tsconfig.json',
-            declaration: false,
-            declarationDir: undefined,
-        }),
-        production && terser(),
-    ].filter(Boolean),
-};
+        external: babylonExternal,
+        plugins: [resolve(), commonjs(), typescriptPlugin(), terser()],
+    },
+];

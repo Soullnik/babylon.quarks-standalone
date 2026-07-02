@@ -32,9 +32,9 @@ The package claims "High-Performance" but publishes no comparison against Babylo
 - `package.json` has no `sideEffects` field while `index.ts` has real side effects (`registerShaderChunks()`, `loadPlugin(...)`). Either declare `sideEffects` precisely or move registration into an explicit `init()` so bundlers can tree-shake.
 - Minor perf: `Array.from(Float32Array)` in `setupBuffers` copies typed arrays into plain arrays; Babylon accepts typed arrays directly.
 
-### 5. UMD/CDN build for the Playground
+### 5. UMD/CDN build for the Playground — done
 
-The Babylon community lives in the Playground (playground.babylonjs.com). The package ships only ESM/CJS, which is hard to consume there. A UMD bundle on unpkg/jsDelivr plus copy-paste Playground snippets is likely the cheapest way to grow adoption.
+The Babylon community lives in the Playground (playground.babylonjs.com). The package now ships `dist/babylon.quarks.umd.min.js` (global `BabylonQuarks`, `quarks.core` bundled, `@babylonjs/core` mapped to the `BABYLON` global) with `unpkg`/`jsdelivr` fields in `package.json`. A paste-ready Playground snippet lives in the package README. Remaining: publish a release, then share saved Playground links on the forum.
 
 ## Documentation & DX
 
@@ -65,7 +65,7 @@ Channels, in order of expected impact:
 ## Suggested order
 
 1. ~~README with previews and the quarks.art → `QuarksLoader` guide~~ (previews done; guide pending)
-2. UMD build + Playground examples
+2. ~~UMD build + Playground examples~~ (done; Playground links pending a release)
 3. Benchmark page
 4. WebGPU compatibility verification / statement
 5. TypeDoc on Pages

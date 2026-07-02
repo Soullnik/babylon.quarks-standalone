@@ -1,11 +1,13 @@
 {
   "name": "babylon.quarks",
-  "version": "0.17.4",
+  "version": "0.17.5",
   "description": "A High-Performance Particle System for Babylon.js",
   "type": "module",
   "types": "./dist/types/index.d.ts",
   "main": "./dist/babylon.quarks.cjs",
   "module": "./dist/babylon.quarks.esm.js",
+  "unpkg": "./dist/babylon.quarks.umd.min.js",
+  "jsdelivr": "./dist/babylon.quarks.umd.min.js",
   "exports": {
     ".": {
       "import": "./dist/babylon.quarks.esm.js",
