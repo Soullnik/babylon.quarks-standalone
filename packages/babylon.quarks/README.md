@@ -22,6 +22,7 @@ High-performance particle system for [Babylon.js](https://www.babylonjs.com/). B
 - **Visual authoring** — create effects in the [quarks.art](https://quarks.art/) editor (or export from Unity) and load them with `QuarksLoader`.
 - **Cross-engine format** — the same effect JSON runs in three.js (three.quarks) and Babylon.js.
 - **Adaptive performance** — optional frame-budget quality scaling built into `BatchedRenderer`.
+- **WebGL and WebGPU** — runs on both Babylon engines; shaders are transpiled to WGSL automatically.
 
 ## Install
 
@@ -117,6 +118,21 @@ The same bundle works in any plain `<script>` setup alongside the global `babylo
 <script src="https://cdn.babylonjs.com/babylon.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/babylon.quarks/dist/babylon.quarks.umd.min.js"></script>
 ```
+
+## WebGPU
+
+The library runs on Babylon's `WebGPUEngine` — its GLSL shaders are transpiled to WGSL automatically by Babylon (glslang/twgsl are fetched by Babylon on engine init). Everything except engine creation stays the same:
+
+```ts
+import {WebGPUEngine} from "@babylonjs/core/Engines/webgpuEngine";
+import "@babylonjs/core/Engines/WebGPU/Extensions/index";
+
+const engine = new WebGPUEngine(canvas, {antialias: true});
+await engine.initAsync();
+// Scene + BatchedRenderer setup is identical to WebGL.
+```
+
+All render modes (billboard, stretched billboard, mesh, trail) are validated to create WebGPU pipelines with zero validation errors. The [live demos](https://soullnik.github.io/babylon.quarks-standalone/) and the [benchmark page](https://soullnik.github.io/babylon.quarks-standalone/benchmark.html) accept `?engine=webgpu` in the URL to switch engines.
 
 ## Load effects from quarks.art / Unity
 

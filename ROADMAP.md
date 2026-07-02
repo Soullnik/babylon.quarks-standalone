@@ -11,12 +11,12 @@ Improvement and promotion plan for `babylon.quarks`, based on a full repository 
 
 ## Technical directions
 
-### 1. WebGPU support (strategic priority)
+### 1. WebGPU support — verified
 
-All shaders are GLSL registered via `Effect.ShadersStore` and used through `ShaderMaterial`. Babylon.js is actively pushing WebGPU as the primary engine, and "does it run on WebGPU?" is the first question users will ask.
+All shaders are GLSL registered via `Effect.ShadersStore` and used through `ShaderMaterial`; under `WebGPUEngine` Babylon transpiles them to WGSL automatically (glslang/twgsl).
 
-- Minimum: test the library under `WebGPUEngine` (Babylon transpiles GLSL to WGSL), fix what breaks, state support in the README.
-- Maximum: native WGSL shader variants via `ShaderLanguage.WGSL`.
+- Done: validated under `WebGPUEngine` in headless Chromium (SwiftShader adapter) — all four render modes (billboard, stretched billboard, mesh, trail) create pipelines and render 90 frames with zero WebGPU validation errors. Support stated in the README; the live demos and the benchmark page accept `?engine=webgpu`.
+- Remaining: a visual pass on real hardware (headless SwiftShader cannot capture WebGPU canvas pixels), and eventually native WGSL shader variants via `ShaderLanguage.WGSL` to drop the transpiler dependency.
 
 ### 2. GPU particle simulation
 
@@ -67,6 +67,6 @@ Channels, in order of expected impact:
 1. ~~README with previews and the quarks.art → `QuarksLoader` guide~~ (previews done; guide pending)
 2. ~~UMD build + Playground examples~~ (done; Playground links pending a release)
 3. ~~Benchmark page~~ (done; publish real-hardware numbers pending)
-4. WebGPU compatibility verification / statement
+4. ~~WebGPU compatibility verification / statement~~ (done; real-hardware visual pass pending)
 5. TypeDoc on Pages
 6. GPU simulation backend — strategic goal, a good reason for v1.0

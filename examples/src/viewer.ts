@@ -1,4 +1,3 @@
-import {Engine} from "@babylonjs/core/Engines/engine";
 import {Scene} from "@babylonjs/core/scene";
 import {ArcRotateCamera} from "@babylonjs/core/Cameras/arcRotateCamera";
 import {HemisphericLight} from "@babylonjs/core/Lights/hemisphericLight";
@@ -6,6 +5,7 @@ import {Vector3 as BVector3} from "@babylonjs/core/Maths/math.vector";
 import {Color4} from "@babylonjs/core/Maths/math.color";
 import {BatchedRenderer, ParticleSystem} from "babylon.quarks";
 import {loadQuarksFromJson} from "./loadQuarksJson";
+import {createEngineFromQuery} from "./shared/engineFactory";
 import {demos} from "./registry";
 import type {DemoContext, DemoDefinition, DemoState} from "./types";
 
@@ -17,7 +17,7 @@ const canvas = document.getElementById("renderer-canvas") as HTMLCanvasElement;
 const demoSelect = document.getElementById("demo-select") as HTMLSelectElement;
 const jsonFileInput = document.getElementById("json-file-input") as HTMLInputElement | null;
 const dropOverlay = document.getElementById("drop-overlay");
-const engine = new Engine(canvas, true);
+const engine = await createEngineFromQuery(canvas);
 
 let scene: Scene;
 let camera: ArcRotateCamera;
