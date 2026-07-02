@@ -1,4 +1,3 @@
-import {Engine} from "@babylonjs/core/Engines/engine";
 import {Scene} from "@babylonjs/core/scene";
 import {ArcRotateCamera} from "@babylonjs/core/Cameras/arcRotateCamera";
 import {Vector3 as BVector3} from "@babylonjs/core/Maths/math.vector";
@@ -19,6 +18,7 @@ import {
     Vector4,
 } from "babylon.quarks";
 import {SHARED_ASSETS, createColorOverLifeRange, createSharedTexture} from "./shared/common";
+import {createEngineFromQuery} from "./shared/engineFactory";
 
 const LIFETIME = 2;
 const EMITTER_RING_RADIUS = 3;
@@ -221,7 +221,7 @@ const progressEl = document.getElementById("progress") as HTMLDivElement;
 const statsEl = document.getElementById("stats") as HTMLDivElement;
 const resultsEl = document.getElementById("results") as HTMLDivElement;
 
-const engine = new Engine(canvas, true);
+const engine = await createEngineFromQuery(canvas);
 
 let scene: Scene | null = null;
 let instrumentation: SceneInstrumentation | null = null;
@@ -286,6 +286,7 @@ function renderLiveStats() {
         return;
     }
     statsEl.innerHTML = [
+        `<b>Engine</b> ${engine.isWebGPU ? "WebGPU" : "WebGL"}`,
         `<b>FPS</b> ${engine.getFps().toFixed(0)}`,
         `<b>CPU frame</b> ${averageCpuMs().toFixed(2)} ms`,
         `<b>Draw calls</b> ${instrumentation?.drawCallsCounter.current ?? 0}`,
