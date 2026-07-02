@@ -42,7 +42,7 @@ The Babylon community lives in the Playground (playground.babylonjs.com). The pa
 - README previews: done — both READMEs now show the demo gallery (previews were already captured by `npm run capture:previews`).
 - ~~API documentation~~: TypeDoc now builds in the Pages workflow and deploys to `/docs/` next to the demos, linked from the gallery toolbar and both READMEs.
 - Document the killer workflow front and center: author an effect in the [quarks.art](https://quarks.art/) editor (or export from Unity) → load the JSON with `QuarksLoader`. A step-by-step guide with screenshots.
-- Add CHANGELOG.md, CONTRIBUTING.md, GitHub repo topics and a social preview image.
+- ~~Add CHANGELOG.md, CONTRIBUTING.md~~ (done: changelog ships with the npm package, contributing guide covers setup/checks/demo guide/release flow). Remaining: GitHub repo topics and a social preview image (repo settings, maintainer-only).
 - Starter templates: StackBlitz/CodeSandbox (Vite + Babylon + quarks), plus an integration example with react-babylonjs / Reactylon.
 
 ## Promotion & positioning

@@ -90,13 +90,13 @@ npm run capture:previews
 
 Replace these files with your own PNG images to customize the demo output.
 
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the dev setup, quality checks, demo guide and PR conventions. Package changes are tracked in the [changelog](packages/babylon.quarks/CHANGELOG.md).
+
 ## Release checklist
 
 1. Run `npm run check` from repository root.
-2. Bump package version in `packages/babylon.quarks/package.json`.
+2. Update `packages/babylon.quarks/CHANGELOG.md` and bump the version in `packages/babylon.quarks/package.json`.
 3. Verify tarball content with `npm pack --dry-run --workspace=babylon.quarks`.
-4. Publish package from CI (recommended) or manually:
-
-```bash
-npm publish --workspace=babylon.quarks --access public
-```
+4. Publish a GitHub release — CI publishes to npm via trusted publishing (or run the `Publish npm package` workflow manually).
