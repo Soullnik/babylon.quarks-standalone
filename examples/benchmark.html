@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>babylon.quarks benchmark</title>
+    <style>
+        :root {
+            color-scheme: dark;
+        }
+
+        html,
+        body {
+            margin: 0;
+            height: 100%;
+            font-family: Inter, Segoe UI, Roboto, sans-serif;
+            background: #070b16;
+            color: #eef3ff;
+            overflow: hidden;
+        }
+
+        #renderer-canvas {
+            position: fixed;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            display: block;
+            touch-action: none;
+        }
+
+        .panel {
+            position: fixed;
+            top: 16px;
+            left: 16px;
+            z-index: 2;
+            width: min(340px, calc(100vw - 32px));
+            max-height: calc(100vh - 32px);
+            overflow-y: auto;
+            border: 1px solid #2a365f;
+            border-radius: 14px;
+            padding: 16px;
+            background: linear-gradient(180deg, rgba(12, 18, 38, 0.9), rgba(6, 10, 22, 0.92));
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+        }
+
+        .panel h1 {
+            margin: 0;
+            font-size: 18px;
+            letter-spacing: -0.01em;
+        }
+
+        .panel p.note {
+            margin: 8px 0 0;
+            color: #b7c6ea;
+            font-size: 12.5px;
+            line-height: 1.5;
+        }
+
+        .field {
+            margin-top: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .field label {
+            font-size: 12px;
+            color: #9eb9ff;
+        }
+
+        .field select {
+            border: 1px solid #2b3761;
+            background: rgba(7, 11, 22, 0.82);
+            border-radius: 10px;
+            color: #eef3ff;
+            font-size: 14px;
+            padding: 8px 10px;
+            outline: none;
+        }
+
+        .buttons {
+            margin-top: 14px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        button {
+            border: 1px solid #4563ad;
+            background: rgba(28, 48, 98, 0.55);
+            color: #d8e3ff;
+            padding: 8px 12px;
+            border-radius: 10px;
+            font-size: 13.5px;
+            cursor: pointer;
+            transition: background 0.2s ease, border-color 0.2s ease;
+        }
+
+        button:hover:not(:disabled) {
+            background: rgba(60, 105, 209, 0.35);
+            border-color: #658ce8;
+        }
+
+        button:disabled {
+            opacity: 0.45;
+            cursor: default;
+        }
+
+        .stats {
+            margin-top: 14px;
+            border: 1px solid #2b3761;
+            border-radius: 10px;
+            padding: 10px 12px;
+            font-size: 13px;
+            line-height: 1.7;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .stats b {
+            color: #9eb9ff;
+            font-weight: 600;
+        }
+
+        .results {
+            margin-top: 14px;
+        }
+
+        .results table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .results th,
+        .results td {
+            border-bottom: 1px solid #22305c;
+            text-align: right;
+            padding: 4px 6px;
+            white-space: nowrap;
+        }
+
+        .results th:first-child,
+        .results td:first-child {
+            text-align: left;
+        }
+
+        .results th {
+            color: #9eb9ff;
+            font-weight: 600;
+        }
+
+        .progress {
+            margin-top: 8px;
+            font-size: 12.5px;
+            color: #b7c6ea;
+        }
+
+        a.back {
+            color: #9eb9ff;
+            font-size: 12.5px;
+            text-decoration: none;
+        }
+
+        a.back:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="renderer-canvas"></canvas>
+    <aside class="panel">
+        <h1>Particle benchmark</h1>
+        <p class="note">
+            Compares <code>babylon.quarks</code> (batched) against Babylon's built-in CPU and GPU particle
+            systems on an equivalent scenario: cone emitters, additive billboards, color fade over a 2s
+            lifetime. CPU frame ms is the most comparable metric; FPS is vsync-capped.
+        </p>
+        <div class="field">
+            <label for="backend-select">Backend</label>
+            <select id="backend-select"></select>
+        </div>
+        <div class="field">
+            <label for="count-select">Target active particles</label>
+            <select id="count-select"></select>
+        </div>
+        <div class="field">
+            <label for="emitters-select">Emitters (systems)</label>
+            <select id="emitters-select"></select>
+        </div>
+        <div class="buttons">
+            <button id="run-sweep">Run full benchmark</button>
+            <button id="copy-results" disabled>Copy as markdown</button>
+        </div>
+        <div id="progress" class="progress"></div>
+        <div id="stats" class="stats"></div>
+        <div id="results" class="results"></div>
+        <p class="note"><a class="back" href="./index.html">← back to demo gallery</a></p>
+    </aside>
+    <script type="module" src="./src/benchmark.ts"></script>
+</body>
+</html>
