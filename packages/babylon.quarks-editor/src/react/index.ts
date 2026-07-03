@@ -26,3 +26,5 @@ export {
     RendererModule,
 } from './modules';
 export {theme, inputStyle, rowStyle, labelStyle, buttonStyle} from './theme';
+export {EffectEditorHost, QuarksEffectEditor} from './EffectEditorHost';
+export type {EffectEditorHostProps, EffectEditorHostHandle} from './EffectEditorHost';
