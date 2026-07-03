@@ -1,4 +1,15 @@
 export {EffectEditor} from './EffectEditor';
+export type {EffectEditorProps} from './EffectEditor';
+export {
+    SpeedOverLifeModule,
+    LimitSpeedOverLifeModule,
+    ForceOverLifeModule,
+    GravityModule,
+    RotationOverLifeModule,
+    NoiseModule,
+    TextureSheetModule,
+} from './behaviorModules';
+export type {TextureOption} from './modules';
 export {ModuleSection} from './ModuleSection';
 export {CurveEditor} from './CurveEditor';
 export {GradientEditor} from './GradientEditor';
