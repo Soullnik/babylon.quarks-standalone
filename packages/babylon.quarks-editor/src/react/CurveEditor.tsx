@@ -1,6 +1,6 @@
 import React, {useCallback, useRef} from 'react';
 import {sampleCurve} from '../core/values';
-import {theme} from './theme';
+import {inputStyle, theme} from './theme';
 
 const WIDTH = 218;
 const HEIGHT = 84;
@@ -11,6 +11,38 @@ const PAD = 8;
  * at t = 0, 1/3, 2/3, 1, draggable vertically (Unity-like simplified curve).
  */
 export function CurveEditor(props: {
+    curve: [number, number, number, number];
+    onChange: (curve: [number, number, number, number]) => void;
+    maxValue?: number;
+}) {
+    return (
+        <div>
+            <CurveCanvas {...props} />
+            <div style={{display: 'flex', gap: 4, marginTop: 4}}>
+                {props.curve.map((v, i) => (
+                    <input
+                        key={i}
+                        type="number"
+                        step={0.05}
+                        title={`Value at t=${['0', '0.33', '0.67', '1'][i]}`}
+                        style={{...inputStyle, fontSize: 11, padding: '3px 5px'}}
+                        value={Math.round(v * 1000) / 1000}
+                        onChange={(e) => {
+                            const parsed = parseFloat(e.target.value);
+                            if (!Number.isNaN(parsed)) {
+                                const next = [...props.curve] as [number, number, number, number];
+                                next[i] = parsed;
+                                props.onChange(next);
+                            }
+                        }}
+                    />
+                ))}
+            </div>
+        </div>
+    );
+}
+
+function CurveCanvas(props: {
     curve: [number, number, number, number];
     onChange: (curve: [number, number, number, number]) => void;
     maxValue?: number;
@@ -75,6 +107,19 @@ export function CurveEditor(props: {
                 />
             ))}
             <polyline points={samples.join(' ')} fill="none" stroke={theme.curveStroke} strokeWidth={2} />
+            {props.curve.map((v, i) => (
+                <text
+                    key={`label-${i}`}
+                    x={toX(i / 3)}
+                    y={Math.min(HEIGHT - 2, Math.max(10, toY(v) - 9))}
+                    textAnchor="middle"
+                    fontSize={9}
+                    fill={theme.textDim}
+                    style={{pointerEvents: 'none', fontVariantNumeric: 'tabular-nums'}}
+                >
+                    {Math.round(v * 100) / 100}
+                </text>
+            ))}
             {props.curve.map((v, i) => (
                 <circle
                     key={i}

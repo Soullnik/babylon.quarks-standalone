@@ -11,6 +11,11 @@ QuarksEffectEditor.Show({
         {label: "Smoke (4x4 sheet)", url: SHARED_ASSETS.smoke},
     ],
     resolveTexture: (url, scene) => createSharedTexture(scene, url),
+    effectPresets: [
+        {label: "Explosion (Unity export)", url: "ps.json"},
+        {label: "Acid Boiling", url: "AcidBoiling.json"},
+        {label: "Sub Emitter", url: "subEmitter2.json"},
+    ],
     // Debug/testing hook: lets the console (and smoke tests) reach the live binding.
     onReady: (handle) => {
         (window as never as {__quarksEditor: unknown}).__quarksEditor = handle;

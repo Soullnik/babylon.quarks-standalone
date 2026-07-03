@@ -43,6 +43,8 @@ export interface EffectEditorHostProps {
     title?: string;
     textureOptions?: TextureOption[];
     resolveTexture?: (url: string, scene: Scene) => unknown;
+    /** Ready-made effects offered in an "Open example" dropdown (fetched as Quarks JSON). */
+    effectPresets?: Array<{label: string; url: string}>;
 }
 
 function createDefaultEffect(scene: Scene, resolveTexture?: (url: string, scene: Scene) => unknown, textureUrl?: string): ParticleSystem {
@@ -96,7 +98,10 @@ export function EffectEditorHost(props: EffectEditorHostProps) {
         };
 
         const makeHandle = (): EffectEditorHostHandle => ({
-            binding: stateRef.current!.binding,
+            // Live getter: stays correct after presets/imports/undo replace the binding.
+            get binding() {
+                return stateRef.current!.binding;
+            },
             history,
             scene,
             renderer,
@@ -215,6 +220,33 @@ export function EffectEditorHost(props: EffectEditorHostProps) {
                             <button style={buttonStyle} onClick={() => binding && props.onSave!(binding.exportJSON('EditorEffect'))}>
                                 Save
                             </button>
+                        )}
+                        {props.effectPresets && props.effectPresets.length > 0 && (
+                            <select
+                                style={{...buttonStyle, maxWidth: 150}}
+                                value=""
+                                onChange={async (e) => {
+                                    const url = e.target.value;
+                                    if (!url || !state) return;
+                                    try {
+                                        const response = await fetch(url);
+                                        historyAction(await response.json());
+                                        state.history.clear();
+                                        force();
+                                    } catch (err) {
+                                        console.error('Failed to load example effect:', err);
+                                    }
+                                }}
+                            >
+                                <option value="" disabled>
+                                    Open example…
+                                </option>
+                                {props.effectPresets.map((p) => (
+                                    <option key={p.url} value={p.url}>
+                                        {p.label}
+                                    </option>
+                                ))}
+                            </select>
                         )}
                         <input
                             ref={importRef}

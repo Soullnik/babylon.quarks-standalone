@@ -31,6 +31,18 @@ interface ModuleProps {
     binding: EffectBinding;
 }
 
+const MESH_QUAD_POSITIONS = new Float32Array([-0.5, -0.5, 0, 0.5, -0.5, 0, 0.5, 0.5, 0, -0.5, 0.5, 0]);
+const MESH_QUAD_INDICES = new Uint32Array([0, 1, 2, 0, 2, 3]);
+const MESH_QUAD_UVS = new Float32Array([0, 0, 1, 0, 1, 1, 0, 1]);
+const MESH_CUBE_POSITIONS = new Float32Array([
+    -0.5, -0.5, -0.5, 0.5, -0.5, -0.5, 0.5, 0.5, -0.5, -0.5, 0.5, -0.5,
+    -0.5, -0.5, 0.5, 0.5, -0.5, 0.5, 0.5, 0.5, 0.5, -0.5, 0.5, 0.5,
+]);
+const MESH_CUBE_INDICES = new Uint32Array([
+    0, 1, 2, 0, 2, 3, 4, 6, 5, 4, 7, 6, 0, 4, 5, 0, 5, 1,
+    3, 2, 6, 3, 6, 7, 0, 3, 7, 0, 7, 4, 1, 5, 6, 1, 6, 2,
+]);
+
 const PARAM_LABELS: {[key: string]: string} = {
     radius: 'Radius',
     arc: 'Arc',
@@ -52,6 +64,9 @@ export function MainModule({binding}: ModuleProps) {
             </Row>
             <Row label="Looping">
                 <CheckboxField value={system.looping} onChange={(v) => binding.apply((s) => (s.looping = v))} />
+            </Row>
+            <Row label="World space">
+                <CheckboxField value={system.worldSpace} onChange={(v) => binding.apply((s) => (s.worldSpace = v))} />
             </Row>
             <ValueField
                 label="Start lifetime"
@@ -261,10 +276,82 @@ export function RendererModule({
                         {value: RenderMode.StretchedBillBoard, label: 'Stretched billboard'},
                         {value: RenderMode.HorizontalBillBoard, label: 'Horizontal billboard'},
                         {value: RenderMode.VerticalBillBoard, label: 'Vertical billboard'},
+                        {value: RenderMode.Trail, label: 'Trail'},
+                        {value: RenderMode.Mesh, label: 'Mesh'},
                     ]}
                     onChange={(mode) => binding.apply((s) => (s.renderMode = mode))}
                 />
             </Row>
+            {system.renderMode === RenderMode.Trail && (
+                <>
+                    <Row label="Trail length">
+                        <NumberField
+                            value={readScalar((system.rendererEmitterSettings as {startLength?: never}).startLength).value}
+                            min={1}
+                            step={1}
+                            onChange={(v) =>
+                                binding.apply((s) => {
+                                    (s.rendererEmitterSettings as {startLength?: unknown}).startLength = new ConstantValue(Math.round(v));
+                                })
+                            }
+                        />
+                    </Row>
+                    <Row label="Follow origin">
+                        <CheckboxField
+                            value={!!(system.rendererEmitterSettings as {followLocalOrigin?: boolean}).followLocalOrigin}
+                            onChange={(v) =>
+                                binding.apply((s) => {
+                                    (s.rendererEmitterSettings as {followLocalOrigin?: boolean}).followLocalOrigin = v;
+                                })
+                            }
+                        />
+                    </Row>
+                </>
+            )}
+            {system.renderMode === RenderMode.StretchedBillBoard && (
+                <>
+                    <Row label="Speed factor">
+                        <NumberField
+                            value={(system.rendererEmitterSettings as {speedFactor?: number}).speedFactor ?? 0}
+                            step={0.1}
+                            onChange={(v) => binding.apply((s) => ((s.rendererEmitterSettings as {speedFactor?: number}).speedFactor = v))}
+                        />
+                    </Row>
+                    <Row label="Length factor">
+                        <NumberField
+                            value={(system.rendererEmitterSettings as {lengthFactor?: number}).lengthFactor ?? 2}
+                            step={0.1}
+                            onChange={(v) => binding.apply((s) => ((s.rendererEmitterSettings as {lengthFactor?: number}).lengthFactor = v))}
+                        />
+                    </Row>
+                </>
+            )}
+            {system.renderMode === RenderMode.Mesh && (
+                <Row label="Geometry">
+                    <SelectField
+                        value={system.instancingGeometry.length === MESH_CUBE_POSITIONS.length ? 'cube' : 'quad'}
+                        options={[
+                            {value: 'quad', label: 'Quad'},
+                            {value: 'cube', label: 'Cube'},
+                        ]}
+                        onChange={(preset) =>
+                            binding.apply((s) => {
+                                const settings = s.getRendererSettings();
+                                if (preset === 'cube') {
+                                    settings.instancingIndices = MESH_CUBE_INDICES;
+                                    settings.instancingUVs = undefined;
+                                    settings.instancingNormals = undefined;
+                                    s.instancingGeometry = MESH_CUBE_POSITIONS;
+                                } else {
+                                    settings.instancingIndices = MESH_QUAD_INDICES;
+                                    settings.instancingUVs = MESH_QUAD_UVS;
+                                    s.instancingGeometry = MESH_QUAD_POSITIONS;
+                                }
+                            })
+                        }
+                    />
+                </Row>
+            )}
             <Row label="Blend mode">
                 <SelectField
                     value={system.blending}
@@ -276,12 +363,51 @@ export function RendererModule({
                     onChange={(blend) => binding.apply((s) => (s.blending = blend))}
                 />
             </Row>
-            {textureOptions && textureOptions.length > 0 && resolveTexture && (
+            {resolveTexture && (
                 <Row label="Texture">
                     <SelectField
-                        value={textureOptions.some((o) => o.url === currentTextureUrl) ? currentTextureUrl : textureOptions[0].url}
-                        options={textureOptions.map((o) => ({value: o.url, label: o.label}))}
-                        onChange={(url) => binding.apply((s) => (s.texture = resolveTexture(url) as never))}
+                        value={
+                            (textureOptions ?? []).some((o) => o.url === currentTextureUrl)
+                                ? currentTextureUrl
+                                : currentTextureUrl
+                                  ? '__current'
+                                  : ((textureOptions ?? [])[0]?.url ?? '__current')
+                        }
+                        options={[
+                            ...(currentTextureUrl && !(textureOptions ?? []).some((o) => o.url === currentTextureUrl)
+                                ? [{value: '__current', label: `(current) ${currentTextureUrl.slice(-24)}`}]
+                                : []),
+                            ...(textureOptions ?? []).map((o) => ({value: o.url, label: o.label})),
+                            {value: '__url', label: 'Custom URL…'},
+                            {value: '__file', label: 'Load from file…'},
+                        ]}
+                        onChange={(url) => {
+                            if (url === '__current') {
+                                return;
+                            }
+                            if (url === '__url') {
+                                const custom = window.prompt('Texture URL', currentTextureUrl);
+                                if (custom) {
+                                    binding.apply((s) => (s.texture = resolveTexture(custom) as never));
+                                }
+                                return;
+                            }
+                            if (url === '__file') {
+                                const input = document.createElement('input');
+                                input.type = 'file';
+                                input.accept = 'image/*';
+                                input.onchange = () => {
+                                    const file = input.files?.[0];
+                                    if (file) {
+                                        // Object URLs preview fine but export as blob: — re-point before shipping.
+                                        binding.apply((s) => (s.texture = resolveTexture(URL.createObjectURL(file)) as never));
+                                    }
+                                };
+                                input.click();
+                                return;
+                            }
+                            binding.apply((s) => (s.texture = resolveTexture(url) as never));
+                        }}
                     />
                 </Row>
             )}
