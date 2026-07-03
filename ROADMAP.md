@@ -49,6 +49,8 @@ Also shipped: multi-system effects — Unity's hierarchy pattern. An `EffectHier
 the module stack at it via a per-system binding routed into the shared undo history. Sub
 Emitters targets live in the hierarchy and are edited by selecting them there.
 
+Also shipped: `EffectEditorHost` + `QuarksEffectEditor.Show({hostElement, effectJson, onSave})` — the NME-style imperative entry point BabylonJS Editor uses for its node editors; the host owns engine/scene/preview/toolbar (undo/redo/restart/import/export/save) and the standalone page is now a thin wrapper over it.
+
 Next: `startDelay` support (needs a quarks.core contribution — Unity's Start Delay has no
 core equivalent; only prewarm exists), npm publish of the editor package, BabylonJS Editor
 plugin host.
