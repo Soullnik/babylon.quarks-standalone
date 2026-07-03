@@ -76,7 +76,20 @@ document.getElementById("export-btn")!.addEventListener("click", () => {
     URL.revokeObjectURL(link.href);
 });
 
-createRoot(document.getElementById("editor-root")!).render(<EffectEditor binding={binding} />);
+const textureOptions = [
+    {label: "Default particle", url: SHARED_ASSETS.defaultParticle},
+    {label: "Texture atlas 1", url: SHARED_ASSETS.atlas},
+    {label: "Texture atlas 2", url: SHARED_ASSETS.atlasSecondary},
+    {label: "Smoke (4x4 sheet)", url: SHARED_ASSETS.smoke},
+];
+
+createRoot(document.getElementById("editor-root")!).render(
+    <EffectEditor
+        binding={binding}
+        textureOptions={textureOptions}
+        resolveTexture={(url) => createSharedTexture(scene, url)}
+    />
+);
 
 // Debug/testing hook: lets the console (and smoke tests) reach the live binding.
 (window as never as {__quarksEditor: unknown}).__quarksEditor = {

@@ -28,13 +28,15 @@ Architecture (designed for embedding into [BabylonJS Editor](https://github.com/
   the same components can mount in the standalone page or in a BabylonJS Editor plugin.
 - Standalone host: `/editor.html` in the examples app (live preview + Export JSON).
 
-Shipped in the first iteration: Main, Emission (rate + bursts), Shape (7 emitter types),
-Size over Lifetime (curve), Color over Lifetime (gradient), Renderer modules; JSON export
-verified to round-trip through `QuarksLoader`.
+Shipped modules (Unity inspector order): Main, Emission (rate + bursts), Shape (7 emitter
+types), Speed over Lifetime, Limit Speed over Lifetime, Force over Lifetime, Gravity,
+Color over Lifetime (gradient), Size over Lifetime (curve), Rotation over Lifetime, Noise,
+Texture Sheet Animation (tiles + frame-over-life), Renderer (render/blend mode, texture
+picker with host-provided presets, render order). JSON export verified to round-trip
+through `QuarksLoader` with all behaviors active.
 
-Next: texture picker, more behavior modules (Rotation/Speed/Force/Noise/Sub-emitters),
-undo/redo in `EffectBinding`, JSON import, multi-system effects, npm publish of the editor
-package, BabylonJS Editor plugin host.
+Next: sub-emitters module, undo/redo in `EffectBinding`, JSON import in the standalone page,
+multi-system effects, npm publish of the editor package, BabylonJS Editor plugin host.
 
 ## Technical directions
 

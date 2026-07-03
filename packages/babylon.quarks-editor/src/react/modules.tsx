@@ -239,8 +239,18 @@ export function ColorOverLifeModule({binding}: ModuleProps) {
     );
 }
 
-export function RendererModule({binding}: ModuleProps) {
+export interface TextureOption {
+    label: string;
+    url: string;
+}
+
+export function RendererModule({
+    binding,
+    textureOptions,
+    resolveTexture,
+}: ModuleProps & {textureOptions?: TextureOption[]; resolveTexture?: (url: string) => unknown}) {
     const system = binding.system;
+    const currentTextureUrl = (system.texture as {url?: string} | null)?.url ?? '';
     return (
         <ModuleSection title="Renderer">
             <Row label="Render mode">
@@ -266,14 +276,17 @@ export function RendererModule({binding}: ModuleProps) {
                     onChange={(blend) => binding.apply((s) => (s.blending = blend))}
                 />
             </Row>
+            {textureOptions && textureOptions.length > 0 && resolveTexture && (
+                <Row label="Texture">
+                    <SelectField
+                        value={textureOptions.some((o) => o.url === currentTextureUrl) ? currentTextureUrl : textureOptions[0].url}
+                        options={textureOptions.map((o) => ({value: o.url, label: o.label}))}
+                        onChange={(url) => binding.apply((s) => (s.texture = resolveTexture(url) as never))}
+                    />
+                </Row>
+            )}
             <Row label="Render order">
                 <NumberField value={system.renderOrder} step={1} onChange={(v) => binding.apply((s) => (s.renderOrder = Math.round(v)))} />
-            </Row>
-            <Row label="UV tiles U">
-                <NumberField value={system.uTileCount} min={1} step={1} onChange={(v) => binding.apply((s) => (s.uTileCount = Math.round(v)))} />
-            </Row>
-            <Row label="UV tiles V">
-                <NumberField value={system.vTileCount} min={1} step={1} onChange={(v) => binding.apply((s) => (s.vTileCount = Math.round(v)))} />
             </Row>
         </ModuleSection>
     );
