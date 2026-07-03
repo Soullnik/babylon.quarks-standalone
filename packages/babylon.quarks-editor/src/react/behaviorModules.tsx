@@ -209,8 +209,31 @@ export function TextureSheetModule({binding}: ModuleProps) {
     const system = binding.system;
     const frameBehavior = findBehavior<FrameOverLife>(system.behaviors, 'FrameOverLife');
     const tiles = Math.max(1, system.uTileCount * system.vTileCount);
+    const textureUrl = (system.texture as {url?: string} | null)?.url;
+    const u = Math.max(1, system.uTileCount);
+    const v = Math.max(1, system.vTileCount);
     return (
         <ModuleSection title="Texture Sheet Animation" defaultOpen={false}>
+            {textureUrl && (
+                <div style={{marginTop: 6}}>
+                    <div style={{position: 'relative', width: 218, border: '1px solid #2b3761', borderRadius: 6, overflow: 'hidden'}}>
+                        <img src={textureUrl} alt="texture atlas" style={{width: '100%', display: 'block'}} />
+                        <div
+                            style={{
+                                position: 'absolute',
+                                inset: 0,
+                                pointerEvents: 'none',
+                                backgroundImage:
+                                    `repeating-linear-gradient(to right, rgba(158,185,255,0.55) 0 1px, transparent 1px calc(100% / ${u})),` +
+                                    `repeating-linear-gradient(to bottom, rgba(158,185,255,0.55) 0 1px, transparent 1px calc(100% / ${v}))`,
+                            }}
+                        />
+                    </div>
+                    <div style={{fontSize: 11, color: '#b7c6ea', marginTop: 3}}>
+                        {u} × {v} = {tiles} tiles; frame indices 0–{tiles - 1}
+                    </div>
+                </div>
+            )}
             <Row label="Tiles U">
                 <NumberField value={system.uTileCount} min={1} step={1} onChange={(v) => binding.apply((s) => (s.uTileCount = Math.round(v)))} />
             </Row>

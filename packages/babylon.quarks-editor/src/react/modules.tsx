@@ -363,12 +363,51 @@ export function RendererModule({
                     onChange={(blend) => binding.apply((s) => (s.blending = blend))}
                 />
             </Row>
-            {textureOptions && textureOptions.length > 0 && resolveTexture && (
+            {resolveTexture && (
                 <Row label="Texture">
                     <SelectField
-                        value={textureOptions.some((o) => o.url === currentTextureUrl) ? currentTextureUrl : textureOptions[0].url}
-                        options={textureOptions.map((o) => ({value: o.url, label: o.label}))}
-                        onChange={(url) => binding.apply((s) => (s.texture = resolveTexture(url) as never))}
+                        value={
+                            (textureOptions ?? []).some((o) => o.url === currentTextureUrl)
+                                ? currentTextureUrl
+                                : currentTextureUrl
+                                  ? '__current'
+                                  : ((textureOptions ?? [])[0]?.url ?? '__current')
+                        }
+                        options={[
+                            ...(currentTextureUrl && !(textureOptions ?? []).some((o) => o.url === currentTextureUrl)
+                                ? [{value: '__current', label: `(current) ${currentTextureUrl.slice(-24)}`}]
+                                : []),
+                            ...(textureOptions ?? []).map((o) => ({value: o.url, label: o.label})),
+                            {value: '__url', label: 'Custom URL…'},
+                            {value: '__file', label: 'Load from file…'},
+                        ]}
+                        onChange={(url) => {
+                            if (url === '__current') {
+                                return;
+                            }
+                            if (url === '__url') {
+                                const custom = window.prompt('Texture URL', currentTextureUrl);
+                                if (custom) {
+                                    binding.apply((s) => (s.texture = resolveTexture(custom) as never));
+                                }
+                                return;
+                            }
+                            if (url === '__file') {
+                                const input = document.createElement('input');
+                                input.type = 'file';
+                                input.accept = 'image/*';
+                                input.onchange = () => {
+                                    const file = input.files?.[0];
+                                    if (file) {
+                                        // Object URLs preview fine but export as blob: — re-point before shipping.
+                                        binding.apply((s) => (s.texture = resolveTexture(URL.createObjectURL(file)) as never));
+                                    }
+                                };
+                                input.click();
+                                return;
+                            }
+                            binding.apply((s) => (s.texture = resolveTexture(url) as never));
+                        }}
                     />
                 </Row>
             )}
