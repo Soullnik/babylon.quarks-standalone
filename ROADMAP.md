@@ -44,7 +44,14 @@ Also shipped: undo/redo — `EffectHistory` (host-owned, snapshot-based over the
 coalesces rapid edits, survives rebinding on restore) wired to toolbar buttons and
 Ctrl+Z / Ctrl+Shift+Z on the standalone page; sub-effect edits route into the same history.
 
-Next: npm publish of the editor package, BabylonJS Editor plugin host.
+Also shipped: multi-system effects — Unity's hierarchy pattern. An `EffectHierarchy` panel
+(root + child systems, add/remove/rename) sits above the inspector; selecting a system points
+the module stack at it via a per-system binding routed into the shared undo history. Sub
+Emitters targets live in the hierarchy and are edited by selecting them there.
+
+Next: `startDelay` support (needs a quarks.core contribution — Unity's Start Delay has no
+core equivalent; only prewarm exists), npm publish of the editor package, BabylonJS Editor
+plugin host.
 
 ## Technical directions
 
