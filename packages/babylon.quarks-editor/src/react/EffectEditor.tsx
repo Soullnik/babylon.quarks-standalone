@@ -18,6 +18,8 @@ import {
     SpeedOverLifeModule,
     TextureSheetModule,
 } from './behaviorModules';
+import {SubEmittersModule} from './SubEmittersModule';
+import {EffectHierarchy} from './EffectHierarchy';
 import {theme} from './theme';
 
 export interface EffectEditorProps {
@@ -28,8 +30,9 @@ export interface EffectEditorProps {
 }
 
 /**
- * Shuriken-style stacked module editor for a babylon.quarks ParticleSystem.
- * Embed it anywhere React runs — the standalone examples page or a BabylonJS Editor plugin.
+ * Shuriken-style effect editor: a Unity-like hierarchy of systems (root + children)
+ * with a stacked module inspector for the selected system. Embed it anywhere React
+ * runs — the standalone examples page or a BabylonJS Editor plugin.
  * Module order mirrors Unity's Particle System inspector.
  */
 export function EffectEditor(props: EffectEditorProps) {
@@ -37,9 +40,29 @@ export function EffectEditor(props: EffectEditorProps) {
         (onStoreChange) => props.binding.subscribe(onStoreChange),
         () => props.binding.getRevision()
     );
-    const binding = props.binding;
+    const [selectedIndex, setSelectedIndex] = React.useState(0);
+    const systems = [props.binding.system, ...props.binding.subSystems];
+    const clampedIndex = Math.min(selectedIndex, systems.length - 1);
+    const selectedSystem = systems[clampedIndex];
+
+    // Inspector edits go through a per-system binding; changes route into the root
+    // binding's undo history and re-render via the subscription below.
+    const binding = React.useMemo(() => {
+        if (clampedIndex === 0) {
+            return props.binding;
+        }
+        const nested = new EffectBinding(selectedSystem);
+        nested.onBeforeChange = () => props.binding.onBeforeChange?.();
+        return nested;
+    }, [props.binding, selectedSystem, clampedIndex]);
+    useSyncExternalStore(
+        (onStoreChange) => binding.subscribe(onStoreChange),
+        () => binding.getRevision()
+    );
+
     return (
         <div style={{fontFamily: theme.font, color: theme.text}}>
+            <EffectHierarchy binding={props.binding} selectedIndex={clampedIndex} onSelect={setSelectedIndex} />
             <MainModule binding={binding} />
             <EmissionModule binding={binding} />
             <ShapeModule binding={binding} />
@@ -51,6 +74,7 @@ export function EffectEditor(props: EffectEditorProps) {
             <SizeOverLifeModule binding={binding} />
             <RotationOverLifeModule binding={binding} />
             <NoiseModule binding={binding} />
+            <SubEmittersModule binding={binding} rootBinding={props.binding} />
             <TextureSheetModule binding={binding} />
             <RendererModule binding={binding} textureOptions={props.textureOptions} resolveTexture={props.resolveTexture} />
         </div>

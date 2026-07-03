@@ -35,8 +35,23 @@ Texture Sheet Animation (tiles + frame-over-life), Renderer (render/blend mode, 
 picker with host-provided presets, render order). JSON export verified to round-trip
 through `QuarksLoader` with all behaviors active.
 
-Next: sub-emitters module, undo/redo in `EffectBinding`, JSON import in the standalone page,
-multi-system effects, npm publish of the editor package, BabylonJS Editor plugin host.
+Also shipped: Sub Emitters module (trigger mode/probability/velocity basis + nested sub-effect
+editing via reused Main/Emission/Shape modules; `EffectBinding` handles multiple systems and
+serializes sub systems as children with resolvable references) and JSON import on the
+standalone page (round-trips with export, including sub emitters).
+
+Also shipped: undo/redo — `EffectHistory` (host-owned, snapshot-based over the effect JSON,
+coalesces rapid edits, survives rebinding on restore) wired to toolbar buttons and
+Ctrl+Z / Ctrl+Shift+Z on the standalone page; sub-effect edits route into the same history.
+
+Also shipped: multi-system effects — Unity's hierarchy pattern. An `EffectHierarchy` panel
+(root + child systems, add/remove/rename) sits above the inspector; selecting a system points
+the module stack at it via a per-system binding routed into the shared undo history. Sub
+Emitters targets live in the hierarchy and are edited by selecting them there.
+
+Next: `startDelay` support (needs a quarks.core contribution — Unity's Start Delay has no
+core equivalent; only prewarm exists), npm publish of the editor package, BabylonJS Editor
+plugin host.
 
 ## Technical directions
 

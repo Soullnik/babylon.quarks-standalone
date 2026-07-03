@@ -10,6 +10,8 @@ export {
     TextureSheetModule,
 } from './behaviorModules';
 export type {TextureOption} from './modules';
+export {SubEmittersModule} from './SubEmittersModule';
+export {EffectHierarchy} from './EffectHierarchy';
 export {ModuleSection} from './ModuleSection';
 export {CurveEditor} from './CurveEditor';
 export {GradientEditor} from './GradientEditor';
