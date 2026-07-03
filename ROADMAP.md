@@ -40,8 +40,11 @@ editing via reused Main/Emission/Shape modules; `EffectBinding` handles multiple
 serializes sub systems as children with resolvable references) and JSON import on the
 standalone page (round-trips with export, including sub emitters).
 
-Next: undo/redo in `EffectBinding`, npm publish of the editor package, BabylonJS Editor
-plugin host.
+Also shipped: undo/redo — `EffectHistory` (host-owned, snapshot-based over the effect JSON,
+coalesces rapid edits, survives rebinding on restore) wired to toolbar buttons and
+Ctrl+Z / Ctrl+Shift+Z on the standalone page; sub-effect edits route into the same history.
+
+Next: npm publish of the editor package, BabylonJS Editor plugin host.
 
 ## Technical directions
 

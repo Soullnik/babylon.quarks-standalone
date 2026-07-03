@@ -93,8 +93,13 @@
             cursor: pointer;
         }
 
-        .sidebar-actions button:hover {
+        .sidebar-actions button:hover:not(:disabled) {
             background: rgba(60, 105, 209, 0.35);
+        }
+
+        .sidebar-actions button:disabled {
+            opacity: 0.4;
+            cursor: default;
         }
 
         #editor-root {
@@ -121,6 +126,8 @@
             <div class="sidebar-header">
                 <h1>Effect editor <span style="color:#9eb9ff;font-size:11px;vertical-align:top">beta</span></h1>
                 <div class="sidebar-actions">
+                    <button id="undo-btn" title="Ctrl+Z" disabled>↶</button>
+                    <button id="redo-btn" title="Ctrl+Shift+Z" disabled>↷</button>
                     <button id="restart-btn">Restart</button>
                     <button id="export-btn">Export JSON</button>
                     <button id="import-btn">Import JSON</button>

@@ -46,7 +46,15 @@ export function SubEmittersModule({binding}: {binding: EffectBinding}) {
     const system = binding.system;
     const behavior = findBehavior<EmitSubParticleSystem>(system.behaviors, 'EmitSubParticleSystem');
     const subSystem = binding.subSystems[0];
-    const subBinding = useMemo(() => (subSystem ? new EffectBinding(subSystem) : null), [subSystem]);
+    const subBinding = useMemo(() => {
+        if (!subSystem) {
+            return null;
+        }
+        const nested = new EffectBinding(subSystem);
+        // Route sub-effect edits into the parent's undo history.
+        nested.onBeforeChange = () => binding.onBeforeChange?.();
+        return nested;
+    }, [subSystem, binding]);
     // Re-render when the nested binding changes so sub-effect edits show immediately.
     useSyncExternalStore(
         (onStoreChange) => (subBinding ? subBinding.subscribe(onStoreChange) : () => {}),

@@ -10,6 +10,8 @@ export class EffectBinding {
     readonly system: ParticleSystem;
     /** Systems spawned by sub-emitter behaviors; serialized as children of the root emitter. */
     readonly subSystems: ParticleSystem[] = [];
+    /** Invoked before any mutation — used by EffectHistory to capture undo snapshots. */
+    onBeforeChange?: () => void;
     private listeners = new Set<EditorListener>();
     private revision = 0;
 
@@ -29,6 +31,7 @@ export class EffectBinding {
     }
 
     apply(mutate: (system: ParticleSystem) => void): void {
+        this.onBeforeChange?.();
         mutate(this.system);
         this.notify();
     }

@@ -17,7 +17,7 @@ import {
     SizeOverLife,
     Vector4,
 } from "babylon.quarks";
-import {EffectBinding, DEFAULT_GRADIENT_STOPS, buildGradient, buildScalar} from "babylon.quarks-editor";
+import {EffectBinding, EffectHistory, DEFAULT_GRADIENT_STOPS, buildGradient, buildScalar} from "babylon.quarks-editor";
 import {EffectEditor} from "babylon.quarks-editor/react";
 import {SHARED_ASSETS, createSharedTexture} from "./shared/common";
 import {createEngineFromQuery} from "./shared/engineFactory";
@@ -65,9 +65,12 @@ const textureOptions = [
 ];
 
 const root = createRoot(document.getElementById("editor-root")!);
+const history = new EffectHistory();
 
 function mountEditor(nextBinding: EffectBinding) {
     binding = nextBinding;
+    history.attach(nextBinding);
+    nextBinding.subscribe(updateHistoryButtons);
     root.render(
         <EffectEditor
             binding={nextBinding}
@@ -76,6 +79,7 @@ function mountEditor(nextBinding: EffectBinding) {
         />
     );
     updateDebugHook();
+    updateHistoryButtons();
 }
 
 /** Replaces the current effect with systems loaded from a Quarks JSON export. */
@@ -117,6 +121,30 @@ document.getElementById("export-btn")!.addEventListener("click", () => {
     URL.revokeObjectURL(link.href);
 });
 
+const undoButton = document.getElementById("undo-btn") as HTMLButtonElement;
+const redoButton = document.getElementById("redo-btn") as HTMLButtonElement;
+
+function updateHistoryButtons() {
+    undoButton.disabled = !history.canUndo;
+    redoButton.disabled = !history.canRedo;
+}
+
+function applyHistory(json: unknown | null) {
+    if (json) {
+        importEffectJson(json);
+    }
+    updateHistoryButtons();
+}
+
+undoButton.addEventListener("click", () => applyHistory(history.undo()));
+redoButton.addEventListener("click", () => applyHistory(history.redo()));
+window.addEventListener("keydown", (event) => {
+    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "z") {
+        event.preventDefault();
+        applyHistory(event.shiftKey ? history.redo() : history.undo());
+    }
+});
+
 const importInput = document.getElementById("import-input") as HTMLInputElement;
 document.getElementById("import-btn")!.addEventListener("click", () => importInput.click());
 importInput.addEventListener("change", async () => {
@@ -127,6 +155,8 @@ importInput.addEventListener("change", async () => {
     }
     try {
         importEffectJson(JSON.parse(await file.text()));
+        history.clear();
+        updateHistoryButtons();
     } catch (e) {
         console.error("Failed to import effect JSON:", e);
         alert("Failed to import effect JSON: " + (e as Error).message);

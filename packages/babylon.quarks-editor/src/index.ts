@@ -1,5 +1,6 @@
 export {EffectBinding} from './core/binding';
 export type {EditorListener} from './core/binding';
+export {EffectHistory} from './core/history';
 export {readScalar, buildScalar, sampleCurve} from './core/values';
 export type {ScalarGenerator, ScalarMode, ScalarValueState} from './core/values';
 export {
