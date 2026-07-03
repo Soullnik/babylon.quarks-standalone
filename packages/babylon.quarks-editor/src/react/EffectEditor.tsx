@@ -18,6 +18,7 @@ import {
     SpeedOverLifeModule,
     TextureSheetModule,
 } from './behaviorModules';
+import {SubEmittersModule} from './SubEmittersModule';
 import {theme} from './theme';
 
 export interface EffectEditorProps {
@@ -51,6 +52,7 @@ export function EffectEditor(props: EffectEditorProps) {
             <SizeOverLifeModule binding={binding} />
             <RotationOverLifeModule binding={binding} />
             <NoiseModule binding={binding} />
+            <SubEmittersModule binding={binding} />
             <TextureSheetModule binding={binding} />
             <RendererModule binding={binding} textureOptions={props.textureOptions} resolveTexture={props.resolveTexture} />
         </div>

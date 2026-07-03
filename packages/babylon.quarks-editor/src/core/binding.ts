@@ -8,11 +8,14 @@ export type EditorListener = () => void;
  */
 export class EffectBinding {
     readonly system: ParticleSystem;
+    /** Systems spawned by sub-emitter behaviors; serialized as children of the root emitter. */
+    readonly subSystems: ParticleSystem[] = [];
     private listeners = new Set<EditorListener>();
     private revision = 0;
 
-    constructor(system: ParticleSystem) {
+    constructor(system: ParticleSystem, subSystems: ParticleSystem[] = []) {
         this.system = system;
+        this.subSystems.push(...subSystems);
     }
 
     subscribe(listener: EditorListener): () => void {
@@ -27,6 +30,23 @@ export class EffectBinding {
 
     apply(mutate: (system: ParticleSystem) => void): void {
         mutate(this.system);
+        this.notify();
+    }
+
+    addSubSystem(sub: ParticleSystem): void {
+        this.subSystems.push(sub);
+        this.notify();
+    }
+
+    removeSubSystem(sub: ParticleSystem): void {
+        const index = this.subSystems.indexOf(sub);
+        if (index >= 0) {
+            this.subSystems.splice(index, 1);
+        }
+        this.notify();
+    }
+
+    private notify(): void {
         this.revision++;
         for (const listener of this.listeners) {
             listener();
@@ -36,6 +56,9 @@ export class EffectBinding {
     restart(): void {
         this.system.restart();
         this.system.play();
+        for (const sub of this.subSystems) {
+            sub.restart();
+        }
     }
 
     /**
@@ -49,6 +72,14 @@ export class EffectBinding {
             geometries: {[k: string]: unknown};
         } = {textures: {}, materials: {}, geometries: {}};
         const ps = this.system.toJSON(meta as never, {useUrlForImage: true} as never);
+        const children = this.subSystems.map((sub, index) => ({
+            uuid: (sub.emitter as {uuid?: string}).uuid ?? `${name}-sub-${index}`,
+            type: 'ParticleEmitter',
+            name: sub.emitter.name || `${name}-sub-${index}`,
+            layers: 1,
+            matrix: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1],
+            ps: sub.toJSON(meta as never, {useUrlForImage: true} as never),
+        }));
 
         // toJSON stores live Texture instances and material refs in meta; flatten them
         // into the serializable images/textures/materials arrays QuarksLoader expects.
@@ -84,6 +115,7 @@ export class EffectBinding {
                     layers: 1,
                     matrix: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1],
                     ps,
+                    children: children.length > 0 ? children : undefined,
                 },
             },
             null,
