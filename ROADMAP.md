@@ -9,6 +9,33 @@ Improvement and promotion plan for `babylon.quarks`, based on a full repository 
 - Feature set already competitive: batched rendering (sprite/trail), all billboard modes + stretched + mesh + trail, soft particles, texture tiles, sub-emitters, mesh surface emitter plugin, `QuarksLoader` for quarks.art / Unity-exported JSON, adaptive performance budget.
 - 18 interactive demos deployed to GitHub Pages with automated preview capture.
 
+## Strategic direction: own effect editor + GPU backend
+
+The project does **not** depend on the quarks.art editor going forward. The two flagship efforts are:
+
+### Effect editor (Shuriken-style, in progress)
+
+A stacked-module editor modeled after Unity's Particle System inspector — the quarks.core data
+model (behaviors = modules) maps to it 1:1, and Unity tutorials translate directly. Explicitly
+**not** a node editor: Babylon already ships NPE for node-based authoring, and a dataflow graph
+only pays off when it compiles to GPU code (see GPU backend below — revisit then).
+
+Architecture (designed for embedding into [BabylonJS Editor](https://github.com/BabylonJS/Editor)):
+
+- `packages/babylon.quarks-editor` — `.` export is the headless core (`EffectBinding`
+  edit-model, value/shape/gradient helpers, Quarks JSON export), `./react` export is the UI
+  (module stack, curve editor, gradient editor, field widgets). React is a peer dependency;
+  the same components can mount in the standalone page or in a BabylonJS Editor plugin.
+- Standalone host: `/editor.html` in the examples app (live preview + Export JSON).
+
+Shipped in the first iteration: Main, Emission (rate + bursts), Shape (7 emitter types),
+Size over Lifetime (curve), Color over Lifetime (gradient), Renderer modules; JSON export
+verified to round-trip through `QuarksLoader`.
+
+Next: texture picker, more behavior modules (Rotation/Speed/Force/Noise/Sub-emitters),
+undo/redo in `EffectBinding`, JSON import, multi-system effects, npm publish of the editor
+package, BabylonJS Editor plugin host.
+
 ## Technical directions
 
 ### 1. WebGPU support — verified
@@ -18,7 +45,7 @@ All shaders are GLSL registered via `Effect.ShadersStore` and used through `Shad
 - Done: validated under `WebGPUEngine` in headless Chromium (SwiftShader adapter) — all four render modes (billboard, stretched billboard, mesh, trail) create pipelines and render 90 frames with zero WebGPU validation errors. Support stated in the README; the live demos and the benchmark page accept `?engine=webgpu`.
 - Remaining: a visual pass on real hardware (headless SwiftShader cannot capture WebGPU canvas pixels), and eventually native WGSL shader variants via `ShaderLanguage.WGSL` to drop the transpiler dependency.
 
-### 2. GPU particle simulation
+### 2. GPU particle simulation (second flagship effort)
 
 Simulation is fully CPU-side (inherited from three.quarks). Babylon ships a built-in `GPUParticleSystem`, which is the main argument against this library in large scenes. The previously reverted "pluggable simulation backend API" idea is worth revisiting: a simulation backend abstraction with a compute-shader implementation on WebGPU would be the headline differentiator for a 1.0 release. Notably, Babylon's Node Particle Editor currently generates CPU-only systems — this is an open window.
 

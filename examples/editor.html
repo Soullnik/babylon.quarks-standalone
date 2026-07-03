@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>babylon.quarks effect editor</title>
+    <style>
+        :root {
+            color-scheme: dark;
+        }
+
+        html,
+        body {
+            margin: 0;
+            height: 100%;
+            font-family: Inter, Segoe UI, Roboto, sans-serif;
+            background: #070b16;
+            color: #eef3ff;
+            overflow: hidden;
+        }
+
+        .layout {
+            display: flex;
+            height: 100vh;
+        }
+
+        .viewport {
+            position: relative;
+            flex: 1;
+            min-width: 0;
+        }
+
+        #renderer-canvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+            touch-action: none;
+        }
+
+        .viewport-hud {
+            position: absolute;
+            left: 14px;
+            top: 12px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 13px;
+            color: #b7c6ea;
+        }
+
+        .viewport-hud a {
+            color: #9eb9ff;
+            text-decoration: none;
+        }
+
+        .viewport-hud a:hover {
+            text-decoration: underline;
+        }
+
+        .sidebar {
+            width: 340px;
+            flex-shrink: 0;
+            border-left: 1px solid #2a365f;
+            background: linear-gradient(180deg, rgba(12, 18, 38, 0.92), rgba(6, 10, 22, 0.94));
+            display: flex;
+            flex-direction: column;
+        }
+
+        .sidebar-header {
+            padding: 12px 14px 10px;
+            border-bottom: 1px solid #22305c;
+        }
+
+        .sidebar-header h1 {
+            margin: 0;
+            font-size: 16px;
+            letter-spacing: -0.01em;
+        }
+
+        .sidebar-actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 10px;
+        }
+
+        .sidebar-actions button {
+            border: 1px solid #4563ad;
+            background: rgba(28, 48, 98, 0.55);
+            color: #d8e3ff;
+            padding: 6px 10px;
+            border-radius: 8px;
+            font-size: 12.5px;
+            cursor: pointer;
+        }
+
+        .sidebar-actions button:hover {
+            background: rgba(60, 105, 209, 0.35);
+        }
+
+        #editor-root {
+            flex: 1;
+            overflow-y: auto;
+            padding: 6px 14px 20px;
+        }
+
+        #particle-count {
+            font-variant-numeric: tabular-nums;
+        }
+    </style>
+</head>
+<body>
+    <div class="layout">
+        <div class="viewport">
+            <canvas id="renderer-canvas"></canvas>
+            <div class="viewport-hud">
+                <a href="./index.html">← gallery</a>
+                <span id="particle-count">0 particles</span>
+            </div>
+        </div>
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <h1>Effect editor <span style="color:#9eb9ff;font-size:11px;vertical-align:top">beta</span></h1>
+                <div class="sidebar-actions">
+                    <button id="restart-btn">Restart</button>
+                    <button id="export-btn">Export JSON</button>
+                </div>
+            </div>
+            <div id="editor-root"></div>
+        </aside>
+    </div>
+    <script type="module" src="./src/editorApp.tsx"></script>
+</body>
+</html>
