@@ -13,7 +13,11 @@
     "resolveJsonModule": true,
     "isolatedModules": true,
     "jsx": "react-jsx",
-    "noEmit": true
+    "noEmit": true,
+    "paths": {
+      "babylon.quarks-editor": ["../packages/babylon.quarks-editor/src/index.ts"],
+      "babylon.quarks-editor/react": ["../packages/babylon.quarks-editor/src/react/index.ts"]
+    }
   },
   "include": ["src/**/*", "vite.config.ts"]
 }

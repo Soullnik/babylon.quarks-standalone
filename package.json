@@ -8,12 +8,13 @@
   ],
   "scripts": {
     "build": "npm run build --workspace=babylon.quarks",
+    "build:editor": "npm run build --workspace=babylon.quarks-editor",
     "build:examples": "npm run build --workspace=examples",
     "test": "npm run test --workspace=babylon.quarks",
     "docs": "npm run docs --workspace=babylon.quarks",
     "capture:previews": "tsx ./scripts/capture-demo-previews.mts",
     "check:pack": "node ./scripts/check-pack-contents.mjs",
-    "check": "npm run build && npm run test && npm run build:examples && npm run check:pack",
+    "check": "npm run build && npm run build:editor && npm run test && npm run build:examples && npm run check:pack",
     "examples": "npm run dev --workspace=examples",
     "dev": "npm run examples"
   },
