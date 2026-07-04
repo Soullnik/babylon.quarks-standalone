@@ -220,28 +220,55 @@ export function EmissionModule({binding}: ModuleProps) {
                 onChange={(g) => binding.apply((s) => (s.emissionOverTime = g))}
             />
             {bursts.map((burst, i) => (
-                <Row key={i} label={`Burst ${i + 1}`}>
-                    <div style={{display: 'flex', gap: 6, alignItems: 'center'}}>
-                        <NumberField
-                            value={burst.time}
-                            min={0}
-                            onChange={(time) => binding.apply(() => (burst.time = time))}
-                        />
-                        <NumberField
-                            value={readScalar(burst.count as never).value}
-                            min={0}
-                            step={1}
-                            onChange={(count) => binding.apply(() => (burst.count = new ConstantValue(Math.round(count))))}
-                        />
+                <div key={i} style={{marginTop: 8, padding: '6px 8px', border: '1px solid #22305c', borderRadius: 8}}>
+                    <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between'}}>
+                        <span style={{fontSize: 11.5, color: '#9eb9ff'}}>Burst {i + 1}</span>
                         <button
-                            style={{background: 'none', border: 'none', color: '#e08c8c', cursor: 'pointer', fontSize: 14}}
+                            style={{background: 'none', border: 'none', color: '#e08c8c', cursor: 'pointer', fontSize: 13}}
                             title="Remove burst"
                             onClick={() => binding.apply((s) => s.emissionBursts.splice(i, 1))}
                         >
                             ✕
                         </button>
                     </div>
-                </Row>
+                    <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginTop: 4}}>
+                        <label style={{fontSize: 10.5, color: '#b7c6ea'}}>
+                            Time
+                            <NumberField value={burst.time} min={0} onChange={(time) => binding.apply(() => (burst.time = time))} />
+                        </label>
+                        <label style={{fontSize: 10.5, color: '#b7c6ea'}}>
+                            Count
+                            <NumberField
+                                value={readScalar(burst.count as never).value}
+                                min={0}
+                                step={1}
+                                onChange={(count) => binding.apply(() => (burst.count = new ConstantValue(Math.round(count))))}
+                            />
+                        </label>
+                        <label style={{fontSize: 10.5, color: '#b7c6ea'}}>
+                            Cycles
+                            <NumberField
+                                value={burst.cycle}
+                                min={1}
+                                step={1}
+                                onChange={(v) => binding.apply(() => (burst.cycle = Math.round(v)))}
+                            />
+                        </label>
+                        <label style={{fontSize: 10.5, color: '#b7c6ea'}}>
+                            Interval
+                            <NumberField value={burst.interval} min={0.01} onChange={(v) => binding.apply(() => (burst.interval = v))} />
+                        </label>
+                        <label style={{fontSize: 10.5, color: '#b7c6ea'}}>
+                            Probability
+                            <NumberField
+                                value={burst.probability}
+                                min={0}
+                                step={0.05}
+                                onChange={(v) => binding.apply(() => (burst.probability = Math.min(1, v)))}
+                            />
+                        </label>
+                    </div>
+                </div>
             ))}
             <button
                 style={{marginTop: 8, background: 'none', border: '1px dashed #34477f', color: '#9eb9ff', borderRadius: 8, padding: '5px 10px', cursor: 'pointer', fontSize: 12.5}}

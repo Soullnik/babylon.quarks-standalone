@@ -11,7 +11,7 @@ Three tiers: ✅ shipped · 🟡 runtime supports it, editor UI missing · 🔴 
 
 ## Emission
 - ✅ rate over time (constant/random/curve), bursts (time/count)
-- 🟡 burst cycles/interval/probability (serialized but not editable)
+- ✅ burst cycles/interval/probability
 - 🔴 rate over distance
 
 ## Shape
@@ -21,12 +21,12 @@ Three tiers: ✅ shipped · 🟡 runtime supports it, editor UI missing · 🔴 
 
 ## Velocity / forces
 - ✅ Speed over Lifetime (curve), Limit Speed over Lifetime (curve + dampen), Force over Lifetime (XYZ), Gravity
-- 🟡 Orbit over Lifetime (`OrbitOverLife`)
+- ✅ Orbit over Lifetime
 - 🔴 Velocity over Lifetime (direct linear XYZ + radial), Inherit Velocity, Lifetime by Emitter Speed
 
 ## Color / size / rotation
 - ✅ Color over Lifetime (gradient), Size over Lifetime (curve), Rotation over Lifetime
-- 🟡 Color by Speed, Size by Speed, Rotation by Speed (behaviors exist in core)
+- ✅ Color by Speed, Size by Speed, Rotation by Speed
 
 ## Noise
 - ✅ frequency + strength (position amount fixed)
@@ -47,7 +47,7 @@ Three tiers: ✅ shipped · 🟡 runtime supports it, editor UI missing · 🔴 
 
 ## Trails (Unity Trails module = ribbons attached to particles)
 - ✅ Trail *render mode* (whole system renders as trails) with length/follow-origin
-- 🟡 Width over Trail (`WidthOverLength`)
+- ✅ Width over Trail
 - 🔴 per-particle ribbon trails on billboard systems (different architecture)
 
 ## Renderer
@@ -62,8 +62,8 @@ Three tiers: ✅ shipped · 🟡 runtime supports it, editor UI missing · 🔴 
 
 ## Suggested order
 1. ~~Playback panel~~ / ~~Main upgrades~~ (done)
-2. "by Speed" trio + Orbit + Width over Trail (BehaviorModule template, ~30 lines each)
-3. Full burst editing, shape mode/spread
+2. ~~"by Speed" trio + Orbit + Width over Trail~~ / ~~full burst editing~~ (done)
+3. Shape mode/spread
 4. Renderer extras (soft particles, alpha test, depth, blend tiles)
 5. Multi-segment curves
 6. Core contributions: startDelay → rate over distance → collision
