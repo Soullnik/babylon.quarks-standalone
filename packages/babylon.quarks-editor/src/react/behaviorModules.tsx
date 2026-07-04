@@ -20,7 +20,7 @@ import {
 import type {Behavior} from 'babylon.quarks';
 import {EffectBinding} from '../core/binding';
 import {DEFAULT_GRADIENT_STOPS, buildGradient, findBehavior, readGradientStops} from '../core/colors';
-import {buildScalar, readScalar} from '../core/values';
+import {buildCurve, buildScalar, readPieces, readScalar} from '../core/values';
 import {GradientEditor} from './GradientEditor';
 import {CurveEditor} from './CurveEditor';
 import {ModuleSection} from './ModuleSection';
@@ -78,11 +78,9 @@ export function SpeedOverLifeModule({binding}: ModuleProps) {
             {(behavior) => (
                 <div style={{marginTop: 6}}>
                     <CurveEditor
-                        curve={readScalar(behavior.speed).curve}
+                        pieces={readPieces(behavior.speed)}
                         maxValue={2}
-                        onChange={(curve) =>
-                            binding.apply(() => (behavior.speed = buildScalar({mode: 'curve', value: 1, min: 0, max: 1, curve}) as never))
-                        }
+                        onChange={(pieces) => binding.apply(() => (behavior.speed = buildCurve(pieces) as never))}
                     />
                 </div>
             )}
@@ -102,11 +100,9 @@ export function LimitSpeedOverLifeModule({binding}: ModuleProps) {
                 <>
                     <div style={{marginTop: 6}}>
                         <CurveEditor
-                            curve={readScalar(behavior.speed).curve}
+                            pieces={readPieces(behavior.speed)}
                             maxValue={8}
-                            onChange={(curve) =>
-                                binding.apply(() => (behavior.speed = buildScalar({mode: 'curve', value: 1, min: 0, max: 1, curve}) as never))
-                            }
+                            onChange={(pieces) => binding.apply(() => (behavior.speed = buildCurve(pieces) as never))}
                         />
                     </div>
                     <Row label="Dampen">
@@ -268,11 +264,9 @@ export function SizeBySpeedModule({binding}: ModuleProps) {
                 <>
                     <div style={{marginTop: 6}}>
                         <CurveEditor
-                            curve={readScalar(behavior.size as never).curve}
+                            pieces={readPieces(behavior.size as never)}
                             maxValue={2}
-                            onChange={(curve) =>
-                                binding.apply(() => (behavior.size = buildScalar({mode: 'curve', value: 1, min: 0, max: 1, curve}) as never))
-                            }
+                            onChange={(pieces) => binding.apply(() => (behavior.size = buildCurve(pieces) as never))}
                         />
                     </div>
                     <SpeedRangeRows binding={binding} behavior={behavior} />
@@ -336,11 +330,9 @@ export function WidthOverTrailModule({binding}: ModuleProps) {
             {(behavior) => (
                 <div style={{marginTop: 6}}>
                     <CurveEditor
-                        curve={readScalar(behavior.width as never).curve}
+                        pieces={readPieces(behavior.width as never)}
                         maxValue={2}
-                        onChange={(curve) =>
-                            binding.apply(() => (behavior.width = buildScalar({mode: 'curve', value: 1, min: 0, max: 1, curve}) as never))
-                        }
+                        onChange={(pieces) => binding.apply(() => (behavior.width = buildCurve(pieces) as never))}
                     />
                 </div>
             )}
@@ -383,6 +375,14 @@ export function TextureSheetModule({binding}: ModuleProps) {
             <Row label="Tiles V">
                 <NumberField value={system.vTileCount} min={1} step={1} onChange={(v) => binding.apply((s) => (s.vTileCount = Math.round(v)))} />
             </Row>
+            <Row label="Blend tiles">
+                <input
+                    type="checkbox"
+                    checked={system.blendTiles}
+                    style={{justifySelf: 'start', width: 15, height: 15, accentColor: '#78a5ff', cursor: 'pointer'}}
+                    onChange={(e) => binding.apply((s) => (s.blendTiles = e.target.checked))}
+                />
+            </Row>
             <Row label="Start tile">
                 <NumberField
                     value={readScalar(system.startTileIndex as never).value}
@@ -413,11 +413,9 @@ export function TextureSheetModule({binding}: ModuleProps) {
             {frameBehavior && (
                 <div style={{marginTop: 6}}>
                     <CurveEditor
-                        curve={readScalar(frameBehavior.frame).curve}
+                        pieces={readPieces(frameBehavior.frame)}
                         maxValue={Math.max(1, tiles - 1)}
-                        onChange={(curve) =>
-                            binding.apply(() => (frameBehavior.frame = buildScalar({mode: 'curve', value: 0, min: 0, max: 1, curve}) as never))
-                        }
+                        onChange={(pieces) => binding.apply(() => (frameBehavior.frame = buildCurve(pieces) as never))}
                     />
                 </div>
             )}

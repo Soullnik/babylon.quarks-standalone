@@ -8,6 +8,7 @@ import {
     SphereEmitter,
 } from 'babylon.quarks';
 import type {EmitterShape} from 'babylon.quarks';
+import {EmitterMode} from 'babylon.quarks';
 
 export type ShapeType = 'point' | 'sphere' | 'hemisphere' | 'cone' | 'circle' | 'donut' | 'rectangle';
 
@@ -29,6 +30,8 @@ export interface ShapeParams {
     donutRadius: number;
     width: number;
     height: number;
+    mode: EmitterMode;
+    spread: number;
 }
 
 export const DEFAULT_SHAPE_PARAMS: ShapeParams = {
@@ -39,6 +42,8 @@ export const DEFAULT_SHAPE_PARAMS: ShapeParams = {
     donutRadius: 0.1,
     width: 1,
     height: 1,
+    mode: EmitterMode.Random,
+    spread: 0,
 };
 
 export function getShapeType(shape: EmitterShape): ShapeType {
@@ -51,6 +56,8 @@ export function readShapeParams(shape: EmitterShape): ShapeParams {
     const num = (key: string, fallback: number) => (typeof anyShape[key] === 'number' ? (anyShape[key] as number) : fallback);
     return {
         radius: num('radius', DEFAULT_SHAPE_PARAMS.radius),
+        mode: num('mode', DEFAULT_SHAPE_PARAMS.mode) as EmitterMode,
+        spread: num('spread', DEFAULT_SHAPE_PARAMS.spread),
         arc: num('arc', DEFAULT_SHAPE_PARAMS.arc),
         thickness: num('thickness', DEFAULT_SHAPE_PARAMS.thickness),
         angle: num('angle', DEFAULT_SHAPE_PARAMS.angle),
@@ -76,26 +83,30 @@ export function createShape(type: ShapeType, params: ShapeParams): EmitterShape 
         case 'point':
             return new PointEmitter();
         case 'sphere':
-            return new SphereEmitter({radius: params.radius, arc: params.arc, thickness: params.thickness});
+            return new SphereEmitter({radius: params.radius, arc: params.arc, thickness: params.thickness, mode: params.mode, spread: params.spread});
         case 'hemisphere':
-            return new HemisphereEmitter({radius: params.radius, arc: params.arc, thickness: params.thickness});
+            return new HemisphereEmitter({radius: params.radius, arc: params.arc, thickness: params.thickness, mode: params.mode, spread: params.spread});
         case 'cone':
             return new ConeEmitter({
                 radius: params.radius,
                 arc: params.arc,
                 thickness: params.thickness,
                 angle: params.angle,
+                mode: params.mode,
+                spread: params.spread,
             });
         case 'circle':
-            return new CircleEmitter({radius: params.radius, arc: params.arc, thickness: params.thickness});
+            return new CircleEmitter({radius: params.radius, arc: params.arc, thickness: params.thickness, mode: params.mode, spread: params.spread});
         case 'donut':
             return new DonutEmitter({
                 radius: params.radius,
                 arc: params.arc,
                 thickness: params.thickness,
                 donutRadius: params.donutRadius,
+                mode: params.mode,
+                spread: params.spread,
             });
         case 'rectangle':
-            return new RectangleEmitter({width: params.width, height: params.height});
+            return new RectangleEmitter({width: params.width, height: params.height, mode: params.mode, spread: params.spread});
     }
 }

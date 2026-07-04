@@ -1,5 +1,5 @@
 import React from 'react';
-import {ScalarGenerator, ScalarValueState, buildScalar, readScalar} from '../core/values';
+import {ScalarGenerator, ScalarValueState, buildCurve, buildScalar, readPieces, readScalar} from '../core/values';
 import {CurveEditor} from './CurveEditor';
 import {NumberField, Row, SelectField} from './fields';
 
@@ -48,7 +48,11 @@ export function ValueField(props: {
             )}
             {state.mode === 'curve' && (
                 <div style={{marginTop: 6}}>
-                    <CurveEditor curve={state.curve} maxValue={props.curveMax} onChange={(curve) => commit({curve})} />
+                    <CurveEditor
+                        pieces={readPieces(props.generator)}
+                        maxValue={props.curveMax}
+                        onChange={(pieces) => props.onChange(buildCurve(pieces))}
+                    />
                 </div>
             )}
         </>

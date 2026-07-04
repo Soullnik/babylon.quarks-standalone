@@ -6,6 +6,7 @@ import {Color4} from "@babylonjs/core/Maths/math.color";
 import {BatchedRenderer, ParticleSystem} from "babylon.quarks";
 import {loadQuarksFromJson} from "./loadQuarksJson";
 import {createEngineFromQuery} from "./shared/engineFactory";
+import {EffectBinding} from "babylon.quarks-editor";
 import {demos} from "./registry";
 import type {DemoContext, DemoDefinition, DemoState} from "./types";
 
@@ -286,6 +287,17 @@ function setupJsonImportUi() {
     window.addEventListener("dragover", onDragOver);
     window.addEventListener("drop", onDrop);
 }
+
+document.getElementById("openInEditorBtn")?.addEventListener("click", () => {
+    if (systems.length === 0) {
+        return;
+    }
+    // Serialize whatever the demo is currently running and hand it to the editor page.
+    const main = systems.find((s) => !s.onlyUsedByOther) ?? systems[0];
+    const binding = new EffectBinding(main, systems.filter((s) => s !== main));
+    sessionStorage.setItem("quarks-editor-effect", binding.exportJSON(activeDemo?.name ?? "DemoEffect"));
+    window.location.href = "./editor.html?effect=session";
+});
 
 document.getElementById("nextBtn")?.addEventListener("click", nextDemo);
 document.getElementById("previousBtn")?.addEventListener("click", previousDemo);

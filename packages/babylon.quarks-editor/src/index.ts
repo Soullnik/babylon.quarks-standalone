@@ -3,8 +3,8 @@ export type {EditorListener} from './core/binding';
 export {EffectHistory} from './core/history';
 export {createChildSystem} from './core/systems';
 export type {ChildSystemOptions} from './core/systems';
-export {readScalar, buildScalar, sampleCurve} from './core/values';
-export type {ScalarGenerator, ScalarMode, ScalarValueState} from './core/values';
+export {readScalar, buildScalar, sampleCurve, readPieces, buildCurve, splitPieces, mergePieces} from './core/values';
+export type {ScalarGenerator, ScalarMode, ScalarValueState, CurvePiece} from './core/values';
 export {
     DEFAULT_GRADIENT_STOPS,
     buildGradient,
