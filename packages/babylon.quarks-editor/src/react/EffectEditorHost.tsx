@@ -78,6 +78,9 @@ export function EffectEditorHost(props: EffectEditorHostProps) {
     const stateRef = useRef<{engine: Engine; scene: Scene; renderer: BatchedRenderer; binding: EffectBinding; history: EffectHistory} | null>(null);
     const [binding, setBinding] = useState<EffectBinding | null>(null);
     const [, force] = useReducer((x: number) => x + 1, 0);
+    const playbackRef = useRef({paused: false, speed: 1, stepQueued: false, elapsed: 0});
+    const [paused, setPaused] = useState(false);
+    const [speed, setSpeed] = useState(1);
 
     useEffect(() => {
         const engine = new Engine(canvasRef.current!, true);
@@ -136,7 +139,16 @@ export function EffectEditorHost(props: EffectEditorHostProps) {
         mount(initial);
 
         engine.runRenderLoop(() => {
-            renderer.update(engine.getDeltaTime() / 1000);
+            const playback = playbackRef.current;
+            let delta = (engine.getDeltaTime() / 1000) * playback.speed;
+            if (playback.paused) {
+                delta = playback.stepQueued ? 1 / 60 : 0;
+                playback.stepQueued = false;
+            }
+            if (delta > 0) {
+                renderer.update(delta);
+                playback.elapsed += delta;
+            }
             scene.render();
             const b = stateRef.current!.binding;
             let count = b.system.particleNum;
@@ -144,7 +156,7 @@ export function EffectEditorHost(props: EffectEditorHostProps) {
                 count += sub.particleNum;
             }
             if (counterRef.current) {
-                counterRef.current.textContent = `${count} particles`;
+                counterRef.current.textContent = `${count} particles · ${playback.elapsed.toFixed(2)}s`;
             }
         });
 
@@ -200,7 +212,41 @@ export function EffectEditorHost(props: EffectEditorHostProps) {
                     <div style={{display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 10}}>
                         <button style={buttonStyle} title="Ctrl+Z" disabled={!state?.history.canUndo} onClick={() => historyAction(state!.history.undo())}>↶</button>
                         <button style={buttonStyle} title="Ctrl+Shift+Z" disabled={!state?.history.canRedo} onClick={() => historyAction(state!.history.redo())}>↷</button>
-                        <button style={buttonStyle} onClick={() => binding?.restart()}>Restart</button>
+                        <button style={buttonStyle} onClick={() => { binding?.restart(); playbackRef.current.elapsed = 0; }}>Restart</button>
+                        <button
+                            style={buttonStyle}
+                            title={paused ? 'Play' : 'Pause'}
+                            onClick={() => {
+                                playbackRef.current.paused = !paused;
+                                setPaused(!paused);
+                            }}
+                        >
+                            {paused ? '▶' : '⏸'}
+                        </button>
+                        <button
+                            style={buttonStyle}
+                            title="Step one frame"
+                            disabled={!paused}
+                            onClick={() => (playbackRef.current.stepQueued = true)}
+                        >
+                            ⏭
+                        </button>
+                        <select
+                            style={{...buttonStyle, padding: '6px 4px'}}
+                            title="Playback speed"
+                            value={speed}
+                            onChange={(e) => {
+                                const next = Number(e.target.value);
+                                playbackRef.current.speed = next;
+                                setSpeed(next);
+                            }}
+                        >
+                            {[0.1, 0.25, 0.5, 1, 2, 4].map((s) => (
+                                <option key={s} value={s}>
+                                    ×{s}
+                                </option>
+                            ))}
+                        </select>
                         <button
                             style={buttonStyle}
                             onClick={() => {

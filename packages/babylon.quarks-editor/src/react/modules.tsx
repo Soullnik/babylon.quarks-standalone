@@ -4,6 +4,9 @@ import {
     ConstantColor,
     ConstantValue,
     Gradient,
+    IntervalValue,
+    RandomColor,
+    RandomQuatGenerator,
     RenderMode,
     SizeOverLife,
     Vector4,
@@ -53,10 +56,41 @@ const PARAM_LABELS: {[key: string]: string} = {
     height: 'Height',
 };
 
+function ColorInput(props: {value: Vector4; onChange: (next: Vector4) => void}) {
+    const {value, onChange} = props;
+    return (
+        <div style={{display: 'flex', gap: 6, alignItems: 'center'}}>
+            <input
+                type="color"
+                value={rgbToHex(value.x, value.y, value.z)}
+                onChange={(e) => {
+                    const rgb = hexToRgb(e.target.value);
+                    onChange(new Vector4(rgb.r, rgb.g, rgb.b, value.w));
+                }}
+                style={{width: 42, height: 24, border: 'none', background: 'transparent', padding: 0, cursor: 'pointer'}}
+            />
+            <NumberField
+                value={value.w}
+                min={0}
+                step={0.05}
+                onChange={(a) => onChange(new Vector4(value.x, value.y, value.z, Math.min(1, a)))}
+            />
+        </div>
+    );
+}
+
 export function MainModule({binding}: ModuleProps) {
     const system = binding.system;
-    const startColor = system.startColor as ConstantColor;
-    const color = startColor instanceof ConstantColor ? startColor.color : new Vector4(1, 1, 1, 1);
+    const startColor = system.startColor;
+    const colorMode = startColor instanceof RandomColor ? 'random' : 'constant';
+    const colorA =
+        startColor instanceof RandomColor ? (startColor as never as {a: Vector4}).a
+        : startColor instanceof ConstantColor ? startColor.color
+        : new Vector4(1, 1, 1, 1);
+    const colorB = startColor instanceof RandomColor ? (startColor as never as {b: Vector4}).b : new Vector4(1, 0.5, 0.2, 1);
+    const rotation = system.startRotation;
+    const rotationMode = rotation instanceof RandomQuatGenerator ? '3d' : readScalar(rotation as never).mode === 'random' ? 'random' : 'angle';
+    const rotationState = readScalar(rotation instanceof RandomQuatGenerator ? undefined : (rotation as never));
     return (
         <ModuleSection title="Main">
             <Row label="Duration">
@@ -67,6 +101,9 @@ export function MainModule({binding}: ModuleProps) {
             </Row>
             <Row label="World space">
                 <CheckboxField value={system.worldSpace} onChange={(v) => binding.apply((s) => (s.worldSpace = v))} />
+            </Row>
+            <Row label="Prewarm">
+                <CheckboxField value={system.prewarm} onChange={(v) => binding.apply((s) => (s.prewarm = v))} />
             </Row>
             <ValueField
                 label="Start lifetime"
@@ -90,26 +127,82 @@ export function MainModule({binding}: ModuleProps) {
                 onChange={(g) => binding.apply((s) => (s.startSize = g))}
             />
             <Row label="Start color">
-                <div style={{display: 'flex', gap: 6, alignItems: 'center'}}>
-                    <input
-                        type="color"
-                        value={rgbToHex(color.x, color.y, color.z)}
-                        onChange={(e) => {
-                            const rgb = hexToRgb(e.target.value);
-                            binding.apply((s) => (s.startColor = new ConstantColor(new Vector4(rgb.r, rgb.g, rgb.b, color.w))));
-                        }}
-                        style={{width: 42, height: 24, border: 'none', background: 'transparent', padding: 0, cursor: 'pointer'}}
-                    />
-                    <NumberField
-                        value={color.w}
-                        min={0}
-                        step={0.05}
-                        onChange={(a) =>
-                            binding.apply((s) => (s.startColor = new ConstantColor(new Vector4(color.x, color.y, color.z, Math.min(1, a)))))
-                        }
-                    />
-                </div>
+                <SelectField
+                    value={colorMode}
+                    options={[
+                        {value: 'constant', label: 'Constant'},
+                        {value: 'random', label: 'Random between two'},
+                    ]}
+                    onChange={(mode) =>
+                        binding.apply((s) => {
+                            s.startColor = mode === 'random' ? new RandomColor(colorA, colorB) : new ConstantColor(colorA);
+                        })
+                    }
+                />
             </Row>
+            <Row label="">
+                <ColorInput
+                    value={colorA}
+                    onChange={(next) =>
+                        binding.apply((s) => {
+                            s.startColor = colorMode === 'random' ? new RandomColor(next, colorB) : new ConstantColor(next);
+                        })
+                    }
+                />
+            </Row>
+            {colorMode === 'random' && (
+                <Row label="">
+                    <ColorInput
+                        value={colorB}
+                        onChange={(next) => binding.apply((s) => (s.startColor = new RandomColor(colorA, next)))}
+                    />
+                </Row>
+            )}
+            <Row label="Start rotation">
+                <SelectField
+                    value={rotationMode}
+                    options={[
+                        {value: 'angle', label: 'Angle (rad)'},
+                        {value: 'random', label: 'Random angle'},
+                        {value: '3d', label: 'Random 3D'},
+                    ]}
+                    onChange={(mode) =>
+                        binding.apply((s) => {
+                            s.startRotation =
+                                mode === '3d'
+                                    ? new RandomQuatGenerator()
+                                    : mode === 'random'
+                                      ? new IntervalValue(0, Math.PI * 2)
+                                      : new ConstantValue(rotationState.value);
+                        })
+                    }
+                />
+            </Row>
+            {rotationMode === 'angle' && (
+                <Row label="">
+                    <NumberField
+                        value={rotationState.value}
+                        step={0.1}
+                        onChange={(v) => binding.apply((s) => (s.startRotation = new ConstantValue(v)))}
+                    />
+                </Row>
+            )}
+            {rotationMode === 'random' && (
+                <Row label="">
+                    <div style={{display: 'flex', gap: 6}}>
+                        <NumberField
+                            value={rotationState.min}
+                            step={0.1}
+                            onChange={(v) => binding.apply((s) => (s.startRotation = new IntervalValue(v, rotationState.max)))}
+                        />
+                        <NumberField
+                            value={rotationState.max}
+                            step={0.1}
+                            onChange={(v) => binding.apply((s) => (s.startRotation = new IntervalValue(rotationState.min, v)))}
+                        />
+                    </div>
+                </Row>
+            )}
         </ModuleSection>
     );
 }
