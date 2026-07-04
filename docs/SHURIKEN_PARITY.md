@@ -60,11 +60,12 @@ Three tiers: ✅ shipped · 🟡 runtime supports it, editor UI missing · 🔴 
 ## Editor UX (Particle Effect panel)
 - ✅ restart, undo/redo, import/export, example presets, hierarchy panel
 - ✅ pause / step / playback speed / elapsed time
-- 🔴 playback time scrubbing, multi-piece curves (PiecewiseBezier supports them; UI edits one segment)
+- ✅ multi-segment curves (add key: dbl-click curve, remove: dbl-click key, drag keys/handles, numeric value for selected key)
+- 🔴 playback time scrubbing
 
 ## Suggested order
 1. ~~Playback panel~~ / ~~Main upgrades~~ (done)
 2. ~~"by Speed" trio + Orbit + Width over Trail~~ / ~~full burst editing~~ (done)
 3. ~~Shape mode/spread~~ / ~~Renderer extras~~ (done)
-4. Multi-segment curves
+4. ~~Multi-segment curves~~ (done)
 5. Core contributions: startDelay → rate over distance → collision

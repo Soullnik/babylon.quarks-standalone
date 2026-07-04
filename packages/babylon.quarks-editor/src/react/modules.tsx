@@ -23,7 +23,7 @@ import {
     rgbToHex,
 } from '../core/colors';
 import {DEFAULT_SHAPE_PARAMS, SHAPE_PARAM_KEYS, SHAPE_TYPES, createShape, getShapeType, readShapeParams} from '../core/shapes';
-import {buildScalar, readScalar} from '../core/values';
+import {buildCurve, buildScalar, readPieces, readScalar} from '../core/values';
 import {CurveEditor} from './CurveEditor';
 import {GradientEditor} from './GradientEditor';
 import {ModuleSection} from './ModuleSection';
@@ -354,12 +354,12 @@ export function SizeOverLifeModule({binding}: ModuleProps) {
         >
             <div style={{marginTop: 6}}>
                 <CurveEditor
-                    curve={curve}
+                    pieces={behavior ? readPieces(behavior.size as never) : [{start: 0, p: curve}]}
                     maxValue={2}
-                    onChange={(next) =>
+                    onChange={(pieces) =>
                         binding.apply((s) => {
                             removeBehavior(s, 'SizeOverLife');
-                            s.addBehavior(new SizeOverLife(buildScalar({mode: 'curve', value: 1, min: 0, max: 1, curve: next}) as never));
+                            s.addBehavior(new SizeOverLife(buildCurve(pieces) as never));
                         })
                     }
                 />
