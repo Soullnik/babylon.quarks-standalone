@@ -1,7 +1,20 @@
 import {QuarksEffectEditor} from "babylon.quarks-editor/react";
 import {SHARED_ASSETS, createSharedTexture} from "./shared/common";
 
+/** ?effect=session reads a JSON stashed by the demo viewer's "Open in editor" button. */
+function resolveInitialEffect(): unknown {
+    const param = new URLSearchParams(window.location.search).get("effect");
+    if (param === "session") {
+        const stored = sessionStorage.getItem("quarks-editor-effect");
+        if (stored) {
+            return JSON.parse(stored);
+        }
+    }
+    return undefined;
+}
+
 QuarksEffectEditor.Show({
+    effectJson: resolveInitialEffect(),
     hostElement: document.getElementById("editor-host")!,
     title: "Effect editor",
     textureOptions: [
@@ -11,11 +24,6 @@ QuarksEffectEditor.Show({
         {label: "Smoke (4x4 sheet)", url: SHARED_ASSETS.smoke},
     ],
     resolveTexture: (url, scene) => createSharedTexture(scene, url),
-    effectPresets: [
-        {label: "Explosion (Unity export)", url: "ps.json"},
-        {label: "Acid Boiling", url: "AcidBoiling.json"},
-        {label: "Sub Emitter", url: "subEmitter2.json"},
-    ],
     // Debug/testing hook: lets the console (and smoke tests) reach the live binding.
     onReady: (handle) => {
         (window as never as {__quarksEditor: unknown}).__quarksEditor = handle;
