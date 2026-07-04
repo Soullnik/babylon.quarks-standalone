@@ -301,12 +301,36 @@ export function ShapeModule({binding}: ModuleProps) {
             {keys.map((key) => (
                 <Row key={key} label={PARAM_LABELS[key]}>
                     <NumberField
-                        value={params[key]}
+                        value={params[key] as number}
                         min={0}
                         onChange={(v) => binding.apply((s) => (s.emitterShape = createShape(type, {...params, [key]: v})))}
                     />
                 </Row>
             ))}
+            {type !== 'point' && (
+                <>
+                    <Row label="Emit mode">
+                        <SelectField
+                            value={params.mode}
+                            options={[
+                                {value: 0, label: 'Random'},
+                                {value: 1, label: 'Loop'},
+                                {value: 2, label: 'Ping-pong'},
+                                {value: 3, label: 'Burst spread'},
+                            ]}
+                            onChange={(mode) => binding.apply((s) => (s.emitterShape = createShape(type, {...params, mode})))}
+                        />
+                    </Row>
+                    <Row label="Spread">
+                        <NumberField
+                            value={params.spread}
+                            min={0}
+                            step={0.05}
+                            onChange={(spread) => binding.apply((s) => (s.emitterShape = createShape(type, {...params, spread})))}
+                        />
+                    </Row>
+                </>
+            )}
         </ModuleSection>
     );
 }
@@ -533,6 +557,52 @@ export function RendererModule({
             )}
             <Row label="Render order">
                 <NumberField value={system.renderOrder} step={1} onChange={(v) => binding.apply((s) => (s.renderOrder = Math.round(v)))} />
+            </Row>
+            <Row label="Soft particles">
+                <CheckboxField value={system.softParticles} onChange={(v) => binding.apply((s) => (s.softParticles = v))} />
+            </Row>
+            {system.softParticles && (
+                <Row label="Fade near/far">
+                    <div style={{display: 'flex', gap: 6}}>
+                        <NumberField value={system.softNearFade} min={0} onChange={(v) => binding.apply((s) => (s.softNearFade = v))} />
+                        <NumberField value={system.softFarFade} min={0} onChange={(v) => binding.apply((s) => (s.softFarFade = v))} />
+                    </div>
+                </Row>
+            )}
+            <Row label="Alpha test">
+                <NumberField
+                    value={system.getRendererSettings().materialAlphaTest ?? 0}
+                    min={0}
+                    step={0.05}
+                    onChange={(v) =>
+                        binding.apply((s) => {
+                            s.getRendererSettings().materialAlphaTest = Math.min(1, v);
+                            s.neededToUpdateRender = true;
+                        })
+                    }
+                />
+            </Row>
+            <Row label="Depth write">
+                <CheckboxField
+                    value={system.getRendererSettings().materialDepthWrite}
+                    onChange={(v) =>
+                        binding.apply((s) => {
+                            s.getRendererSettings().materialDepthWrite = v;
+                            s.neededToUpdateRender = true;
+                        })
+                    }
+                />
+            </Row>
+            <Row label="Depth test">
+                <CheckboxField
+                    value={system.getRendererSettings().materialDepthTest}
+                    onChange={(v) =>
+                        binding.apply((s) => {
+                            s.getRendererSettings().materialDepthTest = v;
+                            s.neededToUpdateRender = true;
+                        })
+                    }
+                />
             </Row>
         </ModuleSection>
     );

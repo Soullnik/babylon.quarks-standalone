@@ -16,7 +16,8 @@ Three tiers: ✅ shipped · 🟡 runtime supports it, editor UI missing · 🔴 
 
 ## Shape
 - ✅ cone/sphere/hemisphere/circle/donut/rectangle/point with base params
-- 🟡 emitter mode/spread/speed per shape, grid emitter, mesh surface emitter (Shape=Mesh)
+- ✅ emitter mode (random/loop/ping-pong/burst) + spread per shape
+- 🟡 per-shape speed generator, grid emitter, mesh surface emitter (Shape=Mesh)
 - 🔴 edge shape, texture-based emission, align/randomize direction options
 
 ## Velocity / forces
@@ -42,7 +43,7 @@ Three tiers: ✅ shipped · 🟡 runtime supports it, editor UI missing · 🔴 
 
 ## Texture Sheet Animation
 - ✅ tiles U/V, start tile, frame-over-life curve, atlas preview with tile grid
-- 🟡 tile blending (`blendTiles`)
+- ✅ tile blending
 - 🔴 sprites mode, single-row mode, cycles
 
 ## Trails (Unity Trails module = ribbons attached to particles)
@@ -52,7 +53,8 @@ Three tiers: ✅ shipped · 🟡 runtime supports it, editor UI missing · 🔴 
 
 ## Renderer
 - ✅ render modes (billboard ×4, trail, mesh), blend mode, texture picker (presets/URL/file), render order, mesh geometry presets
-- 🟡 soft particles, alpha test, depth write/test, layer mask, host-provided mesh assets
+- ✅ soft particles (+near/far fade), alpha test, depth write/test
+- 🟡 layer mask, host-provided mesh assets
 - 🔴 sort mode, min/max particle size, pivot, shadows
 
 ## Editor UX (Particle Effect panel)
@@ -63,7 +65,6 @@ Three tiers: ✅ shipped · 🟡 runtime supports it, editor UI missing · 🔴 
 ## Suggested order
 1. ~~Playback panel~~ / ~~Main upgrades~~ (done)
 2. ~~"by Speed" trio + Orbit + Width over Trail~~ / ~~full burst editing~~ (done)
-3. Shape mode/spread
-4. Renderer extras (soft particles, alpha test, depth, blend tiles)
-5. Multi-segment curves
-6. Core contributions: startDelay → rate over distance → collision
+3. ~~Shape mode/spread~~ / ~~Renderer extras~~ (done)
+4. Multi-segment curves
+5. Core contributions: startDelay → rate over distance → collision

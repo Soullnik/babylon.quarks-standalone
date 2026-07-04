@@ -383,6 +383,14 @@ export function TextureSheetModule({binding}: ModuleProps) {
             <Row label="Tiles V">
                 <NumberField value={system.vTileCount} min={1} step={1} onChange={(v) => binding.apply((s) => (s.vTileCount = Math.round(v)))} />
             </Row>
+            <Row label="Blend tiles">
+                <input
+                    type="checkbox"
+                    checked={system.blendTiles}
+                    style={{justifySelf: 'start', width: 15, height: 15, accentColor: '#78a5ff', cursor: 'pointer'}}
+                    onChange={(e) => binding.apply((s) => (s.blendTiles = e.target.checked))}
+                />
+            </Row>
             <Row label="Start tile">
                 <NumberField
                     value={readScalar(system.startTileIndex as never).value}
