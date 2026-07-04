@@ -1,19 +1,27 @@
 import React from 'react';
 import {
     ApplyForce,
+    ColorBySpeed,
     ConstantValue,
     ForceOverLife,
     FrameOverLife,
+    Gradient,
+    IntervalValue,
     LimitSpeedOverLife,
     Noise,
+    OrbitOverLife,
+    RotationBySpeed,
     RotationOverLife,
+    SizeBySpeed,
     SpeedOverLife,
     Vector3,
+    WidthOverLength,
 } from 'babylon.quarks';
 import type {Behavior} from 'babylon.quarks';
 import {EffectBinding} from '../core/binding';
-import {findBehavior} from '../core/colors';
+import {DEFAULT_GRADIENT_STOPS, buildGradient, findBehavior, readGradientStops} from '../core/colors';
 import {buildScalar, readScalar} from '../core/values';
+import {GradientEditor} from './GradientEditor';
 import {CurveEditor} from './CurveEditor';
 import {ModuleSection} from './ModuleSection';
 import {NumberField, Row} from './fields';
@@ -200,6 +208,141 @@ export function NoiseModule({binding}: ModuleProps) {
                         onChange={(g) => binding.apply(() => (behavior.power = g))}
                     />
                 </>
+            )}
+        </BehaviorModule>
+    );
+}
+
+/** Shared speed-range rows for the "by Speed" trio. */
+function SpeedRangeRows({binding, behavior}: {binding: EffectBinding; behavior: {speedRange: IntervalValue}}) {
+    return (
+        <Row label="Speed range">
+            <div style={{display: 'flex', gap: 6}}>
+                <NumberField
+                    value={behavior.speedRange.a}
+                    min={0}
+                    onChange={(v) => binding.apply(() => (behavior.speedRange = new IntervalValue(v, behavior.speedRange.b)))}
+                />
+                <NumberField
+                    value={behavior.speedRange.b}
+                    min={0}
+                    onChange={(v) => binding.apply(() => (behavior.speedRange = new IntervalValue(behavior.speedRange.a, v)))}
+                />
+            </div>
+        </Row>
+    );
+}
+
+export function ColorBySpeedModule({binding}: ModuleProps) {
+    return (
+        <BehaviorModule<ColorBySpeed>
+            binding={binding}
+            title="Color by Speed"
+            type="ColorBySpeed"
+            create={() => new ColorBySpeed(buildGradient(DEFAULT_GRADIENT_STOPS), new IntervalValue(0, 5))}
+        >
+            {(behavior) => (
+                <>
+                    <div style={{marginTop: 6}}>
+                        <GradientEditor
+                            stops={behavior.color instanceof Gradient ? readGradientStops(behavior.color) : DEFAULT_GRADIENT_STOPS}
+                            onChange={(stops) => binding.apply(() => (behavior.color = buildGradient(stops)))}
+                        />
+                    </div>
+                    <SpeedRangeRows binding={binding} behavior={behavior} />
+                </>
+            )}
+        </BehaviorModule>
+    );
+}
+
+export function SizeBySpeedModule({binding}: ModuleProps) {
+    return (
+        <BehaviorModule<SizeBySpeed>
+            binding={binding}
+            title="Size by Speed"
+            type="SizeBySpeed"
+            create={() => new SizeBySpeed(buildScalar({mode: 'curve', value: 1, min: 0, max: 1, curve: [0.5, 0.8, 1.2, 1.5]}) as never, new IntervalValue(0, 5))}
+        >
+            {(behavior) => (
+                <>
+                    <div style={{marginTop: 6}}>
+                        <CurveEditor
+                            curve={readScalar(behavior.size as never).curve}
+                            maxValue={2}
+                            onChange={(curve) =>
+                                binding.apply(() => (behavior.size = buildScalar({mode: 'curve', value: 1, min: 0, max: 1, curve}) as never))
+                            }
+                        />
+                    </div>
+                    <SpeedRangeRows binding={binding} behavior={behavior} />
+                </>
+            )}
+        </BehaviorModule>
+    );
+}
+
+export function RotationBySpeedModule({binding}: ModuleProps) {
+    return (
+        <BehaviorModule<RotationBySpeed>
+            binding={binding}
+            title="Rotation by Speed"
+            type="RotationBySpeed"
+            create={() => new RotationBySpeed(new ConstantValue(Math.PI), new IntervalValue(0, 5))}
+        >
+            {(behavior) => (
+                <>
+                    <ValueField
+                        label="Velocity (rad/s)"
+                        generator={behavior.angularVelocity}
+                        curveMax={Math.PI * 4}
+                        onChange={(g) => binding.apply(() => (behavior.angularVelocity = g))}
+                    />
+                    <SpeedRangeRows binding={binding} behavior={behavior} />
+                </>
+            )}
+        </BehaviorModule>
+    );
+}
+
+export function OrbitOverLifeModule({binding}: ModuleProps) {
+    return (
+        <BehaviorModule<OrbitOverLife>
+            binding={binding}
+            title="Orbit over Lifetime"
+            type="OrbitOverLife"
+            create={() => new OrbitOverLife(new ConstantValue(Math.PI), new Vector3(0, 1, 0))}
+        >
+            {(behavior) => (
+                <ValueField
+                    label="Orbit speed"
+                    generator={behavior.orbitSpeed}
+                    curveMax={Math.PI * 4}
+                    onChange={(g) => binding.apply(() => (behavior.orbitSpeed = g))}
+                />
+            )}
+        </BehaviorModule>
+    );
+}
+
+export function WidthOverTrailModule({binding}: ModuleProps) {
+    return (
+        <BehaviorModule<WidthOverLength>
+            binding={binding}
+            title="Width over Trail"
+            type="WidthOverLength"
+            create={() => new WidthOverLength(buildScalar({mode: 'curve', value: 1, min: 0, max: 1, curve: [1, 0.75, 0.4, 0]}) as never)}
+        >
+            {(behavior) => (
+                <div style={{marginTop: 6}}>
+                    <CurveEditor
+                        curve={readScalar(behavior.width as never).curve}
+                        maxValue={2}
+                        onChange={(curve) =>
+                            binding.apply(() => (behavior.width = buildScalar({mode: 'curve', value: 1, min: 0, max: 1, curve}) as never))
+                        }
+                    />
+                </div>
             )}
         </BehaviorModule>
     );

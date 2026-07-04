@@ -10,13 +10,18 @@ import {
 } from './modules';
 import type {TextureOption} from './modules';
 import {
+    ColorBySpeedModule,
     ForceOverLifeModule,
     GravityModule,
     LimitSpeedOverLifeModule,
     NoiseModule,
+    OrbitOverLifeModule,
+    RotationBySpeedModule,
     RotationOverLifeModule,
+    SizeBySpeedModule,
     SpeedOverLifeModule,
     TextureSheetModule,
+    WidthOverTrailModule,
 } from './behaviorModules';
 import {SubEmittersModule} from './SubEmittersModule';
 import {EffectHierarchy} from './EffectHierarchy';
@@ -70,10 +75,15 @@ export function EffectEditor(props: EffectEditorProps) {
             <LimitSpeedOverLifeModule binding={binding} />
             <ForceOverLifeModule binding={binding} />
             <GravityModule binding={binding} />
+            <OrbitOverLifeModule binding={binding} />
             <ColorOverLifeModule binding={binding} />
+            <ColorBySpeedModule binding={binding} />
             <SizeOverLifeModule binding={binding} />
+            <SizeBySpeedModule binding={binding} />
             <RotationOverLifeModule binding={binding} />
+            <RotationBySpeedModule binding={binding} />
             <NoiseModule binding={binding} />
+            <WidthOverTrailModule binding={binding} />
             <SubEmittersModule binding={binding} rootBinding={props.binding} />
             <TextureSheetModule binding={binding} />
             <RendererModule binding={binding} textureOptions={props.textureOptions} resolveTexture={props.resolveTexture} />

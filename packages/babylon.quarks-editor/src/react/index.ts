@@ -8,6 +8,11 @@ export {
     RotationOverLifeModule,
     NoiseModule,
     TextureSheetModule,
+    ColorBySpeedModule,
+    SizeBySpeedModule,
+    RotationBySpeedModule,
+    OrbitOverLifeModule,
+    WidthOverTrailModule,
 } from './behaviorModules';
 export type {TextureOption} from './modules';
 export {SubEmittersModule} from './SubEmittersModule';
