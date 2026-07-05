@@ -299,6 +299,13 @@ document.getElementById("openInEditorBtn")?.addEventListener("click", () => {
     window.location.href = "./editor.html?effect=session";
 });
 
+// Debug/testing hook: reach the live demo systems from the console/smoke tests.
+(window as never as {__quarksViewer: unknown}).__quarksViewer = {
+    get systems() {
+        return systems;
+    },
+};
+
 document.getElementById("nextBtn")?.addEventListener("click", nextDemo);
 document.getElementById("previousBtn")?.addEventListener("click", previousDemo);
 demoSelect.addEventListener("change", (event) => {

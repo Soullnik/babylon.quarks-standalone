@@ -305,8 +305,11 @@ export class QuarksLoader {
                 texture: null,
             };
 
-            if (matDef.map) {
-                matInfo.texture = meta.textures[matDef.map] || null;
+            // three.js MeshBasicMaterial uses `map`; QuarksMaterial (what ParticleSystem.toJSON
+            // emits) uses `texture`. Accept both so library-exported effects round-trip.
+            const textureRef = matDef.map ?? matDef.texture;
+            if (textureRef) {
+                matInfo.texture = meta.textures[textureRef] || null;
             }
 
             const blendingToAlphaMode: {[key: number]: number} = {

@@ -417,6 +417,42 @@ describe('QuarksLoader matrix decomposition', () => {
         engine.dispose();
     });
 
+    it('resolves QuarksMaterial texture field on reimport (library round-trip)', () => {
+        const engine = new NullEngine();
+        const scene = new Scene(engine);
+
+        // ParticleSystem.toJSON emits materials with a `texture` uuid (QuarksMaterial), not the
+        // three.js `map` field. QuarksLoader must accept both so a library-exported effect reloads
+        // with its texture intact. Do a genuine round-trip: build a system with a texture, toJSON,
+        // flatten the live-texture meta into the serializable envelope, then parse it back.
+        const source = new ParticleSystem({scene, texture: new Texture('textures/spark.png', scene)});
+        const meta: any = {textures: {}, materials: {}, geometries: {}};
+        const ps = source.toJSON(meta, {} as any);
+
+        const images = Object.entries(meta.textures).map(([uuid, tex]: [string, any]) => ({
+            uuid: `${uuid}-image`,
+            url: tex.url ?? tex.name,
+        }));
+        const textures = Object.keys(meta.textures).map((uuid) => ({uuid, image: `${uuid}-image`}));
+
+        const root = new QuarksLoader(scene).parse(
+            {
+                images,
+                textures,
+                materials: Object.values(meta.materials),
+                object: {uuid: 'emitter-1', type: 'ParticleEmitter', ps},
+            },
+            ''
+        );
+
+        const emitter = root instanceof ParticleEmitter ? root : (root.getChildren().find((n) => n instanceof ParticleEmitter) as ParticleEmitter);
+        expect(emitter).toBeInstanceOf(ParticleEmitter);
+        expect((emitter.system as ParticleSystem).texture).toBeTruthy();
+
+        scene.dispose();
+        engine.dispose();
+    });
+
     it('parses sphere and plain buffer geometry variants', () => {
         const engine = new NullEngine();
         const scene = new Scene(engine);
