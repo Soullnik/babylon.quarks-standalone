@@ -116,19 +116,19 @@ export function EffectEditorHost(props: EffectEditorHostProps) {
                 renderer.deleteSystem(existing);
                 existing.dispose();
             }
-            const {systems} = loadEffectFromJson(scene, renderer, json);
+            const {root, systems} = loadEffectFromJson(scene, renderer, json);
             if (systems.length === 0) {
                 throw new Error('No particle systems found in the JSON.');
             }
             const main = systems.find((s) => !s.onlyUsedByOther) ?? systems[0];
-            mount(new EffectBinding(main, systems.filter((s) => s !== main)));
+            mount(new EffectBinding(main, systems.filter((s) => s !== main), root));
         };
 
         let initial: EffectBinding;
         if (props.effectJson) {
-            const {systems} = loadEffectFromJson(scene, renderer, props.effectJson);
+            const {root, systems} = loadEffectFromJson(scene, renderer, props.effectJson);
             const main = systems.find((s) => !s.onlyUsedByOther) ?? systems[0];
-            initial = new EffectBinding(main, systems.filter((s) => s !== main));
+            initial = new EffectBinding(main, systems.filter((s) => s !== main), root);
         } else {
             const system = createDefaultEffect(scene, props.resolveTexture, props.textureOptions?.[0]?.url);
             renderer.addSystem(system);
@@ -187,9 +187,9 @@ export function EffectEditorHost(props: EffectEditorHostProps) {
                 state.renderer.deleteSystem(existing);
                 existing.dispose();
             }
-            const {systems} = loadEffectFromJson(state.scene, state.renderer, json);
+            const {root, systems} = loadEffectFromJson(state.scene, state.renderer, json);
             const main = systems.find((s) => !s.onlyUsedByOther) ?? systems[0];
-            const next = new EffectBinding(main, systems.filter((s) => s !== main));
+            const next = new EffectBinding(main, systems.filter((s) => s !== main), root);
             state.history.attach(next);
             next.subscribe(force);
             state.binding = next;

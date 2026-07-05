@@ -45,21 +45,21 @@ export function EffectEditor(props: EffectEditorProps) {
         (onStoreChange) => props.binding.subscribe(onStoreChange),
         () => props.binding.getRevision()
     );
-    const [selectedIndex, setSelectedIndex] = React.useState(0);
-    const systems = [props.binding.system, ...props.binding.subSystems];
-    const clampedIndex = Math.min(selectedIndex, systems.length - 1);
-    const selectedSystem = systems[clampedIndex];
+    const allSystems = [props.binding.system, ...props.binding.subSystems];
+    const [selectedSystem, setSelectedSystem] = React.useState(props.binding.system);
+    // Selection survives re-renders but falls back to root if the system was removed/replaced.
+    const activeSystem = allSystems.includes(selectedSystem) ? selectedSystem : props.binding.system;
 
     // Inspector edits go through a per-system binding; changes route into the root
     // binding's undo history and re-render via the subscription below.
     const binding = React.useMemo(() => {
-        if (clampedIndex === 0) {
+        if (activeSystem === props.binding.system) {
             return props.binding;
         }
-        const nested = new EffectBinding(selectedSystem);
+        const nested = new EffectBinding(activeSystem);
         nested.onBeforeChange = () => props.binding.onBeforeChange?.();
         return nested;
-    }, [props.binding, selectedSystem, clampedIndex]);
+    }, [props.binding, activeSystem]);
     useSyncExternalStore(
         (onStoreChange) => binding.subscribe(onStoreChange),
         () => binding.getRevision()
@@ -67,7 +67,7 @@ export function EffectEditor(props: EffectEditorProps) {
 
     return (
         <div style={{fontFamily: theme.font, color: theme.text}}>
-            <EffectHierarchy binding={props.binding} selectedIndex={clampedIndex} onSelect={setSelectedIndex} />
+            <EffectHierarchy binding={props.binding} selectedSystem={activeSystem} onSelect={setSelectedSystem} />
             <MainModule binding={binding} />
             <EmissionModule binding={binding} />
             <ShapeModule binding={binding} />

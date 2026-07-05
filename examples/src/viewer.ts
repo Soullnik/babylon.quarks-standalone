@@ -6,7 +6,8 @@ import {Color4} from "@babylonjs/core/Maths/math.color";
 import {BatchedRenderer, ParticleSystem} from "babylon.quarks";
 import {loadQuarksFromJson} from "./loadQuarksJson";
 import {createEngineFromQuery} from "./shared/engineFactory";
-import {EffectBinding} from "babylon.quarks-editor";
+import {serializeEffectForest} from "babylon.quarks-editor";
+import type {TransformNode} from "@babylonjs/core/Meshes/transformNode";
 import {demos} from "./registry";
 import type {DemoContext, DemoDefinition, DemoState} from "./types";
 
@@ -292,10 +293,18 @@ document.getElementById("openInEditorBtn")?.addEventListener("click", () => {
     if (systems.length === 0) {
         return;
     }
-    // Serialize whatever the demo is currently running and hand it to the editor page.
-    const main = systems.find((s) => !s.onlyUsedByOther) ?? systems[0];
-    const binding = new EffectBinding(main, systems.filter((s) => s !== main));
-    sessionStorage.setItem("quarks-editor-effect", binding.exportJSON(activeDemo?.name ?? "DemoEffect"));
+    // Serialize the full scene hierarchy the demo is running (groups + nested emitters),
+    // not a flat list: walk each emitter up to its top-level effect root under the
+    // batch renderer, dedupe, and serialize the resulting forest.
+    const roots = new Set<TransformNode>();
+    for (const system of systems) {
+        let node: TransformNode = system.emitter;
+        while (node.parent && node.parent !== batchRenderer) {
+            node = node.parent as TransformNode;
+        }
+        roots.add(node);
+    }
+    sessionStorage.setItem("quarks-editor-effect", serializeEffectForest([...roots], activeDemo?.name ?? "DemoEffect"));
     window.location.href = "./editor.html?effect=session";
 });
 
