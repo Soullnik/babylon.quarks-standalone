@@ -44,3 +44,21 @@ export function createChildSystem(parent: ParticleSystem, options: ChildSystemOp
     child.emitter.parent = parent.emitter;
     return child;
 }
+
+/**
+ * Strips EmitSubParticleSystem behaviors that point at any of the removed systems, so
+ * deleting a sub-emitter target never leaves a dangling reference (which crashes the next
+ * update with `reading 'duration'` on the disposed emitter).
+ */
+export function unlinkSubEmitterReferences(systems: ParticleSystem[], removed: ParticleSystem[]): void {
+    const removedEmitters = new Set(removed.map((system) => system.emitter));
+    for (const system of systems) {
+        const behaviors = system.behaviors as Array<{type?: string; subParticleSystem?: unknown}>;
+        for (let i = behaviors.length - 1; i >= 0; i--) {
+            const behavior = behaviors[i];
+            if (behavior.type === 'EmitSubParticleSystem' && removedEmitters.has(behavior.subParticleSystem as never)) {
+                behaviors.splice(i, 1);
+            }
+        }
+    }
+}

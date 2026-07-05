@@ -1,9 +1,31 @@
 import React from 'react';
 import type {ParticleSystem} from 'babylon.quarks';
 import {EffectBinding} from '../core/binding';
+import {collectSystems} from '../core/effectTree';
 import type {EffectTreeNode} from '../core/effectTree';
-import {createChildSystem} from '../core/systems';
+import {createChildSystem, unlinkSubEmitterReferences} from '../core/systems';
 import {theme} from './theme';
+
+const iconButton: React.CSSProperties = {background: 'none', border: 'none', cursor: 'pointer', fontSize: 11, padding: 0};
+
+/** Disposes the given systems, first unlinking any sub-emitter behaviors that target them. */
+function removeSystems(binding: EffectBinding, targets: ParticleSystem[], onSelect: (system: ParticleSystem) => void) {
+    const removable = targets.filter((system) => binding.subSystems.includes(system));
+    if (removable.length === 0) {
+        return;
+    }
+    binding.apply(() => {
+        unlinkSubEmitterReferences([binding.system, ...binding.subSystems], removable);
+        for (const system of removable) {
+            system._renderer?.deleteSystem(system);
+            system.dispose();
+        }
+    });
+    for (const system of removable) {
+        binding.removeSubSystem(system);
+    }
+    onSelect(binding.system);
+}
 
 /**
  * Unity-style effect hierarchy: the loaded group/emitter tree. Selecting an emitter row
@@ -41,9 +63,10 @@ export function EffectHierarchy(props: {
                     fontSize: 12,
                 }}
                 onClick={() => {
+                    // New systems nest under the current selection (Unity: child of the selected effect).
                     let created: ParticleSystem | undefined;
                     binding.apply(() => {
-                        created = createChildSystem(binding.system, {name: `system ${binding.subSystems.length + 1}`});
+                        created = createChildSystem(selectedSystem, {name: `system ${binding.subSystems.length + 1}`});
                         binding.system._renderer?.addSystem(created);
                     });
                     if (created) {
@@ -82,6 +105,13 @@ function TreeRow(props: {
         background: selected ? 'rgba(60, 105, 209, 0.3)' : 'transparent',
     };
 
+    const rename = () => {
+        const name = window.prompt('Name', node.name);
+        if (name) {
+            binding.apply(() => (node.node.name = name));
+        }
+    };
+
     return (
         <>
             <div style={rowStyle} onClick={() => system && onSelect(system)}>
@@ -90,33 +120,36 @@ function TreeRow(props: {
                     {node.name}
                     {system?.onlyUsedByOther ? ' (sub)' : ''}
                 </span>
-                {system && (
-                    <button
-                        title="Rename"
-                        style={{background: 'none', border: 'none', color: theme.textDim, cursor: 'pointer', fontSize: 11, padding: 0}}
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            const name = window.prompt('System name', system.emitter.name);
-                            if (name) {
-                                binding.apply(() => (system.emitter.name = name));
-                            }
-                        }}
-                    >
+                {!isRoot && (
+                    <button title="Rename" style={{...iconButton, color: theme.textDim}} onClick={(e) => {
+                        e.stopPropagation();
+                        rename();
+                    }}>
                         ✎
                     </button>
                 )}
+                {/* Emitter removal (#1: unlink referencing sub-emitters first). */}
                 {system && !isRoot && binding.subSystems.includes(system) && (
                     <button
                         title="Remove system"
-                        style={{background: 'none', border: 'none', color: '#e08c8c', cursor: 'pointer', fontSize: 12, padding: 0}}
+                        style={{...iconButton, color: '#e08c8c', fontSize: 12}}
                         onClick={(e) => {
                             e.stopPropagation();
-                            binding.apply(() => {
-                                system._renderer?.deleteSystem(system);
-                                system.dispose();
-                            });
-                            binding.removeSubSystem(system);
-                            onSelect(binding.system);
+                            removeSystems(binding, [system], onSelect);
+                        }}
+                    >
+                        ✕
+                    </button>
+                )}
+                {/* Group removal (#6: tear down every emitter beneath it, then the group node). */}
+                {!system && !isRoot && (
+                    <button
+                        title="Remove group"
+                        style={{...iconButton, color: '#e08c8c', fontSize: 12}}
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            removeSystems(binding, collectSystems(node), onSelect);
+                            binding.apply(() => node.node.dispose(true, false));
                         }}
                     >
                         ✕
