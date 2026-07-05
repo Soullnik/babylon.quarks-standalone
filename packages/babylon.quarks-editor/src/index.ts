@@ -2,6 +2,8 @@ export {EffectBinding} from './core/binding';
 export type {EditorListener} from './core/binding';
 export {EffectHistory} from './core/history';
 export {createChildSystem} from './core/systems';
+export {buildEffectTree, collectSystems, serializeEffectTree, serializeEffectForest} from './core/effectTree';
+export type {EffectTreeNode} from './core/effectTree';
 export type {ChildSystemOptions} from './core/systems';
 export {readScalar, buildScalar, sampleCurve, readPieces, buildCurve, splitPieces, mergePieces} from './core/values';
 export type {ScalarGenerator, ScalarMode, ScalarValueState, CurvePiece} from './core/values';

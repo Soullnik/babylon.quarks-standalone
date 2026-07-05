@@ -1,4 +1,7 @@
 import type {ParticleSystem} from 'babylon.quarks';
+import type {TransformNode} from '@babylonjs/core/Meshes/transformNode';
+import {buildEffectTree, serializeEffectTree} from './effectTree';
+import type {EffectTreeNode} from './effectTree';
 
 export type EditorListener = () => void;
 
@@ -10,14 +13,22 @@ export class EffectBinding {
     readonly system: ParticleSystem;
     /** Systems spawned by sub-emitter behaviors; serialized as children of the root emitter. */
     readonly subSystems: ParticleSystem[] = [];
+    /** Loaded scene root of the whole effect (Group tree); defaults to the system's emitter. */
+    readonly root: TransformNode;
     /** Invoked before any mutation — used by EffectHistory to capture undo snapshots. */
     onBeforeChange?: () => void;
     private listeners = new Set<EditorListener>();
     private revision = 0;
 
-    constructor(system: ParticleSystem, subSystems: ParticleSystem[] = []) {
+    constructor(system: ParticleSystem, subSystems: ParticleSystem[] = [], root?: TransformNode) {
         this.system = system;
         this.subSystems.push(...subSystems);
+        this.root = root ?? system.emitter;
+    }
+
+    /** Editor hierarchy tree (groups + emitters) rooted at this effect's scene root. */
+    getTree(): EffectTreeNode {
+        return buildEffectTree(this.root);
     }
 
     subscribe(listener: EditorListener): () => void {
@@ -65,64 +76,10 @@ export class EffectBinding {
     }
 
     /**
-     * Serializes the effect into the Quarks JSON envelope understood by QuarksLoader
-     * (three.js Object3D export shape with a ParticleEmitter root).
+     * Serializes the effect into the Quarks JSON envelope understood by QuarksLoader,
+     * preserving the loaded group/emitter hierarchy.
      */
     exportJSON(name = 'effect'): string {
-        const meta: {
-            textures: {[k: string]: unknown};
-            materials: {[k: string]: {[key: string]: unknown}};
-            geometries: {[k: string]: unknown};
-        } = {textures: {}, materials: {}, geometries: {}};
-        const ps = this.system.toJSON(meta as never, {useUrlForImage: true} as never);
-        const children = this.subSystems.map((sub, index) => ({
-            uuid: (sub.emitter as {uuid?: string}).uuid ?? `${name}-sub-${index}`,
-            type: 'ParticleEmitter',
-            name: sub.emitter.name || `${name}-sub-${index}`,
-            layers: 1,
-            matrix: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1],
-            ps: sub.toJSON(meta as never, {useUrlForImage: true} as never),
-        }));
-
-        // toJSON stores live Texture instances and material refs in meta; flatten them
-        // into the serializable images/textures/materials arrays QuarksLoader expects.
-        const images: Array<{uuid: string; url: string}> = [];
-        const textures: Array<{uuid: string; image?: string}> = [];
-        for (const [uuid, value] of Object.entries(meta.textures)) {
-            const texture = value as {url?: string; name?: string} | null;
-            const url = texture?.url ?? texture?.name;
-            if (url) {
-                const imageUuid = `${uuid}-image`;
-                images.push({uuid: imageUuid, url});
-                textures.push({uuid, image: imageUuid});
-            } else {
-                textures.push({uuid});
-            }
-        }
-        const materials = Object.values(meta.materials).map((material) => {
-            const {sourceMaterial: _sourceMaterial, ...serializable} = material;
-            return serializable;
-        });
-
-        return JSON.stringify(
-            {
-                metadata: {version: 4.5, type: 'Object3D', generator: 'babylon.quarks-editor'},
-                geometries: Object.values(meta.geometries),
-                materials,
-                textures,
-                images,
-                object: {
-                    uuid: `${name}-emitter`,
-                    type: 'ParticleEmitter',
-                    name,
-                    layers: 1,
-                    matrix: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1],
-                    ps,
-                    children: children.length > 0 ? children : undefined,
-                },
-            },
-            null,
-            2
-        );
+        return serializeEffectTree(this.root, name);
     }
 }
