@@ -198,53 +198,83 @@ export function EffectEditorHost(props: EffectEditorHostProps) {
         force();
     };
 
+    const overlayButton: React.CSSProperties = {
+        ...buttonStyle,
+        background: 'rgba(20, 30, 60, 0.55)',
+        padding: '6px 10px',
+        minWidth: 34,
+    };
+
     return (
         <div style={{display: 'flex', width: '100%', height: '100%', fontFamily: theme.font, color: theme.text, background: '#070b16'}}>
             <div style={{position: 'relative', flex: 1, minWidth: 0}}>
                 <canvas ref={canvasRef} style={{width: '100%', height: '100%', display: 'block', touchAction: 'none', outline: 'none'}} />
-                <span ref={counterRef} style={{position: 'absolute', left: 14, top: 12, fontSize: 13, color: theme.textDim}} />
+                {/* Unity-style playback bar floating over the viewport. */}
+                <div
+                    style={{
+                        position: 'absolute',
+                        top: 12,
+                        left: '50%',
+                        transform: 'translateX(-50%)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 6,
+                        padding: '6px 8px',
+                        borderRadius: 12,
+                        border: `1px solid ${theme.border}`,
+                        background: 'rgba(7, 11, 22, 0.72)',
+                        backdropFilter: 'blur(10px)',
+                        WebkitBackdropFilter: 'blur(10px)',
+                    }}
+                >
+                    <button
+                        style={overlayButton}
+                        title={paused ? 'Play' : 'Pause'}
+                        onClick={() => {
+                            playbackRef.current.paused = !paused;
+                            setPaused(!paused);
+                        }}
+                    >
+                        {paused ? '▶' : '⏸'}
+                    </button>
+                    <button style={overlayButton} title="Step one frame" disabled={!paused} onClick={() => (playbackRef.current.stepQueued = true)}>
+                        ⏭
+                    </button>
+                    <button
+                        style={overlayButton}
+                        title="Restart"
+                        onClick={() => {
+                            binding?.restart();
+                            playbackRef.current.elapsed = 0;
+                        }}
+                    >
+                        ⟲
+                    </button>
+                    <select
+                        style={{...overlayButton, padding: '6px 4px'}}
+                        title="Playback speed"
+                        value={speed}
+                        onChange={(e) => {
+                            const next = Number(e.target.value);
+                            playbackRef.current.speed = next;
+                            setSpeed(next);
+                        }}
+                    >
+                        {[0.1, 0.25, 0.5, 1, 2, 4].map((s) => (
+                            <option key={s} value={s}>
+                                ×{s}
+                            </option>
+                        ))}
+                    </select>
+                    <span ref={counterRef} style={{fontSize: 12, color: theme.textDim, fontVariantNumeric: 'tabular-nums', paddingLeft: 4, minWidth: 120}} />
+                </div>
             </div>
             <aside style={{width: 340, flexShrink: 0, borderLeft: `1px solid ${theme.border}`, background: theme.panelBg, display: 'flex', flexDirection: 'column'}}>
                 <div style={{padding: '12px 14px 10px', borderBottom: `1px solid ${theme.border}`}}>
                     <div style={{fontSize: 16, fontWeight: 600}}>{props.title ?? 'Effect editor'}</div>
                     <div style={{display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 10}}>
-                        <button style={buttonStyle} title="Ctrl+Z" disabled={!state?.history.canUndo} onClick={() => historyAction(state!.history.undo())}>↶</button>
-                        <button style={buttonStyle} title="Ctrl+Shift+Z" disabled={!state?.history.canRedo} onClick={() => historyAction(state!.history.redo())}>↷</button>
-                        <button style={buttonStyle} onClick={() => { binding?.restart(); playbackRef.current.elapsed = 0; }}>Restart</button>
-                        <button
-                            style={buttonStyle}
-                            title={paused ? 'Play' : 'Pause'}
-                            onClick={() => {
-                                playbackRef.current.paused = !paused;
-                                setPaused(!paused);
-                            }}
-                        >
-                            {paused ? '▶' : '⏸'}
-                        </button>
-                        <button
-                            style={buttonStyle}
-                            title="Step one frame"
-                            disabled={!paused}
-                            onClick={() => (playbackRef.current.stepQueued = true)}
-                        >
-                            ⏭
-                        </button>
-                        <select
-                            style={{...buttonStyle, padding: '6px 4px'}}
-                            title="Playback speed"
-                            value={speed}
-                            onChange={(e) => {
-                                const next = Number(e.target.value);
-                                playbackRef.current.speed = next;
-                                setSpeed(next);
-                            }}
-                        >
-                            {[0.1, 0.25, 0.5, 1, 2, 4].map((s) => (
-                                <option key={s} value={s}>
-                                    ×{s}
-                                </option>
-                            ))}
-                        </select>
+                        <button style={buttonStyle} title="Undo (Ctrl+Z)" disabled={!state?.history.canUndo} onClick={() => historyAction(state!.history.undo())}>↶</button>
+                        <button style={buttonStyle} title="Redo (Ctrl+Shift+Z)" disabled={!state?.history.canRedo} onClick={() => historyAction(state!.history.redo())}>↷</button>
                         <button
                             style={buttonStyle}
                             onClick={() => {
