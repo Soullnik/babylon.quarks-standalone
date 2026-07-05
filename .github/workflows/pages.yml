@@ -11,9 +11,12 @@ permissions:
   pages: write
   id-token: write
 
+# Allow one concurrent deployment; queued runs collapse to the latest, but an
+# in-progress deployment is never cancelled — cancelling it mid-flight leaves
+# Pages in a failed state ("Deployment failed, try again later").
 concurrency:
   group: pages
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   build:
