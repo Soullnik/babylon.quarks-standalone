@@ -102,8 +102,10 @@ export class TrailBatch extends VFXBatch {
         this.rebuildMaterial();
     }
 
+    private static nextMaterialId = 0;
+
     rebuildMaterial(): void {
-        const shaderName = `quarksTrail_${Date.now()}`;
+        const shaderName = `quarksTrail_${TrailBatch.nextMaterialId++}`;
         const defines: string[] = [];
 
         if (this.settings.texture) {
@@ -155,7 +157,11 @@ export class TrailBatch extends VFXBatch {
         mat.forceDepthWrite = this.settings.materialDepthWrite;
         mat.disableDepthWrite = !this.settings.materialDepthWrite;
 
+        const previous = this.mesh.material;
         this.mesh.material = mat;
+        if (previous) {
+            this.scene.onAfterRenderObservable.addOnce(() => previous.dispose());
+        }
     }
 
     private vector_ = new Vector3();

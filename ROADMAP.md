@@ -57,12 +57,13 @@ plugin host.
 
 ## Technical directions
 
-### 1. WebGPU support — verified
+### 1. WebGPU support — experimental (issues found on real hardware)
 
 All shaders are GLSL registered via `Effect.ShadersStore` and used through `ShaderMaterial`; under `WebGPUEngine` Babylon transpiles them to WGSL automatically (glslang/twgsl).
 
-- Done: validated under `WebGPUEngine` in headless Chromium (SwiftShader adapter) — all four render modes (billboard, stretched billboard, mesh, trail) create pipelines and render 90 frames with zero WebGPU validation errors. Support stated in the README; the live demos and the benchmark page accept `?engine=webgpu`.
-- Remaining: a visual pass on real hardware (headless SwiftShader cannot capture WebGPU canvas pixels), and eventually native WGSL shader variants via `ShaderLanguage.WGSL` to drop the transpiler dependency.
+- Each render mode compiles a WebGPU pipeline in isolation. But real-hardware testing revealed that several multi-system demos fail to render. Root cause found and fixed: batch shader names used `Date.now()`, so batches created in the same millisecond overwrote each other's `Effect.ShadersStore` entries — harmless on WebGL (synchronous compile) but fatal on WebGPU (asynchronous pipeline compile → `shaderProcessingContext` undefined). See #19.
+- The `?engine=webgpu` switch on the demos/benchmark now surfaces WebGPU device errors to the console (`[WebGPU]` prefix) for diagnosis.
+- Remaining: confirm the fix on real hardware across all 18 demos, investigate the soft-particle depth path and the glslang/twgsl transpiler dependency, and eventually ship native WGSL shader variants via `ShaderLanguage.WGSL`. Tracked in #19.
 
 ### 2. GPU particle simulation (second flagship effort)
 

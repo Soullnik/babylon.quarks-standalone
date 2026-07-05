@@ -22,7 +22,7 @@ High-performance particle system for [Babylon.js](https://www.babylonjs.com/). B
 - **Visual authoring** — create effects in the [quarks.art](https://quarks.art/) editor (or export from Unity) and load them with `QuarksLoader`.
 - **Cross-engine format** — the same effect JSON runs in three.js (three.quarks) and Babylon.js.
 - **Adaptive performance** — optional frame-budget quality scaling built into `BatchedRenderer`.
-- **WebGL and WebGPU** — runs on both Babylon engines; shaders are transpiled to WGSL automatically.
+- **WebGL** (production) and **WebGPU** (experimental) — runs on both Babylon engines; shaders are transpiled to WGSL automatically.
 
 ## Install
 
@@ -119,7 +119,7 @@ The same bundle works in any plain `<script>` setup alongside the global `babylo
 <script src="https://cdn.jsdelivr.net/npm/babylon.quarks/dist/babylon.quarks.umd.min.js"></script>
 ```
 
-## WebGPU
+## WebGPU (experimental)
 
 The library runs on Babylon's `WebGPUEngine` — its GLSL shaders are transpiled to WGSL automatically by Babylon (glslang/twgsl are fetched by Babylon on engine init). Everything except engine creation stays the same:
 
@@ -132,7 +132,7 @@ await engine.initAsync();
 // Scene + BatchedRenderer setup is identical to WebGL.
 ```
 
-All render modes (billboard, stretched billboard, mesh, trail) are validated to create WebGPU pipelines with zero validation errors. The [live demos](https://soullnik.github.io/babylon.quarks-standalone/) and the [benchmark page](https://soullnik.github.io/babylon.quarks-standalone/benchmark.html) accept `?engine=webgpu` in the URL to switch engines.
+Each render mode (billboard, stretched billboard, mesh, trail) compiles a valid WebGPU pipeline. WebGPU support is still **experimental** — it is being hardened against real-hardware issues that don't appear on WebGL (async pipeline compilation is stricter). The [live demos](https://soullnik.github.io/babylon.quarks-standalone/) and the [benchmark page](https://soullnik.github.io/babylon.quarks-standalone/benchmark.html) accept `?engine=webgpu` in the URL to switch engines; WebGPU device errors are logged to the console with a `[WebGPU]` prefix.
 
 ## Load effects from quarks.art / Unity
 

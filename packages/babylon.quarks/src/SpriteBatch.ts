@@ -109,8 +109,13 @@ export class SpriteBatch extends VFXBatch {
         this.rebuildMaterial();
     }
 
+    private static nextMaterialId = 0;
+
     rebuildMaterial(): void {
-        const shaderName = `quarksParticle_${this.settings.renderMode}_${Date.now()}`;
+        // Monotonic id: Date.now() collides when several batches are created in the
+        // same millisecond, overwriting each other's ShadersStore entries — fatal on
+        // WebGPU where pipeline compilation is asynchronous.
+        const shaderName = `quarksParticle_${this.settings.renderMode}_${SpriteBatch.nextMaterialId++}`;
         this.lastStretchedSpeedFactor = Number.NaN;
         let vertexShader: string;
         let fragmentShader: string;
@@ -237,7 +242,13 @@ export class SpriteBatch extends VFXBatch {
         mat.forceDepthWrite = this.settings.materialDepthWrite;
         mat.disableDepthWrite = !this.settings.materialDepthWrite;
 
+        const previous = this.mesh.material;
         this.mesh.material = mat;
+        if (previous) {
+            // Defer disposal one frame: killing the effect while WebGPU is still
+            // preparing its pipeline crashes the async compile.
+            this.scene.onAfterRenderObservable.addOnce(() => previous.dispose());
+        }
     }
 
     private vector_ = new Vector3();
