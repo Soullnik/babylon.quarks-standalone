@@ -68,10 +68,13 @@ export class EffectBinding {
     }
 
     restart(): void {
-        this.system.restart();
-        this.system.play();
-        for (const sub of this.subSystems) {
-            sub.restart();
+        // Replay every independent system; sub-emitter targets (onlyUsedByOther) are only
+        // reset — their parents re-drive them, so playing them directly would double-emit.
+        for (const system of [this.system, ...this.subSystems]) {
+            system.restart();
+            if (!system.onlyUsedByOther) {
+                system.play();
+            }
         }
     }
 

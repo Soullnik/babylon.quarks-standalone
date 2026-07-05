@@ -542,10 +542,16 @@ export function RendererModule({
                                 input.accept = 'image/*';
                                 input.onchange = () => {
                                     const file = input.files?.[0];
-                                    if (file) {
-                                        // Object URLs preview fine but export as blob: — re-point before shipping.
-                                        binding.apply((s) => (s.texture = resolveTexture(URL.createObjectURL(file)) as never));
+                                    if (!file) {
+                                        return;
                                     }
+                                    // Read as a data URI so the texture survives Export/Save/reimport;
+                                    // an object URL (blob:) would be dead after a reload.
+                                    const reader = new FileReader();
+                                    reader.onload = () => {
+                                        binding.apply((s) => (s.texture = resolveTexture(reader.result as string) as never));
+                                    };
+                                    reader.readAsDataURL(file);
                                 };
                                 input.click();
                                 return;

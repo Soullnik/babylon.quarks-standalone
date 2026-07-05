@@ -5,6 +5,7 @@ import {Scene} from '@babylonjs/core/scene';
 import {ArcRotateCamera} from '@babylonjs/core/Cameras/arcRotateCamera';
 import {Vector3 as BVector3} from '@babylonjs/core/Maths/math.vector';
 import {Color4} from '@babylonjs/core/Maths/math.color';
+import type {TransformNode} from '@babylonjs/core/Meshes/transformNode';
 import {
     BatchedRenderer,
     ColorOverLife,
@@ -65,6 +66,19 @@ function createDefaultEffect(scene: Scene, resolveTexture?: (url: string, scene:
     return system;
 }
 
+/** Disposes an effect's systems and its remaining group tree (otherwise the groups leak). */
+function disposeEffect(root: TransformNode, systems: ParticleSystem[], renderer: BatchedRenderer): void {
+    for (const system of systems) {
+        renderer.deleteSystem(system);
+        system.dispose();
+    }
+    // Disposing the systems already disposed their emitter nodes; dispose the leftover group
+    // tree too. Skip when the root IS a disposed emitter (default single-system effect).
+    if (!systems.some((system) => system.emitter === root)) {
+        root.dispose(false, true);
+    }
+}
+
 /**
  * Self-contained effect editor: live Babylon preview + hierarchy/inspector sidebar.
  * Designed for embedding — see QuarksEffectEditor.Show for the NME-style entry point.
@@ -112,14 +126,13 @@ export function EffectEditorHost(props: EffectEditorHostProps) {
 
         const importJson = (json: unknown) => {
             const current = stateRef.current!.binding;
-            for (const existing of [current.system, ...current.subSystems]) {
-                renderer.deleteSystem(existing);
-                existing.dispose();
-            }
+            // Load first so a bad/empty JSON leaves the current effect intact.
             const {root, systems} = loadEffectFromJson(scene, renderer, json);
             if (systems.length === 0) {
+                disposeEffect(root, systems, renderer);
                 throw new Error('No particle systems found in the JSON.');
             }
+            disposeEffect(current.root, [current.system, ...current.subSystems], renderer);
             const main = systems.find((s) => !s.onlyUsedByOther) ?? systems[0];
             mount(new EffectBinding(main, systems.filter((s) => s !== main), root));
         };
@@ -183,11 +196,8 @@ export function EffectEditorHost(props: EffectEditorHostProps) {
     const historyAction = (json: unknown | null) => {
         if (json && state) {
             const current = state.binding;
-            for (const existing of [current.system, ...current.subSystems]) {
-                state.renderer.deleteSystem(existing);
-                existing.dispose();
-            }
             const {root, systems} = loadEffectFromJson(state.scene, state.renderer, json);
+            disposeEffect(current.root, [current.system, ...current.subSystems], state.renderer);
             const main = systems.find((s) => !s.onlyUsedByOther) ?? systems[0];
             const next = new EffectBinding(main, systems.filter((s) => s !== main), root);
             state.history.attach(next);
