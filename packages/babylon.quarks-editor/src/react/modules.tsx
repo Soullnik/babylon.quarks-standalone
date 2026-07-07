@@ -106,6 +106,18 @@ export function MainModule({binding}: ModuleProps) {
                 <CheckboxField value={system.prewarm} onChange={(v) => binding.apply((s) => (s.prewarm = v))} />
             </Row>
             <ValueField
+                label="Start delay"
+                generator={system.startDelay}
+                min={0}
+                curveMax={5}
+                onChange={(g) =>
+                    binding.apply((s) => {
+                        s.startDelay = g;
+                        s.restart();
+                    })
+                }
+            />
+            <ValueField
                 label="Start lifetime"
                 generator={system.startLife}
                 min={0.01}
@@ -218,6 +230,13 @@ export function EmissionModule({binding}: ModuleProps) {
                 min={0}
                 curveMax={500}
                 onChange={(g) => binding.apply((s) => (s.emissionOverTime = g))}
+            />
+            <ValueField
+                label="Rate over distance"
+                generator={system.emissionOverDistance}
+                min={0}
+                curveMax={50}
+                onChange={(g) => binding.apply((s) => (s.emissionOverDistance = g))}
             />
             {bursts.map((burst, i) => (
                 <div key={i} style={{marginTop: 8, padding: '6px 8px', border: '1px solid #22305c', borderRadius: 8}}>

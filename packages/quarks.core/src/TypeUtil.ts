@@ -14,6 +14,7 @@ export type FieldType =
     | 'mesh'
     | 'particleSystem'
     | 'boolean'
+    | 'string'
     | 'geometry'
     | 'emitterMode'
     | 'vec3Func';

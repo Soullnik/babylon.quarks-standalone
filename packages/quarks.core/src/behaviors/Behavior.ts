@@ -18,6 +18,8 @@ import {IParticleSystem} from '../IParticleSystem';
 import {TurbulenceField} from './TurbulenceField';
 import {Rotation3DOverLife} from './Rotation3DOverLife';
 import {ForceOverLife} from './ForceOverLife';
+import {VelocityOverLife} from './VelocityOverLife';
+import {InheritVelocity} from './InheritVelocity';
 import {Noise} from './Noise';
 import {LimitSpeedOverLife} from './LimitSpeedOverLife';
 import { ApplyCollision } from './ApplyCollision';
@@ -156,6 +158,29 @@ export const BehaviorTypes: {[key: string]: BehaviorPlugin} = {
             ['z', ['value', 'valueFunc']],
         ],
         loadJSON: ForceOverLife.fromJSON,
+    },
+    VelocityOverLife: {
+        type: 'VelocityOverLife',
+        constructor: VelocityOverLife,
+        params: [
+            ['linearX', ['value', 'valueFunc']],
+            ['linearY', ['value', 'valueFunc']],
+            ['linearZ', ['value', 'valueFunc']],
+            ['orbitalX', ['value', 'valueFunc']],
+            ['orbitalY', ['value', 'valueFunc']],
+            ['orbitalZ', ['value', 'valueFunc']],
+            ['space', ['string']],
+        ],
+        loadJSON: VelocityOverLife.fromJSON,
+    },
+    InheritVelocity: {
+        type: 'InheritVelocity',
+        constructor: InheritVelocity,
+        params: [
+            ['multiplier', ['value', 'valueFunc']],
+            ['mode', ['string']],
+        ],
+        loadJSON: InheritVelocity.fromJSON,
     },
     OrbitOverLife: {
         type: 'OrbitOverLife',

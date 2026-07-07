@@ -13,6 +13,7 @@ import {
     ColorBySpeedModule,
     ForceOverLifeModule,
     GravityModule,
+    InheritVelocityModule,
     LimitSpeedOverLifeModule,
     NoiseModule,
     OrbitOverLifeModule,
@@ -21,6 +22,7 @@ import {
     SizeBySpeedModule,
     SpeedOverLifeModule,
     TextureSheetModule,
+    VelocityOverLifeModule,
     WidthOverTrailModule,
 } from './behaviorModules';
 import {SubEmittersModule} from './SubEmittersModule';
@@ -71,8 +73,10 @@ export function EffectEditor(props: EffectEditorProps) {
             <MainModule binding={binding} />
             <EmissionModule binding={binding} />
             <ShapeModule binding={binding} />
+            <VelocityOverLifeModule binding={binding} />
             <SpeedOverLifeModule binding={binding} />
             <LimitSpeedOverLifeModule binding={binding} />
+            <InheritVelocityModule binding={binding} />
             <ForceOverLifeModule binding={binding} />
             <GravityModule binding={binding} />
             <OrbitOverLifeModule binding={binding} />

@@ -6,13 +6,14 @@ Three tiers: ✅ shipped · 🟡 runtime supports it, editor UI missing · 🔴 
 ## Main
 - ✅ duration, looping, start lifetime/speed/size (constant/random/curve), start color, world space
 - ✅ prewarm, start rotation (constant/random angle, 3D random), start color random-between-two
+- ✅ start delay (constant/random, ignored with prewarm, re-armed by restart)
 - 🟡 3D start size (`Vector3Generator`), gradient start color (`RandomColorBetweenGradient`)
-- 🔴 start delay, simulation speed persistence, max particles, stop action, culling, ring buffer
+- 🔴 simulation speed persistence, max particles, stop action, culling, ring buffer
 
 ## Emission
 - ✅ rate over time (constant/random/curve), bursts (time/count)
 - ✅ burst cycles/interval/probability
-- 🔴 rate over distance
+- ✅ rate over distance
 
 ## Shape
 - ✅ cone/sphere/hemisphere/circle/donut/rectangle/point with base params
@@ -23,7 +24,8 @@ Three tiers: ✅ shipped · 🟡 runtime supports it, editor UI missing · 🔴 
 ## Velocity / forces
 - ✅ Speed over Lifetime (curve), Limit Speed over Lifetime (curve + dampen), Force over Lifetime (XYZ), Gravity
 - ✅ Orbit over Lifetime
-- 🔴 Velocity over Lifetime (direct linear XYZ + radial), Inherit Velocity, Lifetime by Emitter Speed
+- ✅ Velocity over Lifetime (linear XYZ local/world + orbital XYZ), Inherit Velocity (initial/current)
+- 🔴 orbital offset, radial velocity, Lifetime by Emitter Speed
 
 ## Color / size / rotation
 - ✅ Color over Lifetime (gradient), Size over Lifetime (curve), Rotation over Lifetime
@@ -68,4 +70,5 @@ Three tiers: ✅ shipped · 🟡 runtime supports it, editor UI missing · 🔴 
 2. ~~"by Speed" trio + Orbit + Width over Trail~~ / ~~full burst editing~~ (done)
 3. ~~Shape mode/spread~~ / ~~Renderer extras~~ (done)
 4. ~~Multi-segment curves~~ (done)
-5. Core contributions: startDelay → rate over distance → collision
+5. ~~Core (vendored fork): startDelay, rate over distance UI, Velocity over Lifetime, Inherit Velocity~~ (done)
+6. Core (vendored fork): collision → noise octaves/scroll → radial/orbital-offset velocity

@@ -71,6 +71,7 @@ export interface ParticleSystemParameters {
     looping?: boolean;
     prewarm?: boolean;
     duration?: number;
+    startDelay?: ValueGenerator | FunctionValueGenerator;
     shape?: EmitterShape;
     startLife?: ValueGenerator | FunctionValueGenerator;
     startSpeed?: ValueGenerator | FunctionValueGenerator;
@@ -124,6 +125,7 @@ export interface ParticleSystemJSONParameters {
     looping: boolean;
     prewarm: boolean;
     duration: number;
+    startDelay?: FunctionJSON;
     shape: any;
     startLife: FunctionJSON;
     startSpeed: FunctionJSON;
@@ -176,6 +178,7 @@ export class ParticleSystem implements IParticleSystem {
     prewarm: boolean;
     looping: boolean;
     duration: number;
+    startDelay: ValueGenerator | FunctionValueGenerator;
     startLife: ValueGenerator | FunctionValueGenerator;
     startSpeed: ValueGenerator | FunctionValueGenerator;
     startRotation: ValueGenerator | FunctionValueGenerator | RotationGenerator;
@@ -197,10 +200,14 @@ export class ParticleSystem implements IParticleSystem {
     neededToUpdateRender: boolean;
     behaviors: Array<Behavior>;
     emissionState: EmissionState;
+    emitterVelocity: Vector3 = new Vector3();
 
     private prewarmed: boolean;
     private emitEnded: boolean;
     private markForDestroy: boolean;
+    private startDelayTimeLeft = 0;
+    private previousEmitterPos?: Vector3;
+    private tempEmitterPos: Vector3 = new Vector3();
     private temp: Vector3 = new Vector3();
     private normalMatrix: Matrix3 = new Matrix3();
     private memory: GeneratorMemory = [];
@@ -378,6 +385,7 @@ export class ParticleSystem implements IParticleSystem {
 
         this.autoDestroy = parameters.autoDestroy ?? false;
         this.duration = parameters.duration ?? 1;
+        this.startDelay = parameters.startDelay ?? new ConstantValue(0);
         this.looping = parameters.looping ?? true;
         this.prewarm = parameters.prewarm ?? false;
         this.startLife = parameters.startLife ?? new ConstantValue(5);
@@ -459,6 +467,8 @@ export class ParticleSystem implements IParticleSystem {
 
         this.emissionBursts.forEach((burst) => burst.count.startGen(this.memory));
         this.emissionOverDistance.startGen(this.memory);
+        this.startDelay.startGen(this.memory);
+        this.startDelayTimeLeft = this.startDelay.genValue(this.memory, 0);
         this.refreshTrailHistoryMode();
 
         this.emitEnded = false;
@@ -747,6 +757,10 @@ export class ParticleSystem implements IParticleSystem {
         this.prewarmed = false;
         this.emissionBursts.forEach((burst) => burst.count.startGen(this.memory));
         this.emissionOverDistance.startGen(this.memory);
+        this.startDelay.startGen(this.memory);
+        this.startDelayTimeLeft = this.startDelay.genValue(this.memory, 0);
+        this.previousEmitterPos = undefined;
+        this.emitterVelocity.set(0, 0, 0);
     }
 
     private firstTimeUpdate = true;
@@ -779,6 +793,26 @@ export class ParticleSystem implements IParticleSystem {
         if (this.neededToUpdateRender) {
             if (this._renderer) this._renderer.updateSystem(this);
             this.neededToUpdateRender = false;
+        }
+
+        const emitterElements = this.emitter.matrixWorld.elements;
+        this.tempEmitterPos.set(emitterElements[12], emitterElements[13], emitterElements[14]);
+        if (this.previousEmitterPos !== undefined && delta > 0) {
+            this.emitterVelocity
+                .copy(this.tempEmitterPos)
+                .sub(this.previousEmitterPos)
+                .divideScalar(delta);
+        }
+        (this.previousEmitterPos ??= new Vector3()).copy(this.tempEmitterPos);
+
+        // Start delay holds back emission once per play/restart (ignored with
+        // prewarm, matching Unity). Carry the remainder so a large frame does
+        // not lose time.
+        if (this.startDelayTimeLeft > 0 && !(this.prewarm && this.looping)) {
+            this.startDelayTimeLeft -= delta;
+            if (this.startDelayTimeLeft >= 0) return;
+            delta = Math.min(-this.startDelayTimeLeft, 0.1);
+            this.startDelayTimeLeft = 0;
         }
 
         if (!this.onlyUsedByOther) {
@@ -931,6 +965,7 @@ export class ParticleSystem implements IParticleSystem {
             looping: this.looping,
             prewarm: this.prewarm,
             duration: this.duration,
+            startDelay: this.startDelay.toJSON(),
             shape: this.emitterShape.toJSON(),
             startLife: this.startLife.toJSON(),
             startSpeed: this.startSpeed.toJSON(),
@@ -1014,6 +1049,7 @@ export class ParticleSystem implements IParticleSystem {
             looping: json.looping,
             prewarm: json.prewarm,
             duration: json.duration,
+            startDelay: json.startDelay ? ValueGeneratorFromJSON(json.startDelay) : undefined,
             shape,
             startLife: ValueGeneratorFromJSON(json.startLife),
             startSpeed: ValueGeneratorFromJSON(json.startSpeed),
@@ -1245,6 +1281,7 @@ export class ParticleSystem implements IParticleSystem {
             looping: this.looping,
             prewarm: this.prewarm,
             duration: this.duration,
+            startDelay: this.startDelay.clone(),
             shape: this.emitterShape.clone(),
             startLife: this.startLife.clone(),
             startSpeed: this.startSpeed.clone(),

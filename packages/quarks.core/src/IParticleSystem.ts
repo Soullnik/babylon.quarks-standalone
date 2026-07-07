@@ -110,6 +110,11 @@ export interface IParticleSystem {
      */
     worldSpace: boolean;
     /**
+     * World-space velocity of the emitter, updated each frame by the runtime.
+     * @type {Vector3}
+     */
+    emitterVelocity?: Vector3;
+    /**
      * Number of particles.
      * @type {number}
      */

@@ -6,6 +6,7 @@ import {
     ForceOverLife,
     FrameOverLife,
     Gradient,
+    InheritVelocity,
     IntervalValue,
     LimitSpeedOverLife,
     Noise,
@@ -15,6 +16,7 @@ import {
     SizeBySpeed,
     SpeedOverLife,
     Vector3,
+    VelocityOverLife,
     WidthOverLength,
 } from 'babylon.quarks';
 import type {Behavior} from 'babylon.quarks';
@@ -24,7 +26,7 @@ import {buildCurve, buildScalar, readPieces, readScalar} from '../core/values';
 import {GradientEditor} from './GradientEditor';
 import {CurveEditor} from './CurveEditor';
 import {ModuleSection} from './ModuleSection';
-import {NumberField, Row} from './fields';
+import {NumberField, Row, SelectField} from './fields';
 import {ValueField} from './ValueField';
 
 interface ModuleProps {
@@ -132,6 +134,70 @@ export function ForceOverLifeModule({binding}: ModuleProps) {
                     <ValueField label="X" generator={behavior.x} curveMax={10} onChange={(g) => binding.apply(() => (behavior.x = g))} />
                     <ValueField label="Y" generator={behavior.y} curveMax={10} onChange={(g) => binding.apply(() => (behavior.y = g))} />
                     <ValueField label="Z" generator={behavior.z} curveMax={10} onChange={(g) => binding.apply(() => (behavior.z = g))} />
+                </>
+            )}
+        </BehaviorModule>
+    );
+}
+
+export function VelocityOverLifeModule({binding}: ModuleProps) {
+    return (
+        <BehaviorModule<VelocityOverLife>
+            binding={binding}
+            title="Velocity over Lifetime"
+            type="VelocityOverLife"
+            create={() => new VelocityOverLife(new ConstantValue(0), new ConstantValue(1), new ConstantValue(0))}
+        >
+            {(behavior) => (
+                <>
+                    <Row label="Space">
+                        <SelectField
+                            value={behavior.space}
+                            options={[
+                                {value: 'local', label: 'Local'},
+                                {value: 'world', label: 'World'},
+                            ]}
+                            onChange={(v) => binding.apply(() => (behavior.space = v))}
+                        />
+                    </Row>
+                    <ValueField label="Linear X" generator={behavior.linearX} curveMax={10} onChange={(g) => binding.apply(() => (behavior.linearX = g))} />
+                    <ValueField label="Linear Y" generator={behavior.linearY} curveMax={10} onChange={(g) => binding.apply(() => (behavior.linearY = g))} />
+                    <ValueField label="Linear Z" generator={behavior.linearZ} curveMax={10} onChange={(g) => binding.apply(() => (behavior.linearZ = g))} />
+                    <ValueField label="Orbital X" generator={behavior.orbitalX} curveMax={Math.PI * 4} onChange={(g) => binding.apply(() => (behavior.orbitalX = g))} />
+                    <ValueField label="Orbital Y" generator={behavior.orbitalY} curveMax={Math.PI * 4} onChange={(g) => binding.apply(() => (behavior.orbitalY = g))} />
+                    <ValueField label="Orbital Z" generator={behavior.orbitalZ} curveMax={Math.PI * 4} onChange={(g) => binding.apply(() => (behavior.orbitalZ = g))} />
+                </>
+            )}
+        </BehaviorModule>
+    );
+}
+
+export function InheritVelocityModule({binding}: ModuleProps) {
+    return (
+        <BehaviorModule<InheritVelocity>
+            binding={binding}
+            title="Inherit Velocity"
+            type="InheritVelocity"
+            create={() => new InheritVelocity(new ConstantValue(1), 'initial')}
+        >
+            {(behavior) => (
+                <>
+                    <Row label="Mode">
+                        <SelectField
+                            value={behavior.mode}
+                            options={[
+                                {value: 'initial', label: 'Initial'},
+                                {value: 'current', label: 'Current'},
+                            ]}
+                            onChange={(v) => binding.apply(() => (behavior.mode = v))}
+                        />
+                    </Row>
+                    <ValueField
+                        label="Multiplier"
+                        generator={behavior.multiplier}
+                        curveMax={2}
+                        onChange={(g) => binding.apply(() => (behavior.multiplier = g))}
+                    />
                 </>
             )}
         </BehaviorModule>
