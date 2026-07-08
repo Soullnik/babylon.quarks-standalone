@@ -251,15 +251,55 @@ export function TimelinePanel(props: TimelinePanelProps): React.ReactElement {
                 )}
             </div>
             {/* position:relative wrapper whose box is exactly the visible panel body — the
-                divider/playhead below are its direct children (siblings of the scroller, not
-                descendants), so top:0/bottom:0 always means "100% of the panel," independent
-                of scroll position or how many tracks there are. */}
-            <div style={{position: 'relative', flex: 1, minHeight: 0}}>
+                ruler header/divider/playhead below are its direct children (siblings of the
+                scroller, not descendants), so top:0/bottom:0 always means "100% of the panel,"
+                independent of scroll position or how many tracks there are. Also measures the
+                full-width box (labels + time axis) for pxPerSecond, since the ruler and the
+                scroller share that width. */}
+            <div ref={bodyRef} style={{position: 'relative', flex: 1, minHeight: 0}}>
+                {/* Fixed ruler header, kept out of the vertical scroller so it never scrolls
+                    away with the track rows. */}
                 <div
-                    ref={bodyRef}
                     style={{
                         position: 'absolute',
                         top: 0,
+                        left: 0,
+                        right: 0,
+                        height: RULER_HEIGHT,
+                        display: 'grid',
+                        gridTemplateColumns: `${LABEL_WIDTH}px 1fr`,
+                        background: theme.panelBg,
+                        zIndex: 2,
+                    }}
+                >
+                    <div style={{height: RULER_HEIGHT}} />
+                    <div
+                        className="qe-hover-bg"
+                        style={{position: 'relative', height: RULER_HEIGHT, cursor: 'ew-resize', overflow: 'hidden'}}
+                        onPointerDown={(e) => {
+                            playbackRef.current.scrubbing = true;
+                            (e.target as Element).setPointerCapture(e.pointerId);
+                            queueScrub(e.clientX);
+                        }}
+                        onPointerMove={(e) => {
+                            if (playbackRef.current.scrubbing) queueScrub(e.clientX);
+                        }}
+                        onPointerUp={(e) => {
+                            playbackRef.current.scrubbing = false;
+                            (e.target as Element).releasePointerCapture?.(e.pointerId);
+                        }}
+                    >
+                        {ticks.map((t) => (
+                            <div key={t} style={{position: 'absolute', left: TIMELINE_INSET + t * pxPerSecond, top: 0, bottom: 0, borderLeft: `1px solid ${theme.border}`, fontSize: 10, color: theme.textDim, paddingLeft: 3}}>
+                                {t}s
+                            </div>
+                        ))}
+                    </div>
+                </div>
+                <div
+                    style={{
+                        position: 'absolute',
+                        top: RULER_HEIGHT,
                         left: 0,
                         right: 0,
                         bottom: 0,
@@ -274,29 +314,6 @@ export function TimelinePanel(props: TimelinePanelProps): React.ReactElement {
                             gridAutoRows: 'min-content',
                         }}
                     >
-                        <div style={{height: RULER_HEIGHT}} />
-                        <div
-                            className="qe-hover-bg"
-                            style={{position: 'relative', height: RULER_HEIGHT, cursor: 'ew-resize', overflow: 'hidden'}}
-                            onPointerDown={(e) => {
-                                playbackRef.current.scrubbing = true;
-                                (e.target as Element).setPointerCapture(e.pointerId);
-                                queueScrub(e.clientX);
-                            }}
-                            onPointerMove={(e) => {
-                                if (playbackRef.current.scrubbing) queueScrub(e.clientX);
-                            }}
-                            onPointerUp={(e) => {
-                                playbackRef.current.scrubbing = false;
-                                (e.target as Element).releasePointerCapture?.(e.pointerId);
-                            }}
-                        >
-                            {ticks.map((t) => (
-                                <div key={t} style={{position: 'absolute', left: TIMELINE_INSET + t * pxPerSecond, top: 0, bottom: 0, borderLeft: `1px solid ${theme.border}`, fontSize: 10, color: theme.textDim, paddingLeft: 3}}>
-                                    {t}s
-                                </div>
-                            ))}
-                        </div>
                         {visibleRows.map((row) => (
                             <TimelineTrackRow
                                 key={row.node.uniqueId}
@@ -317,7 +334,7 @@ export function TimelinePanel(props: TimelinePanelProps): React.ReactElement {
                     </div>
                 </div>
                 {/* Static divider between the label column and the time axis, distinct from the moving playhead. */}
-                <div style={{position: 'absolute', top: 0, bottom: 0, left: LABEL_WIDTH, width: 1, background: theme.border, pointerEvents: 'none'}} />
+                <div style={{position: 'absolute', top: 0, bottom: 0, left: LABEL_WIDTH, width: 1, background: theme.border, pointerEvents: 'none', zIndex: 3}} />
                 <div
                     ref={playheadRef}
                     style={{
@@ -328,7 +345,7 @@ export function TimelinePanel(props: TimelinePanelProps): React.ReactElement {
                         width: 1,
                         background: theme.accent,
                         pointerEvents: 'none',
-                        zIndex: 1,
+                        zIndex: 3,
                     }}
                 />
             </div>
