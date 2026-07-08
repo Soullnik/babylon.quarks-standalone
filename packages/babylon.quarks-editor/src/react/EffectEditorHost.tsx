@@ -26,7 +26,7 @@ import {EffectEditor} from './EffectEditor';
 import {PromptDialog} from './PromptDialog';
 import {TimelinePanel} from './TimelinePanel';
 import type {PlaybackState} from './TimelinePanel';
-import type {GeometryOption, TextureOption} from './modules';
+import type {GeometryData, GeometryOption, TextureOption} from './modules';
 import {buttonStyle, globalEditorStyles, theme} from './theme';
 
 export interface EffectEditorHostHandle {
@@ -50,6 +50,8 @@ export interface EffectEditorHostProps {
     /** Mesh presets for the Mesh render mode (e.g. asset meshes from a host editor). */
     geometryOptions?: GeometryOption[];
     resolveTexture?: (url: string, scene: Scene) => unknown;
+    /** Host loader for the Mesh "Load from file…" option (e.g. GLB via @babylonjs/loaders). */
+    resolveGeometry?: (file: File, scene: Scene) => Promise<GeometryData>;
 }
 
 function createDefaultEffect(scene: Scene, resolveTexture?: (url: string, scene: Scene) => unknown, textureUrl?: string): ParticleSystem {
@@ -315,6 +317,7 @@ export function EffectEditorHost(props: EffectEditorHostProps) {
                                 textureOptions={props.textureOptions}
                                 geometryOptions={props.geometryOptions}
                                 resolveTexture={props.resolveTexture && state ? (url) => props.resolveTexture!(url, state.scene) : undefined}
+                                resolveGeometry={props.resolveGeometry && state ? (file) => props.resolveGeometry!(file, state.scene) : undefined}
                             />
                         )}
                     </div>

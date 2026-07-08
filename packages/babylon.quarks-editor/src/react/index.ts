@@ -17,7 +17,7 @@ export {
     OrbitOverLifeModule,
     WidthOverTrailModule,
 } from './behaviorModules';
-export type {TextureOption, GeometryOption} from './modules';
+export type {TextureOption, GeometryOption, GeometryData} from './modules';
 export {SubEmittersModule} from './SubEmittersModule';
 export {TimelinePanel} from './TimelinePanel';
 export type {TimelinePanelProps, PlaybackState} from './TimelinePanel';

@@ -590,12 +590,91 @@ export interface GeometryOption {
     normals?: Float32Array | number[];
 }
 
+/** Vertex buffers a host loader (e.g. a GLB importer) returns for the Mesh render mode. */
+export type GeometryData = Omit<GeometryOption, 'label'>;
+
+/**
+ * Tiny dependency-free wireframe thumbnail of a mesh geometry. Projects positions with a fixed
+ * isometric rotation, scales them to fit, and strokes the triangle edges on a 2D canvas — enough
+ * for the user to recognise which mesh they picked without spinning up a second Babylon scene.
+ */
+function MeshPreview({positions, indices, size = 96}: {positions: Float32Array; indices?: ArrayLike<number>; size?: number}) {
+    const canvasRef = React.useRef<HTMLCanvasElement>(null);
+    React.useEffect(() => {
+        const canvas = canvasRef.current;
+        if (!canvas || positions.length < 9) {
+            return;
+        }
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+            return;
+        }
+        const n = positions.length / 3;
+        // Fixed iso rotation (yaw ~35°, pitch ~30°) so depth reads clearly.
+        const cy = Math.cos(0.6), sy = Math.sin(0.6), cx = Math.cos(0.52), sx = Math.sin(0.52);
+        const pts: Array<[number, number]> = [];
+        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+        for (let i = 0; i < n; i++) {
+            const x = positions[i * 3], y = positions[i * 3 + 1], z = positions[i * 3 + 2];
+            const rx = x * cy - z * sy;
+            const rz = x * sy + z * cy;
+            const ry = y * cx - rz * sx;
+            pts.push([rx, ry]);
+            if (rx < minX) minX = rx;
+            if (rx > maxX) maxX = rx;
+            if (ry < minY) minY = ry;
+            if (ry > maxY) maxY = ry;
+        }
+        const pad = 8;
+        const span = Math.max(maxX - minX, maxY - minY, 1e-6);
+        const scale = (size - pad * 2) / span;
+        const ox = pad + (size - pad * 2 - (maxX - minX) * scale) / 2;
+        const oy = pad + (size - pad * 2 - (maxY - minY) * scale) / 2;
+        const px = (i: number) => ox + (pts[i][0] - minX) * scale;
+        // Flip Y so +Y points up on screen.
+        const py = (i: number) => size - (oy + (pts[i][1] - minY) * scale);
+
+        ctx.clearRect(0, 0, size, size);
+        ctx.strokeStyle = 'rgba(158,185,255,0.85)';
+        ctx.lineWidth = 1;
+        const edge = (a: number, b: number) => {
+            ctx.beginPath();
+            ctx.moveTo(px(a), py(a));
+            ctx.lineTo(px(b), py(b));
+            ctx.stroke();
+        };
+        const tris = indices && indices.length ? indices.length : n;
+        for (let i = 0; i + 2 < tris; i += 3) {
+            const a = indices && indices.length ? indices[i] : i;
+            const b = indices && indices.length ? indices[i + 1] : i + 1;
+            const c = indices && indices.length ? indices[i + 2] : i + 2;
+            edge(a, b);
+            edge(b, c);
+            edge(c, a);
+        }
+    }, [positions, indices, size]);
+    return (
+        <canvas
+            ref={canvasRef}
+            width={size}
+            height={size}
+            style={{width: size, height: size, border: '1px solid #2b3761', borderRadius: 6, background: '#0c1330'}}
+        />
+    );
+}
+
 export function RendererModule({
     binding,
     textureOptions,
     geometryOptions,
     resolveTexture,
-}: ModuleProps & {textureOptions?: TextureOption[]; geometryOptions?: GeometryOption[]; resolveTexture?: (url: string) => unknown}) {
+    resolveGeometry,
+}: ModuleProps & {
+    textureOptions?: TextureOption[];
+    geometryOptions?: GeometryOption[];
+    resolveTexture?: (url: string) => unknown;
+    resolveGeometry?: (file: File) => Promise<GeometryData>;
+}) {
     const system = binding.system;
     const currentTextureUrl = (system.texture as {url?: string} | null)?.url ?? '';
     const [promptingTextureUrl, setPromptingTextureUrl] = useState(false);
@@ -665,9 +744,17 @@ export function RendererModule({
                     const vertexCount = system.instancingGeometry.length / 3;
                     const triangleCount = (system.getRendererSettings().instancingIndices?.length ?? 0) / 3;
                     const hostGeometry = geometryOptions ?? [];
+                    const applyGeometry = (g: GeometryData) =>
+                        binding.apply((s) => {
+                            const settings = s.getRendererSettings();
+                            settings.instancingIndices = (g.indices ? new Uint32Array(g.indices) : undefined) as never;
+                            settings.instancingUVs = (g.uvs ? new Float32Array(g.uvs) : undefined) as never;
+                            settings.instancingNormals = (g.normals ? new Float32Array(g.normals) : undefined) as never;
+                            s.instancingGeometry = new Float32Array(g.positions);
+                        });
                     return (
                         <Row label="Geometry">
-                            <div style={{display: 'flex', flexDirection: 'column', gap: 4}}>
+                            <div style={{display: 'flex', flexDirection: 'column', gap: 6}}>
                                 <SelectField<string>
                                     value={preset}
                                     options={[
@@ -675,20 +762,32 @@ export function RendererModule({
                                         {value: 'quad', label: 'Quad'},
                                         {value: 'cube', label: 'Cube'},
                                         ...hostGeometry.map((g, i) => ({value: `host:${i}`, label: g.label})),
+                                        ...(resolveGeometry ? [{value: '__file', label: 'Load from file…'}] : []),
                                     ]}
                                     onChange={(next) => {
                                         if (next === 'custom') {
                                             return;
                                         }
+                                        if (next === '__file') {
+                                            const input = document.createElement('input');
+                                            input.type = 'file';
+                                            input.accept = '.glb,.gltf,model/gltf-binary,model/gltf+json';
+                                            input.onchange = () => {
+                                                const file = input.files?.[0];
+                                                if (file) {
+                                                    resolveGeometry!(file).then(applyGeometry);
+                                                }
+                                            };
+                                            input.click();
+                                            return;
+                                        }
+                                        if (next.startsWith('host:')) {
+                                            applyGeometry(hostGeometry[Number(next.slice(5))]);
+                                            return;
+                                        }
                                         binding.apply((s) => {
                                             const settings = s.getRendererSettings();
-                                            if (next.startsWith('host:')) {
-                                                const g = hostGeometry[Number(next.slice(5))];
-                                                settings.instancingIndices = g.indices as never;
-                                                settings.instancingUVs = g.uvs as never;
-                                                settings.instancingNormals = g.normals as never;
-                                                s.instancingGeometry = g.positions as never;
-                                            } else if (next === 'cube') {
+                                            if (next === 'cube') {
                                                 settings.instancingIndices = MESH_CUBE_INDICES;
                                                 settings.instancingUVs = undefined;
                                                 settings.instancingNormals = undefined;
@@ -700,6 +799,10 @@ export function RendererModule({
                                             }
                                         });
                                     }}
+                                />
+                                <MeshPreview
+                                    positions={system.instancingGeometry}
+                                    indices={system.getRendererSettings().instancingIndices}
                                 />
                                 {preset === 'custom' && (
                                     <span style={{fontSize: 10.5, color: '#9eb9ff'}}>
@@ -815,6 +918,23 @@ export function RendererModule({
                                 setPromptingTextureUrl(false);
                             }}
                             onCancel={() => setPromptingTextureUrl(false)}
+                        />
+                    )}
+                    {currentTextureUrl && (
+                        <img
+                            src={currentTextureUrl}
+                            alt="texture preview"
+                            style={{
+                                width: 64,
+                                height: 64,
+                                marginTop: 6,
+                                objectFit: 'contain',
+                                borderRadius: 6,
+                                border: '1px solid #2b3761',
+                                // Checkerboard so texture transparency is visible.
+                                background:
+                                    'repeating-conic-gradient(#2a3252 0% 25%, #171d33 0% 50%) 0 0 / 12px 12px',
+                            }}
                         />
                     )}
                 </Row>

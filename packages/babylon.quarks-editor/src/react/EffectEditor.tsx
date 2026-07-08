@@ -8,7 +8,7 @@ import {
     ShapeModule,
     SizeOverLifeModule,
 } from './modules';
-import type {GeometryOption, TextureOption} from './modules';
+import type {GeometryData, GeometryOption, TextureOption} from './modules';
 import {
     CollisionModule,
     ColorBySpeedModule,
@@ -41,6 +41,8 @@ export interface EffectEditorProps {
     /** Mesh presets offered for the Mesh render mode (host supplies the geometry buffers). */
     geometryOptions?: GeometryOption[];
     resolveTexture?: (url: string) => unknown;
+    /** Host loader for "Load from file…" in the Mesh render mode (e.g. a GLB importer). */
+    resolveGeometry?: (file: File) => Promise<GeometryData>;
 }
 
 /**
@@ -102,6 +104,7 @@ export function EffectEditor(props: EffectEditorProps) {
                 textureOptions={props.textureOptions}
                 geometryOptions={props.geometryOptions}
                 resolveTexture={props.resolveTexture}
+                resolveGeometry={props.resolveGeometry}
             />
         </div>
     );

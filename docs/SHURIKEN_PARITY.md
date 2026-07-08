@@ -47,7 +47,7 @@ Three tiers: ✅ shipped · 🟡 runtime supports it, editor UI missing · 🔴 
 - 🔴 collision/trigger/manual triggers, inherit properties
 
 ## Texture Sheet Animation
-- ✅ tiles U/V, start tile, frame-over-life curve, atlas preview with tile grid
+- ✅ tiles U/V, start tile, frame-over-life curve, atlas preview with tile grid + start-tile highlight
 - ✅ tile blending
 - 🔴 sprites mode, single-row mode, cycles
 
@@ -58,7 +58,8 @@ Three tiers: ✅ shipped · 🟡 runtime supports it, editor UI missing · 🔴 
 
 ## Renderer
 - ✅ render modes (billboard ×4, trail, mesh), blend mode, texture picker (presets/URL/file), render order, mesh geometry presets
-- ✅ host-provided mesh assets (`geometryOptions` prop, analogous to `textureOptions`)
+- ✅ host-provided mesh assets (`geometryOptions`) + load-your-own GLB/glTF (`resolveGeometry` host loader)
+- ✅ texture thumbnail + mesh wireframe previews in the inspector
 - ✅ soft particles (+near/far fade), alpha test, depth write/test
 - 🟡 layer mask
 - 🔴 sort mode, min/max particle size, pivot, shadows
@@ -68,6 +69,7 @@ Three tiers: ✅ shipped · 🟡 runtime supports it, editor UI missing · 🔴 
 - ✅ pause / step / playback speed / elapsed time
 - ✅ multi-segment curves (add key: dbl-click curve, remove: dbl-click key, drag keys/handles, numeric value for selected key)
 - ✅ playback time scrubbing (timeline panel)
+- ✅ texture/mesh previews + texture-sheet start-tile highlight
 
 ## Suggested order
 1. ~~Playback panel~~ / ~~Main upgrades~~ (done)

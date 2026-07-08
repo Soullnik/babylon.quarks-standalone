@@ -546,6 +546,10 @@ export function TextureSheetModule({binding}: ModuleProps) {
     const textureUrl = (system.texture as {url?: string} | null)?.url;
     const u = Math.max(1, system.uTileCount);
     const v = Math.max(1, system.vTileCount);
+    // Start tile → cell (row-major, top-left origin — matches the shader's tile UV mapping).
+    const startIdx = Math.min(Math.max(0, Math.round(readScalar(system.startTileIndex as never).value)), tiles - 1);
+    const startCol = startIdx % u;
+    const startRow = Math.floor(startIdx / u);
     return (
         <ModuleSection title="Texture Sheet Animation" defaultOpen={false}>
             {textureUrl && (
@@ -562,9 +566,38 @@ export function TextureSheetModule({binding}: ModuleProps) {
                                     `repeating-linear-gradient(to bottom, rgba(158,185,255,0.55) 0 1px, transparent 1px calc(100% / ${v}))`,
                             }}
                         />
+                        {/* Highlight the start tile so it's obvious which sprite playback begins on. */}
+                        <div
+                            style={{
+                                position: 'absolute',
+                                pointerEvents: 'none',
+                                left: `${(startCol * 100) / u}%`,
+                                top: `${(startRow * 100) / v}%`,
+                                width: `${100 / u}%`,
+                                height: `${100 / v}%`,
+                                boxSizing: 'border-box',
+                                border: '2px solid #ffce6b',
+                                background: 'rgba(255, 206, 107, 0.22)',
+                            }}
+                        >
+                            <span
+                                style={{
+                                    position: 'absolute',
+                                    top: 1,
+                                    left: 2,
+                                    fontSize: 9,
+                                    fontWeight: 700,
+                                    color: '#ffce6b',
+                                    textShadow: '0 0 3px #000',
+                                }}
+                            >
+                                {startIdx}
+                            </span>
+                        </div>
                     </div>
                     <div style={{fontSize: 11, color: '#b7c6ea', marginTop: 3}}>
-                        {u} × {v} = {tiles} tiles; frame indices 0–{tiles - 1}
+                        {u} × {v} = {tiles} tiles; frame indices 0–{tiles - 1}; start tile{' '}
+                        <span style={{color: '#ffce6b', fontWeight: 600}}>{startIdx}</span>
                     </div>
                 </div>
             )}
