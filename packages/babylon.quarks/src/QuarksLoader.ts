@@ -91,6 +91,13 @@ export class QuarksLoader {
             } else if (geom.type === 'BufferGeometry' && geom.data) {
                 const parsed = this.parseBufferGeometry(geom.data);
                 meta.geometries[geom.uuid] = parsed;
+            } else if (geom.type === 'QuarksGeometry') {
+                meta.geometries[geom.uuid] = {
+                    positions: new Float32Array(geom.positions ?? []),
+                    indices: geom.indices ? new Uint32Array(geom.indices) : new Uint32Array(0),
+                    uvs: geom.uvs ? new Float32Array(geom.uvs) : undefined,
+                    normals: geom.normals ? new Float32Array(geom.normals) : undefined,
+                };
             }
         }
     }
@@ -312,13 +319,22 @@ export class QuarksLoader {
                 matInfo.texture = meta.textures[textureRef] || null;
             }
 
-            const blendingToAlphaMode: {[key: number]: number} = {
-                1: Constants.ALPHA_COMBINE,
-                2: Constants.ALPHA_ADD,
-                3: Constants.ALPHA_SUBTRACT,
-                4: Constants.ALPHA_MULTIPLY,
-            };
-            matInfo.alphaMode = blendingToAlphaMode[matDef.blending] || Constants.ALPHA_COMBINE;
+            // QuarksMaterial (what ParticleSystem.ensureMaterialMeta emits) writes `alphaMode`
+            // directly as a Babylon alpha-mode constant; three.js materials (MeshBasicMaterial
+            // etc.) instead use `blending` with three.js's own 1..4 numbering, which does NOT
+            // line up with Babylon's constants (e.g. three.js Additive=2 vs Babylon ALPHA_ADD=1)
+            // — only convert through the table when there's no native alphaMode to trust.
+            if (typeof matDef.alphaMode === 'number') {
+                matInfo.alphaMode = matDef.alphaMode;
+            } else {
+                const blendingToAlphaMode: {[key: number]: number} = {
+                    1: Constants.ALPHA_COMBINE,
+                    2: Constants.ALPHA_ADD,
+                    3: Constants.ALPHA_SUBTRACT,
+                    4: Constants.ALPHA_MULTIPLY,
+                };
+                matInfo.alphaMode = blendingToAlphaMode[matDef.blending] || Constants.ALPHA_COMBINE;
+            }
 
             meta.materials[matDef.uuid] = matInfo;
         }

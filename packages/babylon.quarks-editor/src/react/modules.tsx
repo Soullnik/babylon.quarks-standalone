@@ -1,4 +1,5 @@
 import React, {useState} from 'react';
+import {Mesh} from '@babylonjs/core/Meshes/mesh';
 import {
     ColorOverLife,
     ConstantColor,
@@ -23,6 +24,7 @@ import {
     rgbToHex,
 } from '../core/colors';
 import {DEFAULT_SHAPE_PARAMS, SHAPE_PARAM_KEYS, SHAPE_TYPES, createShape, getShapeType, readShapeParams} from '../core/shapes';
+import type {ShapeType} from '../core/shapes';
 import {buildCurve, buildScalar, readPieces, readScalar} from '../core/values';
 import {CurveEditor} from './CurveEditor';
 import {GradientEditor} from './GradientEditor';
@@ -47,6 +49,29 @@ const MESH_CUBE_INDICES = new Uint32Array([
     3, 2, 6, 3, 6, 7, 0, 3, 7, 0, 7, 4, 1, 5, 6, 1, 6, 2,
 ]);
 
+function arraysEqual(a: ArrayLike<number>, b: ArrayLike<number>): boolean {
+    if (a.length !== b.length) {
+        return false;
+    }
+    for (let i = 0; i < a.length; i++) {
+        if (a[i] !== b[i]) {
+            return false;
+        }
+    }
+    return true;
+}
+
+/** Detects whether the current mesh geometry is one of the editor's built-in presets or was imported. */
+function detectGeometryPreset(positions: Float32Array): 'cube' | 'quad' | 'custom' {
+    if (arraysEqual(positions, MESH_CUBE_POSITIONS)) {
+        return 'cube';
+    }
+    if (arraysEqual(positions, MESH_QUAD_POSITIONS)) {
+        return 'quad';
+    }
+    return 'custom';
+}
+
 const PARAM_LABELS: {[key: string]: string} = {
     radius: 'Radius',
     arc: 'Arc',
@@ -55,6 +80,8 @@ const PARAM_LABELS: {[key: string]: string} = {
     donutRadius: 'Donut radius',
     width: 'Width',
     height: 'Height',
+    column: 'Columns',
+    row: 'Rows',
 };
 
 function ColorInput(props: {value: Vector4; onChange: (next: Vector4) => void}) {
@@ -307,11 +334,21 @@ export function EmissionModule({binding}: ModuleProps) {
     );
 }
 
+// Shapes whose constructor doesn't accept `mode`/`spread` at all — showing those controls
+// for them would edit a value the shape silently ignores, just like the old "default to
+// first texture" bug: a control that looks live but does nothing.
+const SHAPES_WITHOUT_MODE_SPREAD = new Set<ShapeType>(['point', 'grid', 'mesh_surface']);
+
 export function ShapeModule({binding}: ModuleProps) {
     const system = binding.system;
     const type = getShapeType(system.emitterShape);
     const params = {...DEFAULT_SHAPE_PARAMS, ...readShapeParams(system.emitterShape)};
     const keys = SHAPE_PARAM_KEYS[type];
+    const scene = system.emitter.getScene();
+    // 'vfxBatch' is the renderer's own internal instancing mesh — never a valid emission source.
+    const meshOptions = scene.meshes.filter(
+        (m): m is Mesh => m instanceof Mesh && m.name !== 'vfxBatch' && m.getTotalVertices() > 0
+    );
     return (
         <ModuleSection title="Shape">
             <Row label="Shape">
@@ -330,7 +367,22 @@ export function ShapeModule({binding}: ModuleProps) {
                     />
                 </Row>
             ))}
-            {type !== 'point' && (
+            {type === 'mesh_surface' && (
+                <Row label="Source mesh">
+                    <SelectField
+                        value={params.mesh?.uniqueId != null ? String(params.mesh.uniqueId) : '__none'}
+                        options={[
+                            {value: '__none', label: '(none)'},
+                            ...meshOptions.map((m) => ({value: String(m.uniqueId), label: m.name})),
+                        ]}
+                        onChange={(id) => {
+                            const mesh = id === '__none' ? undefined : meshOptions.find((m) => String(m.uniqueId) === id);
+                            binding.apply((s) => (s.emitterShape = createShape('mesh_surface', {...params, mesh})));
+                        }}
+                    />
+                </Row>
+            )}
+            {!SHAPES_WITHOUT_MODE_SPREAD.has(type) && (
                 <>
                     <Row label="Emit mode">
                         <SelectField
@@ -494,31 +546,67 @@ export function RendererModule({
                     </Row>
                 </>
             )}
-            {system.renderMode === RenderMode.Mesh && (
-                <Row label="Geometry">
-                    <SelectField
-                        value={system.instancingGeometry.length === MESH_CUBE_POSITIONS.length ? 'cube' : 'quad'}
-                        options={[
-                            {value: 'quad', label: 'Quad'},
-                            {value: 'cube', label: 'Cube'},
-                        ]}
-                        onChange={(preset) =>
-                            binding.apply((s) => {
-                                const settings = s.getRendererSettings();
-                                if (preset === 'cube') {
-                                    settings.instancingIndices = MESH_CUBE_INDICES;
-                                    settings.instancingUVs = undefined;
-                                    settings.instancingNormals = undefined;
-                                    s.instancingGeometry = MESH_CUBE_POSITIONS;
-                                } else {
-                                    settings.instancingIndices = MESH_QUAD_INDICES;
-                                    settings.instancingUVs = MESH_QUAD_UVS;
-                                    s.instancingGeometry = MESH_QUAD_POSITIONS;
-                                }
-                            })
-                        }
-                    />
-                </Row>
+            {system.renderMode === RenderMode.Mesh &&
+                (() => {
+                    const preset = detectGeometryPreset(system.instancingGeometry);
+                    console.log(preset)
+                    const vertexCount = system.instancingGeometry.length / 3;
+                    const triangleCount = (system.getRendererSettings().instancingIndices?.length ?? 0) / 3;
+                    return (
+                        <Row label="Geometry">
+                            <div style={{display: 'flex', flexDirection: 'column', gap: 4}}>
+                                <SelectField
+                                    value={preset}
+                                    options={[
+                                        ...(preset === 'custom' ? [{value: 'custom' as const, label: 'Custom (imported)'}] : []),
+                                        {value: 'quad' as const, label: 'Quad'},
+                                        {value: 'cube' as const, label: 'Cube'},
+                                    ]}
+                                    onChange={(next) => {
+                                        if (next === 'custom') {
+                                            return;
+                                        }
+                                        binding.apply((s) => {
+                                            const settings = s.getRendererSettings();
+                                            if (next === 'cube') {
+                                                settings.instancingIndices = MESH_CUBE_INDICES;
+                                                settings.instancingUVs = undefined;
+                                                settings.instancingNormals = undefined;
+                                                s.instancingGeometry = MESH_CUBE_POSITIONS;
+                                            } else {
+                                                settings.instancingIndices = MESH_QUAD_INDICES;
+                                                settings.instancingUVs = MESH_QUAD_UVS;
+                                                s.instancingGeometry = MESH_QUAD_POSITIONS;
+                                            }
+                                        });
+                                    }}
+                                />
+                                {preset === 'custom' && (
+                                    <span style={{fontSize: 10.5, color: '#9eb9ff'}}>
+                                        {vertexCount} verts / {triangleCount} tris — picking a preset replaces this mesh
+                                    </span>
+                                )}
+                            </div>
+                        </Row>
+                    );
+                })()}
+            <div
+                style={{
+                    marginTop: 10,
+                    marginBottom: 2,
+                    fontSize: 11,
+                    fontWeight: 600,
+                    color: '#7c8db5',
+                    textTransform: 'uppercase',
+                    letterSpacing: 0.4,
+                }}
+            >
+                Material
+            </div>
+            {system.material != null && (
+                <div style={{fontSize: 10.5, color: '#9eb9ff', marginBottom: 2}}>
+                    Imported material: {(system.material as {name?: string}).name ?? 'unnamed'} — settings below were derived from it
+                </div>
             )}
             <Row label="Blend mode">
                 <SelectField
@@ -526,22 +614,35 @@ export function RendererModule({
                     options={[
                         {value: 1, label: 'Additive'},
                         {value: 2, label: 'Alpha blend'},
+                        {value: 3, label: 'Subtract'},
                         {value: 4, label: 'Multiply'},
                     ]}
                     onChange={(blend) => binding.apply((s) => (s.blending = blend))}
+                />
+            </Row>
+            <Row label="Transparent">
+                <CheckboxField
+                    value={!!system.getRendererSettings().materialTransparent}
+                    onChange={(v) =>
+                        binding.apply((s) => {
+                            s.getRendererSettings().materialTransparent = v;
+                            s.neededToUpdateRender = true;
+                        })
+                    }
                 />
             </Row>
             {resolveTexture && (
                 <Row label="Texture">
                     <SelectField
                         value={
-                            (textureOptions ?? []).some((o) => o.url === currentTextureUrl)
-                                ? currentTextureUrl
-                                : currentTextureUrl
-                                  ? '__current'
-                                  : ((textureOptions ?? [])[0]?.url ?? '__current')
+                            !currentTextureUrl
+                                ? '__none'
+                                : (textureOptions ?? []).some((o) => o.url === currentTextureUrl)
+                                  ? currentTextureUrl
+                                  : '__current'
                         }
                         options={[
+                            {value: '__none', label: '(none)'},
                             ...(currentTextureUrl && !(textureOptions ?? []).some((o) => o.url === currentTextureUrl)
                                 ? [{value: '__current', label: `(current) ${currentTextureUrl.slice(-24)}`}]
                                 : []),
@@ -551,6 +652,10 @@ export function RendererModule({
                         ]}
                         onChange={(url) => {
                             if (url === '__current') {
+                                return;
+                            }
+                            if (url === '__none') {
+                                binding.apply((s) => (s.texture = null as never));
                                 return;
                             }
                             if (url === '__url') {
