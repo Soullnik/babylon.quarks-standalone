@@ -7,7 +7,7 @@ Three tiers: ✅ shipped · 🟡 runtime supports it, editor UI missing · 🔴 
 - ✅ duration, looping, start lifetime/speed/size (constant/random/curve), start color, world space
 - ✅ prewarm, start rotation (constant/random angle, 3D random), start color random-between-two
 - ✅ start delay (constant/random, ignored with prewarm, re-armed by restart)
-- 🟡 3D start size (`Vector3Generator`), gradient start color (`RandomColorBetweenGradient`)
+- ✅ 3D start size (uniform / per-axis `Vector3Function`), gradient start color (single `Gradient` and random-between-two-gradients `RandomColorBetweenGradient`)
 - 🔴 simulation speed persistence, max particles, stop action, culling, ring buffer
 
 ## Emission
@@ -16,10 +16,11 @@ Three tiers: ✅ shipped · 🟡 runtime supports it, editor UI missing · 🔴 
 - ✅ rate over distance
 
 ## Shape
-- ✅ cone/sphere/hemisphere/circle/donut/rectangle/point with base params
+- ✅ cone/sphere/hemisphere/circle/donut/rectangle/point/grid/mesh-surface with base params
 - ✅ emitter mode (random/loop/ping-pong/burst) + spread per shape
-- 🟡 per-shape speed generator, grid emitter, mesh surface emitter (Shape=Mesh)
-- 🔴 edge shape, texture-based emission, align/randomize direction options
+- ✅ randomize direction (`ChangeEmitDirection`, angle generator)
+- 🟡 per-shape speed generator
+- 🔴 edge shape, texture-based emission, align-to-direction
 
 ## Velocity / forces
 - ✅ Speed over Lifetime (curve), Limit Speed over Lifetime (curve + dampen), Force over Lifetime (XYZ), Gravity
@@ -57,8 +58,9 @@ Three tiers: ✅ shipped · 🟡 runtime supports it, editor UI missing · 🔴 
 
 ## Renderer
 - ✅ render modes (billboard ×4, trail, mesh), blend mode, texture picker (presets/URL/file), render order, mesh geometry presets
+- ✅ host-provided mesh assets (`geometryOptions` prop, analogous to `textureOptions`)
 - ✅ soft particles (+near/far fade), alpha test, depth write/test
-- 🟡 layer mask, host-provided mesh assets
+- 🟡 layer mask
 - 🔴 sort mode, min/max particle size, pivot, shadows
 
 ## Editor UX (Particle Effect panel)
@@ -74,4 +76,5 @@ Three tiers: ✅ shipped · 🟡 runtime supports it, editor UI missing · 🔴 
 4. ~~Multi-segment curves~~ (done)
 5. ~~Core (vendored fork): startDelay, rate over distance UI, Velocity over Lifetime, Inherit Velocity~~ (done)
 6. ~~Collision module + Turbulence + Noise position/rotation amounts~~ (done)
-7. Remaining core work: noise scroll/remap → radial/orbital-offset velocity → collision triggers/shapes
+7. ~~3D start size + gradient start color + Randomize Direction + host mesh assets (`geometryOptions`)~~ (done)
+8. Remaining core work: noise scroll/remap → radial/orbital-offset velocity → collision triggers/shapes → align-to-direction

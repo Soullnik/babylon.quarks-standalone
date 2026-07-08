@@ -7,6 +7,9 @@ export {
     GravityModule,
     RotationOverLifeModule,
     NoiseModule,
+    TurbulenceModule,
+    CollisionModule,
+    EmitDirectionModule,
     TextureSheetModule,
     ColorBySpeedModule,
     SizeBySpeedModule,
@@ -14,7 +17,7 @@ export {
     OrbitOverLifeModule,
     WidthOverTrailModule,
 } from './behaviorModules';
-export type {TextureOption} from './modules';
+export type {TextureOption, GeometryOption} from './modules';
 export {SubEmittersModule} from './SubEmittersModule';
 export {TimelinePanel} from './TimelinePanel';
 export type {TimelinePanelProps, PlaybackState} from './TimelinePanel';

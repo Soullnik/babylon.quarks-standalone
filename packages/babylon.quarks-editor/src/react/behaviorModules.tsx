@@ -2,6 +2,7 @@ import React from 'react';
 import {
     ApplyCollision,
     ApplyForce,
+    ChangeEmitDirection,
     ColorBySpeed,
     ConstantValue,
     ForceOverLife,
@@ -343,6 +344,27 @@ export function TurbulenceModule({binding}: ModuleProps) {
                         onChange={(v) => binding.apply(() => (behavior.timeScale = v))}
                     />
                 </>
+            )}
+        </BehaviorModule>
+    );
+}
+
+export function EmitDirectionModule({binding}: ModuleProps) {
+    return (
+        <BehaviorModule<ChangeEmitDirection>
+            binding={binding}
+            title="Randomize Direction"
+            type="ChangeEmitDirection"
+            create={() => new ChangeEmitDirection(new IntervalValue(0, Math.PI / 6))}
+        >
+            {(behavior) => (
+                <ValueField
+                    label="Angle (rad)"
+                    generator={behavior.angle as never}
+                    min={0}
+                    curveMax={Math.PI}
+                    onChange={(g) => binding.apply(() => (behavior.angle = g as never))}
+                />
             )}
         </BehaviorModule>
     );

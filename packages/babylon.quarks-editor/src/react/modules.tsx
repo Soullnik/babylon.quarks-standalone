@@ -7,9 +7,11 @@ import {
     Gradient,
     IntervalValue,
     RandomColor,
+    RandomColorBetweenGradient,
     RandomQuatGenerator,
     RenderMode,
     SizeOverLife,
+    Vector3Function,
     Vector4,
 } from 'babylon.quarks';
 import type {Behavior, ParticleSystem} from 'babylon.quarks';
@@ -120,6 +122,12 @@ export function MainModule({binding}: ModuleProps) {
     const rotation = system.startRotation;
     const rotationMode = rotation instanceof RandomQuatGenerator ? '3d' : readScalar(rotation as never).mode === 'random' ? 'random' : 'angle';
     const rotationState = readScalar(rotation instanceof RandomQuatGenerator ? undefined : (rotation as never));
+    const startSize = system.startSize as unknown as {type?: string; x?: never; y?: never; z?: never};
+    const size3D = startSize.type === 'vec3function';
+    const colorGenMode =
+        startColor instanceof RandomColorBetweenGradient ? 'gradient2'
+        : startColor instanceof Gradient ? 'gradient'
+        : colorMode;
     return (
         <ModuleSection title="Main">
             <Row label="Duration">
@@ -160,44 +168,135 @@ export function MainModule({binding}: ModuleProps) {
                 curveMax={20}
                 onChange={(g) => binding.apply((s) => (s.startSpeed = g))}
             />
-            <ValueField
-                label="Start size"
-                generator={system.startSize as never}
-                min={0}
-                curveMax={5}
-                onChange={(g) => binding.apply((s) => (s.startSize = g))}
-            />
-            <Row label="Start color">
+            <Row label="Start size">
                 <SelectField
-                    value={colorMode}
+                    value={size3D ? '3d' : 'uniform'}
                     options={[
-                        {value: 'constant', label: 'Constant'},
-                        {value: 'random', label: 'Random between two'},
+                        {value: 'uniform', label: 'Uniform'},
+                        {value: '3d', label: '3D (per axis)'},
                     ]}
                     onChange={(mode) =>
                         binding.apply((s) => {
-                            s.startColor = mode === 'random' ? new RandomColor(colorA, colorB) : new ConstantColor(colorA);
+                            const cur = s.startSize as never as {clone: () => never; x?: never};
+                            if (mode === '3d') {
+                                // Seed all three axes from the current uniform generator.
+                                s.startSize = new Vector3Function(cur.clone(), cur.clone(), cur.clone());
+                            } else {
+                                // Collapse back to the X-axis generator.
+                                s.startSize = (s.startSize as never as {x: never}).x;
+                            }
                         })
                     }
                 />
             </Row>
-            <Row label="">
-                <ColorInput
-                    value={colorA}
-                    onChange={(next) =>
+            {!size3D && (
+                <ValueField
+                    label=""
+                    generator={system.startSize as never}
+                    min={0}
+                    curveMax={5}
+                    onChange={(g) => binding.apply((s) => (s.startSize = g))}
+                />
+            )}
+            {size3D && (
+                <>
+                    {(['x', 'y', 'z'] as const).map((axis) => (
+                        <ValueField
+                            key={axis}
+                            label={axis.toUpperCase()}
+                            generator={startSize[axis] as never}
+                            min={0}
+                            curveMax={5}
+                            onChange={(g) =>
+                                binding.apply((s) => {
+                                    const cur = s.startSize as Vector3Function;
+                                    s.startSize = new Vector3Function(
+                                        axis === 'x' ? (g as never) : cur.x,
+                                        axis === 'y' ? (g as never) : cur.y,
+                                        axis === 'z' ? (g as never) : cur.z
+                                    );
+                                })
+                            }
+                        />
+                    ))}
+                </>
+            )}
+            <Row label="Start color">
+                <SelectField
+                    value={colorGenMode}
+                    options={[
+                        {value: 'constant', label: 'Constant'},
+                        {value: 'random', label: 'Random between two'},
+                        {value: 'gradient', label: 'Gradient'},
+                        {value: 'gradient2', label: 'Random between gradients'},
+                    ]}
+                    onChange={(mode) =>
                         binding.apply((s) => {
-                            s.startColor = colorMode === 'random' ? new RandomColor(next, colorB) : new ConstantColor(next);
+                            if (mode === 'random') {
+                                s.startColor = new RandomColor(colorA, colorB);
+                            } else if (mode === 'gradient') {
+                                s.startColor = buildGradient(DEFAULT_GRADIENT_STOPS);
+                            } else if (mode === 'gradient2') {
+                                s.startColor = new RandomColorBetweenGradient(
+                                    buildGradient(DEFAULT_GRADIENT_STOPS),
+                                    buildGradient(DEFAULT_GRADIENT_STOPS)
+                                );
+                            } else {
+                                s.startColor = new ConstantColor(colorA);
+                            }
                         })
                     }
                 />
             </Row>
-            {colorMode === 'random' && (
+            {(colorGenMode === 'constant' || colorGenMode === 'random') && (
+                <Row label="">
+                    <ColorInput
+                        value={colorA}
+                        onChange={(next) =>
+                            binding.apply((s) => {
+                                s.startColor = colorGenMode === 'random' ? new RandomColor(next, colorB) : new ConstantColor(next);
+                            })
+                        }
+                    />
+                </Row>
+            )}
+            {colorGenMode === 'random' && (
                 <Row label="">
                     <ColorInput
                         value={colorB}
                         onChange={(next) => binding.apply((s) => (s.startColor = new RandomColor(colorA, next)))}
                     />
                 </Row>
+            )}
+            {colorGenMode === 'gradient' && (
+                <div style={{marginTop: 6}}>
+                    <GradientEditor
+                        stops={readGradientStops(startColor as Gradient)}
+                        onChange={(stops) => binding.apply((s) => (s.startColor = buildGradient(stops)))}
+                    />
+                </div>
+            )}
+            {colorGenMode === 'gradient2' && (
+                <div style={{marginTop: 6, display: 'flex', flexDirection: 'column', gap: 6}}>
+                    <GradientEditor
+                        stops={readGradientStops((startColor as RandomColorBetweenGradient).gradient1)}
+                        onChange={(stops) =>
+                            binding.apply((s) => {
+                                const g = s.startColor as RandomColorBetweenGradient;
+                                s.startColor = new RandomColorBetweenGradient(buildGradient(stops), g.gradient2);
+                            })
+                        }
+                    />
+                    <GradientEditor
+                        stops={readGradientStops((startColor as RandomColorBetweenGradient).gradient2)}
+                        onChange={(stops) =>
+                            binding.apply((s) => {
+                                const g = s.startColor as RandomColorBetweenGradient;
+                                s.startColor = new RandomColorBetweenGradient(g.gradient1, buildGradient(stops));
+                            })
+                        }
+                    />
+                </div>
             )}
             <Row label="Start rotation">
                 <SelectField
@@ -478,11 +577,25 @@ export interface TextureOption {
     url: string;
 }
 
+/**
+ * A host-supplied mesh for the Mesh render mode (e.g. asset meshes from BabylonJS Editor),
+ * analogous to TextureOption. The host provides ready vertex buffers; selecting one copies
+ * them into the system's instancing geometry.
+ */
+export interface GeometryOption {
+    label: string;
+    positions: Float32Array | number[];
+    indices?: Uint32Array | number[];
+    uvs?: Float32Array | number[];
+    normals?: Float32Array | number[];
+}
+
 export function RendererModule({
     binding,
     textureOptions,
+    geometryOptions,
     resolveTexture,
-}: ModuleProps & {textureOptions?: TextureOption[]; resolveTexture?: (url: string) => unknown}) {
+}: ModuleProps & {textureOptions?: TextureOption[]; geometryOptions?: GeometryOption[]; resolveTexture?: (url: string) => unknown}) {
     const system = binding.system;
     const currentTextureUrl = (system.texture as {url?: string} | null)?.url ?? '';
     const [promptingTextureUrl, setPromptingTextureUrl] = useState(false);
@@ -549,18 +662,19 @@ export function RendererModule({
             {system.renderMode === RenderMode.Mesh &&
                 (() => {
                     const preset = detectGeometryPreset(system.instancingGeometry);
-                    console.log(preset)
                     const vertexCount = system.instancingGeometry.length / 3;
                     const triangleCount = (system.getRendererSettings().instancingIndices?.length ?? 0) / 3;
+                    const hostGeometry = geometryOptions ?? [];
                     return (
                         <Row label="Geometry">
                             <div style={{display: 'flex', flexDirection: 'column', gap: 4}}>
-                                <SelectField
+                                <SelectField<string>
                                     value={preset}
                                     options={[
-                                        ...(preset === 'custom' ? [{value: 'custom' as const, label: 'Custom (imported)'}] : []),
-                                        {value: 'quad' as const, label: 'Quad'},
-                                        {value: 'cube' as const, label: 'Cube'},
+                                        ...(preset === 'custom' ? [{value: 'custom', label: 'Custom (imported)'}] : []),
+                                        {value: 'quad', label: 'Quad'},
+                                        {value: 'cube', label: 'Cube'},
+                                        ...hostGeometry.map((g, i) => ({value: `host:${i}`, label: g.label})),
                                     ]}
                                     onChange={(next) => {
                                         if (next === 'custom') {
@@ -568,7 +682,13 @@ export function RendererModule({
                                         }
                                         binding.apply((s) => {
                                             const settings = s.getRendererSettings();
-                                            if (next === 'cube') {
+                                            if (next.startsWith('host:')) {
+                                                const g = hostGeometry[Number(next.slice(5))];
+                                                settings.instancingIndices = g.indices as never;
+                                                settings.instancingUVs = g.uvs as never;
+                                                settings.instancingNormals = g.normals as never;
+                                                s.instancingGeometry = g.positions as never;
+                                            } else if (next === 'cube') {
                                                 settings.instancingIndices = MESH_CUBE_INDICES;
                                                 settings.instancingUVs = undefined;
                                                 settings.instancingNormals = undefined;

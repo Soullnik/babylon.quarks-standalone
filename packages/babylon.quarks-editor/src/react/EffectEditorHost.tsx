@@ -26,7 +26,7 @@ import {EffectEditor} from './EffectEditor';
 import {PromptDialog} from './PromptDialog';
 import {TimelinePanel} from './TimelinePanel';
 import type {PlaybackState} from './TimelinePanel';
-import type {TextureOption} from './modules';
+import type {GeometryOption, TextureOption} from './modules';
 import {buttonStyle, globalEditorStyles, theme} from './theme';
 
 export interface EffectEditorHostHandle {
@@ -47,6 +47,8 @@ export interface EffectEditorHostProps {
     onReady?: (handle: EffectEditorHostHandle) => void;
     title?: string;
     textureOptions?: TextureOption[];
+    /** Mesh presets for the Mesh render mode (e.g. asset meshes from a host editor). */
+    geometryOptions?: GeometryOption[];
     resolveTexture?: (url: string, scene: Scene) => unknown;
 }
 
@@ -311,6 +313,7 @@ export function EffectEditorHost(props: EffectEditorHostProps) {
                                 binding={binding}
                                 selectedSystem={activeSystem}
                                 textureOptions={props.textureOptions}
+                                geometryOptions={props.geometryOptions}
                                 resolveTexture={props.resolveTexture && state ? (url) => props.resolveTexture!(url, state.scene) : undefined}
                             />
                         )}

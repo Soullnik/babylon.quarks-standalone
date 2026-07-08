@@ -8,10 +8,11 @@ import {
     ShapeModule,
     SizeOverLifeModule,
 } from './modules';
-import type {TextureOption} from './modules';
+import type {GeometryOption, TextureOption} from './modules';
 import {
     CollisionModule,
     ColorBySpeedModule,
+    EmitDirectionModule,
     ForceOverLifeModule,
     GravityModule,
     InheritVelocityModule,
@@ -37,6 +38,8 @@ export interface EffectEditorProps {
     selectedSystem: ParticleSystem;
     /** Texture presets offered in the Renderer module (host supplies the loader). */
     textureOptions?: TextureOption[];
+    /** Mesh presets offered for the Mesh render mode (host supplies the geometry buffers). */
+    geometryOptions?: GeometryOption[];
     resolveTexture?: (url: string) => unknown;
 }
 
@@ -74,6 +77,7 @@ export function EffectEditor(props: EffectEditorProps) {
             <MainModule binding={binding} />
             <EmissionModule binding={binding} />
             <ShapeModule binding={binding} />
+            <EmitDirectionModule binding={binding} />
             <VelocityOverLifeModule binding={binding} />
             <SpeedOverLifeModule binding={binding} />
             <LimitSpeedOverLifeModule binding={binding} />
@@ -93,7 +97,12 @@ export function EffectEditor(props: EffectEditorProps) {
             <WidthOverTrailModule binding={binding} />
             <SubEmittersModule binding={binding} rootBinding={props.binding} />
             <TextureSheetModule binding={binding} />
-            <RendererModule binding={binding} textureOptions={props.textureOptions} resolveTexture={props.resolveTexture} />
+            <RendererModule
+                binding={binding}
+                textureOptions={props.textureOptions}
+                geometryOptions={props.geometryOptions}
+                resolveTexture={props.resolveTexture}
+            />
         </div>
     );
 }
