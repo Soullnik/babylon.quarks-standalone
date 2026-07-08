@@ -1,5 +1,6 @@
 import React from 'react';
 import {
+    ApplyCollision,
     ApplyForce,
     ColorBySpeed,
     ConstantValue,
@@ -15,12 +16,14 @@ import {
     RotationOverLife,
     SizeBySpeed,
     SpeedOverLife,
+    TurbulenceField,
     Vector3,
     VelocityOverLife,
     WidthOverLength,
 } from 'babylon.quarks';
 import type {Behavior} from 'babylon.quarks';
 import {EffectBinding} from '../core/binding';
+import {ensureGroundResolver} from '../core/collision';
 import {DEFAULT_GRADIENT_STOPS, buildGradient, findBehavior, readGradientStops} from '../core/colors';
 import {buildCurve, buildScalar, readPieces, readScalar} from '../core/values';
 import {GradientEditor} from './GradientEditor';
@@ -269,6 +272,114 @@ export function NoiseModule({binding}: ModuleProps) {
                         curveMax={10}
                         onChange={(g) => binding.apply(() => (behavior.power = g))}
                     />
+                    <ValueField
+                        label="Position amount"
+                        generator={behavior.positionAmount}
+                        min={0}
+                        curveMax={2}
+                        onChange={(g) => binding.apply(() => (behavior.positionAmount = g))}
+                    />
+                    <ValueField
+                        label="Rotation amount"
+                        generator={behavior.rotationAmount}
+                        min={0}
+                        curveMax={Math.PI}
+                        onChange={(g) => binding.apply(() => (behavior.rotationAmount = g))}
+                    />
+                </>
+            )}
+        </BehaviorModule>
+    );
+}
+
+/** Three numeric inputs for a Vector3 field, replacing the whole vector on any edit. */
+function Vector3Row(props: {label: string; value: Vector3; min?: number; step?: number; onChange: (v: Vector3) => void}) {
+    const set = (axis: 'x' | 'y' | 'z', n: number) => {
+        const next = props.value.clone();
+        next[axis] = n;
+        props.onChange(next);
+    };
+    return (
+        <Row label={props.label}>
+            <div style={{display: 'flex', gap: 6}}>
+                <NumberField value={props.value.x} min={props.min} step={props.step} onChange={(n) => set('x', n)} />
+                <NumberField value={props.value.y} min={props.min} step={props.step} onChange={(n) => set('y', n)} />
+                <NumberField value={props.value.z} min={props.min} step={props.step} onChange={(n) => set('z', n)} />
+            </div>
+        </Row>
+    );
+}
+
+export function TurbulenceModule({binding}: ModuleProps) {
+    return (
+        <BehaviorModule<TurbulenceField>
+            binding={binding}
+            title="Turbulence"
+            type="TurbulenceField"
+            create={() => new TurbulenceField(new Vector3(1, 1, 1), 3, new Vector3(1, 1, 1), new Vector3(1, 1, 1))}
+        >
+            {(behavior) => (
+                <>
+                    {/* scale divides particle position, so keep each axis strictly positive. */}
+                    <Vector3Row label="Scale" value={behavior.scale} min={0.01} step={0.1} onChange={(v) => binding.apply(() => (behavior.scale = v))} />
+                    <Row label="Octaves">
+                        <NumberField
+                            value={behavior.octaves}
+                            min={1}
+                            step={1}
+                            onChange={(v) => binding.apply(() => (behavior.octaves = Math.max(1, Math.round(v))))}
+                        />
+                    </Row>
+                    <Vector3Row
+                        label="Strength"
+                        value={behavior.velocityMultiplier}
+                        step={0.5}
+                        onChange={(v) => binding.apply(() => (behavior.velocityMultiplier = v))}
+                    />
+                    <Vector3Row
+                        label="Time scale"
+                        value={behavior.timeScale}
+                        step={0.1}
+                        onChange={(v) => binding.apply(() => (behavior.timeScale = v))}
+                    />
+                </>
+            )}
+        </BehaviorModule>
+    );
+}
+
+export function CollisionModule({binding}: ModuleProps) {
+    // Ensure the shared ground-plane resolver exists before any ApplyCollision is created,
+    // otherwise its update() would dereference an undefined resolver.
+    const resolver = ensureGroundResolver();
+    return (
+        <BehaviorModule<ApplyCollision>
+            binding={binding}
+            title="Collision"
+            type="ApplyCollision"
+            create={() => new ApplyCollision(ensureGroundResolver(), 0.5)}
+        >
+            {(behavior) => (
+                <>
+                    <Row label="Bounce">
+                        <NumberField
+                            value={behavior.bounce}
+                            min={0}
+                            step={0.05}
+                            onChange={(v) => binding.apply(() => (behavior.bounce = v))}
+                        />
+                    </Row>
+                    <Row label="Floor Y">
+                        <NumberField
+                            value={resolver.y}
+                            step={0.1}
+                            onChange={(v) => binding.apply(() => (resolver.y = v))}
+                        />
+                    </Row>
+                    <div style={{fontSize: 11, opacity: 0.6, marginTop: 4}}>
+                        Collides against a ground plane. Bounce is saved with the effect; Floor Y is an
+                        editor preview aid (a host can register its own colliders).
+                    </div>
                 </>
             )}
         </BehaviorModule>

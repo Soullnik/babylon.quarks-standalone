@@ -28,3 +28,4 @@ export {
     createShape,
 } from './core/shapes';
 export type {ShapeType, ShapeParams} from './core/shapes';
+export {GroundPlaneResolver, ensureGroundResolver} from './core/collision';

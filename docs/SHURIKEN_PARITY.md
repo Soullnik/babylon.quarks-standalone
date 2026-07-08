@@ -32,12 +32,14 @@ Three tiers: ✅ shipped · 🟡 runtime supports it, editor UI missing · 🔴 
 - ✅ Color by Speed, Size by Speed, Rotation by Speed
 
 ## Noise
-- ✅ frequency + strength (position amount fixed)
-- 🟡 position/rotation amounts as separate fields
-- 🔴 octaves, scroll speed, remap, quality
+- ✅ frequency + strength, position/rotation amounts as separate fields
+- ✅ Turbulence field as its own module (scale XYZ, octaves, strength XYZ, time scale) — multi-octave curl noise
+- 🔴 Noise scroll speed, remap, quality
 
 ## Collision / triggers / external forces / lights / custom data
-- 🔴 not present in quarks.core
+- ✅ Collision module — bounce off a ground plane (editor-supplied `GroundPlaneResolver`; hosts can register their own via `setPhysicsResolver`)
+- 🟡 external forces — point/directional `ApplyForce` (Gravity) + Turbulence shipped; no Unity "External Forces" multiplier UI
+- 🔴 collision triggers, arbitrary collider shapes (plane only), lights, custom data
 
 ## Sub Emitters
 - ✅ death/birth/frame triggers, probability, velocity basis, target edited via hierarchy
@@ -63,7 +65,7 @@ Three tiers: ✅ shipped · 🟡 runtime supports it, editor UI missing · 🔴 
 - ✅ restart, undo/redo, import/export, example presets, hierarchy panel
 - ✅ pause / step / playback speed / elapsed time
 - ✅ multi-segment curves (add key: dbl-click curve, remove: dbl-click key, drag keys/handles, numeric value for selected key)
-- 🔴 playback time scrubbing
+- ✅ playback time scrubbing (timeline panel)
 
 ## Suggested order
 1. ~~Playback panel~~ / ~~Main upgrades~~ (done)
@@ -71,4 +73,5 @@ Three tiers: ✅ shipped · 🟡 runtime supports it, editor UI missing · 🔴 
 3. ~~Shape mode/spread~~ / ~~Renderer extras~~ (done)
 4. ~~Multi-segment curves~~ (done)
 5. ~~Core (vendored fork): startDelay, rate over distance UI, Velocity over Lifetime, Inherit Velocity~~ (done)
-6. Core (vendored fork): collision → noise octaves/scroll → radial/orbital-offset velocity
+6. ~~Collision module + Turbulence + Noise position/rotation amounts~~ (done)
+7. Remaining core work: noise scroll/remap → radial/orbital-offset velocity → collision triggers/shapes

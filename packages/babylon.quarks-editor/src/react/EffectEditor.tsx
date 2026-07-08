@@ -10,6 +10,7 @@ import {
 } from './modules';
 import type {TextureOption} from './modules';
 import {
+    CollisionModule,
     ColorBySpeedModule,
     ForceOverLifeModule,
     GravityModule,
@@ -22,6 +23,7 @@ import {
     SizeBySpeedModule,
     SpeedOverLifeModule,
     TextureSheetModule,
+    TurbulenceModule,
     VelocityOverLifeModule,
     WidthOverTrailModule,
 } from './behaviorModules';
@@ -86,6 +88,8 @@ export function EffectEditor(props: EffectEditorProps) {
             <RotationOverLifeModule binding={binding} />
             <RotationBySpeedModule binding={binding} />
             <NoiseModule binding={binding} />
+            <TurbulenceModule binding={binding} />
+            <CollisionModule binding={binding} />
             <WidthOverTrailModule binding={binding} />
             <SubEmittersModule binding={binding} rootBinding={props.binding} />
             <TextureSheetModule binding={binding} />

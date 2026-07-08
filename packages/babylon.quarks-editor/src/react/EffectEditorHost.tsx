@@ -19,6 +19,7 @@ import {
 } from 'babylon.quarks';
 import {EffectBinding} from '../core/binding';
 import {EffectHistory} from '../core/history';
+import {ensureGroundResolver} from '../core/collision';
 import {loadEffectFromJson} from '../core/loadEffect';
 import {DEFAULT_GRADIENT_STOPS, buildGradient} from '../core/colors';
 import {EffectEditor} from './EffectEditor';
@@ -104,6 +105,9 @@ export function EffectEditorHost(props: EffectEditorHostProps) {
     const [renamingRoot, setRenamingRoot] = useState(false);
 
     useEffect(() => {
+        // Register the shared ground-plane collider before any effect (default or imported)
+        // is built, so ApplyCollision behaviors deserialized by QuarksLoader resolve against it.
+        ensureGroundResolver();
         const engine = new Engine(canvasRef.current!, true);
         const scene = new Scene(engine);
         scene.clearColor = new Color4(0.03, 0.04, 0.09, 1);
