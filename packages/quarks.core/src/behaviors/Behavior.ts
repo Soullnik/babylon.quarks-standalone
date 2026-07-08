@@ -224,15 +224,13 @@ export const BehaviorTypes: {[key: string]: BehaviorPlugin} = {
         ],
         loadJSON: LimitSpeedOverLife.fromJSON,
     },
-    /*ApplyCollision: {
+    ApplyCollision: {
         type: 'ApplyCollision',
         constructor: ApplyCollision,
-        params: [
-            ['resolver', ['']],
-            ['bounce', ['number']],
-        ],
+        // The resolver is host-provided (getPhysicsResolver), not serialized; only bounce round-trips.
+        params: [['bounce', ['number']]],
         loadJSON: ApplyCollision.fromJSON,
-    }*/
+    },
 };
 
 export function BehaviorFromJSON(json: any, particleSystem: IParticleSystem): Behavior | null {

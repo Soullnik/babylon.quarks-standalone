@@ -19,13 +19,14 @@ import {
 } from 'babylon.quarks';
 import {EffectBinding} from '../core/binding';
 import {EffectHistory} from '../core/history';
+import {ensureGroundResolver} from '../core/collision';
 import {loadEffectFromJson} from '../core/loadEffect';
 import {DEFAULT_GRADIENT_STOPS, buildGradient} from '../core/colors';
 import {EffectEditor} from './EffectEditor';
 import {PromptDialog} from './PromptDialog';
 import {TimelinePanel} from './TimelinePanel';
 import type {PlaybackState} from './TimelinePanel';
-import type {TextureOption} from './modules';
+import type {GeometryData, GeometryOption, TextureOption} from './modules';
 import {buttonStyle, globalEditorStyles, theme} from './theme';
 
 export interface EffectEditorHostHandle {
@@ -46,7 +47,11 @@ export interface EffectEditorHostProps {
     onReady?: (handle: EffectEditorHostHandle) => void;
     title?: string;
     textureOptions?: TextureOption[];
+    /** Mesh presets for the Mesh render mode (e.g. asset meshes from a host editor). */
+    geometryOptions?: GeometryOption[];
     resolveTexture?: (url: string, scene: Scene) => unknown;
+    /** Host loader for the Mesh "Load from file…" option (e.g. GLB via @babylonjs/loaders). */
+    resolveGeometry?: (file: File, scene: Scene) => Promise<GeometryData>;
 }
 
 function createDefaultEffect(scene: Scene, resolveTexture?: (url: string, scene: Scene) => unknown, textureUrl?: string): ParticleSystem {
@@ -104,6 +109,9 @@ export function EffectEditorHost(props: EffectEditorHostProps) {
     const [renamingRoot, setRenamingRoot] = useState(false);
 
     useEffect(() => {
+        // Register the shared ground-plane collider before any effect (default or imported)
+        // is built, so ApplyCollision behaviors deserialized by QuarksLoader resolve against it.
+        ensureGroundResolver();
         const engine = new Engine(canvasRef.current!, true);
         const scene = new Scene(engine);
         scene.clearColor = new Color4(0.03, 0.04, 0.09, 1);
@@ -307,7 +315,9 @@ export function EffectEditorHost(props: EffectEditorHostProps) {
                                 binding={binding}
                                 selectedSystem={activeSystem}
                                 textureOptions={props.textureOptions}
+                                geometryOptions={props.geometryOptions}
                                 resolveTexture={props.resolveTexture && state ? (url) => props.resolveTexture!(url, state.scene) : undefined}
+                                resolveGeometry={props.resolveGeometry && state ? (file) => props.resolveGeometry!(file, state.scene) : undefined}
                             />
                         )}
                     </div>

@@ -1,6 +1,8 @@
 import React from 'react';
 import {
+    ApplyCollision,
     ApplyForce,
+    ChangeEmitDirection,
     ColorBySpeed,
     ConstantValue,
     ForceOverLife,
@@ -15,12 +17,14 @@ import {
     RotationOverLife,
     SizeBySpeed,
     SpeedOverLife,
+    TurbulenceField,
     Vector3,
     VelocityOverLife,
     WidthOverLength,
 } from 'babylon.quarks';
 import type {Behavior} from 'babylon.quarks';
 import {EffectBinding} from '../core/binding';
+import {ensureGroundResolver} from '../core/collision';
 import {DEFAULT_GRADIENT_STOPS, buildGradient, findBehavior, readGradientStops} from '../core/colors';
 import {buildCurve, buildScalar, readPieces, readScalar} from '../core/values';
 import {GradientEditor} from './GradientEditor';
@@ -269,6 +273,135 @@ export function NoiseModule({binding}: ModuleProps) {
                         curveMax={10}
                         onChange={(g) => binding.apply(() => (behavior.power = g))}
                     />
+                    <ValueField
+                        label="Position amount"
+                        generator={behavior.positionAmount}
+                        min={0}
+                        curveMax={2}
+                        onChange={(g) => binding.apply(() => (behavior.positionAmount = g))}
+                    />
+                    <ValueField
+                        label="Rotation amount"
+                        generator={behavior.rotationAmount}
+                        min={0}
+                        curveMax={Math.PI}
+                        onChange={(g) => binding.apply(() => (behavior.rotationAmount = g))}
+                    />
+                </>
+            )}
+        </BehaviorModule>
+    );
+}
+
+/** Three numeric inputs for a Vector3 field, replacing the whole vector on any edit. */
+function Vector3Row(props: {label: string; value: Vector3; min?: number; step?: number; onChange: (v: Vector3) => void}) {
+    const set = (axis: 'x' | 'y' | 'z', n: number) => {
+        const next = props.value.clone();
+        next[axis] = n;
+        props.onChange(next);
+    };
+    return (
+        <Row label={props.label}>
+            <div style={{display: 'flex', gap: 6}}>
+                <NumberField value={props.value.x} min={props.min} step={props.step} onChange={(n) => set('x', n)} />
+                <NumberField value={props.value.y} min={props.min} step={props.step} onChange={(n) => set('y', n)} />
+                <NumberField value={props.value.z} min={props.min} step={props.step} onChange={(n) => set('z', n)} />
+            </div>
+        </Row>
+    );
+}
+
+export function TurbulenceModule({binding}: ModuleProps) {
+    return (
+        <BehaviorModule<TurbulenceField>
+            binding={binding}
+            title="Turbulence"
+            type="TurbulenceField"
+            create={() => new TurbulenceField(new Vector3(1, 1, 1), 3, new Vector3(1, 1, 1), new Vector3(1, 1, 1))}
+        >
+            {(behavior) => (
+                <>
+                    {/* scale divides particle position, so keep each axis strictly positive. */}
+                    <Vector3Row label="Scale" value={behavior.scale} min={0.01} step={0.1} onChange={(v) => binding.apply(() => (behavior.scale = v))} />
+                    <Row label="Octaves">
+                        <NumberField
+                            value={behavior.octaves}
+                            min={1}
+                            step={1}
+                            onChange={(v) => binding.apply(() => (behavior.octaves = Math.max(1, Math.round(v))))}
+                        />
+                    </Row>
+                    <Vector3Row
+                        label="Strength"
+                        value={behavior.velocityMultiplier}
+                        step={0.5}
+                        onChange={(v) => binding.apply(() => (behavior.velocityMultiplier = v))}
+                    />
+                    <Vector3Row
+                        label="Time scale"
+                        value={behavior.timeScale}
+                        step={0.1}
+                        onChange={(v) => binding.apply(() => (behavior.timeScale = v))}
+                    />
+                </>
+            )}
+        </BehaviorModule>
+    );
+}
+
+export function EmitDirectionModule({binding}: ModuleProps) {
+    return (
+        <BehaviorModule<ChangeEmitDirection>
+            binding={binding}
+            title="Randomize Direction"
+            type="ChangeEmitDirection"
+            create={() => new ChangeEmitDirection(new IntervalValue(0, Math.PI / 6))}
+        >
+            {(behavior) => (
+                <ValueField
+                    label="Angle (rad)"
+                    generator={behavior.angle as never}
+                    min={0}
+                    curveMax={Math.PI}
+                    onChange={(g) => binding.apply(() => (behavior.angle = g as never))}
+                />
+            )}
+        </BehaviorModule>
+    );
+}
+
+export function CollisionModule({binding}: ModuleProps) {
+    // Ensure the shared ground-plane resolver exists before any ApplyCollision is created,
+    // otherwise its update() would dereference an undefined resolver.
+    const resolver = ensureGroundResolver();
+    return (
+        <BehaviorModule<ApplyCollision>
+            binding={binding}
+            title="Collision"
+            type="ApplyCollision"
+            create={() => new ApplyCollision(ensureGroundResolver(), 0.5)}
+        >
+            {(behavior) => (
+                <>
+                    <Row label="Bounce">
+                        <NumberField
+                            value={behavior.bounce}
+                            min={0}
+                            step={0.05}
+                            onChange={(v) => binding.apply(() => (behavior.bounce = v))}
+                        />
+                    </Row>
+                    <Row label="Floor Y">
+                        <NumberField
+                            value={resolver.y}
+                            step={0.1}
+                            onChange={(v) => binding.apply(() => (resolver.y = v))}
+                        />
+                    </Row>
+                    <div style={{fontSize: 11, opacity: 0.6, marginTop: 4}}>
+                        Collides against a ground plane. Bounce is saved with the effect; Floor Y is an
+                        editor preview aid (a host can register its own colliders).
+                    </div>
                 </>
             )}
         </BehaviorModule>
@@ -413,6 +546,10 @@ export function TextureSheetModule({binding}: ModuleProps) {
     const textureUrl = (system.texture as {url?: string} | null)?.url;
     const u = Math.max(1, system.uTileCount);
     const v = Math.max(1, system.vTileCount);
+    // Start tile → cell (row-major, top-left origin — matches the shader's tile UV mapping).
+    const startIdx = Math.min(Math.max(0, Math.round(readScalar(system.startTileIndex as never).value)), tiles - 1);
+    const startCol = startIdx % u;
+    const startRow = Math.floor(startIdx / u);
     return (
         <ModuleSection title="Texture Sheet Animation" defaultOpen={false}>
             {textureUrl && (
@@ -429,9 +566,38 @@ export function TextureSheetModule({binding}: ModuleProps) {
                                     `repeating-linear-gradient(to bottom, rgba(158,185,255,0.55) 0 1px, transparent 1px calc(100% / ${v}))`,
                             }}
                         />
+                        {/* Highlight the start tile so it's obvious which sprite playback begins on. */}
+                        <div
+                            style={{
+                                position: 'absolute',
+                                pointerEvents: 'none',
+                                left: `${(startCol * 100) / u}%`,
+                                top: `${(startRow * 100) / v}%`,
+                                width: `${100 / u}%`,
+                                height: `${100 / v}%`,
+                                boxSizing: 'border-box',
+                                border: '2px solid #ffce6b',
+                                background: 'rgba(255, 206, 107, 0.22)',
+                            }}
+                        >
+                            <span
+                                style={{
+                                    position: 'absolute',
+                                    top: 1,
+                                    left: 2,
+                                    fontSize: 9,
+                                    fontWeight: 700,
+                                    color: '#ffce6b',
+                                    textShadow: '0 0 3px #000',
+                                }}
+                            >
+                                {startIdx}
+                            </span>
+                        </div>
                     </div>
                     <div style={{fontSize: 11, color: '#b7c6ea', marginTop: 3}}>
-                        {u} × {v} = {tiles} tiles; frame indices 0–{tiles - 1}
+                        {u} × {v} = {tiles} tiles; frame indices 0–{tiles - 1}; start tile{' '}
+                        <span style={{color: '#ffce6b', fontWeight: 600}}>{startIdx}</span>
                     </div>
                 </div>
             )}

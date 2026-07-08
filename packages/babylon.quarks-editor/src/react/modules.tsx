@@ -7,9 +7,11 @@ import {
     Gradient,
     IntervalValue,
     RandomColor,
+    RandomColorBetweenGradient,
     RandomQuatGenerator,
     RenderMode,
     SizeOverLife,
+    Vector3Function,
     Vector4,
 } from 'babylon.quarks';
 import type {Behavior, ParticleSystem} from 'babylon.quarks';
@@ -120,6 +122,12 @@ export function MainModule({binding}: ModuleProps) {
     const rotation = system.startRotation;
     const rotationMode = rotation instanceof RandomQuatGenerator ? '3d' : readScalar(rotation as never).mode === 'random' ? 'random' : 'angle';
     const rotationState = readScalar(rotation instanceof RandomQuatGenerator ? undefined : (rotation as never));
+    const startSize = system.startSize as unknown as {type?: string; x?: never; y?: never; z?: never};
+    const size3D = startSize.type === 'vec3function';
+    const colorGenMode =
+        startColor instanceof RandomColorBetweenGradient ? 'gradient2'
+        : startColor instanceof Gradient ? 'gradient'
+        : colorMode;
     return (
         <ModuleSection title="Main">
             <Row label="Duration">
@@ -160,44 +168,135 @@ export function MainModule({binding}: ModuleProps) {
                 curveMax={20}
                 onChange={(g) => binding.apply((s) => (s.startSpeed = g))}
             />
-            <ValueField
-                label="Start size"
-                generator={system.startSize as never}
-                min={0}
-                curveMax={5}
-                onChange={(g) => binding.apply((s) => (s.startSize = g))}
-            />
-            <Row label="Start color">
+            <Row label="Start size">
                 <SelectField
-                    value={colorMode}
+                    value={size3D ? '3d' : 'uniform'}
                     options={[
-                        {value: 'constant', label: 'Constant'},
-                        {value: 'random', label: 'Random between two'},
+                        {value: 'uniform', label: 'Uniform'},
+                        {value: '3d', label: '3D (per axis)'},
                     ]}
                     onChange={(mode) =>
                         binding.apply((s) => {
-                            s.startColor = mode === 'random' ? new RandomColor(colorA, colorB) : new ConstantColor(colorA);
+                            const cur = s.startSize as never as {clone: () => never; x?: never};
+                            if (mode === '3d') {
+                                // Seed all three axes from the current uniform generator.
+                                s.startSize = new Vector3Function(cur.clone(), cur.clone(), cur.clone());
+                            } else {
+                                // Collapse back to the X-axis generator.
+                                s.startSize = (s.startSize as never as {x: never}).x;
+                            }
                         })
                     }
                 />
             </Row>
-            <Row label="">
-                <ColorInput
-                    value={colorA}
-                    onChange={(next) =>
+            {!size3D && (
+                <ValueField
+                    label=""
+                    generator={system.startSize as never}
+                    min={0}
+                    curveMax={5}
+                    onChange={(g) => binding.apply((s) => (s.startSize = g))}
+                />
+            )}
+            {size3D && (
+                <>
+                    {(['x', 'y', 'z'] as const).map((axis) => (
+                        <ValueField
+                            key={axis}
+                            label={axis.toUpperCase()}
+                            generator={startSize[axis] as never}
+                            min={0}
+                            curveMax={5}
+                            onChange={(g) =>
+                                binding.apply((s) => {
+                                    const cur = s.startSize as Vector3Function;
+                                    s.startSize = new Vector3Function(
+                                        axis === 'x' ? (g as never) : cur.x,
+                                        axis === 'y' ? (g as never) : cur.y,
+                                        axis === 'z' ? (g as never) : cur.z
+                                    );
+                                })
+                            }
+                        />
+                    ))}
+                </>
+            )}
+            <Row label="Start color">
+                <SelectField
+                    value={colorGenMode}
+                    options={[
+                        {value: 'constant', label: 'Constant'},
+                        {value: 'random', label: 'Random between two'},
+                        {value: 'gradient', label: 'Gradient'},
+                        {value: 'gradient2', label: 'Random between gradients'},
+                    ]}
+                    onChange={(mode) =>
                         binding.apply((s) => {
-                            s.startColor = colorMode === 'random' ? new RandomColor(next, colorB) : new ConstantColor(next);
+                            if (mode === 'random') {
+                                s.startColor = new RandomColor(colorA, colorB);
+                            } else if (mode === 'gradient') {
+                                s.startColor = buildGradient(DEFAULT_GRADIENT_STOPS);
+                            } else if (mode === 'gradient2') {
+                                s.startColor = new RandomColorBetweenGradient(
+                                    buildGradient(DEFAULT_GRADIENT_STOPS),
+                                    buildGradient(DEFAULT_GRADIENT_STOPS)
+                                );
+                            } else {
+                                s.startColor = new ConstantColor(colorA);
+                            }
                         })
                     }
                 />
             </Row>
-            {colorMode === 'random' && (
+            {(colorGenMode === 'constant' || colorGenMode === 'random') && (
+                <Row label="">
+                    <ColorInput
+                        value={colorA}
+                        onChange={(next) =>
+                            binding.apply((s) => {
+                                s.startColor = colorGenMode === 'random' ? new RandomColor(next, colorB) : new ConstantColor(next);
+                            })
+                        }
+                    />
+                </Row>
+            )}
+            {colorGenMode === 'random' && (
                 <Row label="">
                     <ColorInput
                         value={colorB}
                         onChange={(next) => binding.apply((s) => (s.startColor = new RandomColor(colorA, next)))}
                     />
                 </Row>
+            )}
+            {colorGenMode === 'gradient' && (
+                <div style={{marginTop: 6}}>
+                    <GradientEditor
+                        stops={readGradientStops(startColor as Gradient)}
+                        onChange={(stops) => binding.apply((s) => (s.startColor = buildGradient(stops)))}
+                    />
+                </div>
+            )}
+            {colorGenMode === 'gradient2' && (
+                <div style={{marginTop: 6, display: 'flex', flexDirection: 'column', gap: 6}}>
+                    <GradientEditor
+                        stops={readGradientStops((startColor as RandomColorBetweenGradient).gradient1)}
+                        onChange={(stops) =>
+                            binding.apply((s) => {
+                                const g = s.startColor as RandomColorBetweenGradient;
+                                s.startColor = new RandomColorBetweenGradient(buildGradient(stops), g.gradient2);
+                            })
+                        }
+                    />
+                    <GradientEditor
+                        stops={readGradientStops((startColor as RandomColorBetweenGradient).gradient2)}
+                        onChange={(stops) =>
+                            binding.apply((s) => {
+                                const g = s.startColor as RandomColorBetweenGradient;
+                                s.startColor = new RandomColorBetweenGradient(g.gradient1, buildGradient(stops));
+                            })
+                        }
+                    />
+                </div>
             )}
             <Row label="Start rotation">
                 <SelectField
@@ -478,11 +577,104 @@ export interface TextureOption {
     url: string;
 }
 
+/**
+ * A host-supplied mesh for the Mesh render mode (e.g. asset meshes from BabylonJS Editor),
+ * analogous to TextureOption. The host provides ready vertex buffers; selecting one copies
+ * them into the system's instancing geometry.
+ */
+export interface GeometryOption {
+    label: string;
+    positions: Float32Array | number[];
+    indices?: Uint32Array | number[];
+    uvs?: Float32Array | number[];
+    normals?: Float32Array | number[];
+}
+
+/** Vertex buffers a host loader (e.g. a GLB importer) returns for the Mesh render mode. */
+export type GeometryData = Omit<GeometryOption, 'label'>;
+
+/**
+ * Tiny dependency-free wireframe thumbnail of a mesh geometry. Projects positions with a fixed
+ * isometric rotation, scales them to fit, and strokes the triangle edges on a 2D canvas — enough
+ * for the user to recognise which mesh they picked without spinning up a second Babylon scene.
+ */
+function MeshPreview({positions, indices, size = 96}: {positions: Float32Array; indices?: ArrayLike<number>; size?: number}) {
+    const canvasRef = React.useRef<HTMLCanvasElement>(null);
+    React.useEffect(() => {
+        const canvas = canvasRef.current;
+        if (!canvas || positions.length < 9) {
+            return;
+        }
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+            return;
+        }
+        const n = positions.length / 3;
+        // Fixed iso rotation (yaw ~35°, pitch ~30°) so depth reads clearly.
+        const cy = Math.cos(0.6), sy = Math.sin(0.6), cx = Math.cos(0.52), sx = Math.sin(0.52);
+        const pts: Array<[number, number]> = [];
+        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+        for (let i = 0; i < n; i++) {
+            const x = positions[i * 3], y = positions[i * 3 + 1], z = positions[i * 3 + 2];
+            const rx = x * cy - z * sy;
+            const rz = x * sy + z * cy;
+            const ry = y * cx - rz * sx;
+            pts.push([rx, ry]);
+            if (rx < minX) minX = rx;
+            if (rx > maxX) maxX = rx;
+            if (ry < minY) minY = ry;
+            if (ry > maxY) maxY = ry;
+        }
+        const pad = 8;
+        const span = Math.max(maxX - minX, maxY - minY, 1e-6);
+        const scale = (size - pad * 2) / span;
+        const ox = pad + (size - pad * 2 - (maxX - minX) * scale) / 2;
+        const oy = pad + (size - pad * 2 - (maxY - minY) * scale) / 2;
+        const px = (i: number) => ox + (pts[i][0] - minX) * scale;
+        // Flip Y so +Y points up on screen.
+        const py = (i: number) => size - (oy + (pts[i][1] - minY) * scale);
+
+        ctx.clearRect(0, 0, size, size);
+        ctx.strokeStyle = 'rgba(158,185,255,0.85)';
+        ctx.lineWidth = 1;
+        const edge = (a: number, b: number) => {
+            ctx.beginPath();
+            ctx.moveTo(px(a), py(a));
+            ctx.lineTo(px(b), py(b));
+            ctx.stroke();
+        };
+        const tris = indices && indices.length ? indices.length : n;
+        for (let i = 0; i + 2 < tris; i += 3) {
+            const a = indices && indices.length ? indices[i] : i;
+            const b = indices && indices.length ? indices[i + 1] : i + 1;
+            const c = indices && indices.length ? indices[i + 2] : i + 2;
+            edge(a, b);
+            edge(b, c);
+            edge(c, a);
+        }
+    }, [positions, indices, size]);
+    return (
+        <canvas
+            ref={canvasRef}
+            width={size}
+            height={size}
+            style={{width: size, height: size, border: '1px solid #2b3761', borderRadius: 6, background: '#0c1330'}}
+        />
+    );
+}
+
 export function RendererModule({
     binding,
     textureOptions,
+    geometryOptions,
     resolveTexture,
-}: ModuleProps & {textureOptions?: TextureOption[]; resolveTexture?: (url: string) => unknown}) {
+    resolveGeometry,
+}: ModuleProps & {
+    textureOptions?: TextureOption[];
+    geometryOptions?: GeometryOption[];
+    resolveTexture?: (url: string) => unknown;
+    resolveGeometry?: (file: File) => Promise<GeometryData>;
+}) {
     const system = binding.system;
     const currentTextureUrl = (system.texture as {url?: string} | null)?.url ?? '';
     const [promptingTextureUrl, setPromptingTextureUrl] = useState(false);
@@ -549,21 +741,48 @@ export function RendererModule({
             {system.renderMode === RenderMode.Mesh &&
                 (() => {
                     const preset = detectGeometryPreset(system.instancingGeometry);
-                    console.log(preset)
                     const vertexCount = system.instancingGeometry.length / 3;
                     const triangleCount = (system.getRendererSettings().instancingIndices?.length ?? 0) / 3;
+                    const hostGeometry = geometryOptions ?? [];
+                    const applyGeometry = (g: GeometryData) =>
+                        binding.apply((s) => {
+                            const settings = s.getRendererSettings();
+                            settings.instancingIndices = (g.indices ? new Uint32Array(g.indices) : undefined) as never;
+                            settings.instancingUVs = (g.uvs ? new Float32Array(g.uvs) : undefined) as never;
+                            settings.instancingNormals = (g.normals ? new Float32Array(g.normals) : undefined) as never;
+                            s.instancingGeometry = new Float32Array(g.positions);
+                        });
                     return (
                         <Row label="Geometry">
-                            <div style={{display: 'flex', flexDirection: 'column', gap: 4}}>
-                                <SelectField
+                            <div style={{display: 'flex', flexDirection: 'column', gap: 6}}>
+                                <SelectField<string>
                                     value={preset}
                                     options={[
-                                        ...(preset === 'custom' ? [{value: 'custom' as const, label: 'Custom (imported)'}] : []),
-                                        {value: 'quad' as const, label: 'Quad'},
-                                        {value: 'cube' as const, label: 'Cube'},
+                                        ...(preset === 'custom' ? [{value: 'custom', label: 'Custom (imported)'}] : []),
+                                        {value: 'quad', label: 'Quad'},
+                                        {value: 'cube', label: 'Cube'},
+                                        ...hostGeometry.map((g, i) => ({value: `host:${i}`, label: g.label})),
+                                        ...(resolveGeometry ? [{value: '__file', label: 'Load from file…'}] : []),
                                     ]}
                                     onChange={(next) => {
                                         if (next === 'custom') {
+                                            return;
+                                        }
+                                        if (next === '__file') {
+                                            const input = document.createElement('input');
+                                            input.type = 'file';
+                                            input.accept = '.glb,.gltf,model/gltf-binary,model/gltf+json';
+                                            input.onchange = () => {
+                                                const file = input.files?.[0];
+                                                if (file) {
+                                                    resolveGeometry!(file).then(applyGeometry);
+                                                }
+                                            };
+                                            input.click();
+                                            return;
+                                        }
+                                        if (next.startsWith('host:')) {
+                                            applyGeometry(hostGeometry[Number(next.slice(5))]);
                                             return;
                                         }
                                         binding.apply((s) => {
@@ -580,6 +799,10 @@ export function RendererModule({
                                             }
                                         });
                                     }}
+                                />
+                                <MeshPreview
+                                    positions={system.instancingGeometry}
+                                    indices={system.getRendererSettings().instancingIndices}
                                 />
                                 {preset === 'custom' && (
                                     <span style={{fontSize: 10.5, color: '#9eb9ff'}}>
@@ -695,6 +918,23 @@ export function RendererModule({
                                 setPromptingTextureUrl(false);
                             }}
                             onCancel={() => setPromptingTextureUrl(false)}
+                        />
+                    )}
+                    {currentTextureUrl && (
+                        <img
+                            src={currentTextureUrl}
+                            alt="texture preview"
+                            style={{
+                                width: 64,
+                                height: 64,
+                                marginTop: 6,
+                                objectFit: 'contain',
+                                borderRadius: 6,
+                                border: '1px solid #2b3761',
+                                // Checkerboard so texture transparency is visible.
+                                background:
+                                    'repeating-conic-gradient(#2a3252 0% 25%, #171d33 0% 50%) 0 0 / 12px 12px',
+                            }}
                         />
                     )}
                 </Row>

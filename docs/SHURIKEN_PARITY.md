@@ -7,7 +7,7 @@ Three tiers: ✅ shipped · 🟡 runtime supports it, editor UI missing · 🔴 
 - ✅ duration, looping, start lifetime/speed/size (constant/random/curve), start color, world space
 - ✅ prewarm, start rotation (constant/random angle, 3D random), start color random-between-two
 - ✅ start delay (constant/random, ignored with prewarm, re-armed by restart)
-- 🟡 3D start size (`Vector3Generator`), gradient start color (`RandomColorBetweenGradient`)
+- ✅ 3D start size (uniform / per-axis `Vector3Function`), gradient start color (single `Gradient` and random-between-two-gradients `RandomColorBetweenGradient`)
 - 🔴 simulation speed persistence, max particles, stop action, culling, ring buffer
 
 ## Emission
@@ -16,10 +16,11 @@ Three tiers: ✅ shipped · 🟡 runtime supports it, editor UI missing · 🔴 
 - ✅ rate over distance
 
 ## Shape
-- ✅ cone/sphere/hemisphere/circle/donut/rectangle/point with base params
+- ✅ cone/sphere/hemisphere/circle/donut/rectangle/point/grid/mesh-surface with base params
 - ✅ emitter mode (random/loop/ping-pong/burst) + spread per shape
-- 🟡 per-shape speed generator, grid emitter, mesh surface emitter (Shape=Mesh)
-- 🔴 edge shape, texture-based emission, align/randomize direction options
+- ✅ randomize direction (`ChangeEmitDirection`, angle generator)
+- 🟡 per-shape speed generator
+- 🔴 edge shape, texture-based emission, align-to-direction
 
 ## Velocity / forces
 - ✅ Speed over Lifetime (curve), Limit Speed over Lifetime (curve + dampen), Force over Lifetime (XYZ), Gravity
@@ -32,19 +33,21 @@ Three tiers: ✅ shipped · 🟡 runtime supports it, editor UI missing · 🔴 
 - ✅ Color by Speed, Size by Speed, Rotation by Speed
 
 ## Noise
-- ✅ frequency + strength (position amount fixed)
-- 🟡 position/rotation amounts as separate fields
-- 🔴 octaves, scroll speed, remap, quality
+- ✅ frequency + strength, position/rotation amounts as separate fields
+- ✅ Turbulence field as its own module (scale XYZ, octaves, strength XYZ, time scale) — multi-octave curl noise
+- 🔴 Noise scroll speed, remap, quality
 
 ## Collision / triggers / external forces / lights / custom data
-- 🔴 not present in quarks.core
+- ✅ Collision module — bounce off a ground plane (editor-supplied `GroundPlaneResolver`; hosts can register their own via `setPhysicsResolver`)
+- 🟡 external forces — point/directional `ApplyForce` (Gravity) + Turbulence shipped; no Unity "External Forces" multiplier UI
+- 🔴 collision triggers, arbitrary collider shapes (plane only), lights, custom data
 
 ## Sub Emitters
 - ✅ death/birth/frame triggers, probability, velocity basis, target edited via hierarchy
 - 🔴 collision/trigger/manual triggers, inherit properties
 
 ## Texture Sheet Animation
-- ✅ tiles U/V, start tile, frame-over-life curve, atlas preview with tile grid
+- ✅ tiles U/V, start tile, frame-over-life curve, atlas preview with tile grid + start-tile highlight
 - ✅ tile blending
 - 🔴 sprites mode, single-row mode, cycles
 
@@ -55,15 +58,18 @@ Three tiers: ✅ shipped · 🟡 runtime supports it, editor UI missing · 🔴 
 
 ## Renderer
 - ✅ render modes (billboard ×4, trail, mesh), blend mode, texture picker (presets/URL/file), render order, mesh geometry presets
+- ✅ host-provided mesh assets (`geometryOptions`) + load-your-own GLB/glTF (`resolveGeometry` host loader)
+- ✅ texture thumbnail + mesh wireframe previews in the inspector
 - ✅ soft particles (+near/far fade), alpha test, depth write/test
-- 🟡 layer mask, host-provided mesh assets
+- 🟡 layer mask
 - 🔴 sort mode, min/max particle size, pivot, shadows
 
 ## Editor UX (Particle Effect panel)
 - ✅ restart, undo/redo, import/export, example presets, hierarchy panel
 - ✅ pause / step / playback speed / elapsed time
 - ✅ multi-segment curves (add key: dbl-click curve, remove: dbl-click key, drag keys/handles, numeric value for selected key)
-- 🔴 playback time scrubbing
+- ✅ playback time scrubbing (timeline panel)
+- ✅ texture/mesh previews + texture-sheet start-tile highlight
 
 ## Suggested order
 1. ~~Playback panel~~ / ~~Main upgrades~~ (done)
@@ -71,4 +77,6 @@ Three tiers: ✅ shipped · 🟡 runtime supports it, editor UI missing · 🔴 
 3. ~~Shape mode/spread~~ / ~~Renderer extras~~ (done)
 4. ~~Multi-segment curves~~ (done)
 5. ~~Core (vendored fork): startDelay, rate over distance UI, Velocity over Lifetime, Inherit Velocity~~ (done)
-6. Core (vendored fork): collision → noise octaves/scroll → radial/orbital-offset velocity
+6. ~~Collision module + Turbulence + Noise position/rotation amounts~~ (done)
+7. ~~3D start size + gradient start color + Randomize Direction + host mesh assets (`geometryOptions`)~~ (done)
+8. Remaining core work: noise scroll/remap → radial/orbital-offset velocity → collision triggers/shapes → align-to-direction
