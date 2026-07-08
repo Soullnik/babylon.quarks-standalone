@@ -16,8 +16,13 @@ export {
 } from './behaviorModules';
 export type {TextureOption} from './modules';
 export {SubEmittersModule} from './SubEmittersModule';
-export {EffectHierarchy} from './EffectHierarchy';
+export {TimelinePanel} from './TimelinePanel';
+export type {TimelinePanelProps, PlaybackState} from './TimelinePanel';
+export {TimelineTrackRow} from './TimelineTrackRow';
+export type {TimelineTrackRowProps} from './TimelineTrackRow';
 export {ModuleSection} from './ModuleSection';
+export {PromptDialog} from './PromptDialog';
+export type {PromptDialogProps} from './PromptDialog';
 export {CurveEditor} from './CurveEditor';
 export {GradientEditor} from './GradientEditor';
 export {ValueField} from './ValueField';

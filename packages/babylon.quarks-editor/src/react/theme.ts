@@ -52,3 +52,34 @@ export const buttonStyle: CSSProperties = {
     cursor: 'pointer',
     fontFamily: theme.font,
 };
+
+/**
+ * Two hover conventions, applied via className (inline `style` can't express `:hover`):
+ * - `qe-hover` — brightens elements that already have a solid inline background/border
+ *   (buttons, icon buttons, bars, gradient/curve handles, module headers).
+ * - `qe-hover-bg` — adds a background tint for elements left transparent by default (timeline
+ *   rows), since brightening transparent does nothing. Must not be combined with an inline
+ *   `background` on the same element or the tint would need `!important` to show through.
+ */
+export const globalEditorStyles = `
+.qe-hover, .qe-hover-bg {
+    transition: filter 0.12s ease, background 0.12s ease;
+}
+.qe-hover:hover:not(:disabled) {
+    filter: brightness(1.3);
+}
+.qe-hover:active:not(:disabled) {
+    filter: brightness(0.85);
+}
+.qe-hover:disabled {
+    opacity: 0.45;
+    cursor: default;
+}
+.qe-hover-bg:hover {
+    background: rgba(255, 255, 255, 0.07);
+}
+select.qe-hover:hover, input.qe-hover:hover, select.qe-hover:focus, input.qe-hover:focus {
+    border-color: ${theme.borderActive};
+    filter: none;
+}
+`;

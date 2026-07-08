@@ -105,8 +105,7 @@ export class SpriteBatch extends VFXBatch {
         while (target >= this.maxParticles) {
             this.maxParticles *= 2;
         }
-        this.setupBuffers();
-        this.rebuildMaterial();
+        this.buildExpandableBuffers();
     }
 
     rebuildMaterial(): void {

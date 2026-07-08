@@ -444,6 +444,7 @@ export function TextureSheetModule({binding}: ModuleProps) {
             <Row label="Blend tiles">
                 <input
                     type="checkbox"
+                    className="qe-hover"
                     checked={system.blendTiles}
                     style={{justifySelf: 'start', width: 15, height: 15, accentColor: '#78a5ff', cursor: 'pointer'}}
                     onChange={(e) => binding.apply((s) => (s.blendTiles = e.target.checked))}
@@ -460,6 +461,7 @@ export function TextureSheetModule({binding}: ModuleProps) {
             <Row label="Animate frames">
                 <input
                     type="checkbox"
+                    className="qe-hover"
                     checked={!!frameBehavior}
                     style={{justifySelf: 'start', width: 15, height: 15, accentColor: '#78a5ff', cursor: 'pointer'}}
                     onChange={(e) =>

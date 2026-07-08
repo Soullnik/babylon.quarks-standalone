@@ -1,0 +1,267 @@
+import React, {useState} from 'react';
+import type {ParticleSystem} from 'babylon.quarks';
+import type {EffectBinding} from '../core/binding';
+import {buildEffectTree, collectSystems} from '../core/effectTree';
+import {createChildSystem, removeSystems} from '../core/systems';
+import {ungroupNode} from '../core/groups';
+import type {TimelineRow} from '../core/timeline';
+import {PromptDialog} from './PromptDialog';
+import {theme} from './theme';
+
+const iconButton: React.CSSProperties = {background: 'none', border: 'none', cursor: 'pointer', fontSize: 11, padding: 0};
+
+const ROW_HEIGHT = 28;
+
+export interface TimelineTrackRowProps {
+    row: TimelineRow;
+    binding: EffectBinding;
+    selected: boolean;
+    onSelect: (system: ParticleSystem) => void;
+    pxPerSecond: number;
+    /** Matches the ruler's left gutter so bars line up under the correct tick. */
+    offsetPx: number;
+    collapsed: boolean;
+    onToggleCollapse?: () => void;
+    /** Preview-only visibility (toggles `system.emitter.visible`); lets you isolate one track. */
+    hidden?: boolean;
+    onToggleVisible?: () => void;
+    /** Membership in the "group selected rows together" set (unrelated to inspector selection). */
+    groupSelected: boolean;
+    onToggleGroupSelect: () => void;
+}
+
+const checkboxButton: React.CSSProperties = {...iconButton, fontSize: 12, width: 12};
+
+/** One row of the timeline: a label cell (name + actions) and, for tracks, a bar cell. */
+export function TimelineTrackRow(props: TimelineTrackRowProps): React.ReactElement {
+    const {row, binding, selected, onSelect, pxPerSecond, offsetPx, collapsed, onToggleCollapse, hidden, onToggleVisible, groupSelected, onToggleGroupSelect} = props;
+    const [renaming, setRenaming] = useState(false);
+
+    const isRoot = row.node === binding.root;
+
+    const labelStyle: React.CSSProperties = {
+        display: 'flex',
+        alignItems: 'center',
+        gap: 6,
+        height: ROW_HEIGHT,
+        padding: '0 8px',
+        paddingLeft: 8 + row.depth * 14,
+        borderRadius: 6,
+        cursor: row.kind === 'track' ? 'pointer' : onToggleCollapse ? 'pointer' : 'default',
+        fontSize: 12.5,
+        color: row.kind === 'track' && selected ? theme.text : theme.textDim,
+        whiteSpace: 'nowrap',
+        // Left unset (rather than 'transparent') when not selected so the .qe-row-bg hover
+        // tint isn't shadowed by an inline background of the same property.
+        ...(row.kind === 'track' && selected ? {background: 'rgba(60, 105, 209, 0.3)'} : {}),
+    };
+
+    if (row.kind === 'group') {
+        return (
+            <>
+                <div className="qe-hover-bg" style={{...labelStyle, borderTop: `1px solid ${theme.border}`}} onClick={onToggleCollapse}>
+                    {!isRoot && (
+                        <button
+                            className="qe-hover"
+                            title={groupSelected ? 'Remove from group selection' : 'Select for grouping'}
+                            style={{...checkboxButton, color: groupSelected ? theme.accent : theme.textDim}}
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                onToggleGroupSelect();
+                            }}
+                        >
+                            {groupSelected ? '☑' : '☐'}
+                        </button>
+                    )}
+                    <span style={{color: theme.textDim, fontSize: 10, width: 10}}>{collapsed ? '▸' : '▾'}</span>
+                    <span style={{flex: 1, overflow: 'hidden', textOverflow: 'ellipsis'}}>{row.name}</span>
+                    <button
+                        className="qe-hover"
+                        title="Add system to this group"
+                        style={{...iconButton, color: theme.accent, fontSize: 13}}
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            let created: ParticleSystem | undefined;
+                            binding.apply(() => {
+                                created = createChildSystem(binding.system, {
+                                    name: `system ${binding.subSystems.length + 1}`,
+                                    parentNode: row.node,
+                                });
+                                binding.system._renderer?.addSystem(created);
+                            });
+                            if (created) {
+                                binding.addSubSystem(created);
+                                onSelect(created);
+                            }
+                        }}
+                    >
+                        +
+                    </button>
+                    {!isRoot && (
+                        <button className="qe-hover" title="Rename" style={{...iconButton, color: theme.textDim}} onClick={(e) => {
+                            e.stopPropagation();
+                            setRenaming(true);
+                        }}>
+                            ✎
+                        </button>
+                    )}
+                    {!isRoot && (
+                        <button
+                            className="qe-hover"
+                            title="Ungroup (moves its contents up a level)"
+                            style={{...iconButton, color: theme.textDim, fontSize: 12}}
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                binding.apply(() => ungroupNode(row.node));
+                            }}
+                        >
+                            ⛶
+                        </button>
+                    )}
+                    {!isRoot && (
+                        <button
+                            className="qe-hover"
+                            title="Remove group"
+                            style={{...iconButton, color: '#e08c8c', fontSize: 12}}
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                removeSystems(binding, collectSystems(buildEffectTree(row.node)), onSelect);
+                                binding.apply(() => row.node.dispose(true, false));
+                            }}
+                        >
+                            ✕
+                        </button>
+                    )}
+                </div>
+                <div className="qe-hover-bg" style={{height: ROW_HEIGHT, borderTop: `1px solid ${theme.border}`}} onClick={onToggleCollapse} />
+                {renaming && (
+                    <PromptDialog
+                        title="Rename"
+                        defaultValue={row.name}
+                        onSubmit={(name) => {
+                            binding.apply(() => (row.node.name = name));
+                            setRenaming(false);
+                        }}
+                        onCancel={() => setRenaming(false)}
+                    />
+                )}
+            </>
+        );
+    }
+
+    const {system} = row;
+    const barLeft = offsetPx + row.startOffset * pxPerSecond;
+    const barWidth = Math.max(2, row.duration * pxPerSecond);
+
+    return (
+        <>
+            <div className="qe-hover-bg" style={{...labelStyle, opacity: hidden ? 0.5 : 1}} onClick={() => onSelect(system)}>
+                {!isRoot && (
+                    <button
+                        className="qe-hover"
+                        title={groupSelected ? 'Remove from group selection' : 'Select for grouping'}
+                        style={{...checkboxButton, color: groupSelected ? theme.accent : theme.textDim}}
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            onToggleGroupSelect();
+                        }}
+                    >
+                        {groupSelected ? '☑' : '☐'}
+                    </button>
+                )}
+                <button
+                    className="qe-hover"
+                    title={hidden ? 'Show in viewport' : 'Hide in viewport'}
+                    style={{...iconButton, color: hidden ? theme.textDim : theme.accent, fontSize: 12}}
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        onToggleVisible?.();
+                    }}
+                >
+                    {hidden ? '◯' : '◉'}
+                </button>
+                <span style={{color: theme.accent, fontSize: 10, width: 10}}>◆</span>
+                <span style={{flex: 1, overflow: 'hidden', textOverflow: 'ellipsis'}}>
+                    {row.name}
+                    {system.onlyUsedByOther ? ' (sub)' : ''}
+                </span>
+                {!isRoot && (
+                    <button className="qe-hover" title="Rename" style={{...iconButton, color: theme.textDim}} onClick={(e) => {
+                        e.stopPropagation();
+                        setRenaming(true);
+                    }}>
+                        ✎
+                    </button>
+                )}
+                {!isRoot && row.removable && (
+                    <button
+                        className="qe-hover"
+                        title="Remove system"
+                        style={{...iconButton, color: '#e08c8c', fontSize: 12}}
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            removeSystems(binding, [system], onSelect);
+                        }}
+                    >
+                        ✕
+                    </button>
+                )}
+                {selected && (
+                    <button
+                        className="qe-hover"
+                        title="Add child system"
+                        style={{...iconButton, color: theme.accent, fontSize: 13}}
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            let created: ParticleSystem | undefined;
+                            binding.apply(() => {
+                                created = createChildSystem(system, {name: `system ${binding.subSystems.length + 1}`});
+                                binding.system._renderer?.addSystem(created);
+                            });
+                            if (created) {
+                                binding.addSubSystem(created);
+                                onSelect(created);
+                            }
+                        }}
+                    >
+                        +
+                    </button>
+                )}
+            </div>
+            <div className="qe-hover-bg" style={{position: 'relative', height: ROW_HEIGHT}} onClick={() => onSelect(system)}>
+                <div
+                    className="qe-hover"
+                    title={row.startOffsetVariable ? 'Start time varies per spawn' : undefined}
+                    style={{
+                        position: 'absolute',
+                        left: barLeft,
+                        width: barWidth,
+                        top: 5,
+                        height: ROW_HEIGHT - 10,
+                        borderRadius: 4,
+                        cursor: 'pointer',
+                        background: system.onlyUsedByOther ? 'repeating-linear-gradient(135deg, rgba(158,185,255,0.25), rgba(158,185,255,0.25) 4px, rgba(158,185,255,0.4) 4px, rgba(158,185,255,0.4) 8px)' : selected ? theme.accent : '#3c5aa0',
+                        border: system.onlyUsedByOther ? `1px dashed ${theme.accent}` : `1px solid ${theme.border}`,
+                        opacity: hidden ? 0.3 : system.onlyUsedByOther ? 0.75 : 1,
+                        boxSizing: 'border-box',
+                    }}
+                >
+                    {row.looping && (
+                        <span style={{position: 'absolute', right: 4, top: -1, fontSize: 10, color: theme.text}}>⟳</span>
+                    )}
+                </div>
+            </div>
+            {renaming && (
+                <PromptDialog
+                    title="Rename"
+                    defaultValue={row.name}
+                    onSubmit={(name) => {
+                        binding.apply(() => (row.node.name = name));
+                        setRenaming(false);
+                    }}
+                    onCancel={() => setRenaming(false)}
+                />
+            )}
+        </>
+    );
+}

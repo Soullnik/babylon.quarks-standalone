@@ -21,6 +21,7 @@ export function NumberField(props: {value: number; onChange: (value: number) => 
     return (
         <input
             type="number"
+            className="qe-hover"
             style={inputStyle}
             value={text}
             step={props.step ?? 0.1}
@@ -40,6 +41,7 @@ export function CheckboxField(props: {value: boolean; onChange: (value: boolean)
     return (
         <input
             type="checkbox"
+            className="qe-hover"
             checked={props.value}
             onChange={(e) => props.onChange(e.target.checked)}
             style={{justifySelf: 'start', width: 15, height: 15, accentColor: '#78a5ff', cursor: 'pointer'}}
@@ -55,6 +57,7 @@ export function SelectField<T extends string | number>(props: {
     const numeric = typeof props.value === 'number';
     return (
         <select
+            className="qe-hover"
             style={{...inputStyle, cursor: 'pointer'}}
             value={String(props.value)}
             onChange={(e) => props.onChange((numeric ? Number(e.target.value) : e.target.value) as T)}

@@ -110,6 +110,7 @@ export function CurveEditor(props: {pieces: CurvePiece[]; onChange: (pieces: Cur
                 {points.map((pt) => (
                     <circle
                         key={`${pt.ref.piece}-${pt.ref.idx}`}
+                        className="qe-hover"
                         cx={toX(pt.x)}
                         cy={toY(pt.y)}
                         r={pt.isKey ? 5 : 4}
@@ -138,6 +139,7 @@ export function CurveEditor(props: {pieces: CurvePiece[]; onChange: (pieces: Cur
                         <span style={{fontSize: 10.5, color: theme.textDim}}>value</span>
                         <input
                             type="number"
+                            className="qe-hover"
                             step={0.05}
                             style={{...inputStyle, fontSize: 11, padding: '3px 5px', width: 70}}
                             value={Math.round(selectedPoint.y * 1000) / 1000}

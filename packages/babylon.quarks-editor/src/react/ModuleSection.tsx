@@ -23,6 +23,7 @@ export function ModuleSection(props: {
             }}
         >
             <header
+                className="qe-hover"
                 style={{
                     display: 'flex',
                     alignItems: 'center',
@@ -38,6 +39,7 @@ export function ModuleSection(props: {
                 {toggleable && (
                     <input
                         type="checkbox"
+                        className="qe-hover"
                         checked={props.enabled}
                         onClick={(e) => e.stopPropagation()}
                         onChange={(e) => props.onToggle?.(e.target.checked)}

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, {useState} from 'react';
 import {
     ColorOverLife,
     ConstantColor,
@@ -27,6 +27,7 @@ import {buildCurve, buildScalar, readPieces, readScalar} from '../core/values';
 import {CurveEditor} from './CurveEditor';
 import {GradientEditor} from './GradientEditor';
 import {ModuleSection} from './ModuleSection';
+import {PromptDialog} from './PromptDialog';
 import {CheckboxField, NumberField, Row, SelectField} from './fields';
 import {ValueField} from './ValueField';
 
@@ -62,6 +63,7 @@ function ColorInput(props: {value: Vector4; onChange: (next: Vector4) => void}) 
         <div style={{display: 'flex', gap: 6, alignItems: 'center'}}>
             <input
                 type="color"
+                className="qe-hover"
                 value={rgbToHex(value.x, value.y, value.z)}
                 onChange={(e) => {
                     const rgb = hexToRgb(e.target.value);
@@ -243,6 +245,7 @@ export function EmissionModule({binding}: ModuleProps) {
                     <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between'}}>
                         <span style={{fontSize: 11.5, color: '#9eb9ff'}}>Burst {i + 1}</span>
                         <button
+                            className="qe-hover"
                             style={{background: 'none', border: 'none', color: '#e08c8c', cursor: 'pointer', fontSize: 13}}
                             title="Remove burst"
                             onClick={() => binding.apply((s) => s.emissionBursts.splice(i, 1))}
@@ -290,6 +293,7 @@ export function EmissionModule({binding}: ModuleProps) {
                 </div>
             ))}
             <button
+                className="qe-hover"
                 style={{marginTop: 8, background: 'none', border: '1px dashed #34477f', color: '#9eb9ff', borderRadius: 8, padding: '5px 10px', cursor: 'pointer', fontSize: 12.5}}
                 onClick={() =>
                     binding.apply((s) =>
@@ -429,6 +433,7 @@ export function RendererModule({
 }: ModuleProps & {textureOptions?: TextureOption[]; resolveTexture?: (url: string) => unknown}) {
     const system = binding.system;
     const currentTextureUrl = (system.texture as {url?: string} | null)?.url ?? '';
+    const [promptingTextureUrl, setPromptingTextureUrl] = useState(false);
     return (
         <ModuleSection title="Renderer">
             <Row label="Render mode">
@@ -549,10 +554,7 @@ export function RendererModule({
                                 return;
                             }
                             if (url === '__url') {
-                                const custom = window.prompt('Texture URL', currentTextureUrl);
-                                if (custom) {
-                                    binding.apply((s) => (s.texture = resolveTexture(custom) as never));
-                                }
+                                setPromptingTextureUrl(true);
                                 return;
                             }
                             if (url === '__file') {
@@ -578,6 +580,18 @@ export function RendererModule({
                             binding.apply((s) => (s.texture = resolveTexture(url) as never));
                         }}
                     />
+                    {promptingTextureUrl && (
+                        <PromptDialog
+                            title="Texture URL"
+                            defaultValue={currentTextureUrl}
+                            placeholder="https://…"
+                            onSubmit={(url) => {
+                                binding.apply((s) => (s.texture = resolveTexture(url) as never));
+                                setPromptingTextureUrl(false);
+                            }}
+                            onCancel={() => setPromptingTextureUrl(false)}
+                        />
+                    )}
                 </Row>
             )}
             <Row label="Render order">
