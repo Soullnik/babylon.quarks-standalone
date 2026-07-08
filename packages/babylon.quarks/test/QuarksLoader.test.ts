@@ -108,6 +108,68 @@ describe('QuarksLoader matrix decomposition', () => {
         engine.dispose();
     });
 
+    it('round-trips a custom (non-preset) mesh geometry through toJSON/parse', () => {
+        const engine = new NullEngine();
+        const scene = new Scene(engine);
+
+        const customPositions = new Float32Array([0, 1, 0, -1, -1, 0, 1, -1, 0]);
+        const customIndices = new Uint32Array([0, 1, 2]);
+        const ps = new ParticleSystem({
+            scene,
+            renderMode: 2, // Mesh
+            instancingGeometry: customPositions,
+            instancingIndices: customIndices,
+        } as any);
+
+        const meta: any = {geometries: {}, materials: {}, textures: {}, images: {}};
+        const psJSON = ps.toJSON(meta);
+        const envelope = {
+            geometries: Object.values(meta.geometries),
+            materials: Object.values(meta.materials).map(({sourceMaterial: _s, ...rest}: any) => rest),
+            textures: [],
+            images: [],
+            object: {uuid: 'root', type: 'ParticleEmitter', ps: psJSON},
+        };
+
+        const loader = new QuarksLoader(scene);
+        const root = loader.parse(envelope) as ParticleEmitter;
+        const loadedSystem = root.system as ParticleSystem;
+
+        expect(Array.from(loadedSystem.instancingGeometry)).toEqual(Array.from(customPositions));
+
+        scene.dispose();
+        engine.dispose();
+    });
+
+    it('round-trips a material blend mode through toJSON/parse', () => {
+        const engine = new NullEngine();
+        const scene = new Scene(engine);
+
+        const ps = new ParticleSystem({
+            scene,
+            blendMode: Constants.ALPHA_ADD,
+        } as any);
+
+        const meta: any = {geometries: {}, materials: {}, textures: {}, images: {}};
+        const psJSON = ps.toJSON(meta);
+        const envelope = {
+            geometries: Object.values(meta.geometries),
+            materials: Object.values(meta.materials).map(({sourceMaterial: _s, ...rest}: any) => rest),
+            textures: [],
+            images: [],
+            object: {uuid: 'root', type: 'ParticleEmitter', ps: psJSON},
+        };
+
+        const loader = new QuarksLoader(scene);
+        const root = loader.parse(envelope) as ParticleEmitter;
+        const loadedSystem = root.system as ParticleSystem;
+
+        expect(loadedSystem.blending).toBe(Constants.ALPHA_ADD);
+
+        scene.dispose();
+        engine.dispose();
+    });
+
     it('parses QuarksPrefab and resolves particle animation references', () => {
         const engine = new NullEngine();
         const scene = new Scene(engine);

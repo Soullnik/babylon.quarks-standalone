@@ -1,4 +1,5 @@
 import {execSync} from "node:child_process";
+import {readFileSync} from "node:fs";
 
 /**
  * Validates that npm pack output contains publish-critical artifacts.
@@ -36,11 +37,28 @@ function assertRequiredFiles(packResult) {
 }
 
 /**
+ * quarks.core is a vendored fork bundled into the dist artifacts, so the
+ * published package must not declare any runtime dependencies — a consumer
+ * install must never pull the upstream quarks.core from the registry.
+ */
+function assertNoRuntimeDependencies() {
+  const manifestUrl = new URL("../packages/babylon.quarks/package.json", import.meta.url);
+  const manifest = JSON.parse(readFileSync(manifestUrl, "utf8"));
+  const dependencyNames = Object.keys(manifest.dependencies ?? {});
+  if (dependencyNames.length > 0) {
+    throw new Error(
+      `babylon.quarks must stay dependency-free (quarks.core is bundled), found: ${dependencyNames.join(", ")}`
+    );
+  }
+}
+
+/**
  * Main entrypoint for pack verification script.
  */
 function main() {
   const packResult = getPackResult();
   assertRequiredFiles(packResult);
+  assertNoRuntimeDependencies();
   console.log("Pack artifacts are valid.");
 }
 

@@ -4,9 +4,9 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "dev": "vite --port 8000",
+    "dev": "vite --port 3010",
     "build": "vite build",
-    "preview": "vite preview --port 8000",
+    "preview": "vite preview --port 3010",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {

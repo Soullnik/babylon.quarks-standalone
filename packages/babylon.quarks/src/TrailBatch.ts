@@ -48,7 +48,10 @@ export class TrailBatch extends VFXBatch {
         this.mesh.dispose();
         this.mesh = new Mesh('trailBatch', this.scene);
         this.mesh.alwaysSelectAsActiveMesh = true;
+        this.buildGeometryBuffers();
+    }
 
+    private buildGeometryBuffers(): void {
         this.positionBuffer = new Float32Array(this.maxParticles * 6);
         this.previousBuffer = new Float32Array(this.maxParticles * 6);
         this.nextBuffer = new Float32Array(this.maxParticles * 6);
@@ -91,15 +94,13 @@ export class TrailBatch extends VFXBatch {
                 (sub as any)._boundingInfo = this.mesh.getBoundingInfo();
             }
         }
-
     }
 
     expandBuffers(target: number): void {
         while (target >= this.maxParticles) {
             this.maxParticles *= 2;
         }
-        this.setupBuffers();
-        this.rebuildMaterial();
+        this.buildGeometryBuffers();
     }
 
     rebuildMaterial(): void {

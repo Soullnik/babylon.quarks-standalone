@@ -97,7 +97,8 @@ const quarksBackend: (() => Backend) = () => {
                         new Vector4(COLOR_START.r, COLOR_START.g, COLOR_START.b, COLOR_START.a)
                     ),
                     emissionOverTime: new ConstantValue(rate),
-                    shape: new ConeEmitter({radius: CONE_RADIUS, angle: CONE_ANGLE}),
+                    // quarks' angle is a half-angle; Babylon's native cone uses a full angle.
+                    shape: new ConeEmitter({radius: CONE_RADIUS, angle: CONE_ANGLE / 2}),
                     renderMode: RenderMode.BillBoard,
                     texture,
                     transparent: true,
@@ -110,6 +111,8 @@ const quarksBackend: (() => Backend) = () => {
                     )
                 );
                 system.emitter.position = position;
+                // quarks emits along local +Z; Babylon's native cone emits along +Y.
+                system.emitter.rotation.x = -Math.PI / 2;
                 renderer.addSystem(system);
                 systems.push(system);
             }

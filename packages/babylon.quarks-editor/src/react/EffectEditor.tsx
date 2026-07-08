@@ -13,6 +13,7 @@ import {
     ColorBySpeedModule,
     ForceOverLifeModule,
     GravityModule,
+    InheritVelocityModule,
     LimitSpeedOverLifeModule,
     NoiseModule,
     OrbitOverLifeModule,
@@ -21,23 +22,25 @@ import {
     SizeBySpeedModule,
     SpeedOverLifeModule,
     TextureSheetModule,
+    VelocityOverLifeModule,
     WidthOverTrailModule,
 } from './behaviorModules';
 import {SubEmittersModule} from './SubEmittersModule';
-import {EffectHierarchy} from './EffectHierarchy';
 import {theme} from './theme';
+import type {ParticleSystem} from 'babylon.quarks';
 
 export interface EffectEditorProps {
     binding: EffectBinding;
+    /** Currently selected system, lifted up so the timeline panel and this module stack agree. */
+    selectedSystem: ParticleSystem;
     /** Texture presets offered in the Renderer module (host supplies the loader). */
     textureOptions?: TextureOption[];
     resolveTexture?: (url: string) => unknown;
 }
 
 /**
- * Shuriken-style effect editor: a Unity-like hierarchy of systems (root + children)
- * with a stacked module inspector for the selected system. Embed it anywhere React
- * runs — the standalone examples page or a BabylonJS Editor plugin.
+ * Shuriken-style effect editor: a stacked module inspector for the selected system.
+ * Embed it anywhere React runs — the standalone examples page or a BabylonJS Editor plugin.
  * Module order mirrors Unity's Particle System inspector.
  */
 export function EffectEditor(props: EffectEditorProps) {
@@ -46,9 +49,8 @@ export function EffectEditor(props: EffectEditorProps) {
         () => props.binding.getRevision()
     );
     const allSystems = [props.binding.system, ...props.binding.subSystems];
-    const [selectedSystem, setSelectedSystem] = React.useState(props.binding.system);
     // Selection survives re-renders but falls back to root if the system was removed/replaced.
-    const activeSystem = allSystems.includes(selectedSystem) ? selectedSystem : props.binding.system;
+    const activeSystem = allSystems.includes(props.selectedSystem) ? props.selectedSystem : props.binding.system;
 
     // Inspector edits go through a per-system binding; changes route into the root
     // binding's undo history and re-render via the subscription below.
@@ -67,12 +69,13 @@ export function EffectEditor(props: EffectEditorProps) {
 
     return (
         <div style={{fontFamily: theme.font, color: theme.text}}>
-            <EffectHierarchy binding={props.binding} selectedSystem={activeSystem} onSelect={setSelectedSystem} />
             <MainModule binding={binding} />
             <EmissionModule binding={binding} />
             <ShapeModule binding={binding} />
+            <VelocityOverLifeModule binding={binding} />
             <SpeedOverLifeModule binding={binding} />
             <LimitSpeedOverLifeModule binding={binding} />
+            <InheritVelocityModule binding={binding} />
             <ForceOverLifeModule binding={binding} />
             <GravityModule binding={binding} />
             <OrbitOverLifeModule binding={binding} />

@@ -28,6 +28,7 @@ export function GradientEditor(props: {stops: GradientStop[]; onChange: (stops: 
         <div>
             <div
                 ref={barRef}
+                className="qe-hover"
                 style={{
                     position: 'relative',
                     width: BAR_WIDTH,
@@ -59,6 +60,7 @@ export function GradientEditor(props: {stops: GradientStop[]; onChange: (stops: 
                 {stops.map((stop, i) => (
                     <div
                         key={i}
+                        className="qe-hover"
                         style={{
                             position: 'absolute',
                             left: `calc(${stop.pos * 100}% - 6px)`,
@@ -94,6 +96,7 @@ export function GradientEditor(props: {stops: GradientStop[]; onChange: (stops: 
                     <Row label="Stop color">
                         <input
                             type="color"
+                            className="qe-hover"
                             value={rgbToHex(current.r, current.g, current.b)}
                             onChange={(e) => updateStop(selected, hexToRgb(e.target.value))}
                             style={{width: 42, height: 24, border: 'none', background: 'transparent', padding: 0, cursor: 'pointer'}}
@@ -107,6 +110,7 @@ export function GradientEditor(props: {stops: GradientStop[]; onChange: (stops: 
                     </Row>
                     {stops.length > 2 && (
                         <button
+                            className="qe-hover"
                             style={{...buttonStyle, marginTop: 6}}
                             onClick={() => {
                                 props.onChange(stops.filter((_, i) => i !== selected));

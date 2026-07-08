@@ -16,6 +16,8 @@ import {
     Matrix4,
     Vector3,
     Quaternion as QRot,
+    VelocityOverLife,
+    InheritVelocity,
 } from 'quarks.core';
 import {NullEngine} from '@babylonjs/core/Engines/nullEngine';
 import {Scene} from '@babylonjs/core/scene';
@@ -1053,5 +1055,161 @@ describe('ParticleSystem', () => {
             ps.update(1 / 30);
         }
         expect((ps as any).useFastTrailHistory).toBe(false);
+    });
+});
+
+describe('ParticleSystem start delay', () => {
+    const makeDelayedSystem = (parameters: any = {}) =>
+        new ParticleSystem({
+            scene,
+            duration: 5,
+            looping: true,
+            prewarm: false,
+            startLife: new ConstantValue(2),
+            startSpeed: new ConstantValue(0),
+            startSize: new ConstantValue(1),
+            startColor: new ConstantColor(new Vector4(1, 1, 1, 1)),
+            emissionOverTime: new ConstantValue(100),
+            shape: new PointEmitter(),
+            startDelay: new ConstantValue(0.5),
+            ...parameters,
+        });
+
+    it('should not emit until the start delay elapses', () => {
+        const ps = makeDelayedSystem();
+        ps.update(0.1);
+        ps.update(0.1);
+        ps.update(0.1);
+        ps.update(0.1);
+        expect(ps.particleNum).toBe(0);
+        expect(ps.emissionState.time).toBe(0);
+
+        ps.update(0.1);
+        ps.update(0.1);
+        ps.update(0.1);
+        expect(ps.particleNum).toBeGreaterThan(0);
+    });
+
+    it('should carry the delta remainder past the delay in the same update', () => {
+        const ps = makeDelayedSystem({startDelay: new ConstantValue(0.05)});
+        ps.update(0.1);
+        expect(ps.emissionState.time).toBeGreaterThan(0);
+    });
+
+    it('should re-arm the delay on restart', () => {
+        const ps = makeDelayedSystem();
+        for (let i = 0; i < 8; i++) {
+            ps.update(0.1);
+        }
+        expect(ps.particleNum).toBeGreaterThan(0);
+
+        ps.restart();
+        ps.update(0.1);
+        expect(ps.particleNum).toBe(0);
+        expect(ps.emissionState.time).toBe(0);
+    });
+
+    it('should ignore the delay when prewarm and looping are enabled', () => {
+        const ps = makeDelayedSystem({prewarm: true, startDelay: new ConstantValue(5)});
+        ps.update(1 / 60);
+        expect(ps.particleNum).toBeGreaterThan(0);
+    });
+
+    it('should serialize and restore startDelay', () => {
+        const ps = makeDelayedSystem();
+        const meta: any = {textures: {}, materials: {}, geometries: {}};
+        const json = ps.toJSON(meta);
+        expect(json.startDelay).toEqual({type: 'ConstantValue', value: 0.5});
+
+        const restored = ParticleSystem.fromJSON(json, meta, {}, scene);
+        expect((restored.startDelay as ConstantValue).value).toBe(0.5);
+
+        const cloned = ps.clone();
+        expect((cloned.startDelay as ConstantValue).value).toBe(0.5);
+    });
+
+    it('should default startDelay to 0 when missing from JSON', () => {
+        const ps = makeDelayedSystem();
+        const meta: any = {textures: {}, materials: {}, geometries: {}};
+        const json = ps.toJSON(meta);
+        delete json.startDelay;
+
+        const restored = ParticleSystem.fromJSON(json, meta, {}, scene);
+        expect((restored.startDelay as ConstantValue).value).toBe(0);
+        restored.update(0.1);
+        restored.update(0.1);
+        expect(restored.particleNum).toBeGreaterThan(0);
+    });
+});
+
+describe('ParticleSystem emitter velocity', () => {
+    const makeMovingSystem = (behaviors: any[] = []) =>
+        new ParticleSystem({
+            scene,
+            duration: 5,
+            looping: true,
+            worldSpace: true,
+            startLife: new ConstantValue(2),
+            startSpeed: new ConstantValue(0),
+            startSize: new ConstantValue(1),
+            startColor: new ConstantColor(new Vector4(1, 1, 1, 1)),
+            emissionOverTime: new ConstantValue(100),
+            shape: new PointEmitter(),
+            behaviors,
+        });
+
+    it('should track emitter velocity from world movement', () => {
+        const ps = makeMovingSystem();
+        ps.update(0.1);
+
+        ps.emitter.position.set(1, 0, 0);
+        ps.emitter.computeWorldMatrix(true);
+        ps.update(0.1);
+
+        expect(ps.emitterVelocity.x).toBeCloseTo(10);
+        expect(ps.emitterVelocity.y).toBeCloseTo(0);
+    });
+
+    it('should feed InheritVelocity so spawned particles pick up emitter velocity', () => {
+        const ps = makeMovingSystem([new InheritVelocity(new ConstantValue(1), 'initial')]);
+        ps.update(0.1);
+
+        ps.emitter.position.set(2, 0, 0);
+        ps.emitter.computeWorldMatrix(true);
+        ps.update(0.1);
+        ps.update(0.1);
+
+        expect(ps.particleNum).toBeGreaterThan(0);
+        const particle = ps.particles[0];
+        expect(particle.velocity.x).toBeGreaterThan(0);
+    });
+
+    it('should round-trip VelocityOverLife and InheritVelocity behaviors', () => {
+        const ps = makeMovingSystem([
+            new VelocityOverLife(
+                new ConstantValue(1),
+                new ConstantValue(2),
+                new ConstantValue(3),
+                new ConstantValue(0),
+                new ConstantValue(4),
+                new ConstantValue(0),
+                'world'
+            ),
+            new InheritVelocity(new ConstantValue(0.5), 'current'),
+        ]);
+        const meta: any = {textures: {}, materials: {}, geometries: {}};
+        const json = ps.toJSON(meta);
+        const restored = ParticleSystem.fromJSON(json, meta, {}, scene);
+
+        const velocity = restored.behaviors.find((b) => b.type === 'VelocityOverLife') as VelocityOverLife;
+        expect(velocity).toBeDefined();
+        expect((velocity.linearY as ConstantValue).value).toBe(2);
+        expect((velocity.orbitalY as ConstantValue).value).toBe(4);
+        expect(velocity.space).toBe('world');
+
+        const inherit = restored.behaviors.find((b) => b.type === 'InheritVelocity') as InheritVelocity;
+        expect(inherit).toBeDefined();
+        expect((inherit.multiplier as ConstantValue).value).toBe(0.5);
+        expect(inherit.mode).toBe('current');
     });
 });

@@ -23,7 +23,7 @@
     "CHANGELOG.md"
   ],
   "scripts": {
-    "clean": "rimraf dist",
+    "clean": "rimraf dist dist-types tsconfig.tsbuildinfo",
     "build:types": "tsc --emitDeclarationOnly",
     "build:js": "cross-env NODE_ENV=production rollup -c",
     "build": "npm run clean && npm run build:types && npm run build:js",
@@ -54,11 +54,9 @@
   "peerDependencies": {
     "@babylonjs/core": ">=9.0.0"
   },
-  "dependencies": {
-    "quarks.core": "^0.17.0"
-  },
   "devDependencies": {
     "@babylonjs/core": "^9.0.0",
-    "@types/jest": "^30.0.0"
+    "@types/jest": "^30.0.0",
+    "quarks.core": "*"
   }
 }

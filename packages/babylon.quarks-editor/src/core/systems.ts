@@ -7,16 +7,22 @@ import {
     RenderMode,
     Vector4,
 } from 'babylon.quarks';
+import type {TransformNode} from '@babylonjs/core/Meshes/transformNode';
+import type {EffectBinding} from './binding';
 
 export interface ChildSystemOptions {
     name?: string;
     /** One-shot burst (sub-emitter target) instead of a looping stream. */
     oneShot?: boolean;
+    /** Attach point override — defaults to `parent.emitter`. Lets a new system land as a
+     * sibling under a group node instead of nesting under an existing system. */
+    parentNode?: TransformNode;
 }
 
 /**
  * Creates a child system sharing the parent's scene/texture/blending, parented to the
- * parent emitter — the Unity pattern where an effect is a hierarchy of systems.
+ * parent emitter (or `options.parentNode` when given) — the Unity pattern where an effect is
+ * a hierarchy of systems and groups.
  */
 export function createChildSystem(parent: ParticleSystem, options: ChildSystemOptions = {}): ParticleSystem {
     const oneShot = options.oneShot ?? false;
@@ -41,7 +47,7 @@ export function createChildSystem(parent: ParticleSystem, options: ChildSystemOp
     if (oneShot) {
         child.onlyUsedByOther = true;
     }
-    child.emitter.parent = parent.emitter;
+    child.emitter.parent = options.parentNode ?? parent.emitter;
     return child;
 }
 
@@ -61,4 +67,32 @@ export function unlinkSubEmitterReferences(systems: ParticleSystem[], removed: P
             }
         }
     }
+}
+
+/** Disposes the given systems, first unlinking any sub-emitter behaviors that target them. */
+export function removeSystems(binding: EffectBinding, targets: ParticleSystem[], onSelect: (system: ParticleSystem) => void): void {
+    // binding.system is "removable" too as long as some other top-level system can take over
+    // as the new main — being main vs. sub is an internal bookkeeping detail, not something
+    // that should make one arbitrary track un-deletable in the UI.
+    if (targets.includes(binding.system)) {
+        const replacement = binding.subSystems.find((s) => !targets.includes(s) && !s.onlyUsedByOther);
+        if (replacement) {
+            binding.promoteToMain(replacement);
+        }
+    }
+    const removable = targets.filter((system) => binding.subSystems.includes(system));
+    if (removable.length === 0) {
+        return;
+    }
+    binding.apply(() => {
+        unlinkSubEmitterReferences([binding.system, ...binding.subSystems], removable);
+        for (const system of removable) {
+            system._renderer?.deleteSystem(system);
+            system.dispose();
+        }
+    });
+    for (const system of removable) {
+        binding.removeSubSystem(system);
+    }
+    onSelect(binding.system);
 }

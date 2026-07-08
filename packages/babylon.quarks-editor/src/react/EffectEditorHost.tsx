@@ -5,7 +5,7 @@ import {Scene} from '@babylonjs/core/scene';
 import {ArcRotateCamera} from '@babylonjs/core/Cameras/arcRotateCamera';
 import {Vector3 as BVector3} from '@babylonjs/core/Maths/math.vector';
 import {Color4} from '@babylonjs/core/Maths/math.color';
-import type {TransformNode} from '@babylonjs/core/Meshes/transformNode';
+import {TransformNode} from '@babylonjs/core/Meshes/transformNode';
 import {
     BatchedRenderer,
     ColorOverLife,
@@ -22,8 +22,11 @@ import {EffectHistory} from '../core/history';
 import {loadEffectFromJson} from '../core/loadEffect';
 import {DEFAULT_GRADIENT_STOPS, buildGradient} from '../core/colors';
 import {EffectEditor} from './EffectEditor';
+import {PromptDialog} from './PromptDialog';
+import {TimelinePanel} from './TimelinePanel';
+import type {PlaybackState} from './TimelinePanel';
 import type {TextureOption} from './modules';
-import {buttonStyle, theme} from './theme';
+import {buttonStyle, globalEditorStyles, theme} from './theme';
 
 export interface EffectEditorHostHandle {
     binding: EffectBinding;
@@ -56,13 +59,16 @@ function createDefaultEffect(scene: Scene, resolveTexture?: (url: string, scene:
         startSize: new IntervalValue(0.25, 0.5),
         startColor: new ConstantColor(new Vector4(1, 1, 1, 1)),
         emissionOverTime: new ConstantValue(80),
-        shape: new ConeEmitter({radius: 0.3, angle: 0.5}),
+        // quarks' angle is a half-angle; Babylon's native cone uses a full angle.
+        shape: new ConeEmitter({radius: 0.3, angle: 0.25}),
         renderMode: RenderMode.BillBoard,
         texture: (textureUrl && resolveTexture ? resolveTexture(textureUrl, scene) : undefined) as never,
         transparent: true,
         blendMode: 1,
     });
     system.addBehavior(new ColorOverLife(buildGradient(DEFAULT_GRADIENT_STOPS)));
+    // quarks emits along local +Z; Babylon's native cone emits along +Y.
+    system.emitter.rotation.x = -Math.PI / 2;
     return system;
 }
 
@@ -86,13 +92,16 @@ function disposeEffect(root: TransformNode, systems: ParticleSystem[], renderer:
 export function EffectEditorHost(props: EffectEditorHostProps) {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const counterRef = useRef<HTMLSpanElement>(null);
+    const playheadRef = useRef<HTMLDivElement>(null);
     const importRef = useRef<HTMLInputElement>(null);
     const stateRef = useRef<{engine: Engine; scene: Scene; renderer: BatchedRenderer; binding: EffectBinding; history: EffectHistory} | null>(null);
     const [binding, setBinding] = useState<EffectBinding | null>(null);
     const [, force] = useReducer((x: number) => x + 1, 0);
-    const playbackRef = useRef({paused: false, speed: 1, stepQueued: false, elapsed: 0});
+    const playbackRef = useRef<PlaybackState>({paused: false, speed: 1, stepQueued: false, elapsed: 0, scrubbing: false});
     const [paused, setPaused] = useState(false);
     const [speed, setSpeed] = useState(1);
+    const [selectedSystem, setSelectedSystem] = useState<ParticleSystem | null>(null);
+    const [renamingRoot, setRenamingRoot] = useState(false);
 
     useEffect(() => {
         const engine = new Engine(canvasRef.current!, true);
@@ -145,20 +154,26 @@ export function EffectEditorHost(props: EffectEditorHostProps) {
         } else {
             const system = createDefaultEffect(scene, props.resolveTexture, props.textureOptions?.[0]?.url);
             renderer.addSystem(system);
-            initial = new EffectBinding(system);
+            // Root is a plain group (not the system's own emitter) so a new top-level system
+            // can be added as a sibling later, instead of always nesting under this one.
+            const root = new TransformNode('Effect', scene);
+            system.emitter.parent = root;
+            initial = new EffectBinding(system, [], root);
         }
         mount(initial);
 
         engine.runRenderLoop(() => {
             const playback = playbackRef.current;
-            let delta = (engine.getDeltaTime() / 1000) * playback.speed;
-            if (playback.paused) {
-                delta = playback.stepQueued ? 1 / 60 : 0;
-                playback.stepQueued = false;
-            }
-            if (delta > 0) {
-                renderer.update(delta);
-                playback.elapsed += delta;
+            if (!playback.scrubbing) {
+                let delta = (engine.getDeltaTime() / 1000) * playback.speed;
+                if (playback.paused) {
+                    delta = playback.stepQueued ? 1 / 60 : 0;
+                    playback.stepQueued = false;
+                }
+                if (delta > 0) {
+                    renderer.update(delta);
+                    playback.elapsed += delta;
+                }
             }
             scene.render();
             const b = stateRef.current!.binding;
@@ -208,134 +223,112 @@ export function EffectEditorHost(props: EffectEditorHostProps) {
         force();
     };
 
-    const overlayButton: React.CSSProperties = {
-        ...buttonStyle,
-        background: 'rgba(20, 30, 60, 0.55)',
-        padding: '6px 10px',
-        minWidth: 34,
-    };
+    // Selection survives re-renders but falls back to root if the system was removed/replaced
+    // (e.g. after undo/redo or import swaps the whole binding out from under it).
+    const allSystems = binding ? [binding.system, ...binding.subSystems] : [];
+    const activeSystem = binding ? (selectedSystem && allSystems.includes(selectedSystem) ? selectedSystem : binding.system) : null;
 
     return (
-        <div style={{display: 'flex', width: '100%', height: '100%', fontFamily: theme.font, color: theme.text, background: '#070b16'}}>
-            <div style={{position: 'relative', flex: 1, minWidth: 0}}>
-                <canvas ref={canvasRef} style={{width: '100%', height: '100%', display: 'block', touchAction: 'none', outline: 'none'}} />
-                {/* Unity-style playback bar floating over the viewport. */}
-                <div
-                    style={{
-                        position: 'absolute',
-                        top: 12,
-                        left: '50%',
-                        transform: 'translateX(-50%)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 6,
-                        padding: '6px 8px',
-                        borderRadius: 12,
-                        border: `1px solid ${theme.border}`,
-                        background: 'rgba(7, 11, 22, 0.72)',
-                        backdropFilter: 'blur(10px)',
-                        WebkitBackdropFilter: 'blur(10px)',
-                    }}
-                >
-                    <button
-                        style={overlayButton}
-                        title={paused ? 'Play' : 'Pause'}
-                        onClick={() => {
-                            playbackRef.current.paused = !paused;
-                            setPaused(!paused);
-                        }}
-                    >
-                        {paused ? '▶' : '⏸'}
-                    </button>
-                    <button style={overlayButton} title="Step one frame" disabled={!paused} onClick={() => (playbackRef.current.stepQueued = true)}>
-                        ⏭
-                    </button>
-                    <button
-                        style={overlayButton}
-                        title="Restart"
-                        onClick={() => {
-                            binding?.restart();
-                            playbackRef.current.elapsed = 0;
-                        }}
-                    >
-                        ⟲
-                    </button>
-                    <select
-                        style={{...overlayButton, padding: '6px 4px'}}
-                        title="Playback speed"
-                        value={speed}
-                        onChange={(e) => {
-                            const next = Number(e.target.value);
-                            playbackRef.current.speed = next;
-                            setSpeed(next);
-                        }}
-                    >
-                        {[0.1, 0.25, 0.5, 1, 2, 4].map((s) => (
-                            <option key={s} value={s}>
-                                ×{s}
-                            </option>
-                        ))}
-                    </select>
-                    <span ref={counterRef} style={{fontSize: 12, color: theme.textDim, fontVariantNumeric: 'tabular-nums', paddingLeft: 4, minWidth: 120}} />
+        <div style={{display: 'flex', flexDirection: 'column', width: '100%', height: '100%', fontFamily: theme.font, color: theme.text, background: '#070b16'}}>
+            <style>{globalEditorStyles}</style>
+            <div style={{display: 'flex', flex: 1, minHeight: 0}}>
+                <div style={{position: 'relative', flex: 1, minWidth: 0}}>
+                    <canvas ref={canvasRef} style={{width: '100%', height: '100%', display: 'block', touchAction: 'none', outline: 'none'}} />
                 </div>
-            </div>
-            <aside style={{width: 340, flexShrink: 0, borderLeft: `1px solid ${theme.border}`, background: theme.panelBg, display: 'flex', flexDirection: 'column'}}>
-                <div style={{padding: '12px 14px 10px', borderBottom: `1px solid ${theme.border}`}}>
-                    <div style={{fontSize: 16, fontWeight: 600}}>{props.title ?? 'Effect editor'}</div>
-                    <div style={{display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 10}}>
-                        <button style={buttonStyle} title="Undo (Ctrl+Z)" disabled={!state?.history.canUndo} onClick={() => historyAction(state!.history.undo())}>↶</button>
-                        <button style={buttonStyle} title="Redo (Ctrl+Shift+Z)" disabled={!state?.history.canRedo} onClick={() => historyAction(state!.history.redo())}>↷</button>
-                        <button
-                            style={buttonStyle}
-                            onClick={() => {
-                                if (!binding) return;
-                                const blob = new Blob([binding.exportJSON('EditorEffect')], {type: 'application/json'});
-                                const link = document.createElement('a');
-                                link.href = URL.createObjectURL(blob);
-                                link.download = 'effect.json';
-                                link.click();
-                                URL.revokeObjectURL(link.href);
-                            }}
+                <aside style={{width: 340, flexShrink: 0, borderLeft: `1px solid ${theme.border}`, background: theme.panelBg, display: 'flex', flexDirection: 'column'}}>
+                    <div style={{padding: '12px 14px 10px', borderBottom: `1px solid ${theme.border}`}}>
+                        <div
+                            className="qe-hover-bg"
+                            title={binding ? 'Rename effect' : undefined}
+                            style={{fontSize: 16, fontWeight: 600, cursor: binding ? 'pointer' : 'default', borderRadius: 6, padding: '2px 4px', margin: '-2px -4px'}}
+                            onClick={() => binding && setRenamingRoot(true)}
                         >
-                            Export
-                        </button>
-                        <button style={buttonStyle} onClick={() => importRef.current?.click()}>Import</button>
-                        {props.onSave && (
-                            <button style={buttonStyle} onClick={() => binding && props.onSave!(binding.exportJSON('EditorEffect'))}>
-                                Save
-                            </button>
+                            {(binding?.root.name || props.title) ?? 'Effect editor'}
+                        </div>
+                        {renamingRoot && binding && (
+                            <PromptDialog
+                                title="Rename effect"
+                                defaultValue={binding.root.name}
+                                onSubmit={(name) => {
+                                    binding.apply(() => (binding.root.name = name));
+                                    setRenamingRoot(false);
+                                }}
+                                onCancel={() => setRenamingRoot(false)}
+                            />
                         )}
-                        <input
-                            ref={importRef}
-                            type="file"
-                            accept=".json,application/json"
-                            hidden
-                            onChange={async (e) => {
-                                const file = e.target.files?.[0];
-                                e.target.value = '';
-                                if (!file || !state) return;
-                                try {
-                                    const json = JSON.parse(await file.text());
-                                    historyAction(json);
-                                    state.history.clear();
-                                    force();
-                                } catch (err) {
-                                    console.error('Failed to import effect JSON:', err);
-                                }
-                            }}
-                        />
+                        <div style={{display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 10}}>
+                            <button className="qe-hover" style={buttonStyle} title="Undo (Ctrl+Z)" disabled={!state?.history.canUndo} onClick={() => historyAction(state!.history.undo())}>↶</button>
+                            <button className="qe-hover" style={buttonStyle} title="Redo (Ctrl+Shift+Z)" disabled={!state?.history.canRedo} onClick={() => historyAction(state!.history.redo())}>↷</button>
+                            <button
+                                className="qe-hover"
+                                style={buttonStyle}
+                                onClick={() => {
+                                    if (!binding) return;
+                                    const blob = new Blob([binding.exportJSON('EditorEffect')], {type: 'application/json'});
+                                    const link = document.createElement('a');
+                                    link.href = URL.createObjectURL(blob);
+                                    link.download = 'effect.json';
+                                    link.click();
+                                    URL.revokeObjectURL(link.href);
+                                }}
+                            >
+                                Export
+                            </button>
+                            <button className="qe-hover" style={buttonStyle} onClick={() => importRef.current?.click()}>Import</button>
+                            {props.onSave && (
+                                <button className="qe-hover" style={buttonStyle} onClick={() => binding && props.onSave!(binding.exportJSON('EditorEffect'))}>
+                                    Save
+                                </button>
+                            )}
+                            <input
+                                ref={importRef}
+                                type="file"
+                                accept=".json,application/json"
+                                hidden
+                                onChange={async (e) => {
+                                    const file = e.target.files?.[0];
+                                    e.target.value = '';
+                                    if (!file || !state) return;
+                                    try {
+                                        const json = JSON.parse(await file.text());
+                                        historyAction(json);
+                                        state.history.clear();
+                                        force();
+                                    } catch (err) {
+                                        console.error('Failed to import effect JSON:', err);
+                                    }
+                                }}
+                            />
+                        </div>
                     </div>
-                </div>
-                <div style={{flex: 1, overflowY: 'auto', padding: '6px 14px 20px'}}>
-                    {binding && (
-                        <EffectEditor
-                            binding={binding}
-                            textureOptions={props.textureOptions}
-                            resolveTexture={props.resolveTexture && state ? (url) => props.resolveTexture!(url, state.scene) : undefined}
-                        />
-                    )}
-                </div>
-            </aside>
+                    <div style={{flex: 1, overflowY: 'auto', padding: '6px 14px 20px'}}>
+                        {binding && activeSystem && (
+                            <EffectEditor
+                                binding={binding}
+                                selectedSystem={activeSystem}
+                                textureOptions={props.textureOptions}
+                                resolveTexture={props.resolveTexture && state ? (url) => props.resolveTexture!(url, state.scene) : undefined}
+                            />
+                        )}
+                    </div>
+                </aside>
+            </div>
+            {binding && activeSystem && state && (
+                <TimelinePanel
+                    binding={binding}
+                    selectedSystem={activeSystem}
+                    onSelect={setSelectedSystem}
+                    scene={state.scene}
+                    renderer={state.renderer}
+                    playbackRef={playbackRef}
+                    playheadRef={playheadRef}
+                    counterRef={counterRef}
+                    paused={paused}
+                    setPaused={setPaused}
+                    speed={speed}
+                    setSpeed={setSpeed}
+                />
+            )}
         </div>
     );
 }

@@ -2,15 +2,18 @@ import {
     CircleEmitter,
     ConeEmitter,
     DonutEmitter,
+    GridEmitter,
     HemisphereEmitter,
+    MeshSurfaceEmitter,
     PointEmitter,
     RectangleEmitter,
     SphereEmitter,
 } from 'babylon.quarks';
 import type {EmitterShape} from 'babylon.quarks';
 import {EmitterMode} from 'babylon.quarks';
+import type {Mesh} from '@babylonjs/core/Meshes/mesh';
 
-export type ShapeType = 'point' | 'sphere' | 'hemisphere' | 'cone' | 'circle' | 'donut' | 'rectangle';
+export type ShapeType = 'point' | 'sphere' | 'hemisphere' | 'cone' | 'circle' | 'donut' | 'rectangle' | 'grid' | 'mesh_surface';
 
 export const SHAPE_TYPES: Array<{value: ShapeType; label: string}> = [
     {value: 'cone', label: 'Cone'},
@@ -19,6 +22,8 @@ export const SHAPE_TYPES: Array<{value: ShapeType; label: string}> = [
     {value: 'circle', label: 'Circle'},
     {value: 'donut', label: 'Donut'},
     {value: 'rectangle', label: 'Rectangle'},
+    {value: 'grid', label: 'Grid'},
+    {value: 'mesh_surface', label: 'Mesh surface'},
     {value: 'point', label: 'Point'},
 ];
 
@@ -32,6 +37,9 @@ export interface ShapeParams {
     height: number;
     mode: EmitterMode;
     spread: number;
+    column: number;
+    row: number;
+    mesh?: Mesh;
 }
 
 export const DEFAULT_SHAPE_PARAMS: ShapeParams = {
@@ -44,6 +52,9 @@ export const DEFAULT_SHAPE_PARAMS: ShapeParams = {
     height: 1,
     mode: EmitterMode.Random,
     spread: 0,
+    column: 10,
+    row: 10,
+    mesh: undefined,
 };
 
 export function getShapeType(shape: EmitterShape): ShapeType {
@@ -64,10 +75,14 @@ export function readShapeParams(shape: EmitterShape): ShapeParams {
         donutRadius: num('donutRadius', DEFAULT_SHAPE_PARAMS.donutRadius),
         width: num('width', DEFAULT_SHAPE_PARAMS.width),
         height: num('height', DEFAULT_SHAPE_PARAMS.height),
+        column: num('column', DEFAULT_SHAPE_PARAMS.column),
+        row: num('row', DEFAULT_SHAPE_PARAMS.row),
+        mesh: anyShape.mesh as Mesh | undefined,
     };
 }
 
-/** Which parameters are relevant per shape type (drives the UI). */
+/** Which parameters are relevant per shape type (drives the UI). `mesh_surface`'s mesh
+ * reference isn't a NumberField, so it's handled separately by the Shape module. */
 export const SHAPE_PARAM_KEYS: {[K in ShapeType]: Array<keyof ShapeParams>} = {
     point: [],
     sphere: ['radius', 'arc', 'thickness'],
@@ -76,6 +91,8 @@ export const SHAPE_PARAM_KEYS: {[K in ShapeType]: Array<keyof ShapeParams>} = {
     circle: ['radius', 'arc', 'thickness'],
     donut: ['radius', 'arc', 'thickness', 'donutRadius'],
     rectangle: ['width', 'height'],
+    grid: ['width', 'height', 'column', 'row'],
+    mesh_surface: [],
 };
 
 export function createShape(type: ShapeType, params: ShapeParams): EmitterShape {
@@ -108,5 +125,9 @@ export function createShape(type: ShapeType, params: ShapeParams): EmitterShape 
             });
         case 'rectangle':
             return new RectangleEmitter({width: params.width, height: params.height, mode: params.mode, spread: params.spread});
+        case 'grid':
+            return new GridEmitter({width: params.width, height: params.height, column: params.column, row: params.row});
+        case 'mesh_surface':
+            return new MeshSurfaceEmitter(params.mesh);
     }
 }

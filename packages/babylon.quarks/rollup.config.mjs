@@ -2,6 +2,7 @@ import resolve from '@rollup/plugin-node-resolve';
 import commonjs from '@rollup/plugin-commonjs';
 import typescript from '@rollup/plugin-typescript';
 import terser from '@rollup/plugin-terser';
+import dts from 'rollup-plugin-dts';
 
 const production = process.env.NODE_ENV === 'production';
 
@@ -12,9 +13,12 @@ const typescriptPlugin = () =>
         tsconfig: './tsconfig.json',
         declaration: false,
         declarationDir: undefined,
+        composite: false,
     });
 
 export default [
+    // quarks.core is our vendored fork (packages/quarks.core) and is bundled
+    // into every artifact — the published package has no runtime dependencies.
     {
         input: 'src/index.ts',
         output: [
@@ -29,7 +33,7 @@ export default [
                 sourcemap: true,
             },
         ],
-        external: [...babylonExternal, 'quarks.core'],
+        external: babylonExternal,
         plugins: [resolve(), commonjs(), typescriptPlugin(), production && terser()].filter(Boolean),
     },
     // Browser/CDN build for the Babylon.js Playground and <script> usage.
@@ -45,5 +49,17 @@ export default [
         },
         external: babylonExternal,
         plugins: [resolve(), commonjs(), typescriptPlugin(), terser()],
+    },
+    // Roll the tsc output (dist-types/, includes quarks.core via symlink) into a
+    // single self-contained public declaration bundle.
+    {
+        input: 'dist-types/index.d.ts',
+        output: {
+            file: 'dist/types/index.d.ts',
+            format: 'es',
+        },
+        external: babylonExternal,
+        // respectExternal: inline everything (quarks.core) except the external list above
+        plugins: [dts({respectExternal: true})],
     },
 ];

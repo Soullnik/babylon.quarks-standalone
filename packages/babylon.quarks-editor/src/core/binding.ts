@@ -10,7 +10,8 @@ export type EditorListener = () => void;
  * change notifies subscribers (React UI, save indicators, hosts like BabylonJS Editor).
  */
 export class EffectBinding {
-    readonly system: ParticleSystem;
+    /** Not `readonly` — `promoteToMain` reassigns this when the current main system is removed. */
+    system: ParticleSystem;
     /** Systems spawned by sub-emitter behaviors; serialized as children of the root emitter. */
     readonly subSystems: ParticleSystem[] = [];
     /** Loaded scene root of the whole effect (Group tree); defaults to the system's emitter. */
@@ -57,6 +58,22 @@ export class EffectBinding {
         if (index >= 0) {
             this.subSystems.splice(index, 1);
         }
+        this.notify();
+    }
+
+    /**
+     * Swaps which system is "main" — used when the current `system` is about to be removed
+     * but other top-level systems remain. Being "main" vs. a sub-system is otherwise
+     * meaningless to the effect itself (both play/restart/export the same way); it only
+     * exists so there's always a designated fallback system to select.
+     */
+    promoteToMain(next: ParticleSystem): void {
+        const index = this.subSystems.indexOf(next);
+        if (index < 0) {
+            return;
+        }
+        this.subSystems.splice(index, 1, this.system);
+        this.system = next;
         this.notify();
     }
 
