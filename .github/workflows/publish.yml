@@ -44,12 +44,8 @@ jobs:
       - name: Verify package tarball contents
         run: npm run check:pack
 
-      - name: Publish babylon.quarks
-        run: npm publish --workspace=babylon.quarks --access public
-
-      - name: Publish babylon.quarks-editor
-        run: npm publish --workspace=babylon.quarks-editor --access public
-
+      # Built and attached before the npm publish steps so the Unity package always reaches
+      # the release regardless of npm publish outcome (e.g. a version already published).
       - name: Build Unity exporter .unitypackage
         run: npm run build:unitypackage
 
@@ -58,3 +54,9 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh release upload "${{ github.event.release.tag_name }}" tools/unity-quarks-exporter/dist/BabylonQuarksUnityExporter.unitypackage --clobber
+
+      - name: Publish babylon.quarks
+        run: npm publish --workspace=babylon.quarks --access public
+
+      - name: Publish babylon.quarks-editor
+        run: npm publish --workspace=babylon.quarks-editor --access public
