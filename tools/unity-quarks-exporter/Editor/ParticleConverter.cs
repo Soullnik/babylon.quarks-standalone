@@ -220,6 +220,8 @@ namespace BabylonQuarks.UnityExporter
         {
             if (renderMode == 1) // stretched billboard
             {
+                // Unity Velocity Scale → speedFactor, Length Scale → lengthFactor, both faithfully
+                // (the runtime keeps the stretch aligned to velocity even when speedFactor is 0).
                 return new JObject()
                     .Set("speedFactor", renderer.velocityScale)
                     .Set("lengthFactor", renderer.lengthScale);
