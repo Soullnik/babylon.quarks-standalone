@@ -51,9 +51,12 @@ Emitters targets live in the hierarchy and are edited by selecting them there.
 
 Also shipped: `EffectEditorHost` + `QuarksEffectEditor.Show({hostElement, effectJson, onSave})` — the NME-style imperative entry point BabylonJS Editor uses for its node editors; the host owns engine/scene/preview/toolbar (undo/redo/restart/import/export/save) and the standalone page is now a thin wrapper over it.
 
+Also shipped: `babylon.quarks-editor` is now wired into `publish.yml` alongside `babylon.quarks`
+(built via `npm run build:editor`, tarball validated by `check-pack-contents.mjs`, published on
+the next GitHub release with its own LICENSE/CHANGELOG).
+
 Next: `startDelay` support (needs a quarks.core contribution — Unity's Start Delay has no
-core equivalent; only prewarm exists), npm publish of the editor package, BabylonJS Editor
-plugin host.
+core equivalent; only prewarm exists), BabylonJS Editor plugin host.
 
 ## Technical directions
 

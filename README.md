@@ -101,11 +101,11 @@ Replace these files with your own PNG images to customize the demo output.
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for the dev setup, quality checks, demo guide and PR conventions. Package changes are tracked in the [changelog](packages/babylon.quarks/CHANGELOG.md).
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the dev setup, quality checks, demo guide and PR conventions. Package changes are tracked in the [`babylon.quarks` changelog](packages/babylon.quarks/CHANGELOG.md) and the [`babylon.quarks-editor` changelog](packages/babylon.quarks-editor/CHANGELOG.md).
 
 ## Release checklist
 
 1. Run `npm run check` from repository root.
-2. Update `packages/babylon.quarks/CHANGELOG.md` and bump the version in `packages/babylon.quarks/package.json`.
-3. Verify tarball content with `npm pack --dry-run --workspace=babylon.quarks`.
-4. Publish a GitHub release — CI publishes to npm via trusted publishing (or run the `Publish npm package` workflow manually).
+2. Update the changed package(s)' `CHANGELOG.md` and bump their `package.json` version (`packages/babylon.quarks` and/or `packages/babylon.quarks-editor`).
+3. Verify tarball content with `npm run check:pack` (covers both publishable packages).
+4. Publish a GitHub release — CI publishes both `babylon.quarks` and `babylon.quarks-editor` to npm via trusted publishing (or run the `Publish npm package` workflow manually).

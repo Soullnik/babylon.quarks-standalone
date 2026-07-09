@@ -75,10 +75,14 @@ style — 4-space indent, single quotes in package sources.
 
 1. `npm run check` from the repo root.
 2. Update `packages/babylon.quarks/CHANGELOG.md` and bump the version in
-   `packages/babylon.quarks/package.json` (keep the `quarks.core` 0.x line alignment).
-3. Verify the tarball: `npm pack --dry-run --workspace=babylon.quarks`.
-4. Publish a GitHub release — the `publish.yml` workflow publishes to npm via trusted
-   publishing (OIDC). It can also be run manually from the Actions tab.
+   `packages/babylon.quarks/package.json` (keep the `quarks.core` 0.x line alignment). If the
+   editor changed too, do the same for `packages/babylon.quarks-editor/CHANGELOG.md` and
+   `package.json`.
+3. Verify the tarballs: `npm run check:pack` (validates both `babylon.quarks` and
+   `babylon.quarks-editor`).
+4. Publish a GitHub release — the `publish.yml` workflow publishes both `babylon.quarks` and
+   `babylon.quarks-editor` to npm via trusted publishing (OIDC). It can also be run manually
+   from the Actions tab.
 
 ## Questions
 

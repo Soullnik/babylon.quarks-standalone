@@ -4,50 +4,42 @@ import {readFileSync} from "node:fs";
 /**
  * Validates that npm pack output contains publish-critical artifacts.
  */
-function getPackResult() {
+function getPackResult(workspace) {
   const rawOutput = execSync(
-    "npm pack --dry-run --json --workspace=babylon.quarks",
+    `npm pack --dry-run --json --workspace=${workspace}`,
     {encoding: "utf8"}
   );
   const parsedOutput = JSON.parse(rawOutput);
   if (!Array.isArray(parsedOutput) || parsedOutput.length === 0) {
-    throw new Error("npm pack did not return JSON artifacts.");
+    throw new Error(`npm pack did not return JSON artifacts for ${workspace}.`);
   }
   return parsedOutput[0];
 }
 
 /**
- * Ensures all required files are present inside tarball.
+ * Ensures all required files are present inside a tarball.
  */
-function assertRequiredFiles(packResult) {
+function assertRequiredFiles(workspace, packResult, requiredFiles) {
   const filePaths = new Set((packResult.files ?? []).map((entry) => entry.path));
-  const requiredFiles = [
-    "dist/babylon.quarks.esm.js",
-    "dist/babylon.quarks.cjs",
-    "dist/babylon.quarks.umd.min.js",
-    "dist/types/index.d.ts",
-    "LICENSE",
-    "README.md",
-  ];
-
   const missingFiles = requiredFiles.filter((filePath) => !filePaths.has(filePath));
   if (missingFiles.length > 0) {
-    throw new Error(`Missing publish artifacts: ${missingFiles.join(", ")}`);
+    throw new Error(`Missing publish artifacts in ${workspace}: ${missingFiles.join(", ")}`);
   }
 }
 
 /**
- * quarks.core is a vendored fork bundled into the dist artifacts, so the
- * published package must not declare any runtime dependencies — a consumer
- * install must never pull the upstream quarks.core from the registry.
+ * Published packages must not declare runtime dependencies: babylon.quarks bundles
+ * quarks.core (a vendored fork) into its dist artifacts, and babylon.quarks-editor relies
+ * entirely on peerDependencies (babylon.quarks/@babylonjs/core/react) so consumers don't get
+ * a second copy pulled in from the registry.
  */
-function assertNoRuntimeDependencies() {
-  const manifestUrl = new URL("../packages/babylon.quarks/package.json", import.meta.url);
+function assertNoRuntimeDependencies(packageDir) {
+  const manifestUrl = new URL(`../packages/${packageDir}/package.json`, import.meta.url);
   const manifest = JSON.parse(readFileSync(manifestUrl, "utf8"));
   const dependencyNames = Object.keys(manifest.dependencies ?? {});
   if (dependencyNames.length > 0) {
     throw new Error(
-      `babylon.quarks must stay dependency-free (quarks.core is bundled), found: ${dependencyNames.join(", ")}`
+      `${manifest.name} must stay dependency-free, found: ${dependencyNames.join(", ")}`
     );
   }
 }
@@ -56,9 +48,26 @@ function assertNoRuntimeDependencies() {
  * Main entrypoint for pack verification script.
  */
 function main() {
-  const packResult = getPackResult();
-  assertRequiredFiles(packResult);
-  assertNoRuntimeDependencies();
+  assertRequiredFiles("babylon.quarks", getPackResult("babylon.quarks"), [
+    "dist/babylon.quarks.esm.js",
+    "dist/babylon.quarks.cjs",
+    "dist/babylon.quarks.umd.min.js",
+    "dist/types/index.d.ts",
+    "LICENSE",
+    "README.md",
+  ]);
+  assertNoRuntimeDependencies("babylon.quarks");
+
+  assertRequiredFiles("babylon.quarks-editor", getPackResult("babylon.quarks-editor"), [
+    "dist/index.js",
+    "dist/index.d.ts",
+    "dist/react/index.js",
+    "dist/react/index.d.ts",
+    "LICENSE",
+    "README.md",
+  ]);
+  assertNoRuntimeDependencies("babylon.quarks-editor");
+
   console.log("Pack artifacts are valid.");
 }
 

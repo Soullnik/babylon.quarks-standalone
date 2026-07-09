@@ -18,7 +18,9 @@
   "files": [
     "dist",
     "src",
-    "README.md"
+    "LICENSE",
+    "README.md",
+    "CHANGELOG.md"
   ],
   "scripts": {
     "clean": "rimraf dist",
@@ -38,6 +40,10 @@
   ],
   "author": "soullnik <soullnik96@gmail.com>",
   "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/Soullnik/babylon.quarks-standalone/issues"
+  },
+  "homepage": "https://github.com/Soullnik/babylon.quarks-standalone#readme",
   "peerDependencies": {
     "@babylonjs/core": ">=9.0.0",
     "babylon.quarks": ">=0.17.0",
