@@ -17,13 +17,62 @@ npm install babylon.quarks @babylonjs/core
 
 ## Get started
 
-Use the package in your Babylon.js app:
+Requires an existing Babylon.js `Scene`. Peer dependency: `@babylonjs/core` >= 9.
 
 ```ts
-import {BatchedRenderer, ParticleSystem} from "babylon.quarks";
+import {
+    BatchedRenderer,
+    ParticleSystem,
+    PointEmitter,
+    RenderMode,
+    ConstantValue,
+    IntervalValue,
+    ConstantColor,
+    Vector4,
+} from "babylon.quarks";
+
+// One renderer per scene; it batches every system added to it into shared draw calls.
+const batchRenderer = new BatchedRenderer("particles", scene);
+
+const system = new ParticleSystem({
+    scene,
+    duration: 5,
+    looping: true,
+    startLife: new IntervalValue(4, 5),
+    startSpeed: new ConstantValue(1),
+    startSize: new IntervalValue(1, 2),
+    startColor: new ConstantColor(new Vector4(1, 1, 1, 1)),
+    emissionOverTime: new ConstantValue(20),
+    shape: new PointEmitter(),
+    renderMode: RenderMode.BillBoard,
+    texture: myParticleTexture,
+    transparent: true,
+});
+batchRenderer.addSystem(system);
+
+// Advance the simulation every frame:
+scene.onBeforeRenderObservable.add(() => {
+    batchRenderer.update(scene.getEngine().getDeltaTime() / 1000);
+});
 ```
 
-Then initialize `BatchedRenderer` with your Babylon scene and add one or more `ParticleSystem` instances.
+### Load an authored effect
+
+Effects designed in the [effect editor](https://soullnik.github.io/babylon.quarks-standalone/editor.html) or [Unity exporter](tools/unity-quarks-exporter/README.md) (or exported from [quarks.art](https://quarks.art/) — same JSON format) load with `QuarksLoader` instead of being hand-coded:
+
+```ts
+import {BatchedRenderer, QuarksLoader, QuarksUtil} from "babylon.quarks";
+
+const batchRenderer = new BatchedRenderer("particles", scene);
+const loader = new QuarksLoader(scene);
+const effect = await loader.load("effects/explosion.json");
+QuarksUtil.addToBatchRenderer(effect, batchRenderer);
+QuarksUtil.play(effect);
+
+scene.onBeforeRenderObservable.add(() => {
+    batchRenderer.update(scene.getEngine().getDeltaTime() / 1000);
+});
+```
 
 For the Babylon.js Playground or plain `<script>` usage there is a UMD bundle exposed as the `BabylonQuarks` global — see the [package README](packages/babylon.quarks/README.md#use-in-the-babylonjs-playground) for a paste-ready Playground snippet:
 
@@ -31,6 +80,8 @@ For the Babylon.js Playground or plain `<script>` usage there is a UMD bundle ex
 await BABYLON.Tools.LoadScriptAsync("https://cdn.jsdelivr.net/npm/babylon.quarks/dist/babylon.quarks.umd.min.js");
 const {BatchedRenderer, ParticleSystem} = BabylonQuarks;
 ```
+
+Full API reference, WebGPU setup and more: [package README](packages/babylon.quarks/README.md) · [API docs](https://soullnik.github.io/babylon.quarks-standalone/docs/).
 
 ## Author effects
 
