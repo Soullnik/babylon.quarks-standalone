@@ -8,6 +8,8 @@ import {Vector3 as BVector3} from '@babylonjs/core/Maths/math.vector';
 import {Color3, Color4} from '@babylonjs/core/Maths/math.color';
 import {MeshBuilder} from '@babylonjs/core/Meshes/meshBuilder';
 import {TransformNode} from '@babylonjs/core/Meshes/transformNode';
+import {GizmoManager} from '@babylonjs/core/Gizmos/gizmoManager';
+import {UtilityLayerRenderer} from '@babylonjs/core/Rendering/utilityLayerRenderer';
 import {GridMaterial} from '@babylonjs/materials/grid/gridMaterial';
 import {
     BatchedRenderer,
@@ -93,6 +95,31 @@ function disposeEffect(root: TransformNode, systems: ParticleSystem[], renderer:
     }
 }
 
+type GizmoMode = 'none' | 'position' | 'rotation' | 'scale';
+
+const GIZMO_MODE_BUTTONS: Array<{value: GizmoMode; icon: string; title: string}> = [
+    {value: 'none', icon: '↖', title: 'Select (hide stage gizmo)'},
+    {value: 'position', icon: 'M', title: 'Move the stage node (position)'},
+    {value: 'rotation', icon: 'R', title: 'Rotate the stage node'},
+    {value: 'scale', icon: 'S', title: 'Scale the stage node'},
+];
+
+const squareButtonStyle: React.CSSProperties = {
+    ...buttonStyle,
+    width: 28,
+    height: 28,
+    padding: 0,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontWeight: 700,
+};
+
+const activeSquareButtonStyle: React.CSSProperties = {
+    border: `1px solid ${theme.borderActive}`,
+    background: 'rgba(120, 165, 255, 0.35)',
+};
+
 /**
  * Self-contained effect editor: live Babylon preview + hierarchy/inspector sidebar.
  * Designed for embedding — see QuarksEffectEditor.Show for the NME-style entry point.
@@ -102,14 +129,16 @@ export function EffectEditorHost(props: EffectEditorHostProps) {
     const counterRef = useRef<HTMLSpanElement>(null);
     const playheadRef = useRef<HTMLDivElement>(null);
     const importRef = useRef<HTMLInputElement>(null);
-    const stateRef = useRef<{engine: Engine; scene: Scene; renderer: BatchedRenderer; binding: EffectBinding; history: EffectHistory} | null>(null);
+    const stateRef = useRef<{engine: Engine; scene: Scene; renderer: BatchedRenderer; binding: EffectBinding; history: EffectHistory; stageRoot: TransformNode} | null>(null);
+    const gizmoManagerRef = useRef<GizmoManager | null>(null);
     const [binding, setBinding] = useState<EffectBinding | null>(null);
     const [, force] = useReducer((x: number) => x + 1, 0);
     const playbackRef = useRef<PlaybackState>({paused: false, speed: 1, stepQueued: false, elapsed: 0, scrubbing: false});
     const [paused, setPaused] = useState(false);
     const [speed, setSpeed] = useState(1);
-    const [selectedSystem, setSelectedSystem] = useState<ParticleSystem | null>(null);
     const [renamingRoot, setRenamingRoot] = useState(false);
+    const [gizmoMode, setGizmoMode] = useState<GizmoMode>('none');
+    const [selectedNode, setSelectedNode] = useState<TransformNode | null>(null);
 
     useEffect(() => {
         // Register the shared ground-plane collider before any effect (default or imported)
@@ -141,14 +170,23 @@ export function EffectEditorHost(props: EffectEditorHostProps) {
         const ground = MeshBuilder.CreateGround('ground', {width: 100, height: 100}, scene);
         ground.material = groundMaterial;
 
+        const stageRoot = new TransformNode('StageRoot', scene);
+        const gizmoUtilityLayer = new UtilityLayerRenderer(scene);
+        const gizmoManager = new GizmoManager(scene, undefined, gizmoUtilityLayer);
+        gizmoManager.usePointerToAttachGizmos = false;
+        gizmoManager.attachToNode(stageRoot);
+        gizmoManagerRef.current = gizmoManager;
+
         const renderer = new BatchedRenderer('quarks-editor', scene);
         const history = new EffectHistory();
 
         const mount = (nextBinding: EffectBinding) => {
+            nextBinding.root.parent = stageRoot;
             history.attach(nextBinding);
             nextBinding.subscribe(force);
-            stateRef.current = {engine, scene, renderer, binding: nextBinding, history};
+            stateRef.current = {engine, scene, renderer, binding: nextBinding, history, stageRoot};
             setBinding(nextBinding);
+            setSelectedNode(nextBinding.system.emitter);
             props.onReady?.(makeHandle());
         };
 
@@ -217,7 +255,8 @@ export function EffectEditorHost(props: EffectEditorHostProps) {
             }
         });
 
-        const onResize = () => engine.resize();
+        const resizeObserver = new ResizeObserver(() => engine.resize());
+        resizeObserver.observe(canvasRef.current!);
         const onKey = (e: KeyboardEvent) => {
             if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
                 e.preventDefault();
@@ -228,17 +267,43 @@ export function EffectEditorHost(props: EffectEditorHostProps) {
                 force();
             }
         };
-        window.addEventListener('resize', onResize);
         window.addEventListener('keydown', onKey);
         return () => {
-            window.removeEventListener('resize', onResize);
+            resizeObserver.disconnect();
             window.removeEventListener('keydown', onKey);
+            gizmoManager.dispose();
+            gizmoUtilityLayer.dispose();
             engine.dispose();
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
+    useEffect(() => {
+        const gm = gizmoManagerRef.current;
+        if (!gm) return;
+        gm.positionGizmoEnabled = gizmoMode === 'position';
+        gm.rotationGizmoEnabled = gizmoMode === 'rotation';
+        gm.scaleGizmoEnabled = gizmoMode === 'scale';
+        const activeGizmo = gizmoMode === 'position' ? gm.gizmos.positionGizmo : gizmoMode === 'rotation' ? gm.gizmos.rotationGizmo : gizmoMode === 'scale' ? gm.gizmos.scaleGizmo : null;
+        const observer = activeGizmo?.onDragObservable.add(() => force());
+        return () => {
+            if (activeGizmo && observer) activeGizmo.onDragObservable.remove(observer);
+        };
+    }, [gizmoMode]);
+
+    useEffect(() => {
+        const gm = gizmoManagerRef.current;
+        const stageRoot = stateRef.current?.stageRoot;
+        if (!gm || !stageRoot) return;
+        if (selectedNode && selectedNode.isDisposed()) {
+            setSelectedNode(stateRef.current?.binding.system.emitter ?? null);
+            return;
+        }
+        gm.attachToNode(selectedNode ?? stageRoot);
+    }, [selectedNode, binding]);
+
     const state = stateRef.current;
+    const gizmoNode = selectedNode && !selectedNode.isDisposed() ? selectedNode : state?.stageRoot;
     const historyAction = (json: unknown | null) => {
         if (json && state) {
             const current = state.binding;
@@ -246,18 +311,19 @@ export function EffectEditorHost(props: EffectEditorHostProps) {
             disposeEffect(current.root, [current.system, ...current.subSystems], state.renderer);
             const main = systems.find((s) => !s.onlyUsedByOther) ?? systems[0];
             const next = new EffectBinding(main, systems.filter((s) => s !== main), root);
+            next.root.parent = state.stageRoot;
             state.history.attach(next);
             next.subscribe(force);
             state.binding = next;
             setBinding(next);
+            setSelectedNode(next.system.emitter);
         }
         force();
     };
 
-    // Selection survives re-renders but falls back to root if the system was removed/replaced
-    // (e.g. after undo/redo or import swaps the whole binding out from under it).
     const allSystems = binding ? [binding.system, ...binding.subSystems] : [];
-    const activeSystem = binding ? (selectedSystem && allSystems.includes(selectedSystem) ? selectedSystem : binding.system) : null;
+    const activeSystem = binding ? (allSystems.find((s) => s.emitter === selectedNode) ?? binding.system) : null;
+    const gizmoTargetLabel = selectedNode ? gizmoNode?.name || 'Node' : 'Stage (preview parent)';
 
     return (
         <div style={{display: 'flex', flexDirection: 'column', width: '100%', height: '100%', fontFamily: theme.font, color: theme.text, background: '#070b16'}}>
@@ -265,6 +331,29 @@ export function EffectEditorHost(props: EffectEditorHostProps) {
             <div style={{display: 'flex', flex: 1, minHeight: 0}}>
                 <div style={{position: 'relative', flex: 1, minWidth: 0}}>
                     <canvas ref={canvasRef} style={{width: '100%', height: '100%', display: 'block', touchAction: 'none', outline: 'none'}} />
+                    <div style={{position: 'absolute', top: 12, right: 12, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6}}>
+                        <div style={{display: 'flex', gap: 4, background: theme.panelBg, border: `1px solid ${theme.border}`, borderRadius: 8, padding: 4}}>
+                            <button className="qe-hover" style={squareButtonStyle} title="Undo (Ctrl+Z)" disabled={!state?.history.canUndo} onClick={() => historyAction(state!.history.undo())}>
+                                ↶
+                            </button>
+                            <button className="qe-hover" style={squareButtonStyle} title="Redo (Ctrl+Shift+Z)" disabled={!state?.history.canRedo} onClick={() => historyAction(state!.history.redo())}>
+                                ↷
+                            </button>
+                        </div>
+                        <div style={{display: 'flex', flexDirection: 'column', gap: 4, background: theme.panelBg, border: `1px solid ${theme.border}`, borderRadius: 8, padding: 4}}>
+                            {GIZMO_MODE_BUTTONS.map((m) => (
+                                <button
+                                    key={m.value}
+                                    className="qe-hover"
+                                    style={{...squareButtonStyle, ...(gizmoMode === m.value ? activeSquareButtonStyle : {})}}
+                                    title={m.title}
+                                    onClick={() => setGizmoMode(m.value)}
+                                >
+                                    {m.icon}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
                 </div>
                 <aside style={{width: 340, flexShrink: 0, borderLeft: `1px solid ${theme.border}`, background: theme.panelBg, display: 'flex', flexDirection: 'column'}}>
                     <div style={{padding: '12px 14px 10px', borderBottom: `1px solid ${theme.border}`}}>
@@ -288,8 +377,6 @@ export function EffectEditorHost(props: EffectEditorHostProps) {
                             />
                         )}
                         <div style={{display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 10}}>
-                            <button className="qe-hover" style={buttonStyle} title="Undo (Ctrl+Z)" disabled={!state?.history.canUndo} onClick={() => historyAction(state!.history.undo())}>↶</button>
-                            <button className="qe-hover" style={buttonStyle} title="Redo (Ctrl+Shift+Z)" disabled={!state?.history.canRedo} onClick={() => historyAction(state!.history.redo())}>↷</button>
                             <button
                                 className="qe-hover"
                                 style={buttonStyle}
@@ -333,10 +420,12 @@ export function EffectEditorHost(props: EffectEditorHostProps) {
                         </div>
                     </div>
                     <div style={{flex: 1, overflowY: 'auto', padding: '6px 14px 20px'}}>
-                        {binding && activeSystem && (
+                        {binding && activeSystem && gizmoNode && (
                             <EffectEditor
                                 binding={binding}
                                 selectedSystem={activeSystem}
+                                gizmoTargetNode={gizmoNode}
+                                gizmoTargetLabel={gizmoTargetLabel}
                                 textureOptions={props.textureOptions}
                                 geometryOptions={props.geometryOptions}
                                 resolveTexture={props.resolveTexture && state ? (url) => props.resolveTexture!(url, state.scene) : undefined}
@@ -349,8 +438,8 @@ export function EffectEditorHost(props: EffectEditorHostProps) {
             {binding && activeSystem && state && (
                 <TimelinePanel
                     binding={binding}
-                    selectedSystem={activeSystem}
-                    onSelect={setSelectedSystem}
+                    selectedNode={selectedNode}
+                    onSelectNode={setSelectedNode}
                     scene={state.scene}
                     renderer={state.renderer}
                     playbackRef={playbackRef}

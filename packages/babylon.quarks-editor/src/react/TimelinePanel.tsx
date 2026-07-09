@@ -19,8 +19,8 @@ export interface PlaybackState {
 
 export interface TimelinePanelProps {
     binding: EffectBinding;
-    selectedSystem: ParticleSystem;
-    onSelect: (system: ParticleSystem) => void;
+    selectedNode: TransformNode | null;
+    onSelectNode: (node: TransformNode | null) => void;
     scene: Scene;
     renderer: BatchedRenderer;
     playbackRef: React.MutableRefObject<PlaybackState>;
@@ -34,6 +34,7 @@ export interface TimelinePanelProps {
 
 const LABEL_WIDTH = 200;
 const RULER_HEIGHT = 22;
+const STAGE_ROW_HEIGHT = 26;
 const PANEL_HEIGHT = 220;
 /** Small gap between the label column and the first pixel of the time axis. */
 export const TIMELINE_INSET = 10;
@@ -50,7 +51,7 @@ function pickTickInterval(pxPerSecond: number): number {
  * draggable playhead (approximate scrub — see core/scrub.ts), and one track row per system.
  */
 export function TimelinePanel(props: TimelinePanelProps): React.ReactElement {
-    const {binding, selectedSystem, onSelect, scene, renderer, playbackRef, playheadRef, counterRef, paused, setPaused, speed, setSpeed} = props;
+    const {binding, selectedNode, onSelectNode, scene, renderer, playbackRef, playheadRef, counterRef, paused, setPaused, speed, setSpeed} = props;
 
     const [bodyWidthPx, setBodyWidthPx] = useState(600);
     const [collapsedGroups, setCollapsedGroups] = useState<Set<TransformNode>>(() => new Set());
@@ -297,9 +298,34 @@ export function TimelinePanel(props: TimelinePanelProps): React.ReactElement {
                     </div>
                 </div>
                 <div
+                    className="qe-hover-bg"
+                    title="Preview parent — simulates effect.parent = someNode; not saved in the exported JSON"
                     style={{
                         position: 'absolute',
                         top: RULER_HEIGHT,
+                        left: 0,
+                        right: 0,
+                        height: STAGE_ROW_HEIGHT,
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 6,
+                        padding: '0 8px',
+                        fontSize: 12.5,
+                        fontStyle: 'italic',
+                        cursor: 'pointer',
+                        color: selectedNode === null ? theme.text : theme.textDim,
+                        borderBottom: `1px solid ${theme.border}`,
+                        ...(selectedNode === null ? {background: 'rgba(60, 105, 209, 0.3)'} : {}),
+                    }}
+                    onClick={() => onSelectNode(null)}
+                >
+                    <span style={{fontSize: 10, width: 10}}>◎</span>
+                    <span>Stage (preview parent)</span>
+                </div>
+                <div
+                    style={{
+                        position: 'absolute',
+                        top: RULER_HEIGHT + STAGE_ROW_HEIGHT,
                         left: 0,
                         right: 0,
                         bottom: 0,
@@ -319,8 +345,8 @@ export function TimelinePanel(props: TimelinePanelProps): React.ReactElement {
                                 key={row.node.uniqueId}
                                 row={row}
                                 binding={binding}
-                                selected={row.kind === 'track' && row.system === selectedSystem}
-                                onSelect={onSelect}
+                                selected={row.node === selectedNode}
+                                onSelectNode={onSelectNode}
                                 pxPerSecond={pxPerSecond}
                                 offsetPx={TIMELINE_INSET}
                                 collapsed={row.kind === 'group' && collapsedGroups.has(row.node)}
