@@ -153,10 +153,12 @@
         }
 
         .hero h1 .accent {
-            background: linear-gradient(92deg, #9ec1ff, #7f9dff 55%, #b79bff);
-            -webkit-background-clip: text;
-            background-clip: text;
-            -webkit-text-fill-color: transparent;
+            /* Solid bright blue-white tint reads clearly on the dark hero (a gradient clip went
+               muddy behind the particle canvas). A light-blue glow makes it luminous on dark
+               areas; the dark shadow keeps an edge over bright particle spots. */
+            color: #d3e2ff;
+            -webkit-text-fill-color: #d3e2ff;
+            text-shadow: 0 0 20px rgba(140, 170, 255, 0.6), 0 2px 22px rgba(4, 6, 14, 0.92), 0 0 3px rgba(4, 6, 14, 0.85);
         }
 
         .hero .lead {
