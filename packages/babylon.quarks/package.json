@@ -37,13 +37,21 @@
     "url": "git+https://github.com/Soullnik/babylon.quarks-standalone.git"
   },
   "keywords": [
+    "babylonjs",
+    "babylon.js",
+    "particles",
+    "particle-system",
     "particle",
-    "library",
+    "vfx",
+    "visual-effects",
+    "gpu-particles",
+    "webgl",
+    "webgpu",
+    "quarks",
+    "three.quarks",
     "3d",
     "game",
-    "performance",
-    "babylonjs",
-    "vfx"
+    "performance"
   ],
   "author": "soullnik <soullnik96@gmail.com>",
   "license": "MIT",

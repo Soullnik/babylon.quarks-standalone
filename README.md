@@ -1,10 +1,24 @@
 ﻿# babylon.quarks standalone
 
 [![npm version](https://img.shields.io/npm/v/babylon.quarks)](https://www.npmjs.com/package/babylon.quarks)
+[![npm downloads](https://img.shields.io/npm/dm/babylon.quarks)](https://www.npmjs.com/package/babylon.quarks)
 [![CI](https://github.com/Soullnik/babylon.quarks-standalone/actions/workflows/ci.yml/badge.svg)](https://github.com/Soullnik/babylon.quarks-standalone/actions/workflows/ci.yml)
 [![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![TypeScript](https://img.shields.io/badge/types-TypeScript-3178c6.svg)](https://www.typescriptlang.org/)
 
-Monorepo for the `babylon.quarks` npm package, an in-house visual effect editor, a Unity exporter and Babylon.js examples — a high-performance batched particle system for [Babylon.js](https://www.babylonjs.com/), built on the `quarks.core` engine (historically derived from [quarks.art](https://quarks.art/) / three.quarks).
+**A high-performance, GPU-batched particle system and VFX library for [Babylon.js](https://www.babylonjs.com/)** — trails, mesh particles, sub-emitters and 20+ behaviors, a Shuriken-style visual effect editor, WebGL & WebGPU rendering, and a Unity → Quarks exporter.
+
+**[Live demos](https://soullnik.github.io/babylon.quarks-standalone/)** · **[Effect editor](https://soullnik.github.io/babylon.quarks-standalone/editor.html)** · **[API docs](https://soullnik.github.io/babylon.quarks-standalone/docs/)** · **[npm](https://www.npmjs.com/package/babylon.quarks)**
+
+This monorepo holds the `babylon.quarks` npm package, an in-house visual effect editor, a Unity exporter, and Babylon.js examples. The engine (`quarks.core`) is historically derived from [quarks.art](https://quarks.art/) / three.quarks.
+
+## Features
+
+- **GPU-batched rendering** — one draw call across many systems for high particle counts, with adaptive performance scaling
+- **Full behavior stack** — color / size / rotation over life, noise, turbulence, forces, collision, velocity, by-speed modifiers, and sub-emitters
+- **Trails, stretched billboards & mesh particles** — plus emission from mesh surfaces
+- **Shuriken-style visual editor** — module inspector, curves, gradients and a timeline; export / import Quarks JSON
+- **WebGL & WebGPU** · **TypeScript-first** · **Unity → Quarks exporter**
 
 ## npm package
 

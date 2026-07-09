@@ -32,8 +32,13 @@
   },
   "keywords": [
     "babylonjs",
+    "babylon.js",
     "particles",
+    "particle-system",
+    "particle-editor",
     "vfx",
+    "vfx-editor",
+    "shuriken",
     "editor",
     "react",
     "quarks"
