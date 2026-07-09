@@ -82,8 +82,9 @@ gradients sample both color and alpha keys.
   want it as an emission source. Box / Edge shapes still fall back to a point emitter.
 - **Collision:** only `bounce` is exported. quarks resolves collisions against a host-provided
   collider (e.g. the editor's ground plane), so Unity's collision planes/world aren't carried over.
-- **3D rotation:** only the Z axis of start / over-lifetime rotation is exported (the billboard
-  axis). Per-axis 3D rotation isn't mapped.
+- **3D rotation:** 3D *start* rotation is exported as an Euler generator for **Mesh** render mode
+  (billboards can't tilt, so they use the Z angle only). Rotation **over lifetime** still exports
+  the Z axis only.
 - **Texture Sheet Animation:** the frame animation is exported as a full linear sweep over the
   sheet; Unity's `frameOverTime` curve / cycle semantics aren't mapped 1:1.
 - **Blend mode** is inferred from the material's shader name / `_DstBlend`; unusual custom shaders

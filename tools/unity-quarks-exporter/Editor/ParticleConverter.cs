@@ -28,7 +28,7 @@ namespace BabylonQuarks.UnityExporter
                 .Set("shape", BuildShape(ps.shape, ctx))
                 .Set("startLife", ValueConverter.Curve(main.startLifetime))
                 .Set("startSpeed", ValueConverter.Curve(main.startSpeed))
-                .Set("startRotation", ValueConverter.Curve(main.startRotation))
+                .Set("startRotation", BuildStartRotation(main, renderMode))
                 .Set("startSize", BuildStartSize(main))
                 .Set("startColor", ValueConverter.StartColor(main.startColor))
                 .Set("emissionOverTime", EmissionRate(ps, true))
@@ -74,6 +74,34 @@ namespace BabylonQuarks.UnityExporter
         }
 
         // ---- Main ------------------------------------------------------------------------
+
+        private static JToken BuildStartRotation(ParticleSystem.MainModule main, int renderMode)
+        {
+            bool mesh = renderMode == 2;
+            if (main.startRotation3D)
+            {
+                // Mesh particles carry a full 3D orientation (quarks EulerGenerator → quaternion).
+                // Billboards only rotate in screen space, so use just the Z angle.
+                if (mesh)
+                {
+                    return Euler(
+                        ValueConverter.Curve(main.startRotationX),
+                        ValueConverter.Curve(main.startRotationY),
+                        ValueConverter.Curve(main.startRotationZ));
+                }
+                return ValueConverter.Curve(main.startRotationZ);
+            }
+            if (mesh)
+            {
+                // A scalar rotation on a mesh spins around Z in Unity; a plain quarks scalar would
+                // spin around Y, so wrap it as a Z-only Euler to keep the axis correct.
+                return Euler(ValueConverter.Constant(0), ValueConverter.Constant(0), ValueConverter.Curve(main.startRotation));
+            }
+            return ValueConverter.Curve(main.startRotation);
+        }
+
+        private static JToken Euler(JToken x, JToken y, JToken z) =>
+            new JObject().Set("type", "Euler").Set("angleX", x).Set("angleY", y).Set("angleZ", z).Set("eulerOrder", "XYZ");
 
         private static JToken BuildStartSize(ParticleSystem.MainModule main)
         {
@@ -165,8 +193,9 @@ namespace BabylonQuarks.UnityExporter
             return new JObject()
                 .Set("type", type)
                 .Set("radius", radius)
+                // Unity radiusThickness maps 1:1 to quarks thickness (0 = surface shell, 1 = full volume).
+                .Set("thickness", Mathf.Clamp01(thickness))
                 .Set("arc", arc)
-                .Set("thickness", Mathf.Clamp01(thickness) <= 0f ? 1f : thickness)
                 .Set("mode", 0)
                 .Set("spread", 0)
                 .Set("speed", ValueConverter.Constant(0));
