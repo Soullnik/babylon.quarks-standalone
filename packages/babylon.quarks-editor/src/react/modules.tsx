@@ -4,6 +4,7 @@ import {
     ColorOverLife,
     ConstantColor,
     ConstantValue,
+    EulerGenerator,
     Gradient,
     IntervalValue,
     RandomColor,
@@ -120,8 +121,27 @@ export function MainModule({binding}: ModuleProps) {
         : new Vector4(1, 1, 1, 1);
     const colorB = startColor instanceof RandomColor ? (startColor as never as {b: Vector4}).b : new Vector4(1, 0.5, 0.2, 1);
     const rotation = system.startRotation;
-    const rotationMode = rotation instanceof RandomQuatGenerator ? '3d' : readScalar(rotation as never).mode === 'random' ? 'random' : 'angle';
-    const rotationState = readScalar(rotation instanceof RandomQuatGenerator ? undefined : (rotation as never));
+    const isEuler = rotation instanceof EulerGenerator;
+    const rotationMode =
+        rotation instanceof RandomQuatGenerator ? '3d'
+        : isEuler ? 'euler'
+        : readScalar(rotation as never).mode === 'random' ? 'random'
+        : 'angle';
+    const rotationState = readScalar(rotation instanceof RandomQuatGenerator || isEuler ? undefined : (rotation as never));
+    const eulerAngles = {
+        x: isEuler ? readScalar((rotation as EulerGenerator).angleX as never).value : 0,
+        y: isEuler ? readScalar((rotation as EulerGenerator).angleY as never).value : 0,
+        z: isEuler ? readScalar((rotation as EulerGenerator).angleZ as never).value : 0,
+    };
+    const setEulerAxis = (axis: 'x' | 'y' | 'z', v: number) =>
+        binding.apply((s) => {
+            const cur = s.startRotation as EulerGenerator;
+            s.startRotation = new EulerGenerator(
+                axis === 'x' ? new ConstantValue(v) : cur.angleX,
+                axis === 'y' ? new ConstantValue(v) : cur.angleY,
+                axis === 'z' ? new ConstantValue(v) : cur.angleZ
+            );
+        });
     const startSize = system.startSize as unknown as {type?: string; x?: never; y?: never; z?: never};
     const size3D = startSize.type === 'vec3function';
     const colorGenMode =
@@ -304,6 +324,7 @@ export function MainModule({binding}: ModuleProps) {
                     options={[
                         {value: 'angle', label: 'Angle (rad)'},
                         {value: 'random', label: 'Random angle'},
+                        {value: 'euler', label: '3D (per axis)'},
                         {value: '3d', label: 'Random 3D'},
                     ]}
                     onChange={(mode) =>
@@ -311,13 +332,24 @@ export function MainModule({binding}: ModuleProps) {
                             s.startRotation =
                                 mode === '3d'
                                     ? new RandomQuatGenerator()
-                                    : mode === 'random'
-                                      ? new IntervalValue(0, Math.PI * 2)
-                                      : new ConstantValue(rotationState.value);
+                                    : mode === 'euler'
+                                      ? new EulerGenerator(new ConstantValue(eulerAngles.x), new ConstantValue(eulerAngles.y), new ConstantValue(eulerAngles.z))
+                                      : mode === 'random'
+                                        ? new IntervalValue(0, Math.PI * 2)
+                                        : new ConstantValue(rotationState.value);
                         })
                     }
                 />
             </Row>
+            {rotationMode === 'euler' && (
+                <>
+                    {(['x', 'y', 'z'] as const).map((axis) => (
+                        <Row key={axis} label={`  ${axis.toUpperCase()} (rad)`}>
+                            <NumberField value={eulerAngles[axis]} step={0.1} onChange={(v) => setEulerAxis(axis, v)} />
+                        </Row>
+                    ))}
+                </>
+            )}
             {rotationMode === 'angle' && (
                 <Row label="">
                     <NumberField

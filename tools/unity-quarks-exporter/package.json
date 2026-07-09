@@ -1,0 +1,18 @@
+{
+    "name": "com.babylonquarks.unity-exporter",
+    "version": "0.1.0",
+    "displayName": "Babylon Quarks Exporter",
+    "description": "Export Unity Shuriken particle effects to babylon.quarks JSON that QuarksLoader can load.",
+    "unity": "2020.3",
+    "keywords": [
+        "particles",
+        "vfx",
+        "babylonjs",
+        "quarks",
+        "export",
+        "shuriken"
+    ],
+    "author": {
+        "name": "babylon.quarks"
+    }
+}

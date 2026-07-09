@@ -29,7 +29,10 @@ export class ApplyCollision implements Behavior {
     initialize(particle: Particle): void {}
 
     update(particle: Particle, delta: number): void {
-        if (this.resolver.resolve(particle.position, this.tempV)) {
+        // No-op when no collider is registered (getPhysicsResolver() was undefined at load time),
+        // so a collision-bearing effect loads and renders anywhere — a host that wants actual
+        // collisions registers a resolver via setPhysicsResolver.
+        if (this.resolver && this.resolver.resolve(particle.position, this.tempV)) {
             particle.velocity.reflect(this.tempV).multiplyScalar(this.bounce);
         }
     }
