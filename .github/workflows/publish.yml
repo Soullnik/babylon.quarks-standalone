@@ -10,7 +10,8 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      # write: uploading the .unitypackage to the GitHub Release below.
+      contents: write
       # Required for npm trusted publishing (OIDC token exchange).
       id-token: write
     steps:
@@ -42,3 +43,12 @@ jobs:
 
       - name: Publish babylon.quarks
         run: npm publish --workspace=babylon.quarks --access public
+
+      - name: Build Unity exporter .unitypackage
+        run: npm run build:unitypackage
+
+      - name: Attach .unitypackage to the GitHub Release
+        if: github.event_name == 'release'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "${{ github.event.release.tag_name }}" tools/unity-quarks-exporter/dist/BabylonQuarksUnityExporter.unitypackage --clobber

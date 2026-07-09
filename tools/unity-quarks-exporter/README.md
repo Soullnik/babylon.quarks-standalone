@@ -7,8 +7,14 @@ Unity, export it, and drop it straight into a Babylon.js scene.
 
 ## Install
 
-Pick either:
+Pick one:
 
+- **`.unitypackage`** — download `BabylonQuarksUnityExporter.unitypackage` from the
+  [latest release](https://github.com/Soullnik/babylon.quarks-standalone/releases/latest), then
+  in Unity: **Assets → Import Package → Custom Package…**. Lands under
+  `Assets/BabylonQuarksUnityExporter/Editor/`. Built from this folder by
+  `npm run build:unitypackage` (wired into the release pipeline, see
+  [`build-unitypackage.mjs`](../../scripts/build-unitypackage.mjs)).
 - **Copy into a project** — copy the `Editor/` folder anywhere under your project's `Assets/`
   (e.g. `Assets/QuarksExporter/Editor/`). The scripts are editor-only (guarded by the assembly
   definition), so they never ship in a build.
