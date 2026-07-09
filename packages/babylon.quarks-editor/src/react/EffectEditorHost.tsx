@@ -326,7 +326,7 @@ export function EffectEditorHost(props: EffectEditorHostProps) {
     const gizmoTargetLabel = selectedNode ? gizmoNode?.name || 'Node' : 'Stage (preview parent)';
 
     return (
-        <div style={{display: 'flex', flexDirection: 'column', width: '100%', height: '100%', fontFamily: theme.font, color: theme.text, background: '#070b16'}}>
+        <div className="qe-root" style={{display: 'flex', flexDirection: 'column', width: '100%', height: '100%', fontFamily: theme.font, color: theme.text, background: '#070b16'}}>
             <style>{globalEditorStyles}</style>
             <div style={{display: 'flex', flex: 1, minHeight: 0}}>
                 <div style={{position: 'relative', flex: 1, minWidth: 0}}>
