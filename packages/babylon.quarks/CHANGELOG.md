@@ -4,6 +4,17 @@ All notable changes to the `babylon.quarks` package are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project follows the `quarks.core` 0.x version line.
 
+## [0.17.7] — 2026-07-09
+
+### Changed
+
+- Docs reframed around the in-house `babylon.quarks-editor` effect editor and the Unity
+  exporter as the primary authoring workflows, instead of the external quarks.art editor
+  (quarks.art-exported JSON still loads fine — same format).
+- `babylon.quarks-editor`'s README now documents the `resolveTexture`/`resolveGeometry` host
+  callbacks: their per-entry-point signatures (`EffectEditorHost`/`Show()` pass a `Scene` second
+  argument, the bare `EffectEditor` component does not) and what happens when they're omitted.
+
 ## [0.17.5] — 2026-07-02
 
 ### Added

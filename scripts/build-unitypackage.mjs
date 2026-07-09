@@ -3,7 +3,7 @@ import {createHash} from "node:crypto";
 import {cpSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync} from "node:fs";
 import {tmpdir} from "node:os";
 import {fileURLToPath} from "node:url";
-import {join} from "node:path";
+import {basename, join} from "node:path";
 
 const SOURCE_DIR = fileURLToPath(new URL("../tools/unity-quarks-exporter/Editor/", import.meta.url));
 const OUT_DIR = fileURLToPath(new URL("../tools/unity-quarks-exporter/dist/", import.meta.url));
@@ -72,9 +72,11 @@ function main() {
 
     mkdirSync(OUT_DIR, {recursive: true});
     const guidDirs = readdirSync(staging);
-    // --force-local: GNU tar treats a Windows "D:\..." path as a remote host spec
-    // (scp-style host:path) without this; harmless no-op on Linux CI.
-    execFileSync("tar", ["czf", OUT_FILE, "--force-local", "-C", staging, ...guidDirs]);
+    // Archive filename must be relative (not "D:\...") and run with cwd=OUT_DIR:
+    // GNU tar treats a drive-letter-colon path as a remote host spec (scp-style
+    // host:path), and Windows' bundled bsdtar doesn't support --force-local to
+    // override that. A relative name sidesteps the ambiguity on both.
+    execFileSync("tar", ["czf", basename(OUT_FILE), "-C", staging, ...guidDirs], {cwd: OUT_DIR});
   } finally {
     rmSync(staging, {recursive: true, force: true});
   }

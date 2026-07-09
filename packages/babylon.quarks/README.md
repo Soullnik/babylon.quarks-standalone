@@ -4,7 +4,7 @@
 [![CI](https://github.com/Soullnik/babylon.quarks-standalone/actions/workflows/ci.yml/badge.svg)](https://github.com/Soullnik/babylon.quarks-standalone/actions/workflows/ci.yml)
 [![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/Soullnik/babylon.quarks-standalone/blob/main/LICENSE)
 
-High-performance particle system for [Babylon.js](https://www.babylonjs.com/). Built on [quarks.art](https://quarks.art/) (`quarks.core`).
+High-performance particle system for [Babylon.js](https://www.babylonjs.com/). Built on `quarks.core` (historically derived from [quarks.art](https://quarks.art/) / three.quarks).
 
 [**Live demos**](https://soullnik.github.io/babylon.quarks-standalone/)
 
@@ -19,7 +19,7 @@ High-performance particle system for [Babylon.js](https://www.babylonjs.com/). B
 - **Render modes** — billboard, vertical/horizontal billboard, stretched billboard, mesh particles, and **trails** (not available in Babylon's built-in particle systems).
 - **Sub-emitters** and a rich set of composable behaviors (color/size/speed over life, noise turbulence, forces, and more from `quarks.core`).
 - **Soft particles**, texture tile animation with blending, custom blend functions.
-- **Visual authoring** — create effects in the [quarks.art](https://quarks.art/) editor (or export from Unity) and load them with `QuarksLoader`.
+- **Visual authoring** — design effects in our own [effect editor](https://soullnik.github.io/babylon.quarks-standalone/editor.html) or export them from Unity, then load with `QuarksLoader` (quarks.art-exported JSON also works — same format).
 - **Cross-engine format** — the same effect JSON runs in three.js (three.quarks) and Babylon.js.
 - **Adaptive performance** — optional frame-budget quality scaling built into `BatchedRenderer`.
 - **WebGL and WebGPU** — runs on both Babylon engines; shaders are transpiled to WGSL automatically.
@@ -134,9 +134,13 @@ await engine.initAsync();
 
 All render modes (billboard, stretched billboard, mesh, trail) are validated to create WebGPU pipelines with zero validation errors. The [live demos](https://soullnik.github.io/babylon.quarks-standalone/) and the [benchmark page](https://soullnik.github.io/babylon.quarks-standalone/benchmark.html) accept `?engine=webgpu` in the URL to switch engines.
 
-## Load effects from quarks.art / Unity
+## Author & load effects
 
-Author an effect in the [quarks.art editor](https://quarks.art/) (or export from Unity), then load the JSON:
+Design an effect with one of these tools, then load the exported JSON with `QuarksLoader`:
+
+- **[Effect editor](https://soullnik.github.io/babylon.quarks-standalone/editor.html)** — our in-house Shuriken-style editor ([`babylon.quarks-editor`](https://www.npmjs.com/package/babylon.quarks-editor), embeddable in your own app).
+- **[Unity exporter](https://github.com/Soullnik/babylon.quarks-standalone/tree/main/tools/unity-quarks-exporter)** — a Unity Editor tool that exports Shuriken Particle Systems to the same JSON format.
+- **quarks.art** — effects exported from the [quarks.art](https://quarks.art/) editor also load fine, since it's the same JSON envelope.
 
 ```ts
 import {BatchedRenderer, QuarksLoader, QuarksUtil} from "babylon.quarks";

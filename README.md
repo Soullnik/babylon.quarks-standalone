@@ -4,7 +4,7 @@
 [![CI](https://github.com/Soullnik/babylon.quarks-standalone/actions/workflows/ci.yml/badge.svg)](https://github.com/Soullnik/babylon.quarks-standalone/actions/workflows/ci.yml)
 [![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-Monorepo for the `babylon.quarks` npm package and Babylon.js examples — a high-performance batched particle system for [Babylon.js](https://www.babylonjs.com/), built on the [quarks.art](https://quarks.art/) engine (`quarks.core`).
+Monorepo for the `babylon.quarks` npm package, an in-house visual effect editor, a Unity exporter and Babylon.js examples — a high-performance batched particle system for [Babylon.js](https://www.babylonjs.com/), built on the `quarks.core` engine (historically derived from [quarks.art](https://quarks.art/) / three.quarks).
 
 ## npm package
 
@@ -32,6 +32,12 @@ await BABYLON.Tools.LoadScriptAsync("https://cdn.jsdelivr.net/npm/babylon.quarks
 const {BatchedRenderer, ParticleSystem} = BabylonQuarks;
 ```
 
+## Author effects
+
+- **[Effect editor](https://soullnik.github.io/babylon.quarks-standalone/editor.html)** — our own Shuriken-style visual editor (hierarchy panel + module inspector). Try it live, or run it locally with `npm run examples` and open `editor.html`. See the [`babylon.quarks-editor` README](packages/babylon.quarks-editor/README.md) to embed it in your own app.
+- **[Unity exporter](tools/unity-quarks-exporter/README.md)** — author in Unity's Shuriken Particle System and export straight to Quarks JSON via a Unity Editor tool (`.unitypackage`, UPM, or copy-in).
+- Effects exported from the [quarks.art](https://quarks.art/) editor still load fine — it's the same JSON format, read by `QuarksLoader` regardless of which tool produced it.
+
 ## Live examples
 
 [GitHub Pages demo](https://soullnik.github.io/babylon.quarks-standalone/) · [API docs](https://soullnik.github.io/babylon.quarks-standalone/docs/) · [Particle benchmark](https://soullnik.github.io/babylon.quarks-standalone/benchmark.html) (babylon.quarks vs Babylon's built-in CPU/GPU particle systems)
@@ -51,7 +57,10 @@ See [ROADMAP.md](ROADMAP.md) for planned improvements (WebGPU, GPU simulation, b
 ## Workspace structure
 
 - `packages/babylon.quarks` - publishable package
-- `examples` - Vite app used for local demos and GitHub Pages
+- `packages/babylon.quarks-editor` - in-house Shuriken-style effect editor (headless core + React UI)
+- `packages/quarks.core` - underlying particle simulation engine
+- `tools/unity-quarks-exporter` - Unity Editor tool that exports Shuriken effects to Quarks JSON
+- `examples` - Vite app used for local demos, the effect editor page and GitHub Pages
 
 ## Quick start
 

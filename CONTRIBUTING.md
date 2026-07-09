@@ -6,9 +6,14 @@ requests are all welcome.
 ## Repository layout
 
 - `packages/babylon.quarks` — the publishable npm package (source, tests, build config).
-- `examples` — Vite app with the demo gallery, benchmark page and API docs entry; deployed to
-  GitHub Pages.
-- `scripts` — repo tooling (preview capture, tarball checks).
+- `packages/babylon.quarks-editor` — the in-house Shuriken-style effect editor (headless core +
+  React UI); see its own README for install/usage.
+- `packages/quarks.core` — the underlying particle simulation engine.
+- `tools/unity-quarks-exporter` — a Unity Editor tool that exports Shuriken effects to Quarks
+  JSON, built into a `.unitypackage` via `npm run build:unitypackage`.
+- `examples` — Vite app with the demo gallery, effect editor page (`editor.html`), benchmark page
+  and API docs entry; deployed to GitHub Pages.
+- `scripts` — repo tooling (preview capture, tarball checks, Unity package build).
 - `ROADMAP.md` — planned work; a good place to find something to pick up.
 
 ## Getting started
@@ -18,8 +23,12 @@ Requirements: Node.js >= 20.11, npm >= 10.
 ```bash
 npm install
 npm run build        # build the package (ESM + CJS + UMD + types)
-npm run dev          # start the examples app at http://localhost:8000
+npm run build:editor  # build the babylon.quarks-editor package
+npm run dev          # start the examples app at http://localhost:8000 (open editor.html for the effect editor)
 ```
+
+Building the Unity exporter's `.unitypackage` is separate and only needed when touching
+`tools/unity-quarks-exporter`: `npm run build:unitypackage`.
 
 The examples app aliases `babylon.quarks` to the package **source** (`src/index.ts`), so
 changes to the library show up in demos without rebuilding.
