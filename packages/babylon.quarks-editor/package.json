@@ -1,6 +1,6 @@
 {
   "name": "babylon.quarks-editor",
-  "version": "0.17.6",
+  "version": "0.17.7",
   "description": "Shuriken-style effect editor for babylon.quarks: headless edit-model core + React module-stack UI",
   "type": "module",
   "main": "./dist/index.js",
@@ -18,7 +18,9 @@
   "files": [
     "dist",
     "src",
-    "README.md"
+    "LICENSE",
+    "README.md",
+    "CHANGELOG.md"
   ],
   "scripts": {
     "clean": "rimraf dist",
@@ -38,13 +40,19 @@
   ],
   "author": "soullnik <soullnik96@gmail.com>",
   "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/Soullnik/babylon.quarks-standalone/issues"
+  },
+  "homepage": "https://github.com/Soullnik/babylon.quarks-standalone#readme",
   "peerDependencies": {
     "@babylonjs/core": ">=9.0.0",
+    "@babylonjs/materials": ">=9.0.0",
     "babylon.quarks": ">=0.17.0",
     "react": ">=18",
     "react-dom": ">=18"
   },
   "devDependencies": {
+    "@babylonjs/materials": "9.6.2",
     "@types/react": "^19.0.0",
     "react": "^19.0.0",
     "rimraf": "^6.0.0",

@@ -35,6 +35,9 @@ jobs:
       - name: Build package
         run: npm run build
 
+      - name: Build effect editor
+        run: npm run build:editor
+
       - name: Run package tests
         run: npm run test
 
@@ -43,6 +46,9 @@ jobs:
 
       - name: Publish babylon.quarks
         run: npm publish --workspace=babylon.quarks --access public
+
+      - name: Publish babylon.quarks-editor
+        run: npm publish --workspace=babylon.quarks-editor --access public
 
       - name: Build Unity exporter .unitypackage
         run: npm run build:unitypackage

@@ -51,9 +51,12 @@ Emitters targets live in the hierarchy and are edited by selecting them there.
 
 Also shipped: `EffectEditorHost` + `QuarksEffectEditor.Show({hostElement, effectJson, onSave})` — the NME-style imperative entry point BabylonJS Editor uses for its node editors; the host owns engine/scene/preview/toolbar (undo/redo/restart/import/export/save) and the standalone page is now a thin wrapper over it.
 
+Also shipped: `babylon.quarks-editor` is now wired into `publish.yml` alongside `babylon.quarks`
+(built via `npm run build:editor`, tarball validated by `check-pack-contents.mjs`, published on
+the next GitHub release with its own LICENSE/CHANGELOG).
+
 Next: `startDelay` support (needs a quarks.core contribution — Unity's Start Delay has no
-core equivalent; only prewarm exists), npm publish of the editor package, BabylonJS Editor
-plugin host.
+core equivalent; only prewarm exists), BabylonJS Editor plugin host.
 
 ## Technical directions
 
@@ -87,7 +90,7 @@ The Babylon community lives in the Playground (playground.babylonjs.com). The pa
 
 - README previews: done — both READMEs now show the demo gallery (previews were already captured by `npm run capture:previews`).
 - ~~API documentation~~: TypeDoc now builds in the Pages workflow and deploys to `/docs/` next to the demos, linked from the gallery toolbar and both READMEs.
-- Document the killer workflow front and center: author an effect in the [quarks.art](https://quarks.art/) editor (or export from Unity) → load the JSON with `QuarksLoader`. A step-by-step guide with screenshots.
+- ~~Document the killer workflow front and center~~ (done: both READMEs now lead with the in-house effect editor and the Unity exporter, with quarks.art JSON noted as still-compatible, and link out to `QuarksLoader`). Remaining: a step-by-step guide with screenshots.
 - ~~Add CHANGELOG.md, CONTRIBUTING.md~~ (done: changelog ships with the npm package, contributing guide covers setup/checks/demo guide/release flow). Remaining: GitHub repo topics and a social preview image (repo settings, maintainer-only).
 - Starter templates: StackBlitz/CodeSandbox (Vite + Babylon + quarks), plus an integration example with react-babylonjs / Reactylon.
 
@@ -99,7 +102,7 @@ The competition is not other libraries but Babylon's built-ins: `ParticleSystem`
 - **Sub-emitters** and rich behavior composition.
 - **Batching** of heterogeneous systems into few draw calls.
 - **Cross-engine format** — one effect runs in three.js and Babylon.
-- **Unity effect import** and the **quarks.art visual editor**.
+- **Unity effect import** and our own **Shuriken-style effect editor**.
 
 Channels, in order of expected impact:
 
@@ -111,7 +114,7 @@ Channels, in order of expected impact:
 
 ## Suggested order
 
-1. ~~README with previews and the quarks.art → `QuarksLoader` guide~~ (previews done; guide pending)
+1. ~~README with previews and the effect editor / Unity exporter → `QuarksLoader` guide~~ (done)
 2. ~~UMD build + Playground examples~~ (done; Playground links pending a release)
 3. ~~Benchmark page~~ (done; publish real-hardware numbers pending)
 4. ~~WebGPU compatibility verification / statement~~ (done; real-hardware visual pass pending)
