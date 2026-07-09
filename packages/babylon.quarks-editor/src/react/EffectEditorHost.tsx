@@ -3,9 +3,12 @@ import {createRoot} from 'react-dom/client';
 import {Engine} from '@babylonjs/core/Engines/engine';
 import {Scene} from '@babylonjs/core/scene';
 import {ArcRotateCamera} from '@babylonjs/core/Cameras/arcRotateCamera';
+import {DirectionalLight} from '@babylonjs/core/Lights/directionalLight';
 import {Vector3 as BVector3} from '@babylonjs/core/Maths/math.vector';
-import {Color4} from '@babylonjs/core/Maths/math.color';
+import {Color3, Color4} from '@babylonjs/core/Maths/math.color';
+import {MeshBuilder} from '@babylonjs/core/Meshes/meshBuilder';
 import {TransformNode} from '@babylonjs/core/Meshes/transformNode';
+import {GridMaterial} from '@babylonjs/materials/grid/gridMaterial';
 import {
     BatchedRenderer,
     ColorOverLife,
@@ -118,6 +121,26 @@ export function EffectEditorHost(props: EffectEditorHostProps) {
         const camera = new ArcRotateCamera('cam', -Math.PI / 2, 1.15, 9, new BVector3(0, 1.4, 0), scene);
         camera.attachControl(canvasRef.current!, true);
         camera.wheelDeltaPercentage = 0.01;
+
+        // Mesh render mode particles are lit (billboard modes ignore these), and the grid gives
+        // a visual floor at the same y=0 plane the Collision module's ground resolver uses.
+        scene.ambientColor = new Color3(1, 1, 1);
+        const sunLight = new DirectionalLight('sun', new BVector3(-1, -1, -1), scene);
+        sunLight.intensity = 1.0;
+        sunLight.diffuse = new Color3(1, 1, 1);
+        sunLight.specular = new Color3(1, 1, 1);
+
+        const groundMaterial = new GridMaterial('groundMaterial', scene);
+        groundMaterial.majorUnitFrequency = 2;
+        groundMaterial.minorUnitVisibility = 0.1;
+        groundMaterial.gridRatio = 0.5;
+        groundMaterial.backFaceCulling = false;
+        groundMaterial.mainColor = new Color3(1, 1, 1);
+        groundMaterial.lineColor = new Color3(1, 1, 1);
+        groundMaterial.opacity = 0.5;
+        const ground = MeshBuilder.CreateGround('ground', {width: 100, height: 100}, scene);
+        ground.material = groundMaterial;
+
         const renderer = new BatchedRenderer('quarks-editor', scene);
         const history = new EffectHistory();
 
