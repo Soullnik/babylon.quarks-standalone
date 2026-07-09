@@ -15,7 +15,7 @@ if (typeof window !== "undefined") {
     window.requestAnimationFrame(() => loadHeroBackground());
 }
 
-const demosContainer = document.getElementById("demos");
+const demosContainer = document.getElementById("demos-grid");
 const searchInput = document.getElementById("search");
 const statsText = document.getElementById("stats");
 

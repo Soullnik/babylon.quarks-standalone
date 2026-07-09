@@ -3,10 +3,54 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Babylon.quarks</title>
+    <title>Babylon.quarks — High-Performance Particle System &amp; VFX for Babylon.js</title>
+    <meta name="description" content="Babylon.quarks is a high-performance, GPU-batched particle system and VFX library for Babylon.js: trails, mesh particles, sub-emitters, 20+ behaviors, a Shuriken-style visual editor, WebGL &amp; WebGPU support, and a Unity effect exporter. Open-source, MIT, TypeScript-first." />
+    <meta name="keywords" content="babylon.js particles, babylonjs particle system, babylon vfx, gpu particles, babylon.js particle library, three.quarks babylon, webgpu particles, particle editor" />
+    <meta name="author" content="Soullnik" />
+    <meta name="theme-color" content="#0b1020" />
+    <link rel="canonical" href="https://soullnik.github.io/babylon.quarks-standalone/" />
+    <link rel="icon" href="./favicon.ico" />
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Babylon.quarks" />
+    <meta property="og:title" content="Babylon.quarks — High-Performance Particle System for Babylon.js" />
+    <meta property="og:description" content="GPU-batched particle system &amp; VFX library for Babylon.js — trails, mesh particles, sub-emitters, 20+ behaviors, a Shuriken-style visual editor, WebGL &amp; WebGPU, and a Unity exporter." />
+    <meta property="og:url" content="https://soullnik.github.io/babylon.quarks-standalone/" />
+    <meta property="og:image" content="https://soullnik.github.io/babylon.quarks-standalone/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Babylon.quarks — High-Performance Particle System for Babylon.js" />
+    <meta name="twitter:description" content="GPU-batched particle system &amp; VFX library for Babylon.js with a Shuriken-style visual editor, WebGL/WebGPU, and a Unity exporter." />
+    <meta name="twitter:image" content="https://soullnik.github.io/babylon.quarks-standalone/og-image.png" />
+
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        "name": "Babylon.quarks",
+        "description": "A high-performance, GPU-batched particle system and VFX library for Babylon.js, with a Shuriken-style visual effect editor, WebGL and WebGPU rendering, and a Unity effect exporter.",
+        "applicationCategory": "DeveloperApplication",
+        "operatingSystem": "Web",
+        "url": "https://soullnik.github.io/babylon.quarks-standalone/",
+        "codeRepository": "https://github.com/Soullnik/babylon.quarks-standalone",
+        "programmingLanguage": "TypeScript",
+        "license": "https://opensource.org/licenses/MIT",
+        "author": { "@type": "Person", "name": "Soullnik" },
+        "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" }
+    }
+    </script>
+
     <style>
         :root {
             color-scheme: dark;
+        }
+
+        * {
+            box-sizing: border-box;
         }
 
         body {
@@ -41,28 +85,263 @@
             z-index: 2;
             max-width: 1120px;
             margin: 0 auto;
-            padding: 40px 20px 60px;
+            padding: 24px 20px 40px;
             background: transparent;
         }
 
+        /* --- top nav --- */
+        .nav {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            flex-wrap: wrap;
+            margin-bottom: 44px;
+        }
+
+        .nav .brand {
+            font-weight: 700;
+            font-size: 16px;
+            letter-spacing: -0.01em;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .nav .brand .dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: radial-gradient(circle at 30% 30%, #a9c2ff, #4f6fbe);
+            box-shadow: 0 0 12px rgba(120, 165, 255, 0.8);
+        }
+
+        .nav .nav-links {
+            margin-left: auto;
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+
+        .nav .nav-links a {
+            color: #c8d6f5;
+            text-decoration: none;
+            font-size: 14px;
+            padding: 6px 10px;
+            border-radius: 8px;
+            transition: background 0.2s ease, color 0.2s ease;
+        }
+
+        .nav .nav-links a:hover {
+            background: rgba(60, 105, 209, 0.28);
+            color: #fff;
+        }
+
+        /* --- hero --- */
         .hero h1 {
             margin: 0;
-            font-size: clamp(28px, 5vw, 44px);
-            letter-spacing: -0.02em;
+            font-size: clamp(30px, 5.5vw, 52px);
+            letter-spacing: -0.025em;
+            line-height: 1.08;
             text-shadow: 0 2px 28px rgba(4, 6, 14, 0.95), 0 0 3px rgba(4, 6, 14, 0.9);
         }
 
-        .hero p {
-            margin: 14px 0 0;
-            max-width: 760px;
+        .hero h1 .accent {
+            background: linear-gradient(92deg, #9ec1ff, #7f9dff 55%, #b79bff);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .hero .lead {
+            margin: 16px 0 0;
+            max-width: 720px;
             color: #dce6ff;
             line-height: 1.6;
-            font-size: 16px;
+            font-size: clamp(15px, 2.1vw, 18px);
             text-shadow: 0 1px 18px rgba(4, 6, 14, 0.92);
         }
 
+        .cta-row {
+            margin-top: 26px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            align-items: center;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            text-decoration: none;
+            font-size: 15px;
+            font-weight: 600;
+            padding: 11px 18px;
+            border-radius: 11px;
+            border: 1px solid #4563ad;
+            color: #eaf0ff;
+            background: rgba(28, 48, 98, 0.55);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            transition: transform 0.15s ease, background 0.2s ease, border-color 0.2s ease;
+        }
+
+        .btn:hover {
+            transform: translateY(-1px);
+            background: rgba(60, 105, 209, 0.4);
+            border-color: #658ce8;
+        }
+
+        .btn.primary {
+            border-color: #6f8fe6;
+            background: linear-gradient(180deg, rgba(96, 140, 240, 0.6), rgba(60, 100, 210, 0.55));
+        }
+
+        .btn.primary:hover {
+            background: linear-gradient(180deg, rgba(120, 165, 255, 0.7), rgba(80, 120, 230, 0.65));
+        }
+
+        .install {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            font-family: "SF Mono", ui-monospace, Menlo, Consolas, monospace;
+            font-size: 14px;
+            color: #d8e3ff;
+            border: 1px solid #2b3761;
+            background: rgba(7, 11, 22, 0.82);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            padding: 10px 14px;
+            border-radius: 11px;
+        }
+
+        .install .prompt {
+            color: #6f86c9;
+        }
+
+        .install button {
+            border: 1px solid #34477f;
+            background: rgba(28, 48, 98, 0.5);
+            color: #b7c6ea;
+            border-radius: 7px;
+            padding: 3px 8px;
+            font-size: 12px;
+            cursor: pointer;
+            transition: background 0.15s ease, color 0.15s ease;
+        }
+
+        .install button:hover {
+            background: rgba(60, 105, 209, 0.4);
+            color: #fff;
+        }
+
+        .badges {
+            margin-top: 22px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .badge {
+            border: 1px solid #34477f;
+            border-radius: 999px;
+            font-size: 12.5px;
+            color: #9eb9ff;
+            padding: 4px 11px;
+            background: rgba(12, 18, 38, 0.55);
+        }
+
+        /* --- section scaffolding --- */
+        .section {
+            margin-top: 56px;
+        }
+
+        .section > h2 {
+            margin: 0 0 6px;
+            font-size: clamp(21px, 3vw, 28px);
+            letter-spacing: -0.02em;
+        }
+
+        .section > .sub {
+            margin: 0 0 20px;
+            color: #b7c6ea;
+            font-size: 15px;
+            max-width: 680px;
+            line-height: 1.55;
+        }
+
+        /* --- features --- */
+        .features {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 14px;
+        }
+
+        .feature {
+            border: 1px solid #2a365f;
+            border-radius: 14px;
+            padding: 18px;
+            background: linear-gradient(180deg, rgba(12, 18, 38, 0.82), rgba(6, 10, 22, 0.88));
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+        }
+
+        .feature .icon {
+            width: 34px;
+            height: 34px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 9px;
+            background: rgba(60, 105, 209, 0.22);
+            border: 1px solid #3c56a0;
+            margin-bottom: 12px;
+            font-size: 18px;
+        }
+
+        .feature h3 {
+            margin: 0 0 6px;
+            font-size: 16px;
+        }
+
+        .feature p {
+            margin: 0;
+            color: #b7c6ea;
+            font-size: 14px;
+            line-height: 1.55;
+        }
+
+        /* --- quick start --- */
+        .quickstart {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 14px;
+        }
+
+        pre.code {
+            margin: 0;
+            border: 1px solid #2a365f;
+            border-radius: 14px;
+            background: rgba(6, 10, 22, 0.9);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            padding: 18px 20px;
+            overflow-x: auto;
+            font-family: "SF Mono", ui-monospace, Menlo, Consolas, monospace;
+            font-size: 13.5px;
+            line-height: 1.7;
+            color: #d3ddf7;
+        }
+
+        pre.code .k { color: #c39bff; }
+        pre.code .s { color: #8fd6a0; }
+        pre.code .c { color: #6f86c9; }
+        pre.code .f { color: #9ec1ff; }
+
+        /* --- toolbar / gallery (kept) --- */
         .toolbar {
-            margin-top: 28px;
+            margin: 0 0 18px;
             display: flex;
             flex-wrap: wrap;
             align-items: center;
@@ -94,7 +373,6 @@
         }
 
         .grid {
-            margin-top: 24px;
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
             gap: 14px;
@@ -189,37 +467,52 @@
             border-color: #658ce8;
         }
 
-        .toolbar-links {
-            margin-left: auto;
+        /* --- why --- */
+        .why p {
+            margin: 0;
+            max-width: 760px;
+            color: #cdd9f5;
+            font-size: 15.5px;
+            line-height: 1.65;
+        }
+
+        .why code {
+            color: #9ec1ff;
+            font-family: "SF Mono", ui-monospace, Menlo, Consolas, monospace;
+            font-size: 0.92em;
+        }
+
+        /* --- footer --- */
+        footer {
+            margin-top: 64px;
+            padding-top: 24px;
+            border-top: 1px solid #212c50;
             display: flex;
             flex-wrap: wrap;
+            gap: 12px 20px;
             align-items: center;
-            gap: 10px;
-        }
-
-        .github-btn {
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            color: #d8e3ff;
-            text-decoration: none;
-            border: 1px solid #4563ad;
-            background: rgba(28, 48, 98, 0.55);
-            backdrop-filter: blur(10px);
-            -webkit-backdrop-filter: blur(10px);
-            padding: 8px 12px;
-            border-radius: 10px;
+            color: #93a5cf;
             font-size: 14px;
-            transition: background 0.2s ease, border-color 0.2s ease;
         }
 
-        .github-btn:hover {
-            background: rgba(60, 105, 209, 0.35);
-            border-color: #658ce8;
+        footer a {
+            color: #c8d6f5;
+            text-decoration: none;
         }
 
-        .github-btn svg {
-            flex-shrink: 0;
+        footer a:hover {
+            color: #fff;
+            text-decoration: underline;
+        }
+
+        footer .foot-links {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 16px;
+        }
+
+        footer .spacer {
+            margin-left: auto;
         }
     </style>
 </head>
@@ -227,38 +520,149 @@
     <canvas id="hero-bg" aria-hidden="true"></canvas>
     <div class="hero-vignette" aria-hidden="true"></div>
     <main class="page">
+        <nav class="nav">
+            <span class="brand"><span class="dot" aria-hidden="true"></span>Babylon.quarks</span>
+            <div class="nav-links">
+                <a href="#features">Features</a>
+                <a href="#quick-start">Quick start</a>
+                <a href="#demos">Demos</a>
+                <a href="./editor.html">Editor</a>
+                <a href="https://soullnik.github.io/babylon.quarks-standalone/docs/">Docs</a>
+                <a href="https://github.com/Soullnik/babylon.quarks-standalone" target="_blank" rel="noopener noreferrer">GitHub</a>
+            </div>
+        </nav>
+
         <section class="hero">
-            <h1>Babylon.quarks</h1>
-            <p>Interactive gallery of particle demos for Babylon.js. Explore emitter behaviors, blending, trails, and advanced rendering setups used by <code>babylon.quarks</code>.</p>
-        </section>
-        <section class="toolbar">
-            <input id="search" class="search" type="search" placeholder="Search demos by name or tag..." aria-label="Search demos" />
-            <span id="stats" class="stats"></span>
-            <div class="toolbar-links">
-                <a class="github-btn" href="./editor.html" aria-label="Effect editor">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
-                    Effect Editor
-                </a>
-                <a class="github-btn" href="https://soullnik.github.io/babylon.quarks-standalone/docs/" aria-label="API documentation">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M18 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zM9 4h2v5l-1-.75L9 9V4zm9 16H6V4h1v9l3-2.25L13 13V4h5v16z"/></svg>
-                    API Docs
-                </a>
-                <a class="github-btn" href="./benchmark.html" aria-label="Particle benchmark">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 4C6.48 4 2 8.48 2 14c0 2.05.62 3.96 1.68 5.55.17.26.46.45.8.45h15.04c.34 0 .63-.19.8-.45A9.93 9.93 0 0 0 22 14c0-5.52-4.48-10-10-10zm1.41 11.41a2 2 0 0 1-2.82 0c-.79-.78-1.85-4.11-2.28-5.55a.4.4 0 0 1 .5-.5c1.44.43 4.77 1.49 5.55 2.28a2 2 0 0 1-.95 3.77z"/></svg>
-                    Benchmark
-                </a>
-                <a class="github-btn" href="https://github.com/Soullnik/babylon.quarks-standalone" target="_blank" rel="noopener noreferrer" aria-label="babylon.quarks-standalone on GitHub">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
-                    GitHub
-                </a>
-                <a class="github-btn" href="https://www.npmjs.com/package/babylon.quarks" target="_blank" rel="noopener noreferrer" aria-label="babylon.quarks on npm">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M1.763 0C.786 0 0 .786 0 1.763v20.474C0 23.214.786 24 1.763 24h20.474c.977 0 1.763-.786 1.763-1.763V1.763C24 .786 23.214 0 22.237 0H1.763zM5.13 5.323l13.837.019-.009 13.818h-3.464l.01-10.382h-3.46L12.04 19.17h-3.47L5.113 5.311z"/></svg>
-                    npm
-                </a>
+            <h1>High-performance <span class="accent">particles &amp; VFX</span><br />for Babylon.js</h1>
+            <p class="lead">
+                Babylon.quarks is a GPU-batched particle system and visual-effects library for
+                <strong>Babylon.js</strong> — trails, stretched billboards, mesh particles, sub-emitters and 20+
+                behaviors, a Shuriken-style visual effect editor, WebGL &amp; WebGPU rendering, and a
+                Unity&nbsp;→&nbsp;Quarks exporter. Open-source and TypeScript-first.
+            </p>
+            <div class="cta-row">
+                <a class="btn primary" href="#demos">View demos ↓</a>
+                <a class="btn" href="./editor.html">Open the editor</a>
+                <a class="btn" href="https://github.com/Soullnik/babylon.quarks-standalone" target="_blank" rel="noopener noreferrer">GitHub ★</a>
+                <span class="install">
+                    <span class="prompt">$</span>
+                    <span id="install-cmd">npm i babylon.quarks</span>
+                    <button id="copy-install" type="button" aria-label="Copy install command">Copy</button>
+                </span>
+            </div>
+            <div class="badges">
+                <span class="badge">Babylon.js 9+</span>
+                <span class="badge">WebGL &amp; WebGPU</span>
+                <span class="badge">TypeScript</span>
+                <span class="badge">MIT licensed</span>
+                <span class="badge">GPU-batched</span>
             </div>
         </section>
-        <section id="demos" class="grid"></section>
+
+        <section id="features" class="section">
+            <h2>Everything you need for game-ready VFX</h2>
+            <p class="sub">A batched renderer built for high particle counts, a full behavior stack, and a visual editor — all running on Babylon.js.</p>
+            <div class="features">
+                <div class="feature">
+                    <div class="icon" aria-hidden="true">⚡</div>
+                    <h3>GPU-batched rendering</h3>
+                    <p>One draw call across many systems for high particle counts, with adaptive performance scaling.</p>
+                </div>
+                <div class="feature">
+                    <div class="icon" aria-hidden="true">〰️</div>
+                    <h3>Trails &amp; stretched billboards</h3>
+                    <p>Ribbon trails, velocity-stretched billboards, and four billboard alignment modes.</p>
+                </div>
+                <div class="feature">
+                    <div class="icon" aria-hidden="true">🧊</div>
+                    <h3>Mesh particles</h3>
+                    <p>Render particles as instanced meshes, or emit from any mesh surface.</p>
+                </div>
+                <div class="feature">
+                    <div class="icon" aria-hidden="true">✨</div>
+                    <h3>Sub-emitters &amp; 20+ behaviors</h3>
+                    <p>Color / size / rotation over life, noise, turbulence, forces, collision, velocity, and more.</p>
+                </div>
+                <div class="feature">
+                    <div class="icon" aria-hidden="true">🎛️</div>
+                    <h3>Shuriken-style editor</h3>
+                    <p>A Unity-like visual effect editor with a module inspector, curves, gradients and a timeline.</p>
+                </div>
+                <div class="feature">
+                    <div class="icon" aria-hidden="true">🎮</div>
+                    <h3>Unity → Quarks exporter</h3>
+                    <p>Export a Unity Shuriken effect straight to Babylon.quarks JSON and load it in one call.</p>
+                </div>
+            </div>
+        </section>
+
+        <section id="quick-start" class="section">
+            <h2>Quick start</h2>
+            <p class="sub">Install the package, add a batched renderer, and load an exported effect with <code style="color:#9ec1ff">QuarksLoader</code>.</p>
+            <div class="quickstart">
+<pre class="code"><span class="c"># install</span>
+npm i babylon.quarks
+
+<span class="c">// render an effect in your Babylon scene</span>
+<span class="k">import</span> { BatchedRenderer, QuarksLoader } <span class="k">from</span> <span class="s">"babylon.quarks"</span>;
+
+<span class="k">const</span> renderer = <span class="k">new</span> <span class="f">BatchedRenderer</span>(<span class="s">"vfx"</span>, scene);
+<span class="k">const</span> root = <span class="k">new</span> <span class="f">QuarksLoader</span>(scene).<span class="f">parse</span>(effectJson);
+root.parent = renderer;
+</pre>
+            </div>
+        </section>
+
+        <section id="demos" class="section">
+            <h2>Explore the demos</h2>
+            <p class="sub">18 interactive particle demos — emitter shapes, blending, trails, sub-emitters, GPU turbulence and more. Open any of them in the editor.</p>
+            <div class="toolbar">
+                <input id="search" class="search" type="search" placeholder="Search demos by name or tag..." aria-label="Search demos" />
+                <span id="stats" class="stats"></span>
+            </div>
+            <div id="demos-grid" class="grid"></div>
+        </section>
+
+        <section class="section why">
+            <h2>Why Babylon.quarks?</h2>
+            <p>
+                Babylon.js ships a capable built-in <code>ParticleSystem</code>, but Babylon.quarks adds a
+                <strong>GPU-batched renderer</strong> for high particle counts, a <strong>modular behavior stack</strong>
+                (noise, turbulence, collision, sub-emitters, by-speed modifiers…), first-class <strong>trail and
+                mesh</strong> rendering, and a <strong>visual effect editor</strong> — plus a JSON format you can author
+                in Unity and import directly. It's the toolkit for authoring complex, reusable effects.
+            </p>
+        </section>
+
+        <footer>
+            <span>Babylon.quarks — MIT licensed</span>
+            <div class="foot-links">
+                <a href="https://github.com/Soullnik/babylon.quarks-standalone" target="_blank" rel="noopener noreferrer">GitHub</a>
+                <a href="https://www.npmjs.com/package/babylon.quarks" target="_blank" rel="noopener noreferrer">npm</a>
+                <a href="https://soullnik.github.io/babylon.quarks-standalone/docs/">API docs</a>
+                <a href="./editor.html">Effect editor</a>
+                <a href="./benchmark.html">Benchmark</a>
+                <a href="https://forum.babylonjs.com/" target="_blank" rel="noopener noreferrer">Babylon.js forum</a>
+            </div>
+            <span class="spacer"></span>
+            <span>Built on Babylon.js</span>
+        </footer>
     </main>
+    <script>
+        (function () {
+            var btn = document.getElementById("copy-install");
+            if (!btn) return;
+            btn.addEventListener("click", function () {
+                var cmd = (document.getElementById("install-cmd") || {}).textContent || "npm i babylon.quarks";
+                var done = function () { btn.textContent = "Copied"; setTimeout(function () { btn.textContent = "Copy"; }, 1400); };
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    navigator.clipboard.writeText(cmd).then(done).catch(done);
+                } else {
+                    done();
+                }
+            });
+        })();
+    </script>
     <script type="module" src="./src/gallery.ts"></script>
 </body>
 </html>
