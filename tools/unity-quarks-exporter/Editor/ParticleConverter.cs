@@ -25,7 +25,7 @@ namespace BabylonQuarks.UnityExporter
                 .Set("prewarm", main.prewarm)
                 .Set("duration", main.duration)
                 .Set("startDelay", ValueConverter.Curve(main.startDelay))
-                .Set("shape", BuildShape(ps.shape))
+                .Set("shape", BuildShape(ps.shape, ctx))
                 .Set("startLife", ValueConverter.Curve(main.startLifetime))
                 .Set("startSpeed", ValueConverter.Curve(main.startSpeed))
                 .Set("startRotation", ValueConverter.Curve(main.startRotation))
@@ -54,13 +54,19 @@ namespace BabylonQuarks.UnityExporter
 
             // ---- behaviors from the over-lifetime / by-speed modules ----
             AddGravity(main, behaviors);
+            AddRandomizeDirection(ps, behaviors);
             AddColorOverLife(ps, behaviors);
             AddSizeOverLife(ps, behaviors);
             AddRotationOverLife(ps, behaviors);
             AddVelocityOverLife(ps, behaviors);
+            AddInheritVelocity(ps, behaviors);
             AddLimitVelocity(ps, behaviors);
             AddForceOverLife(ps, behaviors);
+            AddColorBySpeed(ps, behaviors);
+            AddSizeBySpeed(ps, behaviors);
+            AddRotationBySpeed(ps, behaviors);
             AddNoise(ps, behaviors);
+            AddCollision(ps, behaviors);
             AddSubEmitters(ps, ctx, behaviors);
 
             obj.Set("behaviors", behaviors);
@@ -122,7 +128,7 @@ namespace BabylonQuarks.UnityExporter
 
         // ---- Shape -----------------------------------------------------------------------
 
-        private static JToken BuildShape(ParticleSystem.ShapeModule shape)
+        private static JToken BuildShape(ParticleSystem.ShapeModule shape, ExportContext ctx)
         {
             if (!shape.enabled) return new JObject().Set("type", "point");
 
@@ -141,8 +147,15 @@ namespace BabylonQuarks.UnityExporter
                     return ShapeBase("circle", shape.radius, arc, thickness);
                 case ParticleSystemShapeType.Donut:
                     return ShapeBase("donut", shape.radius, arc, thickness).Set("donutRadius", shape.donutRadius);
+                case ParticleSystemShapeType.Mesh:
+                    if (shape.mesh != null)
+                    {
+                        string meshNodeUuid = ctx.AddMeshSourceNode(shape.mesh);
+                        return new JObject().Set("type", "mesh_surface").Set("mesh", meshNodeUuid);
+                    }
+                    return new JObject().Set("type", "point");
                 default:
-                    // Box/Mesh/Edge and other volumes have no direct quarks equivalent yet.
+                    // Box/Edge and other volumes have no direct quarks equivalent yet.
                     return new JObject().Set("type", "point");
             }
         }
@@ -291,6 +304,70 @@ namespace BabylonQuarks.UnityExporter
                 .Set("positionAmount", ValueConverter.Constant(1))
                 .Set("rotationAmount", ValueConverter.Constant(0)));
         }
+
+        private static void AddInheritVelocity(ParticleSystem ps, JArray behaviors)
+        {
+            var m = ps.inheritVelocity;
+            if (!m.enabled) return;
+            behaviors.Add(new JObject()
+                .Set("type", "InheritVelocity")
+                .Set("multiplier", ValueConverter.Curve(m.curve))
+                .Set("mode", m.mode == ParticleSystemInheritVelocityMode.Current ? "current" : "initial"));
+        }
+
+        private static void AddRandomizeDirection(ParticleSystem ps, JArray behaviors)
+        {
+            var shape = ps.shape;
+            if (!shape.enabled || shape.randomDirectionAmount <= 0f) return;
+            // Unity's randomDirectionAmount is a 0..1 blend; map to a 0..π scatter angle.
+            behaviors.Add(new JObject()
+                .Set("type", "ChangeEmitDirection")
+                .Set("angle", ValueConverter.Constant(shape.randomDirectionAmount * Mathf.PI)));
+        }
+
+        private static void AddColorBySpeed(ParticleSystem ps, JArray behaviors)
+        {
+            var m = ps.colorBySpeed;
+            if (!m.enabled) return;
+            behaviors.Add(new JObject()
+                .Set("type", "ColorBySpeed")
+                .Set("color", ValueConverter.StartColorGradient(m.color))
+                .Set("speedRange", SpeedRange(m.range)));
+        }
+
+        private static void AddSizeBySpeed(ParticleSystem ps, JArray behaviors)
+        {
+            var m = ps.sizeBySpeed;
+            if (!m.enabled) return;
+            var curve = m.separateAxes ? m.x : m.size;
+            behaviors.Add(new JObject()
+                .Set("type", "SizeBySpeed")
+                .Set("size", ValueConverter.Curve(curve))
+                .Set("speedRange", SpeedRange(m.range)));
+        }
+
+        private static void AddRotationBySpeed(ParticleSystem ps, JArray behaviors)
+        {
+            var m = ps.rotationBySpeed;
+            if (!m.enabled) return;
+            behaviors.Add(new JObject()
+                .Set("type", "RotationBySpeed")
+                .Set("angularVelocity", ScaleCurve(m.z, Mathf.Deg2Rad))
+                .Set("speedRange", SpeedRange(m.range)));
+        }
+
+        private static void AddCollision(ParticleSystem ps, JArray behaviors)
+        {
+            var m = ps.collision;
+            if (!m.enabled) return;
+            // quarks ApplyCollision resolves against a host-provided collider; only `bounce` is
+            // portable (the plane/world colliders themselves aren't part of the effect JSON).
+            behaviors.Add(new JObject()
+                .Set("type", "ApplyCollision")
+                .Set("bounce", ConstantOf(m.bounce)));
+        }
+
+        private static JToken SpeedRange(Vector2 range) => ValueConverter.Interval(range.x, range.y);
 
         private static void AddSubEmitters(ParticleSystem ps, ExportContext ctx, JArray behaviors)
         {

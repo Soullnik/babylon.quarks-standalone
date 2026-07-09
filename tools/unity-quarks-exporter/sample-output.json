@@ -1,6 +1,8 @@
 {
   "metadata": { "version": 4.5, "type": "Object3D", "generator": "unity-quark-exporter" },
-  "geometries": [],
+  "geometries": [
+    { "uuid": "geom-a", "type": "QuarksGeometry", "positions": [-0.5, 0, -0.5, 0.5, 0, -0.5, 0, 0, 0.5], "indices": [0, 1, 2] }
+  ],
   "materials": [
     {
       "uuid": "material-a", "type": "QuarksMaterial", "transparent": true,
@@ -51,6 +53,12 @@
             { "type": "ColorOverLife", "color": { "type": "Gradient", "functions": [ { "function": { "type": "ColorRange", "a": { "r": 1, "g": 1, "b": 1, "a": 1 }, "b": { "r": 1, "g": 1, "b": 1, "a": 0 } }, "start": 0 } ] } },
             { "type": "SizeOverLife", "size": { "type": "PiecewiseBezier", "functions": [ { "function": { "p0": 1, "p1": 0.6666, "p2": 0.3333, "p3": 0 }, "start": 0 } ] } },
             { "type": "Noise", "frequency": { "type": "ConstantValue", "value": 2 }, "power": { "type": "ConstantValue", "value": 1 }, "positionAmount": { "type": "ConstantValue", "value": 1 }, "rotationAmount": { "type": "ConstantValue", "value": 0 } },
+            { "type": "ChangeEmitDirection", "angle": { "type": "ConstantValue", "value": 0.5 } },
+            { "type": "InheritVelocity", "multiplier": { "type": "ConstantValue", "value": 0.5 }, "mode": "initial" },
+            { "type": "ColorBySpeed", "color": { "type": "Gradient", "functions": [ { "function": { "type": "ColorRange", "a": { "r": 0, "g": 0, "b": 1, "a": 1 }, "b": { "r": 1, "g": 0, "b": 0, "a": 1 } }, "start": 0 } ] }, "speedRange": { "type": "IntervalValue", "a": 0, "b": 5 } },
+            { "type": "SizeBySpeed", "size": { "type": "PiecewiseBezier", "functions": [ { "function": { "p0": 0.5, "p1": 1, "p2": 1.5, "p3": 2 }, "start": 0 } ] }, "speedRange": { "type": "IntervalValue", "a": 0, "b": 5 } },
+            { "type": "RotationBySpeed", "angularVelocity": { "type": "ConstantValue", "value": 1 }, "speedRange": { "type": "IntervalValue", "a": 0, "b": 5 } },
+            { "type": "ApplyCollision", "bounce": 0.5 },
             { "type": "EmitSubParticleSystem", "subParticleSystem": "node-2", "useVelocityAsBasis": false, "mode": 0, "emitProbability": 1 }
           ]
         },
@@ -62,7 +70,7 @@
             "ps": {
               "version": "3.0", "autoDestroy": false, "looping": false, "prewarm": false, "duration": 1,
               "startDelay": { "type": "ConstantValue", "value": 0 },
-              "shape": { "type": "sphere", "radius": 0.05, "arc": 6.283185307179586, "thickness": 1, "mode": 0, "spread": 0, "speed": { "type": "ConstantValue", "value": 0 } },
+              "shape": { "type": "mesh_surface", "mesh": "mesh-node-a" },
               "startLife": { "type": "IntervalValue", "a": 0.3, "b": 0.6 },
               "startSpeed": { "type": "IntervalValue", "a": 1, "b": 3 },
               "startRotation": { "type": "ConstantValue", "value": 0 },
@@ -80,6 +88,11 @@
             }
           }
         ]
+      },
+      {
+        "uuid": "mesh-node-a", "name": "Emitter Source", "layers": 1,
+        "matrix": [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1],
+        "type": "Mesh", "geometry": "geom-a"
       }
     ]
   }

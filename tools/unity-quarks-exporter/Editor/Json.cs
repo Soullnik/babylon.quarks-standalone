@@ -144,6 +144,18 @@ namespace BabylonQuarks.UnityExporter
             return this;
         }
 
+        /// <summary>Returns the array at <paramref name="key"/>, creating and attaching one if absent.</summary>
+        public JArray GetOrCreateArray(string key)
+        {
+            foreach (var kv in Members)
+            {
+                if (kv.Key == key && kv.Value is JArray existing) return existing;
+            }
+            var arr = new JArray();
+            Set(key, arr);
+            return arr;
+        }
+
         internal override void Write(StringBuilder sb, int indent)
         {
             if (Members.Count == 0)

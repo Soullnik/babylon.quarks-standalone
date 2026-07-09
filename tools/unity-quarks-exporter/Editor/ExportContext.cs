@@ -23,6 +23,9 @@ namespace BabylonQuarks.UnityExporter
 
         public bool EmbedTextures = true;
 
+        /// <summary>Mesh nodes emitted for mesh-shape emitters; appended to the root object's children.</summary>
+        public readonly System.Collections.Generic.List<JObject> MeshSourceNodes = new System.Collections.Generic.List<JObject>();
+
         private int _idCounter;
         private readonly Dictionary<string, string> _imageByUrl = new Dictionary<string, string>();
         private readonly Dictionary<Transform, string> _transformUuid = new Dictionary<Transform, string>();
@@ -140,6 +143,25 @@ namespace BabylonQuarks.UnityExporter
             }
             Geometries.Add(g);
             return uuid;
+        }
+
+        /// <summary>
+        /// Emits a Mesh node (+ its geometry) so a mesh-shape emitter can reference it by uuid.
+        /// QuarksLoader.linkReferences resolves the emitter's `mesh_surface.mesh` to this node.
+        /// The node is a real (visible) Mesh in the loaded scene — hide it if only used for emission.
+        /// </summary>
+        public string AddMeshSourceNode(Mesh mesh)
+        {
+            string geometryUuid = AddGeometryForMesh(mesh);
+            string nodeUuid = NewId("node");
+            MeshSourceNodes.Add(new JObject()
+                .Set("uuid", nodeUuid)
+                .Set("name", mesh.name + " (emitter source)")
+                .Set("layers", 1)
+                .Set("matrix", new JArray().Add(1).Add(0).Add(0).Add(0).Add(0).Add(1).Add(0).Add(0).Add(0).Add(0).Add(1).Add(0).Add(0).Add(0).Add(0).Add(1))
+                .Set("type", "Mesh")
+                .Set("geometry", geometryUuid));
+            return nodeUuid;
         }
 
         private static int DetectBlend(Material mat)

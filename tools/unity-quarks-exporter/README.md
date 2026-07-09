@@ -48,14 +48,17 @@ death-triggered spark sub-emitter).
 | --- | --- |
 | **Main** | duration, loop, prewarm, start delay/lifetime/speed/size (incl. 3D size), start rotation, start color (constant / two colors / gradient / two gradients), simulation space → `worldSpace`, gravity → `ApplyForce` |
 | **Emission** | rate over time, rate over distance, bursts (time / count / cycles / interval / probability) |
-| **Shape** | Cone, Sphere, Hemisphere, Circle, Donut (radius, angle, arc, thickness) |
+| **Shape** | Cone, Sphere, Hemisphere, Circle, Donut (radius, angle, arc, thickness), **Mesh** → `mesh_surface`, randomize direction → `ChangeEmitDirection` |
 | **Color over Lifetime** | `ColorOverLife` (gradient) |
 | **Size over Lifetime** | `SizeOverLife` (curve → piecewise Bézier) |
 | **Rotation over Lifetime** | `RotationOverLife` (deg→rad) |
 | **Velocity over Lifetime** | `VelocityOverLife` (linear + orbital XYZ, local/world) |
+| **Inherit Velocity** | `InheritVelocity` (multiplier + initial/current) |
 | **Limit Velocity over Lifetime** | `LimitSpeedOverLife` (limit + dampen) |
 | **Force over Lifetime** | `ForceOverLife` (XYZ) |
+| **Color / Size / Rotation by Speed** | `ColorBySpeed` / `SizeBySpeed` / `RotationBySpeed` (+ speed range) |
 | **Noise** | `Noise` (frequency + strength) |
+| **Collision** | `ApplyCollision` (bounce; collider is host-provided) |
 | **Texture Sheet Animation** | tiles U/V, start tile, `FrameOverLife` sweep |
 | **Sub Emitters** | child systems wired via `EmitSubParticleSystem` (birth/death → quarks modes) |
 | **Renderer** | render mode (billboard ×4 / stretched / mesh), sort order, mesh geometry, material blend mode + main texture (embedded) |
@@ -68,14 +71,19 @@ gradients sample both color and alpha keys.
 - **Coordinate space:** node transforms are exported as a straightforward local TRS matrix. Unity
   is left-handed and three.js/Babylon right-handed, so off-origin child offsets may need a manual
   tweak; effects authored at the origin are unaffected.
-- **Shapes:** Box / Mesh / Edge emitter shapes fall back to a point emitter (no direct quarks
-  equivalent yet).
+- **Mesh shape:** exported as a `mesh_surface` emitter plus a `Mesh` source node holding the
+  geometry. That node is a real (visible) mesh in the loaded scene — hide/disable it if you only
+  want it as an emission source. Box / Edge shapes still fall back to a point emitter.
+- **Collision:** only `bounce` is exported. quarks resolves collisions against a host-provided
+  collider (e.g. the editor's ground plane), so Unity's collision planes/world aren't carried over.
+- **3D rotation:** only the Z axis of start / over-lifetime rotation is exported (the billboard
+  axis). Per-axis 3D rotation isn't mapped.
 - **Texture Sheet Animation:** the frame animation is exported as a full linear sweep over the
   sheet; Unity's `frameOverTime` curve / cycle semantics aren't mapped 1:1.
 - **Blend mode** is inferred from the material's shader name / `_DstBlend`; unusual custom shaders
   default to alpha blend.
-- Modules with no quarks counterpart (Collision, Lights, Trails ribbon, Custom Data, External
-  Forces) are skipped.
+- Modules with no quarks counterpart (Lights, Trails ribbon, Custom Data, Collision triggers) are
+  skipped.
 
 ## Layout
 

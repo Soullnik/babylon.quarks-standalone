@@ -63,6 +63,17 @@ namespace BabylonQuarks.UnityExporter
             // Pass 2: serialize the hierarchy into the object tree.
             JObject obj = SerializeNode(root.transform, ctx);
 
+            // Mesh-shape emitters emit a source Mesh node each; attach them under the root so
+            // linkReferences can resolve every mesh_surface.mesh reference.
+            if (ctx.MeshSourceNodes.Count > 0)
+            {
+                JArray children = obj.GetOrCreateArray("children");
+                foreach (var meshNode in ctx.MeshSourceNodes)
+                {
+                    children.Add(meshNode);
+                }
+            }
+
             var envelope = new JObject()
                 .Set("metadata", new JObject()
                     .Set("version", 4.5)
