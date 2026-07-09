@@ -6,7 +6,7 @@ import {Color4} from "@babylonjs/core/Maths/math.color";
 import {BatchedRenderer, ParticleSystem} from "babylon.quarks";
 import {loadQuarksFromJson} from "./loadQuarksJson";
 import {createEngineFromQuery} from "./shared/engineFactory";
-import {serializeEffectForest} from "babylon.quarks-editor";
+import {ensurePortableTextureUrl, serializeEffectForest} from "babylon.quarks-editor";
 import type {TransformNode} from "@babylonjs/core/Meshes/transformNode";
 import {demos} from "./registry";
 import type {DemoContext, DemoDefinition, DemoState} from "./types";
@@ -289,7 +289,7 @@ function setupJsonImportUi() {
     window.addEventListener("drop", onDrop);
 }
 
-document.getElementById("openInEditorBtn")?.addEventListener("click", () => {
+document.getElementById("openInEditorBtn")?.addEventListener("click", async () => {
     if (systems.length === 0) {
         return;
     }
@@ -303,6 +303,15 @@ document.getElementById("openInEditorBtn")?.addEventListener("click", () => {
             node = node.parent as TransformNode;
         }
         roots.add(node);
+    }
+    // Some demos (e.g. alphaTest) assign a texture pulled straight off a loaded GLB's
+    // material; embedded glTF images only have Babylon's internal placeholder url, which
+    // can't survive the navigation to the editor's own page/engine below. Bake real pixels
+    // into a portable data URI first so the reloaded effect keeps its texture.
+    for (const system of systems) {
+        if (system.texture) {
+            await ensurePortableTextureUrl(system.texture);
+        }
     }
     sessionStorage.setItem("quarks-editor-effect", serializeEffectForest([...roots], activeDemo?.name ?? "DemoEffect"));
     window.location.href = "./editor.html?effect=session";
