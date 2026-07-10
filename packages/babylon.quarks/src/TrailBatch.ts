@@ -73,7 +73,10 @@ export class TrailBatch extends VFXBatch {
         this.mesh.setVerticesData(VertexBuffer.PositionKind, this.positionBuffer, true);
         this.mesh.setVerticesData(VertexBuffer.UVKind, this.uvBuffer, true);
         this.mesh.setVerticesData(VertexBuffer.ColorKind, this.colorBuffer, true, 4);
-        this.mesh.setIndices(this.indexBuffer.subarray(0, 6), null, true);
+        // Allocate the GPU index buffer at full capacity: WebGL grows the buffer on
+        // update (bufferData), but WebGPU writes into the existing allocation and
+        // rejects out-of-bounds updates.
+        this.mesh.setIndices(this.indexBuffer, null, true);
         const engine = this.scene.getEngine();
         this.previousVB = new VertexBuffer(engine, this.previousBuffer, 'previous', true, false, 3, false);
         this.nextVB = new VertexBuffer(engine, this.nextBuffer, 'next', true, false, 3, false);
