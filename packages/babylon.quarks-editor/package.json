@@ -1,6 +1,6 @@
 {
   "name": "babylon.quarks-editor",
-  "version": "0.17.7",
+  "version": "0.17.8",
   "description": "Shuriken-style effect editor for babylon.quarks: headless edit-model core + React module-stack UI",
   "type": "module",
   "main": "./dist/index.js",
@@ -32,8 +32,13 @@
   },
   "keywords": [
     "babylonjs",
+    "babylon.js",
     "particles",
+    "particle-system",
+    "particle-editor",
     "vfx",
+    "vfx-editor",
+    "shuriken",
     "editor",
     "react",
     "quarks"

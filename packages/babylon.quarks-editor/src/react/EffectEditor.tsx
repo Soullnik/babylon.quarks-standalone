@@ -1,5 +1,7 @@
 import React, {useSyncExternalStore} from 'react';
+import type {TransformNode} from '@babylonjs/core/Meshes/transformNode';
 import {EffectBinding} from '../core/binding';
+import {ObjectModule} from './ObjectModule';
 import {
     ColorOverLifeModule,
     EmissionModule,
@@ -36,6 +38,8 @@ export interface EffectEditorProps {
     binding: EffectBinding;
     /** Currently selected system, lifted up so the timeline panel and this module stack agree. */
     selectedSystem: ParticleSystem;
+    gizmoTargetNode: TransformNode;
+    gizmoTargetLabel: string;
     /** Texture presets offered in the Renderer module (host supplies the loader). */
     textureOptions?: TextureOption[];
     /** Mesh presets offered for the Mesh render mode (host supplies the geometry buffers). */
@@ -74,8 +78,18 @@ export function EffectEditor(props: EffectEditorProps) {
         () => binding.getRevision()
     );
 
+    const gizmoTargetIsEmitter = allSystems.some((s) => s.emitter === props.gizmoTargetNode);
+    if (!gizmoTargetIsEmitter) {
+        return (
+            <div style={{fontFamily: theme.font, color: theme.text}}>
+                <ObjectModule node={props.gizmoTargetNode} label={props.gizmoTargetLabel} />
+            </div>
+        );
+    }
+
     return (
         <div style={{fontFamily: theme.font, color: theme.text}}>
+            <ObjectModule node={props.gizmoTargetNode} label={props.gizmoTargetLabel} />
             <MainModule binding={binding} />
             <EmissionModule binding={binding} />
             <ShapeModule binding={binding} />

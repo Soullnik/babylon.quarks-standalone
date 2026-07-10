@@ -5,7 +5,8 @@ import type {TransformNode} from '@babylonjs/core/Meshes/transformNode';
 import type {EffectBinding} from './binding';
 import type {EffectTreeNode} from './effectTree';
 
-const MIN_TIMELINE_SPAN = 4;
+/** Guards against a literally zero-width ruler (e.g. no tracks yet) — not a usability stretch. */
+const MIN_TIMELINE_SPAN = 0.01;
 
 export type TimelineRow =
     | {kind: 'group'; node: TransformNode; name: string; depth: number}
@@ -82,7 +83,7 @@ export function computeTimelineRows(binding: EffectBinding): TimelineRow[] {
     return rows;
 }
 
-/** Overall visible timeline span: the furthest track extent, floored at a sane minimum. */
+/** Overall timeline span: the furthest track extent (start offset + duration). */
 export function computeTimelineSpan(rows: TimelineRow[]): number {
     let span = 0;
     for (const row of rows) {

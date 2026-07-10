@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://soullnik.github.io/babylon.quarks-standalone/sitemap.xml

@@ -1,5 +1,6 @@
 import React, {useState} from 'react';
 import type {ParticleSystem} from 'babylon.quarks';
+import type {TransformNode} from '@babylonjs/core/Meshes/transformNode';
 import type {EffectBinding} from '../core/binding';
 import {buildEffectTree, collectSystems} from '../core/effectTree';
 import {createChildSystem, removeSystems} from '../core/systems';
@@ -16,7 +17,7 @@ export interface TimelineTrackRowProps {
     row: TimelineRow;
     binding: EffectBinding;
     selected: boolean;
-    onSelect: (system: ParticleSystem) => void;
+    onSelectNode: (node: TransformNode | null) => void;
     pxPerSecond: number;
     /** Matches the ruler's left gutter so bars line up under the correct tick. */
     offsetPx: number;
@@ -34,7 +35,7 @@ const checkboxButton: React.CSSProperties = {...iconButton, fontSize: 12, width:
 
 /** One row of the timeline: a label cell (name + actions) and, for tracks, a bar cell. */
 export function TimelineTrackRow(props: TimelineTrackRowProps): React.ReactElement {
-    const {row, binding, selected, onSelect, pxPerSecond, offsetPx, collapsed, onToggleCollapse, hidden, onToggleVisible, groupSelected, onToggleGroupSelect} = props;
+    const {row, binding, selected, onSelectNode, pxPerSecond, offsetPx, collapsed, onToggleCollapse, hidden, onToggleVisible, groupSelected, onToggleGroupSelect} = props;
     const [renaming, setRenaming] = useState(false);
 
     const isRoot = row.node === binding.root;
@@ -49,17 +50,22 @@ export function TimelineTrackRow(props: TimelineTrackRowProps): React.ReactEleme
         borderRadius: 6,
         cursor: row.kind === 'track' ? 'pointer' : onToggleCollapse ? 'pointer' : 'default',
         fontSize: 12.5,
-        color: row.kind === 'track' && selected ? theme.text : theme.textDim,
+        color: selected ? theme.text : theme.textDim,
         whiteSpace: 'nowrap',
+        boxSizing: 'border-box',
         // Left unset (rather than 'transparent') when not selected so the .qe-row-bg hover
         // tint isn't shadowed by an inline background of the same property.
-        ...(row.kind === 'track' && selected ? {background: 'rgba(60, 105, 209, 0.3)'} : {}),
+        ...(selected ? {background: 'rgba(60, 105, 209, 0.3)'} : {}),
     };
 
     if (row.kind === 'group') {
         return (
             <>
-                <div className="qe-hover-bg" style={{...labelStyle, borderTop: `1px solid ${theme.border}`}} onClick={onToggleCollapse}>
+                <div
+                    className="qe-hover-bg"
+                    style={{...labelStyle, borderTop: `1px solid ${theme.border}`}}
+                    onClick={() => onSelectNode(row.node)}
+                >
                     {!isRoot && (
                         <button
                             className="qe-hover"
@@ -73,7 +79,17 @@ export function TimelineTrackRow(props: TimelineTrackRowProps): React.ReactEleme
                             {groupSelected ? '☑' : '☐'}
                         </button>
                     )}
-                    <span style={{color: theme.textDim, fontSize: 10, width: 10}}>{collapsed ? '▸' : '▾'}</span>
+                    <span
+                        className="qe-hover"
+                        title={collapsed ? 'Expand' : 'Collapse'}
+                        style={{color: theme.textDim, fontSize: 10, width: 10, cursor: 'pointer'}}
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            onToggleCollapse?.();
+                        }}
+                    >
+                        {collapsed ? '▸' : '▾'}
+                    </span>
                     <span style={{flex: 1, overflow: 'hidden', textOverflow: 'ellipsis'}}>{row.name}</span>
                     <button
                         className="qe-hover"
@@ -91,7 +107,7 @@ export function TimelineTrackRow(props: TimelineTrackRowProps): React.ReactEleme
                             });
                             if (created) {
                                 binding.addSubSystem(created);
-                                onSelect(created);
+                                onSelectNode(created.emitter);
                             }
                         }}
                     >
@@ -125,7 +141,7 @@ export function TimelineTrackRow(props: TimelineTrackRowProps): React.ReactEleme
                             style={{...iconButton, color: '#e08c8c', fontSize: 12}}
                             onClick={(e) => {
                                 e.stopPropagation();
-                                removeSystems(binding, collectSystems(buildEffectTree(row.node)), onSelect);
+                                removeSystems(binding, collectSystems(buildEffectTree(row.node)), (s) => onSelectNode(s.emitter));
                                 binding.apply(() => row.node.dispose(true, false));
                             }}
                         >
@@ -133,7 +149,7 @@ export function TimelineTrackRow(props: TimelineTrackRowProps): React.ReactEleme
                         </button>
                     )}
                 </div>
-                <div className="qe-hover-bg" style={{height: ROW_HEIGHT, borderTop: `1px solid ${theme.border}`}} onClick={onToggleCollapse} />
+                <div className="qe-hover-bg" style={{height: ROW_HEIGHT, borderTop: `1px solid ${theme.border}`}} onClick={() => onSelectNode(row.node)} />
                 {renaming && (
                     <PromptDialog
                         title="Rename"
@@ -155,7 +171,11 @@ export function TimelineTrackRow(props: TimelineTrackRowProps): React.ReactEleme
 
     return (
         <>
-            <div className="qe-hover-bg" style={{...labelStyle, opacity: hidden ? 0.5 : 1}} onClick={() => onSelect(system)}>
+            <div
+                className="qe-hover-bg"
+                style={{...labelStyle, opacity: hidden ? 0.5 : 1}}
+                onClick={() => onSelectNode(row.node)}
+            >
                 {!isRoot && (
                     <button
                         className="qe-hover"
@@ -200,7 +220,7 @@ export function TimelineTrackRow(props: TimelineTrackRowProps): React.ReactEleme
                         style={{...iconButton, color: '#e08c8c', fontSize: 12}}
                         onClick={(e) => {
                             e.stopPropagation();
-                            removeSystems(binding, [system], onSelect);
+                            removeSystems(binding, [system], (s) => onSelectNode(s.emitter));
                         }}
                     >
                         ✕
@@ -220,7 +240,7 @@ export function TimelineTrackRow(props: TimelineTrackRowProps): React.ReactEleme
                             });
                             if (created) {
                                 binding.addSubSystem(created);
-                                onSelect(created);
+                                onSelectNode(created.emitter);
                             }
                         }}
                     >
@@ -228,7 +248,11 @@ export function TimelineTrackRow(props: TimelineTrackRowProps): React.ReactEleme
                     </button>
                 )}
             </div>
-            <div className="qe-hover-bg" style={{position: 'relative', height: ROW_HEIGHT}} onClick={() => onSelect(system)}>
+            <div
+                className="qe-hover-bg"
+                style={{position: 'relative', height: ROW_HEIGHT}}
+                onClick={() => onSelectNode(row.node)}
+            >
                 <div
                     className="qe-hover"
                     title={row.startOffsetVariable ? 'Start time varies per spawn' : undefined}
