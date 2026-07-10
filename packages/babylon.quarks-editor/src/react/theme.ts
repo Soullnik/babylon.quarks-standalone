@@ -82,4 +82,27 @@ select.qe-hover:hover, input.qe-hover:hover, select.qe-hover:focus, input.qe-hov
     border-color: ${theme.borderActive};
     filter: none;
 }
+.qe-root, .qe-root * {
+    scrollbar-width: thin;
+    scrollbar-color: ${theme.border} transparent;
+}
+.qe-root ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+}
+.qe-root ::-webkit-scrollbar-track {
+    background: transparent;
+}
+.qe-root ::-webkit-scrollbar-thumb {
+    background-color: ${theme.border};
+    background-clip: padding-box;
+    border: 2px solid transparent;
+    border-radius: 8px;
+}
+.qe-root ::-webkit-scrollbar-thumb:hover {
+    background-color: ${theme.borderActive};
+}
+.qe-root ::-webkit-scrollbar-corner {
+    background: transparent;
+}
 `;

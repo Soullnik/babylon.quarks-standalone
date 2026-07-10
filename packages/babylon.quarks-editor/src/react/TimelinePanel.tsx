@@ -19,8 +19,8 @@ export interface PlaybackState {
 
 export interface TimelinePanelProps {
     binding: EffectBinding;
-    selectedSystem: ParticleSystem;
-    onSelect: (system: ParticleSystem) => void;
+    selectedNode: TransformNode | null;
+    onSelectNode: (node: TransformNode | null) => void;
     scene: Scene;
     renderer: BatchedRenderer;
     playbackRef: React.MutableRefObject<PlaybackState>;
@@ -34,9 +34,12 @@ export interface TimelinePanelProps {
 
 const LABEL_WIDTH = 200;
 const RULER_HEIGHT = 22;
+const STAGE_ROW_HEIGHT = 26;
 const PANEL_HEIGHT = 220;
 /** Small gap between the label column and the first pixel of the time axis. */
 export const TIMELINE_INSET = 10;
+/** Gap reserved at the right edge so the full-duration mark doesn't sit flush against the panel edge. */
+const RIGHT_PADDING = 16;
 
 function pickTickInterval(pxPerSecond: number): number {
     if (pxPerSecond >= 60) return 1;
@@ -50,7 +53,7 @@ function pickTickInterval(pxPerSecond: number): number {
  * draggable playhead (approximate scrub — see core/scrub.ts), and one track row per system.
  */
 export function TimelinePanel(props: TimelinePanelProps): React.ReactElement {
-    const {binding, selectedSystem, onSelect, scene, renderer, playbackRef, playheadRef, counterRef, paused, setPaused, speed, setSpeed} = props;
+    const {binding, selectedNode, onSelectNode, scene, renderer, playbackRef, playheadRef, counterRef, paused, setPaused, speed, setSpeed} = props;
 
     const [bodyWidthPx, setBodyWidthPx] = useState(600);
     const [collapsedGroups, setCollapsedGroups] = useState<Set<TransformNode>>(() => new Set());
@@ -116,25 +119,53 @@ export function TimelinePanel(props: TimelinePanelProps): React.ReactElement {
     }, []);
 
     const rows = useMemo(() => computeTimelineRows(binding), [binding, binding.getRevision()]);
+    // The ruler spans exactly the furthest track extent (no artificial stretch), minus a
+    // right-hand gap so the full-duration mark never sits flush against the panel edge.
     const timelineSpan = useMemo(() => computeTimelineSpan(rows), [rows]);
-    const pxPerSecond = Math.max(1, bodyWidthPx - TIMELINE_INSET) / timelineSpan;
+    const pxPerSecond = Math.max(1, bodyWidthPx - TIMELINE_INSET - RIGHT_PADDING) / timelineSpan;
 
     // Follows playbackRef.elapsed independently of Babylon's render loop (Host only owns
-    // simulation time; this owns translating it into pixels for the playhead line). Looping
-    // effects run forever, so elapsed grows unbounded — wrap it to the visible span instead
-    // of letting the playhead fly off past the right edge.
+    // simulation time; this owns translating it into pixels for the playhead line). Whether
+    // the *whole* effect loops is an OR across tracks (there's no single canonical "root" —
+    // an effect can have several top-level systems): if any track loops, elapsed grows
+    // unbounded and we wrap it at timelineSpan. If none loop, finishing a run snaps playback
+    // straight back to frame 0 (paused) — a one-shot preview parked and ready for the next Play.
+    const anyLooping = useMemo(() => rows.some((r) => r.kind === 'track' && r.looping), [rows]);
+    // Tracks elapsed from the previous tick so the finish-reset below only fires on a genuine
+    // crossing during live playback. Without this, manually dragging the playhead to (or past)
+    // the end pins elapsed at timelineSpan while scrubbing=true skips the reset — but the very
+    // next tick after release would otherwise see elapsed >= timelineSpan with no memory of
+    // *how* it got there, and wrongly treat a drag as a finished run.
+    const prevElapsedRef = useRef(0);
     React.useEffect(() => {
         let raf: number;
         const tick = () => {
+            const state = playbackRef.current;
+            const elapsed = state.elapsed;
+            let shown = elapsed;
+            if (anyLooping) {
+                shown = timelineSpan > 0 ? elapsed % timelineSpan : 0;
+            } else if (elapsed >= timelineSpan) {
+                shown = timelineSpan;
+                const justFinishedPlaying = !state.scrubbing && !state.paused && prevElapsedRef.current < timelineSpan;
+                if (justFinishedPlaying) {
+                    scrubTo(binding, renderer, 0);
+                    state.elapsed = 0;
+                    state.paused = true;
+                    setPaused(true);
+                    scene.render();
+                    shown = 0;
+                }
+            }
+            prevElapsedRef.current = elapsed;
             if (playheadRef.current) {
-                const wrapped = timelineSpan > 0 ? playbackRef.current.elapsed % timelineSpan : 0;
-                playheadRef.current.style.left = `${LABEL_WIDTH + TIMELINE_INSET + wrapped * pxPerSecond}px`;
+                playheadRef.current.style.left = `${LABEL_WIDTH + TIMELINE_INSET + shown * pxPerSecond}px`;
             }
             raf = requestAnimationFrame(tick);
         };
         raf = requestAnimationFrame(tick);
         return () => cancelAnimationFrame(raf);
-    }, [pxPerSecond, timelineSpan, playbackRef, playheadRef]);
+    }, [pxPerSecond, timelineSpan, anyLooping, playbackRef, playheadRef, setPaused, binding, renderer, scene]);
 
     const visibleRows = useMemo(() => {
         let hideUntilDepth: number | null = null;
@@ -215,6 +246,8 @@ export function TimelinePanel(props: TimelinePanelProps): React.ReactElement {
         >
             <div style={{display: 'flex', alignItems: 'center', gap: 6, padding: '6px 10px', borderBottom: `1px solid ${theme.border}`}}>
                 <button className="qe-hover" style={overlayButton} title={paused ? 'Play' : 'Pause'} onClick={() => {
+                    // A finished one-shot effect already snapped itself back to frame 0 and
+                    // paused (see the tick effect above), so a plain toggle is enough here.
                     playbackRef.current.paused = !paused;
                     setPaused(!paused);
                 }}>
@@ -297,9 +330,34 @@ export function TimelinePanel(props: TimelinePanelProps): React.ReactElement {
                     </div>
                 </div>
                 <div
+                    className="qe-hover-bg"
+                    title="Preview parent — simulates effect.parent = someNode; not saved in the exported JSON"
                     style={{
                         position: 'absolute',
                         top: RULER_HEIGHT,
+                        left: 0,
+                        right: 0,
+                        height: STAGE_ROW_HEIGHT,
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 6,
+                        padding: '0 8px',
+                        fontSize: 12.5,
+                        fontStyle: 'italic',
+                        cursor: 'pointer',
+                        color: selectedNode === null ? theme.text : theme.textDim,
+                        borderBottom: `1px solid ${theme.border}`,
+                        ...(selectedNode === null ? {background: 'rgba(60, 105, 209, 0.3)'} : {}),
+                    }}
+                    onClick={() => onSelectNode(null)}
+                >
+                    <span style={{fontSize: 10, width: 10}}>◎</span>
+                    <span>Stage (preview parent)</span>
+                </div>
+                <div
+                    style={{
+                        position: 'absolute',
+                        top: RULER_HEIGHT + STAGE_ROW_HEIGHT,
                         left: 0,
                         right: 0,
                         bottom: 0,
@@ -319,8 +377,8 @@ export function TimelinePanel(props: TimelinePanelProps): React.ReactElement {
                                 key={row.node.uniqueId}
                                 row={row}
                                 binding={binding}
-                                selected={row.kind === 'track' && row.system === selectedSystem}
-                                onSelect={onSelect}
+                                selected={row.node === selectedNode}
+                                onSelectNode={onSelectNode}
                                 pxPerSecond={pxPerSecond}
                                 offsetPx={TIMELINE_INSET}
                                 collapsed={row.kind === 'group' && collapsedGroups.has(row.node)}
