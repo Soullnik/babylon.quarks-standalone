@@ -608,17 +608,41 @@
 
         <section id="quick-start" class="section">
             <h2>Quick start</h2>
-            <p class="sub">Install the package, add a batched renderer, and load an exported effect with <code style="color:#9ec1ff">QuarksLoader</code>.</p>
+            <p class="sub">Install the package, load an exported effect with <code style="color:#9ec1ff">QuarksLoader</code>, register it with the batched renderer, and tick it every frame.</p>
             <div class="quickstart">
 <pre class="code"><span class="c"># install</span>
 npm i babylon.quarks
 
 <span class="c">// render an effect in your Babylon scene</span>
-<span class="k">import</span> { BatchedRenderer, QuarksLoader } <span class="k">from</span> <span class="s">"babylon.quarks"</span>;
+<span class="k">import</span> { BatchedRenderer, QuarksLoader, QuarksUtil } <span class="k">from</span> <span class="s">"babylon.quarks"</span>;
 
 <span class="k">const</span> renderer = <span class="k">new</span> <span class="f">BatchedRenderer</span>(<span class="s">"vfx"</span>, scene);
 <span class="k">const</span> root = <span class="k">new</span> <span class="f">QuarksLoader</span>(scene).<span class="f">parse</span>(effectJson);
-root.parent = renderer;
+QuarksUtil.<span class="f">addToBatchRenderer</span>(root, renderer);
+QuarksUtil.<span class="f">play</span>(root);
+
+<span class="c">// tick the simulation every frame</span>
+scene.onBeforeRenderObservable.<span class="f">add</span>(() =&gt; {
+    renderer.<span class="f">update</span>(scene.<span class="f">getEngine</span>().<span class="f">getDeltaTime</span>() / 1000);
+});
+</pre>
+<pre class="code"><span class="c">// ...or build a system in code — no JSON needed</span>
+<span class="k">import</span> { ParticleSystem, ConstantValue, IntervalValue, SphereEmitter,
+         SizeOverLife, PiecewiseBezier, Bezier } <span class="k">from</span> <span class="s">"babylon.quarks"</span>;
+<span class="k">import</span> { Texture } <span class="k">from</span> <span class="s">"@babylonjs/core/Materials/Textures/texture"</span>;
+
+<span class="k">const</span> sparks = <span class="k">new</span> <span class="f">ParticleSystem</span>({
+    scene,
+    startLife: <span class="k">new</span> <span class="f">IntervalValue</span>(1, 2),
+    startSpeed: <span class="k">new</span> <span class="f">IntervalValue</span>(2, 5),
+    startSize: <span class="k">new</span> <span class="f">IntervalValue</span>(0.1, 0.3),
+    emissionOverTime: <span class="k">new</span> <span class="f">ConstantValue</span>(60),
+    shape: <span class="k">new</span> <span class="f">SphereEmitter</span>({ radius: 0.2 }),
+    texture: <span class="k">new</span> <span class="f">Texture</span>(<span class="s">"particle.png"</span>, scene),
+});
+sparks.<span class="f">addBehavior</span>(<span class="k">new</span> <span class="f">SizeOverLife</span>(<span class="k">new</span> <span class="f">PiecewiseBezier</span>([[<span class="k">new</span> <span class="f">Bezier</span>(1, 0.9, 0.6, 0), 0]])));
+renderer.<span class="f">addSystem</span>(sparks);
+sparks.<span class="f">play</span>();
 </pre>
             </div>
         </section>
