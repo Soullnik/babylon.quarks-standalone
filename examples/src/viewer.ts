@@ -94,7 +94,12 @@ function createBaseScene() {
     camera.minZ = 0.1;
     new HemisphericLight("light", new BVector3(0, 1, 0), scene);
 
-    batchRenderer = new BatchedRenderer("batchRenderer", scene);
+    // ?sim=gpu (or auto) requests GPU compute simulation for every demo
+    // system; unsupported systems/engines fall back to CPU per system.
+    const requestedSim = new URLSearchParams(window.location.search).get("sim");
+    batchRenderer = new BatchedRenderer("batchRenderer", scene, {
+        defaultSimulation: requestedSim === "gpu" ? "gpu" : requestedSim === "auto" ? "auto" : undefined,
+    });
     systems = [];
     demoState = {totalTime: 0, refreshIndex: 0};
 }

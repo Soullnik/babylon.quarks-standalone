@@ -1,14 +1,10 @@
 import {Mesh} from '@babylonjs/core/Meshes/mesh';
 import {VertexData} from '@babylonjs/core/Meshes/mesh.vertexData';
 import {VertexBuffer} from '@babylonjs/core/Buffers/buffer';
-import {Effect} from '@babylonjs/core/Materials/effect';
 import {ShaderMaterial} from '@babylonjs/core/Materials/shaderMaterial';
 import {Scene} from '@babylonjs/core/scene';
-import {Constants} from '@babylonjs/core/Engines/constants';
-import {Vector2 as BVector2, Vector3 as BVector3, Vector4 as BVector4} from '@babylonjs/core/Maths/math.vector';
 import {
     Vector3,
-    Vector4,
     Quaternion,
     Matrix3,
     SpriteParticle,
@@ -16,11 +12,7 @@ import {
 } from 'quarks.core';
 import {VFXBatch, RenderMode} from './VFXBatch';
 import {VFXBatchSettings} from './BatchedRenderer';
-import particle_vert from './shaders/particle_vert.glsl';
-import particle_frag from './shaders/particle_frag.glsl';
-import particle_physics_frag from './shaders/particle_physics_frag.glsl';
-import stretched_bb_particle_vert from './shaders/stretched_bb_particle_vert.glsl';
-import local_particle_physics_vert from './shaders/local_particle_physics_vert.glsl';
+import {buildSpriteMaterial} from './materials/spriteMaterial';
 
 export class SpriteBatch extends VFXBatch {
     private offsetBuffer!: Float32Array;
@@ -109,134 +101,8 @@ export class SpriteBatch extends VFXBatch {
     }
 
     rebuildMaterial(): void {
-        const shaderName = `quarksParticle_${this.settings.renderMode}_${Date.now()}`;
         this.lastStretchedSpeedFactor = Number.NaN;
-        let vertexShader: string;
-        let fragmentShader: string;
-        const defines: string[] = [];
-
-        if (this.settings.renderMode === RenderMode.Mesh) {
-            vertexShader = local_particle_physics_vert;
-            fragmentShader = particle_physics_frag;
-        } else if (this.settings.renderMode === RenderMode.StretchedBillBoard) {
-            vertexShader = stretched_bb_particle_vert;
-            fragmentShader = particle_frag;
-        } else {
-            vertexShader = particle_vert;
-            fragmentShader = particle_frag;
-        }
-
-        if (this.settings.texture) {
-            defines.push('USE_MAP');
-        }
-        if (this.settings.uTileCount > 1 || this.settings.vTileCount > 1) {
-            defines.push('UV_TILE');
-        }
-        if (this.settings.blendTiles) {
-            defines.push('TILE_BLEND');
-        }
-        if (this.settings.softParticles) {
-            defines.push('SOFT_PARTICLES');
-        }
-        if (this.settings.materialAlphaTest > 0) {
-            defines.push('USE_ALPHATEST');
-        }
-        if (this.settings.renderMode === RenderMode.VerticalBillBoard) {
-            defines.push('VERTICAL');
-        }
-        if (this.settings.renderMode === RenderMode.HorizontalBillBoard) {
-            defines.push('HORIZONTAL');
-        }
-
-        Effect.ShadersStore[shaderName + 'VertexShader'] = vertexShader;
-        Effect.ShadersStore[shaderName + 'FragmentShader'] = fragmentShader;
-
-        const attributes = ['position', 'uv', 'offset', 'color', 'size', 'rotation', 'uvTile'];
-        if (this.settings.renderMode === RenderMode.Mesh) {
-            attributes.push('normal');
-        }
-        if (this.settings.renderMode === RenderMode.StretchedBillBoard) {
-            attributes.push('velocity');
-        }
-
-        const uniforms = ['world', 'view', 'projection', 'worldView', 'worldViewProjection'];
-        const samplers: string[] = [];
-
-        if (this.settings.uTileCount > 1 || this.settings.vTileCount > 1) {
-            uniforms.push('tileCountX');
-            uniforms.push('tileCountY');
-        }
-        if (this.settings.texture) {
-            samplers.push('map');
-        }
-        if (this.settings.renderMode === RenderMode.StretchedBillBoard) {
-            uniforms.push('speedFactor');
-        }
-        if (this.settings.softParticles) {
-            uniforms.push('softParams');
-            uniforms.push('projParams');
-            samplers.push('depthTexture');
-        }
-        if (this.settings.materialAlphaTest > 0) {
-            uniforms.push('alphaTest');
-        }
-        if (this.settings.renderMode === RenderMode.Mesh) {
-            uniforms.push('lightDirection');
-            uniforms.push('lightColor');
-            uniforms.push('ambientColor');
-        }
-
-        const mat = new ShaderMaterial(shaderName, this.scene,
-            {vertex: shaderName, fragment: shaderName},
-            {
-                attributes,
-                uniforms,
-                samplers,
-                defines,
-                needAlphaBlending: this.settings.materialTransparent,
-            }
-        );
-
-        if (this.settings.texture) {
-            mat.setTexture('map', this.settings.texture);
-        }
-        if (this.settings.uTileCount > 1 || this.settings.vTileCount > 1) {
-            mat.setFloat('tileCountX', this.settings.uTileCount);
-            mat.setFloat('tileCountY', this.settings.vTileCount);
-        }
-        if (this.settings.renderMode === RenderMode.StretchedBillBoard) {
-            mat.setFloat('speedFactor', this.settings.softNearFade > 0 ? this.settings.softNearFade : 1.0);
-        }
-        if (this.settings.softParticles) {
-            mat.setVector2('softParams', new BVector2(this.settings.softNearFade, 1.0 / Math.max(this.settings.softFarFade - this.settings.softNearFade, 0.0001)));
-            mat.onBindObservable.add(() => {
-                const camera = this.scene.activeCamera;
-                if (camera) {
-                    mat.setVector4('projParams', new BVector4(camera.minZ, camera.maxZ, 0, 0));
-                }
-            });
-        }
-        if (this.settings.materialAlphaTest > 0) {
-            mat.setFloat('alphaTest', this.settings.materialAlphaTest);
-        }
-        if (this.settings.renderMode === RenderMode.Mesh) {
-            mat.setVector3('lightDirection', new BVector3(0.4, -1, 0.6));
-            mat.setVector3('lightColor', new BVector3(1, 1, 1));
-            mat.setVector3('ambientColor', new BVector3(0.35, 0.35, 0.35));
-        }
-
-        mat.backFaceCulling = false;
-
-        if (this.settings.materialTransparent) {
-            mat.alphaMode = this.settings.materialBlendMode;
-        } else {
-            mat.alphaMode = Constants.ALPHA_DISABLE;
-        }
-        mat.needDepthPrePass = this.settings.materialDepthWrite;
-        mat.forceDepthWrite = this.settings.materialDepthWrite;
-        mat.disableDepthWrite = !this.settings.materialDepthWrite;
-
-        this.mesh.material = mat;
+        this.mesh.material = buildSpriteMaterial(this.settings, this.scene);
     }
 
     private vector_ = new Vector3();

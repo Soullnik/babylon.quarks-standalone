@@ -8,14 +8,20 @@ import type {AbstractEngine} from "@babylonjs/core/Engines/abstractEngine";
 export async function createEngineFromQuery(canvas: HTMLCanvasElement): Promise<AbstractEngine> {
     const requested = new URLSearchParams(window.location.search).get("engine");
     if (requested === "webgpu") {
-        const {WebGPUEngine} = await import("@babylonjs/core/Engines/webgpuEngine");
-        await import("@babylonjs/core/Engines/WebGPU/Extensions/index");
-        if (await WebGPUEngine.IsSupportedAsync) {
-            const engine = new WebGPUEngine(canvas, {antialias: true});
-            await engine.initAsync();
-            return engine;
+        try {
+            const {WebGPUEngine} = await import("@babylonjs/core/Engines/webgpuEngine");
+            await import("@babylonjs/core/Engines/WebGPU/Extensions/index");
+            if (await WebGPUEngine.IsSupportedAsync) {
+                const engine = new WebGPUEngine(canvas, {antialias: true});
+                await engine.initAsync();
+                return engine;
+            }
+            console.warn("WebGPU requested but not supported in this browser; falling back to WebGL.");
+        } catch (error) {
+            // IsSupportedAsync only checks for an adapter; device creation can
+            // still fail (e.g. driver/DXC issues) — fall back instead of dying.
+            console.warn("WebGPU initialization failed; falling back to WebGL.", error);
         }
-        console.warn("WebGPU requested but not supported in this browser; falling back to WebGL.");
     }
     return new Engine(canvas, true);
 }

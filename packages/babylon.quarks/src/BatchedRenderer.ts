@@ -7,6 +7,11 @@ import {VFXBatch, RenderMode, StoredBatchSettings} from './VFXBatch';
 import {SpriteBatch} from './SpriteBatch';
 import {TrailBatch} from './TrailBatch';
 import {ParticleSystem} from './ParticleSystem';
+import {resolveSimulationBackend, SimulationBackend, SimulationMode} from './gpu/SimulationBackend';
+import {GpuParticleSimulator} from './gpu/GpuParticleSimulator';
+import {GpuSpriteBatch} from './gpu/GpuSpriteBatch';
+import {estimateCapacity} from './gpu/GpuCapacity';
+import {encodeSystem} from './gpu/encodeSystem';
 
 export interface VFXBatchSettings {
     instancingGeometry: Float32Array;
@@ -28,6 +33,14 @@ export interface VFXBatchSettings {
     materialAlphaTest: number;
     texture: Texture | null;
     layerMask: number;
+}
+
+export interface BatchedRendererOptions {
+    /**
+     * Simulation mode applied to systems that don't specify their own
+     * `simulation` parameter. Defaults to 'cpu'.
+     */
+    defaultSimulation?: SimulationMode;
 }
 
 export interface AdaptivePerformanceOptions {
@@ -59,9 +72,11 @@ export class BatchedRenderer extends TransformNode {
         lastFrameCpuMs: 0,
     };
     private lastAppliedQuality = Number.NaN;
+    private readonly options: BatchedRendererOptions;
 
-    constructor(name: string, scene: Scene) {
+    constructor(name: string, scene: Scene, options: BatchedRendererOptions = {}) {
         super(name, scene);
+        this.options = options;
     }
 
     private static clamp(value: number, min: number, max: number): number {
@@ -89,15 +104,70 @@ export class BatchedRenderer extends TransformNode {
         );
     }
 
+    /**
+     * Resolves the simulation backend for a system: evaluates GPU support,
+     * stores the resolved state on the system and creates/disposes its
+     * GpuParticleSimulator accordingly.
+     */
+    private resolveBackend(particleSystem: ParticleSystem): boolean {
+        const requested: SimulationMode = particleSystem.simulationMode ?? this.options.defaultSimulation ?? 'cpu';
+        const scene = this.getScene();
+        let state = resolveSimulationBackend(particleSystem, scene, requested);
+
+        if (state.active === SimulationBackend.GPU) {
+            const capacity = estimateCapacity(particleSystem, particleSystem.gpuMaxParticles);
+            const result = encodeSystem(particleSystem, capacity);
+            /* istanbul ignore if -- evaluateGpuSupport already vetted every feature the encoder checks */
+            if (result.ok === false) {
+                state = {
+                    requested,
+                    active: SimulationBackend.CPU,
+                    fallbackReason: result.reasons[0],
+                    unsupportedFeatures: result.reasons,
+                };
+            } else {
+                if (particleSystem._gpuSimulator && particleSystem._gpuSimulator.signature !== result.encoded.signature) {
+                    // config changed since the simulator was built (updateSystem path)
+                    particleSystem._gpuSimulator.dispose();
+                    particleSystem._gpuSimulator = undefined;
+                }
+                if (!particleSystem._gpuSimulator) {
+                    particleSystem._gpuSimulator = new GpuParticleSimulator(particleSystem, scene, result.encoded);
+                }
+            }
+        }
+
+        if (state.active === SimulationBackend.CPU) {
+            if (particleSystem._gpuSimulator) {
+                particleSystem._gpuSimulator.dispose();
+                particleSystem._gpuSimulator = undefined;
+            }
+            if (requested === 'gpu' && !particleSystem._gpuFallbackWarned) {
+                particleSystem._gpuFallbackWarned = true;
+                console.warn(
+                    `babylon.quarks: GPU simulation was requested but is unavailable for this system; ` +
+                        `falling back to CPU. Reasons: ${state.unsupportedFeatures?.join('; ')}`
+                );
+            }
+        }
+
+        particleSystem._simulationState = state;
+        return state.active === SimulationBackend.GPU;
+    }
+
     addSystem(system: IParticleSystem) {
         const particleSystem = system as ParticleSystem;
         particleSystem._renderer = this;
         if (this.adaptivePerformanceState.enabled) {
             particleSystem.setQualityFactor(this.adaptivePerformanceState.currentQuality);
         }
+        const isGpu = this.resolveBackend(particleSystem);
         const settings = particleSystem.getRendererSettings();
         for (let i = 0; i < this.batches.length; i++) {
-            if (BatchedRenderer.equals(this.batches[i].settings, settings)) {
+            if (
+                this.batches[i] instanceof GpuSpriteBatch === isGpu &&
+                BatchedRenderer.equals(this.batches[i].settings, settings)
+            ) {
                 this.batches[i].addSystem(system);
                 this.systemToBatchIndex.set(system, i);
                 return;
@@ -105,19 +175,23 @@ export class BatchedRenderer extends TransformNode {
         }
         let batch: VFXBatch;
         const scene = this.getScene();
-        switch (settings.renderMode) {
-            case RenderMode.Trail:
-                batch = new TrailBatch(settings, scene);
-                break;
-            case RenderMode.Mesh:
-            case RenderMode.BillBoard:
-            case RenderMode.VerticalBillBoard:
-            case RenderMode.HorizontalBillBoard:
-            case RenderMode.StretchedBillBoard:
-                batch = new SpriteBatch(settings, scene);
-                break;
-            default:
-                throw new Error(`Unsupported render mode: ${settings.renderMode}`);
+        if (isGpu) {
+            batch = new GpuSpriteBatch(settings, scene);
+        } else {
+            switch (settings.renderMode) {
+                case RenderMode.Trail:
+                    batch = new TrailBatch(settings, scene);
+                    break;
+                case RenderMode.Mesh:
+                case RenderMode.BillBoard:
+                case RenderMode.VerticalBillBoard:
+                case RenderMode.HorizontalBillBoard:
+                case RenderMode.StretchedBillBoard:
+                    batch = new SpriteBatch(settings, scene);
+                    break;
+                default:
+                    throw new Error(`Unsupported render mode: ${settings.renderMode}`);
+            }
         }
         batch.mesh.parent = this;
         if (this.depthTexture) {

@@ -1,0 +1,382 @@
+// Jest Snapshot v1, https://jestjs.io/docs/snapshot-testing
+
+exports[`GPU codegen assembles spawn/update/reset kernels for a fountain system (snapshot): reset 1`] = `
+"
+struct SimParams {
+    emitterMatrix : mat4x4<f32>,
+    normalMatrix : mat4x4<f32>,
+    timing : vec4<f32>,
+    counts : vec4<u32>,
+    scaleV : vec4<f32>,
+    g0_startColor : vec4<f32>,
+    g1_startSpeed : f32,
+    g2_startLife : vec2<f32>,
+    g3_startSize : vec2<f32>,
+    g4_startRotation : f32,
+    g5_startTile : f32,
+    g6_cone : vec4<f32>,
+    g7_applyForce : vec4<f32>,
+    g8_gravity : vec4<f32>,
+};
+@group(0) @binding(0) var<storage, read> params : SimParams;
+@group(0) @binding(1) var<storage, read_write> particles : array<Particle>;
+@group(0) @binding(2) var<storage, read_write> counters : Counters;
+@group(0) @binding(3) var<storage, read_write> freeList : array<u32>;
+@group(0) @binding(4) var<storage, read_write> instanceData : array<f32>;
+@group(0) @binding(5) var curveAtlas : texture_2d<f32>;
+
+struct Particle {
+    position_age : vec4<f32>,   // xyz position (sim space), w age
+    velocity_life : vec4<f32>,  // xyz velocity, w life (life <= 0 means free slot)
+    start_color : vec4<f32>,
+    start_misc : vec4<f32>,     // x startSize, y startSpeed, z rotation, w uvTile
+    seed : vec4<u32>,           // x per-particle random seed
+};
+
+struct Counters {
+    aliveCount : atomic<u32>,
+    freeTop : atomic<i32>,
+    dropped : atomic<u32>,
+    pad : u32,
+};
+
+fn pcg(v : u32) -> u32 {
+    let s = v * 747796405u + 2891336453u;
+    let w = ((s >> ((s >> 28u) + 4u)) ^ s) * 277803737u;
+    return (w >> 22u) ^ w;
+}
+
+fn prand(seed : u32, id : u32) -> f32 {
+    return f32(pcg(seed ^ (id * 2654435769u))) / 4294967296.0;
+}
+
+fn nextRand(state : ptr<function, u32>) -> f32 {
+    *state = pcg(*state);
+    return f32(*state) / 4294967296.0;
+}
+
+
+fn sampleCurve(row : u32, t : f32) -> vec4<f32> {
+    let x = clamp(t, 0.0, 1.0) * 127.0;
+    let i0 = u32(floor(x));
+    let i1 = min(i0 + 1u, 127u);
+    let a = textureLoad(curveAtlas, vec2<u32>(i0, row), 0);
+    let b = textureLoad(curveAtlas, vec2<u32>(i1, row), 0);
+    return mix(a, b, x - f32(i0));
+}
+
+fn clearInstance(slot : u32) {
+    let base = (params.counts.z + slot) * 12u;
+    instanceData[base + 7u] = 0.0;
+    instanceData[base + 8u] = 0.0;
+    instanceData[base + 9u] = 0.0;
+}
+
+@compute @workgroup_size(64)
+fn main(@builtin(global_invocation_id) gid : vec3<u32>) {
+    let slot = gid.x;
+    if (slot >= 1024u) {
+        return;
+    }
+    particles[slot].velocity_life = vec4<f32>(0.0);
+    freeList[slot] = 1024u - 1u - slot;
+    let base = (params.counts.z + slot) * 12u;
+    for (var k = 0u; k < 12u; k = k + 1u) {
+        instanceData[base + k] = 0.0;
+    }
+    if (slot == 0u) {
+        atomicStore(&counters.aliveCount, 0u);
+        atomicStore(&counters.freeTop, i32(1024u));
+        atomicStore(&counters.dropped, 0u);
+    }
+}
+"
+`;
+
+exports[`GPU codegen assembles spawn/update/reset kernels for a fountain system (snapshot): spawn 1`] = `
+"
+struct SimParams {
+    emitterMatrix : mat4x4<f32>,
+    normalMatrix : mat4x4<f32>,
+    timing : vec4<f32>,
+    counts : vec4<u32>,
+    scaleV : vec4<f32>,
+    g0_startColor : vec4<f32>,
+    g1_startSpeed : f32,
+    g2_startLife : vec2<f32>,
+    g3_startSize : vec2<f32>,
+    g4_startRotation : f32,
+    g5_startTile : f32,
+    g6_cone : vec4<f32>,
+    g7_applyForce : vec4<f32>,
+    g8_gravity : vec4<f32>,
+};
+@group(0) @binding(0) var<storage, read> params : SimParams;
+@group(0) @binding(1) var<storage, read_write> particles : array<Particle>;
+@group(0) @binding(2) var<storage, read_write> counters : Counters;
+@group(0) @binding(3) var<storage, read_write> freeList : array<u32>;
+@group(0) @binding(4) var<storage, read_write> instanceData : array<f32>;
+@group(0) @binding(5) var curveAtlas : texture_2d<f32>;
+
+struct Particle {
+    position_age : vec4<f32>,   // xyz position (sim space), w age
+    velocity_life : vec4<f32>,  // xyz velocity, w life (life <= 0 means free slot)
+    start_color : vec4<f32>,
+    start_misc : vec4<f32>,     // x startSize, y startSpeed, z rotation, w uvTile
+    seed : vec4<u32>,           // x per-particle random seed
+};
+
+struct Counters {
+    aliveCount : atomic<u32>,
+    freeTop : atomic<i32>,
+    dropped : atomic<u32>,
+    pad : u32,
+};
+
+fn pcg(v : u32) -> u32 {
+    let s = v * 747796405u + 2891336453u;
+    let w = ((s >> ((s >> 28u) + 4u)) ^ s) * 277803737u;
+    return (w >> 22u) ^ w;
+}
+
+fn prand(seed : u32, id : u32) -> f32 {
+    return f32(pcg(seed ^ (id * 2654435769u))) / 4294967296.0;
+}
+
+fn nextRand(state : ptr<function, u32>) -> f32 {
+    *state = pcg(*state);
+    return f32(*state) / 4294967296.0;
+}
+
+
+fn sampleCurve(row : u32, t : f32) -> vec4<f32> {
+    let x = clamp(t, 0.0, 1.0) * 127.0;
+    let i0 = u32(floor(x));
+    let i1 = min(i0 + 1u, 127u);
+    let a = textureLoad(curveAtlas, vec2<u32>(i0, row), 0);
+    let b = textureLoad(curveAtlas, vec2<u32>(i1, row), 0);
+    return mix(a, b, x - f32(i0));
+}
+
+fn clearInstance(slot : u32) {
+    let base = (params.counts.z + slot) * 12u;
+    instanceData[base + 7u] = 0.0;
+    instanceData[base + 8u] = 0.0;
+    instanceData[base + 9u] = 0.0;
+}
+
+@compute @workgroup_size(64)
+fn main(@builtin(global_invocation_id) gid : vec3<u32>) {
+    let i = gid.x;
+    if (i >= params.counts.x) {
+        return;
+    }
+    let top = atomicSub(&counters.freeTop, 1) - 1;
+    if (top < 0) {
+        atomicAdd(&counters.freeTop, 1);
+        atomicAdd(&counters.dropped, 1u);
+        return;
+    }
+    let slot = freeList[u32(top)];
+    var rng = pcg(params.counts.y ^ (i * 747796405u) ^ 2654435769u);
+    let seed = pcg(rng ^ 668265263u);
+    let tEmit = params.timing.y;
+
+    let startColor = params.g0_startColor;
+    let startSpeed = params.g1_startSpeed;
+    let startLife = max(mix(params.g2_startLife.x, params.g2_startLife.y, prand(seed, 0u)), 1e-6);
+    var startSize = mix(params.g3_startSize.x, params.g3_startSize.y, prand(seed, 1u));
+    let startRotation = params.g4_startRotation;
+    let startTile = params.g5_startTile;
+
+    var position = vec3<f32>(0.0);
+    var velocity = vec3<f32>(0.0);
+
+    {
+        let u = nextRand(&rng);
+        let randR = mix(1.0 - params.g6_cone.z, 1.0, nextRand(&rng));
+        let theta = u * params.g6_cone.y;
+        let r = sqrt(randR);
+        position = vec3<f32>(r * cos(theta), r * sin(theta), 0.0);
+        let coneAngle = params.g6_cone.w * r;
+        velocity = (vec3<f32>(0.0, 0.0, cos(coneAngle)) + position * sin(coneAngle)) * startSpeed;
+        position = position * params.g6_cone.x;
+    }
+
+    if ((params.counts.w & 1u) != 0u) {
+        position = (params.emitterMatrix * vec4<f32>(position, 1.0)).xyz;
+        velocity = (params.normalMatrix * vec4<f32>(velocity * params.scaleV.xyz, 0.0)).xyz;
+        startSize = startSize * params.scaleV.w;
+    }
+
+    var p : Particle;
+    p.position_age = vec4<f32>(position, 0.0);
+    p.velocity_life = vec4<f32>(velocity, startLife);
+    p.start_color = startColor;
+    p.start_misc = vec4<f32>(startSize, startSpeed, startRotation, startTile);
+    p.seed = vec4<u32>(seed, 0u, 0u, 0u);
+    particles[slot] = p;
+    atomicAdd(&counters.aliveCount, 1u);
+}
+"
+`;
+
+exports[`GPU codegen assembles spawn/update/reset kernels for a fountain system (snapshot): update 1`] = `
+"
+struct SimParams {
+    emitterMatrix : mat4x4<f32>,
+    normalMatrix : mat4x4<f32>,
+    timing : vec4<f32>,
+    counts : vec4<u32>,
+    scaleV : vec4<f32>,
+    g0_startColor : vec4<f32>,
+    g1_startSpeed : f32,
+    g2_startLife : vec2<f32>,
+    g3_startSize : vec2<f32>,
+    g4_startRotation : f32,
+    g5_startTile : f32,
+    g6_cone : vec4<f32>,
+    g7_applyForce : vec4<f32>,
+    g8_gravity : vec4<f32>,
+};
+@group(0) @binding(0) var<storage, read> params : SimParams;
+@group(0) @binding(1) var<storage, read_write> particles : array<Particle>;
+@group(0) @binding(2) var<storage, read_write> counters : Counters;
+@group(0) @binding(3) var<storage, read_write> freeList : array<u32>;
+@group(0) @binding(4) var<storage, read_write> instanceData : array<f32>;
+@group(0) @binding(5) var curveAtlas : texture_2d<f32>;
+
+struct Particle {
+    position_age : vec4<f32>,   // xyz position (sim space), w age
+    velocity_life : vec4<f32>,  // xyz velocity, w life (life <= 0 means free slot)
+    start_color : vec4<f32>,
+    start_misc : vec4<f32>,     // x startSize, y startSpeed, z rotation, w uvTile
+    seed : vec4<u32>,           // x per-particle random seed
+};
+
+struct Counters {
+    aliveCount : atomic<u32>,
+    freeTop : atomic<i32>,
+    dropped : atomic<u32>,
+    pad : u32,
+};
+
+fn pcg(v : u32) -> u32 {
+    let s = v * 747796405u + 2891336453u;
+    let w = ((s >> ((s >> 28u) + 4u)) ^ s) * 277803737u;
+    return (w >> 22u) ^ w;
+}
+
+fn prand(seed : u32, id : u32) -> f32 {
+    return f32(pcg(seed ^ (id * 2654435769u))) / 4294967296.0;
+}
+
+fn nextRand(state : ptr<function, u32>) -> f32 {
+    *state = pcg(*state);
+    return f32(*state) / 4294967296.0;
+}
+
+
+fn sampleCurve(row : u32, t : f32) -> vec4<f32> {
+    let x = clamp(t, 0.0, 1.0) * 127.0;
+    let i0 = u32(floor(x));
+    let i1 = min(i0 + 1u, 127u);
+    let a = textureLoad(curveAtlas, vec2<u32>(i0, row), 0);
+    let b = textureLoad(curveAtlas, vec2<u32>(i1, row), 0);
+    return mix(a, b, x - f32(i0));
+}
+
+fn clearInstance(slot : u32) {
+    let base = (params.counts.z + slot) * 12u;
+    instanceData[base + 7u] = 0.0;
+    instanceData[base + 8u] = 0.0;
+    instanceData[base + 9u] = 0.0;
+}
+
+fn writeInstance(slot : u32, pos : vec3<f32>, color : vec4<f32>, size3 : vec3<f32>, uvTile : f32, rotation : f32) {
+    let base = (params.counts.z + slot) * 12u;
+    instanceData[base] = pos.x;
+    instanceData[base + 1u] = pos.y;
+    instanceData[base + 2u] = pos.z;
+    instanceData[base + 3u] = color.x;
+    instanceData[base + 4u] = color.y;
+    instanceData[base + 5u] = color.z;
+    instanceData[base + 6u] = color.w;
+    instanceData[base + 7u] = size3.x;
+    instanceData[base + 8u] = size3.y;
+    instanceData[base + 9u] = size3.z;
+    instanceData[base + 10u] = uvTile;
+    instanceData[base + 11u] = rotation;
+}
+
+@compute @workgroup_size(64)
+fn main(@builtin(global_invocation_id) gid : vec3<u32>) {
+    let slot = gid.x;
+    if (slot >= 1024u) {
+        return;
+    }
+    var p = particles[slot];
+    let life = p.velocity_life.w;
+    if (life <= 0.0) {
+        clearInstance(slot);
+        return;
+    }
+
+    var position = p.position_age.xyz;
+    var age = p.position_age.w;
+    var velocity = p.velocity_life.xyz;
+    let startColor = p.start_color;
+    let startSize = p.start_misc.x;
+    let startSpeed = p.start_misc.y;
+    var rotation = p.start_misc.z;
+    var uvTile = p.start_misc.w;
+    var color = startColor;
+    var size = startSize;
+    var speedModifier = 1.0;
+    let seed = p.seed.x;
+    let delta = params.timing.x;
+    let tLife = clamp(age / life, 0.0, 1.0);
+
+    velocity += params.g7_applyForce.xyz * (params.g7_applyForce.w * delta);
+
+    {
+        let toCenter = params.g8_gravity.xyz - position;
+        let distSq = max(dot(toCenter, toCenter), 1e-12);
+        velocity += toCenter * inverseSqrt(distSq) * ((params.g8_gravity.w / distSq) * delta);
+    }
+    size = startSize * sampleCurve(0u, tLife).x;
+    color = sampleCurve(1u, tLife) * startColor;
+
+    position += velocity * (delta * speedModifier);
+    age += delta;
+
+    if (age >= life) {
+        p.velocity_life = vec4<f32>(velocity, 0.0);
+        particles[slot] = p;
+        let top = atomicAdd(&counters.freeTop, 1);
+        freeList[u32(top)] = slot;
+        atomicSub(&counters.aliveCount, 1u);
+        clearInstance(slot);
+        return;
+    }
+
+    p.position_age = vec4<f32>(position, age);
+    p.velocity_life = vec4<f32>(velocity, life);
+    p.start_misc = vec4<f32>(startSize, startSpeed, rotation, uvTile);
+    particles[slot] = p;
+
+    if ((params.counts.w & 2u) == 0u) {
+        clearInstance(slot);
+        return;
+    }
+
+    var outPos = position;
+    var outSize = vec3<f32>(size);
+    if ((params.counts.w & 1u) == 0u) {
+        outPos = (params.emitterMatrix * vec4<f32>(position, 1.0)).xyz;
+        outSize = outSize * params.scaleV.xyz;
+    }
+    writeInstance(slot, outPos, color, outSize, uvTile, rotation);
+}
+"
+`;

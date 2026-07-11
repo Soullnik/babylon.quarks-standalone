@@ -73,58 +73,73 @@ function perEmitterRate(config: BenchConfig): number {
     return config.totalParticles / config.emitterCount / LIFETIME;
 }
 
-const quarksBackend: (() => Backend) = () => {
-    let renderer: BatchedRenderer | null = null;
-    let systems: ParticleSystem[] = [];
-    return {
-        id: "quarks",
-        label: "babylon.quarks (batched)",
-        isSupported: () => true,
-        start(scene, config) {
-            renderer = new BatchedRenderer("bench-quarks", scene);
-            systems = [];
-            const texture = createSharedTexture(scene, SHARED_ASSETS.defaultParticle);
-            const rate = perEmitterRate(config);
-            for (const position of emitterPositions(config.emitterCount)) {
-                const system = new ParticleSystem({
-                    scene,
-                    duration: LIFETIME,
-                    looping: true,
-                    startLife: new ConstantValue(LIFETIME),
-                    startSpeed: new IntervalValue(3, 5),
-                    startSize: new IntervalValue(0.2, 0.4),
-                    startColor: new ConstantColor(
-                        new Vector4(COLOR_START.r, COLOR_START.g, COLOR_START.b, COLOR_START.a)
-                    ),
-                    emissionOverTime: new ConstantValue(rate),
-                    // quarks' angle is a half-angle; Babylon's native cone uses a full angle.
-                    shape: new ConeEmitter({radius: CONE_RADIUS, angle: CONE_ANGLE / 2}),
-                    renderMode: RenderMode.BillBoard,
-                    texture,
-                    transparent: true,
-                    blendMode: Constants.ALPHA_ADD,
-                });
-                system.addBehavior(
-                    createColorOverLifeRange(
-                        new Vector4(COLOR_START.r, COLOR_START.g, COLOR_START.b, COLOR_START.a),
-                        new Vector4(COLOR_END.r, COLOR_END.g, COLOR_END.b, COLOR_END.a)
-                    )
-                );
-                system.emitter.position = position;
-                // quarks emits along local +Z; Babylon's native cone emits along +Y.
-                system.emitter.rotation.x = -Math.PI / 2;
-                renderer.addSystem(system);
-                systems.push(system);
-            }
-        },
-        update(delta) {
-            renderer?.update(delta);
-        },
-        getActiveCount() {
-            return systems.reduce((sum, system) => sum + system.particleNum, 0);
-        },
+function createQuarksBackend(id: string, label: string, simulation: "cpu" | "gpu"): () => Backend {
+    return () => {
+        let renderer: BatchedRenderer | null = null;
+        let systems: ParticleSystem[] = [];
+        return {
+            id,
+            label,
+            isSupported: () => simulation === "cpu" || Boolean(engine.getCaps().supportComputeShaders),
+            start(scene, config) {
+                renderer = new BatchedRenderer(`bench-${id}`, scene);
+                systems = [];
+                const texture = createSharedTexture(scene, SHARED_ASSETS.defaultParticle);
+                const rate = perEmitterRate(config);
+                const perSystem = Math.ceil(config.totalParticles / config.emitterCount);
+                for (const position of emitterPositions(config.emitterCount)) {
+                    const system = new ParticleSystem({
+                        scene,
+                        duration: LIFETIME,
+                        looping: true,
+                        startLife: new ConstantValue(LIFETIME),
+                        startSpeed: new IntervalValue(3, 5),
+                        startSize: new IntervalValue(0.2, 0.4),
+                        startColor: new ConstantColor(
+                            new Vector4(COLOR_START.r, COLOR_START.g, COLOR_START.b, COLOR_START.a)
+                        ),
+                        emissionOverTime: new ConstantValue(rate),
+                        // quarks' angle is a half-angle; Babylon's native cone uses a full angle.
+                        shape: new ConeEmitter({radius: CONE_RADIUS, angle: CONE_ANGLE / 2}),
+                        renderMode: RenderMode.BillBoard,
+                        texture,
+                        transparent: true,
+                        blendMode: Constants.ALPHA_ADD,
+                        simulation,
+                        maxParticles: simulation === "gpu" ? Math.ceil(perSystem * 1.25) : undefined,
+                    });
+                    system.addBehavior(
+                        createColorOverLifeRange(
+                            new Vector4(COLOR_START.r, COLOR_START.g, COLOR_START.b, COLOR_START.a),
+                            new Vector4(COLOR_END.r, COLOR_END.g, COLOR_END.b, COLOR_END.a)
+                        )
+                    );
+                    system.emitter.position = position;
+                    // quarks emits along local +Z; Babylon's native cone emits along +Y.
+                    system.emitter.rotation.x = -Math.PI / 2;
+                    renderer.addSystem(system);
+                    systems.push(system);
+                }
+                if (simulation === "gpu") {
+                    for (const system of systems) {
+                        if (system.simulationState.active !== "gpu") {
+                            console.warn("quarks-gpu benchmark: system fell back to CPU:", system.simulationState);
+                        }
+                    }
+                }
+            },
+            update(delta) {
+                renderer?.update(delta);
+            },
+            getActiveCount() {
+                return systems.reduce((sum, system) => sum + system.particleNum, 0);
+            },
+        };
     };
-};
+}
+
+const quarksBackend = createQuarksBackend("quarks", "babylon.quarks (batched)", "cpu");
+const quarksGpuBackend = createQuarksBackend("quarks-gpu", "babylon.quarks (GPU compute)", "gpu");
 
 function configureNativeSystem(
     system: NativeParticleSystem | GPUParticleSystem,
@@ -204,12 +219,14 @@ const nativeGpuBackend: (() => Backend) = () => {
 
 const backendFactories: {[id: string]: () => Backend} = {
     "quarks": quarksBackend,
+    "quarks-gpu": quarksGpuBackend,
     "native-cpu": nativeCpuBackend,
     "native-gpu": nativeGpuBackend,
 };
 
 const backendLabels: {[id: string]: string} = {
     "quarks": "babylon.quarks (batched)",
+    "quarks-gpu": "babylon.quarks (GPU compute)",
     "native-cpu": "Babylon ParticleSystem (CPU)",
     "native-gpu": "Babylon GPUParticleSystem",
 };
@@ -422,8 +439,14 @@ function applySelection() {
     startRun(backendSelect.value, currentConfig());
 }
 
+const quarksGpuSupported = Boolean(engine.getCaps().supportComputeShaders);
 fillSelect(backendSelect, [
     {value: "quarks", label: backendLabels["quarks"]},
+    {
+        value: "quarks-gpu",
+        label: backendLabels["quarks-gpu"] + (quarksGpuSupported ? "" : " (needs ?engine=webgpu)"),
+        disabled: !quarksGpuSupported,
+    },
     {value: "native-cpu", label: backendLabels["native-cpu"]},
     {
         value: "native-gpu",
@@ -433,7 +456,7 @@ fillSelect(backendSelect, [
 ]);
 fillSelect(
     countSelect,
-    [2000, 5000, 10000, 20000, 50000].map((count) => ({value: String(count), label: count.toLocaleString("en-US")}))
+    [2000, 5000, 10000, 20000, 50000, 100000, 200000, 1_000_000].map((count) => ({value: String(count), label: count.toLocaleString("en-US")}))
 );
 countSelect.value = "10000";
 fillSelect(emittersSelect, [1, 4, 16].map((count) => ({value: String(count), label: String(count)})));

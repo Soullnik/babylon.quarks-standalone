@@ -42,6 +42,8 @@ import {ParticleEmitter} from './ParticleEmitter';
 import {RenderMode} from './VFXBatch';
 import {BatchedRenderer, VFXBatchSettings} from './BatchedRenderer';
 import {ensureTriangleIndices} from './geometryUtil';
+import type {SimulationBackendState, SimulationMode} from './gpu/SimulationBackend';
+import type {GpuParticleSimulator} from './gpu/GpuParticleSimulator';
 
 export interface BurstParameters {
     time: number;
@@ -109,6 +111,17 @@ export interface ParticleSystemParameters {
     alphaTest?: number;
     layerMask?: number;
     scene?: Scene;
+    /**
+     * Simulation backend request: 'cpu' (default), 'gpu' (WebGPU compute,
+     * warns and falls back to CPU when unsupported) or 'auto' (GPU when
+     * silently possible). Resolved when the system is added to a renderer.
+     */
+    simulation?: SimulationMode;
+    /**
+     * GPU particle-slot capacity. Estimated from emission rate x max life
+     * when omitted. Ignored by the CPU backend (which grows unbounded).
+     */
+    maxParticles?: number;
 }
 
 export interface BurstParametersJSON {
@@ -158,6 +171,8 @@ export interface ParticleSystemJSONParameters {
     alphaTest?: number;
     behaviors: Array<any>;
     worldSpace: boolean;
+    simulation?: SimulationMode;
+    maxParticles?: number;
 }
 
 export interface BabylonMetaData {
@@ -218,6 +233,24 @@ export class ParticleSystem implements IParticleSystem {
     private useFastTrailHistory = true;
     /** @internal **/
     _renderer?: BatchedRenderer;
+    /**
+     * Requested simulation mode; undefined defers to the renderer's
+     * defaultSimulation option. Resolved on addSystem.
+     */
+    simulationMode?: SimulationMode;
+    /** Requested GPU capacity (see ParticleSystemParameters.maxParticles). */
+    gpuMaxParticles?: number;
+    /** @internal set by BatchedRenderer when the GPU backend is active **/
+    _gpuSimulator?: GpuParticleSimulator;
+    /** @internal **/
+    _simulationState: SimulationBackendState = {requested: 'cpu', active: 'cpu' as SimulationBackendState['active']};
+    /** @internal warn-once flag for gpu-request fallbacks **/
+    _gpuFallbackWarned = false;
+
+    /** Resolved simulation backend state (requested/active/fallbackReason). */
+    get simulationState(): SimulationBackendState {
+        return this._simulationState;
+    }
 
     set time(time: number) {
         this.emissionState.time = time;
@@ -450,6 +483,9 @@ export class ParticleSystem implements IParticleSystem {
 
         this.particles = [];
         this.startTileIndex = parameters.startTileIndex || new ConstantValue(0);
+        this.simulationMode = parameters.simulation;
+        this.gpuMaxParticles = parameters.maxParticles;
+        this._simulationState = {requested: this.simulationMode ?? 'cpu', active: 'cpu' as SimulationBackendState['active']};
         this.emitter = new ParticleEmitter(this, parameters.scene);
 
         this.paused = false;
@@ -738,6 +774,8 @@ export class ParticleSystem implements IParticleSystem {
 
     dispose() {
         if (this._renderer) this._renderer.deleteSystem(this);
+        this._gpuSimulator?.dispose();
+        this._gpuSimulator = undefined;
         this.emitter.dispose();
         this.fire({type: 'destroy', particleSystem: this});
     }
@@ -761,6 +799,7 @@ export class ParticleSystem implements IParticleSystem {
         this.startDelayTimeLeft = this.startDelay.genValue(this.memory, 0);
         this.previousEmitterPos = undefined;
         this.emitterVelocity.set(0, 0, 0);
+        this._gpuSimulator?.requestReset();
     }
 
     private firstTimeUpdate = true;
@@ -813,6 +852,19 @@ export class ParticleSystem implements IParticleSystem {
             if (this.startDelayTimeLeft >= 0) return;
             delta = Math.min(-this.startDelayTimeLeft, 0.1);
             this.startDelayTimeLeft = 0;
+        }
+
+        if (this._gpuSimulator) {
+            // GPU backend: CPU keeps the scalar emission bookkeeping; spawning,
+            // behaviors, integration and death all happen in compute kernels
+            // dispatched from GpuSpriteBatch.update().
+            let spawnCount = 0;
+            if (!this.onlyUsedByOther) {
+                spawnCount = this.collectSpawnCount(delta, this.emissionState, this.emitter.matrixWorld);
+            }
+            this._gpuSimulator.pushFrame(delta, spawnCount);
+            this.particleNum = this._gpuSimulator.aliveEstimate;
+            return;
         }
 
         if (!this.onlyUsedByOther) {
@@ -882,6 +934,36 @@ export class ParticleSystem implements IParticleSystem {
     }
 
     emit(delta: number, emissionState: EmissionState, emitterMatrix: Matrix4) {
+        this.processEmission(delta, emissionState, emitterMatrix, (count, isBursting) => {
+            if (isBursting) {
+                emissionState.isBursting = true;
+                emissionState.burstParticleCount = count;
+            }
+            this.spawn(count, emissionState, emitterMatrix);
+            emissionState.isBursting = false;
+        });
+    }
+
+    /**
+     * Runs the emission bookkeeping (rate accumulation, bursts, distance
+     * emission, loop wraparound) and reports the number of particles to spawn
+     * this frame without spawning them. Used by the GPU backend, which spawns
+     * on the GPU; mutates emission state exactly like emit().
+     */
+    private collectSpawnCount(delta: number, emissionState: EmissionState, emitterMatrix: Matrix4): number {
+        let total = 0;
+        this.processEmission(delta, emissionState, emitterMatrix, (count) => {
+            total += count;
+        });
+        return total;
+    }
+
+    private processEmission(
+        delta: number,
+        emissionState: EmissionState,
+        emitterMatrix: Matrix4,
+        spawnFn: (count: number, isBursting: boolean) => void
+    ) {
         if (emissionState.time > this.duration) {
             if (this.looping) {
                 emissionState.time -= this.duration;
@@ -900,7 +982,7 @@ export class ParticleSystem implements IParticleSystem {
         const qualityFactor = this.qualityFactor;
 
         const totalSpawn = Math.ceil(emissionState.waitEmiting);
-        this.spawn(totalSpawn, emissionState, emitterMatrix);
+        spawnFn(totalSpawn, false);
         emissionState.waitEmiting -= totalSpawn;
 
         while (
@@ -911,10 +993,7 @@ export class ParticleSystem implements IParticleSystem {
             if (Math.random() < burst.probability) {
                 const rawCount = burst.count.genValue(this.memory, this.time);
                 const count = qualityFactor >= 0.999 ? rawCount : Math.floor(rawCount * qualityFactor);
-                emissionState.isBursting = true;
-                emissionState.burstParticleCount = count;
-                this.spawn(count, emissionState, emitterMatrix);
-                emissionState.isBursting = false;
+                spawnFn(count, true);
             }
             emissionState.burstIndex++;
         }
@@ -1002,6 +1081,8 @@ export class ParticleSystem implements IParticleSystem {
             alphaTest: this.rendererSettings.materialAlphaTest,
             behaviors: this.behaviors.map((b) => b.toJSON()),
             worldSpace: this.worldSpace,
+            simulation: this.simulationMode,
+            maxParticles: this.gpuMaxParticles,
         };
     }
 
@@ -1093,6 +1174,8 @@ export class ParticleSystem implements IParticleSystem {
             behaviors: [],
             worldSpace: json.worldSpace,
             layerMask: json.layers,
+            simulation: json.simulation,
+            maxParticles: json.maxParticles,
         });
         ps.behaviors = (json.behaviors ?? [])
             .map((behaviorJson) => {
@@ -1245,6 +1328,10 @@ export class ParticleSystem implements IParticleSystem {
         if (this.listeners[event]) this.listeners[event] = [];
     }
 
+    hasEventListeners(event: ParticleSystemEventType): boolean {
+        return (this.listeners[event]?.length ?? 0) > 0;
+    }
+
     removeEventListener(event: ParticleSystemEventType, callback: (event: ParticleSystemEvent) => void): void {
         if (this.listeners[event]) {
             const index = this.listeners[event].indexOf(callback);
@@ -1310,6 +1397,8 @@ export class ParticleSystem implements IParticleSystem {
             softNearFade: this.rendererSettings.softNearFade,
             behaviors: newBehaviors,
             worldSpace: this.worldSpace,
+            simulation: this.simulationMode,
+            maxParticles: this.gpuMaxParticles,
             blendMode: this.rendererSettings.materialBlendMode,
             transparent: this.rendererSettings.materialTransparent,
             depthTest: this.rendererSettings.materialDepthTest,

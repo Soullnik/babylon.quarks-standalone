@@ -3,7 +3,19 @@ import {MeshSurfaceEmitterPlugin} from './MeshSurfaceEmitter';
 import {registerShaderChunks} from './shaders';
 
 export {BatchedRenderer} from './BatchedRenderer';
-export type {VFXBatchSettings, AdaptivePerformanceOptions, AdaptivePerformanceState} from './BatchedRenderer';
+export type {
+    VFXBatchSettings,
+    AdaptivePerformanceOptions,
+    AdaptivePerformanceState,
+    BatchedRendererOptions,
+} from './BatchedRenderer';
+export {SimulationBackend, evaluateGpuSupport, resolveSimulationBackend} from './gpu/SimulationBackend';
+export type {SimulationMode, SimulationBackendState} from './gpu/SimulationBackend';
+export {GpuSpriteBatch} from './gpu/GpuSpriteBatch';
+export {GpuParticleSimulator} from './gpu/GpuParticleSimulator';
+export {GpuBehaviorRegistry} from './gpu/behaviors/GpuBehaviorRegistry';
+export {GpuEmitterRegistry} from './gpu/emitters/GpuEmitterRegistry';
+export {estimateCapacity} from './gpu/GpuCapacity';
 export {BatchedParticleRenderer} from './BatchedParticleRenderer';
 export {VFXBatch, RenderMode} from './VFXBatch';
 export type {StoredBatchSettings} from './VFXBatch';
