@@ -79,17 +79,15 @@ export function EffectEditor(props: EffectEditorProps) {
     );
 
     const gizmoTargetIsEmitter = allSystems.some((s) => s.emitter === props.gizmoTargetNode);
-    if (!gizmoTargetIsEmitter) {
-        return (
-            <div style={{fontFamily: theme.font, color: theme.text}}>
-                <ObjectModule node={props.gizmoTargetNode} label={props.gizmoTargetLabel} />
-            </div>
-        );
-    }
 
     return (
         <div style={{fontFamily: theme.font, color: theme.text}}>
             <ObjectModule node={props.gizmoTargetNode} label={props.gizmoTargetLabel} />
+            {!gizmoTargetIsEmitter && (
+                <div style={{fontSize: 11, color: theme.textDim, margin: '0 0 10px', lineHeight: 1.45}}>
+                    Modules below edit <strong>{activeSystem.emitter.name || 'particle system'}</strong>. Select its emitter in the timeline to move it with the gizmo.
+                </div>
+            )}
             <MainModule binding={binding} />
             <EmissionModule binding={binding} />
             <ShapeModule binding={binding} />

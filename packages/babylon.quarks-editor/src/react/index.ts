@@ -39,5 +39,9 @@ export {
     RendererModule,
 } from './modules';
 export {theme, inputStyle, rowStyle, labelStyle, buttonStyle} from './theme';
+export {MessageDialog} from './MessageDialog';
+export type {MessageDialogProps} from './MessageDialog';
+export {GalleryPanel} from './GalleryPanel';
+export type {GalleryPanelProps} from './GalleryPanel';
 export {EffectEditorHost, QuarksEffectEditor} from './EffectEditorHost';
 export type {EffectEditorHostProps, EffectEditorHostHandle} from './EffectEditorHost';

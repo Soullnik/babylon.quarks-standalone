@@ -51,6 +51,7 @@ QuarksEffectEditor.Show({
     effectJson: resolveInitialEffect(),
     hostElement: document.getElementById("editor-host")!,
     title: "Effect editor",
+    backLink: {href: "./index.html", label: "gallery"},
     textureOptions: [
         {label: "Default particle", url: SHARED_ASSETS.defaultParticle},
         {label: "Texture atlas 1", url: SHARED_ASSETS.atlas},

@@ -41,7 +41,6 @@ export class TrailBatch extends VFXBatch {
         this.maxParticles = 10000;
         this.setupBuffers();
         this.rebuildMaterial();
-        this.mesh.setEnabled(false);
     }
 
     setupBuffers(): void {
@@ -397,7 +396,6 @@ export class TrailBatch extends VFXBatch {
             const colorVB = this.mesh.getVertexBuffer(VertexBuffer.ColorKind);
             if (colorVB) colorVB.update(this.colorBuffer);
 
-            this.mesh.setEnabled(true);
             if (this.mesh.subMeshes && this.mesh.subMeshes.length > 0) {
                 const meshBoundingInfo = this.mesh.getBoundingInfo();
                 for (const subMesh of this.mesh.subMeshes) {
@@ -406,8 +404,9 @@ export class TrailBatch extends VFXBatch {
                 this.mesh.subMeshes[0].indexCount = triangles * 3;
                 this.mesh.subMeshes[0].verticesCount = index;
             }
-        } else {
-            this.mesh.setEnabled(false);
+        } else if (this.mesh.subMeshes && this.mesh.subMeshes.length > 0) {
+            this.mesh.subMeshes[0].indexCount = 0;
+            this.mesh.subMeshes[0].verticesCount = 0;
         }
     }
 

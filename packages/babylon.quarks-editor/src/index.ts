@@ -29,4 +29,6 @@ export {
 } from './core/shapes';
 export type {ShapeType, ShapeParams} from './core/shapes';
 export {GroundPlaneResolver, ensureGroundResolver} from './core/collision';
+export {applyRendererMaterial, getMaterialLabel} from './core/material';
+export type {RendererMaterialPatch} from './core/material';
 export {ensurePortableTextureUrl} from './core/textureExport';

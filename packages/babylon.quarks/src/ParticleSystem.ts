@@ -899,9 +899,11 @@ export class ParticleSystem implements IParticleSystem {
         const emissionBurstCount = emissionBursts.length;
         const qualityFactor = this.qualityFactor;
 
-        const totalSpawn = Math.ceil(emissionState.waitEmiting);
-        this.spawn(totalSpawn, emissionState, emitterMatrix);
-        emissionState.waitEmiting -= totalSpawn;
+        const totalSpawn = Math.floor(emissionState.waitEmiting);
+        if (totalSpawn > 0) {
+            this.spawn(totalSpawn, emissionState, emitterMatrix);
+            emissionState.waitEmiting -= totalSpawn;
+        }
 
         while (
             emissionState.burstIndex < emissionBurstCount &&
@@ -1074,7 +1076,7 @@ export class ParticleSystem implements IParticleSystem {
             rendererEmitterSettings,
             renderOrder: json.renderOrder,
             texture,
-            material: materialMeta?.sourceMaterial,
+            material: materialMeta?.sourceMaterial ?? materialMeta,
             blendMode: materialMeta?.alphaMode ?? json.blending ?? Constants.ALPHA_ADD,
             transparent: materialMeta?.transparent ?? json.transparent ?? true,
             depthTest: materialMeta?.depthTest ?? json.depthTest ?? true,

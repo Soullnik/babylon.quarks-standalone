@@ -4,6 +4,13 @@ All notable changes to the `babylon.quarks` package are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project follows the `quarks.core` 0.x version line.
 
+## [0.17.9] — 2026-07-14
+
+### Fixed
+
+- `ParticleSystem` JSON load — preserve `material` reference from exported metadata
+  (`sourceMaterial`) so editor/renderer can resolve shader settings from the effect file.
+
 ## [0.17.7] — 2026-07-09
 
 ### Changed

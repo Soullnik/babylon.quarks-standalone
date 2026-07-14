@@ -1,9 +1,15 @@
 import React, {useState} from 'react';
+import {ChevronDownIcon, ChevronRightIcon} from '@heroicons/react/24/solid';
+import {getInspectorHint} from './inspectorHints';
+import {InspectorInfoIcon} from './InspectorInfoIcon';
 import {theme} from './theme';
+import {iconStyle} from './icons';
 
 /** Unity-style module foldout with an optional enable checkbox. */
 export function ModuleSection(props: {
     title: string;
+    hint?: string;
+    hintKey?: string;
     children: React.ReactNode;
     enabled?: boolean;
     onToggle?: (enabled: boolean) => void;
@@ -12,6 +18,10 @@ export function ModuleSection(props: {
     const [open, setOpen] = useState(props.defaultOpen ?? true);
     const toggleable = props.onToggle !== undefined;
     const dimmed = toggleable && props.enabled === false;
+    const titleHint = props.hint ?? getInspectorHint(props.hintKey ?? props.title);
+    const objectHint = props.title.startsWith('Object — ') ? getInspectorHint('Object') : undefined;
+    const tooltip = titleHint ?? objectHint;
+
     return (
         <section
             style={{
@@ -35,7 +45,9 @@ export function ModuleSection(props: {
                 }}
                 onClick={() => setOpen(!open)}
             >
-                <span style={{color: theme.accent, fontSize: 10, width: 10}}>{open ? '▼' : '►'}</span>
+                <span style={{color: theme.accent, display: 'inline-flex'}}>
+                    {open ? <ChevronDownIcon style={iconStyle(12)} /> : <ChevronRightIcon style={iconStyle(12)} />}
+                </span>
                 {toggleable && (
                     <input
                         type="checkbox"
@@ -46,7 +58,10 @@ export function ModuleSection(props: {
                         style={{width: 14, height: 14, accentColor: '#78a5ff', cursor: 'pointer'}}
                     />
                 )}
-                <span style={{color: dimmed ? theme.textDim : theme.text, fontSize: 13, fontWeight: 600}}>{props.title}</span>
+                <span style={{color: dimmed ? theme.textDim : theme.text, fontSize: 13, fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 5}}>
+                    {props.title}
+                    {tooltip ? <InspectorInfoIcon content={tooltip} onClick={(e) => e.stopPropagation()} /> : null}
+                </span>
             </header>
             {open && !dimmed && <div style={{padding: '4px 10px 10px'}}>{props.children}</div>}
         </section>

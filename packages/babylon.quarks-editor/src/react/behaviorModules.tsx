@@ -135,9 +135,9 @@ export function ForceOverLifeModule({binding}: ModuleProps) {
         >
             {(behavior) => (
                 <>
-                    <ValueField label="X" generator={behavior.x} curveMax={10} onChange={(g) => binding.apply(() => (behavior.x = g))} />
-                    <ValueField label="Y" generator={behavior.y} curveMax={10} onChange={(g) => binding.apply(() => (behavior.y = g))} />
-                    <ValueField label="Z" generator={behavior.z} curveMax={10} onChange={(g) => binding.apply(() => (behavior.z = g))} />
+                    <ValueField hintKey="force.x" label="X" generator={behavior.x} curveMax={10} onChange={(g) => binding.apply(() => (behavior.x = g))} />
+                    <ValueField hintKey="force.y" label="Y" generator={behavior.y} curveMax={10} onChange={(g) => binding.apply(() => (behavior.y = g))} />
+                    <ValueField hintKey="force.z" label="Z" generator={behavior.z} curveMax={10} onChange={(g) => binding.apply(() => (behavior.z = g))} />
                 </>
             )}
         </BehaviorModule>
@@ -186,7 +186,7 @@ export function InheritVelocityModule({binding}: ModuleProps) {
         >
             {(behavior) => (
                 <>
-                    <Row label="Mode">
+                    <Row label="Mode" hintKey="inheritVelocity.mode">
                         <SelectField
                             value={behavior.mode}
                             options={[
@@ -217,7 +217,7 @@ export function GravityModule({binding}: ModuleProps) {
             create={() => new ApplyForce(new Vector3(0, -1, 0), new ConstantValue(9.81))}
         >
             {(behavior) => (
-                <Row label="Strength">
+                <Row label="Strength" hintKey="gravity.strength">
                     <NumberField
                         value={readScalar(behavior.magnitude).value}
                         step={0.5}
@@ -239,6 +239,7 @@ export function RotationOverLifeModule({binding}: ModuleProps) {
         >
             {(behavior) => (
                 <ValueField
+                    hintKey="rotationOverLife.velocity"
                     label="Velocity (rad/s)"
                     generator={behavior.angularVelocity}
                     curveMax={Math.PI * 4}
@@ -260,6 +261,7 @@ export function NoiseModule({binding}: ModuleProps) {
             {(behavior) => (
                 <>
                     <ValueField
+                        hintKey="noise.frequency"
                         label="Frequency"
                         generator={behavior.frequency}
                         min={0}
@@ -267,6 +269,7 @@ export function NoiseModule({binding}: ModuleProps) {
                         onChange={(g) => binding.apply(() => (behavior.frequency = g))}
                     />
                     <ValueField
+                        hintKey="noise.strength"
                         label="Strength"
                         generator={behavior.power}
                         min={0}
@@ -294,14 +297,14 @@ export function NoiseModule({binding}: ModuleProps) {
 }
 
 /** Three numeric inputs for a Vector3 field, replacing the whole vector on any edit. */
-function Vector3Row(props: {label: string; value: Vector3; min?: number; step?: number; onChange: (v: Vector3) => void}) {
+function Vector3Row(props: {label: string; hintKey?: string; value: Vector3; min?: number; step?: number; onChange: (v: Vector3) => void}) {
     const set = (axis: 'x' | 'y' | 'z', n: number) => {
         const next = props.value.clone();
         next[axis] = n;
         props.onChange(next);
     };
     return (
-        <Row label={props.label}>
+        <Row label={props.label} hintKey={props.hintKey}>
             <div style={{display: 'flex', gap: 6}}>
                 <NumberField value={props.value.x} min={props.min} step={props.step} onChange={(n) => set('x', n)} />
                 <NumberField value={props.value.y} min={props.min} step={props.step} onChange={(n) => set('y', n)} />
@@ -322,7 +325,7 @@ export function TurbulenceModule({binding}: ModuleProps) {
             {(behavior) => (
                 <>
                     {/* scale divides particle position, so keep each axis strictly positive. */}
-                    <Vector3Row label="Scale" value={behavior.scale} min={0.01} step={0.1} onChange={(v) => binding.apply(() => (behavior.scale = v))} />
+                    <Vector3Row hintKey="turbulence.scale" label="Scale" value={behavior.scale} min={0.01} step={0.1} onChange={(v) => binding.apply(() => (behavior.scale = v))} />
                     <Row label="Octaves">
                         <NumberField
                             value={behavior.octaves}
@@ -332,6 +335,7 @@ export function TurbulenceModule({binding}: ModuleProps) {
                         />
                     </Row>
                     <Vector3Row
+                        hintKey="turbulence.strength"
                         label="Strength"
                         value={behavior.velocityMultiplier}
                         step={0.5}
@@ -486,6 +490,7 @@ export function RotationBySpeedModule({binding}: ModuleProps) {
             {(behavior) => (
                 <>
                     <ValueField
+                        hintKey="rotationBySpeed.velocity"
                         label="Velocity (rad/s)"
                         generator={behavior.angularVelocity}
                         curveMax={Math.PI * 4}

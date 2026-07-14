@@ -9,6 +9,8 @@ import {NumberField, Row, SelectField} from './fields';
  */
 export function ValueField(props: {
     label: string;
+    hint?: string;
+    hintKey?: string;
     generator: ScalarGenerator | undefined;
     onChange: (generator: ScalarGenerator) => void;
     min?: number;
@@ -22,7 +24,7 @@ export function ValueField(props: {
 
     return (
         <>
-            <Row label={props.label}>
+            <Row label={props.label} hint={props.hint} hintKey={props.hintKey}>
                 <SelectField
                     value={state.mode}
                     options={[

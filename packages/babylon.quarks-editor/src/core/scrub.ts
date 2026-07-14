@@ -1,7 +1,39 @@
-import type {BatchedRenderer} from 'babylon.quarks';
+import type {BatchedRenderer, ParticleSystem} from 'babylon.quarks';
 import type {EffectBinding} from './binding';
 
 const WIDE_STEP_THRESHOLD = 8;
+
+function bindingSystems(binding: EffectBinding): ParticleSystem[] {
+    return [binding.system, ...binding.subSystems];
+}
+
+/**
+ * Scrub only the focused effect's systems — does not advance other preview effects
+ * via the shared BatchedRenderer.update loop.
+ */
+export function scrubFocusTo(binding: EffectBinding, time: number): void {
+    const systems = bindingSystems(binding);
+    for (const system of systems) {
+        system.restart();
+        system.play();
+    }
+    if (time <= 0) {
+        return;
+    }
+    const fixedStep = time > WIDE_STEP_THRESHOLD ? 1 / 30 : 1 / 60;
+    const steps = Math.floor(time / fixedStep);
+    for (let i = 0; i < steps; i++) {
+        for (const system of systems) {
+            system.update(fixedStep);
+        }
+    }
+    const remainder = time - steps * fixedStep;
+    if (remainder > 0) {
+        for (const system of systems) {
+            system.update(remainder);
+        }
+    }
+}
 
 /**
  * Approximate timeline scrub: replays every system from t=0 up to `time` using the existing
