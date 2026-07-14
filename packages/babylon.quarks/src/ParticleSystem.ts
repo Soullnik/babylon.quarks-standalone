@@ -1074,7 +1074,7 @@ export class ParticleSystem implements IParticleSystem {
             rendererEmitterSettings,
             renderOrder: json.renderOrder,
             texture,
-            material: materialMeta?.sourceMaterial,
+            material: materialMeta?.sourceMaterial ?? materialMeta,
             blendMode: materialMeta?.alphaMode ?? json.blending ?? Constants.ALPHA_ADD,
             transparent: materialMeta?.transparent ?? json.transparent ?? true,
             depthTest: materialMeta?.depthTest ?? json.depthTest ?? true,

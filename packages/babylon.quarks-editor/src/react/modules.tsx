@@ -946,63 +946,6 @@ export function RendererModule({
                     onChange={(v) => patchMaterial({depthTest: v})}
                 />
             </Row>
-            {system.renderMode === RenderMode.Mesh && (() => {
-                const settings = system.getRendererSettings();
-                const lightDirection = settings.meshLightDirection ?? [0.4, -1, 0.6];
-                const lightColor = settings.meshLightColor ?? [1, 1, 1];
-                const ambientColor = settings.meshAmbientColor ?? [0.35, 0.35, 0.35];
-                return (
-                    <>
-                        <Row label="Light dir X/Y/Z">
-                            <div style={{display: 'flex', gap: 6}}>
-                                <NumberField
-                                    value={lightDirection[0]}
-                                    step={0.1}
-                                    onChange={(v) =>
-                                        patchMaterial({
-                                            meshLightDirection: [v, lightDirection[1], lightDirection[2]],
-                                        })
-                                    }
-                                />
-                                <NumberField
-                                    value={lightDirection[1]}
-                                    step={0.1}
-                                    onChange={(v) =>
-                                        patchMaterial({
-                                            meshLightDirection: [lightDirection[0], v, lightDirection[2]],
-                                        })
-                                    }
-                                />
-                                <NumberField
-                                    value={lightDirection[2]}
-                                    step={0.1}
-                                    onChange={(v) =>
-                                        patchMaterial({
-                                            meshLightDirection: [lightDirection[0], lightDirection[1], v],
-                                        })
-                                    }
-                                />
-                            </div>
-                        </Row>
-                        <Row label="Light color">
-                            <ColorInput
-                                value={new Vector4(lightColor[0], lightColor[1], lightColor[2], 1)}
-                                onChange={(next) =>
-                                    patchMaterial({meshLightColor: [next.x, next.y, next.z]})
-                                }
-                            />
-                        </Row>
-                        <Row label="Ambient">
-                            <ColorInput
-                                value={new Vector4(ambientColor[0], ambientColor[1], ambientColor[2], 1)}
-                                onChange={(next) =>
-                                    patchMaterial({meshAmbientColor: [next.x, next.y, next.z]})
-                                }
-                            />
-                        </Row>
-                    </>
-                );
-            })()}
             {system.renderMode === RenderMode.Mesh &&
                 (() => {
                     const preset = detectGeometryPreset(system.instancingGeometry);

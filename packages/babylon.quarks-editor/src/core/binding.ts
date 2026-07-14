@@ -85,13 +85,10 @@ export class EffectBinding {
     }
 
     restart(): void {
-        // Replay every independent system; sub-emitter targets (onlyUsedByOther) are only
-        // reset — their parents re-drive them, so playing them directly would double-emit.
+        // onlyUsedByOther systems skip self-emission in update(); play() only unpauses sim.
         for (const system of [this.system, ...this.subSystems]) {
             system.restart();
-            if (!system.onlyUsedByOther) {
-                system.play();
-            }
+            system.play();
         }
     }
 
