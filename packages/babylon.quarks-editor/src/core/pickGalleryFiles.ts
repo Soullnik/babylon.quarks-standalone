@@ -4,25 +4,22 @@ interface DirectoryPickerWindow {
     showDirectoryPicker?: (options?: {mode?: 'read' | 'readwrite'}) => Promise<FileSystemDirectoryHandle>;
 }
 
-interface DirectoryEntryHandle {
-    kind: 'file' | 'directory';
-    getFile?: () => Promise<File>;
-}
-
-interface DirectoryHandleWithEntries extends FileSystemDirectoryHandle {
-    entries: () => AsyncIterableIterator<[string, DirectoryEntryHandle]>;
+/**
+ * Structural type for directory handles that expose `entries()`.
+ * Not declared as extending `FileSystemDirectoryHandle` because DOM lib typings
+ * omit `entries()` and narrowing its iterator value type would be incompatible.
+ */
+interface DirectoryHandleWithEntries {
+    entries(): AsyncIterableIterator<[string, FileSystemDirectoryHandle | FileSystemFileHandle]>;
 }
 
 /** Recursively collects `.json` files from a directory handle (File System Access API). */
-async function readJsonFilesFromDirectory(
-    dir: DirectoryHandleWithEntries,
-    prefix = ''
-): Promise<File[]> {
+async function readJsonFilesFromDirectory(dir: DirectoryHandleWithEntries, prefix = ''): Promise<File[]> {
     const files: File[] = [];
     for await (const [name, entry] of dir.entries()) {
         if (entry.kind === 'file') {
             if (!name.toLowerCase().endsWith('.json')) continue;
-            const file = await entry.getFile!();
+            const file = await entry.getFile();
             Object.defineProperty(file, 'webkitRelativePath', {
                 value: prefix + name,
                 configurable: true,
@@ -31,7 +28,9 @@ async function readJsonFilesFromDirectory(
             continue;
         }
         if (entry.kind === 'directory') {
-            files.push(...(await readJsonFilesFromDirectory(entry as DirectoryHandleWithEntries, `${prefix}${name}/`)));
+            files.push(
+                ...(await readJsonFilesFromDirectory(entry as unknown as DirectoryHandleWithEntries, `${prefix}${name}/`))
+            );
         }
     }
     return files;

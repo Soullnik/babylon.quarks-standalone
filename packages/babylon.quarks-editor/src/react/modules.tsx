@@ -40,6 +40,7 @@ import {ValueField} from './ValueField';
 import {iconStyle} from './icons';
 import {theme} from './theme';
 import {PlusIcon, XMarkIcon} from '@heroicons/react/24/solid';
+import {InspectorInfoIcon} from './InspectorInfoIcon';
 
 interface ModuleProps {
     binding: EffectBinding;
@@ -416,42 +417,37 @@ export function EmissionModule({binding}: ModuleProps) {
                             <XMarkIcon style={iconStyle(14)} />
                         </button>
                     </div>
-                    <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginTop: 4}}>
-                        <label style={{fontSize: 10.5, color: '#b7c6ea'}}>
-                            Time
+                    <div style={{display: 'flex', flexDirection: 'column', gap: 2, marginTop: 4}}>
+                        <Row label="Time">
                             <NumberField value={burst.time} min={0} onChange={(time) => binding.apply(() => (burst.time = time))} />
-                        </label>
-                        <label style={{fontSize: 10.5, color: '#b7c6ea'}}>
-                            Count
+                        </Row>
+                        <Row label="Count">
                             <NumberField
                                 value={readScalar(burst.count as never).value}
                                 min={0}
                                 step={1}
                                 onChange={(count) => binding.apply(() => (burst.count = new ConstantValue(Math.round(count))))}
                             />
-                        </label>
-                        <label style={{fontSize: 10.5, color: '#b7c6ea'}}>
-                            Cycles
+                        </Row>
+                        <Row label="Cycles">
                             <NumberField
                                 value={burst.cycle}
                                 min={1}
                                 step={1}
                                 onChange={(v) => binding.apply(() => (burst.cycle = Math.round(v)))}
                             />
-                        </label>
-                        <label style={{fontSize: 10.5, color: '#b7c6ea'}}>
-                            Interval
+                        </Row>
+                        <Row label="Interval">
                             <NumberField value={burst.interval} min={0.01} onChange={(v) => binding.apply(() => (burst.interval = v))} />
-                        </label>
-                        <label style={{fontSize: 10.5, color: '#b7c6ea'}}>
-                            Probability
+                        </Row>
+                        <Row label="Probability">
                             <NumberField
                                 value={burst.probability}
                                 min={0}
                                 step={0.05}
                                 onChange={(v) => binding.apply(() => (burst.probability = Math.min(1, v)))}
                             />
-                        </label>
+                        </Row>
                     </div>
                 </div>
             ))}
@@ -500,7 +496,7 @@ export function ShapeModule({binding}: ModuleProps) {
     );
     return (
         <ModuleSection title="Shape">
-            <Row label="Shape">
+            <Row label="Shape" hintKey="shape.type">
                 <SelectField
                     value={type}
                     options={SHAPE_TYPES}
@@ -810,9 +806,13 @@ export function RendererModule({
                     color: '#7c8db5',
                     textTransform: 'uppercase',
                     letterSpacing: 0.4,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 5,
                 }}
             >
                 Material
+                <InspectorInfoIcon content="Shader and blending settings applied to the particle sprite or mesh." size={12} />
             </div>
             {materialLabel ? (
                 <Row label="Source">

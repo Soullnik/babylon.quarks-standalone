@@ -22,9 +22,9 @@ function setEulerDegreeAxis(node: TransformNode, axis: 'x' | 'y' | 'z', degrees:
     }
 }
 
-function AxisRow(props: {label: string; values: {x: number; y: number; z: number}; step: number; onChange: (axis: 'x' | 'y' | 'z', value: number) => void}) {
+function AxisRow(props: {label: string; hintKey?: string; values: {x: number; y: number; z: number}; step: number; onChange: (axis: 'x' | 'y' | 'z', value: number) => void}) {
     return (
-        <Row label={props.label}>
+        <Row label={props.label} hintKey={props.hintKey}>
             <div style={{display: 'flex', gap: 4}}>
                 <NumberField value={props.values.x} step={props.step} onChange={(v) => props.onChange('x', v)} />
                 <NumberField value={props.values.y} step={props.step} onChange={(v) => props.onChange('y', v)} />

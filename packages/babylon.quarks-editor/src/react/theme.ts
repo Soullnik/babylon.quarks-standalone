@@ -118,4 +118,44 @@ select.qe-hover:hover, input.qe-hover:hover, select.qe-hover:focus, input.qe-hov
 .qe-root ::-webkit-scrollbar-corner {
     background: transparent;
 }
+.qe-tooltip {
+    z-index: 100000;
+    padding: 8px 10px;
+    font-size: 11.5px;
+    line-height: 1.45;
+    color: ${theme.text};
+    background: linear-gradient(180deg, rgba(18, 26, 52, 0.98), rgba(8, 12, 26, 0.98));
+    border: 1px solid ${theme.borderActive};
+    border-radius: 8px;
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45);
+    pointer-events: none;
+    font-family: ${theme.font};
+    animation: qe-tooltip-in 0.12s ease;
+}
+.qe-tooltip--right::before,
+.qe-tooltip--left::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    width: 0;
+    height: 0;
+    border: 5px solid transparent;
+    transform: translateY(-50%);
+}
+.qe-tooltip--right::before {
+    left: -10px;
+    border-right-color: ${theme.borderActive};
+}
+.qe-tooltip--left::before {
+    right: -10px;
+    border-left-color: ${theme.borderActive};
+}
+@keyframes qe-tooltip-in {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
 `;

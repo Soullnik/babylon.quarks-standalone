@@ -1,12 +1,11 @@
 import React, {useEffect, useState} from 'react';
-import {inputStyle, labelStyle, rowStyle} from './theme';
+import {InspectorLabel} from './InspectorLabel';
+import {inputStyle, rowStyle} from './theme';
 
-export function Row(props: {label: string; children: React.ReactNode}) {
+export function Row(props: {label: string; hint?: string; hintKey?: string; children: React.ReactNode}) {
     return (
         <div style={rowStyle}>
-            <span style={labelStyle} title={props.label}>
-                {props.label}
-            </span>
+            <InspectorLabel label={props.label} hint={props.hint} hintKey={props.hintKey} />
             {props.children}
         </div>
     );
