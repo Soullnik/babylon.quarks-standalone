@@ -7,17 +7,32 @@ function bindingSystems(binding: EffectBinding): ParticleSystem[] {
     return [binding.system, ...binding.subSystems];
 }
 
+/** Unpauses every system in the focused effect. */
+export function playFocus(binding: EffectBinding): void {
+    for (const system of bindingSystems(binding)) {
+        system.play();
+    }
+}
+
+/** Freezes the focused effect at its current simulation state. */
+export function pauseFocus(binding: EffectBinding): void {
+    for (const system of bindingSystems(binding)) {
+        system.pause();
+    }
+}
+
 /**
  * Scrub only the focused effect's systems — does not advance other preview effects
  * via the shared BatchedRenderer.update loop.
  */
-export function scrubFocusTo(binding: EffectBinding, time: number): void {
+export function scrubFocusTo(binding: EffectBinding, renderer: BatchedRenderer, time: number): void {
     const systems = bindingSystems(binding);
     for (const system of systems) {
         system.restart();
         system.play();
     }
     if (time <= 0) {
+        renderer.refreshBatches();
         return;
     }
     const fixedStep = time > WIDE_STEP_THRESHOLD ? 1 / 30 : 1 / 60;
@@ -33,6 +48,33 @@ export function scrubFocusTo(binding: EffectBinding, time: number): void {
             system.update(remainder);
         }
     }
+    renderer.refreshBatches();
+}
+
+/**
+ * Scrub to `time`, then keep simulating the focused effect until every particle has died.
+ * Used when parking a one-shot at the timeline end so burst tails do not linger on screen.
+ */
+export function scrubFocusToSettled(binding: EffectBinding, renderer: BatchedRenderer, time: number): void {
+    scrubFocusTo(binding, renderer, time);
+    const systems = bindingSystems(binding);
+    const step = 1 / 60;
+    const maxExtra = 2;
+    let extra = 0;
+    while (extra < maxExtra) {
+        let alive = 0;
+        for (const system of systems) {
+            alive += system.particleNum;
+        }
+        if (alive === 0) {
+            break;
+        }
+        for (const system of systems) {
+            system.update(step);
+        }
+        extra += step;
+    }
+    renderer.refreshBatches();
 }
 
 /**
@@ -46,6 +88,7 @@ export function scrubFocusTo(binding: EffectBinding, time: number): void {
 export function scrubTo(binding: EffectBinding, renderer: BatchedRenderer, time: number): void {
     binding.restart();
     if (time <= 0) {
+        renderer.refreshBatches();
         return;
     }
     const fixedStep = time > WIDE_STEP_THRESHOLD ? 1 / 30 : 1 / 60;

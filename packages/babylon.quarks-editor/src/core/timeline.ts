@@ -83,8 +83,36 @@ export function computeTimelineRows(binding: EffectBinding): TimelineRow[] {
     return rows;
 }
 
+/** Upper bound on startLife for timeline span (burst/one-shot tail). */
+function estimateMaxStartLife(system: ParticleSystem): number {
+    const life = system.startLife;
+    if (life instanceof ConstantValue) {
+        return Math.max(0, life.value);
+    }
+    if (life instanceof IntervalValue) {
+        return Math.max(life.a, life.b);
+    }
+    return 1;
+}
+
+/** When emission is burst-only, the effect window ends at the last burst time, not full duration. */
+function estimateEmissionEnd(system: ParticleSystem): number {
+    const rate =
+        system.emissionOverTime instanceof ConstantValue ? system.emissionOverTime.value : null;
+    const perMeter =
+        system.emissionOverDistance instanceof ConstantValue ? system.emissionOverDistance.value : null;
+    if ((rate != null && rate > 0) || (perMeter != null && perMeter > 0)) {
+        return system.duration;
+    }
+    if (system.emissionBursts.length === 0) {
+        return system.duration;
+    }
+    return Math.max(...system.emissionBursts.map((burst) => burst.time));
+}
+
 /**
- * Overall timeline ruler span — emission window per track (`startOffset + duration`).
+ * Overall timeline ruler span — worst-case visual tail per track (max startLife, last burst).
+ * Actual playback often ends earlier when interval lives sample short or tracks finish out of phase.
  */
 export function computeTimelineSpan(rows: TimelineRow[]): number {
     let span = 0;
@@ -92,7 +120,7 @@ export function computeTimelineSpan(rows: TimelineRow[]): number {
         if (row.kind !== 'track') {
             continue;
         }
-        span = Math.max(span, row.startOffset + row.duration);
+        span = Math.max(span, row.startOffset + estimateEmissionEnd(row.system) + estimateMaxStartLife(row.system));
     }
     return Math.max(span, MIN_TIMELINE_SPAN);
 }

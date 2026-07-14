@@ -383,15 +383,38 @@ export class SpriteBatch extends VFXBatch {
         // single frame (common with short lifetimes + low emission overlap) causes flicker.
         this.mesh.forcedInstanceCount = index;
 
-        if (index > 0) {
-            this.offsetVB.update(this.offsetBuffer);
-            this.sizeVB.update(this.sizeBuffer);
-            this.colorVB.update(this.colorBuffer);
-            this.uvTileVB.update(this.uvTileBuffer);
-            this.rotationVB.update(this.rotationBuffer);
-            if (isStretchedRender && this.velocityVB && this.velocityBuffer) {
-                this.velocityVB.update(this.velocityBuffer);
-            }
+        if (index === 0) {
+            this.uploadClearedInstance(isMeshRender, isStretchedRender);
+            return;
+        }
+
+        this.offsetVB.update(this.offsetBuffer);
+        this.sizeVB.update(this.sizeBuffer);
+        this.colorVB.update(this.colorBuffer);
+        this.uvTileVB.update(this.uvTileBuffer);
+        this.rotationVB.update(this.rotationBuffer);
+        if (isStretchedRender && this.velocityVB && this.velocityBuffer) {
+            this.velocityVB.update(this.velocityBuffer);
+        }
+    }
+
+    /** Pushes a zero-alpha instance so stale instancing data cannot linger on screen. */
+    private uploadClearedInstance(isMeshRender: boolean, isStretchedRender: boolean): void {
+        this.colorBuffer[3] = 0;
+        this.sizeBuffer[0] = 0;
+        this.sizeBuffer[1] = 0;
+        this.sizeBuffer[2] = 0;
+        this.colorVB.update(this.colorBuffer.subarray(0, 4));
+        this.sizeVB.update(this.sizeBuffer.subarray(0, 3));
+        this.offsetVB.update(this.offsetBuffer.subarray(0, 3));
+        this.uvTileVB.update(this.uvTileBuffer.subarray(0, 1));
+        if (isMeshRender) {
+            this.rotationVB.update(this.rotationBuffer.subarray(0, 4));
+        } else {
+            this.rotationVB.update(this.rotationBuffer.subarray(0, 1));
+        }
+        if (isStretchedRender && this.velocityVB && this.velocityBuffer) {
+            this.velocityVB.update(this.velocityBuffer.subarray(0, 4));
         }
     }
 

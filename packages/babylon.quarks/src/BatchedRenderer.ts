@@ -194,9 +194,7 @@ export class BatchedRenderer extends TransformNode {
         for (const ps of this.systemToBatchIndex.keys()) {
             (ps as ParticleSystem).update(delta);
         }
-        for (let i = 0; i < this.batches.length; i++) {
-            this.batches[i].update();
-        }
+        this.refreshBatches();
         if (!adaptiveState.enabled) {
             return;
         }
@@ -215,6 +213,39 @@ export class BatchedRenderer extends TransformNode {
                 adaptiveState.maxQuality
             );
         }
+    }
+
+    /** Rebuild instance buffers from current particle state without advancing simulation. */
+    refreshBatches(): void {
+        for (let i = 0; i < this.batches.length; i++) {
+            this.batches[i].update();
+        }
+    }
+
+    /** Per-batch particle vs GPU instance counts — for diagnosing stale render state. */
+    getBatchRenderStats(): Array<{
+        batchIndex: number;
+        renderMode: RenderMode;
+        instanceCount: number;
+        particleCount: number;
+        systemNames: string[];
+    }> {
+        return this.batches.map((batch, batchIndex) => {
+            let particleCount = 0;
+            const systemNames: string[] = [];
+            for (const system of batch.systems) {
+                const ps = system as ParticleSystem;
+                particleCount += ps.particleNum;
+                systemNames.push(ps.emitter.name);
+            }
+            return {
+                batchIndex,
+                renderMode: batch.settings.renderMode,
+                instanceCount: batch.mesh.forcedInstanceCount ?? 0,
+                particleCount,
+                systemNames,
+            };
+        });
     }
 
     dispose(): void {

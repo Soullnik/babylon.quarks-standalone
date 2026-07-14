@@ -1,8 +1,18 @@
 import {Vector3} from '@babylonjs/core/Maths/math.vector';
 import type {Scene} from '@babylonjs/core/scene';
+import type {TransformNode} from '@babylonjs/core/Meshes/transformNode';
 import type {BatchedRenderer} from 'babylon.quarks';
 import type {GalleryEntry} from './loadEffectGallery';
 import {DEFAULT_GALLERY_SPACING, galleryGridPosition} from './galleryLayout';
+
+/** Clears live particles and freezes simulation for one placed catalog entry. */
+export function clearGalleryEntrySimulation(entry: GalleryEntry, renderer: BatchedRenderer): void {
+    for (const system of entry.systems) {
+        system.restart();
+        system.pause();
+    }
+    renderer.refreshBatches();
+}
 
 /** Parents a catalog entry into the live scene and registers its systems with the renderer. */
 export function placeGalleryEntryInScene(
@@ -35,6 +45,30 @@ export function placeGalleryEntriesAt(
         const position = center.add(new Vector3(offset.x, 0, offset.z));
         placeGalleryEntryInScene(entry, renderer, position);
     });
+}
+
+/**
+ * Unregisters a placed effect from the renderer and returns it to the hidden catalog.
+ * Systems stay alive for inspector editing; drag into the viewport to place again.
+ */
+export function removeGalleryEntryFromScene(
+    entry: GalleryEntry,
+    renderer: BatchedRenderer,
+    catalogRoot: TransformNode
+): void {
+    if (!entry.inScene) {
+        return;
+    }
+
+    clearGalleryEntrySimulation(entry, renderer);
+
+    for (const system of entry.systems) {
+        renderer.deleteSystem(system);
+    }
+
+    entry.root.parent = catalogRoot;
+    entry.root.setEnabled(false);
+    entry.inScene = false;
 }
 
 /** Raycasts the editor ground plane from canvas/client coordinates. */

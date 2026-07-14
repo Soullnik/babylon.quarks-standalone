@@ -62,6 +62,30 @@ describe('SpriteBatch', () => {
         system.dispose();
     });
 
+    it('clears instance buffers after all particles die', () => {
+        const renderer = new BatchedRenderer('sprite-empty', scene);
+        const system = createSpriteSystem({
+            looping: false,
+            duration: 1,
+            emissionOverTime: new ConstantValue(0),
+            emissionOverDistance: new ConstantValue(0),
+            startLife: new ConstantValue(0.05),
+            emissionBursts: [{time: 0, count: new ConstantValue(4), probability: 1, interval: 0.01, cycle: 1}],
+        });
+        renderer.addSystem(system);
+        for (let i = 0; i < 10; i++) {
+            renderer.update(1 / 60);
+        }
+        expect(system.particleNum).toBe(0);
+        const batch = getSpriteBatch(renderer);
+        expect(batch.mesh.forcedInstanceCount).toBe(0);
+        const colorBuffer = (batch as any).colorBuffer as Float32Array;
+        expect(colorBuffer[3]).toBe(0);
+
+        renderer.dispose();
+        system.dispose();
+    });
+
     it('populates instance buffers and applies local-space scale', () => {
         const renderer = new BatchedRenderer('sprite-local-space', scene);
         const system = createSpriteSystem({worldSpace: false});

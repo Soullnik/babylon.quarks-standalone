@@ -205,6 +205,7 @@ export class ParticleSystem implements IParticleSystem {
     private prewarmed: boolean;
     private emitEnded: boolean;
     private markForDestroy: boolean;
+    private finishedEventFired = false;
     private startDelayTimeLeft = 0;
     private previousEmitterPos?: Vector3;
     private tempEmitterPos: Vector3 = new Vector3();
@@ -225,6 +226,52 @@ export class ParticleSystem implements IParticleSystem {
 
     get time(): number {
         return this.emissionState.time;
+    }
+
+    get isEmitEnded(): boolean {
+        return this.emitEnded;
+    }
+
+    /** Whether continuous or queued emission can still spawn particles before the system is done. */
+    hasPendingEmission(): boolean {
+        if (this.looping) {
+            return true;
+        }
+        if (this.emitEnded) {
+            return false;
+        }
+        if (this.onlyUsedByOther) {
+            return false;
+        }
+        const state = this.emissionState;
+        if (state.waitEmiting > 0) {
+            return true;
+        }
+        if (state.burstIndex < this.emissionBursts.length) {
+            return true;
+        }
+        if (state.time >= this.duration) {
+            return false;
+        }
+        const timeRatio = state.time / this.duration;
+        if (this.emissionOverTime.genValue(this.memory, timeRatio) > 0) {
+            return true;
+        }
+        return this.emissionOverDistance.genValue(this.memory, timeRatio) > 0;
+    }
+
+    /** Non-looping system with no particles left and nothing left to emit. */
+    isFinished(): boolean {
+        if (this.looping) {
+            return false;
+        }
+        if (this.particleNum > 0) {
+            return false;
+        }
+        if (this.onlyUsedByOther) {
+            return true;
+        }
+        return !this.hasPendingEmission();
     }
 
     get layers() {
@@ -754,6 +801,7 @@ export class ParticleSystem implements IParticleSystem {
         this.behaviors.forEach((behavior) => behavior.reset());
         this.emitEnded = false;
         this.markForDestroy = false;
+        this.finishedEventFired = false;
         this.prewarmed = false;
         this.emissionBursts.forEach((burst) => burst.count.startGen(this.memory));
         this.emissionOverDistance.startGen(this.memory);
@@ -774,8 +822,7 @@ export class ParticleSystem implements IParticleSystem {
             this.emitter.computeWorldMatrix(true);
         }
 
-        if (this.emitEnded && this.particleNum === 0) {
-            if (this.markForDestroy) this.dispose();
+        if (!this.looping && this.finishedEventFired && this.particleNum === 0) {
             return;
         }
 
@@ -879,6 +926,21 @@ export class ParticleSystem implements IParticleSystem {
             }
         }
         this.particleNum = liveParticleCount;
+        this.notifyFinished();
+    }
+
+    private notifyFinished(): void {
+        if (!this.isFinished()) {
+            return;
+        }
+        if (!this.finishedEventFired) {
+            this.finishedEventFired = true;
+            this.fire({type: 'finished', particleSystem: this});
+        }
+        if (this.autoDestroy) {
+            this.markForDestroy = true;
+            this.dispose();
+        }
     }
 
     emit(delta: number, emissionState: EmissionState, emitterMatrix: Matrix4) {

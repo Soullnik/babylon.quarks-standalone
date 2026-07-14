@@ -90,7 +90,7 @@ export interface IEmitter {
     matrixWorld: any; //type is annoying
 }
 
-export type ParticleSystemEventType = "emitEnd" | "destroy" | "particleDied";
+export type ParticleSystemEventType = "emitEnd" | "finished" | "destroy" | "particleDied";
 export interface ParticleSystemEvent {
     type: ParticleSystemEventType;
     particleSystem: IParticleSystem;
@@ -151,6 +151,12 @@ export interface IParticleSystem {
     //getRendererSettings(): VFXBatchSettings;
 
     paused: boolean;
+    /** True after `endEmit()` — emission window closed (non-looping duration elapsed). */
+    readonly isEmitEnded: boolean;
+    /** Whether more particles can still spawn (bursts, rate, distance). */
+    hasPendingEmission(): boolean;
+    /** Non-looping system with no live particles and no pending emission. */
+    isFinished(): boolean;
     pause(): void;
     stop(): void;
     play(): void;

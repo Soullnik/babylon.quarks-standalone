@@ -25,21 +25,30 @@ import {GridMaterial} from '@babylonjs/materials/grid/gridMaterial';
 import {
     BatchedRenderer,
     ParticleSystem,
+    QuarksUtil,
 } from 'babylon.quarks';
 import {EffectBinding} from '../core/binding';
 import {EffectHistory} from '../core/history';
 import {ensureGroundResolver} from '../core/collision';
 import {createGalleryDefaultEntry} from '../core/defaultEffect';
 import {loadEffectFromJson, disposeLoadedEffect, parseEffectFromJson} from '../core/loadEffect';
-import {applyGalleryPlayback, countActivePreviews, countGalleryParticles, hasActivePreview} from '../core/galleryPlayback';
-import {createPlaybackState, getFocusElapsed, isFocusFinished, setFocusElapsed, type PlaybackState} from '../core/playback';
+import {applyGalleryPlayback, countActivePreviews, countGalleryParticles, hasActivePreview, pauseFinishedPreviews} from '../core/galleryPlayback';
+import {createPlaybackState, clearFocusFinished, getFocusElapsed, isFocusFinished, markFocusFinished, setFocusElapsed, type PlaybackState} from '../core/playback';
+import {pauseFocus, scrubFocusToSettled} from '../core/scrub';
+import {logRenderMismatch} from '../core/renderDebug';
 import {cancelGalleryCameraFocus, focusGalleryEntry} from '../core/galleryLayout';
 import {computeTimelineRows, computeTimelineSpan} from '../core/timeline';
 import {GalleryDropMarker} from '../core/galleryDropMarker';
 import {GallerySelectionMarker} from '../core/gallerySelectionMarker';
 import {EmitterShapeWireframes} from '../core/emitterShapeWireframe';
 import {getGalleryDragSession, setGalleryDragSession} from '../core/galleryDragSession';
-import {pickGroundPosition, placeGalleryEntriesAt, placeGalleryEntryInScene} from '../core/galleryScene';
+import {
+    clearGalleryEntrySimulation,
+    pickGroundPosition,
+    placeGalleryEntriesAt,
+    placeGalleryEntryInScene,
+    removeGalleryEntryFromScene,
+} from '../core/galleryScene';
 import {describeGalleryDrag, GALLERY_DRAG_MIME, readGalleryDrag} from '../core/galleryTree';
 import {loadEffectGallery, collectJsonFiles, bindingFromGalleryEntry, mergeGalleryEntries, type GalleryEntry, type GalleryLoadProgress} from '../core/loadEffectGallery';
 import {pickGalleryJsonFiles} from '../core/pickGalleryFiles';
@@ -135,6 +144,7 @@ export function EffectEditorHost(props: EffectEditorHostProps) {
     const importGalleryRef = useRef<(files: FileList | File[]) => Promise<void>>(async () => {});
     const selectGalleryEntryRef = useRef<(entry: GalleryEntry) => void>(() => {});
     const toggleGalleryPreviewRef = useRef<(entry: GalleryEntry) => void>(() => {});
+    const removeGalleryFromSceneRef = useRef<(entry: GalleryEntry) => void>(() => {});
     const placeGalleryDropRef = useRef<(clientX: number, clientY: number, dataTransfer?: DataTransfer) => void>(() => {});
     const createGalleryDefaultRef = useRef<() => void>(() => {});
     const dropMarkerRef = useRef<GalleryDropMarker | null>(null);
@@ -352,12 +362,14 @@ export function EffectEditorHost(props: EffectEditorHostProps) {
                 return;
             }
             const id = entry.root.uniqueId;
+            const removing = (stateRef.current?.previewRootIds ?? []).includes(id);
             setPreviewRootIds((prev) => {
                 const next = new Set(prev);
                 if (next.has(id)) {
                     next.delete(id);
                 } else {
                     next.add(id);
+                    clearFocusFinished(playbackRef.current, id);
                 }
                 const ids = [...next];
                 if (stateRef.current) {
@@ -365,6 +377,47 @@ export function EffectEditorHost(props: EffectEditorHostProps) {
                 }
                 return ids;
             });
+            if (removing) {
+                clearGalleryEntrySimulation(entry, renderer);
+                clearFocusFinished(playbackRef.current, id);
+            }
+            renderer.refreshBatches();
+            scene.render();
+            force();
+        };
+
+        const removeGalleryFromScene = (entry: GalleryEntry) => {
+            if (!entry.inScene) {
+                return;
+            }
+            const id = entry.root.uniqueId;
+            removeGalleryEntryFromScene(entry, renderer, galleryRoot);
+            setPreviewRootIds((prev) => {
+                const next = prev.filter((rootId) => rootId !== id);
+                if (stateRef.current) {
+                    stateRef.current.previewRootIds = next;
+                }
+                return next;
+            });
+            clearFocusFinished(playbackRef.current, id);
+            playbackRef.current.focusElapsedByRoot.delete(id);
+            galleryEntries = [...galleryEntries];
+            if (stateRef.current) {
+                stateRef.current.galleryEntries = galleryEntries;
+            }
+            setGallery(galleryEntries);
+            if (stateRef.current?.binding?.root === entry.root) {
+                selectionMarker.hide();
+            }
+            applyGalleryPlayback(
+                galleryEntries,
+                new Set(stateRef.current?.previewRootIds ?? []),
+                playbackRef.current.stagePlaying,
+                playbackRef.current.focusFinishedByRoot
+            );
+            renderer.refreshBatches();
+            scene.render();
+            force();
         };
 
         const addGalleryPreview = (...entries: GalleryEntry[]) => {
@@ -503,6 +556,7 @@ export function EffectEditorHost(props: EffectEditorHostProps) {
         importGalleryRef.current = appendGalleryFromFiles;
         selectGalleryEntryRef.current = focusCatalogEntry;
         toggleGalleryPreviewRef.current = toggleGalleryPreview;
+        removeGalleryFromSceneRef.current = removeGalleryFromScene;
         placeGalleryDropRef.current = placeGalleryDropAt;
         createGalleryDefaultRef.current = appendGalleryDefault;
 
@@ -550,11 +604,41 @@ export function EffectEditorHost(props: EffectEditorHostProps) {
                         hasActivePreview(snapshot.galleryEntries, previewIds) && (playback.stagePlaying || stepQueued);
                     if (simulate) {
                         renderer.update(delta);
-                        const focusId = playback.focusRootId ?? snapshot.binding?.root.uniqueId ?? null;
-                        if (focusId != null && playback.stagePlaying && !playback.focusFinishedByRoot.has(focusId)) {
+                        let needsRefresh = false;
+                        if (pauseFinishedPreviews(snapshot.galleryEntries, previewIds, playback.focusFinishedByRoot)) {
+                            needsRefresh = true;
+                        }
+                        const binding = snapshot.binding;
+                        const focusId = playback.focusRootId ?? binding?.root.uniqueId ?? null;
+                        if (
+                            focusId != null &&
+                            binding &&
+                            playback.stagePlaying &&
+                            !playback.focusFinishedByRoot.has(focusId) &&
+                            !focusTimelineMetaRef.current.anyLooping &&
+                            QuarksUtil.isEffectFinished(binding.root)
+                        ) {
+                            const settleAt = getFocusElapsed(playback, focusId);
+                            scrubFocusToSettled(binding, renderer, settleAt);
+                            markFocusFinished(playback, focusId);
+                            pauseFocus(binding);
+                            needsRefresh = true;
+                        } else if (
+                            focusId != null &&
+                            playback.stagePlaying &&
+                            !playback.focusFinishedByRoot.has(focusId)
+                        ) {
                             const prev = getFocusElapsed(playback, focusId);
                             setFocusElapsed(playback, focusId, prev + delta);
                         }
+                        if (needsRefresh) {
+                            renderer.refreshBatches();
+                        }
+                        if (snapshot.galleryEntries.length > 0) {
+                            logRenderMismatch(renderer, countGalleryParticles(snapshot.galleryEntries, previewIds));
+                        }
+                    } else if (snapshot && snapshot.galleryEntries.length > 0) {
+                        renderer.refreshBatches();
                     }
                 }
             }
@@ -606,7 +690,9 @@ export function EffectEditorHost(props: EffectEditorHostProps) {
                     const stageLabel = playback.stagePlaying ? 'playing' : 'paused';
                     const timeLabel = meta.anyLooping
                         ? `${focusElapsed.toFixed(1)}s ⟳`
-                        : `${Math.min(focusElapsed, meta.span).toFixed(1)}s / ${meta.span.toFixed(1)}s${focusEnded ? ' (end)' : ''}`;
+                        : focusEnded
+                          ? `${focusElapsed.toFixed(1)}s / ${meta.span.toFixed(1)}s (end)`
+                          : `${focusElapsed.toFixed(1)}s / ${meta.span.toFixed(1)}s`;
                     counterRef.current.textContent = `${playing} preview · ${stageLabel}${focusLabel} · ${timeLabel} · ${count} particles · ${inScene}/${snapshot.galleryEntries.length} in catalog`;
                 }
             } else if (binding) {
@@ -620,7 +706,9 @@ export function EffectEditorHost(props: EffectEditorHostProps) {
                     const stageLabel = playback.stagePlaying ? 'playing' : 'paused';
                     const timeLabel = meta.anyLooping
                         ? `${focusElapsed.toFixed(1)}s ⟳`
-                        : `${Math.min(focusElapsed, meta.span).toFixed(1)}s / ${meta.span.toFixed(1)}s${focusEnded ? ' (end)' : ''}`;
+                        : focusEnded
+                          ? `${focusElapsed.toFixed(1)}s / ${meta.span.toFixed(1)}s (end)`
+                          : `${focusElapsed.toFixed(1)}s / ${meta.span.toFixed(1)}s`;
                     counterRef.current.textContent = `${stageLabel} · ${timeLabel} · ${count} particles`;
                 }
             }
@@ -678,7 +766,15 @@ export function EffectEditorHost(props: EffectEditorHostProps) {
         if (!isCatalogEntry) {
             return;
         }
-        applyGalleryPlayback(snap.galleryEntries, new Set(previewRootIds), stagePlaying);
+        applyGalleryPlayback(
+            snap.galleryEntries,
+            new Set(previewRootIds),
+            stagePlaying,
+            playbackRef.current.focusFinishedByRoot
+        );
+        if (!stagePlaying && stateRef.current?.renderer) {
+            stateRef.current.renderer.refreshBatches();
+        }
     }, [stagePlaying, previewRootIds, gallery]);
 
     useEffect(() => {
@@ -875,7 +971,7 @@ export function EffectEditorHost(props: EffectEditorHostProps) {
                             Gallery{gallery.length > 0 ? ` · ${gallery.length}` : ''}
                         </div>
                         <div style={{fontSize: 11, color: theme.textDim, marginTop: 4, lineHeight: 1.4}}>
-                            Drag into the viewport to place effects.
+                            Drag into viewport to place · ✓ preview · × remove from stage
                         </div>
                     </div>
                     <div style={{flex: 1, minHeight: 0, overflow: 'hidden', padding: '8px 12px 14px', display: 'flex', flexDirection: 'column'}}>
@@ -887,6 +983,7 @@ export function EffectEditorHost(props: EffectEditorHostProps) {
                             folderInputRef={galleryFolderInputRef}
                             onFocus={(entry) => selectGalleryEntryRef.current(entry)}
                             onTogglePreview={(entry) => toggleGalleryPreviewRef.current(entry)}
+                            onRemoveFromScene={(entry) => removeGalleryFromSceneRef.current(entry)}
                             onImportFiles={(files) => void runGalleryImport(files)}
                             onImportFolder={() => void handleImportFolder()}
                             onCreateDefault={() => createGalleryDefaultRef.current()}
@@ -1134,6 +1231,7 @@ export function EffectEditorHost(props: EffectEditorHostProps) {
                     selectedNode={selectedNode}
                     onSelectNode={setSelectedNode}
                     scene={state.scene}
+                    renderer={state.renderer}
                     playbackRef={playbackRef}
                     playheadRef={playheadRef}
                     counterRef={counterRef}

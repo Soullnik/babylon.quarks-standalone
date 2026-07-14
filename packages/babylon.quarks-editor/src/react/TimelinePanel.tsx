@@ -6,7 +6,7 @@ import {
     PlayIcon,
     RectangleGroupIcon,
 } from '@heroicons/react/24/solid';
-import type {ParticleSystem} from 'babylon.quarks';
+import type {ParticleSystem, BatchedRenderer} from 'babylon.quarks';
 import type {Scene} from '@babylonjs/core/scene';
 import type {TransformNode} from '@babylonjs/core/Meshes/transformNode';
 import type {EffectBinding} from '../core/binding';
@@ -19,7 +19,7 @@ import {
     type PlaybackState,
 } from '../core/playback';
 import {groupNodes} from '../core/groups';
-import {scrubFocusTo} from '../core/scrub';
+import {pauseFocus, playFocus, scrubFocusTo, scrubFocusToSettled} from '../core/scrub';
 import {computeTimelineRows, computeTimelineSpan} from '../core/timeline';
 import {TimelineTrackRow} from './TimelineTrackRow';
 import {iconStyle} from './icons';
@@ -32,6 +32,7 @@ export interface TimelinePanelProps {
     selectedNode: TransformNode | null;
     onSelectNode: (node: TransformNode | null) => void;
     scene: Scene;
+    renderer: BatchedRenderer;
     playbackRef: React.MutableRefObject<PlaybackState>;
     playheadRef: React.RefObject<HTMLDivElement>;
     counterRef: React.RefObject<HTMLSpanElement>;
@@ -63,7 +64,7 @@ function pickTickInterval(pxPerSecond: number): number {
  * apply only to the focused effect without stopping other previews.
  */
 export function TimelinePanel(props: TimelinePanelProps): React.ReactElement {
-    const {binding, selectedNode, onSelectNode, scene, playbackRef, playheadRef, counterRef, stagePlaying, setStagePlaying, speed, setSpeed, playbackEnabled = true} = props;
+    const {binding, selectedNode, onSelectNode, scene, renderer, playbackRef, playheadRef, counterRef, stagePlaying, setStagePlaying, speed, setSpeed, playbackEnabled = true} = props;
 
     const [bodyWidthPx, setBodyWidthPx] = useState(600);
     const [collapsedGroups, setCollapsedGroups] = useState<Set<TransformNode>>(() => new Set());
@@ -144,13 +145,19 @@ export function TimelinePanel(props: TimelinePanelProps): React.ReactElement {
             let shown = elapsed;
             if (anyLooping) {
                 shown = timelineSpan > 0 ? elapsed % timelineSpan : 0;
-            } else if (elapsed >= timelineSpan || isFocusFinished(state, focusRootId)) {
+            } else if (isFocusFinished(state, focusRootId)) {
+                // Park at real simulation time — core may finish before the ruler's worst-case span.
+                shown = elapsed;
+            } else if (elapsed >= timelineSpan) {
                 shown = timelineSpan;
                 const justFinishedPlaying =
-                    !state.scrubbing && state.stagePlaying && prevElapsedRef.current < timelineSpan && elapsed >= timelineSpan;
+                    !state.scrubbing && state.stagePlaying && prevElapsedRef.current < timelineSpan;
                 if (justFinishedPlaying) {
+                    scrubFocusToSettled(binding, renderer, timelineSpan);
                     markFocusFinished(state, focusRootId);
                     setFocusElapsed(state, focusRootId, timelineSpan);
+                    pauseFocus(binding);
+                    scene.render();
                 }
             }
             prevElapsedRef.current = elapsed;
@@ -161,7 +168,7 @@ export function TimelinePanel(props: TimelinePanelProps): React.ReactElement {
         };
         raf = requestAnimationFrame(tick);
         return () => cancelAnimationFrame(raf);
-    }, [pxPerSecond, timelineSpan, anyLooping, playbackRef, playheadRef, focusRootId, playbackEnabled]);
+    }, [pxPerSecond, timelineSpan, anyLooping, playbackRef, playheadRef, focusRootId, playbackEnabled, binding, scene, renderer]);
 
     const visibleRows = useMemo(() => {
         let hideUntilDepth: number | null = null;
@@ -197,16 +204,23 @@ export function TimelinePanel(props: TimelinePanelProps): React.ReactElement {
     };
 
     const applyScrub = (time: number) => {
-        scrubFocusTo(binding, time);
         const state = playbackRef.current;
-        setFocusElapsed(state, focusRootId, time);
-        if (time < timelineSpan) {
-            clearFocusFinished(state, focusRootId);
-        } else if (!anyLooping) {
+        const atEnd = !anyLooping && time >= timelineSpan;
+        const shown = atEnd ? timelineSpan : time;
+        if (atEnd) {
+            scrubFocusToSettled(binding, renderer, timelineSpan);
             markFocusFinished(state, focusRootId);
+            pauseFocus(binding);
+        } else {
+            scrubFocusTo(binding, renderer, time);
+            clearFocusFinished(state, focusRootId);
+            if (stagePlaying) {
+                playFocus(binding);
+            }
         }
+        setFocusElapsed(state, focusRootId, shown);
         if (playheadRef.current) {
-            playheadRef.current.style.left = `${LABEL_WIDTH + TIMELINE_INSET + time * pxPerSecond}px`;
+            playheadRef.current.style.left = `${LABEL_WIDTH + TIMELINE_INSET + shown * pxPerSecond}px`;
         }
         scene.render();
     };
@@ -223,10 +237,13 @@ export function TimelinePanel(props: TimelinePanelProps): React.ReactElement {
     };
 
     const restartFocus = () => {
-        scrubFocusTo(binding, 0);
+        scrubFocusTo(binding, renderer, 0);
         const state = playbackRef.current;
         setFocusElapsed(state, focusRootId, 0);
         clearFocusFinished(state, focusRootId);
+        if (stagePlaying) {
+            playFocus(binding);
+        }
         if (playheadRef.current) {
             playheadRef.current.style.left = `${LABEL_WIDTH + TIMELINE_INSET}px`;
         }

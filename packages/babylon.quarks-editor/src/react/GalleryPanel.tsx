@@ -7,6 +7,7 @@ import {
     FolderIcon,
     FolderOpenIcon,
     SparklesIcon,
+    XMarkIcon,
 } from '@heroicons/react/24/solid';
 import type {TransformNode} from '@babylonjs/core/Meshes/transformNode';
 import type {GalleryEntry, GalleryLoadProgress} from '../core/loadEffectGallery';
@@ -34,6 +35,7 @@ export interface GalleryPanelProps {
     folderInputRef: React.RefObject<HTMLInputElement | null>;
     onFocus: (entry: GalleryEntry) => void;
     onTogglePreview: (entry: GalleryEntry) => void;
+    onRemoveFromScene: (entry: GalleryEntry) => void;
     onImportFiles: (files: FileList | File[]) => void;
     onImportFolder: () => void;
     onCreateDefault: () => void;
@@ -55,9 +57,18 @@ function EffectRow(props: {
     inPreview: boolean;
     onFocus: (entry: GalleryEntry) => void;
     onTogglePreview: (entry: GalleryEntry) => void;
+    onRemoveFromScene: (entry: GalleryEntry) => void;
 }): React.ReactElement {
-    const {entry, depth, focused, inPreview, onFocus, onTogglePreview} = props;
+    const {entry, depth, focused, inPreview, onFocus, onTogglePreview, onRemoveFromScene} = props;
     const isLooping = entry.systems.some((system) => system.looping);
+    const parkedOnStage = entry.inScene && !inPreview;
+    const rowBackground = focused
+        ? 'rgba(120, 165, 255, 0.22)'
+        : inPreview
+          ? 'rgba(120, 165, 255, 0.1)'
+          : parkedOnStage
+            ? 'rgba(120, 165, 255, 0.04)'
+            : 'transparent';
     return (
         <div
             style={{
@@ -66,7 +77,7 @@ function EffectRow(props: {
                 width: '100%',
                 height: GALLERY_ROW_HEIGHT,
                 borderBottom: `1px solid ${theme.border}`,
-                background: focused ? 'rgba(120, 165, 255, 0.22)' : inPreview ? 'rgba(120, 165, 255, 0.08)' : 'transparent',
+                background: rowBackground,
                 boxSizing: 'border-box',
             }}
         >
@@ -74,7 +85,11 @@ function EffectRow(props: {
                 <button
                     type="button"
                     className="qe-hover"
-                    title={inPreview ? 'Remove from stage preview' : 'Preview on stage (keep playing)'}
+                    title={
+                        inPreview
+                            ? 'Remove from stage preview — stops group playback and clears particles; effect stays on stage'
+                            : 'Add to stage preview — plays with Stage Play/Pause'
+                    }
                     style={{
                         flexShrink: 0,
                         width: 28,
@@ -93,7 +108,11 @@ function EffectRow(props: {
                         onTogglePreview(entry);
                     }}
                 >
-                    {inPreview ? <CheckCircleIcon style={iconStyle(14)} /> : <span style={{width: 10, height: 10, border: `1px solid currentColor`, borderRadius: 2, boxSizing: 'border-box'}} />}
+                    {inPreview ? (
+                        <CheckCircleIcon style={iconStyle(14)} />
+                    ) : (
+                        <span style={{width: 10, height: 10, border: `1px solid currentColor`, borderRadius: 2, boxSizing: 'border-box'}} />
+                    )}
                 </button>
             ) : (
                 <span style={{width: 28, flexShrink: 0, borderRight: `1px solid ${theme.border}`}} />
@@ -104,8 +123,8 @@ function EffectRow(props: {
                 className="qe-hover-bg"
                 title={
                     entry.inScene
-                        ? `${entry.path} — in scene · Ctrl+click toggles preview`
-                        : `${entry.path} — drag into viewport`
+                        ? `${entry.path} — on stage${inPreview ? ' · previewing' : ' · parked'} · Ctrl+click toggles preview`
+                        : `${entry.path} — catalog only · drag into viewport to place`
                 }
                 style={{
                     display: 'flex',
@@ -118,7 +137,7 @@ function EffectRow(props: {
                     border: 'none',
                     background: 'transparent',
                     color: focused ? theme.text : theme.textDim,
-                    padding: `0 12px 0 ${8 + depth * 14}px`,
+                    padding: `0 8px 0 ${8 + depth * 14}px`,
                     fontSize: 12.5,
                     cursor: 'grab',
                     fontFamily: theme.font,
@@ -133,16 +152,56 @@ function EffectRow(props: {
                 onDragStart={(e) => beginGalleryDrag(e, {kind: 'effect', id: entry.root.uniqueId})}
                 onDragEnd={endGalleryDrag}
             >
-                <span style={{width: 14, flexShrink: 0, opacity: entry.inScene ? 1 : 0.35, color: entry.inScene ? theme.accent : theme.textDim, display: 'inline-flex'}}>
-                    {entry.inScene ? <SparklesIcon style={iconStyle(14)} /> : <SparklesIcon style={iconStyle(14)} />}
+                <span
+                    style={{
+                        width: 14,
+                        flexShrink: 0,
+                        opacity: entry.inScene ? 1 : 0.35,
+                        color: inPreview ? theme.accent : entry.inScene ? theme.text : theme.textDim,
+                        display: 'inline-flex',
+                    }}
+                    title={entry.inScene ? 'On stage' : 'Catalog only'}
+                >
+                    <SparklesIcon style={iconStyle(14)} />
                 </span>
                 <span style={{overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'}}>{entry.name}</span>
+                {parkedOnStage && (
+                    <span title="On stage but not in preview" style={{flexShrink: 0, fontSize: 10, color: theme.textDim, letterSpacing: 0.3}}>
+                        parked
+                    </span>
+                )}
                 {isLooping && (
                     <span title="Looping effect" style={{flexShrink: 0, fontSize: 11, color: theme.textDim}}>
                         ⟳
                     </span>
                 )}
             </button>
+            {entry.inScene ? (
+                <button
+                    type="button"
+                    className="qe-hover"
+                    title="Remove from scene — returns to catalog; drag into viewport to place again"
+                    style={{
+                        flexShrink: 0,
+                        width: 28,
+                        border: 'none',
+                        borderLeft: `1px solid ${theme.border}`,
+                        background: 'transparent',
+                        color: theme.textDim,
+                        cursor: 'pointer',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        padding: 0,
+                    }}
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        onRemoveFromScene(entry);
+                    }}
+                >
+                    <XMarkIcon style={iconStyle(13)} />
+                </button>
+            ) : null}
         </div>
     );
 }
@@ -218,9 +277,10 @@ function VirtualGalleryTree(props: {
     previewRootIds: ReadonlySet<number>;
     onFocus: (entry: GalleryEntry) => void;
     onTogglePreview: (entry: GalleryEntry) => void;
+    onRemoveFromScene: (entry: GalleryEntry) => void;
     onToggleFolder: (path: string) => void;
 }): React.ReactElement {
-    const {rows, closedFolders, focusedRoot, previewRootIds, onFocus, onTogglePreview, onToggleFolder} = props;
+    const {rows, closedFolders, focusedRoot, previewRootIds, onFocus, onTogglePreview, onRemoveFromScene, onToggleFolder} = props;
     const scrollRef = useRef<HTMLDivElement>(null);
     const virtualizer = useVirtualizer({
         count: rows.length,
@@ -273,6 +333,7 @@ function VirtualGalleryTree(props: {
                                     inPreview={previewRootIds.has(row.node.entry.root.uniqueId)}
                                     onFocus={onFocus}
                                     onTogglePreview={onTogglePreview}
+                                    onRemoveFromScene={onRemoveFromScene}
                                 />
                             )}
                         </div>
@@ -285,7 +346,7 @@ function VirtualGalleryTree(props: {
 
 /** Folder-tree catalog; import effects here and drag them into the viewport. */
 export function GalleryPanel(props: GalleryPanelProps): React.ReactElement {
-    const {entries, focusedRoot, previewRootIds, loading, folderInputRef, onFocus, onTogglePreview, onImportFiles, onImportFolder, onCreateDefault} = props;
+    const {entries, focusedRoot, previewRootIds, loading, folderInputRef, onFocus, onTogglePreview, onRemoveFromScene, onImportFiles, onImportFolder, onCreateDefault} = props;
     const [query, setQuery] = useState('');
     const [closedFolders, setClosedFolders] = useState<Set<string>>(() => new Set());
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -394,10 +455,12 @@ export function GalleryPanel(props: GalleryPanelProps): React.ReactElement {
             <div style={{fontSize: 12, color: theme.textDim, lineHeight: 1.45}}>
                 {isLoading
                     ? `Loading… ${loading.done} / ${loading.total || '…'} files`
-                    : `${previewCount} previewing · ${inSceneCount} in scene · ${entries.length} total`}
+                    : `${previewCount} previewing · ${inSceneCount} on stage · ${entries.length} in catalog`}
             </div>
-            <div style={{fontSize: 11, color: theme.textDim, lineHeight: 1.4}}>
-                Preview plays on stage · Click = edit · Checkbox or Ctrl+click toggles preview.
+            <div style={{fontSize: 11, color: theme.textDim, lineHeight: 1.45}}>
+                ✓ stage preview · ✨ on stage · drag to place · × remove from stage
+                <br />
+                Click = edit · Ctrl+click = toggle preview
             </div>
             <input
                 className="qe-hover"
@@ -445,6 +508,7 @@ export function GalleryPanel(props: GalleryPanelProps): React.ReactElement {
                     previewRootIds={previewRootIds}
                     onFocus={onFocus}
                     onTogglePreview={onTogglePreview}
+                    onRemoveFromScene={onRemoveFromScene}
                     onToggleFolder={toggleFolder}
                 />
             )}

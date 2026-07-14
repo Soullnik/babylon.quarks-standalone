@@ -589,6 +589,31 @@ describe('ParticleSystem', () => {
         expect(died).toHaveBeenCalled();
     });
 
+    it('reports finished for burst-only one-shot after particles die before duration ends', () => {
+        const ps = new ParticleSystem({
+            scene,
+            duration: 1,
+            looping: false,
+            startLife: new ConstantValue(0.1),
+            startSpeed: new ConstantValue(0),
+            startSize: new ConstantValue(1),
+            startColor: new ConstantColor(new Vector4(1, 1, 1, 1)),
+            emissionOverTime: new ConstantValue(0),
+            emissionOverDistance: new ConstantValue(0),
+            emissionBursts: [{time: 0, count: new ConstantValue(2), probability: 1, interval: 0.01, cycle: 1}],
+            shape: new PointEmitter(),
+        });
+        const finished = jest.fn();
+        ps.addEventListener('finished', finished);
+        for (let i = 0; i < 20; i++) {
+            ps.update(1 / 60);
+        }
+        expect(ps.particleNum).toBe(0);
+        expect(ps.isFinished()).toBe(true);
+        expect(ps.isEmitEnded).toBe(false);
+        expect(finished).toHaveBeenCalledTimes(1);
+    });
+
     it('restores fromJSON with numeric startTileIndex', () => {
         const meta: any = {textures: {}, materials: {}, geometries: {}};
         const ps = ParticleSystem.fromJSON(

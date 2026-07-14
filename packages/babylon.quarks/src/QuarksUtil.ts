@@ -56,6 +56,24 @@ export class QuarksUtil {
         });
     }
 
+    /** True when every emitter under `root` is a finished non-looping system (or looping). */
+    static isEffectFinished(root: Node): boolean {
+        let found = false;
+        let finished = true;
+        QuarksUtil.runOnAllParticleEmitters(root, (emitter) => {
+            found = true;
+            const system = emitter.system as unknown as ParticleSystem;
+            if (system.looping) {
+                finished = false;
+                return;
+            }
+            if (!system.isFinished()) {
+                finished = false;
+            }
+        });
+        return found && finished;
+    }
+
     private static traverseNode(node: Node, callback: (node: Node) => void): void {
         callback(node);
         const children = node.getChildren();
