@@ -7,7 +7,7 @@ Shuriken-style effect editor for [babylon.quarks](https://www.npmjs.com/package/
 ## Install
 
 ```bash
-npm install babylon.quarks-editor babylon.quarks @babylonjs/core react
+npm install babylon.quarks-editor babylon.quarks @babylonjs/core react @heroicons/react @tanstack/react-virtual
 ```
 
 ## Usage

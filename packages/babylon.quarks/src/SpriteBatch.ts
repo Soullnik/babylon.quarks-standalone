@@ -379,8 +379,9 @@ export class SpriteBatch extends VFXBatch {
             }
         }
 
+        // Keep the mesh enabled even when count is 0 — toggling visibility off for a
+        // single frame (common with short lifetimes + low emission overlap) causes flicker.
         this.mesh.forcedInstanceCount = index;
-        this.mesh.setEnabled(index > 0);
 
         if (index > 0) {
             this.offsetVB.update(this.offsetBuffer);

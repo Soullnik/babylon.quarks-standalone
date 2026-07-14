@@ -55,7 +55,8 @@ describe('SpriteBatch', () => {
         const batch = getSpriteBatch(renderer);
         expect(batch).toBeInstanceOf(SpriteBatch);
         expect(batch.mesh.forcedInstanceCount).toBe(0);
-        expect(batch.mesh.isEnabled()).toBe(false);
+        // Mesh stays enabled to avoid one-frame visibility toggles when particle count hits zero.
+        expect(batch.mesh.isEnabled()).toBe(true);
 
         renderer.dispose();
         system.dispose();

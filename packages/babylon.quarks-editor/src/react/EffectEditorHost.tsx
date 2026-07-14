@@ -1,4 +1,4 @@
-import React, {useEffect, useReducer, useRef, useState} from 'react';
+import React, {useEffect, useMemo, useReducer, useRef, useState, useCallback} from 'react';
 import {createRoot} from 'react-dom/client';
 import {
     ArrowLeftIcon,
@@ -10,6 +10,7 @@ import {
     CursorArrowRaysIcon,
     Square2StackIcon,
 } from '@heroicons/react/24/solid';
+import {PointerEventTypes} from '@babylonjs/core/Events/pointerEvents';
 import {Engine} from '@babylonjs/core/Engines/engine';
 import {Scene} from '@babylonjs/core/scene';
 import {ArcRotateCamera} from '@babylonjs/core/Cameras/arcRotateCamera';
@@ -42,6 +43,8 @@ import {pickGroundPosition, placeGalleryEntriesAt, placeGalleryEntryInScene} fro
 import {describeGalleryDrag, GALLERY_DRAG_MIME, readGalleryDrag} from '../core/galleryTree';
 import {loadEffectGallery, collectJsonFiles, bindingFromGalleryEntry, mergeGalleryEntries, type GalleryEntry, type GalleryLoadProgress} from '../core/loadEffectGallery';
 import {pickGalleryJsonFiles} from '../core/pickGalleryFiles';
+import {GalleryViewportPicker} from '../core/viewportPicker';
+import {notifyTransformChanged} from '../core/transformStore';
 import {EffectEditor} from './EffectEditor';
 import {PromptDialog} from './PromptDialog';
 import {MessageDialog} from './MessageDialog';
@@ -137,6 +140,7 @@ export function EffectEditorHost(props: EffectEditorHostProps) {
     const dropMarkerRef = useRef<GalleryDropMarker | null>(null);
     const selectionMarkerRef = useRef<GallerySelectionMarker | null>(null);
     const emitterWireframesRef = useRef<EmitterShapeWireframes | null>(null);
+    const viewportPickerRef = useRef<GalleryViewportPicker | null>(null);
     const galleryDragDepthRef = useRef(0);
     const stateRef = useRef<{
         engine: Engine;
@@ -146,7 +150,6 @@ export function EffectEditorHost(props: EffectEditorHostProps) {
         renderer: BatchedRenderer;
         binding: EffectBinding | null;
         history: EffectHistory;
-        stageRoot: TransformNode;
         galleryRoot: TransformNode | null;
         galleryEntries: GalleryEntry[];
         previewRootIds: number[];
@@ -249,11 +252,9 @@ export function EffectEditorHost(props: EffectEditorHostProps) {
         const ground = MeshBuilder.CreateGround('ground', {width: 100, height: 100}, scene);
         ground.material = groundMaterial;
 
-        const stageRoot = new TransformNode('StageRoot', scene);
         const gizmoUtilityLayer = new UtilityLayerRenderer(scene);
         const gizmoManager = new GizmoManager(scene, undefined, gizmoUtilityLayer);
         gizmoManager.usePointerToAttachGizmos = false;
-        gizmoManager.attachToNode(stageRoot);
         gizmoManagerRef.current = gizmoManager;
 
         const renderer = new BatchedRenderer('quarks-editor', scene);
@@ -268,6 +269,40 @@ export function EffectEditorHost(props: EffectEditorHostProps) {
         selectionMarkerRef.current = selectionMarker;
         const emitterWireframes = new EmitterShapeWireframes(scene);
         emitterWireframesRef.current = emitterWireframes;
+        const viewportPicker = new GalleryViewportPicker(scene);
+        viewportPickerRef.current = viewportPicker;
+
+        const handleViewportPointerLeave = () => viewportPicker.setHover(null);
+        canvasRef.current?.addEventListener('pointerleave', handleViewportPointerLeave);
+
+        const pointerObserver = scene.onPointerObservable.add((pointerInfo) => {
+            if (galleryDragDepthRef.current > 0) {
+                return;
+            }
+            const event = pointerInfo.event;
+            if (pointerInfo.type === PointerEventTypes.POINTERMOVE) {
+                const effectRoot = viewportPicker.pick(event.clientX, event.clientY);
+                const focusedRoot = stateRef.current?.binding?.root ?? null;
+                viewportPicker.setHover(effectRoot && effectRoot !== focusedRoot ? effectRoot : null);
+                return;
+            }
+            if (pointerInfo.type !== PointerEventTypes.POINTERDOWN || event.button !== 0) {
+                return;
+            }
+            const effectRoot = viewportPicker.pick(event.clientX, event.clientY);
+            if (!effectRoot) {
+                return;
+            }
+            const snap = stateRef.current;
+            if (!snap) {
+                return;
+            }
+            const entry = snap.galleryEntries.find((item) => item.root === effectRoot);
+            if (entry && snap.binding?.root !== effectRoot) {
+                selectGalleryEntryRef.current(entry);
+            }
+            setSelectedNode(effectRoot);
+        });
 
         const clearGalleryDragPreview = () => {
             galleryDragDepthRef.current = 0;
@@ -288,7 +323,6 @@ export function EffectEditorHost(props: EffectEditorHostProps) {
                 renderer,
                 binding: bindingValue,
                 history,
-                stageRoot,
                 galleryRoot,
                 galleryEntries,
                 previewRootIds: stateRef.current?.previewRootIds ?? [],
@@ -302,7 +336,7 @@ export function EffectEditorHost(props: EffectEditorHostProps) {
             next.subscribe(force);
             syncStateRef(next);
             setBinding(next);
-            setSelectedNode(next.system.emitter);
+            setSelectedNode(entry.root);
             setSelectedGalleryRoot(entry.root);
             playbackRef.current.focusRootId = entry.root.uniqueId;
             if (entry.inScene) {
@@ -360,9 +394,9 @@ export function EffectEditorHost(props: EffectEditorHostProps) {
 
             const position = pickGroundPosition(scene, clientX, clientY);
             if (toPlace.length === 1) {
-                placeGalleryEntryInScene(toPlace[0], stageRoot, renderer, position);
+                placeGalleryEntryInScene(toPlace[0], renderer, position);
             } else {
-                placeGalleryEntriesAt(toPlace, stageRoot, renderer, position);
+                placeGalleryEntriesAt(toPlace, renderer, position);
             }
 
             galleryEntries = [...galleryEntries];
@@ -379,12 +413,12 @@ export function EffectEditorHost(props: EffectEditorHostProps) {
         };
 
         const mount = (nextBinding: EffectBinding) => {
-            nextBinding.root.parent = stageRoot;
+            nextBinding.root.parent = null;
             history.attach(nextBinding);
             nextBinding.subscribe(force);
             syncStateRef(nextBinding);
             setBinding(nextBinding);
-            setSelectedNode(nextBinding.system.emitter);
+            setSelectedNode(nextBinding.root);
             props.onReady?.(makeHandle());
         };
 
@@ -480,12 +514,12 @@ export function EffectEditorHost(props: EffectEditorHostProps) {
         let initialEntry: GalleryEntry;
         if (props.effectJson) {
             const {root, systems} = loadEffectFromJson(scene, renderer, props.effectJson);
-            root.parent = stageRoot;
+            root.parent = null;
             const name = root.name || 'Effect';
             initialEntry = {name, path: `_opened/${name}.json`, root, systems, inScene: true};
         } else {
             initialEntry = createGalleryDefaultEntry(scene, galleryRoot, [], galleryDefaults);
-            placeGalleryEntryInScene(initialEntry, stageRoot, renderer, BVector3.Zero());
+            placeGalleryEntryInScene(initialEntry, renderer, BVector3.Zero());
         }
 
         galleryEntries = [initialEntry];
@@ -526,10 +560,20 @@ export function EffectEditorHost(props: EffectEditorHostProps) {
             }
             scene.render();
             selectionMarker.follow();
+            viewportPickerRef.current?.follow();
             const wireframes = emitterWireframesRef.current;
             if (wireframes && snapshot?.binding) {
                 const b = snapshot.binding;
                 wireframes.sync([b.system, ...b.subSystems], `${b.root.uniqueId}:${b.getRevision()}`);
+            }
+            const picker = viewportPickerRef.current;
+            if (picker && snapshot) {
+                const b = snapshot.binding;
+                const galleryKey = snapshot.galleryEntries
+                    .map((entry) => `${entry.root.uniqueId}:${entry.inScene ? 1 : 0}`)
+                    .join('|');
+                const key = `${galleryKey}::${b?.root.uniqueId ?? 'none'}`;
+                picker.sync(snapshot.galleryEntries, b?.root ?? null, key);
             }
             if (!snapshot) return;
 
@@ -607,6 +651,10 @@ export function EffectEditorHost(props: EffectEditorHostProps) {
             selectionMarkerRef.current = null;
             emitterWireframes.dispose();
             emitterWireframesRef.current = null;
+            viewportPicker.dispose();
+            viewportPickerRef.current = null;
+            canvasRef.current?.removeEventListener('pointerleave', handleViewportPointerLeave);
+            scene.onPointerObservable.remove(pointerObserver);
             gizmoManager.dispose();
             gizmoUtilityLayer.dispose();
             engine.dispose();
@@ -644,29 +692,59 @@ export function EffectEditorHost(props: EffectEditorHostProps) {
         gm.rotationGizmoEnabled = gizmoMode === 'rotation';
         gm.scaleGizmoEnabled = gizmoMode === 'scale';
         const activeGizmo = gizmoMode === 'position' ? gm.gizmos.positionGizmo : gizmoMode === 'rotation' ? gm.gizmos.rotationGizmo : gizmoMode === 'scale' ? gm.gizmos.scaleGizmo : null;
-        const observer = activeGizmo?.onDragObservable.add(() => force());
+        let dragRaf = 0;
+        const scheduleTransformRefresh = () => {
+            if (dragRaf !== 0) {
+                return;
+            }
+            dragRaf = requestAnimationFrame(() => {
+                dragRaf = 0;
+                notifyTransformChanged();
+            });
+        };
+        const dragObserver = activeGizmo?.onDragObservable.add(scheduleTransformRefresh);
+        const dragEndObserver = activeGizmo?.onDragEndObservable.add(() => notifyTransformChanged());
         return () => {
-            if (activeGizmo && observer) activeGizmo.onDragObservable.remove(observer);
+            if (dragRaf !== 0) {
+                cancelAnimationFrame(dragRaf);
+            }
+            if (activeGizmo && dragObserver) {
+                activeGizmo.onDragObservable.remove(dragObserver);
+            }
+            if (activeGizmo && dragEndObserver) {
+                activeGizmo.onDragEndObservable.remove(dragEndObserver);
+            }
         };
     }, [gizmoMode]);
 
     useEffect(() => {
         const gm = gizmoManagerRef.current;
-        const stageRoot = stateRef.current?.stageRoot;
-        if (!gm || !stageRoot) return;
+        if (!gm) return;
         if (selectedNode && selectedNode.isDisposed()) {
-            setSelectedNode(stateRef.current?.binding?.system.emitter ?? null);
+            setSelectedNode(stateRef.current?.binding?.root ?? stateRef.current?.binding?.system.emitter ?? null);
             return;
         }
         if (isGalleryLoading) {
-            gm.attachToNode(stageRoot);
             return;
         }
-        gm.attachToNode(selectedNode ?? stageRoot);
+        const target =
+            selectedNode && !selectedNode.isDisposed()
+                ? selectedNode
+                : binding?.root && !binding.root.isDisposed()
+                  ? binding.root
+                  : null;
+        if (target) {
+            gm.attachToNode(target);
+        }
     }, [selectedNode, binding, isGalleryLoading]);
 
     const state = stateRef.current;
-    const gizmoNode = selectedNode && !selectedNode.isDisposed() ? selectedNode : state?.stageRoot;
+    const gizmoNode =
+        selectedNode && !selectedNode.isDisposed()
+            ? selectedNode
+            : binding?.root && !binding.root.isDisposed()
+              ? binding.root
+              : null;
     const historyAction = (json: unknown | null) => {
         if (json && state?.binding) {
             const current = state.binding;
@@ -688,7 +766,7 @@ export function EffectEditorHost(props: EffectEditorHostProps) {
                 }
                 if (wasInScene && savedPosition) {
                     root.position.copyFrom(savedPosition);
-                    root.parent = state.stageRoot;
+                    root.parent = null;
                     root.setEnabled(true);
                 } else {
                     root.parent = state.galleryRoot;
@@ -715,7 +793,7 @@ export function EffectEditorHost(props: EffectEditorHostProps) {
                 next.subscribe(force);
                 state.binding = next;
                 setBinding(next);
-                setSelectedNode(next.system.emitter);
+                setSelectedNode(root);
                 setSelectedGalleryRoot(root);
                 playbackRef.current.focusRootId = root.uniqueId;
                 if (wasInScene) {
@@ -732,12 +810,12 @@ export function EffectEditorHost(props: EffectEditorHostProps) {
                 disposeEffect(current.root, [current.system, ...current.subSystems], state.renderer);
                 const main = systems.find((s) => !s.onlyUsedByOther) ?? systems[0];
                 const next = new EffectBinding(main, systems.filter((s) => s !== main), root);
-                next.root.parent = state.stageRoot;
+                next.root.parent = null;
                 state.history.attach(next);
                 next.subscribe(force);
                 state.binding = next;
                 setBinding(next);
-                setSelectedNode(next.system.emitter);
+                setSelectedNode(root);
                 setSelectedGalleryRoot(null);
                 selectionMarkerRef.current?.hide();
                 state.ground.scaling.x = 1;
@@ -751,13 +829,31 @@ export function EffectEditorHost(props: EffectEditorHostProps) {
 
     const allSystems = binding ? [binding.system, ...binding.subSystems] : [];
     const activeSystem = binding ? (allSystems.find((s) => s.emitter === selectedNode) ?? binding.system) : null;
-    const gizmoTargetLabel = selectedNode ? gizmoNode?.name || 'Node' : 'Stage (preview parent)';
+    const gizmoTargetLabel = gizmoNode?.name || 'Node';
     const selectedGalleryEntry = selectedGalleryRoot
         ? gallery.find((entry) => entry.root === selectedGalleryRoot) ?? null
         : null;
     /** Timeline is always shown when an effect is selected; playback only when it is on stage. */
     const showTimeline = Boolean(binding && activeSystem && state);
     const timelinePlaybackEnabled = !selectedGalleryEntry || selectedGalleryEntry.inScene;
+    const previewRootIdSet = useMemo(() => new Set(previewRootIds), [previewRootIds]);
+    const resolveTextureForEditor = useCallback(
+        (url: string) => {
+            const scene = stateRef.current?.scene;
+            return scene && props.resolveTexture ? props.resolveTexture(url, scene) : undefined;
+        },
+        [props.resolveTexture]
+    );
+    const resolveGeometryForEditor = useCallback(
+        (file: File) => {
+            const scene = stateRef.current?.scene;
+            if (!scene || !props.resolveGeometry) {
+                return Promise.reject(new Error('Geometry loader is not available.'));
+            }
+            return props.resolveGeometry(file, scene);
+        },
+        [props.resolveGeometry]
+    );
 
     return (
         <div className="qe-root" style={{display: 'flex', flexDirection: 'column', width: '100%', height: '100%', fontFamily: theme.font, color: theme.text, background: '#070b16'}}>
@@ -786,7 +882,7 @@ export function EffectEditorHost(props: EffectEditorHostProps) {
                         <GalleryPanel
                             entries={gallery}
                             focusedRoot={selectedGalleryRoot}
-                            previewRootIds={new Set(previewRootIds)}
+                            previewRootIds={previewRootIdSet}
                             loading={galleryLoading}
                             folderInputRef={galleryFolderInputRef}
                             onFocus={(entry) => selectGalleryEntryRef.current(entry)}
@@ -1023,8 +1119,8 @@ export function EffectEditorHost(props: EffectEditorHostProps) {
                                 gizmoTargetLabel={gizmoTargetLabel}
                                 textureOptions={props.textureOptions}
                                 geometryOptions={props.geometryOptions}
-                                resolveTexture={props.resolveTexture && state ? (url) => props.resolveTexture!(url, state.scene) : undefined}
-                                resolveGeometry={props.resolveGeometry && state ? (file) => props.resolveGeometry!(file, state.scene) : undefined}
+                                resolveTexture={props.resolveTexture ? resolveTextureForEditor : undefined}
+                                resolveGeometry={props.resolveGeometry ? resolveGeometryForEditor : undefined}
                             />
                         ) : (
                             <div style={{fontSize: 13, color: theme.textDim, lineHeight: 1.5}}>No effect selected.</div>

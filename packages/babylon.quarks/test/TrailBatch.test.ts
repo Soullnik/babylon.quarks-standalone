@@ -55,7 +55,8 @@ describe('TrailBatch', () => {
         }
 
         const batch = getTrailBatch(renderer);
-        expect(batch.mesh.isEnabled()).toBe(false);
+        expect(batch.mesh.isEnabled()).toBe(true);
+        expect(batch.mesh.subMeshes[0]?.indexCount ?? 0).toBe(0);
 
         renderer.dispose();
         system.dispose();

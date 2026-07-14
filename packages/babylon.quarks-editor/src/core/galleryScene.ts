@@ -1,19 +1,17 @@
 import {Vector3} from '@babylonjs/core/Maths/math.vector';
 import type {Scene} from '@babylonjs/core/scene';
 import type {BatchedRenderer} from 'babylon.quarks';
-import type {TransformNode} from '@babylonjs/core/Meshes/transformNode';
 import type {GalleryEntry} from './loadEffectGallery';
 import {DEFAULT_GALLERY_SPACING, galleryGridPosition} from './galleryLayout';
 
-/** Parents a catalog entry into the live stage and registers its systems with the renderer. */
+/** Parents a catalog entry into the live scene and registers its systems with the renderer. */
 export function placeGalleryEntryInScene(
     entry: GalleryEntry,
-    stageRoot: TransformNode,
     renderer: BatchedRenderer,
     worldPosition: Vector3
 ): void {
     entry.root.setEnabled(true);
-    entry.root.parent = stageRoot;
+    entry.root.parent = null;
     entry.root.position.copyFrom(worldPosition);
 
     if (!entry.inScene) {
@@ -28,7 +26,6 @@ export function placeGalleryEntryInScene(
 /** Spawns a batch of catalog effects in a square grid centered on `center`. */
 export function placeGalleryEntriesAt(
     entries: GalleryEntry[],
-    stageRoot: TransformNode,
     renderer: BatchedRenderer,
     center: Vector3,
     spacing = DEFAULT_GALLERY_SPACING
@@ -36,7 +33,7 @@ export function placeGalleryEntriesAt(
     entries.forEach((entry, index) => {
         const offset = galleryGridPosition(index, entries.length, spacing);
         const position = center.add(new Vector3(offset.x, 0, offset.z));
-        placeGalleryEntryInScene(entry, stageRoot, renderer, position);
+        placeGalleryEntryInScene(entry, renderer, position);
     });
 }
 

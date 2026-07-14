@@ -2,6 +2,7 @@ import {ParticleEmitter} from 'babylon.quarks';
 import type {ParticleSystem} from 'babylon.quarks';
 import {TransformNode} from '@babylonjs/core/Meshes/transformNode';
 import {Matrix, Quaternion} from '@babylonjs/core/Maths/math.vector';
+import {isEditorSceneNode} from './editorScene';
 
 /** A node in the editor's effect hierarchy: a Group (organizational) or a ParticleEmitter. */
 export interface EffectTreeNode {
@@ -24,7 +25,7 @@ export function buildEffectTree(root: TransformNode, depth = 0): EffectTreeNode 
         children: [],
     };
     for (const child of root.getChildren()) {
-        if (child instanceof TransformNode) {
+        if (child instanceof TransformNode && !isEditorSceneNode(child)) {
             treeNode.children.push(buildEffectTree(child, depth + 1));
         }
     }

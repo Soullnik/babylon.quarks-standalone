@@ -7,6 +7,7 @@ import {MeshBuilder} from '@babylonjs/core/Meshes/meshBuilder';
 import {TransformNode} from '@babylonjs/core/Meshes/transformNode';
 import type {Scene} from '@babylonjs/core/scene';
 import {getShapeType, readShapeParams} from './shapes';
+import {EDITOR_SCENE_NODE_METADATA} from './editorScene';
 
 const LINE_COLOR = new Color3(0.45, 0.82, 1);
 const DIRECTION_COLOR = new Color3(0.75, 0.92, 1);
@@ -63,6 +64,7 @@ export class EmitterShapeWireframes {
             }
             for (const mesh of buildEmitterWireframe(system, this.scene)) {
                 mesh.parent = system.emitter;
+                mesh.metadata = {...(mesh.metadata ?? {}), ...EDITOR_SCENE_NODE_METADATA};
                 mesh.isPickable = false;
                 mesh.renderingGroupId = 1;
                 this.meshes.push(mesh);

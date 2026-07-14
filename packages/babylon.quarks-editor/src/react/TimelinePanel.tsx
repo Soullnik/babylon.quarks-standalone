@@ -45,7 +45,6 @@ export interface TimelinePanelProps {
 
 const LABEL_WIDTH = 200;
 const RULER_HEIGHT = 22;
-const STAGE_ROW_HEIGHT = 26;
 const PANEL_HEIGHT = 220;
 /** Small gap between the label column and the first pixel of the time axis. */
 export const TIMELINE_INSET = 10;
@@ -391,34 +390,9 @@ export function TimelinePanel(props: TimelinePanelProps): React.ReactElement {
                             </div>
                         </div>
                         <div
-                            className="qe-hover-bg"
-                            title="Preview parent — simulates effect.parent = someNode; not saved in the exported JSON"
                             style={{
                                 position: 'absolute',
                                 top: RULER_HEIGHT,
-                                left: 0,
-                                right: 0,
-                                height: STAGE_ROW_HEIGHT,
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: 6,
-                                padding: '0 8px',
-                                fontSize: 12.5,
-                                fontStyle: 'italic',
-                                cursor: 'pointer',
-                                color: selectedNode === null ? theme.text : theme.textDim,
-                                borderBottom: `1px solid ${theme.border}`,
-                                ...(selectedNode === null ? {background: 'rgba(60, 105, 209, 0.3)'} : {}),
-                            }}
-                            onClick={() => onSelectNode(null)}
-                        >
-                            <span style={{fontSize: 10, width: 10}}>◎</span>
-                            <span>Stage (preview parent)</span>
-                        </div>
-                        <div
-                            style={{
-                                position: 'absolute',
-                                top: RULER_HEIGHT + STAGE_ROW_HEIGHT,
                                 left: 0,
                                 right: 0,
                                 bottom: 0,

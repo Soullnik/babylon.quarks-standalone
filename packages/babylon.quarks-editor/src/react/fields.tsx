@@ -14,8 +14,11 @@ export function Row(props: {label: string; hint?: string; hintKey?: string; chil
 /** Number input that keeps focus-friendly local text state and commits parsed values. */
 export function NumberField(props: {value: number; onChange: (value: number) => void; step?: number; min?: number}) {
     const [text, setText] = useState(String(round(props.value)));
+    const focusedRef = React.useRef(false);
     useEffect(() => {
-        setText(String(round(props.value)));
+        if (!focusedRef.current) {
+            setText(String(round(props.value)));
+        }
     }, [props.value]);
     return (
         <input
@@ -25,6 +28,13 @@ export function NumberField(props: {value: number; onChange: (value: number) => 
             value={text}
             step={props.step ?? 0.1}
             min={props.min}
+            onFocus={() => {
+                focusedRef.current = true;
+            }}
+            onBlur={() => {
+                focusedRef.current = false;
+                setText(String(round(props.value)));
+            }}
             onChange={(e) => {
                 setText(e.target.value);
                 const parsed = parseFloat(e.target.value);

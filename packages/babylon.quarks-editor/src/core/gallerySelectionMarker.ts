@@ -5,44 +5,48 @@ import {MeshBuilder} from '@babylonjs/core/Meshes/meshBuilder';
 import {TransformNode} from '@babylonjs/core/Meshes/transformNode';
 import type {Scene} from '@babylonjs/core/scene';
 
-const RING_RADIUS = 1.2;
+export const GROUND_RING_RADIUS = 1.2;
 const RING_SEGMENTS = 64;
 const RING_Y = 0.03;
-const RING_COLOR = new Color3(0.55, 0.78, 1);
+const SELECTION_RING_COLOR = new Color3(0.55, 0.78, 1);
+const HOVER_RING_COLOR = new Color3(1, 0.86, 0.35);
 
-/** Flat blue selection ring on the ground under the selected in-scene effect. */
-export class GallerySelectionMarker {
-    private readonly root: TransformNode;
+function buildGroundRingPoints(radius: number): Vector3[] {
+    const points: Vector3[] = [];
+    for (let i = 0; i <= RING_SEGMENTS; i++) {
+        const t = (i / RING_SEGMENTS) * Math.PI * 2;
+        points.push(new Vector3(Math.cos(t) * radius, 0, Math.sin(t) * radius));
+    }
+    return points;
+}
+
+/** Flat ground ring that tracks a transform on the XZ plane. */
+class GroundRingMarker {
+    private readonly anchor: TransformNode;
     private readonly ring: LinesMesh;
     private trackedRoot: TransformNode | null = null;
 
-    constructor(scene: Scene) {
-        this.root = new TransformNode('gallery-selection-root', scene);
-        this.ring = MeshBuilder.CreateLines(
-            'gallery-selection-ring',
-            {points: buildGroundRingPoints(RING_RADIUS)},
-            scene
-        ) as LinesMesh;
-        this.ring.color = RING_COLOR;
-        this.ring.parent = this.root;
+    constructor(scene: Scene, name: string, color: Color3) {
+        this.anchor = new TransformNode(`${name}-root`, scene);
+        this.ring = MeshBuilder.CreateLines(`${name}-ring`, {points: buildGroundRingPoints(GROUND_RING_RADIUS)}, scene) as LinesMesh;
+        this.ring.color = color;
+        this.ring.parent = this.anchor;
         this.ring.isPickable = false;
         this.ring.renderingGroupId = 1;
         this.hide();
     }
 
-    /** Shows the marker and tracks `entryRoot` on the ground plane. */
     show(entryRoot: TransformNode): void {
         this.trackedRoot = entryRoot;
         this.syncPosition();
-        this.root.setEnabled(true);
+        this.anchor.setEnabled(true);
     }
 
     hide(): void {
         this.trackedRoot = null;
-        this.root.setEnabled(false);
+        this.anchor.setEnabled(false);
     }
 
-    /** Keeps the ring under the effect while it moves. */
     follow(): void {
         if (!this.trackedRoot || this.trackedRoot.isDisposed()) {
             return;
@@ -53,7 +57,7 @@ export class GallerySelectionMarker {
     dispose(): void {
         this.hide();
         this.ring.dispose();
-        this.root.dispose();
+        this.anchor.dispose();
     }
 
     private syncPosition(): void {
@@ -61,15 +65,20 @@ export class GallerySelectionMarker {
             return;
         }
         const pos = this.trackedRoot.getAbsolutePosition();
-        this.root.position.set(pos.x, RING_Y, pos.z);
+        this.anchor.position.set(pos.x, RING_Y, pos.z);
     }
 }
 
-function buildGroundRingPoints(radius: number): Vector3[] {
-    const points: Vector3[] = [];
-    for (let i = 0; i <= RING_SEGMENTS; i++) {
-        const t = (i / RING_SEGMENTS) * Math.PI * 2;
-        points.push(new Vector3(Math.cos(t) * radius, 0, Math.sin(t) * radius));
+/** Flat blue selection ring on the ground under the focused in-scene effect. */
+export class GallerySelectionMarker extends GroundRingMarker {
+    constructor(scene: Scene) {
+        super(scene, 'gallery-selection', SELECTION_RING_COLOR);
     }
-    return points;
+}
+
+/** Same ring as selection, yellow — shown while hovering an effect root in the viewport. */
+export class GalleryHoverMarker extends GroundRingMarker {
+    constructor(scene: Scene) {
+        super(scene, 'gallery-hover', HOVER_RING_COLOR);
+    }
 }
