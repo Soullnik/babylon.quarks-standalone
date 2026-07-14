@@ -23,4 +23,13 @@ describe("PiecewiseBezier", () => {
         expect(piecewiseBezier2.functions[0][0].p[2]).toBe(.75);
         expect(piecewiseBezier2.functions[0][0].p[3]).toBe(0);
     });
+
+    test("clamps before the first key instead of returning zero", () => {
+        const piecewiseBezier = new PiecewiseBezier([
+            [new Bezier(0.85625, 0.85625, 1, 1), 0.0034129619598388672],
+            [new Bezier(1, 1, 0.85625, 0.85625), 0.5051194429397583],
+        ]);
+        expect(piecewiseBezier.genValue([], 0)).toBeCloseTo(0.85625, 5);
+        expect(piecewiseBezier.genValue([], 1)).toBeCloseTo(0.85625, 5);
+    });
 });

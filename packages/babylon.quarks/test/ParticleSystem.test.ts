@@ -89,6 +89,32 @@ describe('ParticleSystem', () => {
         expect(ps.particleNum).toBeGreaterThan(0);
     });
 
+    it('keeps continuous emitters alive when rate * lifetime is near one', () => {
+        const delta = 1 / 60;
+        const ps = new ParticleSystem({
+            scene,
+            looping: true,
+            duration: 1,
+            startLife: new ConstantValue(0.2),
+            startSpeed: new ConstantValue(0),
+            startSize: new ConstantValue(2.5),
+            startColor: new ConstantColor(new Vector4(1, 1, 1, 1)),
+            emissionOverTime: new ConstantValue(5),
+            shape: new PointEmitter(),
+            renderMode: RenderMode.BillBoard,
+        });
+
+        for (let i = 0; i < 60; i++) {
+            ps.update(delta);
+        }
+        expect(ps.particleNum).toBeGreaterThan(0);
+
+        for (let i = 0; i < 600; i++) {
+            ps.update(delta);
+            expect(ps.particleNum).toBeGreaterThan(0);
+        }
+    });
+
     it('should support behaviors', () => {
         const ps = new ParticleSystem({
             scene,
@@ -1202,10 +1228,9 @@ describe('ParticleSystem emitter velocity', () => {
         ps.emitter.position.set(2, 0, 0);
         ps.emitter.computeWorldMatrix(true);
         ps.update(0.1);
-        ps.update(0.1);
 
         expect(ps.particleNum).toBeGreaterThan(0);
-        const particle = ps.particles[0];
+        const particle = ps.particles[ps.particleNum - 1];
         expect(particle.velocity.x).toBeGreaterThan(0);
     });
 

@@ -56,6 +56,8 @@ const tempQ = new Quaternion();
 const tempV = new Vector3();
 const tempV2 = new Vector3();
 const PREWARM_FPS = 60;
+const SIMULATION_STEP = 1 / PREWARM_FPS;
+const MAX_SIMULATION_STEPS_PER_FRAME = 8;
 
 const DEFAULT_POSITIONS = new Float32Array([
     -0.5, -0.5, 0,
@@ -217,6 +219,8 @@ export class ParticleSystem implements IParticleSystem {
     private materialRef: any = null;
     private qualityFactor = 1;
     private useFastTrailHistory = true;
+    private simulationAccumulator = 0;
+    private destroyed = false;
     /** @internal **/
     _renderer?: BatchedRenderer;
 
@@ -784,6 +788,10 @@ export class ParticleSystem implements IParticleSystem {
     }
 
     dispose() {
+        if (this.destroyed) {
+            return;
+        }
+        this.destroyed = true;
         if (this._renderer) this._renderer.deleteSystem(this);
         this.emitter.dispose();
         this.fire({type: 'destroy', particleSystem: this});
@@ -809,6 +817,8 @@ export class ParticleSystem implements IParticleSystem {
         this.startDelayTimeLeft = this.startDelay.genValue(this.memory, 0);
         this.previousEmitterPos = undefined;
         this.emitterVelocity.set(0, 0, 0);
+        this.simulationAccumulator = 0;
+        this.destroyed = false;
     }
 
     private firstTimeUpdate = true;
@@ -862,6 +872,19 @@ export class ParticleSystem implements IParticleSystem {
             this.startDelayTimeLeft = 0;
         }
 
+        this.simulationAccumulator += delta;
+        const stepsToRun = Math.min(
+            MAX_SIMULATION_STEPS_PER_FRAME,
+            Math.floor((this.simulationAccumulator + 1e-9) / SIMULATION_STEP)
+        );
+        for (let i = 0; i < stepsToRun; i++) {
+            this.simulateStep(SIMULATION_STEP);
+        }
+        this.simulationAccumulator -= stepsToRun * SIMULATION_STEP;
+    }
+
+    /** Advances emission, behaviors, motion and culling by one fixed timestep. */
+    private simulateStep(delta: number): void {
         if (!this.onlyUsedByOther) {
             this.emit(delta, this.emissionState, this.emitter.matrixWorld);
         }
@@ -961,12 +984,6 @@ export class ParticleSystem implements IParticleSystem {
         const emissionBurstCount = emissionBursts.length;
         const qualityFactor = this.qualityFactor;
 
-        const totalSpawn = Math.floor(emissionState.waitEmiting);
-        if (totalSpawn > 0) {
-            this.spawn(totalSpawn, emissionState, emitterMatrix);
-            emissionState.waitEmiting -= totalSpawn;
-        }
-
         while (
             emissionState.burstIndex < emissionBurstCount &&
             emissionBursts[emissionState.burstIndex].time <= emissionState.time
@@ -999,6 +1016,15 @@ export class ParticleSystem implements IParticleSystem {
                 }
             }
         }
+
+        // Accrue before spawning so replacement particles can appear on the same
+        // frame an old one dies (rate * lifetime ≈ 1 would otherwise flicker).
+        const totalSpawn = Math.floor(emissionState.waitEmiting);
+        if (totalSpawn > 0) {
+            this.spawn(totalSpawn, emissionState, emitterMatrix);
+            emissionState.waitEmiting -= totalSpawn;
+        }
+
         if (emissionState.previousWorldPos === undefined) emissionState.previousWorldPos = new Vector3();
         emissionState.previousWorldPos.set(emitterMatrix.elements[12], emitterMatrix.elements[13], emitterMatrix.elements[14]);
         emissionState.time += delta;

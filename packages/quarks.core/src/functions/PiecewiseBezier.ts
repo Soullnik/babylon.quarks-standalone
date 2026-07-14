@@ -13,9 +13,17 @@ export class PiecewiseBezier extends PiecewiseFunction<Bezier> implements Functi
     }
 
     genValue(memory: GeneratorMemory, t = 0): number {
+        if (this.functions.length === 0) {
+            return 0;
+        }
         const index = this.findFunction(t);
         if (index === -1) {
-            return 0;
+            // Clamp like Unity: before the first key use the first curve value, not zero.
+            if (t < this.getStartX(0)) {
+                return this.functions[0][0].genValue(0);
+            }
+            const last = this.functions.length - 1;
+            return this.functions[last][0].genValue(1);
         }
         return this.functions[index][0].genValue(
             (t - this.getStartX(index)) / (this.getEndX(index) - this.getStartX(index))
