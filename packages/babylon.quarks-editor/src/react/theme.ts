@@ -48,9 +48,22 @@ export const buttonStyle: CSSProperties = {
     color: '#d8e3ff',
     padding: '6px 10px',
     borderRadius: 8,
-    fontSize: 12.5,
     cursor: 'pointer',
+    fontSize: 12.5,
     fontFamily: theme.font,
+};
+
+/** Visually hides a file input while keeping it activatable via an associated <label>. */
+export const hiddenFileInputStyle: CSSProperties = {
+    position: 'absolute',
+    width: 1,
+    height: 1,
+    padding: 0,
+    margin: -1,
+    overflow: 'hidden',
+    clip: 'rect(0, 0, 0, 0)',
+    whiteSpace: 'nowrap',
+    border: 0,
 };
 
 /**

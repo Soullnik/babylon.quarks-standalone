@@ -27,11 +27,21 @@ Requires Unity **2020.3+**.
 
 ## Use
 
+### Single effect
+
 1. In the Hierarchy, select the GameObject of your effect. This can be a single Particle System
    or a **parent** GameObject containing several (sub-emitters and grouped systems included).
 2. Menu **Tools → Quarks → Export Selected Effect to JSON**.
 3. Choose where to save the `.json`. Textures are embedded as data URIs, so the file is
    self-contained.
+
+### Folder of prefabs
+
+1. In the **Project** window, select a folder under `Assets` that contains effect prefabs
+   (each prefab root or children must include at least one `ParticleSystem`).
+2. Menu **Tools → Quarks → Export Folder of Effects to JSON**.
+3. Pick an output folder on disk. Every matching prefab is exported as `{name}.json`; subfolders
+   under the selected Assets folder are mirrored in the output.
 
 Load the result in Babylon.js:
 

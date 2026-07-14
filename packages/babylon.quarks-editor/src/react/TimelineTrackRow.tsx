@@ -1,4 +1,16 @@
 import React, {useState} from 'react';
+import {
+    CheckIcon,
+    ChevronDownIcon,
+    ChevronRightIcon,
+    EyeIcon,
+    EyeSlashIcon,
+    PencilSquareIcon,
+    PlusIcon,
+    SparklesIcon,
+    SquaresPlusIcon,
+    XMarkIcon,
+} from '@heroicons/react/24/solid';
 import type {ParticleSystem} from 'babylon.quarks';
 import type {TransformNode} from '@babylonjs/core/Meshes/transformNode';
 import type {EffectBinding} from '../core/binding';
@@ -7,9 +19,18 @@ import {createChildSystem, removeSystems} from '../core/systems';
 import {ungroupNode} from '../core/groups';
 import type {TimelineRow} from '../core/timeline';
 import {PromptDialog} from './PromptDialog';
+import {iconStyle} from './icons';
 import {theme} from './theme';
 
-const iconButton: React.CSSProperties = {background: 'none', border: 'none', cursor: 'pointer', fontSize: 11, padding: 0};
+const iconButton: React.CSSProperties = {
+    background: 'none',
+    border: 'none',
+    cursor: 'pointer',
+    padding: 0,
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+};
 
 const ROW_HEIGHT = 28;
 
@@ -31,7 +52,7 @@ export interface TimelineTrackRowProps {
     onToggleGroupSelect: () => void;
 }
 
-const checkboxButton: React.CSSProperties = {...iconButton, fontSize: 12, width: 12};
+const checkboxButton: React.CSSProperties = {...iconButton, width: 12, height: 12};
 
 /** One row of the timeline: a label cell (name + actions) and, for tracks, a bar cell. */
 export function TimelineTrackRow(props: TimelineTrackRowProps): React.ReactElement {
@@ -76,25 +97,29 @@ export function TimelineTrackRow(props: TimelineTrackRowProps): React.ReactEleme
                                 onToggleGroupSelect();
                             }}
                         >
-                            {groupSelected ? '☑' : '☐'}
+                            {groupSelected ? (
+                                <CheckIcon style={iconStyle(12)} />
+                            ) : (
+                                <span style={{width: 10, height: 10, border: `1px solid currentColor`, borderRadius: 2, display: 'block', boxSizing: 'border-box'}} />
+                            )}
                         </button>
                     )}
                     <span
                         className="qe-hover"
                         title={collapsed ? 'Expand' : 'Collapse'}
-                        style={{color: theme.textDim, fontSize: 10, width: 10, cursor: 'pointer'}}
+                        style={{color: theme.textDim, width: 12, cursor: 'pointer', display: 'inline-flex'}}
                         onClick={(e) => {
                             e.stopPropagation();
                             onToggleCollapse?.();
                         }}
                     >
-                        {collapsed ? '▸' : '▾'}
+                        {collapsed ? <ChevronRightIcon style={iconStyle(12)} /> : <ChevronDownIcon style={iconStyle(12)} />}
                     </span>
                     <span style={{flex: 1, overflow: 'hidden', textOverflow: 'ellipsis'}}>{row.name}</span>
                     <button
                         className="qe-hover"
                         title="Add system to this group"
-                        style={{...iconButton, color: theme.accent, fontSize: 13}}
+                        style={{...iconButton, color: theme.accent}}
                         onClick={(e) => {
                             e.stopPropagation();
                             let created: ParticleSystem | undefined;
@@ -111,41 +136,41 @@ export function TimelineTrackRow(props: TimelineTrackRowProps): React.ReactEleme
                             }
                         }}
                     >
-                        +
+                        <PlusIcon style={iconStyle(13)} />
                     </button>
                     {!isRoot && (
                         <button className="qe-hover" title="Rename" style={{...iconButton, color: theme.textDim}} onClick={(e) => {
                             e.stopPropagation();
                             setRenaming(true);
                         }}>
-                            ✎
+                            <PencilSquareIcon style={iconStyle(12)} />
                         </button>
                     )}
                     {!isRoot && (
                         <button
                             className="qe-hover"
                             title="Ungroup (moves its contents up a level)"
-                            style={{...iconButton, color: theme.textDim, fontSize: 12}}
+                            style={{...iconButton, color: theme.textDim}}
                             onClick={(e) => {
                                 e.stopPropagation();
                                 binding.apply(() => ungroupNode(row.node));
                             }}
                         >
-                            ⛶
+                            <SquaresPlusIcon style={iconStyle(12)} />
                         </button>
                     )}
                     {!isRoot && (
                         <button
                             className="qe-hover"
                             title="Remove group"
-                            style={{...iconButton, color: '#e08c8c', fontSize: 12}}
+                            style={{...iconButton, color: '#e08c8c'}}
                             onClick={(e) => {
                                 e.stopPropagation();
                                 removeSystems(binding, collectSystems(buildEffectTree(row.node)), (s) => onSelectNode(s.emitter));
                                 binding.apply(() => row.node.dispose(true, false));
                             }}
                         >
-                            ✕
+                            <XMarkIcon style={iconStyle(12)} />
                         </button>
                     )}
                 </div>
@@ -186,21 +211,27 @@ export function TimelineTrackRow(props: TimelineTrackRowProps): React.ReactEleme
                             onToggleGroupSelect();
                         }}
                     >
-                        {groupSelected ? '☑' : '☐'}
+                        {groupSelected ? (
+                            <CheckIcon style={iconStyle(12)} />
+                        ) : (
+                            <span style={{width: 10, height: 10, border: `1px solid currentColor`, borderRadius: 2, display: 'block', boxSizing: 'border-box'}} />
+                        )}
                     </button>
                 )}
                 <button
                     className="qe-hover"
                     title={hidden ? 'Show in viewport' : 'Hide in viewport'}
-                    style={{...iconButton, color: hidden ? theme.textDim : theme.accent, fontSize: 12}}
+                    style={{...iconButton, color: hidden ? theme.textDim : theme.accent}}
                     onClick={(e) => {
                         e.stopPropagation();
                         onToggleVisible?.();
                     }}
                 >
-                    {hidden ? '◯' : '◉'}
+                    {hidden ? <EyeSlashIcon style={iconStyle(12)} /> : <EyeIcon style={iconStyle(12)} />}
                 </button>
-                <span style={{color: theme.accent, fontSize: 10, width: 10}}>◆</span>
+                <span style={{color: theme.accent, display: 'inline-flex'}}>
+                    <SparklesIcon style={iconStyle(11)} />
+                </span>
                 <span style={{flex: 1, overflow: 'hidden', textOverflow: 'ellipsis'}}>
                     {row.name}
                     {system.onlyUsedByOther ? ' (sub)' : ''}
@@ -210,27 +241,27 @@ export function TimelineTrackRow(props: TimelineTrackRowProps): React.ReactEleme
                         e.stopPropagation();
                         setRenaming(true);
                     }}>
-                        ✎
+                        <PencilSquareIcon style={iconStyle(12)} />
                     </button>
                 )}
                 {!isRoot && row.removable && (
                     <button
                         className="qe-hover"
                         title="Remove system"
-                        style={{...iconButton, color: '#e08c8c', fontSize: 12}}
+                        style={{...iconButton, color: '#e08c8c'}}
                         onClick={(e) => {
                             e.stopPropagation();
                             removeSystems(binding, [system], (s) => onSelectNode(s.emitter));
                         }}
                     >
-                        ✕
+                        <XMarkIcon style={iconStyle(12)} />
                     </button>
                 )}
                 {selected && (
                     <button
                         className="qe-hover"
                         title="Add child system"
-                        style={{...iconButton, color: theme.accent, fontSize: 13}}
+                        style={{...iconButton, color: theme.accent}}
                         onClick={(e) => {
                             e.stopPropagation();
                             let created: ParticleSystem | undefined;
@@ -244,7 +275,7 @@ export function TimelineTrackRow(props: TimelineTrackRowProps): React.ReactEleme
                             }
                         }}
                     >
-                        +
+                        <PlusIcon style={iconStyle(13)} />
                     </button>
                 )}
             </div>
@@ -264,10 +295,14 @@ export function TimelineTrackRow(props: TimelineTrackRowProps): React.ReactEleme
                         height: ROW_HEIGHT - 10,
                         borderRadius: 4,
                         cursor: 'pointer',
-                        background: system.onlyUsedByOther ? 'repeating-linear-gradient(135deg, rgba(158,185,255,0.25), rgba(158,185,255,0.25) 4px, rgba(158,185,255,0.4) 4px, rgba(158,185,255,0.4) 8px)' : selected ? theme.accent : '#3c5aa0',
+                        boxSizing: 'border-box',
+                        background: system.onlyUsedByOther
+                            ? 'repeating-linear-gradient(135deg, rgba(158,185,255,0.25), rgba(158,185,255,0.25) 4px, rgba(158,185,255,0.4) 4px, rgba(158,185,255,0.4) 8px)'
+                            : selected
+                              ? theme.accent
+                              : '#3c5aa0',
                         border: system.onlyUsedByOther ? `1px dashed ${theme.accent}` : `1px solid ${theme.border}`,
                         opacity: hidden ? 0.3 : system.onlyUsedByOther ? 0.75 : 1,
-                        boxSizing: 'border-box',
                     }}
                 >
                     {row.looping && (

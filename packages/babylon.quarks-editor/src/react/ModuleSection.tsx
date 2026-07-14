@@ -1,5 +1,7 @@
 import React, {useState} from 'react';
+import {ChevronDownIcon, ChevronRightIcon} from '@heroicons/react/24/solid';
 import {theme} from './theme';
+import {iconStyle} from './icons';
 
 /** Unity-style module foldout with an optional enable checkbox. */
 export function ModuleSection(props: {
@@ -35,7 +37,9 @@ export function ModuleSection(props: {
                 }}
                 onClick={() => setOpen(!open)}
             >
-                <span style={{color: theme.accent, fontSize: 10, width: 10}}>{open ? '▼' : '►'}</span>
+                <span style={{color: theme.accent, display: 'inline-flex'}}>
+                    {open ? <ChevronDownIcon style={iconStyle(12)} /> : <ChevronRightIcon style={iconStyle(12)} />}
+                </span>
                 {toggleable && (
                     <input
                         type="checkbox"

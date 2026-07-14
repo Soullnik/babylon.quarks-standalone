@@ -1,4 +1,11 @@
 import React, {useMemo, useRef, useState} from 'react';
+import {
+    ArrowPathIcon,
+    ForwardIcon,
+    PauseIcon,
+    PlayIcon,
+    RectangleGroupIcon,
+} from '@heroicons/react/24/solid';
 import type {ParticleSystem, BatchedRenderer} from 'babylon.quarks';
 import type {Scene} from '@babylonjs/core/scene';
 import type {TransformNode} from '@babylonjs/core/Meshes/transformNode';
@@ -7,6 +14,7 @@ import {groupNodes} from '../core/groups';
 import {scrubTo} from '../core/scrub';
 import {computeTimelineRows, computeTimelineSpan} from '../core/timeline';
 import {TimelineTrackRow} from './TimelineTrackRow';
+import {iconStyle} from './icons';
 import {buttonStyle, theme} from './theme';
 
 export interface PlaybackState {
@@ -30,6 +38,8 @@ export interface TimelinePanelProps {
     setPaused: (paused: boolean) => void;
     speed: number;
     setSpeed: (speed: number) => void;
+    /** False when a catalog entry is selected but not yet dropped into the viewport. */
+    playbackEnabled?: boolean;
 }
 
 const LABEL_WIDTH = 200;
@@ -53,7 +63,7 @@ function pickTickInterval(pxPerSecond: number): number {
  * draggable playhead (approximate scrub — see core/scrub.ts), and one track row per system.
  */
 export function TimelinePanel(props: TimelinePanelProps): React.ReactElement {
-    const {binding, selectedNode, onSelectNode, scene, renderer, playbackRef, playheadRef, counterRef, paused, setPaused, speed, setSpeed} = props;
+    const {binding, selectedNode, onSelectNode, scene, renderer, playbackRef, playheadRef, counterRef, paused, setPaused, speed, setSpeed, playbackEnabled = true} = props;
 
     const [bodyWidthPx, setBodyWidthPx] = useState(600);
     const [collapsedGroups, setCollapsedGroups] = useState<Set<TransformNode>>(() => new Set());
@@ -138,6 +148,9 @@ export function TimelinePanel(props: TimelinePanelProps): React.ReactElement {
     // *how* it got there, and wrongly treat a drag as a finished run.
     const prevElapsedRef = useRef(0);
     React.useEffect(() => {
+        if (!playbackEnabled) {
+            return;
+        }
         let raf: number;
         const tick = () => {
             const state = playbackRef.current;
@@ -165,7 +178,7 @@ export function TimelinePanel(props: TimelinePanelProps): React.ReactElement {
         };
         raf = requestAnimationFrame(tick);
         return () => cancelAnimationFrame(raf);
-    }, [pxPerSecond, timelineSpan, anyLooping, playbackRef, playheadRef, setPaused, binding, renderer, scene]);
+    }, [pxPerSecond, timelineSpan, anyLooping, playbackRef, playheadRef, setPaused, binding, renderer, scene, playbackEnabled]);
 
     const visibleRows = useMemo(() => {
         let hideUntilDepth: number | null = null;
@@ -229,7 +242,15 @@ export function TimelinePanel(props: TimelinePanelProps): React.ReactElement {
         ticks.push(t);
     }
 
-    const overlayButton: React.CSSProperties = {...buttonStyle, padding: '5px 9px', minWidth: 32};
+    const overlayButton: React.CSSProperties = {
+        ...buttonStyle,
+        padding: '5px 9px',
+        minWidth: 32,
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 6,
+    };
 
     return (
         <div
@@ -245,25 +266,26 @@ export function TimelinePanel(props: TimelinePanelProps): React.ReactElement {
             }}
         >
             <div style={{display: 'flex', alignItems: 'center', gap: 6, padding: '6px 10px', borderBottom: `1px solid ${theme.border}`}}>
-                <button className="qe-hover" style={overlayButton} title={paused ? 'Play' : 'Pause'} onClick={() => {
+                <button className="qe-hover" style={{...overlayButton, opacity: playbackEnabled ? 1 : 0.45}} title={paused ? 'Play' : 'Pause'} disabled={!playbackEnabled} onClick={() => {
                     // A finished one-shot effect already snapped itself back to frame 0 and
                     // paused (see the tick effect above), so a plain toggle is enough here.
                     playbackRef.current.paused = !paused;
                     setPaused(!paused);
                 }}>
-                    {paused ? '▶' : '⏸'}
+                    {paused ? <PlayIcon style={iconStyle(14)} /> : <PauseIcon style={iconStyle(14)} />}
                 </button>
-                <button className="qe-hover" style={overlayButton} title="Step one frame" disabled={!paused} onClick={() => (playbackRef.current.stepQueued = true)}>
-                    ⏭
+                <button className="qe-hover" style={{...overlayButton, opacity: playbackEnabled ? 1 : 0.45}} title="Step one frame" disabled={!playbackEnabled || !paused} onClick={() => (playbackRef.current.stepQueued = true)}>
+                    <ForwardIcon style={iconStyle(14)} />
                 </button>
-                <button className="qe-hover" style={overlayButton} title="Restart" onClick={restart}>
-                    ⟲
+                <button className="qe-hover" style={{...overlayButton, opacity: playbackEnabled ? 1 : 0.45}} title="Restart" disabled={!playbackEnabled} onClick={restart}>
+                    <ArrowPathIcon style={iconStyle(14)} />
                 </button>
                 <select
                     className="qe-hover"
-                    style={{...overlayButton, padding: '5px 4px'}}
+                    style={{...overlayButton, padding: '5px 4px', opacity: playbackEnabled ? 1 : 0.45}}
                     title="Playback speed"
                     value={speed}
+                    disabled={!playbackEnabled}
                     onChange={(e) => {
                         const next = Number(e.target.value);
                         playbackRef.current.speed = next;
@@ -279,6 +301,7 @@ export function TimelinePanel(props: TimelinePanelProps): React.ReactElement {
                 <span ref={counterRef} style={{fontSize: 12, color: theme.textDim, fontVariantNumeric: 'tabular-nums', paddingLeft: 4, minWidth: 120}} />
                 {groupSelection.size >= 2 && (
                     <button className="qe-hover" style={overlayButton} title="Group the checked rows" onClick={groupSelectedNodes}>
+                        <RectangleGroupIcon style={iconStyle(14)} />
                         Group ({groupSelection.size})
                     </button>
                 )}
@@ -290,6 +313,25 @@ export function TimelinePanel(props: TimelinePanelProps): React.ReactElement {
                 full-width box (labels + time axis) for pxPerSecond, since the ruler and the
                 scroller share that width. */}
             <div ref={bodyRef} style={{position: 'relative', flex: 1, minHeight: 0}}>
+                {!playbackEnabled ? (
+                    <div
+                        style={{
+                            position: 'absolute',
+                            inset: 0,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            padding: '0 24px',
+                            textAlign: 'center',
+                            fontSize: 13,
+                            color: theme.textDim,
+                            lineHeight: 1.5,
+                        }}
+                    >
+                        Selected effect is not in the scene. Drag it into the viewport to preview playback.
+                    </div>
+                ) : (
+                    <>
                 {/* Fixed ruler header, kept out of the vertical scroller so it never scrolls
                     away with the track rows. */}
                 <div
@@ -406,6 +448,8 @@ export function TimelinePanel(props: TimelinePanelProps): React.ReactElement {
                         zIndex: 3,
                     }}
                 />
+                    </>
+                )}
             </div>
         </div>
     );

@@ -8,6 +8,13 @@ import type {Node} from '@babylonjs/core/node';
  * name every emitter gets when the source JSON didn't give it one of its own. */
 const DEFAULT_EMITTER_NAME = 'particleEmitter';
 
+export interface LoadEffectOptions {
+    /** Registers systems with the batched renderer (default true). */
+    registerRenderer?: boolean;
+    /** Restarts and unpauses after load (default matches registerRenderer). */
+    autoplay?: boolean;
+}
+
 function hasMeaningfulName(node: TransformNode): boolean {
     return !!node.name && node.name !== DEFAULT_EMITTER_NAME;
 }
@@ -27,15 +34,6 @@ function collapseInto(wrapper: TransformNode, only: TransformNode, parent: Node 
     wrapper.dispose(true, false);
 }
 
-/**
- * Collapses redundant organizational groups left over by importers — Unity's
- * one-GameObject-per-component convention turns every visual layer into its own Group, so a
- * single particle system becomes "Sparks" > unnamed emitter, and a component quarks doesn't
- * understand (e.g. a Light) becomes an empty Group with nothing under it. Recurses
- * bottom-up so nested wrapper chains collapse all the way down. The tree root itself is
- * handled separately by `promoteIfSingleChildRoot`, since collapsing it means returning a
- * different node as the effect's root.
- */
 function flattenRedundantGroups(node: TransformNode): void {
     for (const child of node.getChildren()) {
         if (child instanceof TransformNode) {
@@ -60,10 +58,6 @@ function flattenRedundantGroups(node: TransformNode): void {
     collapseInto(node, only, node.parent);
 }
 
-/** If the tree root itself only ever wraps a single child (after `flattenRedundantGroups`
- * has settled everything below it), that wrapper adds a tree level with nothing to organize —
- * promote the child to be the new root instead. Loops in case that child is, in turn, also a
- * single-child wrapper. */
 function promoteIfSingleChildRoot(root: TransformNode): TransformNode {
     let current = root;
     while (!(current instanceof ParticleEmitter)) {
@@ -79,6 +73,61 @@ function promoteIfSingleChildRoot(root: TransformNode): TransformNode {
     return current;
 }
 
+/** Disposes a loaded effect's systems and its remaining group tree. */
+export function disposeLoadedEffect(
+    root: TransformNode,
+    systems: ParticleSystem[],
+    renderer: BatchedRenderer,
+    inRenderer = true
+): void {
+    for (const system of systems) {
+        if (inRenderer) {
+            renderer.deleteSystem(system);
+        }
+        system.dispose();
+    }
+    if (!systems.some((system) => system.emitter === root)) {
+        root.dispose(false, true);
+    }
+}
+
+/** Parses Quarks JSON into a live hierarchy without optional renderer registration / playback. */
+export function parseEffectFromJson(
+    scene: Scene,
+    renderer: BatchedRenderer | null,
+    json: unknown,
+    options: LoadEffectOptions = {},
+    baseUrl = ''
+): {root: TransformNode; systems: ParticleSystem[]} {
+    const registerRenderer = options.registerRenderer ?? true;
+    const autoplay = options.autoplay ?? registerRenderer;
+
+    const loader = new QuarksLoader(scene, {baseUrl});
+    let root = loader.parse(json as never, baseUrl);
+    flattenRedundantGroups(root);
+    root = promoteIfSingleChildRoot(root);
+
+    const systems: ParticleSystem[] = [];
+    QuarksUtil.runOnAllParticleEmitters(root, (emitter: ParticleEmitter) => {
+        const system = emitter.system as ParticleSystem;
+        if (registerRenderer && renderer) {
+            renderer.addSystem(system);
+        }
+        systems.push(system);
+    });
+
+    QuarksUtil.restart(root);
+    if (autoplay) {
+        QuarksUtil.play(root);
+    } else {
+        for (const system of systems) {
+            system.pause();
+        }
+    }
+
+    return {root, systems};
+}
+
 /** Parses a Quarks JSON export, registers all systems with the renderer and starts playback. */
 export function loadEffectFromJson(
     scene: Scene,
@@ -86,17 +135,5 @@ export function loadEffectFromJson(
     json: unknown,
     baseUrl = ''
 ): {root: TransformNode; systems: ParticleSystem[]} {
-    const loader = new QuarksLoader(scene, {baseUrl});
-    let root = loader.parse(json as never, baseUrl);
-    flattenRedundantGroups(root);
-    root = promoteIfSingleChildRoot(root);
-    const systems: ParticleSystem[] = [];
-    QuarksUtil.runOnAllParticleEmitters(root, (emitter: ParticleEmitter) => {
-        const system = emitter.system as ParticleSystem;
-        renderer.addSystem(system);
-        systems.push(system);
-    });
-    QuarksUtil.restart(root);
-    QuarksUtil.play(root);
-    return {root, systems};
+    return parseEffectFromJson(scene, renderer, json, {registerRenderer: true, autoplay: true}, baseUrl);
 }

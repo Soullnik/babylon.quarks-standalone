@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.IO;
 using UnityEditor;
 using UnityEngine;
@@ -32,14 +33,146 @@ namespace BabylonQuarks.UnityExporter
             string path = EditorUtility.SaveFilePanel("Export Quarks effect", "", root.name + ".json", "json");
             if (string.IsNullOrEmpty(path)) return;
 
-            string json = Export(root);
-            File.WriteAllText(path, json);
-            Debug.Log($"[Quarks Exporter] Exported '{root.name}' → {path}");
+            ExportToFile(root, path);
             EditorUtility.RevealInFinder(path);
         }
 
         [MenuItem("Tools/Quarks/Export Selected Effect to JSON", true)]
         private static bool ValidateExportSelected() => Selection.activeGameObject != null;
+
+        [MenuItem("Tools/Quarks/Export Folder of Effects to JSON", false, 2)]
+        public static void ExportSelectedFolder()
+        {
+            string assetFolder = GetSelectedAssetFolder();
+            if (string.IsNullOrEmpty(assetFolder))
+            {
+                EditorUtility.DisplayDialog("Quarks Exporter",
+                    "Select a folder under Assets in the Project window.", "OK");
+                return;
+            }
+
+            string outputFolder = EditorUtility.OpenFolderPanel("Export Quarks effects to", "", "");
+            if (string.IsNullOrEmpty(outputFolder)) return;
+
+            ExportFolder(assetFolder, outputFolder);
+        }
+
+        [MenuItem("Tools/Quarks/Export Folder of Effects to JSON", true)]
+        private static bool ValidateExportSelectedFolder() => !string.IsNullOrEmpty(GetSelectedAssetFolder());
+
+        /// <summary>Writes one effect hierarchy to a JSON file on disk.</summary>
+        public static void ExportToFile(GameObject root, string path)
+        {
+            string json = Export(root);
+            File.WriteAllText(path, json);
+            Debug.Log($"[Quarks Exporter] Exported '{root.name}' → {path}");
+        }
+
+        /// <summary>
+        /// Exports every prefab with a ParticleSystem under <paramref name="assetFolder"/>.
+        /// Output mirrors the subfolder layout relative to the selected Assets folder.
+        /// </summary>
+        public static void ExportFolder(string assetFolder, string outputFolder)
+        {
+            string[] guids = AssetDatabase.FindAssets("t:Prefab", new[] { assetFolder });
+            var prefabPaths = new List<string>();
+            foreach (string guid in guids)
+            {
+                string assetPath = AssetDatabase.GUIDToAssetPath(guid);
+                GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(assetPath);
+                if (prefab != null && prefab.GetComponentsInChildren<ParticleSystem>(true).Length > 0)
+                {
+                    prefabPaths.Add(assetPath);
+                }
+            }
+
+            if (prefabPaths.Count == 0)
+            {
+                EditorUtility.DisplayDialog("Quarks Exporter",
+                    $"No prefabs with ParticleSystem found under '{assetFolder}'.", "OK");
+                return;
+            }
+
+            prefabPaths.Sort();
+            string folderPrefix = assetFolder.EndsWith("/") ? assetFolder : assetFolder + "/";
+
+            int exported = 0;
+            int skipped = 0;
+            bool cancelled = false;
+
+            try
+            {
+                for (int i = 0; i < prefabPaths.Count; i++)
+                {
+                    string assetPath = prefabPaths[i];
+                    string prefabName = Path.GetFileNameWithoutExtension(assetPath);
+                    if (EditorUtility.DisplayCancelableProgressBar(
+                            "Quarks Exporter",
+                            $"Exporting {prefabName} ({i + 1}/{prefabPaths.Count})",
+                            (float)i / prefabPaths.Count))
+                    {
+                        cancelled = true;
+                        break;
+                    }
+
+                    GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(assetPath);
+                    GameObject instance = PrefabUtility.InstantiatePrefab(prefab) as GameObject;
+                    if (instance == null)
+                    {
+                        skipped++;
+                        continue;
+                    }
+
+                    try
+                    {
+                        string relative = assetPath.StartsWith(folderPrefix)
+                            ? assetPath.Substring(folderPrefix.Length)
+                            : Path.GetFileName(assetPath);
+                        string relativeDir = Path.GetDirectoryName(relative);
+                        if (!string.IsNullOrEmpty(relativeDir))
+                        {
+                            relativeDir = relativeDir.Replace('/', Path.DirectorySeparatorChar);
+                        }
+                        string outDir = string.IsNullOrEmpty(relativeDir)
+                            ? outputFolder
+                            : Path.Combine(outputFolder, relativeDir);
+                        Directory.CreateDirectory(outDir);
+                        string outPath = Path.Combine(outDir, prefabName + ".json");
+                        ExportToFile(instance, outPath);
+                        exported++;
+                    }
+                    finally
+                    {
+                        Object.DestroyImmediate(instance);
+                    }
+                }
+            }
+            finally
+            {
+                EditorUtility.ClearProgressBar();
+            }
+
+            string message = cancelled
+                ? $"Cancelled after exporting {exported} of {prefabPaths.Count} effect(s)."
+                : $"Exported {exported} effect(s) to:\n{outputFolder}";
+            if (skipped > 0)
+            {
+                message += $"\n\nSkipped {skipped} prefab(s) that could not be instantiated.";
+            }
+
+            EditorUtility.DisplayDialog("Quarks Exporter", message, "OK");
+            if (exported > 0)
+            {
+                EditorUtility.RevealInFinder(outputFolder);
+            }
+        }
+
+        private static string GetSelectedAssetFolder()
+        {
+            if (Selection.activeObject == null) return null;
+            string path = AssetDatabase.GetAssetPath(Selection.activeObject);
+            return AssetDatabase.IsValidFolder(path) ? path : null;
+        }
 
         /// <summary>Serializes a GameObject hierarchy into the Quarks JSON envelope string.</summary>
         public static string Export(GameObject root)

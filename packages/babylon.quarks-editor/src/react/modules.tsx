@@ -1,5 +1,6 @@
-import React, {useState} from 'react';
+import React, {useMemo, useState} from 'react';
 import {Mesh} from '@babylonjs/core/Meshes/mesh';
+import {Texture} from '@babylonjs/core/Materials/Textures/texture';
 import {
     ColorOverLife,
     ConstantColor,
@@ -29,12 +30,16 @@ import {
 import {DEFAULT_SHAPE_PARAMS, SHAPE_PARAM_KEYS, SHAPE_TYPES, createShape, getShapeType, readShapeParams} from '../core/shapes';
 import type {ShapeType} from '../core/shapes';
 import {buildCurve, buildScalar, readPieces, readScalar} from '../core/values';
+import {applyRendererMaterial, getMaterialLabel} from '../core/material';
 import {CurveEditor} from './CurveEditor';
 import {GradientEditor} from './GradientEditor';
 import {ModuleSection} from './ModuleSection';
 import {PromptDialog} from './PromptDialog';
 import {CheckboxField, NumberField, Row, SelectField} from './fields';
 import {ValueField} from './ValueField';
+import {iconStyle} from './icons';
+import {theme} from './theme';
+import {PlusIcon, XMarkIcon} from '@heroicons/react/24/solid';
 
 interface ModuleProps {
     binding: EffectBinding;
@@ -404,11 +409,11 @@ export function EmissionModule({binding}: ModuleProps) {
                         <span style={{fontSize: 11.5, color: '#9eb9ff'}}>Burst {i + 1}</span>
                         <button
                             className="qe-hover"
-                            style={{background: 'none', border: 'none', color: '#e08c8c', cursor: 'pointer', fontSize: 13}}
+                            style={{background: 'none', border: 'none', color: '#e08c8c', cursor: 'pointer', padding: 0, display: 'inline-flex'}}
                             title="Remove burst"
                             onClick={() => binding.apply((s) => s.emissionBursts.splice(i, 1))}
                         >
-                            ✕
+                            <XMarkIcon style={iconStyle(14)} />
                         </button>
                     </div>
                     <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginTop: 4}}>
@@ -452,14 +457,27 @@ export function EmissionModule({binding}: ModuleProps) {
             ))}
             <button
                 className="qe-hover"
-                style={{marginTop: 8, background: 'none', border: '1px dashed #34477f', color: '#9eb9ff', borderRadius: 8, padding: '5px 10px', cursor: 'pointer', fontSize: 12.5}}
+                style={{
+                    marginTop: 8,
+                    background: 'none',
+                    border: '1px dashed #34477f',
+                    color: '#9eb9ff',
+                    borderRadius: 8,
+                    padding: '5px 10px',
+                    cursor: 'pointer',
+                    fontSize: 12.5,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 6,
+                }}
                 onClick={() =>
                     binding.apply((s) =>
                         s.emissionBursts.push({time: 0, count: new ConstantValue(20), cycle: 1, interval: 0.01, probability: 1})
                     )
                 }
             >
-                + Add burst
+                <PlusIcon style={iconStyle(13)} />
+                Add burst
             </button>
         </ModuleSection>
     );
@@ -710,6 +728,19 @@ export function RendererModule({
     const system = binding.system;
     const currentTextureUrl = (system.texture as {url?: string} | null)?.url ?? '';
     const [promptingTextureUrl, setPromptingTextureUrl] = useState(false);
+    const materialLabel = getMaterialLabel(system.material);
+    const loadTexture = useMemo(() => {
+        return (url: string) => {
+            if (resolveTexture) {
+                return resolveTexture(url);
+            }
+            const scene = system.emitter.getScene();
+            return scene ? new Texture(url, scene) : null;
+        };
+    }, [resolveTexture, system]);
+    const patchMaterial = (patch: Parameters<typeof applyRendererMaterial>[1]) => {
+        binding.apply((s) => applyRendererMaterial(s, patch));
+    };
     return (
         <ModuleSection title="Renderer">
             <Row label="Render mode">
@@ -770,6 +801,208 @@ export function RendererModule({
                     </Row>
                 </>
             )}
+            <div
+                style={{
+                    marginTop: 10,
+                    marginBottom: 2,
+                    fontSize: 11,
+                    fontWeight: 600,
+                    color: '#7c8db5',
+                    textTransform: 'uppercase',
+                    letterSpacing: 0.4,
+                }}
+            >
+                Material
+            </div>
+            {materialLabel ? (
+                <Row label="Source">
+                    <div style={{fontSize: 12, color: theme.textDim, lineHeight: 1.45}}>{materialLabel}</div>
+                </Row>
+            ) : null}
+            <Row label="Blend mode">
+                <SelectField
+                    value={system.blending}
+                    options={[
+                        {value: 1, label: 'Additive'},
+                        {value: 2, label: 'Alpha blend'},
+                        {value: 3, label: 'Subtract'},
+                        {value: 4, label: 'Multiply'},
+                    ]}
+                    onChange={(blend) => patchMaterial({blendMode: blend})}
+                />
+            </Row>
+            <Row label="Transparent">
+                <CheckboxField
+                    value={!!system.getRendererSettings().materialTransparent}
+                    onChange={(v) => patchMaterial({transparent: v})}
+                />
+            </Row>
+            <Row label="Texture">
+                <SelectField
+                    value={
+                        !currentTextureUrl
+                            ? '__none'
+                            : (textureOptions ?? []).some((o) => o.url === currentTextureUrl)
+                              ? currentTextureUrl
+                              : '__current'
+                    }
+                    options={[
+                        {value: '__none', label: '(none)'},
+                        ...(currentTextureUrl && !(textureOptions ?? []).some((o) => o.url === currentTextureUrl)
+                            ? [{value: '__current', label: `(current) ${currentTextureUrl.slice(-24)}`}]
+                            : []),
+                        ...(textureOptions ?? []).map((o) => ({value: o.url, label: o.label})),
+                        {value: '__url', label: 'Custom URL…'},
+                        {value: '__file', label: 'Load from file…'},
+                    ]}
+                    onChange={(url) => {
+                        if (url === '__current') {
+                            return;
+                        }
+                        if (url === '__none') {
+                            patchMaterial({texture: null});
+                            return;
+                        }
+                        if (url === '__url') {
+                            setPromptingTextureUrl(true);
+                            return;
+                        }
+                        if (url === '__file') {
+                            const input = document.createElement('input');
+                            input.type = 'file';
+                            input.accept = 'image/*';
+                            input.onchange = () => {
+                                const file = input.files?.[0];
+                                if (!file) {
+                                    return;
+                                }
+                                const reader = new FileReader();
+                                reader.onload = () => {
+                                    const texture = loadTexture(reader.result as string);
+                                    if (texture) {
+                                        patchMaterial({texture});
+                                    }
+                                };
+                                reader.readAsDataURL(file);
+                            };
+                            input.click();
+                            return;
+                        }
+                        const texture = loadTexture(url);
+                        if (texture) {
+                            patchMaterial({texture});
+                        }
+                    }}
+                />
+                {promptingTextureUrl && (
+                    <PromptDialog
+                        title="Texture URL"
+                        defaultValue={currentTextureUrl}
+                        placeholder="https://…"
+                        onSubmit={(url) => {
+                            const texture = loadTexture(url);
+                            if (texture) {
+                                patchMaterial({texture});
+                            }
+                            setPromptingTextureUrl(false);
+                        }}
+                        onCancel={() => setPromptingTextureUrl(false)}
+                    />
+                )}
+                {currentTextureUrl && (
+                    <img
+                        src={currentTextureUrl}
+                        alt="texture preview"
+                        style={{
+                            width: 64,
+                            height: 64,
+                            marginTop: 6,
+                            objectFit: 'contain',
+                            borderRadius: 6,
+                            border: '1px solid #2b3761',
+                            background:
+                                'repeating-conic-gradient(#2a3252 0% 25%, #171d33 0% 50%) 0 0 / 12px 12px',
+                        }}
+                    />
+                )}
+            </Row>
+            <Row label="Alpha test">
+                <NumberField
+                    value={system.getRendererSettings().materialAlphaTest ?? 0}
+                    min={0}
+                    step={0.05}
+                    onChange={(v) => patchMaterial({alphaTest: Math.min(1, v)})}
+                />
+            </Row>
+            <Row label="Depth write">
+                <CheckboxField
+                    value={system.getRendererSettings().materialDepthWrite}
+                    onChange={(v) => patchMaterial({depthWrite: v})}
+                />
+            </Row>
+            <Row label="Depth test">
+                <CheckboxField
+                    value={system.getRendererSettings().materialDepthTest}
+                    onChange={(v) => patchMaterial({depthTest: v})}
+                />
+            </Row>
+            {system.renderMode === RenderMode.Mesh && (() => {
+                const settings = system.getRendererSettings();
+                const lightDirection = settings.meshLightDirection ?? [0.4, -1, 0.6];
+                const lightColor = settings.meshLightColor ?? [1, 1, 1];
+                const ambientColor = settings.meshAmbientColor ?? [0.35, 0.35, 0.35];
+                return (
+                    <>
+                        <Row label="Light dir X/Y/Z">
+                            <div style={{display: 'flex', gap: 6}}>
+                                <NumberField
+                                    value={lightDirection[0]}
+                                    step={0.1}
+                                    onChange={(v) =>
+                                        patchMaterial({
+                                            meshLightDirection: [v, lightDirection[1], lightDirection[2]],
+                                        })
+                                    }
+                                />
+                                <NumberField
+                                    value={lightDirection[1]}
+                                    step={0.1}
+                                    onChange={(v) =>
+                                        patchMaterial({
+                                            meshLightDirection: [lightDirection[0], v, lightDirection[2]],
+                                        })
+                                    }
+                                />
+                                <NumberField
+                                    value={lightDirection[2]}
+                                    step={0.1}
+                                    onChange={(v) =>
+                                        patchMaterial({
+                                            meshLightDirection: [lightDirection[0], lightDirection[1], v],
+                                        })
+                                    }
+                                />
+                            </div>
+                        </Row>
+                        <Row label="Light color">
+                            <ColorInput
+                                value={new Vector4(lightColor[0], lightColor[1], lightColor[2], 1)}
+                                onChange={(next) =>
+                                    patchMaterial({meshLightColor: [next.x, next.y, next.z]})
+                                }
+                            />
+                        </Row>
+                        <Row label="Ambient">
+                            <ColorInput
+                                value={new Vector4(ambientColor[0], ambientColor[1], ambientColor[2], 1)}
+                                onChange={(next) =>
+                                    patchMaterial({meshAmbientColor: [next.x, next.y, next.z]})
+                                }
+                            />
+                        </Row>
+                    </>
+                );
+            })()}
             {system.renderMode === RenderMode.Mesh &&
                 (() => {
                     const preset = detectGeometryPreset(system.instancingGeometry);
@@ -845,132 +1078,6 @@ export function RendererModule({
                         </Row>
                     );
                 })()}
-            <div
-                style={{
-                    marginTop: 10,
-                    marginBottom: 2,
-                    fontSize: 11,
-                    fontWeight: 600,
-                    color: '#7c8db5',
-                    textTransform: 'uppercase',
-                    letterSpacing: 0.4,
-                }}
-            >
-                Material
-            </div>
-            {system.material != null && (
-                <div style={{fontSize: 10.5, color: '#9eb9ff', marginBottom: 2}}>
-                    Imported material: {(system.material as {name?: string}).name ?? 'unnamed'} — settings below were derived from it
-                </div>
-            )}
-            <Row label="Blend mode">
-                <SelectField
-                    value={system.blending}
-                    options={[
-                        {value: 1, label: 'Additive'},
-                        {value: 2, label: 'Alpha blend'},
-                        {value: 3, label: 'Subtract'},
-                        {value: 4, label: 'Multiply'},
-                    ]}
-                    onChange={(blend) => binding.apply((s) => (s.blending = blend))}
-                />
-            </Row>
-            <Row label="Transparent">
-                <CheckboxField
-                    value={!!system.getRendererSettings().materialTransparent}
-                    onChange={(v) =>
-                        binding.apply((s) => {
-                            s.getRendererSettings().materialTransparent = v;
-                            s.neededToUpdateRender = true;
-                        })
-                    }
-                />
-            </Row>
-            {resolveTexture && (
-                <Row label="Texture">
-                    <SelectField
-                        value={
-                            !currentTextureUrl
-                                ? '__none'
-                                : (textureOptions ?? []).some((o) => o.url === currentTextureUrl)
-                                  ? currentTextureUrl
-                                  : '__current'
-                        }
-                        options={[
-                            {value: '__none', label: '(none)'},
-                            ...(currentTextureUrl && !(textureOptions ?? []).some((o) => o.url === currentTextureUrl)
-                                ? [{value: '__current', label: `(current) ${currentTextureUrl.slice(-24)}`}]
-                                : []),
-                            ...(textureOptions ?? []).map((o) => ({value: o.url, label: o.label})),
-                            {value: '__url', label: 'Custom URL…'},
-                            {value: '__file', label: 'Load from file…'},
-                        ]}
-                        onChange={(url) => {
-                            if (url === '__current') {
-                                return;
-                            }
-                            if (url === '__none') {
-                                binding.apply((s) => (s.texture = null as never));
-                                return;
-                            }
-                            if (url === '__url') {
-                                setPromptingTextureUrl(true);
-                                return;
-                            }
-                            if (url === '__file') {
-                                const input = document.createElement('input');
-                                input.type = 'file';
-                                input.accept = 'image/*';
-                                input.onchange = () => {
-                                    const file = input.files?.[0];
-                                    if (!file) {
-                                        return;
-                                    }
-                                    // Read as a data URI so the texture survives Export/Save/reimport;
-                                    // an object URL (blob:) would be dead after a reload.
-                                    const reader = new FileReader();
-                                    reader.onload = () => {
-                                        binding.apply((s) => (s.texture = resolveTexture(reader.result as string) as never));
-                                    };
-                                    reader.readAsDataURL(file);
-                                };
-                                input.click();
-                                return;
-                            }
-                            binding.apply((s) => (s.texture = resolveTexture(url) as never));
-                        }}
-                    />
-                    {promptingTextureUrl && (
-                        <PromptDialog
-                            title="Texture URL"
-                            defaultValue={currentTextureUrl}
-                            placeholder="https://…"
-                            onSubmit={(url) => {
-                                binding.apply((s) => (s.texture = resolveTexture(url) as never));
-                                setPromptingTextureUrl(false);
-                            }}
-                            onCancel={() => setPromptingTextureUrl(false)}
-                        />
-                    )}
-                    {currentTextureUrl && (
-                        <img
-                            src={currentTextureUrl}
-                            alt="texture preview"
-                            style={{
-                                width: 64,
-                                height: 64,
-                                marginTop: 6,
-                                objectFit: 'contain',
-                                borderRadius: 6,
-                                border: '1px solid #2b3761',
-                                // Checkerboard so texture transparency is visible.
-                                background:
-                                    'repeating-conic-gradient(#2a3252 0% 25%, #171d33 0% 50%) 0 0 / 12px 12px',
-                            }}
-                        />
-                    )}
-                </Row>
-            )}
             <Row label="Render order">
                 <NumberField value={system.renderOrder} step={1} onChange={(v) => binding.apply((s) => (s.renderOrder = Math.round(v)))} />
             </Row>
@@ -985,41 +1092,6 @@ export function RendererModule({
                     </div>
                 </Row>
             )}
-            <Row label="Alpha test">
-                <NumberField
-                    value={system.getRendererSettings().materialAlphaTest ?? 0}
-                    min={0}
-                    step={0.05}
-                    onChange={(v) =>
-                        binding.apply((s) => {
-                            s.getRendererSettings().materialAlphaTest = Math.min(1, v);
-                            s.neededToUpdateRender = true;
-                        })
-                    }
-                />
-            </Row>
-            <Row label="Depth write">
-                <CheckboxField
-                    value={system.getRendererSettings().materialDepthWrite}
-                    onChange={(v) =>
-                        binding.apply((s) => {
-                            s.getRendererSettings().materialDepthWrite = v;
-                            s.neededToUpdateRender = true;
-                        })
-                    }
-                />
-            </Row>
-            <Row label="Depth test">
-                <CheckboxField
-                    value={system.getRendererSettings().materialDepthTest}
-                    onChange={(v) =>
-                        binding.apply((s) => {
-                            s.getRendererSettings().materialDepthTest = v;
-                            s.neededToUpdateRender = true;
-                        })
-                    }
-                />
-            </Row>
         </ModuleSection>
     );
 }

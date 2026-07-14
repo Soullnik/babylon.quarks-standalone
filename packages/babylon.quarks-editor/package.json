@@ -59,10 +59,14 @@
   "devDependencies": {
     "@babylonjs/materials": "9.6.2",
     "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
     "react": "^19.0.0",
-    "rimraf": "^6.0.0",
-    "typescript": "^5.9.3",
     "react-dom": "^19.0.0",
-    "@types/react-dom": "^19.0.0"
+    "rimraf": "^6.0.0",
+    "typescript": "^5.9.3"
+  },
+  "dependencies": {
+    "@heroicons/react": "^2.2.0",
+    "@tanstack/react-virtual": "^3.14.6"
   }
 }

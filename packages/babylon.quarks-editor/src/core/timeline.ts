@@ -83,13 +83,16 @@ export function computeTimelineRows(binding: EffectBinding): TimelineRow[] {
     return rows;
 }
 
-/** Overall timeline span: the furthest track extent (start offset + duration). */
+/**
+ * Overall timeline ruler span — emission window per track (`startOffset + duration`).
+ */
 export function computeTimelineSpan(rows: TimelineRow[]): number {
     let span = 0;
     for (const row of rows) {
-        if (row.kind === 'track') {
-            span = Math.max(span, row.startOffset + row.duration);
+        if (row.kind !== 'track') {
+            continue;
         }
+        span = Math.max(span, row.startOffset + row.duration);
     }
     return Math.max(span, MIN_TIMELINE_SPAN);
 }
