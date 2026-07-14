@@ -26,10 +26,14 @@ const GALLERY_ROW_HEIGHT = 34;
 
 export interface GalleryPanelProps {
     entries: GalleryEntry[];
-    selectedRoot: TransformNode | null;
+    /** Effect shown in the inspector and timeline. */
+    focusedRoot: TransformNode | null;
+    /** In-scene effects that keep simulating while transport plays. */
+    previewRootIds: ReadonlySet<number>;
     loading: GalleryLoadProgress | null;
     folderInputRef: React.RefObject<HTMLInputElement | null>;
-    onSelect: (entry: GalleryEntry) => void;
+    onFocus: (entry: GalleryEntry) => void;
+    onTogglePreview: (entry: GalleryEntry) => void;
     onImportFiles: (files: FileList | File[]) => void;
     onImportFolder: () => void;
     onCreateDefault: () => void;
@@ -47,42 +51,99 @@ function endGalleryDrag(): void {
 function EffectRow(props: {
     entry: GalleryEntry;
     depth: number;
-    selected: boolean;
-    onSelect: (entry: GalleryEntry) => void;
+    focused: boolean;
+    inPreview: boolean;
+    onFocus: (entry: GalleryEntry) => void;
+    onTogglePreview: (entry: GalleryEntry) => void;
 }): React.ReactElement {
-    const {entry, depth, selected, onSelect} = props;
+    const {entry, depth, focused, inPreview, onFocus, onTogglePreview} = props;
+    const isLooping = entry.systems.some((system) => system.looping);
     return (
-        <button
-            type="button"
-            draggable
-            className="qe-hover-bg"
-            title={entry.inScene ? `${entry.path} — in scene` : `${entry.path} — drag into viewport`}
+        <div
             style={{
                 display: 'flex',
-                alignItems: 'center',
-                gap: 8,
+                alignItems: 'stretch',
                 width: '100%',
                 height: GALLERY_ROW_HEIGHT,
-                boxSizing: 'border-box',
-                textAlign: 'left',
-                border: 'none',
                 borderBottom: `1px solid ${theme.border}`,
-                background: selected ? 'rgba(120, 165, 255, 0.22)' : 'transparent',
-                color: selected ? theme.text : theme.textDim,
-                padding: `0 12px 0 ${12 + depth * 14}px`,
-                fontSize: 12.5,
-                cursor: 'grab',
-                fontFamily: theme.font,
+                background: focused ? 'rgba(120, 165, 255, 0.22)' : inPreview ? 'rgba(120, 165, 255, 0.08)' : 'transparent',
+                boxSizing: 'border-box',
             }}
-            onClick={() => onSelect(entry)}
-            onDragStart={(e) => beginGalleryDrag(e, {kind: 'effect', id: entry.root.uniqueId})}
-            onDragEnd={endGalleryDrag}
         >
-            <span style={{width: 14, flexShrink: 0, opacity: entry.inScene ? 1 : 0.35, color: entry.inScene ? theme.accent : theme.textDim, display: 'inline-flex'}}>
-                {entry.inScene ? <CheckCircleIcon style={iconStyle(14)} /> : <SparklesIcon style={iconStyle(14)} />}
-            </span>
-            <span style={{overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'}}>{entry.name}</span>
-        </button>
+            {entry.inScene ? (
+                <button
+                    type="button"
+                    className="qe-hover"
+                    title={inPreview ? 'Remove from stage preview' : 'Preview on stage (keep playing)'}
+                    style={{
+                        flexShrink: 0,
+                        width: 28,
+                        border: 'none',
+                        borderRight: `1px solid ${theme.border}`,
+                        background: 'transparent',
+                        color: inPreview ? theme.accent : theme.textDim,
+                        cursor: 'pointer',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        padding: 0,
+                    }}
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        onTogglePreview(entry);
+                    }}
+                >
+                    {inPreview ? <CheckCircleIcon style={iconStyle(14)} /> : <span style={{width: 10, height: 10, border: `1px solid currentColor`, borderRadius: 2, boxSizing: 'border-box'}} />}
+                </button>
+            ) : (
+                <span style={{width: 28, flexShrink: 0, borderRight: `1px solid ${theme.border}`}} />
+            )}
+            <button
+                type="button"
+                draggable
+                className="qe-hover-bg"
+                title={
+                    entry.inScene
+                        ? `${entry.path} — in scene · Ctrl+click toggles preview`
+                        : `${entry.path} — drag into viewport`
+                }
+                style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    flex: 1,
+                    minWidth: 0,
+                    height: '100%',
+                    textAlign: 'left',
+                    border: 'none',
+                    background: 'transparent',
+                    color: focused ? theme.text : theme.textDim,
+                    padding: `0 12px 0 ${8 + depth * 14}px`,
+                    fontSize: 12.5,
+                    cursor: 'grab',
+                    fontFamily: theme.font,
+                }}
+                onClick={(e) => {
+                    if ((e.ctrlKey || e.metaKey) && entry.inScene) {
+                        onTogglePreview(entry);
+                        return;
+                    }
+                    onFocus(entry);
+                }}
+                onDragStart={(e) => beginGalleryDrag(e, {kind: 'effect', id: entry.root.uniqueId})}
+                onDragEnd={endGalleryDrag}
+            >
+                <span style={{width: 14, flexShrink: 0, opacity: entry.inScene ? 1 : 0.35, color: entry.inScene ? theme.accent : theme.textDim, display: 'inline-flex'}}>
+                    {entry.inScene ? <SparklesIcon style={iconStyle(14)} /> : <SparklesIcon style={iconStyle(14)} />}
+                </span>
+                <span style={{overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'}}>{entry.name}</span>
+                {isLooping && (
+                    <span title="Looping effect" style={{flexShrink: 0, fontSize: 11, color: theme.textDim}}>
+                        ⟳
+                    </span>
+                )}
+            </button>
+        </div>
     );
 }
 
@@ -153,11 +214,13 @@ function flatRowKey(row: GalleryFlatRow): string {
 function VirtualGalleryTree(props: {
     rows: GalleryFlatRow[];
     closedFolders: ReadonlySet<string>;
-    selectedRoot: TransformNode | null;
-    onSelect: (entry: GalleryEntry) => void;
+    focusedRoot: TransformNode | null;
+    previewRootIds: ReadonlySet<number>;
+    onFocus: (entry: GalleryEntry) => void;
+    onTogglePreview: (entry: GalleryEntry) => void;
     onToggleFolder: (path: string) => void;
 }): React.ReactElement {
-    const {rows, closedFolders, selectedRoot, onSelect, onToggleFolder} = props;
+    const {rows, closedFolders, focusedRoot, previewRootIds, onFocus, onTogglePreview, onToggleFolder} = props;
     const scrollRef = useRef<HTMLDivElement>(null);
     const virtualizer = useVirtualizer({
         count: rows.length,
@@ -206,8 +269,10 @@ function VirtualGalleryTree(props: {
                                 <EffectRow
                                     entry={row.node.entry}
                                     depth={row.depth}
-                                    selected={selectedRoot === row.node.entry.root}
-                                    onSelect={onSelect}
+                                    focused={focusedRoot === row.node.entry.root}
+                                    inPreview={previewRootIds.has(row.node.entry.root.uniqueId)}
+                                    onFocus={onFocus}
+                                    onTogglePreview={onTogglePreview}
                                 />
                             )}
                         </div>
@@ -220,7 +285,7 @@ function VirtualGalleryTree(props: {
 
 /** Folder-tree catalog; import effects here and drag them into the viewport. */
 export function GalleryPanel(props: GalleryPanelProps): React.ReactElement {
-    const {entries, selectedRoot, loading, folderInputRef, onSelect, onImportFiles, onImportFolder, onCreateDefault} = props;
+    const {entries, focusedRoot, previewRootIds, loading, folderInputRef, onFocus, onTogglePreview, onImportFiles, onImportFolder, onCreateDefault} = props;
     const [query, setQuery] = useState('');
     const [closedFolders, setClosedFolders] = useState<Set<string>>(() => new Set());
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -233,6 +298,10 @@ export function GalleryPanel(props: GalleryPanelProps): React.ReactElement {
         [filtered, closedFolders, expandAll]
     );
     const inSceneCount = useMemo(() => entries.filter((entry) => entry.inScene).length, [entries]);
+    const previewCount = useMemo(
+        () => entries.filter((entry) => entry.inScene && previewRootIds.has(entry.root.uniqueId)).length,
+        [entries, previewRootIds]
+    );
     const isLoading = loading !== null;
 
     const toggleFolder = useCallback((path: string) => {
@@ -325,7 +394,10 @@ export function GalleryPanel(props: GalleryPanelProps): React.ReactElement {
             <div style={{fontSize: 12, color: theme.textDim, lineHeight: 1.45}}>
                 {isLoading
                     ? `Loading… ${loading.done} / ${loading.total || '…'} files`
-                    : `${inSceneCount} in scene · ${entries.length} total`}
+                    : `${previewCount} previewing · ${inSceneCount} in scene · ${entries.length} total`}
+            </div>
+            <div style={{fontSize: 11, color: theme.textDim, lineHeight: 1.4}}>
+                Preview plays on stage · Click = edit · Checkbox or Ctrl+click toggles preview.
             </div>
             <input
                 className="qe-hover"
@@ -369,8 +441,10 @@ export function GalleryPanel(props: GalleryPanelProps): React.ReactElement {
                 <VirtualGalleryTree
                     rows={flatRows}
                     closedFolders={closedFolders}
-                    selectedRoot={selectedRoot}
-                    onSelect={onSelect}
+                    focusedRoot={focusedRoot}
+                    previewRootIds={previewRootIds}
+                    onFocus={onFocus}
+                    onTogglePreview={onTogglePreview}
                     onToggleFolder={toggleFolder}
                 />
             )}

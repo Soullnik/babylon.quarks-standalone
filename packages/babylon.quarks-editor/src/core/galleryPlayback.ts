@@ -1,9 +1,13 @@
 import type {GalleryEntry} from './loadEffectGallery';
 
-/** Freezes every gallery entry; optionally plays the selected one when it is in the scene. */
+function isPreviewEntry(entry: GalleryEntry, previewRootIds: ReadonlySet<number>): boolean {
+    return entry.inScene && previewRootIds.has(entry.root.uniqueId);
+}
+
+/** Freezes every gallery entry; unpauses all in-scene entries in the preview set when transport is playing. */
 export function applyGalleryPlayback(
     entries: GalleryEntry[],
-    selectedRoot: GalleryEntry['root'] | null,
+    previewRootIds: ReadonlySet<number>,
     transportPlaying: boolean
 ): void {
     for (const entry of entries) {
@@ -12,31 +16,40 @@ export function applyGalleryPlayback(
         }
     }
 
-    if (!transportPlaying || !selectedRoot) {
+    if (!transportPlaying) {
         return;
     }
 
-    const selected = entries.find((entry) => entry.root === selectedRoot);
-    if (!selected?.inScene) {
-        return;
-    }
-
-    // Sub-emitter targets skip self-emission in update(), but still need play() so
-    // spawned particles simulate (matches QuarksUtil.play).
-    for (const system of selected.systems) {
-        system.play();
+    for (const entry of entries) {
+        if (!isPreviewEntry(entry, previewRootIds)) {
+            continue;
+        }
+        for (const system of entry.systems) {
+            system.play();
+        }
     }
 }
 
-/** Particle count for the selected in-scene gallery effect (timeline counter). */
-export function countGalleryParticles(entries: GalleryEntry[], selectedRoot: GalleryEntry['root'] | null): number {
-    const selected = entries.find((entry) => entry.root === selectedRoot);
-    if (!selected?.inScene) {
-        return 0;
-    }
+/** Whether any preview effect on stage should keep simulating. */
+export function hasActivePreview(entries: GalleryEntry[], previewRootIds: ReadonlySet<number>): boolean {
+    return entries.some((entry) => isPreviewEntry(entry, previewRootIds));
+}
+
+/** In-scene preview effects currently in the preview set. */
+export function countActivePreviews(entries: GalleryEntry[], previewRootIds: ReadonlySet<number>): number {
+    return entries.filter((entry) => isPreviewEntry(entry, previewRootIds)).length;
+}
+
+/** Particle count across all active preview effects. */
+export function countGalleryParticles(entries: GalleryEntry[], previewRootIds: ReadonlySet<number>): number {
     let count = 0;
-    for (const system of selected.systems) {
-        count += system.particleNum;
+    for (const entry of entries) {
+        if (!isPreviewEntry(entry, previewRootIds)) {
+            continue;
+        }
+        for (const system of entry.systems) {
+            count += system.particleNum;
+        }
     }
     return count;
 }
