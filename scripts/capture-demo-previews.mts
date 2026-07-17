@@ -4,7 +4,7 @@ import {chromium} from "playwright";
 import {demoManifest} from "../examples/src/demoManifest.ts";
 
 const VIEWPORT = {width: 1280, height: 720};
-const BASE_URL = process.env.EXAMPLES_BASE_URL ?? "http://localhost:8001";
+const BASE_URL = process.env.EXAMPLES_BASE_URL ?? "http://localhost:3010";
 const OUTPUT_DIR = path.resolve("examples/public/previews");
 
 /**
