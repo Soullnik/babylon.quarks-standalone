@@ -165,4 +165,14 @@ export const demoManifest: DemoManifestEntry[] = [
         tags: ["loop", "sci-fi"],
         preview: {icon: "BH", gradient: "linear-gradient(135deg, #2a1a3d 0%, #6b3d9a 100%)"},
     },
+    {
+        key: "MagicZoneUnityExample",
+        name: "MagicZone: Unity exported by unity-quarks-exporter example",
+        module: "MagicZoneUnityExample",
+        sourcePath: "examples/src/demos/MagicZoneUnityExample.ts",
+        description:
+            "MagicZone: Unity exported by unity-quarks-exporter example. This demo shows how to import a Unity authored effect into MagicZone.",
+        tags: ["import", "rotation"],
+        preview: {icon: "MZ", gradient: "linear-gradient(135deg, #7ec8ff 0%, #2a3f8e 100%)"},
+    },
 ];

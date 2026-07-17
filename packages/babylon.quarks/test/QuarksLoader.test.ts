@@ -679,6 +679,52 @@ describe('QuarksLoader matrix decomposition', () => {
         engine.dispose();
     });
 
+    it('resolves image urls against baseUrl for relative paths but not for data/absolute URIs', () => {
+        // Regression: parseImages used to always prepend baseUrl, turning a data URI into an
+        // invalid path like "https://cdn.example.com/base/data:image/png;base64,AAAA". Only
+        // triggers with a non-empty baseUrl (i.e. via .load(url), not bare .parse(json)) —
+        // the pre-fix test above never caught it because it always parsed with baseUrl=''.
+        const engine = new NullEngine();
+        const scene = new Scene(engine);
+        const loader = new QuarksLoader(scene);
+
+        const dataUri = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+        const root = loader.parse(
+            {
+                textures: [
+                    {uuid: 'tex-data', image: 'img-data'},
+                    {uuid: 'tex-relative', image: 'img-relative'},
+                ],
+                images: [
+                    {uuid: 'img-data', url: dataUri},
+                    {uuid: 'img-relative', url: 'textures/spark.png'},
+                ],
+                materials: [
+                    {uuid: 'mat-data', type: 'MeshBasicMaterial', map: 'tex-data'},
+                    {uuid: 'mat-relative', type: 'MeshBasicMaterial', map: 'tex-relative'},
+                ],
+                geometries: [{uuid: 'plane', type: 'PlaneGeometry', width: 1, height: 1}],
+                object: {
+                    uuid: 'root',
+                    type: 'Group',
+                    children: [
+                        {uuid: 'mesh-data', type: 'Mesh', name: 'mesh-data', geometry: 'plane', material: 'mat-data'},
+                        {uuid: 'mesh-relative', type: 'Mesh', name: 'mesh-relative', geometry: 'plane', material: 'mat-relative'},
+                    ],
+                },
+            },
+            'https://cdn.example.com/base/'
+        );
+
+        const meshData = root.getChildren().find((node) => node.name === 'mesh-data') as Mesh;
+        const meshRelative = root.getChildren().find((node) => node.name === 'mesh-relative') as Mesh;
+        expect((meshData.material as any).diffuseTexture.url).toBe(dataUri);
+        expect((meshRelative.material as any).diffuseTexture.url).toBe('https://cdn.example.com/base/textures/spark.png');
+
+        scene.dispose();
+        engine.dispose();
+    });
+
     it('links mesh_surface emitter to concrete Mesh instances', () => {
         const engine = new NullEngine();
         const scene = new Scene(engine);

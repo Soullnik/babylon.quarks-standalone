@@ -255,8 +255,21 @@ export class QuarksLoader {
     private parseImages(images: any[], baseUrl: string, _meta: LoadedMeta): void {
         (this as any)._images = {};
         for (const img of images) {
-            (this as any)._images[img.uuid] = img.url ? baseUrl + img.url : null;
+            (this as any)._images[img.uuid] = img.url ? this.resolveImageUrl(baseUrl, img.url) : null;
         }
+    }
+
+    /**
+     * `img.url` is already absolute for data/blob URIs and full http(s) URLs — common for
+     * "portable" exports that embed textures as base64 (see ensurePortableTextureUrl in
+     * babylon.quarks-editor). Prepending baseUrl to those turns e.g.
+     * "data:image/png;base64,AAAA" into an invalid path like "/some/dir/data:image/png;base64,AAAA".
+     */
+    private resolveImageUrl(baseUrl: string, url: string): string {
+        if (/^(data|blob):/i.test(url) || /^[a-z][a-z0-9+.-]*:\/\//i.test(url) || url.startsWith('/')) {
+            return url;
+        }
+        return baseUrl + url;
     }
 
     private parseTextures(textures: any[], meta: LoadedMeta): void {
