@@ -57,6 +57,8 @@ import {notifyTransformChanged} from '../core/transformStore';
 import {EffectEditor} from './EffectEditor';
 import {PromptDialog} from './PromptDialog';
 import {MessageDialog} from './MessageDialog';
+import {ExportSettingsDialog, DEFAULT_EXPORT_SETTINGS, type ExportSettings} from './ExportSettingsDialog';
+import {downloadBlob} from './downloadBlob';
 import {GalleryPanel} from './GalleryPanel';
 import {TimelinePanel} from './TimelinePanel';
 import type {GeometryData, GeometryOption, TextureOption} from './modules';
@@ -179,6 +181,8 @@ export function EffectEditorHost(props: EffectEditorHostProps) {
     const [selectedGalleryRoot, setSelectedGalleryRoot] = useState<TransformNode | null>(null);
     const [previewRootIds, setPreviewRootIds] = useState<number[]>([]);
     const [messageDialog, setMessageDialog] = useState<{title: string; message: string} | null>(null);
+    const [exportSettings, setExportSettings] = useState<ExportSettings>(DEFAULT_EXPORT_SETTINGS);
+    const [exportSettingsOpen, setExportSettingsOpen] = useState(false);
     const [galleryDragHover, setGalleryDragHover] = useState<{label: string; count: number} | null>(null);
     const [showEmitterWireframes, setShowEmitterWireframes] = useState(false);
 
@@ -1190,18 +1194,22 @@ export function EffectEditorHost(props: EffectEditorHostProps) {
                                 disabled={!binding}
                                 onClick={() => {
                                     if (!binding) return;
-                                    const blob = new Blob([binding.exportJSON('EditorEffect')], {type: 'application/json'});
-                                    const link = document.createElement('a');
-                                    link.href = URL.createObjectURL(blob);
-                                    link.download = 'effect.json';
-                                    link.click();
-                                    URL.revokeObjectURL(link.href);
+                                    const blob = new Blob([binding.exportJSON('EditorEffect', exportSettings)], {type: 'application/json'});
+                                    downloadBlob('effect.json', blob);
                                 }}
                             >
                                 Export
                             </button>
+                            <button
+                                className="qe-hover"
+                                style={buttonStyle}
+                                title="Export settings"
+                                onClick={() => setExportSettingsOpen(true)}
+                            >
+                                Export…
+                            </button>
                             {props.onSave && (
-                                <button className="qe-hover" style={buttonStyle} disabled={!binding} onClick={() => binding && props.onSave!(binding.exportJSON('EditorEffect'))}>
+                                <button className="qe-hover" style={buttonStyle} disabled={!binding} onClick={() => binding && props.onSave!(binding.exportJSON('EditorEffect', exportSettings))}>
                                     Save
                                 </button>
                             )}
@@ -1244,6 +1252,16 @@ export function EffectEditorHost(props: EffectEditorHostProps) {
             )}
             {messageDialog && (
                 <MessageDialog title={messageDialog.title} message={messageDialog.message} onClose={() => setMessageDialog(null)} />
+            )}
+            {exportSettingsOpen && (
+                <ExportSettingsDialog
+                    value={exportSettings}
+                    onApply={(settings) => {
+                        setExportSettings(settings);
+                        setExportSettingsOpen(false);
+                    }}
+                    onCancel={() => setExportSettingsOpen(false)}
+                />
             )}
         </div>
     );

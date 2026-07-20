@@ -1,5 +1,9 @@
 import React, {useMemo, useState} from 'react';
+import type {Scene} from '@babylonjs/core/scene';
 import {Mesh} from '@babylonjs/core/Meshes/mesh';
+import {VertexData} from '@babylonjs/core/Meshes/mesh.vertexData';
+import {VertexBuffer} from '@babylonjs/core/Buffers/buffer';
+import {SceneLoader} from '@babylonjs/core/Loading/sceneLoader';
 import {Texture} from '@babylonjs/core/Materials/Textures/texture';
 import {
     ColorOverLife,
@@ -38,7 +42,8 @@ import {PromptDialog} from './PromptDialog';
 import {CheckboxField, NumberField, Row, SelectField} from './fields';
 import {ValueField} from './ValueField';
 import {iconStyle} from './icons';
-import {theme} from './theme';
+import {theme, buttonStyle} from './theme';
+import {downloadBlob} from './downloadBlob';
 import {PlusIcon, XMarkIcon} from '@heroicons/react/24/solid';
 import {InspectorInfoIcon} from './InspectorInfoIcon';
 
@@ -623,6 +628,82 @@ export interface TextureOption {
     url: string;
 }
 
+const MIME_EXTENSIONS: {[mime: string]: string} = {
+    'image/png': 'png',
+    'image/jpeg': 'jpg',
+    'image/webp': 'webp',
+    'image/gif': 'gif',
+    'image/bmp': 'bmp',
+    'image/svg+xml': 'svg',
+};
+
+/** Downloads the raw bytes behind a texture/image URL (data:, blob:, or http(s):) as a file
+ * — the "take it out to optimize" half of the export/optimize/reimport round-trip. */
+async function downloadTextureAsset(url: string, filenameHint: string): Promise<void> {
+    const response = await fetch(url);
+    const blob = await response.blob();
+    const extension = MIME_EXTENSIONS[blob.type] ?? 'png';
+    const safeName = filenameHint.replace(/[^a-z0-9_-]+/gi, '_').replace(/^_+|_+$/g, '') || 'texture';
+    downloadBlob(`${safeName}.${extension}`, blob);
+}
+
+/** Loads a glTF/GLB from a URL and returns its first mesh's vertex buffers, tagged with the
+ * source URL so the effect can be re-exported as a compact GLTFGeometry reference. */
+async function loadGeometryFromUrl(url: string, scene: Scene): Promise<GeometryData & {sourceUrl: string}> {
+    const lastSlash = url.lastIndexOf('/');
+    const rootUrl = lastSlash >= 0 ? url.substring(0, lastSlash + 1) : '';
+    const fileName = lastSlash >= 0 ? url.substring(lastSlash + 1) : url;
+    const result = await SceneLoader.ImportMeshAsync('', rootUrl, fileName, scene);
+    try {
+        const mesh = result.meshes.find((m) => m.getTotalVertices() > 0 && m.getVerticesData(VertexBuffer.PositionKind));
+        if (!mesh) {
+            throw new Error('No mesh with geometry found at this URL');
+        }
+        const positions = mesh.getVerticesData(VertexBuffer.PositionKind)!;
+        const normals = mesh.getVerticesData(VertexBuffer.NormalKind);
+        const uvs = mesh.getVerticesData(VertexBuffer.UVKind);
+        const indices = mesh.getIndices();
+        return {
+            positions: new Float32Array(positions),
+            indices: indices ? new Uint32Array(indices) : undefined,
+            uvs: uvs ? new Float32Array(uvs) : undefined,
+            normals: normals ? new Float32Array(normals) : undefined,
+            sourceUrl: url,
+        };
+    } finally {
+        result.meshes.forEach((m) => m.dispose());
+        result.skeletons?.forEach((s) => s.dispose());
+        result.transformNodes?.forEach((t) => t.dispose());
+    }
+}
+
+/** Exports the system's current Mesh-render-mode geometry as a standalone .glb — the "take it
+ * out to optimize" half of the round-trip (bring it back via the geometry picker's Custom URL…). */
+async function downloadGeometryAsGlb(system: ParticleSystem, filenameHint: string): Promise<void> {
+    const scene = system.emitter.getScene();
+    if (!scene) return;
+    const {GLTF2Export} = await import('@babylonjs/serializers/glTF/2.0');
+    const mesh = new Mesh('quarks_geometry_export', scene);
+    try {
+        const vertexData = new VertexData();
+        vertexData.positions = system.instancingGeometry;
+        const settings = system.getRendererSettings();
+        vertexData.indices = settings.instancingIndices;
+        if (settings.instancingUVs?.length) vertexData.uvs = settings.instancingUVs;
+        if (settings.instancingNormals?.length) vertexData.normals = settings.instancingNormals;
+        vertexData.applyToMesh(mesh, false);
+
+        const safeName = filenameHint.replace(/[^a-z0-9_-]+/gi, '_').replace(/^_+|_+$/g, '') || 'geometry';
+        const data = await GLTF2Export.GLBAsync(scene, safeName, {shouldExportNode: (node) => node === mesh});
+        const file = data.files[`${safeName}.glb`] ?? Object.values(data.files)[0];
+        if (file) {
+            downloadBlob(`${safeName}.glb`, file instanceof Blob ? file : new Blob([file]));
+        }
+    } finally {
+        mesh.dispose();
+    }
+}
+
 /**
  * A host-supplied mesh for the Mesh render mode (e.g. asset meshes from BabylonJS Editor),
  * analogous to TextureOption. The host provides ready vertex buffers; selecting one copies
@@ -724,6 +805,8 @@ export function RendererModule({
     const system = binding.system;
     const currentTextureUrl = (system.texture as {url?: string} | null)?.url ?? '';
     const [promptingTextureUrl, setPromptingTextureUrl] = useState(false);
+    const [promptingGeometryUrl, setPromptingGeometryUrl] = useState(false);
+    const [geometryBusy, setGeometryBusy] = useState(false);
     const materialLabel = getMaterialLabel(system.material);
     const loadTexture = useMemo(() => {
         return (url: string) => {
@@ -910,20 +993,33 @@ export function RendererModule({
                     />
                 )}
                 {currentTextureUrl && (
-                    <img
-                        src={currentTextureUrl}
-                        alt="texture preview"
-                        style={{
-                            width: 64,
-                            height: 64,
-                            marginTop: 6,
-                            objectFit: 'contain',
-                            borderRadius: 6,
-                            border: '1px solid #2b3761',
-                            background:
-                                'repeating-conic-gradient(#2a3252 0% 25%, #171d33 0% 50%) 0 0 / 12px 12px',
-                        }}
-                    />
+                    <div style={{display: 'flex', alignItems: 'flex-end', gap: 8, marginTop: 6}}>
+                        <img
+                            src={currentTextureUrl}
+                            alt="texture preview"
+                            style={{
+                                width: 64,
+                                height: 64,
+                                objectFit: 'contain',
+                                borderRadius: 6,
+                                border: '1px solid #2b3761',
+                                background:
+                                    'repeating-conic-gradient(#2a3252 0% 25%, #171d33 0% 50%) 0 0 / 12px 12px',
+                            }}
+                        />
+                        <button
+                            className="qe-hover"
+                            style={{...buttonStyle, padding: '4px 8px', fontSize: 11.5}}
+                            title="Download this texture to optimize it externally, then bring it back via Custom URL…"
+                            onClick={() => {
+                                downloadTextureAsset(currentTextureUrl, materialLabel || 'texture').catch((err) =>
+                                    console.error('Failed to export texture', err)
+                                );
+                            }}
+                        >
+                            Export
+                        </button>
+                    </div>
                 )}
             </Row>
             <Row label="Alpha test">
@@ -952,8 +1048,18 @@ export function RendererModule({
                     const vertexCount = system.instancingGeometry.length / 3;
                     const triangleCount = (system.getRendererSettings().instancingIndices?.length ?? 0) / 3;
                     const hostGeometry = geometryOptions ?? [];
-                    const applyGeometry = (g: GeometryData) =>
+                    const applyGeometry = (g: GeometryData, sourceUrl?: string) =>
                         binding.apply((s) => {
+                            if (sourceUrl) {
+                                s.updateInstancingGeometry(
+                                    new Float32Array(g.positions),
+                                    g.indices ? new Uint32Array(g.indices) : new Uint32Array(0),
+                                    g.uvs ? new Float32Array(g.uvs) : undefined,
+                                    g.normals ? new Float32Array(g.normals) : undefined,
+                                    sourceUrl
+                                );
+                                return;
+                            }
                             const settings = s.getRendererSettings();
                             settings.instancingIndices = (g.indices ? new Uint32Array(g.indices) : undefined) as never;
                             settings.instancingUVs = (g.uvs ? new Float32Array(g.uvs) : undefined) as never;
@@ -971,9 +1077,14 @@ export function RendererModule({
                                         {value: 'cube', label: 'Cube'},
                                         ...hostGeometry.map((g, i) => ({value: `host:${i}`, label: g.label})),
                                         ...(resolveGeometry ? [{value: '__file', label: 'Load from file…'}] : []),
+                                        {value: '__url', label: 'Custom URL…'},
                                     ]}
                                     onChange={(next) => {
                                         if (next === 'custom') {
+                                            return;
+                                        }
+                                        if (next === '__url') {
+                                            setPromptingGeometryUrl(true);
                                             return;
                                         }
                                         if (next === '__file') {
@@ -983,7 +1094,7 @@ export function RendererModule({
                                             input.onchange = () => {
                                                 const file = input.files?.[0];
                                                 if (file) {
-                                                    resolveGeometry!(file).then(applyGeometry);
+                                                    resolveGeometry!(file).then((g) => applyGeometry(g));
                                                 }
                                             };
                                             input.click();
@@ -1008,6 +1119,23 @@ export function RendererModule({
                                         });
                                     }}
                                 />
+                                {promptingGeometryUrl && (
+                                    <PromptDialog
+                                        title="Geometry URL (glTF/GLB)"
+                                        placeholder="https://…/model.glb"
+                                        onSubmit={(url) => {
+                                            setPromptingGeometryUrl(false);
+                                            const scene = system.emitter.getScene();
+                                            if (!scene) return;
+                                            setGeometryBusy(true);
+                                            loadGeometryFromUrl(url, scene)
+                                                .then((g) => applyGeometry(g, g.sourceUrl))
+                                                .catch((err) => console.error('Failed to load geometry from URL', err))
+                                                .finally(() => setGeometryBusy(false));
+                                        }}
+                                        onCancel={() => setPromptingGeometryUrl(false)}
+                                    />
+                                )}
                                 <MeshPreview
                                     positions={system.instancingGeometry}
                                     indices={system.getRendererSettings().instancingIndices}
@@ -1017,6 +1145,20 @@ export function RendererModule({
                                         {vertexCount} verts / {triangleCount} tris — picking a preset replaces this mesh
                                     </span>
                                 )}
+                                <button
+                                    className="qe-hover"
+                                    style={{...buttonStyle, padding: '4px 8px', fontSize: 11.5, alignSelf: 'flex-start'}}
+                                    disabled={geometryBusy || vertexCount === 0}
+                                    title="Download this mesh as .glb to optimize it externally, then bring it back via Custom URL…"
+                                    onClick={() => {
+                                        setGeometryBusy(true);
+                                        downloadGeometryAsGlb(system, materialLabel || 'geometry')
+                                            .catch((err) => console.error('Failed to export geometry', err))
+                                            .finally(() => setGeometryBusy(false));
+                                    }}
+                                >
+                                    {geometryBusy ? 'Working…' : 'Export'}
+                                </button>
                             </div>
                         </Row>
                     );

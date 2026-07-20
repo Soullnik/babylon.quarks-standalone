@@ -1,7 +1,7 @@
 import type {ParticleSystem} from 'babylon.quarks';
 import type {TransformNode} from '@babylonjs/core/Meshes/transformNode';
 import {buildEffectTree, serializeEffectTree} from './effectTree';
-import type {EffectTreeNode} from './effectTree';
+import type {EffectTreeNode, SerializeEffectOptions} from './effectTree';
 
 export type EditorListener = () => void;
 
@@ -96,7 +96,7 @@ export class EffectBinding {
      * Serializes the effect into the Quarks JSON envelope understood by QuarksLoader,
      * preserving the loaded group/emitter hierarchy.
      */
-    exportJSON(name = 'effect'): string {
-        return serializeEffectTree(this.root, name);
+    exportJSON(name = 'effect', options?: SerializeEffectOptions): string {
+        return serializeEffectTree(this.root, name, options);
     }
 }

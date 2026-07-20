@@ -2,6 +2,8 @@ import {Scene} from '@babylonjs/core/scene';
 import {TransformNode} from '@babylonjs/core/Meshes/transformNode';
 import {Mesh} from '@babylonjs/core/Meshes/mesh';
 import {VertexData} from '@babylonjs/core/Meshes/mesh.vertexData';
+import {VertexBuffer} from '@babylonjs/core/Buffers/buffer';
+import {SceneLoader} from '@babylonjs/core/Loading/sceneLoader';
 import {Texture} from '@babylonjs/core/Materials/Textures/texture';
 import {StandardMaterial} from '@babylonjs/core/Materials/standardMaterial';
 import {Constants} from '@babylonjs/core/Engines/constants';
@@ -54,9 +56,10 @@ export class QuarksLoader {
             geometries: {},
             materials: {},
         };
+        (this as any)._pendingGeometryConsumers = {};
 
         if (json.geometries) {
-            this.parseGeometries(json.geometries, meta);
+            this.parseGeometries(json.geometries, meta, baseUrl);
         }
         if (json.images) {
             this.parseImages(json.images, baseUrl, meta);
@@ -73,9 +76,17 @@ export class QuarksLoader {
         return root;
     }
 
-    private parseGeometries(geometries: any[], meta: LoadedMeta): void {
+    private parseGeometries(geometries: any[], meta: LoadedMeta, baseUrl: string): void {
+        const pendingConsumers = (this as any)._pendingGeometryConsumers as {[uuid: string]: ParticleSystem[]};
         for (const geom of geometries) {
-            if (geom.type === 'PlaneGeometry') {
+            if (geom.type === 'GLTFGeometry' && geom.url) {
+                // Placeholder so Mesh-render-mode particle systems can be constructed immediately;
+                // real geometry is fetched in the background and popped in once the glTF/glb resolves
+                // (mirrors how parseTextures resolves images without blocking parse()).
+                meta.geometries[geom.uuid] = {positions: new Float32Array(0), indices: new Uint32Array(0)};
+                pendingConsumers[geom.uuid] = [];
+                this.loadGltfGeometry(geom.uuid, geom.url, baseUrl, pendingConsumers, geom.meshIndex, geom.meshName);
+            } else if (geom.type === 'PlaneGeometry') {
                 const w = geom.width || 1;
                 const h = geom.height || 1;
                 const hw = w / 2;
@@ -255,8 +266,60 @@ export class QuarksLoader {
     private parseImages(images: any[], baseUrl: string, _meta: LoadedMeta): void {
         (this as any)._images = {};
         for (const img of images) {
-            (this as any)._images[img.uuid] = img.url ? this.resolveImageUrl(baseUrl, img.url) : null;
+            (this as any)._images[img.uuid] = img.url ? this.resolveUrl(baseUrl, img.url) : null;
         }
+    }
+
+    private loadGltfGeometry(
+        uuid: string,
+        url: string,
+        baseUrl: string,
+        pendingConsumers: {[uuid: string]: ParticleSystem[]},
+        meshIndex?: number,
+        meshName?: string
+    ): void {
+        const resolvedUrl = this.resolveUrl(baseUrl, url);
+        const lastSlash = resolvedUrl.lastIndexOf('/');
+        const rootUrl = lastSlash >= 0 ? resolvedUrl.substring(0, lastSlash + 1) : '';
+        const fileName = lastSlash >= 0 ? resolvedUrl.substring(lastSlash + 1) : resolvedUrl;
+        SceneLoader.ImportMeshAsync('', rootUrl, fileName, this.scene)
+            .then((result) => {
+                try {
+                    const meshes = result.meshes.filter(
+                        (m): m is Mesh => m instanceof Mesh && m.getTotalVertices() > 0 && !!m.getVerticesData(VertexBuffer.PositionKind)
+                    );
+                    const selected =
+                        (typeof meshName === 'string' ? meshes.find((m) => m.name === meshName) : undefined) ??
+                        meshes[typeof meshIndex === 'number' ? meshIndex : 0] ??
+                        meshes[0];
+                    if (!selected) return;
+
+                    const positions = selected.getVerticesData(VertexBuffer.PositionKind)!;
+                    const rawIndices = selected.getIndices();
+                    if (!rawIndices) return;
+                    const uvs = selected.getVerticesData(VertexBuffer.UVKind);
+                    const normals = selected.getVerticesData(VertexBuffer.NormalKind);
+
+                    const parsedPositions = new Float32Array(positions);
+                    const parsedIndices =
+                        rawIndices instanceof Uint32Array || rawIndices instanceof Uint16Array
+                            ? rawIndices
+                            : new Uint32Array(rawIndices);
+                    const parsedUvs = uvs ? new Float32Array(uvs) : undefined;
+                    const parsedNormals = normals ? new Float32Array(normals) : undefined;
+
+                    for (const ps of pendingConsumers[uuid] ?? []) {
+                        ps.updateInstancingGeometry(parsedPositions, parsedIndices, parsedUvs, parsedNormals, resolvedUrl);
+                    }
+                } finally {
+                    result.meshes.forEach((m) => m.dispose());
+                    result.skeletons?.forEach((s) => s.dispose());
+                    result.transformNodes?.forEach((t) => t.dispose());
+                }
+            })
+            .catch((err) => {
+                console.error(`QuarksLoader: failed to load GLTFGeometry from "${resolvedUrl}"`, err);
+            });
     }
 
     /**
@@ -264,8 +327,9 @@ export class QuarksLoader {
      * "portable" exports that embed textures as base64 (see ensurePortableTextureUrl in
      * babylon.quarks-editor). Prepending baseUrl to those turns e.g.
      * "data:image/png;base64,AAAA" into an invalid path like "/some/dir/data:image/png;base64,AAAA".
+     * The same rule applies to external GLTFGeometry URLs.
      */
-    private resolveImageUrl(baseUrl: string, url: string): string {
+    private resolveUrl(baseUrl: string, url: string): string {
         if (/^(data|blob):/i.test(url) || /^[a-z][a-z0-9+.-]*:\/\//i.test(url) || url.startsWith('/')) {
             return url;
         }
@@ -486,6 +550,10 @@ export class QuarksLoader {
         const dependencies: {[uuid: string]: Behavior} = {};
         const ps = ParticleSystem.fromJSON(json, meta as any, dependencies, this.scene);
         (ps as any)._meshSurfaceReferenceUUID = json?.shape?.type === 'mesh_surface' ? json?.shape?.mesh : undefined;
+        if (typeof json.instancingGeometry === 'string') {
+            const pendingConsumers = (this as any)._pendingGeometryConsumers as {[uuid: string]: ParticleSystem[]} | undefined;
+            pendingConsumers?.[json.instancingGeometry]?.push(ps);
+        }
         return ps;
     }
 

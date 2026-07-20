@@ -217,6 +217,13 @@ export class ParticleSystem implements IParticleSystem {
     private listeners: {[event: string]: Array<(event: ParticleSystemEvent) => void>} = {};
     private readonly layerMaskProxy: {mask: number};
     private materialRef: any = null;
+    /**
+     * Set when the current Mesh-render-mode instancing geometry was loaded from an external
+     * glTF/GLB URL (see updateInstancingGeometry) rather than authored/imported inline. Read by
+     * ensureGeometryMeta so re-exporting the effect writes a compact URL reference instead of
+     * re-inlining the whole mesh.
+     */
+    geometrySourceUrl?: string;
     private qualityFactor = 1;
     private useFastTrailHistory = true;
     private simulationAccumulator = 0;
@@ -362,6 +369,31 @@ export class ParticleSystem implements IParticleSystem {
         this.restart();
         this.particles.length = 0;
         this.rendererSettings.instancingGeometry = geometry;
+        this.geometrySourceUrl = undefined;
+        this.neededToUpdateRender = true;
+    }
+
+    /**
+     * Replaces the Mesh-render-mode instancing geometry in one shot (positions, indices, and
+     * optionally uvs/normals). Used by QuarksLoader to pop in geometry that was fetched
+     * asynchronously from an external glTF/GLB (GLTFGeometry) after the system was already
+     * constructed from a placeholder, and by the editor when loading geometry from a URL —
+     * pass `sourceUrl` so re-exporting the effect can reference it instead of re-inlining it.
+     */
+    updateInstancingGeometry(
+        positions: Float32Array,
+        indices: Uint32Array | Uint16Array,
+        uvs?: Float32Array,
+        normals?: Float32Array,
+        sourceUrl?: string
+    ): void {
+        this.restart();
+        this.particles.length = 0;
+        this.rendererSettings.instancingGeometry = positions;
+        this.rendererSettings.instancingIndices = indices;
+        this.rendererSettings.instancingUVs = uvs ?? DEFAULT_UVS;
+        this.geometrySourceUrl = sourceUrl;
+        this.rendererSettings.instancingNormals = normals ?? ParticleSystem.createFallbackNormals(positions);
         this.neededToUpdateRender = true;
     }
 
@@ -1229,14 +1261,23 @@ export class ParticleSystem implements IParticleSystem {
 
     private ensureGeometryMeta(meta: BabylonMetaData): string {
         const geometryUUID = ParticleSystem.nextSerializationId('quarks_geometry');
-        meta.geometries[geometryUUID] = {
-            uuid: geometryUUID,
-            type: 'QuarksGeometry',
-            positions: Array.from(this.rendererSettings.instancingGeometry),
-            indices: Array.from(this.rendererSettings.instancingIndices),
-            uvs: this.rendererSettings.instancingUVs ? Array.from(this.rendererSettings.instancingUVs) : undefined,
-            normals: this.rendererSettings.instancingNormals ? Array.from(this.rendererSettings.instancingNormals) : undefined,
-        };
+        // Geometry loaded from an external glTF/GLB URL (see updateInstancingGeometry) is
+        // re-exported as a compact reference instead of re-inlining the whole mesh — this is
+        // what keeps effect JSON small for meshes that already live at a stable URL.
+        meta.geometries[geometryUUID] = this.geometrySourceUrl
+            ? {
+                  uuid: geometryUUID,
+                  type: 'GLTFGeometry',
+                  url: this.geometrySourceUrl,
+              }
+            : {
+                  uuid: geometryUUID,
+                  type: 'QuarksGeometry',
+                  positions: Array.from(this.rendererSettings.instancingGeometry),
+                  indices: Array.from(this.rendererSettings.instancingIndices),
+                  uvs: this.rendererSettings.instancingUVs ? Array.from(this.rendererSettings.instancingUVs) : undefined,
+                  normals: this.rendererSettings.instancingNormals ? Array.from(this.rendererSettings.instancingNormals) : undefined,
+              };
         return geometryUUID;
     }
 

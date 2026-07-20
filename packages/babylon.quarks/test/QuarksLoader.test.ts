@@ -3,6 +3,8 @@ import {Constants} from '@babylonjs/core/Engines/constants';
 import {Scene} from '@babylonjs/core/scene';
 import {Matrix, Quaternion, Vector3} from '@babylonjs/core/Maths/math.vector';
 import {Mesh} from '@babylonjs/core/Meshes/mesh';
+import {VertexData} from '@babylonjs/core/Meshes/mesh.vertexData';
+import {SceneLoader} from '@babylonjs/core/Loading/sceneLoader';
 import {Texture} from '@babylonjs/core/Materials/Textures/texture';
 import {loadPlugin} from 'quarks.core';
 import {QuarksLoader} from '../src/QuarksLoader';
@@ -875,5 +877,141 @@ describe('QuarksLoader matrix decomposition', () => {
 
         scene.dispose();
         engine.dispose();
+    });
+
+    describe('GLTFGeometry (external glTF/GLB geometry URLs)', () => {
+        function meshRenderEnvelope(geometryUuid: string, meshName?: string) {
+            return {
+                geometries: [{uuid: geometryUuid, type: 'GLTFGeometry', url: 'models/leaf.glb', meshName}],
+                object: {
+                    uuid: 'root',
+                    type: 'ParticleEmitter',
+                    ps: {
+                        version: '3.0',
+                        autoDestroy: false,
+                        looping: true,
+                        prewarm: false,
+                        duration: 1,
+                        shape: {type: 'point'},
+                        startLife: {type: 'ConstantValue', value: 1},
+                        startSpeed: {type: 'ConstantValue', value: 0},
+                        startRotation: {type: 'ConstantValue', value: 0},
+                        startSize: {type: 'ConstantValue', value: 1},
+                        startColor: {type: 'ConstantColor', color: {r: 1, g: 1, b: 1, a: 1}},
+                        emissionOverTime: {type: 'ConstantValue', value: 0},
+                        emissionOverDistance: {type: 'ConstantValue', value: 0},
+                        emissionBursts: [],
+                        onlyUsedByOther: false,
+                        instancingGeometry: geometryUuid,
+                        renderOrder: 0,
+                        renderMode: 2, // Mesh
+                        rendererEmitterSettings: {},
+                        layers: 1,
+                        startTileIndex: {type: 'ConstantValue', value: 0},
+                        uTileCount: 1,
+                        vTileCount: 1,
+                        blendTiles: false,
+                        softParticles: false,
+                        softFarFade: 0,
+                        softNearFade: 0,
+                        behaviors: [],
+                        worldSpace: true,
+                    },
+                },
+            };
+        }
+
+        function makeImportedMesh(scene: Scene): Mesh {
+            const mesh = new Mesh('imported', scene);
+            const vertexData = new VertexData();
+            vertexData.positions = [0, 1, 0, -1, -1, 0, 1, -1, 0];
+            vertexData.indices = [0, 1, 2];
+            vertexData.uvs = [0.5, 1, 0, 0, 1, 0];
+            vertexData.normals = [0, 0, 1, 0, 0, 1, 0, 0, 1];
+            vertexData.applyToMesh(mesh, true);
+            return mesh;
+        }
+
+        afterEach(() => {
+            jest.restoreAllMocks();
+        });
+
+        it('starts with an empty placeholder and pops in real geometry once the glTF resolves', async () => {
+            const engine = new NullEngine();
+            const scene = new Scene(engine);
+            const importedMesh = makeImportedMesh(scene);
+            const skeleton = {dispose: jest.fn()};
+            const transformNode = {dispose: jest.fn()};
+            const importSpy = jest.spyOn(SceneLoader, 'ImportMeshAsync').mockResolvedValue({
+                meshes: [importedMesh],
+                particleSystems: [],
+                skeletons: [skeleton],
+                animationGroups: [],
+                transformNodes: [transformNode],
+                lights: [],
+            } as any);
+
+            const loader = new QuarksLoader(scene);
+            // meshName picks the mesh by name out of the imported result (exercises the meshName lookup path).
+            const root = loader.parse(meshRenderEnvelope('ext-geo', 'imported'), 'https://cdn.example.com/effects/') as ParticleEmitter;
+            const system = root.system as ParticleSystem;
+
+            expect(system.instancingGeometry.length).toBe(0);
+
+            await new Promise((resolve) => setTimeout(resolve, 0));
+
+            expect(Array.from(system.instancingGeometry)).toEqual([0, 1, 0, -1, -1, 0, 1, -1, 0]);
+            expect(Array.from(system.getRendererSettings().instancingIndices as Uint32Array)).toEqual([0, 1, 2]);
+            expect((system as any).geometrySourceUrl).toBe('https://cdn.example.com/effects/models/leaf.glb');
+            expect(importSpy).toHaveBeenCalledWith('', 'https://cdn.example.com/effects/models/', 'leaf.glb', scene);
+            expect(skeleton.dispose).toHaveBeenCalled();
+            expect(transformNode.dispose).toHaveBeenCalled();
+
+            scene.dispose();
+            engine.dispose();
+        });
+
+        it('re-exports GLTFGeometry-sourced geometry as a URL reference instead of inlining it', async () => {
+            const engine = new NullEngine();
+            const scene = new Scene(engine);
+            const importedMesh = makeImportedMesh(scene);
+            jest
+                .spyOn(SceneLoader, 'ImportMeshAsync')
+                .mockResolvedValue({meshes: [importedMesh], particleSystems: [], skeletons: [], animationGroups: [], transformNodes: [], lights: []} as any);
+
+            const loader = new QuarksLoader(scene, {baseUrl: ''});
+            const root = loader.parse(meshRenderEnvelope('ext-geo')) as ParticleEmitter;
+            await new Promise((resolve) => setTimeout(resolve, 0));
+
+            const meta: any = {geometries: {}, materials: {}, textures: {}, images: {}};
+            (root.system as ParticleSystem).toJSON(meta);
+            const geometryEntries = Object.values(meta.geometries) as any[];
+
+            expect(geometryEntries).toHaveLength(1);
+            expect(geometryEntries[0]).toMatchObject({type: 'GLTFGeometry', url: 'models/leaf.glb'});
+            expect(geometryEntries[0].positions).toBeUndefined();
+
+            scene.dispose();
+            engine.dispose();
+        });
+
+        it('leaves the placeholder empty and logs an error when the glTF fails to load', async () => {
+            const engine = new NullEngine();
+            const scene = new Scene(engine);
+            jest.spyOn(SceneLoader, 'ImportMeshAsync').mockRejectedValue(new Error('network error'));
+            const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+            const loader = new QuarksLoader(scene, {baseUrl: ''});
+            const root = loader.parse(meshRenderEnvelope('ext-geo')) as ParticleEmitter;
+            const system = root.system as ParticleSystem;
+
+            await new Promise((resolve) => setTimeout(resolve, 0));
+
+            expect(system.instancingGeometry.length).toBe(0);
+            expect(errorSpy).toHaveBeenCalled();
+
+            scene.dispose();
+            engine.dispose();
+        });
     });
 });

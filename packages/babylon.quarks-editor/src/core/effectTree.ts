@@ -51,6 +51,11 @@ interface SerializeMeta {
     geometries: {[k: string]: unknown};
 }
 
+export interface SerializeEffectOptions {
+    /** When true, the output JSON has no indentation (smaller file, not human-readable). */
+    minify?: boolean;
+}
+
 function localMatrix(node: TransformNode): number[] {
     const rotation = node.rotationQuaternion ?? Quaternion.FromEulerVector(node.rotation);
     return Matrix.Compose(node.scaling, rotation, node.position).asArray().slice();
@@ -81,19 +86,19 @@ function serializeNode(tree: EffectTreeNode, meta: SerializeMeta, fallbackUuid: 
  * Serializes an effect tree into the Quarks JSON envelope understood by QuarksLoader,
  * preserving the group/emitter hierarchy (not flattened).
  */
-export function serializeEffectTree(root: TransformNode, name = 'effect'): string {
+export function serializeEffectTree(root: TransformNode, name = 'effect', options?: SerializeEffectOptions): string {
     const meta: SerializeMeta = {textures: {}, materials: {}, geometries: {}};
     const object = serializeNode(buildEffectTree(root), meta, `${name}-node`);
-    return finishEnvelope(object, meta);
+    return finishEnvelope(object, meta, options);
 }
 
 /**
  * Serializes several effect roots as children of a synthetic group — used when an effect
  * spans multiple top-level trees (e.g. a demo running several loaded effects at once).
  */
-export function serializeEffectForest(roots: TransformNode[], name = 'effect'): string {
+export function serializeEffectForest(roots: TransformNode[], name = 'effect', options?: SerializeEffectOptions): string {
     if (roots.length === 1) {
-        return serializeEffectTree(roots[0], name);
+        return serializeEffectTree(roots[0], name, options);
     }
     const meta: SerializeMeta = {textures: {}, materials: {}, geometries: {}};
     const children = roots.map((root, i) => serializeNode(buildEffectTree(root), meta, `${name}-node-${i}`));
@@ -105,11 +110,11 @@ export function serializeEffectForest(roots: TransformNode[], name = 'effect'): 
         matrix: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1],
         children,
     };
-    return finishEnvelope(object, meta);
+    return finishEnvelope(object, meta, options);
 }
 
 /** Flattens accumulated meta and wraps the serialized object into the Quarks envelope. */
-function finishEnvelope(object: Record<string, unknown>, meta: SerializeMeta): string {
+function finishEnvelope(object: Record<string, unknown>, meta: SerializeMeta, options?: SerializeEffectOptions): string {
     // toJSON stashes live Texture instances and material records in meta; flatten them into
     // the serializable images/textures/materials arrays QuarksLoader expects.
     const images: Array<{uuid: string; url: string}> = [];
@@ -139,6 +144,6 @@ function finishEnvelope(object: Record<string, unknown>, meta: SerializeMeta): s
             object,
         },
         null,
-        2
+        options?.minify ? undefined : 2
     );
 }
