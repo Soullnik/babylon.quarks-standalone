@@ -28,7 +28,7 @@ export async function init({scene, camera, batchRenderer, systems, demoState}: D
     wall.position = wallCenter;
 
     const loader = new QuarksLoader(scene, {baseUrl: ""});
-    const root = await loader.load("gunFireBlue.json");
+    const root = await loader.load("GunFirePurple.json");
     root.parent = batchRenderer;
     // Emitter sits at the exact same point as the wall's center, so any
     // particle ending up on the far side from the camera should be hidden
