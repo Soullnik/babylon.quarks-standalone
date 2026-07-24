@@ -4,6 +4,7 @@ import type {Scene} from "@babylonjs/core/scene";
 import {Mesh} from "@babylonjs/core/Meshes/mesh";
 import {CreatePlane} from "@babylonjs/core/Meshes/Builders/planeBuilder";
 import {StandardMaterial} from "@babylonjs/core/Materials/standardMaterial";
+import {Material} from "@babylonjs/core/Materials/material";
 import {Texture} from "@babylonjs/core/Materials/Textures/texture";
 import type {Color3} from "@babylonjs/core/Maths/math.color";
 import characterUrl from "../assets/character.png";
@@ -35,6 +36,12 @@ export function makeCharacterBillboard(name: string, scene: Scene, tint: Color3)
     material.disableLighting = true;
     material.emissiveColor = tint;
     material.backFaceCulling = false;
+    // Alpha-TEST (cutout) instead of alpha-blend: Babylon renders alpha-tested
+    // materials in the opaque pass (normal depth write, no transparent-list
+    // sort), so this occludes/gets occluded by particles exactly like a plain
+    // opaque plane — no more all-or-nothing depending on mesh sort order.
+    material.transparencyMode = Material.MATERIAL_ALPHATEST;
+    material.alphaCutOff = 0.5;
     mesh.material = material;
 
     return mesh;
