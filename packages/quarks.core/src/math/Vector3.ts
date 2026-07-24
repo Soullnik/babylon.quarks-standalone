@@ -8,10 +8,10 @@ class Vector3 {
     x: number;
     y: number;
     z: number;
-    readonly isVector3 = true;
+    // Set once on the prototype (see bottom of file) instead of per instance:
+    // vectors are allocated in hot loops, so the constructor stays minimal.
+    declare readonly isVector3: boolean;
     constructor(x = 0, y = 0, z = 0) {
-        (Vector3.prototype as any).isVector3 = true;
-
         this.x = x;
         this.y = y;
         this.z = z;
@@ -603,6 +603,8 @@ class Vector3 {
         yield this.z;
     }
 }
+
+(Vector3.prototype as any).isVector3 = true;
 
 const _vector = /*@__PURE__*/ new Vector3();
 const _quaternion = /*@__PURE__*/ new Quaternion();

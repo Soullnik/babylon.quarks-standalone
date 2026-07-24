@@ -13,17 +13,38 @@ import {
 export class SizeOverLife implements Behavior {
     type = 'SizeOverLife';
 
-    initialize(particle: Particle): void {
-        this.size.startGen(particle.memory);
+    private _size!: FunctionValueGenerator | Vector3Generator;
+    // Cached so the per-particle update does not repeat the instanceof test.
+    private _sizeIsVector3 = false;
+
+    constructor(size: FunctionValueGenerator | Vector3Generator) {
+        this.size = size;
     }
 
-    constructor(public size: FunctionValueGenerator | Vector3Generator) {}
+    get size(): FunctionValueGenerator | Vector3Generator {
+        return this._size;
+    }
+
+    set size(size: FunctionValueGenerator | Vector3Generator) {
+        this._size = size;
+        this._sizeIsVector3 = size instanceof Vector3Function;
+    }
+
+    initialize(particle: Particle): void {
+        this._size.startGen(particle.memory);
+    }
 
     update(particle: Particle): void {
-        if (this.size instanceof Vector3Function) {
-            this.size.genValue(particle.memory, particle.size, particle.age / particle.life).multiply(particle.startSize);
+        const t = particle.age / particle.life;
+        if (this._sizeIsVector3) {
+            (this._size as Vector3Function).genValue(particle.memory, particle.size, t).multiply(particle.startSize);
         } else {
-            particle.size.copy(particle.startSize).multiplyScalar((this.size as FunctionValueGenerator).genValue(particle.memory, particle.age / particle.life));
+            const scale = (this._size as FunctionValueGenerator).genValue(particle.memory, t);
+            const size = particle.size;
+            const startSize = particle.startSize;
+            size.x = startSize.x * scale;
+            size.y = startSize.y * scale;
+            size.z = startSize.z * scale;
         }
     }
     toJSON(): any {

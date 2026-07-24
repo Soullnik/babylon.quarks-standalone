@@ -9,11 +9,9 @@ export const WebGPUCoordinateSystem = 2001;
 
 class Matrix4 {
     elements: number[];
-    readonly isMatrix4 = true;
+    declare readonly isMatrix4: boolean;
 
     constructor(n11?: number, n12?: number, n13?: number, n14?: number, n21?: number, n22?: number, n23?: number, n24?: number, n31?: number, n32?: number, n33?: number, n34?: number, n41?: number, n42?: number, n43?: number, n44?: number) {
-        (Matrix4.prototype as any).isMatrix4 = true;
-
         this.elements = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
 
         if (n11 !== undefined) {
@@ -1032,6 +1030,8 @@ class Matrix4 {
         return array;
     }
 }
+
+(Matrix4.prototype as any).isMatrix4 = true;
 
 const _v1 = /*@__PURE__*/ new Vector3();
 const _m1 = /*@__PURE__*/ new Matrix4();

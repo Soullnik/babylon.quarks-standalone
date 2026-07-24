@@ -24,7 +24,12 @@ export class ApplyForce implements Behavior {
     initialize(particle: Particle): void {}
 
     update(particle: Particle, delta: number): void {
-        particle.velocity.addScaledVector(this.direction, this.magnitudeValue * delta);
+        const scale = this.magnitudeValue * delta;
+        const direction = this.direction;
+        const velocity = particle.velocity;
+        velocity.x += direction.x * scale;
+        velocity.y += direction.y * scale;
+        velocity.z += direction.z * scale;
     }
 
     frameUpdate(delta: number): void {

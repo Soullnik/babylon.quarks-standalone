@@ -9,11 +9,9 @@ class Quaternion {
 	_y: number;
 	_z: number;
 	_w: number;
-	isQuaternion: boolean;
+	declare readonly isQuaternion: boolean;
 
 	constructor( x = 0, y = 0, z = 0, w = 1 ) {
-
-		this.isQuaternion = true;
 
 		this._x = x;
 		this._y = y;
@@ -692,5 +690,7 @@ class Quaternion {
 	}
 
 }
+
+( Quaternion.prototype as any ).isQuaternion = true;
 
 export { Quaternion };

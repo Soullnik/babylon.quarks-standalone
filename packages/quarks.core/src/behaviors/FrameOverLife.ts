@@ -7,15 +7,31 @@ import {FunctionValueGenerator, PiecewiseBezier, ValueGeneratorFromJSON} from '.
  */
 export class FrameOverLife implements Behavior {
     type = 'FrameOverLife';
-    constructor(public frame: FunctionValueGenerator) {}
+
+    private _frame!: FunctionValueGenerator;
+    // Cached so the per-particle update does not repeat the instanceof test.
+    private _frameIsBezier = false;
+
+    constructor(frame: FunctionValueGenerator) {
+        this.frame = frame;
+    }
+
+    get frame(): FunctionValueGenerator {
+        return this._frame;
+    }
+
+    set frame(frame: FunctionValueGenerator) {
+        this._frame = frame;
+        this._frameIsBezier = frame instanceof PiecewiseBezier;
+    }
 
     initialize(particle: Particle): void {
-        this.frame.startGen(particle.memory);
+        this._frame.startGen(particle.memory);
     }
 
     update(particle: Particle, delta: number): void {
-        if (this.frame instanceof PiecewiseBezier) {
-            particle.uvTile = this.frame.genValue(particle.memory, particle.age / particle.life);
+        if (this._frameIsBezier) {
+            particle.uvTile = this._frame.genValue(particle.memory, particle.age / particle.life);
         }
     }
 

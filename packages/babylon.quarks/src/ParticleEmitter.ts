@@ -5,14 +5,26 @@ import {Matrix4, IParticleSystem, SerializationOptions} from 'quarks.core';
 export class ParticleEmitter extends TransformNode {
     system: IParticleSystem;
     private _matrixWorld: Matrix4 = new Matrix4();
+    private _matrixWorldFlag = -1;
 
+    /**
+     * The node's world matrix in quarks.core form. Mirrored from Babylon's
+     * matrix only when that matrix actually changed (tracked by its
+     * `updateFlag`), so repeated reads inside a frame are free.
+     */
     get matrixWorld(): Matrix4 {
         const m = this.getWorldMatrix();
+        const flag = m.updateFlag;
+        if (flag === this._matrixWorldFlag) {
+            return this._matrixWorld;
+        }
+        this._matrixWorldFlag = flag;
         const e = this._matrixWorld.elements;
-        e[0] = m.m[0]; e[1] = m.m[1]; e[2] = m.m[2]; e[3] = m.m[3];
-        e[4] = m.m[4]; e[5] = m.m[5]; e[6] = m.m[6]; e[7] = m.m[7];
-        e[8] = m.m[8]; e[9] = m.m[9]; e[10] = m.m[10]; e[11] = m.m[11];
-        e[12] = m.m[12]; e[13] = m.m[13]; e[14] = m.m[14]; e[15] = m.m[15];
+        const s = m.m;
+        e[0] = s[0]; e[1] = s[1]; e[2] = s[2]; e[3] = s[3];
+        e[4] = s[4]; e[5] = s[5]; e[6] = s[6]; e[7] = s[7];
+        e[8] = s[8]; e[9] = s[9]; e[10] = s[10]; e[11] = s[11];
+        e[12] = s[12]; e[13] = s[13]; e[14] = s[14]; e[15] = s[15];
         return this._matrixWorld;
     }
 

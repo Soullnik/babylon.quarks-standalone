@@ -13,6 +13,7 @@ import {
     Matrix3,
     SpriteParticle,
     StretchedBillBoardSettings,
+    IParticleSystem,
 } from 'quarks.core';
 import {VFXBatch, RenderMode} from './VFXBatch';
 import {VFXBatchSettings} from './BatchedRenderer';
@@ -29,6 +30,9 @@ export class SpriteBatch extends VFXBatch {
     private colorBuffer!: Float32Array;
     private uvTileBuffer!: Float32Array;
     private velocityBuffer?: Float32Array;
+
+    /** Concretely typed handle on the batch material, see syncStretchedSpeedFactor. */
+    private shaderMaterial: ShaderMaterial | null = null;
 
     private offsetVB!: VertexBuffer;
     private rotationVB!: VertexBuffer;
@@ -61,6 +65,18 @@ export class SpriteBatch extends VFXBatch {
         vertexData.applyToMesh(this.mesh, false);
 
         this.buildExpandableBuffers();
+    }
+
+    /** Releases the instance vertex buffers so a resize does not leak GPU memory. */
+    private disposeExpandableBuffers(): void {
+        this.offsetVB?.dispose();
+        this.colorVB?.dispose();
+        this.sizeVB?.dispose();
+        this.uvTileVB?.dispose();
+        this.rotationVB?.dispose();
+        this.velocityVB?.dispose();
+        this.velocityVB = undefined;
+        this.velocityBuffer = undefined;
     }
 
     private buildExpandableBuffers(): void {
@@ -105,11 +121,15 @@ export class SpriteBatch extends VFXBatch {
         while (target >= this.maxParticles) {
             this.maxParticles *= 2;
         }
+        this.disposeExpandableBuffers();
         this.buildExpandableBuffers();
     }
 
     rebuildMaterial(): void {
-        const shaderName = `quarksParticle_${this.settings.renderMode}_${Date.now()}`;
+        // The shader sources only depend on the render mode, so the store entry is
+        // registered once per mode. A unique name per rebuild would leak entries in
+        // Effect.ShadersStore and defeat Babylon's compiled-effect cache.
+        const shaderName = `quarksParticle_${this.settings.renderMode}`;
         this.lastStretchedSpeedFactor = Number.NaN;
         let vertexShader: string;
         let fragmentShader: string;
@@ -209,10 +229,14 @@ export class SpriteBatch extends VFXBatch {
         }
         if (this.settings.softParticles) {
             mat.setVector2('softParams', new BVector2(this.settings.softNearFade, 1.0 / Math.max(this.settings.softFarFade - this.settings.softNearFade, 0.0001)));
+            // Reused across binds: this runs on every draw call.
+            const projParams = new BVector4(0, 0, 0, 0);
             mat.onBindObservable.add(() => {
                 const camera = this.scene.activeCamera;
                 if (camera) {
-                    mat.setVector4('projParams', new BVector4(camera.minZ, camera.maxZ, 0, 0));
+                    projParams.x = camera.minZ;
+                    projParams.y = camera.maxZ;
+                    mat.setVector4('projParams', projParams);
                 }
             });
         }
@@ -237,6 +261,7 @@ export class SpriteBatch extends VFXBatch {
         mat.disableDepthWrite = !this.settings.materialDepthWrite;
 
         this.mesh.material = mat;
+        this.shaderMaterial = mat;
     }
 
     private vector_ = new Vector3();
@@ -257,25 +282,36 @@ export class SpriteBatch extends VFXBatch {
         const isStretchedRender = renderMode === RenderMode.StretchedBillBoard;
 
         const visibleSystems = this.getVisibleSystems();
-        for (const system of visibleSystems) {
-            particleCount += system.particleNum;
+        for (let i = 0; i < visibleSystems.length; i++) {
+            particleCount += visibleSystems[i].particleNum;
         }
         if (particleCount > this.maxParticles) {
             this.expandBuffers(particleCount);
         }
 
-        for (const system of visibleSystems) {
+        for (let s = 0; s < visibleSystems.length; s++) {
+            const system = visibleSystems[s];
             const particles = system.particles;
             const particleNum = system.particleNum;
             const rotation = this.quaternion2_;
             const translation = this.vector2_;
             const scale = this.vector3_;
             const systemWorldSpace = system.worldSpace;
-            system.emitter.matrixWorld.decompose(translation, rotation, scale);
-            this.rotationMat_.setFromMatrix4(system.emitter.matrixWorld);
+            const emitterMatrix = system.emitter.matrixWorld;
+            emitterMatrix.decompose(translation, rotation, scale);
+            this.rotationMat_.setFromMatrix4(emitterMatrix);
             const absScaleX = Math.abs(scale.x);
             const absScaleY = Math.abs(scale.y);
             const absScaleZ = Math.abs(scale.z);
+            // Stretched-billboard settings are per system, not per particle.
+            const stretchedSettings = isStretchedRender
+                ? (system.rendererEmitterSettings as StretchedBillBoardSettings)
+                : undefined;
+            const speedFactor =
+                stretchedSettings === undefined || stretchedSettings.speedFactor === 0
+                    ? 0.001
+                    : stretchedSettings.speedFactor;
+            const lengthFactor = stretchedSettings?.lengthFactor ?? 0;
 
             for (let j = 0; j < particleNum; j++, index++) {
                 const particle = particles[j] as SpriteParticle;
@@ -303,52 +339,51 @@ export class SpriteBatch extends VFXBatch {
                     this.rotationBuffer[index] = particle.rotation as number;
                 }
 
-                let vec: Vector3;
-                if (systemWorldSpace) {
-                    vec = particle.position;
-                } else {
-                    vec = this.vector_;
-                    if (particle.parentMatrix) {
-                        vec.copy(particle.position).applyMatrix4(particle.parentMatrix);
-                    } else {
-                        vec.copy(particle.position).applyMatrix4(system.emitter.matrixWorld);
-                    }
+                const position = particle.position;
+                let px = position.x;
+                let py = position.y;
+                let pz = position.z;
+                if (!systemWorldSpace) {
+                    // Inlined point transform: this is the default (local space)
+                    // path and runs for every particle every frame.
+                    const me = (particle.parentMatrix ?? emitterMatrix).elements;
+                    const w = 1 / (me[3] * px + me[7] * py + me[11] * pz + me[15]);
+                    const tx = (me[0] * px + me[4] * py + me[8] * pz + me[12]) * w;
+                    const ty = (me[1] * px + me[5] * py + me[9] * pz + me[13]) * w;
+                    pz = (me[2] * px + me[6] * py + me[10] * pz + me[14]) * w;
+                    px = tx;
+                    py = ty;
                 }
 
                 const oi = index * 3;
-                this.offsetBuffer[oi] = vec.x;
-                this.offsetBuffer[oi + 1] = vec.y;
-                this.offsetBuffer[oi + 2] = vec.z;
+                this.offsetBuffer[oi] = px;
+                this.offsetBuffer[oi + 1] = py;
+                this.offsetBuffer[oi + 2] = pz;
 
+                const color = particle.color;
                 const ci = index * 4;
-                this.colorBuffer[ci] = particle.color.x;
-                this.colorBuffer[ci + 1] = particle.color.y;
-                this.colorBuffer[ci + 2] = particle.color.z;
-                this.colorBuffer[ci + 3] = particle.color.w;
+                this.colorBuffer[ci] = color.x;
+                this.colorBuffer[ci + 1] = color.y;
+                this.colorBuffer[ci + 2] = color.z;
+                this.colorBuffer[ci + 3] = color.w;
 
+                const size = particle.size;
                 const si = index * 3;
-                if (systemWorldSpace) {
-                    this.sizeBuffer[si] = particle.size.x;
-                    this.sizeBuffer[si + 1] = particle.size.y;
-                    this.sizeBuffer[si + 2] = particle.size.z;
+                // Particle size is already in world units when the system is in world
+                // space or the particle carries its own parent transform.
+                if (systemWorldSpace || particle.parentMatrix) {
+                    this.sizeBuffer[si] = size.x;
+                    this.sizeBuffer[si + 1] = size.y;
+                    this.sizeBuffer[si + 2] = size.z;
                 } else {
-                    if (particle.parentMatrix) {
-                        this.sizeBuffer[si] = particle.size.x;
-                        this.sizeBuffer[si + 1] = particle.size.y;
-                        this.sizeBuffer[si + 2] = particle.size.z;
-                    } else {
-                        this.sizeBuffer[si] = particle.size.x * absScaleX;
-                        this.sizeBuffer[si + 1] = particle.size.y * absScaleY;
-                        this.sizeBuffer[si + 2] = particle.size.z * absScaleZ;
-                    }
+                    this.sizeBuffer[si] = size.x * absScaleX;
+                    this.sizeBuffer[si + 1] = size.y * absScaleY;
+                    this.sizeBuffer[si + 2] = size.z * absScaleZ;
                 }
 
                 this.uvTileBuffer[index] = particle.uvTile;
 
                 if (isStretchedRender && this.velocityBuffer) {
-                    let speedFactor = (system.rendererEmitterSettings as StretchedBillBoardSettings).speedFactor;
-                    if (speedFactor === 0) speedFactor = 0.001;
-                    const lengthFactor = (system.rendererEmitterSettings as StretchedBillBoardSettings).lengthFactor;
                     let vel: Vector3;
                     if (systemWorldSpace) {
                         vel = particle.velocity;
@@ -370,13 +405,8 @@ export class SpriteBatch extends VFXBatch {
             }
         }
 
-        if (isStretchedRender && this.mesh.material instanceof ShaderMaterial && visibleSystems.length > 0) {
-            const speedFactor = (visibleSystems[0].rendererEmitterSettings as StretchedBillBoardSettings).speedFactor ?? 1.0;
-            const clampedSpeedFactor = speedFactor === 0 ? 0.001 : speedFactor;
-            if (clampedSpeedFactor !== this.lastStretchedSpeedFactor) {
-                this.mesh.material.setFloat('speedFactor', clampedSpeedFactor);
-                this.lastStretchedSpeedFactor = clampedSpeedFactor;
-            }
+        if (isStretchedRender && visibleSystems.length > 0) {
+            this.syncStretchedSpeedFactor(visibleSystems[0]);
         }
 
         // Keep the mesh enabled even when count is 0 — toggling visibility off for a
@@ -388,13 +418,36 @@ export class SpriteBatch extends VFXBatch {
             return;
         }
 
-        this.offsetVB.update(this.offsetBuffer);
-        this.sizeVB.update(this.sizeBuffer);
-        this.colorVB.update(this.colorBuffer);
-        this.uvTileVB.update(this.uvTileBuffer);
-        this.rotationVB.update(this.rotationBuffer);
+        // Upload only the slots actually filled this frame: the buffers are sized
+        // for the high-water mark and are usually far larger than the live count.
+        this.offsetVB.update(this.offsetBuffer.subarray(0, index * 3));
+        this.sizeVB.update(this.sizeBuffer.subarray(0, index * 3));
+        this.colorVB.update(this.colorBuffer.subarray(0, index * 4));
+        this.uvTileVB.update(this.uvTileBuffer.subarray(0, index));
+        this.rotationVB.update(this.rotationBuffer.subarray(0, isMeshRender ? index * 4 : index));
         if (isStretchedRender && this.velocityVB && this.velocityBuffer) {
-            this.velocityVB.update(this.velocityBuffer);
+            this.velocityVB.update(this.velocityBuffer.subarray(0, index * 4));
+        }
+    }
+
+    /**
+     * Pushes the stretched-billboard speed factor to the shader when it changed.
+     *
+     * Deliberately kept out of `update`: touching the loosely typed
+     * `mesh.material` from inside that function gives V8 a generic property
+     * access it has no feedback for, which knocks the whole particle loop out of
+     * optimised code on every frame.
+     */
+    private syncStretchedSpeedFactor(system: IParticleSystem): void {
+        const material = this.shaderMaterial;
+        if (material === null) {
+            return;
+        }
+        const speedFactor = (system.rendererEmitterSettings as StretchedBillBoardSettings).speedFactor ?? 1.0;
+        const clampedSpeedFactor = speedFactor === 0 ? 0.001 : speedFactor;
+        if (clampedSpeedFactor !== this.lastStretchedSpeedFactor) {
+            material.setFloat('speedFactor', clampedSpeedFactor);
+            this.lastStretchedSpeedFactor = clampedSpeedFactor;
         }
     }
 

@@ -7,9 +7,11 @@ class Vector4 {
     y: number;
     z: number;
     w: number;
+    // Prototype-level marker (assigned once at the bottom of this file) so the
+    // constructor only writes the four components.
+    declare readonly isVector4: boolean;
 
     constructor(x: number = 0, y: number = 0, z: number = 0, w: number = 1) {
-        (Vector4.prototype as any).isVector4 = true;
         this.x = x;
         this.y = y;
         this.z = z;
@@ -532,5 +534,7 @@ class Vector4 {
         yield this.w;
     }
 }
+
+(Vector4.prototype as any).isVector4 = true;
 
 export {Vector4};

@@ -7,11 +7,17 @@ export abstract class PiecewiseFunction<T> {
     }
 
     findFunction(t: number): number {
-        let mid = 0;
-        let left = 0, right = this.functions.length - 1;
+        const functions = this.functions;
+        const last = functions.length - 1;
+        // Single-curve piecewise functions are the common case (one bezier over
+        // the whole [0, 1] range); resolve them without running the search.
+        if (last <= 0) {
+            return last === 0 && t >= functions[0][1] && t <= 1 ? 0 : -1;
+        }
+        let left = 0, right = last;
         while (left + 1 < right) {
-            mid = Math.floor((left + right) / 2);
-            if (t < this.getStartX(mid))
+            const mid = (left + right) >> 1;
+            if (t < functions[mid][1])
                 right = mid - 1;
             else if (t > this.getEndX(mid))
                 left = mid + 1;
@@ -19,7 +25,7 @@ export abstract class PiecewiseFunction<T> {
                 return mid;
         }
         for (let i = left; i <= right; i ++) {
-            if (t >= this.functions[i][1] && t <= this.getEndX(i))
+            if (t >= functions[i][1] && t <= this.getEndX(i))
                 return i;
         }
         return -1;

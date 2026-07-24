@@ -218,7 +218,6 @@ export class ParticleSystem implements IParticleSystem {
     private readonly layerMaskProxy: {mask: number};
     private materialRef: any = null;
     private qualityFactor = 1;
-    private useFastTrailHistory = true;
     private simulationAccumulator = 0;
     private destroyed = false;
     /** @internal **/
@@ -520,7 +519,6 @@ export class ParticleSystem implements IParticleSystem {
         this.emissionOverDistance.startGen(this.memory);
         this.startDelay.startGen(this.memory);
         this.startDelayTimeLeft = this.startDelay.genValue(this.memory, 0);
-        this.refreshTrailHistoryMode();
 
         this.emitEnded = false;
         this.markForDestroy = false;
@@ -600,84 +598,23 @@ export class ParticleSystem implements IParticleSystem {
     play() { this.paused = false; }
     stop() { this.restart(); this.pause(); }
 
-    private refreshTrailHistoryMode() {
-        this.useFastTrailHistory = !this.behaviors.some((behavior) => (behavior as any).type === 'WidthOverLength');
-    }
-
-    private ensureTrailHistoryCapacity(particle: TrailParticle, capacity: number) {
-        const trailAny = particle as any;
-        if (trailAny._trailHistoryCapacity === capacity && trailAny._trailHistoryPositions) {
-            return;
-        }
-        trailAny._trailHistoryCapacity = capacity;
-        trailAny._trailHistoryPositions = new Float32Array(capacity * 3);
-        trailAny._trailHistorySizes = new Float32Array(capacity);
-        trailAny._trailHistoryColors = new Float32Array(capacity * 4);
-        trailAny._trailHistoryHead = 0;
-        trailAny._trailHistoryCount = 0;
-    }
-
-    private resetTrailHistory(particle: TrailParticle) {
-        const trailAny = particle as any;
-        trailAny._trailHistoryHead = 0;
-        trailAny._trailHistoryCount = 0;
-    }
-
-    private getTrailHistoryCount(particle: TrailParticle): number {
-        const trailAny = particle as any;
-        const fastHistoryCount = trailAny._trailHistoryCount;
-        if (typeof fastHistoryCount === 'number') {
-            return fastHistoryCount;
-        }
-        return particle.previous.length;
-    }
-
-    private updateFastTrailHistory(particle: TrailParticle) {
-        const trailAny = particle as any;
-        const capacity = Math.max(1, Math.ceil(particle.length));
-        this.ensureTrailHistoryCapacity(particle, capacity);
-        let head = trailAny._trailHistoryHead as number;
-        let count = trailAny._trailHistoryCount as number;
-        const positions = trailAny._trailHistoryPositions as Float32Array;
-        const sizes = trailAny._trailHistorySizes as Float32Array;
-        const colors = trailAny._trailHistoryColors as Float32Array;
-
-        if (particle.age <= particle.life) {
-            const posIndex = head * 3;
-            positions[posIndex] = particle.position.x;
-            positions[posIndex + 1] = particle.position.y;
-            positions[posIndex + 2] = particle.position.z;
-            sizes[head] = particle.size.x;
-            const colorIndex = head * 4;
-            colors[colorIndex] = particle.color.x;
-            colors[colorIndex + 1] = particle.color.y;
-            colors[colorIndex + 2] = particle.color.z;
-            colors[colorIndex + 3] = particle.color.w;
-            head = (head + 1) % capacity;
-            if (count < capacity) {
-                count++;
-            }
-        } else if (count > 0) {
-            count--;
-        }
-
-        trailAny._trailHistoryHead = head;
-        trailAny._trailHistoryCount = count;
-    }
-
     setQualityFactor(qualityFactor: number) {
         this.qualityFactor = Math.max(0.1, Math.min(1, qualityFactor));
     }
 
     private spawn(count: number, emissionState: EmissionState, matrix: Matrix4) {
-        tempQ.setFromRotationMatrix(matrix);
         const translation = tempV;
         const scale = tempV2;
+        // decompose writes tempQ, so no separate setFromRotationMatrix is needed.
         matrix.decompose(translation, tempQ, scale);
         const behaviors = this.behaviors;
         const behaviorCount = behaviors.length;
         const renderMode = this.rendererSettings.renderMode;
         const isTrailMode = renderMode === RenderMode.Trail;
+        const isSpriteMode = !isTrailMode;
+        const isMeshMode = renderMode === RenderMode.Mesh;
+        const startRotationIsRotation = this.startRotation.type === 'rotation';
+        const startSizeIsVector3 = this.startSize.type === 'vec3function';
         const timeRatio = emissionState.time / this.duration;
         const trailSettings = isTrailMode ? (this.rendererEmitterSettings as TrailSettings) : undefined;
         const followLocalOrigin = Boolean(trailSettings?.followLocalOrigin);
@@ -704,7 +641,7 @@ export class ParticleSystem implements IParticleSystem {
             particle.life = this.startLife.genValue(particle.memory, timeRatio);
             particle.age = 0;
             this.startSize.startGen(particle.memory);
-            if (this.startSize.type === 'vec3function') {
+            if (startSizeIsVector3) {
                 (this.startSize as Vector3Generator).genValue(particle.memory, particle.startSize, timeRatio);
             } else {
                 const size = (this.startSize as FunctionValueGenerator).genValue(particle.memory, timeRatio);
@@ -714,39 +651,42 @@ export class ParticleSystem implements IParticleSystem {
             particle.uvTile = this.startTileIndex.genValue(particle.memory);
             particle.size.copy(particle.startSize);
 
-            if (
-                this.rendererSettings.renderMode === RenderMode.Mesh ||
-                this.rendererSettings.renderMode === RenderMode.BillBoard ||
-                this.rendererSettings.renderMode === RenderMode.VerticalBillBoard ||
-                this.rendererSettings.renderMode === RenderMode.HorizontalBillBoard ||
-                this.rendererSettings.renderMode === RenderMode.StretchedBillBoard
-            ) {
+            if (isSpriteMode) {
                 const sprite = particle as SpriteParticle;
                 this.startRotation.startGen(particle.memory);
-                if (renderMode === RenderMode.Mesh) {
+                if (isMeshMode) {
                     if (!(sprite.rotation instanceof Quaternion)) {
                         sprite.rotation = new Quaternion();
                     }
-                    if (this.startRotation.type === 'rotation') {
-                        this.startRotation.genValue(particle.memory, sprite.rotation as Quaternion, 1, timeRatio);
+                    if (startRotationIsRotation) {
+                        (this.startRotation as RotationGenerator).genValue(
+                            particle.memory,
+                            sprite.rotation as Quaternion,
+                            1,
+                            timeRatio
+                        );
                     } else {
-                        (sprite.rotation as Quaternion).setFromAxisAngle(UP, this.startRotation.genValue(sprite.memory, timeRatio));
+                        (sprite.rotation as Quaternion).setFromAxisAngle(
+                            UP,
+                            (this.startRotation as FunctionValueGenerator).genValue(sprite.memory, timeRatio)
+                        );
                     }
                 } else {
-                    if (this.startRotation.type === 'rotation') {
+                    if (startRotationIsRotation) {
                         sprite.rotation = 0;
                     } else {
-                        sprite.rotation = this.startRotation.genValue(sprite.memory, timeRatio);
+                        sprite.rotation = (this.startRotation as FunctionValueGenerator).genValue(
+                            sprite.memory,
+                            timeRatio
+                        );
                     }
                 }
-            } else if (isTrailMode && trailSettings) {
+            } else if (trailSettings) {
                 const trail = particle as TrailParticle;
                 trailSettings.startLength.startGen(trail.memory);
                 trail.length = trailSettings.startLength.genValue(trail.memory, timeRatio);
-                if (this.useFastTrailHistory) {
-                    this.ensureTrailHistoryCapacity(trail, Math.max(1, Math.ceil(trail.length)));
-                    this.resetTrailHistory(trail);
-                }
+                trail.ensureHistoryCapacity(Math.max(1, Math.ceil(trail.length)));
+                trail.resetHistory();
             }
 
             this.emitterShape.initialize(particle, emissionState);
@@ -890,23 +830,25 @@ export class ParticleSystem implements IParticleSystem {
         }
 
         const particles = this.particles;
-        const behaviorCount = this.behaviors.length;
+        const behaviors = this.behaviors;
+        const behaviorCount = behaviors.length;
         const particleCount = this.particleNum;
+        const isTrailMode = this.rendererSettings.renderMode === RenderMode.Trail;
         this.emitterShape.update(this, delta);
         for (let j = 0; j < behaviorCount; j++) {
-            const behavior = this.behaviors[j];
+            const behavior = behaviors[j];
             behavior.frameUpdate(delta);
             for (let i = 0; i < particleCount; i++) {
                 const particle = particles[i];
-                if (!particle.died) {
+                // Inlined `died` — this runs once per behavior per particle.
+                if (particle.age < particle.life) {
                     behavior.update(particle, delta);
                 }
             }
         }
 
         const followLocalOrigin =
-            this.rendererSettings.renderMode === RenderMode.Trail &&
-            (this.rendererEmitterSettings as TrailSettings).followLocalOrigin;
+            isTrailMode && (this.rendererEmitterSettings as TrailSettings).followLocalOrigin;
         const emitterMatrix = this.emitter.matrixWorld;
         for (let i = 0; i < particleCount; i++) {
             const particle = particles[i];
@@ -923,29 +865,24 @@ export class ParticleSystem implements IParticleSystem {
             particle.age += delta;
         }
 
-        if (this.rendererSettings.renderMode === RenderMode.Trail) {
+        if (isTrailMode) {
             for (let i = 0; i < particleCount; i++) {
-                const trailParticle = particles[i] as TrailParticle;
-                if (this.useFastTrailHistory) {
-                    this.updateFastTrailHistory(trailParticle);
-                } else {
-                    trailParticle.update();
-                }
+                (particles[i] as TrailParticle).update();
             }
         }
 
+        const notifyDeaths = this.hasListeners('particleDied');
         let liveParticleCount = this.particleNum;
         for (let i = 0; i < liveParticleCount; i++) {
             const particle = particles[i];
-            if (
-                particle.died &&
-                (!(particle instanceof TrailParticle) || this.getTrailHistoryCount(particle as TrailParticle) === 0)
-            ) {
+            if (particle.age >= particle.life && (!isTrailMode || (particle as TrailParticle).historyCount === 0)) {
                 particles[i] = particles[liveParticleCount - 1];
                 particles[liveParticleCount - 1] = particle;
                 liveParticleCount--;
                 i--;
-                this.fire({type: 'particleDied', particleSystem: this, particle: particle});
+                if (notifyDeaths) {
+                    this.fire({type: 'particleDied', particleSystem: this, particle: particle});
+                }
             }
         }
         this.particleNum = liveParticleCount;
@@ -971,7 +908,9 @@ export class ParticleSystem implements IParticleSystem {
             if (this.looping) {
                 emissionState.time -= this.duration;
                 emissionState.burstIndex = 0;
-                this.behaviors.forEach((behavior) => behavior.reset());
+                for (let i = 0; i < this.behaviors.length; i++) {
+                    this.behaviors[i].reset();
+                }
             } else {
                 if (!this.emitEnded && !this.onlyUsedByOther) {
                     this.endEmit();
@@ -979,7 +918,11 @@ export class ParticleSystem implements IParticleSystem {
             }
         }
 
-        this.normalMatrix.getNormalMatrix(emitterMatrix);
+        // Only spawns in world space consume the normal matrix, and computing it
+        // inverts a 4x4 — skip it for local-space systems.
+        if (this.worldSpace) {
+            this.normalMatrix.getNormalMatrix(emitterMatrix);
+        }
         const emissionBursts = this.emissionBursts;
         const emissionBurstCount = emissionBursts.length;
         const qualityFactor = this.qualityFactor;
@@ -1319,7 +1262,6 @@ export class ParticleSystem implements IParticleSystem {
 
     addBehavior(behavior: Behavior) {
         this.behaviors.push(behavior);
-        this.refreshTrailHistoryMode();
     }
 
     getRendererSettings(): VFXBatchSettings {
@@ -1342,9 +1284,19 @@ export class ParticleSystem implements IParticleSystem {
         }
     }
 
+    /** True when at least one callback is registered for the event type. */
+    private hasListeners(event: ParticleSystemEventType): boolean {
+        const callbacks = this.listeners[event];
+        return callbacks !== undefined && callbacks.length > 0;
+    }
+
     private fire(event: ParticleSystemEvent) {
-        if (this.listeners[event.type]) {
-            this.listeners[event.type].forEach((callback) => callback(event));
+        const callbacks = this.listeners[event.type];
+        if (callbacks === undefined) {
+            return;
+        }
+        for (let i = 0; i < callbacks.length; i++) {
+            callbacks[i](event);
         }
     }
 

@@ -5,9 +5,39 @@ import SimplexNoise from '../util/SimplexNoise';
 import {ConstantValue, FunctionValueGenerator, ValueGenerator, ValueGeneratorFromJSON} from '../functions';
 import {randomInt} from '../util/MathUtil';
 
-const generators: Array<SimplexNoise> = [];
+const GENERATOR_COUNT = 100;
+const generators: Array<SimplexNoise | undefined> = new Array(GENERATOR_COUNT);
 const tempV = new Vector3();
 const tempQ = new Quaternion();
+
+/** Simplex generators are built on first use, so constructing a Noise behavior stays cheap. */
+function getGenerator(index: number): SimplexNoise {
+    let generator = generators[index];
+    if (generator === undefined) {
+        generator = new SimplexNoise();
+        generators[index] = generator;
+    }
+    return generator;
+}
+
+/**
+ * Per-particle noise state. Kept as a single object on the particle so the hot
+ * update path performs one dynamic property lookup instead of one per field,
+ * and so the object shape stays monomorphic.
+ */
+interface NoiseState {
+    lastPos: Vector3;
+    lastRot: number;
+    lastRotQ: Quaternion | null;
+    generatorX: SimplexNoise;
+    generatorY: SimplexNoise;
+    generatorZ: SimplexNoise;
+    generatorW: SimplexNoise;
+}
+
+interface NoisyParticle extends Particle {
+    _noiseState?: NoiseState;
+}
 
 /**
  * Apply noise to particles.
@@ -21,79 +51,85 @@ export class Noise implements Behavior {
         public power: FunctionValueGenerator | ValueGenerator,
         public positionAmount: FunctionValueGenerator | ValueGenerator = new ConstantValue(1),
         public rotationAmount: FunctionValueGenerator | ValueGenerator = new ConstantValue(0)
-    ) {
-        if (generators.length === 0) {
-            for (let i = 0; i < 100; i++) {
-                generators.push(new SimplexNoise());
-            }
-        }
-    }
+    ) {}
 
     initialize(particle: Particle): void {
-        (particle as any).lastPosNoise = new Vector3();
-        if (typeof particle.rotation === 'number') {
-            (particle as any).lastRotNoise = 0;
-        } else {
-            (particle as any).lastRotNoise = new Quaternion();
+        const isScalarRotation = typeof particle.rotation === 'number';
+        let state = (particle as NoisyParticle)._noiseState;
+        if (state === undefined) {
+            state = {
+                lastPos: new Vector3(),
+                lastRot: 0,
+                lastRotQ: isScalarRotation ? null : new Quaternion(),
+                generatorX: getGenerator(randomInt(0, GENERATOR_COUNT)),
+                generatorY: getGenerator(randomInt(0, GENERATOR_COUNT)),
+                generatorZ: getGenerator(randomInt(0, GENERATOR_COUNT)),
+                generatorW: getGenerator(randomInt(0, GENERATOR_COUNT)),
+            };
+            (particle as NoisyParticle)._noiseState = state;
+            return;
         }
-        (particle as any).generatorIndex = [randomInt(0, 100), randomInt(0, 100), randomInt(0, 100), randomInt(0, 100)];
-        this.positionAmount.startGen(particle.memory);
-        this.rotationAmount.startGen(particle.memory);
-        this.frequency.startGen(particle.memory);
-        this.power.startGen(particle.memory);
+        // Recycled particle: reset the accumulated offsets and re-roll generators.
+        state.lastPos.set(0, 0, 0);
+        state.lastRot = 0;
+        if (isScalarRotation) {
+            state.lastRotQ = null;
+        } else if (state.lastRotQ === null) {
+            state.lastRotQ = new Quaternion();
+        } else {
+            state.lastRotQ.set(0, 0, 0, 1);
+        }
+        state.generatorX = getGenerator(randomInt(0, GENERATOR_COUNT));
+        state.generatorY = getGenerator(randomInt(0, GENERATOR_COUNT));
+        state.generatorZ = getGenerator(randomInt(0, GENERATOR_COUNT));
+        state.generatorW = getGenerator(randomInt(0, GENERATOR_COUNT));
     }
 
     update(particle: Particle, _: number): void {
-        let frequency = this.frequency.genValue(particle.memory, particle.age / particle.life);
-        let power = this.power.genValue(particle.memory, particle.age / particle.life);
-        let positionAmount = this.positionAmount.genValue(particle.memory, particle.age / particle.life);
-        let rotationAmount = this.rotationAmount.genValue(particle.memory, particle.age / particle.life);
-        if (positionAmount > 0 && (particle as any).lastPosNoise !== undefined) {
-            particle.position.sub((particle as any).lastPosNoise);
+        const state = (particle as NoisyParticle)._noiseState;
+        if (state === undefined) {
+            return;
+        }
+        const memory = particle.memory;
+        const t = particle.age / particle.life;
+        const frequency = this.frequency.genValue(memory, t);
+        const power = this.power.genValue(memory, t);
+        const positionAmount = this.positionAmount.genValue(memory, t);
+        const rotationAmount = this.rotationAmount.genValue(memory, t);
+        const noiseTime = particle.age * frequency;
+
+        if (positionAmount > 0) {
+            const amount = power * positionAmount;
+            particle.position.sub(state.lastPos);
             tempV.set(
-                generators[(particle as any).generatorIndex[0]].noise2D(0, particle.age * frequency) *
-                    power *
-                    positionAmount,
-                generators[(particle as any).generatorIndex[1]].noise2D(0, particle.age * frequency) *
-                    power *
-                    positionAmount,
-                generators[(particle as any).generatorIndex[2]].noise2D(0, particle.age * frequency) *
-                    power *
-                    positionAmount
+                state.generatorX.noise2D(0, noiseTime) * amount,
+                state.generatorY.noise2D(0, noiseTime) * amount,
+                state.generatorZ.noise2D(0, noiseTime) * amount
             );
             particle.position.add(tempV);
-            (particle as any).lastPosNoise.copy(tempV);
+            state.lastPos.copy(tempV);
         }
 
-        if (rotationAmount > 0 && (particle as any).lastRotNoise !== undefined) {
+        if (rotationAmount > 0) {
+            const amount = power * rotationAmount;
             if (typeof particle.rotation === 'number') {
-                particle.rotation -= (particle as any).lastRotNoise;
-                particle.rotation +=
-                    generators[(particle as any).generatorIndex[3]].noise2D(0, particle.age * frequency) *
-                    Math.PI *
-                    power *
-                    rotationAmount;
-            } else {
-                ((particle as any).lastRotNoise as Quaternion).invert();
-                (particle.rotation as Quaternion).multiply((particle as any).lastRotNoise);
+                const noise = state.generatorW.noise2D(0, noiseTime) * Math.PI * amount;
+                particle.rotation = particle.rotation - state.lastRot + noise;
+                state.lastRot = noise;
+            } else if (state.lastRotQ !== null) {
+                const rotation = particle.rotation as Quaternion;
+                state.lastRotQ.invert();
+                rotation.multiply(state.lastRotQ);
                 tempQ
                     .set(
-                        generators[(particle as any).generatorIndex[0]].noise2D(0, particle.age * frequency) *
-                            power *
-                            rotationAmount,
-                        generators[(particle as any).generatorIndex[1]].noise2D(0, particle.age * frequency) *
-                            power *
-                            rotationAmount,
-                        generators[(particle as any).generatorIndex[2]].noise2D(0, particle.age * frequency) *
-                            power *
-                            rotationAmount,
-                        generators[(particle as any).generatorIndex[3]].noise2D(0, particle.age * frequency) *
-                            power *
-                            rotationAmount
+                        state.generatorX.noise2D(0, noiseTime) * amount,
+                        state.generatorY.noise2D(0, noiseTime) * amount,
+                        state.generatorZ.noise2D(0, noiseTime) * amount,
+                        state.generatorW.noise2D(0, noiseTime) * amount
                     )
                     .normalize();
-                (particle.rotation as Quaternion).multiply(tempQ);
-                (particle as any).lastRotNoise.copy(tempQ);
+                rotation.multiply(tempQ);
+                state.lastRotQ.copy(tempQ);
             }
         }
     }

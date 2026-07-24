@@ -19,17 +19,27 @@ export class ContinuousLinearFunction<T extends ObjectValueType<T> | number> {
     }
 
     findKey(t: number): number {
-        let mid = 0;
+        const keys = this.keys;
+        const last = keys.length - 1;
+        // One- and two-key gradients are by far the most common case; resolve
+        // them without running the search.
+        if (last <= 0) {
+            return last === 0 && t >= keys[0][1] && t <= 1 ? 0 : -1;
+        }
+        if (last === 1) {
+            if (t < keys[0][1] || t > 1) return -1;
+            return t <= keys[1][1] ? 0 : 1;
+        }
         let left = 0,
-            right = this.keys.length - 1;
+            right = last;
         while (left + 1 < right) {
-            mid = Math.floor((left + right) / 2);
-            if (t < this.getStartX(mid)) right = mid - 1;
+            const mid = (left + right) >> 1;
+            if (t < keys[mid][1]) right = mid - 1;
             else if (t > this.getEndX(mid)) left = mid + 1;
             else return mid;
         }
         for (let i = left; i <= right; i++) {
-            if (t >= this.getStartX(i) && t <= this.getEndX(i)) return i;
+            if (t >= keys[i][1] && t <= this.getEndX(i)) return i;
         }
         return -1;
     }
@@ -44,29 +54,29 @@ export class ContinuousLinearFunction<T extends ObjectValueType<T> | number> {
     }
 
     genValue(value: T, t: number): T {
+        const keys = this.keys;
         const index = this.findKey(t);
+        const last = keys.length - 1;
         if (this.subType === 'Number') {
             if (index === -1) {
-                return this.keys[0][0];
-            } else if (index + 1 >= this.keys.length) {
-                return this.keys[this.keys.length - 1][0];
+                return keys[0][0];
+            } else if (index >= last) {
+                return keys[last][0];
             }
-            return (((this.keys[index + 1][0] as number) - (this.keys[index][0] as number)) *
-                ((t - this.getStartX(index)) / (this.getEndX(index) - this.getStartX(index))) +
-                (this.keys[index][0] as number)) as T;
+            const startX = keys[index][1];
+            const a = keys[index][0] as number;
+            return ((((keys[index + 1][0] as number) - a) * (t - startX)) / (keys[index + 1][1] - startX) + a) as T;
         } else {
             if (index === -1) {
-                return (value as ObjectValueType<T>).copy(this.keys[0][0]) as T;
+                return (value as ObjectValueType<T>).copy(keys[0][0]) as T;
             }
-            if (index + 1 >= this.keys.length) {
-                return (value as ObjectValueType<T>).copy(this.keys[this.keys.length - 1][0]) as T;
+            if (index >= last) {
+                return (value as ObjectValueType<T>).copy(keys[last][0]) as T;
             }
+            const startX = keys[index][1];
             return (value as ObjectValueType<T>)
-                .copy(this.keys[index][0])
-                .lerp(
-                    this.keys[index + 1][0],
-                    (t - this.getStartX(index)) / (this.getEndX(index) - this.getStartX(index))
-                ) as T;
+                .copy(keys[index][0])
+                .lerp(keys[index + 1][0], (t - startX) / (keys[index + 1][1] - startX)) as T;
         }
     }
 

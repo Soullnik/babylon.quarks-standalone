@@ -48,6 +48,8 @@ export class BatchedRenderer extends TransformNode {
     batches: Array<VFXBatch> = [];
     systemToBatchIndex: Map<IParticleSystem, number> = new Map<IParticleSystem, number>();
     depthTexture: BaseTexture | null = null;
+    /** Systems in insertion order — iterated every frame, unlike the map. */
+    private systems: Array<IParticleSystem> = [];
     private adaptivePerformanceState: AdaptivePerformanceState = {
         enabled: false,
         targetFrameMs: 16.7,
@@ -92,9 +94,18 @@ export class BatchedRenderer extends TransformNode {
     addSystem(system: IParticleSystem) {
         const particleSystem = system as ParticleSystem;
         particleSystem._renderer = this;
+        if (!this.systemToBatchIndex.has(system) && this.systems.indexOf(system) === -1) {
+            this.systems.push(system);
+        }
         if (this.adaptivePerformanceState.enabled) {
             particleSystem.setQualityFactor(this.adaptivePerformanceState.currentQuality);
         }
+        this.assignToBatch(particleSystem);
+    }
+
+    /** Places a system into a compatible batch, creating one when none matches. */
+    private assignToBatch(particleSystem: ParticleSystem) {
+        const system = particleSystem as IParticleSystem;
         const settings = particleSystem.getRendererSettings();
         for (let i = 0; i < this.batches.length; i++) {
             if (BatchedRenderer.equals(this.batches[i].settings, settings)) {
@@ -129,15 +140,31 @@ export class BatchedRenderer extends TransformNode {
     }
 
     deleteSystem(system: IParticleSystem) {
-        const batchIndex = this.systemToBatchIndex.get(system);
-        if (batchIndex !== undefined) {
-            this.batches[batchIndex].removeSystem(system);
-            this.systemToBatchIndex.delete(system);
+        const removed = this.removeFromBatch(system);
+        const index = this.systems.indexOf(system);
+        if (index !== -1) {
+            this.systems.splice(index, 1);
         }
+        return removed;
     }
 
+    /** Detaches a system from its batch, leaving the renderer's system list alone. */
+    private removeFromBatch(system: IParticleSystem): boolean {
+        const batchIndex = this.systemToBatchIndex.get(system);
+        if (batchIndex === undefined) {
+            return false;
+        }
+        this.batches[batchIndex].removeSystem(system);
+        this.systemToBatchIndex.delete(system);
+        return true;
+    }
+
+    /**
+     * Re-buckets a system whose render settings changed. The system keeps its
+     * place in the update order, so this is safe to call mid-frame.
+     */
     updateSystem(system: IParticleSystem) {
-        this.deleteSystem(system);
+        this.removeFromBatch(system);
         this.addSystem(system);
     }
 
@@ -179,8 +206,8 @@ export class BatchedRenderer extends TransformNode {
         if (quality === this.lastAppliedQuality) {
             return;
         }
-        for (const ps of this.systemToBatchIndex.keys()) {
-            (ps as ParticleSystem).setQualityFactor(quality);
+        for (let i = 0; i < this.systems.length; i++) {
+            (this.systems[i] as ParticleSystem).setQualityFactor(quality);
         }
         this.lastAppliedQuality = quality;
     }
@@ -191,8 +218,15 @@ export class BatchedRenderer extends TransformNode {
         if (adaptiveState.enabled) {
             this.applyAdaptiveQuality();
         }
-        for (const ps of this.systemToBatchIndex.keys()) {
-            (ps as ParticleSystem).update(delta);
+        const systems = this.systems;
+        for (let i = 0; i < systems.length; i++) {
+            const system = systems[i];
+            (system as ParticleSystem).update(delta);
+            // An autoDestroy system disposes itself from inside update and drops
+            // out of the list; stay on the slot it vacated.
+            if (systems[i] !== system) {
+                i--;
+            }
         }
         this.refreshBatches();
         if (!adaptiveState.enabled) {
@@ -253,6 +287,7 @@ export class BatchedRenderer extends TransformNode {
             batch.dispose();
         }
         this.batches = [];
+        this.systems.length = 0;
         this.systemToBatchIndex.clear();
         super.dispose();
     }

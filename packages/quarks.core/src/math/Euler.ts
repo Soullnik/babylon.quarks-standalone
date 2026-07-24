@@ -13,12 +13,10 @@ class Euler {
     _y: number;
     _z: number;
     _order: EulerOrder;
-    isEuler: boolean;
+    declare readonly isEuler: boolean;
     static DEFAULT_ORDER: EulerOrder = 'XYZ';
 
     constructor(x = 0, y = 0, z = 0, order: EulerOrder = Euler.DEFAULT_ORDER) {
-        this.isEuler = true;
-
         this._x = x;
         this._y = y;
         this._z = z;
@@ -249,5 +247,7 @@ class Euler {
     }
 }
 
+
+(Euler.prototype as any).isEuler = true;
 
 export {Euler};

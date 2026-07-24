@@ -15,11 +15,13 @@ export class ColorOverLife implements Behavior {
     }
 
     update(particle: Particle, delta: number): void {
-        this.color.genColor(particle.memory, particle.color, particle.age / particle.life);
-        particle.color.x *= particle.startColor.x;
-        particle.color.y *= particle.startColor.y;
-        particle.color.z *= particle.startColor.z;
-        particle.color.w *= particle.startColor.w;
+        const color = particle.color;
+        const startColor = particle.startColor;
+        this.color.genColor(particle.memory, color, particle.age / particle.life);
+        color.x *= startColor.x;
+        color.y *= startColor.y;
+        color.z *= startColor.z;
+        color.w *= startColor.w;
     }
 
     frameUpdate(delta: number): void {}

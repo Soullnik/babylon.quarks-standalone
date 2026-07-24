@@ -19,14 +19,14 @@ export class OrbitOverLife implements Behavior {
     }
 
     initialize(particle: Particle): void {
-        this.orbitSpeed.startGen((particle as any).memory);
+        this.orbitSpeed.startGen(particle.memory);
     }
 
     update(particle: Particle, delta: number): void {
         this.temp.copy(particle.position).projectOnVector(this.axis);
         this.rotation.setFromAxisAngle(
             this.axis,
-            this.orbitSpeed.genValue((particle as any).memory, particle.age / particle.life) * delta
+            this.orbitSpeed.genValue(particle.memory, particle.age / particle.life) * delta
         );
         particle.position.sub(this.temp);
         particle.position.applyQuaternion(this.rotation);

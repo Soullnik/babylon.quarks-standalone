@@ -258,6 +258,9 @@ export class SpriteParticle implements Particle {
     memory = [];
 }
 
+/** Shared zero-length placeholder so trail buffers are never null. */
+const EMPTY_HISTORY = new Float32Array(0);
+
 export class RecordState {
     /**
      * Creates a new record state.
@@ -345,6 +348,10 @@ export class TrailParticle implements Particle {
     color: Vector4 = new Vector4();
     /**
      * Previous states of the particle.
+     *
+     * @deprecated The trail history now lives in the flat ring buffer below
+     * (`historyPositions` / `historySizes` / `historyColors`), which records a
+     * sample without allocating. This list is no longer populated or rendered.
      * @type {LinkedList<RecordState>}
      */
     previous: LinkedList<RecordState> = new LinkedList<RecordState>();
@@ -354,19 +361,82 @@ export class TrailParticle implements Particle {
      */
     uvTile = 0;
 
+    /** Ring buffer of recorded positions, 3 floats per sample. */
+    historyPositions: Float32Array = EMPTY_HISTORY;
+    /** Ring buffer of recorded widths, 1 float per sample. */
+    historySizes: Float32Array = EMPTY_HISTORY;
+    /** Ring buffer of recorded colors, 4 floats per sample. */
+    historyColors: Float32Array = EMPTY_HISTORY;
+    /** Number of samples the ring buffers can hold. */
+    historyCapacity = 0;
+    /** Slot the next sample is written to. */
+    historyHead = 0;
+    /** Number of valid samples currently held. */
+    historyCount = 0;
+
     /**
-     * Updates the particle state.
+     * Allocates the trail ring buffers, reusing them when the capacity is unchanged.
+     * @param {number} capacity - Number of samples to hold.
+     */
+    ensureHistoryCapacity(capacity: number): void {
+        if (this.historyCapacity === capacity) {
+            return;
+        }
+        this.historyCapacity = capacity;
+        this.historyPositions = new Float32Array(capacity * 3);
+        this.historySizes = new Float32Array(capacity);
+        this.historyColors = new Float32Array(capacity * 4);
+        this.historyHead = 0;
+        this.historyCount = 0;
+    }
+
+    /** Drops every recorded sample without releasing the buffers. */
+    resetHistory(): void {
+        this.historyHead = 0;
+        this.historyCount = 0;
+    }
+
+    /**
+     * Ring buffer slot of the i-th sample counting from the oldest one.
+     * @param {number} i - Sample offset, `0` being the oldest live sample.
+     */
+    getHistoryIndex(i: number): number {
+        const capacity = this.historyCapacity;
+        return (this.historyHead - this.historyCount + capacity + i) % capacity;
+    }
+
+    /**
+     * Records the current state into the trail ring buffer, or retires the
+     * oldest sample once the particle is dead. Allocation free.
      */
     update() {
-        if (this.age <= this.life) {
-            this.previous.push(new RecordState(this.position.clone(), this.size.x, this.color.clone()));
-        } else {
-            if (this.previous.length > 0) {
-                this.previous.dequeue();
+        this.ensureHistoryCapacity(Math.max(1, Math.ceil(this.length)));
+        const capacity = this.historyCapacity;
+
+        if (this.age > this.life) {
+            if (this.historyCount > 0) {
+                this.historyCount--;
             }
+            return;
         }
-        while (this.previous.length > this.length) {
-            this.previous.dequeue();
+
+        const head = this.historyHead;
+        const positionIndex = head * 3;
+        const positions = this.historyPositions;
+        positions[positionIndex] = this.position.x;
+        positions[positionIndex + 1] = this.position.y;
+        positions[positionIndex + 2] = this.position.z;
+        this.historySizes[head] = this.size.x;
+        const colorIndex = head * 4;
+        const colors = this.historyColors;
+        colors[colorIndex] = this.color.x;
+        colors[colorIndex + 1] = this.color.y;
+        colors[colorIndex + 2] = this.color.z;
+        colors[colorIndex + 3] = this.color.w;
+
+        this.historyHead = (head + 1) % capacity;
+        if (this.historyCount < capacity) {
+            this.historyCount++;
         }
     }
 
@@ -383,7 +453,7 @@ export class TrailParticle implements Particle {
      */
     reset() {
         this.memory.length = 0;
-        this.previous.clear();
+        this.resetHistory();
     }
 
     memory = [];

@@ -18,6 +18,8 @@ import {
     Quaternion as QRot,
     VelocityOverLife,
     InheritVelocity,
+    WidthOverLength,
+    TrailParticle,
 } from 'quarks.core';
 import {NullEngine} from '@babylonjs/core/Engines/nullEngine';
 import {Scene} from '@babylonjs/core/scene';
@@ -708,16 +710,7 @@ describe('ParticleSystem', () => {
         expect(rot.w).toBeDefined();
     });
 
-    it('disables fast trail history when WidthOverLength behavior is present', () => {
-        const widthBehavior = {
-            type: 'WidthOverLength',
-            clone: () => widthBehavior,
-            reset: () => {},
-            initialize: () => {},
-            frameUpdate: () => {},
-            update: () => {},
-            toJSON: () => ({type: 'WidthOverLength'}),
-        } as any;
+    it('WidthOverLength writes trail widths into the history ring buffer', () => {
         const ps = new ParticleSystem({
             scene,
             renderMode: RenderMode.Trail,
@@ -728,9 +721,19 @@ describe('ParticleSystem', () => {
             emissionOverTime: new ConstantValue(20),
             shape: new PointEmitter(),
             rendererEmitterSettings: {startLength: new ConstantValue(6), followLocalOrigin: false},
-            behaviors: [widthBehavior],
+            behaviors: [new WidthOverLength(new PiecewiseBezier([[new Bezier(0.5, 0.5, 0.5, 0.5), 0]]))],
         });
-        expect((ps as any).useFastTrailHistory).toBe(false);
+        for (let i = 0; i < 10; i++) {
+            ps.update(1 / 60);
+        }
+        expect(ps.particleNum).toBeGreaterThan(0);
+        const trail = ps.particles[0] as TrailParticle;
+        expect(trail.historyCount).toBeGreaterThan(1);
+        // The newest sample is recorded after the behavior pass, so it still
+        // carries the raw particle size until the next step.
+        for (let i = 0; i < trail.historyCount - 1; i++) {
+            expect(trail.historySizes[trail.getHistoryIndex(i)]).toBeCloseTo(0.5);
+        }
     });
 
     it('clones trail and stretched systems with renderer emitter settings', () => {
@@ -1031,7 +1034,7 @@ describe('ParticleSystem', () => {
         expect((ps as any).emitEnded).toBe(false);
     });
 
-    it('fast trail history path stays active for short-lived trail particles', () => {
+    it('records trail history in the ring buffer for short-lived trail particles', () => {
         const ps = new ParticleSystem({
             scene,
             renderMode: RenderMode.Trail,
@@ -1050,7 +1053,12 @@ describe('ParticleSystem', () => {
         for (let i = 0; i < 20; i++) {
             ps.update(1 / 20);
         }
-        expect((ps as any).useFastTrailHistory).toBe(true);
+        expect(ps.particleNum).toBeGreaterThan(0);
+        const trail = ps.particles[0] as TrailParticle;
+        expect(trail.historyCapacity).toBe(8);
+        expect(trail.historyCount).toBeGreaterThan(0);
+        // The legacy linked list is no longer populated.
+        expect(trail.previous.length).toBe(0);
     });
 
     it('trail followLocalOrigin respects particle parentMatrix when updating positions', () => {
@@ -1078,34 +1086,34 @@ describe('ParticleSystem', () => {
         expect(ps.particleNum).toBeGreaterThan(0);
     });
 
-    it('slow trail path uses TrailParticle.update when WidthOverLength is present', () => {
-        const widthBehavior = {
-            type: 'WidthOverLength',
-            clone: () => widthBehavior,
-            reset: () => {},
-            initialize: () => {},
-            frameUpdate: () => {},
-            update: () => {},
-            toJSON: () => ({type: 'WidthOverLength'}),
-        } as any;
+    it('retires trail history samples once the particle outlives its life', () => {
         const ps = new ParticleSystem({
             scene,
             renderMode: RenderMode.Trail,
-            startLife: new ConstantValue(0.5),
+            looping: false,
+            startLife: new ConstantValue(0.1),
             startSpeed: new ConstantValue(0),
             startSize: new ConstantValue(1),
             startColor: new ConstantColor(new Vector4(1, 1, 1, 1)),
-            emissionOverTime: new ConstantValue(200),
+            emissionOverTime: new ConstantValue(0),
+            emissionBursts: [{time: 0, count: new ConstantValue(1), cycle: 1, interval: 0, probability: 1}],
             shape: new PointEmitter(),
             rendererEmitterSettings: {startLength: new ConstantValue(10), followLocalOrigin: false},
-            behaviors: [widthBehavior],
         });
         ps.emit(0.05, ps.emissionState, ps.emitter.matrixWorld);
-        ps.emit(0.05, ps.emissionState, ps.emitter.matrixWorld);
-        for (let i = 0; i < 15; i++) {
-            ps.update(1 / 30);
+        expect(ps.particleNum).toBe(1);
+        const trail = ps.particles[0] as TrailParticle;
+        for (let i = 0; i < 6; i++) {
+            ps.update(1 / 60);
         }
-        expect((ps as any).useFastTrailHistory).toBe(false);
+        const peakHistory = trail.historyCount;
+        expect(peakHistory).toBeGreaterThan(0);
+        for (let i = 0; i < 30; i++) {
+            ps.update(1 / 60);
+        }
+        // Dead particles shed one sample per step until the trail is gone.
+        expect(trail.historyCount).toBe(0);
+        expect(ps.particleNum).toBe(0);
     });
 });
 

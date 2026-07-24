@@ -6,12 +6,11 @@ export class Bezier {
     }
 
     genValue(t: number): number {
+        const p = this.p;
         const t2 = t * t;
-        const t3 = t * t * t;
         const mt = 1 - t;
         const mt2 = mt * mt;
-        const mt3 = mt2 * mt;
-        return this.p[0] * mt3 + this.p[1] * mt2 * t * 3 + this.p[2] * mt * t2 * 3 + this.p[3] * t3;
+        return p[0] * mt2 * mt + p[1] * mt2 * t * 3 + p[2] * mt * t2 * 3 + p[3] * t2 * t;
     }
 
     // get the coefficients of the polynomial's derivatives

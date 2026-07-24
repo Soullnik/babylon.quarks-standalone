@@ -5,7 +5,6 @@ import {FunctionJSON} from './FunctionJSON';
 import {ContinuousLinearFunction} from './ContinuousLinearFunction';
 import {GeneratorMemory} from './GeneratorMemory';
 
-const tempVec3 = new Vector3();
 export class Gradient implements FunctionColorGenerator {
     type: 'function';
     color: ContinuousLinearFunction<Vector3>;
@@ -27,8 +26,48 @@ export class Gradient implements FunctionColorGenerator {
     }
 
     genColor(memory: GeneratorMemory, color: Vector4, t: number): Vector4 {
-        this.color.genValue(tempVec3, t);
-        return color.set(tempVec3.x, tempVec3.y, tempVec3.z, this.alpha.genValue(1, t));
+        // Specialised inline of ContinuousLinearFunction.genValue for both
+        // channels: this runs once per particle per frame, and going through the
+        // generic (number | Vector3) path costs a temp vector plus polymorphic
+        // key reads.
+        const colorKeys = this.color.keys;
+        const lastColor = colorKeys.length - 1;
+        const colorIndex = this.color.findKey(t);
+        let r: number;
+        let g: number;
+        let b: number;
+        if (colorIndex === -1 || colorIndex >= lastColor) {
+            const key = colorKeys[colorIndex === -1 ? 0 : lastColor][0];
+            r = key.x;
+            g = key.y;
+            b = key.z;
+        } else {
+            const from = colorKeys[colorIndex][0];
+            const to = colorKeys[colorIndex + 1][0];
+            const startX = colorKeys[colorIndex][1];
+            const ratio = (t - startX) / (colorKeys[colorIndex + 1][1] - startX);
+            r = from.x + (to.x - from.x) * ratio;
+            g = from.y + (to.y - from.y) * ratio;
+            b = from.z + (to.z - from.z) * ratio;
+        }
+
+        const alphaKeys = this.alpha.keys;
+        const lastAlpha = alphaKeys.length - 1;
+        const alphaIndex = this.alpha.findKey(t);
+        let a: number;
+        if (alphaIndex === -1 || alphaIndex >= lastAlpha) {
+            a = alphaKeys[alphaIndex === -1 ? 0 : lastAlpha][0];
+        } else {
+            const startX = alphaKeys[alphaIndex][1];
+            const from = alphaKeys[alphaIndex][0];
+            a = from + (alphaKeys[alphaIndex + 1][0] - from) * ((t - startX) / (alphaKeys[alphaIndex + 1][1] - startX));
+        }
+
+        color.x = r;
+        color.y = g;
+        color.z = b;
+        color.w = a;
+        return color;
     }
 
     toJSON(): FunctionJSON {
