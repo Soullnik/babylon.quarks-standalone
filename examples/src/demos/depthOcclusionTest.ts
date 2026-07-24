@@ -1,4 +1,5 @@
 import type {DemoContext} from "../types";
+import '@babylonjs/core/Rendering/depthRendererSceneComponent';
 import {Vector3 as BVector3} from "@babylonjs/core/Maths/math.vector";
 import {CreatePlane} from "@babylonjs/core/Meshes/Builders/planeBuilder";
 import {StandardMaterial} from "@babylonjs/core/Materials/standardMaterial";
@@ -9,6 +10,10 @@ import {makeCharacterBillboard} from "../shared/characterBillboard";
 const REFRESH_TIME = 1.2;
 const OCCLUDER_SPACING = 2;
 const EMITTER_HEIGHT = 0.9;
+// World-unit band, ending right at the occluder's own depth, over which a
+// soft particle fades out instead of being hard-clipped by the depth test.
+const SOFT_NEAR_FADE = 0;
+const SOFT_FAR_FADE = 0.3;
 
 /**
  * Side-by-side occlusion comparison: the SAME effect (GunFirePurple, exported
@@ -16,10 +21,21 @@ const EMITTER_HEIGHT = 0.9;
  * occluders — a plain opaque plane on the left and the real in-game
  * alpha-cutout character billboard on the right — so their rendering can be
  * compared directly under identical particle settings.
+ *
+ * Both particle systems have softParticles enabled: instead of the alpha-test
+ * occluder's depth hard-clipping the particle exactly at its silhouette edge,
+ * the particle fades smoothly over SOFT_FAR_FADE world units as it nears the
+ * occluder's depth (sampled from a scene depth texture), removing the sharp
+ * cutoff line while keeping the occluder's correct opaque-pass sorting.
  */
 export async function init({scene, camera, batchRenderer, systems, demoState}: DemoContext) {
     camera.setPosition(new BVector3(0, 1.6, 5));
     camera.setTarget(new BVector3(0, 0.9, 0));
+
+    if (typeof scene.enableDepthRenderer === 'function') {
+        const depthRenderer = scene.enableDepthRenderer();
+        batchRenderer.setDepthTexture(depthRenderer.getDepthMap());
+    }
 
     const planeX = -OCCLUDER_SPACING / 2;
     const characterX = OCCLUDER_SPACING / 2;
@@ -46,6 +62,9 @@ export async function init({scene, camera, batchRenderer, systems, demoState}: D
         QuarksUtil.runOnAllParticleEmitters(root, (emitter: ParticleEmitter) => {
             const system = emitter.system as ParticleSystem;
             system.looping = false;
+            system.rendererSettings.softParticles = true;
+            system.rendererSettings.softNearFade = SOFT_NEAR_FADE;
+            system.rendererSettings.softFarFade = SOFT_FAR_FADE;
             batchRenderer.addSystem(system);
             systems.push(system);
             trackedSystems.push(system);
