@@ -3,7 +3,6 @@ import {VertexBuffer} from '@babylonjs/core/Buffers/buffer';
 import {Effect} from '@babylonjs/core/Materials/effect';
 import {ShaderMaterial} from '@babylonjs/core/Materials/shaderMaterial';
 import {Scene} from '@babylonjs/core/scene';
-import {BoundingInfo} from '@babylonjs/core/Culling/boundingInfo';
 import {Vector3 as BVector3} from '@babylonjs/core/Maths/math.vector';
 import {Vector2 as BVector2} from '@babylonjs/core/Maths/math.vector';
 import {Constants} from '@babylonjs/core/Engines/constants';
@@ -83,16 +82,10 @@ export class TrailBatch extends VFXBatch {
         this.mesh.setVerticesBuffer(this.sideVB);
         this.mesh.setVerticesBuffer(this.widthVB);
 
-        // Disable bounding info recomputation
+        // Bounding info is rebuilt from actual trail positions every frame in
+        // update() (see updateBoundingInfoFromWorldBounds) — disable Babylon's
+        // own vertex-based sync so it doesn't fight with that.
         this.mesh.doNotSyncBoundingInfo = true;
-        const min = new BVector3(-10000, -10000, -10000);
-        const max = new BVector3(10000, 10000, 10000);
-        this.mesh.setBoundingInfo(new BoundingInfo(min, max));
-        if (this.mesh.subMeshes) {
-            for (const sub of this.mesh.subMeshes) {
-                (sub as any)._boundingInfo = this.mesh.getBoundingInfo();
-            }
-        }
     }
 
     expandBuffers(target: number): void {
@@ -166,6 +159,9 @@ export class TrailBatch extends VFXBatch {
     update(): void {
         let index = 0;
         let triangles = 0;
+
+        let minX = Number.POSITIVE_INFINITY, minY = Number.POSITIVE_INFINITY, minZ = Number.POSITIVE_INFINITY;
+        let maxX = Number.NEGATIVE_INFINITY, maxY = Number.NEGATIVE_INFINITY, maxZ = Number.NEGATIVE_INFINITY;
 
         let particleCount = 0;
         const visibleSystems = this.getVisibleSystems();
@@ -340,13 +336,22 @@ export class TrailBatch extends VFXBatch {
                     this.sideBuffer[index] = 1;
                     this.sideBuffer[index + 1] = -1;
 
+                    let effectiveWidth: number;
                     if (systemWorldSpace || particle.parentMatrix) {
-                        this.widthBuffer[index] = currentSize;
-                        this.widthBuffer[index + 1] = currentSize;
+                        effectiveWidth = currentSize;
                     } else {
-                        this.widthBuffer[index] = currentSize * objectScale;
-                        this.widthBuffer[index + 1] = currentSize * objectScale;
+                        effectiveWidth = currentSize * objectScale;
                     }
+                    this.widthBuffer[index] = effectiveWidth;
+                    this.widthBuffer[index + 1] = effectiveWidth;
+
+                    const pad = effectiveWidth * 0.5;
+                    if (currentX - pad < minX) minX = currentX - pad;
+                    if (currentX + pad > maxX) maxX = currentX + pad;
+                    if (currentY - pad < minY) minY = currentY - pad;
+                    if (currentY + pad > maxY) maxY = currentY + pad;
+                    if (currentZ - pad < minZ) minZ = currentZ - pad;
+                    if (currentZ + pad > maxZ) maxZ = currentZ + pad;
 
                     const ui = index * 2;
                     this.uvBuffer[ui] = (i / particleHistoryLength + col) * tileWidth;
@@ -408,6 +413,8 @@ export class TrailBatch extends VFXBatch {
             this.mesh.subMeshes[0].indexCount = 0;
             this.mesh.subMeshes[0].verticesCount = 0;
         }
+
+        this.updateBoundingInfoFromWorldBounds(index > 0, minX, minY, minZ, maxX, maxY, maxZ);
     }
 
     dispose(): void {

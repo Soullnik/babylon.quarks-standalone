@@ -256,6 +256,9 @@ export class SpriteBatch extends VFXBatch {
         const isMeshRender = renderMode === RenderMode.Mesh;
         const isStretchedRender = renderMode === RenderMode.StretchedBillBoard;
 
+        let minX = Number.POSITIVE_INFINITY, minY = Number.POSITIVE_INFINITY, minZ = Number.POSITIVE_INFINITY;
+        let maxX = Number.NEGATIVE_INFINITY, maxY = Number.NEGATIVE_INFINITY, maxZ = Number.NEGATIVE_INFINITY;
+
         const visibleSystems = this.getVisibleSystems();
         for (const system of visibleSystems) {
             particleCount += system.particleNum;
@@ -327,21 +330,32 @@ export class SpriteBatch extends VFXBatch {
                 this.colorBuffer[ci + 3] = particle.color.w;
 
                 const si = index * 3;
-                if (systemWorldSpace) {
-                    this.sizeBuffer[si] = particle.size.x;
-                    this.sizeBuffer[si + 1] = particle.size.y;
-                    this.sizeBuffer[si + 2] = particle.size.z;
+                let sx: number, sy: number, sz: number;
+                if (systemWorldSpace || particle.parentMatrix) {
+                    sx = particle.size.x;
+                    sy = particle.size.y;
+                    sz = particle.size.z;
                 } else {
-                    if (particle.parentMatrix) {
-                        this.sizeBuffer[si] = particle.size.x;
-                        this.sizeBuffer[si + 1] = particle.size.y;
-                        this.sizeBuffer[si + 2] = particle.size.z;
-                    } else {
-                        this.sizeBuffer[si] = particle.size.x * absScaleX;
-                        this.sizeBuffer[si + 1] = particle.size.y * absScaleY;
-                        this.sizeBuffer[si + 2] = particle.size.z * absScaleZ;
-                    }
+                    sx = particle.size.x * absScaleX;
+                    sy = particle.size.y * absScaleY;
+                    sz = particle.size.z * absScaleZ;
                 }
+                this.sizeBuffer[si] = sx;
+                this.sizeBuffer[si + 1] = sy;
+                this.sizeBuffer[si + 2] = sz;
+
+                // Billboards extend roughly size/2 from their offset in any
+                // direction they happen to face the camera; padding by the
+                // largest half-extent keeps this a cheap, order-independent
+                // bound rather than a tight (and rotation-dependent) one.
+                const pad = Math.max(sx, sy, sz) * 0.5;
+                const px = vec.x, py = vec.y, pz = vec.z;
+                if (px - pad < minX) minX = px - pad;
+                if (px + pad > maxX) maxX = px + pad;
+                if (py - pad < minY) minY = py - pad;
+                if (py + pad > maxY) maxY = py + pad;
+                if (pz - pad < minZ) minZ = pz - pad;
+                if (pz + pad > maxZ) maxZ = pz + pad;
 
                 this.uvTileBuffer[index] = particle.uvTile;
 
@@ -382,6 +396,8 @@ export class SpriteBatch extends VFXBatch {
         // Keep the mesh enabled even when count is 0 — toggling visibility off for a
         // single frame (common with short lifetimes + low emission overlap) causes flicker.
         this.mesh.forcedInstanceCount = index;
+
+        this.updateBoundingInfoFromWorldBounds(index > 0, minX, minY, minZ, maxX, maxY, maxZ);
 
         if (index === 0) {
             this.uploadClearedInstance(isMeshRender, isStretchedRender);
