@@ -101,7 +101,10 @@ namespace BabylonQuarks.UnityExporter
         }
 
         private static JToken Euler(JToken x, JToken y, JToken z) =>
-            new JObject().Set("type", "Euler").Set("angleX", x).Set("angleY", y).Set("angleZ", z).Set("eulerOrder", "XYZ");
+            // Unity's intrinsic ZXY order (rotate Z, then X, then Y) is the same rotation as quarks'
+            // intrinsic YXZ order — not XYZ. Using XYZ here turns an in-plane Unity spin (e.g. a
+            // random Y-axis roll on a flat mesh) into a wobble out of plane.
+            new JObject().Set("type", "Euler").Set("angleX", x).Set("angleY", y).Set("angleZ", z).Set("eulerOrder", "YXZ");
 
         private static JToken BuildStartSize(ParticleSystem.MainModule main)
         {
