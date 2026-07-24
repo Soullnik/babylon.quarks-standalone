@@ -1,39 +1,38 @@
 import type {DemoContext} from "../types";
 import {Vector3 as BVector3} from "@babylonjs/core/Maths/math.vector";
-import {CreateBox} from "@babylonjs/core/Meshes/Builders/boxBuilder";
-import {StandardMaterial} from "@babylonjs/core/Materials/standardMaterial";
 import {Color3} from "@babylonjs/core/Maths/math.color";
 import {QuarksLoader, QuarksUtil, ParticleEmitter, ParticleSystem} from "babylon.quarks";
+import {makeCharacterBillboard} from "../shared/characterBillboard";
 
 const REFRESH_TIME = 1.2;
 
 /**
  * Repro harness for the "opaque wall always occludes particles regardless of
- * true depth" report: a Unity-authored effect (GunFireBlue) fired next to an
- * opaque vertical wall, mirroring the Unity scene the bug was first seen in.
- * The burst is brief (~0.2-0.35s life) and re-fires every REFRESH_TIME so it
- * can be watched repeatedly.
+ * true depth" report. A plain opaque StandardMaterial box occluded correctly
+ * (confirmed) — this variant swaps the box for the actual in-game occluder:
+ * an alpha-cut-out character billboard (StandardMaterial +
+ * useAlphaFromDiffuseTexture, same as the real character placeholder). That
+ * flag makes Babylon treat the mesh as transparent instead of opaque, which
+ * is the suspected difference from the box test.
  */
 export async function init({scene, camera, batchRenderer, systems, demoState}: DemoContext) {
     camera.setPosition(new BVector3(2.5, 2, 3));
-    camera.setTarget(new BVector3(0, 0.6, 0));
+    camera.setTarget(new BVector3(0, 0.8, 0));
 
-    const wallCenter = new BVector3(0, 0.8, 0);
+    const characterBase = new BVector3(0, 0, 0);
+    const character = makeCharacterBillboard("occluderCharacter", scene, new Color3(0.6, 0.6, 0.65));
+    character.position.x = characterBase.x;
+    character.position.z = characterBase.z;
 
-    const wall = CreateBox("occluderWall", {width: 2, height: 2.5, depth: 0.15}, scene);
-    const wallMat = new StandardMaterial("occluderWallMat", scene);
-    wallMat.diffuseColor = new Color3(0.9, 0.1, 0.1);
-    wallMat.specularColor = new Color3(0, 0, 0);
-    wall.material = wallMat;
-    wall.position = wallCenter;
+    const emitterPoint = new BVector3(characterBase.x, 0.9, characterBase.z);
 
     const loader = new QuarksLoader(scene, {baseUrl: ""});
     const root = await loader.load("gunFireBlue.json");
     root.parent = batchRenderer;
-    // Emitter sits at the exact same point as the wall's center, so any
-    // particle ending up on the far side from the camera should be hidden
-    // and any on the near side should render in front of the wall.
-    root.position = wallCenter.clone();
+    // Emitter sits at roughly chest height on the character, same idea as the
+    // wall test: some particles should end up nearer the camera than the
+    // character and render on top of it, others farther and get hidden.
+    root.position = emitterPoint.clone();
 
     const trackedSystems: ParticleSystem[] = [];
     QuarksUtil.runOnAllParticleEmitters(root, (emitter: ParticleEmitter) => {

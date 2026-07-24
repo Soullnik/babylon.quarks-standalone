@@ -170,7 +170,7 @@ export const demoManifest: DemoManifestEntry[] = [
         name: "Depth Occlusion Test (GunFireBlue)",
         module: "depthOcclusionTest",
         sourcePath: "examples/src/demos/depthOcclusionTest.ts",
-        description: "Diagnostic harness: opaque wall next to a Unity-exported effect to check depth occlusion.",
+        description: "Diagnostic harness: alpha-cutout character billboard next to a Unity-exported effect to check depth occlusion.",
         tags: ["diagnostic", "depth", "import"],
         preview: {icon: "DO", gradient: "linear-gradient(135deg, #ff6b6b 0%, #742020 100%)"},
     },
