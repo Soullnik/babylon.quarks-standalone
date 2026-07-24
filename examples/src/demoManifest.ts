@@ -166,6 +166,15 @@ export const demoManifest: DemoManifestEntry[] = [
         preview: {icon: "BH", gradient: "linear-gradient(135deg, #2a1a3d 0%, #6b3d9a 100%)"},
     },
     {
+        key: "DepthOcclusionTest",
+        name: "Depth Occlusion Test (GunFireBlue)",
+        module: "depthOcclusionTest",
+        sourcePath: "examples/src/demos/depthOcclusionTest.ts",
+        description: "Diagnostic harness: opaque wall next to a Unity-exported effect to check depth occlusion.",
+        tags: ["diagnostic", "depth", "import"],
+        preview: {icon: "DO", gradient: "linear-gradient(135deg, #ff6b6b 0%, #742020 100%)"},
+    },
+    {
         key: "MagicZoneUnityExample",
         name: "MagicZone: Unity exported by unity-quarks-exporter example",
         module: "MagicZoneUnityExample",
