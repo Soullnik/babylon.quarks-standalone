@@ -2,7 +2,15 @@
 
 All notable changes to the Unity Quarks Exporter are documented here.
 
-## [Unreleased]
+## [0.19.0] — 2026-07-25
+
+### Changed
+
+- The exporter now carries the same version as the babylon.quarks packages it
+  writes for, which is why this release jumps from 0.2.0 to 0.19.0. Nothing was
+  released in between; the two are versioned together from here on, so the
+  exporter version tells you which library version its output was written
+  against.
 
 ### Fixed
 
