@@ -8,6 +8,8 @@ export interface Vector3Generator {
     type: 'vec3function';
     startGen(memory: GeneratorMemory): void;
     genValue(memory: GeneratorMemory, vec: Vector3, t?: number): Vector3;
+    /** See FunctionValueGenerator.refreshTable. */
+    refreshTable?(): void;
     toJSON(): FunctionJSON;
     clone(): Vector3Generator;
 }

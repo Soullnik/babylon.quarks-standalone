@@ -54,7 +54,9 @@ export class LimitSpeedOverLife implements Behavior {
         return new LimitSpeedOverLife(ValueGeneratorFromJSON(json.speed) as FunctionValueGenerator, json.dampen);
     }
 
-    frameUpdate(delta: number): void {}
+    frameUpdate(delta: number): void {
+        this.speed.refreshTable?.();
+    }
 
     clone(): Behavior {
         return new LimitSpeedOverLife(this.speed.clone(), this.dampen);

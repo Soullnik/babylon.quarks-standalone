@@ -19,6 +19,8 @@ export interface FunctionColorGenerator {
     type: 'function';
     startGen(memory: GeneratorMemory): void;
     genColor(memory: GeneratorMemory, color: Vector4, t: number): Vector4;
+    /** See FunctionValueGenerator.refreshTable. */
+    refreshTable?(): void;
     toJSON(): FunctionJSON;
     clone(): FunctionColorGenerator;
 }

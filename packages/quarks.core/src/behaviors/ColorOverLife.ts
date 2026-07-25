@@ -43,7 +43,11 @@ export class ColorOverLife implements Behavior {
         }
     }
 
-    frameUpdate(delta: number): void {}
+    frameUpdate(delta: number): void {
+        // Refresh once per frame, before either update path reads the generator,
+        // so both see the same values and an edited gradient is picked up.
+        this.color.refreshTable?.();
+    }
 
     toJSON(): any {
         return {

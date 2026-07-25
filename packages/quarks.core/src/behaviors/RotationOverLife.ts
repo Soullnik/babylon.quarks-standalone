@@ -49,7 +49,9 @@ export class RotationOverLife implements Behavior {
         return new RotationOverLife(ValueGeneratorFromJSON(json.angularVelocity) as FunctionValueGenerator);
     }
 
-    frameUpdate(delta: number): void {}
+    frameUpdate(delta: number): void {
+        this.angularVelocity.refreshTable?.();
+    }
 
     clone(): Behavior {
         return new RotationOverLife(this.angularVelocity.clone());

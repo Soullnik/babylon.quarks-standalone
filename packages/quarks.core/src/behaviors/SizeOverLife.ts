@@ -89,7 +89,9 @@ export class SizeOverLife implements Behavior {
         return new SizeOverLife(GeneratorFromJSON(json.size) as FunctionValueGenerator);
     }
 
-    frameUpdate(delta: number): void {}
+    frameUpdate(delta: number): void {
+        this._size.refreshTable?.();
+    }
 
     clone(): Behavior {
         return new SizeOverLife(this.size.clone());

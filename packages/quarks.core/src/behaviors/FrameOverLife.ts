@@ -49,7 +49,9 @@ export class FrameOverLife implements Behavior {
         }
     }
 
-    frameUpdate(delta: number): void {}
+    frameUpdate(delta: number): void {
+        this._frame.refreshTable?.();
+    }
 
     toJSON(): any {
         return {
