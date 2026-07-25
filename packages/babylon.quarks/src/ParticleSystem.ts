@@ -850,6 +850,31 @@ export class ParticleSystem implements IParticleSystem {
     }
 
     /**
+     * Time the display is ahead of the simulation, in seconds, always less than
+     * one step.
+     *
+     * The simulation runs on a fixed 1/60 step so that emission and lifetimes
+     * stay in phase — without it a slow emitter flickers when the frame rate
+     * wobbles. But frames do not arrive on that grid: a display running at
+     * anything other than exactly 60Hz leaves some frames with no step at all
+     * (half of them at 120Hz, three in five at 144Hz) and others with two, so
+     * the particles are drawn stuttering even while the frame rate is perfect.
+     *
+     * Renderers close the gap by advancing what they draw along each particle's
+     * velocity by this much. That reproduces the straight-line part of the
+     * motion exactly — it is the same term the next step would integrate — so
+     * the simulation stays fixed-step while the picture moves continuously.
+     */
+    get simulationResidual(): number {
+        if (this.paused) {
+            return 0;
+        }
+        // Never more than a step, even if a frame long enough to hit the
+        // per-frame step cap left the accumulator with time it could not spend.
+        return this.simulationAccumulator < SIMULATION_STEP ? this.simulationAccumulator : SIMULATION_STEP;
+    }
+
+    /**
      * Execution plan for this system's behaviors, rebuilt when the list changes.
      *
      * Consecutive behaviors that can be compiled into one loop are merged, so

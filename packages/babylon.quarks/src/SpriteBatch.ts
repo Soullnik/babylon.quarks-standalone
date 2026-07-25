@@ -14,6 +14,7 @@ import {
     SpriteParticle,
     StretchedBillBoardSettings,
     IParticleSystem,
+    ParticleStore,
 } from 'quarks.core';
 import {VFXBatch, RenderMode} from './VFXBatch';
 import {VFXBatchSettings} from './BatchedRenderer';
@@ -325,16 +326,30 @@ export class SpriteBatch extends VFXBatch {
             // emits through another one; otherwise the whole range shares the
             // emitter's matrix and can be transformed in place after the copy.
             const sharedTransform = store !== undefined && system.onlyUsedByOther !== true;
+            // The simulation runs on a fixed step that the display does not
+            // share, so the last step is usually in the past by the time the
+            // frame is drawn. Carrying each particle along its own velocity for
+            // the leftover time puts it where it belongs now; without it the
+            // particles visibly stutter on any display that is not exactly 60Hz.
+            const residual = system.simulationResidual ?? 0;
             let copiedPositionAndSize = false;
             if (store !== undefined && systemWorldSpace) {
-                this.offsetBuffer.set(store.position.subarray(0, particleNum * 3), index * 3);
+                if (residual > 0 && particleNum > 0) {
+                    SpriteBatch.extrapolate(this.offsetBuffer, index * 3, store, particleNum, residual);
+                } else {
+                    this.offsetBuffer.set(store.position.subarray(0, particleNum * 3), index * 3);
+                }
                 this.sizeBuffer.set(store.size.subarray(0, particleNum * 3), index * 3);
                 copiedPositionAndSize = true;
             } else if (sharedTransform && particleNum > 0) {
                 const base = index * 3;
                 const end = base + particleNum * 3;
                 const offsets = this.offsetBuffer;
-                offsets.set(store!.position.subarray(0, particleNum * 3), base);
+                if (residual > 0) {
+                    SpriteBatch.extrapolate(offsets, base, store!, particleNum, residual);
+                } else {
+                    offsets.set(store!.position.subarray(0, particleNum * 3), base);
+                }
                 const me = emitterMatrix.elements;
                 const m00 = me[0], m01 = me[1], m02 = me[2], m03 = me[3];
                 const m10 = me[4], m11 = me[5], m12 = me[6], m13 = me[7];
@@ -387,9 +402,11 @@ export class SpriteBatch extends VFXBatch {
 
                 if (!copiedPositionAndSize) {
                     const position = particle.position;
-                    let px = position.x;
-                    let py = position.y;
-                    let pz = position.z;
+                    const velocity = particle.velocity;
+                    const advance = residual * particle.speedModifier;
+                    let px = position.x + velocity.x * advance;
+                    let py = position.y + velocity.y * advance;
+                    let pz = position.z + velocity.z * advance;
                     if (!systemWorldSpace) {
                         // Inlined point transform: this is the default (local space)
                         // path and runs for every particle every frame.
@@ -498,6 +515,35 @@ export class SpriteBatch extends VFXBatch {
         if (clampedSpeedFactor !== this.lastStretchedSpeedFactor) {
             material.setFloat('speedFactor', clampedSpeedFactor);
             this.lastStretchedSpeedFactor = clampedSpeedFactor;
+        }
+    }
+
+    /**
+     * Writes rows `[0, count)` of the store's positions into `target` at
+     * `base`, each carried along its own velocity for `residual` seconds.
+     *
+     * This is the same integration the next simulation step performs, so for a
+     * particle under constant velocity the drawn path is exactly the continuous
+     * one. A particle whose motion comes from somewhere else — a force about to
+     * change its velocity, a behavior that displaces it directly — is off by
+     * whatever that adds over less than one step.
+     */
+    private static extrapolate(
+        target: Float32Array,
+        base: number,
+        store: ParticleStore,
+        count: number,
+        residual: number
+    ): void {
+        const positions = store.position;
+        const velocities = store.velocity;
+        const scalars = store.scalars;
+        const stride = ParticleStore.SCALAR_STRIDE;
+        for (let i = 0, o = 0, s = ParticleStore.SPEED_MODIFIER; i < count; i++, o += 3, s += stride) {
+            const advance = residual * scalars[s];
+            target[base + o] = positions[o] + velocities[o] * advance;
+            target[base + o + 1] = positions[o + 1] + velocities[o + 1] * advance;
+            target[base + o + 2] = positions[o + 2] + velocities[o + 2] * advance;
         }
     }
 

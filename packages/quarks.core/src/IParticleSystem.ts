@@ -108,6 +108,14 @@ export interface IParticleSystem {
      */
     store?: ParticleStore;
     /**
+     * Wall-clock time that has passed since the last simulated step, in
+     * seconds, when the implementation simulates on a fixed timestep. A
+     * renderer uses it to draw where the particles are now rather than where
+     * the last step left them.
+     * @type {number}
+     */
+    simulationResidual?: number;
+    /**
      * Whether this system only emits through another system, which is when its
      * particles carry their own parent transform.
      * @type {boolean}
