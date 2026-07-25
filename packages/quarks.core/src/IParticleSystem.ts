@@ -108,6 +108,12 @@ export interface IParticleSystem {
      */
     store?: ParticleStore;
     /**
+     * Whether this system only emits through another system, which is when its
+     * particles carry their own parent transform.
+     * @type {boolean}
+     */
+    onlyUsedByOther?: boolean;
+    /**
      * Whether the ParticleSystem should be automatically disposed when it finishes emitting particles.
      * @type {string}
      */

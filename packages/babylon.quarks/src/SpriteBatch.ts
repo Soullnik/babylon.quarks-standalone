@@ -321,10 +321,42 @@ export class SpriteBatch extends VFXBatch {
             if (copiedColor) {
                 this.colorBuffer.set(store!.color.subarray(0, particleNum * 4), index * 4);
             }
-            const copiedPositionAndSize = store !== undefined && systemWorldSpace;
-            if (copiedPositionAndSize) {
-                this.offsetBuffer.set(store!.position.subarray(0, particleNum * 3), index * 3);
-                this.sizeBuffer.set(store!.size.subarray(0, particleNum * 3), index * 3);
+            // Particles only carry their own parent transform when the system
+            // emits through another one; otherwise the whole range shares the
+            // emitter's matrix and can be transformed in place after the copy.
+            const sharedTransform = store !== undefined && system.onlyUsedByOther !== true;
+            let copiedPositionAndSize = false;
+            if (store !== undefined && systemWorldSpace) {
+                this.offsetBuffer.set(store.position.subarray(0, particleNum * 3), index * 3);
+                this.sizeBuffer.set(store.size.subarray(0, particleNum * 3), index * 3);
+                copiedPositionAndSize = true;
+            } else if (sharedTransform && particleNum > 0) {
+                const base = index * 3;
+                const end = base + particleNum * 3;
+                const offsets = this.offsetBuffer;
+                offsets.set(store!.position.subarray(0, particleNum * 3), base);
+                const me = emitterMatrix.elements;
+                const m00 = me[0], m01 = me[1], m02 = me[2], m03 = me[3];
+                const m10 = me[4], m11 = me[5], m12 = me[6], m13 = me[7];
+                const m20 = me[8], m21 = me[9], m22 = me[10], m23 = me[11];
+                const m30 = me[12], m31 = me[13], m32 = me[14], m33 = me[15];
+                for (let o = base; o < end; o += 3) {
+                    const px = offsets[o];
+                    const py = offsets[o + 1];
+                    const pz = offsets[o + 2];
+                    const w = 1 / (m03 * px + m13 * py + m23 * pz + m33);
+                    offsets[o] = (m00 * px + m10 * py + m20 * pz + m30) * w;
+                    offsets[o + 1] = (m01 * px + m11 * py + m21 * pz + m31) * w;
+                    offsets[o + 2] = (m02 * px + m12 * py + m22 * pz + m32) * w;
+                }
+                const sizes = this.sizeBuffer;
+                sizes.set(store!.size.subarray(0, particleNum * 3), base);
+                for (let o = base; o < end; o += 3) {
+                    sizes[o] *= absScaleX;
+                    sizes[o + 1] *= absScaleY;
+                    sizes[o + 2] *= absScaleZ;
+                }
+                copiedPositionAndSize = true;
             }
 
             for (let j = 0; j < particleNum; j++, index++) {

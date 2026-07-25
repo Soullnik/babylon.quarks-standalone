@@ -5,7 +5,15 @@ import {ShaderMaterial} from '@babylonjs/core/Materials/shaderMaterial';
 import {RawTexture} from '@babylonjs/core/Materials/Textures/rawTexture';
 import {FreeCamera} from '@babylonjs/core/Cameras/freeCamera';
 import {Vector3} from '@babylonjs/core/Maths/math.vector';
-import {ConstantColor, ConstantValue, IntervalValue, Matrix4, PointEmitter, Vector4} from 'quarks.core';
+import {
+    ConstantColor,
+    ConstantValue,
+    IntervalValue,
+    Matrix4,
+    PointEmitter,
+    Vector3 as QVector3,
+    Vector4,
+} from 'quarks.core';
 import {BatchedRenderer} from '../src/BatchedRenderer';
 import {ParticleSystem} from '../src/ParticleSystem';
 import {SpriteBatch} from '../src/SpriteBatch';
@@ -399,6 +407,33 @@ describe('SpriteBatch', () => {
             expect(particle.storeIndex).toBe(i);
             expect(system.store.position[i * 3]).toBeCloseTo(particle.position.x, 5);
             expect(system.store.color[i * 4 + 3]).toBeCloseTo(particle.color.w, 5);
+        }
+
+        renderer.dispose();
+        system.dispose();
+    });
+    it('range-copies local space attributes through the emitter transform', () => {
+        const renderer = new BatchedRenderer('sprite-bulk-local', scene);
+        const system = createSpriteSystem({worldSpace: false, startSpeed: new ConstantValue(3)});
+        system.emitter.position.set(3, -2, 5);
+        system.emitter.scaling.set(2, 2, 2);
+        system.emitter.rotation.set(0.3, 0.7, 0);
+        renderer.addSystem(system);
+        for (let i = 0; i < 20; i++) {
+            renderer.update(1 / 60);
+        }
+
+        const batch = getSpriteBatch(renderer) as any;
+        expect(system.particleNum).toBeGreaterThan(1);
+        const expected = new QVector3();
+        for (let i = 0; i < system.particleNum; i++) {
+            const particle = system.particles[i];
+            expected.copy(particle.position).applyMatrix4(system.emitter.matrixWorld);
+            expect(batch.offsetBuffer[i * 3]).toBeCloseTo(expected.x, 4);
+            expect(batch.offsetBuffer[i * 3 + 1]).toBeCloseTo(expected.y, 4);
+            expect(batch.offsetBuffer[i * 3 + 2]).toBeCloseTo(expected.z, 4);
+            // local space multiplies size by the emitter scale
+            expect(batch.sizeBuffer[i * 3]).toBeCloseTo(particle.size.x * 2, 4);
         }
 
         renderer.dispose();
