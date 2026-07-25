@@ -22,6 +22,22 @@ export class ParticleStore {
     startSize: Float32Array;
     color: Float32Array;
     startColor: Float32Array;
+    /**
+     * age, life and speedModifier interleaved, {@link SCALAR_STRIDE} per row.
+     *
+     * Double precision, unlike the vector columns: age accumulates `+= delta`
+     * for the particle's whole life and is compared against life to decide
+     * death, so rounding it to float32 shifts when particles die and makes
+     * tightly balanced emitters flicker.
+     */
+    scalars: Float64Array;
+
+    /** Values per row in {@link scalars}. */
+    static readonly SCALAR_STRIDE = 3;
+    /** Offsets within a {@link scalars} row. */
+    static readonly AGE = 0;
+    static readonly LIFE = 1;
+    static readonly SPEED_MODIFIER = 2;
 
     constructor(capacity = 64) {
         this.capacity = Math.max(1, capacity);
@@ -31,6 +47,7 @@ export class ParticleStore {
         this.startSize = new Float32Array(this.capacity * 3);
         this.color = new Float32Array(this.capacity * 4);
         this.startColor = new Float32Array(this.capacity * 4);
+        this.scalars = new Float64Array(this.capacity * ParticleStore.SCALAR_STRIDE);
     }
 
     /**
@@ -54,6 +71,7 @@ export class ParticleStore {
         this.startSize = ParticleStore.grow(this.startSize, capacity * 3);
         this.color = ParticleStore.grow(this.color, capacity * 4);
         this.startColor = ParticleStore.grow(this.startColor, capacity * 4);
+        this.scalars = ParticleStore.growDouble(this.scalars, capacity * ParticleStore.SCALAR_STRIDE);
         this.capacity = capacity;
         return true;
     }
@@ -79,9 +97,16 @@ export class ParticleStore {
         const b4 = b * 4;
         ParticleStore.swap4(this.color, a4, b4);
         ParticleStore.swap4(this.startColor, a4, b4);
+        ParticleStore.swap3(this.scalars, a * ParticleStore.SCALAR_STRIDE, b * ParticleStore.SCALAR_STRIDE);
     }
 
-    private static swap3(data: Float32Array, a: number, b: number): void {
+    private static growDouble(source: Float64Array, length: number): Float64Array {
+        const grown = new Float64Array(length);
+        grown.set(source);
+        return grown;
+    }
+
+    private static swap3(data: Float32Array | Float64Array, a: number, b: number): void {
         let temp = data[a];
         data[a] = data[b];
         data[b] = temp;

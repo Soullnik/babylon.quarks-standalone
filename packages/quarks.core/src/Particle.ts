@@ -206,25 +206,49 @@ export class SpriteParticle implements Particle {
      */
     velocity: Vector3;
     /**
-     * Age of the particle.
-     * @type {number}
-     */
-    age = 0;
-    /**
-     * Life duration of the particle.
-     * @type {number}
-     */
-    life = 1;
-    /**
      * Size of the particle.
      * @type {Vector3}
      */
     size: Vector3;
+    /** Row of the store's interleaved scalars this particle owns. */
+    protected scalars: Float64Array;
+    protected scalarOffset: number;
+
+    /**
+     * Age of the particle.
+     * @type {number}
+     */
+    get age(): number {
+        return this.scalars[this.scalarOffset];
+    }
+
+    set age(value: number) {
+        this.scalars[this.scalarOffset] = value;
+    }
+
+    /**
+     * Life duration of the particle.
+     * @type {number}
+     */
+    get life(): number {
+        return this.scalars[this.scalarOffset + 1];
+    }
+
+    set life(value: number) {
+        this.scalars[this.scalarOffset + 1] = value;
+    }
+
     /**
      * Speed modifier of the particle.
      * @type {number}
      */
-    speedModifier = 1;
+    get speedModifier(): number {
+        return this.scalars[this.scalarOffset + 2];
+    }
+
+    set speedModifier(value: number) {
+        this.scalars[this.scalarOffset + 2] = value;
+    }
     // extra properties
     /**
      * Angular velocity of the particle.
@@ -264,8 +288,12 @@ export class SpriteParticle implements Particle {
         this.startSize = new Vector3View(store.startSize, offset3);
         this.color = new Vector4View(store.color, offset4);
         this.startColor = new Vector4View(store.startColor, offset4);
+        this.scalars = store.scalars;
+        this.scalarOffset = storeIndex * ParticleStore.SCALAR_STRIDE;
         this.size.set(1, 1, 1);
         this.startSize.set(1, 1, 1);
+        this.life = 1;
+        this.speedModifier = 1;
     }
 
     /**
@@ -288,6 +316,8 @@ export class SpriteParticle implements Particle {
         (this.startSize as Vector3View).bind(store.startSize, offset3);
         (this.color as Vector4View).bind(store.color, offset4);
         (this.startColor as Vector4View).bind(store.startColor, offset4);
+        this.scalars = store.scalars;
+        this.scalarOffset = this.storeIndex * ParticleStore.SCALAR_STRIDE;
     }
 
     /**
@@ -366,31 +396,54 @@ export class TrailParticle implements Particle {
      */
     velocity: Vector3;
     /**
-     * Age of the particle.
-     * @type {number}
-     */
-    age = 0;
-    /**
-     * Life duration of the particle.
-     * @type {number}
-     */
-    life = 1;
-    /**
      * Size of the particle.
      * @type {Vector3}
      */
     size: Vector3;
+    /** Row of the store's interleaved scalars this particle owns. */
+    protected scalars: Float64Array;
+    protected scalarOffset: number;
+
+    /**
+     * Age of the particle.
+     * @type {number}
+     */
+    get age(): number {
+        return this.scalars[this.scalarOffset];
+    }
+
+    set age(value: number) {
+        this.scalars[this.scalarOffset] = value;
+    }
+
+    /**
+     * Life duration of the particle.
+     * @type {number}
+     */
+    get life(): number {
+        return this.scalars[this.scalarOffset + 1];
+    }
+
+    set life(value: number) {
+        this.scalars[this.scalarOffset + 1] = value;
+    }
+
+    /**
+     * Speed modifier of the particle.
+     * @type {number}
+     */
+    get speedModifier(): number {
+        return this.scalars[this.scalarOffset + 2];
+    }
+
+    set speedModifier(value: number) {
+        this.scalars[this.scalarOffset + 2] = value;
+    }
     /**
      * Length of the trail.
      * @type {number}
      */
     length = 100;
-    /**
-     * Speed modifier of the particle.
-     * @type {number}
-     */
-    speedModifier = 1;
-
     // GPU properties
     /**
      * Color of the particle.
@@ -441,8 +494,12 @@ export class TrailParticle implements Particle {
         this.startSize = new Vector3View(store.startSize, offset3);
         this.color = new Vector4View(store.color, offset4);
         this.startColor = new Vector4View(store.startColor, offset4);
+        this.scalars = store.scalars;
+        this.scalarOffset = storeIndex * ParticleStore.SCALAR_STRIDE;
         this.size.set(1, 1, 1);
         this.startSize.set(1, 1, 1);
+        this.life = 1;
+        this.speedModifier = 1;
     }
 
     /**
@@ -465,6 +522,8 @@ export class TrailParticle implements Particle {
         (this.startSize as Vector3View).bind(store.startSize, offset3);
         (this.color as Vector4View).bind(store.color, offset4);
         (this.startColor as Vector4View).bind(store.startColor, offset4);
+        this.scalars = store.scalars;
+        this.scalarOffset = this.storeIndex * ParticleStore.SCALAR_STRIDE;
     }
 
     /**

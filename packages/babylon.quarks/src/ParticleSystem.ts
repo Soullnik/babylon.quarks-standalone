@@ -893,17 +893,17 @@ export class ParticleSystem implements IParticleSystem {
             }
         } else {
             // Live particles own rows [0, particleNum), so integrate straight
-            // over the position and velocity columns instead of stepping through
-            // the vector views of each particle.
+            // over the columns. Nothing in here touches a particle object.
             const positions = this.store.position;
             const velocities = this.store.velocity;
-            for (let i = 0, offset = 0; i < particleCount; i++, offset += 3) {
-                const particle = particles[i];
-                const step = delta * particle.speedModifier;
+            const scalars = this.store.scalars;
+            const stride = ParticleStore.SCALAR_STRIDE;
+            for (let i = 0, offset = 0, scalar = 0; i < particleCount; i++, offset += 3, scalar += stride) {
+                const step = delta * scalars[scalar + ParticleStore.SPEED_MODIFIER];
                 positions[offset] += velocities[offset] * step;
                 positions[offset + 1] += velocities[offset + 1] * step;
                 positions[offset + 2] += velocities[offset + 2] * step;
-                particle.age += delta;
+                scalars[scalar + ParticleStore.AGE] += delta;
             }
         }
 
@@ -915,10 +915,14 @@ export class ParticleSystem implements IParticleSystem {
 
         const notifyDeaths = this.hasListeners('particleDied');
         const store = this.store;
+        const scalars = store.scalars;
+        const scalarStride = ParticleStore.SCALAR_STRIDE;
         let liveParticleCount = this.particleNum;
         for (let i = 0; i < liveParticleCount; i++) {
             const particle = particles[i];
-            if (particle.age >= particle.life && (!isTrailMode || (particle as TrailParticle).historyCount === 0)) {
+            const scalar = i * scalarStride;
+            const dead = scalars[scalar + ParticleStore.AGE] >= scalars[scalar + ParticleStore.LIFE];
+            if (dead && (!isTrailMode || (particle as TrailParticle).historyCount === 0)) {
                 const last = liveParticleCount - 1;
                 const survivor = particles[last] as StoreBackedParticle;
                 particles[i] = survivor;
