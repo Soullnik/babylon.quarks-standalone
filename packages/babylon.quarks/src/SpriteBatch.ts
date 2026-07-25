@@ -23,6 +23,12 @@ import particle_frag from './shaders/particle_frag.glsl';
 import particle_physics_frag from './shaders/particle_physics_frag.glsl';
 import stretched_bb_particle_vert from './shaders/stretched_bb_particle_vert.glsl';
 import local_particle_physics_vert from './shaders/local_particle_physics_vert.glsl';
+import particle_vert_wgsl from './shaders/particle_vert.wgsl';
+import particle_frag_wgsl from './shaders/particle_frag.wgsl';
+import particle_physics_frag_wgsl from './shaders/particle_physics_frag.wgsl';
+import stretched_bb_particle_vert_wgsl from './shaders/stretched_bb_particle_vert.wgsl';
+import local_particle_physics_vert_wgsl from './shaders/local_particle_physics_vert.wgsl';
+import {registerShaders, shaderLanguageFor, ShaderSources} from './shaders/shaderLanguageSupport';
 
 export class SpriteBatch extends VFXBatch {
     private offsetBuffer!: Float32Array;
@@ -132,19 +138,19 @@ export class SpriteBatch extends VFXBatch {
         // Effect.ShadersStore and defeat Babylon's compiled-effect cache.
         const shaderName = `quarksParticle_${this.settings.renderMode}`;
         this.lastStretchedSpeedFactor = Number.NaN;
-        let vertexShader: string;
-        let fragmentShader: string;
         const defines: string[] = [];
 
+        let vertexShader: ShaderSources;
+        let fragmentShader: ShaderSources;
         if (this.settings.renderMode === RenderMode.Mesh) {
-            vertexShader = local_particle_physics_vert;
-            fragmentShader = particle_physics_frag;
+            vertexShader = {glsl: local_particle_physics_vert, wgsl: local_particle_physics_vert_wgsl};
+            fragmentShader = {glsl: particle_physics_frag, wgsl: particle_physics_frag_wgsl};
         } else if (this.settings.renderMode === RenderMode.StretchedBillBoard) {
-            vertexShader = stretched_bb_particle_vert;
-            fragmentShader = particle_frag;
+            vertexShader = {glsl: stretched_bb_particle_vert, wgsl: stretched_bb_particle_vert_wgsl};
+            fragmentShader = {glsl: particle_frag, wgsl: particle_frag_wgsl};
         } else {
-            vertexShader = particle_vert;
-            fragmentShader = particle_frag;
+            vertexShader = {glsl: particle_vert, wgsl: particle_vert_wgsl};
+            fragmentShader = {glsl: particle_frag, wgsl: particle_frag_wgsl};
         }
 
         if (this.settings.texture) {
@@ -169,8 +175,8 @@ export class SpriteBatch extends VFXBatch {
             defines.push('HORIZONTAL');
         }
 
-        Effect.ShadersStore[shaderName + 'VertexShader'] = vertexShader;
-        Effect.ShadersStore[shaderName + 'FragmentShader'] = fragmentShader;
+        const shaderLanguage = shaderLanguageFor(this.scene.getEngine());
+        registerShaders(shaderName, vertexShader, fragmentShader, shaderLanguage);
 
         const attributes = ['position', 'uv', 'offset', 'color', 'size', 'rotation', 'uvTile'];
         if (this.settings.renderMode === RenderMode.Mesh) {
@@ -215,6 +221,7 @@ export class SpriteBatch extends VFXBatch {
                 samplers,
                 defines,
                 needAlphaBlending: this.settings.materialTransparent,
+                shaderLanguage,
             }
         );
 

@@ -12,6 +12,9 @@ import {VFXBatch, RenderMode} from './VFXBatch';
 import {VFXBatchSettings} from './BatchedRenderer';
 import trail_vert from './shaders/trail_vert.glsl';
 import trail_frag from './shaders/trail_frag.glsl';
+import trail_vert_wgsl from './shaders/trail_vert.wgsl';
+import trail_frag_wgsl from './shaders/trail_frag.wgsl';
+import {registerShaders, shaderLanguageFor} from './shaders/shaderLanguageSupport';
 
 export class TrailBatch extends VFXBatch {
     private positionBuffer!: Float32Array;
@@ -112,8 +115,13 @@ export class TrailBatch extends VFXBatch {
             defines.push('USE_MAP');
         }
 
-        Effect.ShadersStore[shaderName + 'VertexShader'] = trail_vert;
-        Effect.ShadersStore[shaderName + 'FragmentShader'] = trail_frag;
+        const shaderLanguage = shaderLanguageFor(this.scene.getEngine());
+        registerShaders(
+            shaderName,
+            {glsl: trail_vert, wgsl: trail_vert_wgsl},
+            {glsl: trail_frag, wgsl: trail_frag_wgsl},
+            shaderLanguage
+        );
 
         const attributes = ['position', 'previous', 'next', 'side', 'width', 'uv', 'color'];
         const uniforms = ['world', 'view', 'projection', 'worldViewProjection', 'lineWidth', 'resolution', 'sizeAttenuation'];
@@ -131,6 +139,7 @@ export class TrailBatch extends VFXBatch {
                 samplers,
                 defines,
                 needAlphaBlending: this.settings.materialTransparent,
+                shaderLanguage,
             }
         );
 

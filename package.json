@@ -18,7 +18,8 @@
     "build:unitypackage": "node ./scripts/build-unitypackage.mjs",
     "check": "npm run build && npm run build:editor && npm run test && npm run build:examples && npm run check:pack",
     "examples": "npm run dev --workspace=examples",
-    "dev": "npm run examples"
+    "dev": "npm run examples",
+    "validate:wgsl": "node ./scripts/validate-wgsl.mjs"
   },
   "engines": {
     "node": ">=20.11.0",
