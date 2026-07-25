@@ -18,12 +18,14 @@ export class RotationOverLife implements Behavior {
 
     update(particle: Particle, delta: number): void {
         if (typeof particle.rotation === 'number') {
-            (particle.rotation as number) +=
-                delta *
-                (this.angularVelocity as FunctionValueGenerator).genValue(
-                    particle.memory,
-                    particle.age / particle.life
-                );
+            const rate = (this.angularVelocity as FunctionValueGenerator).genValue(
+                particle.memory,
+                particle.age / particle.life
+            );
+            (particle.rotation as number) += delta * rate;
+            // Kept for the renderer, which draws between steps and has no other
+            // way to know how fast this particle is turning.
+            particle.angularVelocity = rate;
         }
     }
 
@@ -34,7 +36,9 @@ export class RotationOverLife implements Behavior {
             if (particle.age >= particle.life || typeof particle.rotation !== 'number') {
                 continue;
             }
-            particle.rotation += delta * generator.genValue(particle.memory, particle.age / particle.life);
+            const rate = generator.genValue(particle.memory, particle.age / particle.life);
+            particle.rotation += delta * rate;
+            particle.angularVelocity = rate;
         }
     }
 

@@ -77,8 +77,12 @@ function fragmentFor(behavior: Behavior, k: number): Fragment | null {
         case 'RotationOverLife':
             return {
                 setup: `const g${k} = behaviors[${k}].angularVelocity;`,
+                // The rate is kept on the particle for the renderer, which draws
+                // between simulation steps.
                 body: `if (typeof p.rotation === 'number') {
-                        p.rotation += delta * g${k}.genValue(p.memory, t);
+                        const rate = g${k}.genValue(p.memory, t);
+                        p.rotation += delta * rate;
+                        p.angularVelocity = rate;
                     }`,
             };
         case 'FrameOverLife':
@@ -165,7 +169,9 @@ function fragmentFor(behavior: Behavior, k: number): Fragment | null {
                     const lo${k} = b${k}.speedRange.a;
                     const span${k} = b${k}.speedRange.b - lo${k};`,
                 body: `if (typeof p.rotation === 'number') {
-                        p.rotation += delta * g${k}.genValue(p.memory, (p.startSpeed - lo${k}) / span${k});
+                        const rate = g${k}.genValue(p.memory, (p.startSpeed - lo${k}) / span${k});
+                        p.rotation += delta * rate;
+                        p.angularVelocity = rate;
                     }`,
             };
         case 'OrbitOverLife':
@@ -192,6 +198,8 @@ function fragmentFor(behavior: Behavior, k: number): Fragment | null {
                     if (r instanceof deps.Quaternion) {
                         g${k}.genValue(p.memory, q${k}, delta, t);
                         r.multiply(q${k});
+                        const step = p.angularVelocity;
+                        if (step instanceof deps.Quaternion) { step.copy(q${k}); }
                     }}`,
             };
         case 'VelocityOverLife':

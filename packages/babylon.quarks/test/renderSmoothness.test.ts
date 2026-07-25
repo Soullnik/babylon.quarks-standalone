@@ -1,4 +1,14 @@
-import {ConstantColor, ConstantValue, PointEmitter, Vector4} from 'quarks.core';
+import {
+    AxisAngleGenerator,
+    ConstantColor,
+    ConstantValue,
+    PointEmitter,
+    Rotation3DOverLife,
+    RotationOverLife,
+    TrailParticle,
+    Vector3 as QVector3,
+    Vector4,
+} from 'quarks.core';
 import {NullEngine} from '@babylonjs/core/Engines/nullEngine';
 import {Scene} from '@babylonjs/core/scene';
 import {ParticleSystem} from '../src/ParticleSystem';
@@ -137,6 +147,180 @@ describe('render-time smoothness', () => {
             previous = now;
         }
         renderer.dispose();
+    });
+
+    describe('turning', () => {
+        const SPIN = 8; // rad/s, the sort of rate AcidBoiling's sprites use
+
+        function setupSpinning(renderMode: RenderMode) {
+            const mesh = renderMode === RenderMode.Mesh;
+            const system = new ParticleSystem({
+                scene,
+                duration: 100,
+                looping: true,
+                worldSpace: true,
+                startLife: new ConstantValue(50),
+                startSpeed: new ConstantValue(0),
+                startSize: new ConstantValue(1),
+                startColor: new ConstantColor(new Vector4(1, 1, 1, 1)),
+                emissionOverTime: new ConstantValue(0),
+                emissionBursts: [{time: 0, count: new ConstantValue(1), cycle: 1, interval: 0, probability: 1}],
+                shape: new PointEmitter(),
+                renderMode,
+                behaviors: [
+                    mesh
+                        ? new Rotation3DOverLife(new AxisAngleGenerator(new QVector3(0, 0, 1), new ConstantValue(SPIN)))
+                        : new RotationOverLife(new ConstantValue(SPIN)),
+                ],
+            });
+            const renderer = new BatchedRenderer('smoothness-spin', scene);
+            renderer.addSystem(system);
+            system.play();
+            for (let i = 0; i < 4; i++) renderer.update(1 / 60);
+            return {system, renderer};
+        }
+
+        const rotations = (renderer: BatchedRenderer) =>
+            (renderer.batches[0] as unknown as {rotationBuffer: Float32Array}).rotationBuffer;
+
+        it('keeps a spinning billboard turning on frames that run no simulation step', () => {
+            const {renderer} = setupSpinning(RenderMode.BillBoard);
+            const delta = 1 / 120;
+            let previous = rotations(renderer)[0];
+            for (let i = 0; i < 12; i++) {
+                renderer.update(delta);
+                const now = rotations(renderer)[0];
+                expect(now - previous).toBeCloseTo(delta * SPIN, 5);
+                previous = now;
+            }
+            renderer.dispose();
+        });
+
+        it('keeps a spinning mesh turning too', () => {
+            const {renderer} = setupSpinning(RenderMode.Mesh);
+            const delta = 1 / 120;
+            const angle = (buffer: Float32Array) => 2 * Math.atan2(Math.abs(buffer[2]), buffer[3]);
+            let previous = angle(rotations(renderer));
+            const turns: number[] = [];
+            for (let i = 0; i < 12; i++) {
+                renderer.update(delta);
+                const now = angle(rotations(renderer));
+                // Ignore the wrap when the quaternion crosses half a turn.
+                if (now > previous) turns.push(now - previous);
+                previous = now;
+            }
+            expect(turns.length).toBeGreaterThan(6);
+            for (const turn of turns) {
+                // Within a thousandth of a degree of an even sub-step turn: the
+                // partial turn is a normalised lerp rather than a true slerp.
+                expect(turn).toBeCloseTo(delta * SPIN, 4);
+            }
+            renderer.dispose();
+        });
+
+        it('does not carry a recycled particle spin into a system that has none', () => {
+            // A pooled row can come back without a turning behavior to reset it.
+            const {system, renderer} = setupSpinning(RenderMode.BillBoard);
+            system.behaviors.length = 0;
+            const particle = system.particles[0];
+            particle.rotation = 0.25;
+            particle.angularVelocity = 0;
+            renderer.refreshBatches();
+            const held = rotations(renderer)[0];
+            renderer.update(1 / 120);
+            expect(rotations(renderer)[0]).toBeCloseTo(held, 6);
+            renderer.dispose();
+        });
+    });
+
+    describe('trails', () => {
+        /** One trail particle, moving in +Z, its ribbon long enough to have a body. */
+        function setupTrail(followLocalOrigin = false) {
+            const system = new ParticleSystem({
+                scene,
+                duration: 100,
+                looping: true,
+                worldSpace: true,
+                startLife: new ConstantValue(50),
+                startSpeed: new ConstantValue(SPEED),
+                startSize: new ConstantValue(1),
+                startColor: new ConstantColor(new Vector4(1, 1, 1, 1)),
+                emissionOverTime: new ConstantValue(0),
+                emissionBursts: [{time: 0, count: new ConstantValue(1), cycle: 1, interval: 0, probability: 1}],
+                shape: new PointEmitter(),
+                renderMode: RenderMode.Trail,
+                rendererEmitterSettings: {startLength: new ConstantValue(10), followLocalOrigin},
+            });
+            const renderer = new BatchedRenderer('smoothness-trail', scene);
+            renderer.addSystem(system);
+            system.play();
+            renderer.update(1 / 60);
+            const particle = system.particles[0] as TrailParticle;
+            particle.position.set(0, 0, 0);
+            particle.velocity.set(0, 0, SPEED);
+            particle.speedModifier = 1;
+            // Lay down a few samples so the ribbon has a body behind its head.
+            for (let i = 0; i < 6; i++) renderer.update(1 / 60);
+            return {system, renderer, particle};
+        }
+
+        const positions = (renderer: BatchedRenderer) =>
+            (renderer.batches[0] as unknown as {positionBuffer: Float32Array}).positionBuffer;
+
+        /** Z of the newest ribbon sample, which is written last. */
+        const headZ = (renderer: BatchedRenderer, particle: TrailParticle) =>
+            positions(renderer)[(particle.historyCount - 1) * 2 * 3 + 2];
+
+        it('keeps the ribbon head moving on frames that run no simulation step', () => {
+            const {renderer, particle} = setupTrail();
+            const delta = 1 / 120;
+            let previous = headZ(renderer, particle);
+            for (let i = 0; i < 12; i++) {
+                renderer.update(delta);
+                const now = headZ(renderer, particle);
+                expect(now - previous).toBeCloseTo(delta * SPEED, 5);
+                previous = now;
+            }
+            renderer.dispose();
+        });
+
+        it('leaves the samples behind the head where they were recorded', () => {
+            const {renderer, particle} = setupTrail();
+            const before = positions(renderer).slice(0, (particle.historyCount - 1) * 2 * 3);
+            renderer.update(1 / 120); // no simulation step, so only the head may move
+            const after = positions(renderer).slice(0, (particle.historyCount - 1) * 2 * 3);
+            expect(Array.from(after)).toEqual(Array.from(before));
+            renderer.dispose();
+        });
+
+        it('feeds the head to the shader consistently as current, previous and next', () => {
+            // The ribbon direction comes from neighbouring samples, so a head
+            // carried forward in one buffer but not the others would twist it.
+            const {renderer, particle} = setupTrail();
+            renderer.update(1 / 120);
+            const buffers = renderer.batches[0] as unknown as {
+                positionBuffer: Float32Array;
+                previousBuffer: Float32Array;
+                nextBuffer: Float32Array;
+            };
+            const last = particle.historyCount - 1;
+            const headOffset = last * 2 * 3;
+            const beforeHeadOffset = (last - 1) * 2 * 3;
+            // The head is its own `next` on the final sample...
+            expect(buffers.nextBuffer[headOffset + 2]).toBeCloseTo(buffers.positionBuffer[headOffset + 2], 6);
+            // ...and the `next` of the sample before it.
+            expect(buffers.nextBuffer[beforeHeadOffset + 2]).toBeCloseTo(buffers.positionBuffer[headOffset + 2], 6);
+            renderer.dispose();
+        });
+
+        it('leaves a ribbon pinned to the emitter origin alone', () => {
+            // Those follow the emitter transform, not the particle's velocity.
+            const {renderer, particle} = setupTrail(true);
+            const before = headZ(renderer, particle);
+            renderer.update(1 / 120);
+            expect(headZ(renderer, particle)).toBeCloseTo(before, 6);
+            renderer.dispose();
+        });
     });
 
     it('holds a paused system exactly where the simulation left it', () => {

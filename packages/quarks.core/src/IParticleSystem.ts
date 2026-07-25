@@ -116,6 +116,14 @@ export interface IParticleSystem {
      */
     simulationResidual?: number;
     /**
+     * Length of one simulation step, in seconds, when the implementation
+     * simulates on a fixed timestep. Turning is recorded per step rather than
+     * per second, so a renderer needs this to know what fraction of a step
+     * {@link simulationResidual} is.
+     * @type {number}
+     */
+    simulationStep?: number;
+    /**
      * Whether this system only emits through another system, which is when its
      * particles carry their own parent transform.
      * @type {boolean}

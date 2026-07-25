@@ -29,6 +29,12 @@ export class Rotation3DOverLife implements Behavior {
                 particle.age / particle.life
             );
             ((particle as SpriteParticle).rotation as Quaternion).multiply(this.tempQuat);
+            // This step's turn, kept for the renderer to draw a fraction of when
+            // the frame falls between steps.
+            const step = (particle as SpriteParticle).angularVelocity;
+            if (step instanceof Quaternion) {
+                step.copy(this.tempQuat);
+            }
         }
     }
     toJSON(): any {

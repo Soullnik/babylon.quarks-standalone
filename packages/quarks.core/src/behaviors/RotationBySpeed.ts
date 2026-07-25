@@ -25,8 +25,10 @@ export class RotationBySpeed implements Behavior {
     update(particle: Particle, delta: number): void {
         if (typeof particle.rotation === 'number') {
             const t = (particle.startSpeed - this.speedRange.a) / (this.speedRange.b - this.speedRange.a);
-            (particle.rotation as number) +=
-                delta * (this.angularVelocity as FunctionValueGenerator).genValue(particle.memory, t);
+            const rate = (this.angularVelocity as FunctionValueGenerator).genValue(particle.memory, t);
+            (particle.rotation as number) += delta * rate;
+            // Kept for the renderer, which draws between steps.
+            particle.angularVelocity = rate;
         }
     }
 

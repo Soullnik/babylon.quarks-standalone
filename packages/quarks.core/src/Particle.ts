@@ -58,6 +58,16 @@ export interface IParticle {
 
 export interface Particle extends IParticle {
     /**
+     * How fast the particle is turning, as the behavior that turns it last left
+     * it: a rate in radians per second for a particle that rotates by an angle,
+     * or one simulation step's turn for one that rotates by quaternion.
+     *
+     * Written by the turning behaviors and read by the renderer, which draws
+     * between simulation steps and has no other way to continue the turn.
+     * @type {number | Quaternion}
+     */
+    angularVelocity?: number | Quaternion;
+    /**
      * Speed modifier of the particle.
      * @type {number}
      */

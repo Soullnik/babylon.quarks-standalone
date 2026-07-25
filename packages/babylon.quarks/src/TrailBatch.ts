@@ -7,7 +7,7 @@ import {BoundingInfo} from '@babylonjs/core/Culling/boundingInfo';
 import {Vector3 as BVector3} from '@babylonjs/core/Maths/math.vector';
 import {Vector2 as BVector2} from '@babylonjs/core/Maths/math.vector';
 import {Constants} from '@babylonjs/core/Engines/constants';
-import {IParticleSystem, Matrix4, Quaternion, TrailParticle, Vector3} from 'quarks.core';
+import {IParticleSystem, Matrix4, Quaternion, TrailParticle, TrailSettings, Vector3} from 'quarks.core';
 import {VFXBatch, RenderMode} from './VFXBatch';
 import {VFXBatchSettings} from './BatchedRenderer';
 import trail_vert from './shaders/trail_vert.glsl';
@@ -215,6 +215,15 @@ export class TrailBatch extends VFXBatch {
             const tileHeight = 1 / vTileCount;
             const systemWorldSpace = system.worldSpace;
             const objectScale = (Math.abs(scale.x) + Math.abs(scale.y) + Math.abs(scale.z)) / 3;
+            // A ribbon's samples were recorded at past steps and stay where they
+            // were; only its newest sample is the particle, and that one has
+            // moved on since the step that recorded it. Leaving it behind makes
+            // the whole trail stutter on frames that ran no step. A trail pinned
+            // to the emitter's origin is driven by the emitter's transform
+            // rather than by the particle's velocity, so it is left alone.
+            const residual = (system.rendererEmitterSettings as TrailSettings).followLocalOrigin
+                ? 0
+                : (system.simulationResidual ?? 0);
 
             for (let j = 0; j < particleNum; j++) {
                 const particle = particles[j] as TrailParticle;
@@ -222,6 +231,11 @@ export class TrailBatch extends VFXBatch {
                 if (particleHistoryLength === 0) {
                     continue;
                 }
+                const newest = particleHistoryLength - 1;
+                const advance = residual * particle.speedModifier;
+                const headX = particle.velocity.x * advance;
+                const headY = particle.velocity.y * advance;
+                const headZ = particle.velocity.z * advance;
                 const historyCapacity = particle.historyCapacity;
                 const historyPositions = particle.historyPositions;
                 const historySizes = particle.historySizes;
@@ -262,6 +276,30 @@ export class TrailBatch extends VFXBatch {
                     let nextX = historyPositions[nextPosIndex];
                     let nextY = historyPositions[nextPosIndex + 1];
                     let nextZ = historyPositions[nextPosIndex + 2];
+
+                    // The head shows up as `current` on the last sample and as
+                    // `next` on the one before it, and is its own `previous`
+                    // when the ribbon is a single sample long. It has to be
+                    // carried forward in every one of those, or the shader
+                    // builds this segment's direction from two different
+                    // versions of the same point.
+                    if (advance !== 0) {
+                        if (i === newest) {
+                            currentX += headX;
+                            currentY += headY;
+                            currentZ += headZ;
+                            if (newest === 0) {
+                                previousX += headX;
+                                previousY += headY;
+                                previousZ += headZ;
+                            }
+                        }
+                        if (i >= newest - 1) {
+                            nextX += headX;
+                            nextY += headY;
+                            nextZ += headZ;
+                        }
+                    }
 
                     const currentSize = historySizes[currentSlot];
                     const currentColorIndex = currentSlot * 4;

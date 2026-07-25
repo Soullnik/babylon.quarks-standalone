@@ -684,6 +684,12 @@ export class ParticleSystem implements IParticleSystem {
                     if (!(sprite.rotation instanceof Quaternion)) {
                         sprite.rotation = new Quaternion();
                     }
+                    // A recycled particle can still carry the turn of whatever
+                    // it was last time; the renderer would draw a fraction of it
+                    // before any behavior has had a chance to say otherwise.
+                    if (sprite.angularVelocity instanceof Quaternion) {
+                        sprite.angularVelocity.set(0, 0, 0, 1);
+                    }
                     if (startRotationIsRotation) {
                         (this.startRotation as RotationGenerator).genValue(
                             particle.memory,
@@ -706,6 +712,9 @@ export class ParticleSystem implements IParticleSystem {
                             timeRatio
                         );
                     }
+                    // Set until a turning behavior says otherwise, so the
+                    // renderer never carries a recycled particle's old spin.
+                    sprite.angularVelocity = 0;
                 }
             } else if (trailSettings) {
                 const trail = particle as TrailParticle;
@@ -865,6 +874,11 @@ export class ParticleSystem implements IParticleSystem {
      * motion exactly — it is the same term the next step would integrate — so
      * the simulation stays fixed-step while the picture moves continuously.
      */
+    /** Length of one simulation step, in seconds. See {@link simulationResidual}. */
+    get simulationStep(): number {
+        return SIMULATION_STEP;
+    }
+
     get simulationResidual(): number {
         if (this.paused) {
             return 0;

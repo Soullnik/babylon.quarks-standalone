@@ -271,6 +271,8 @@ export class SpriteBatch extends VFXBatch {
     private quaternion_ = new Quaternion();
     private quaternion2_ = new Quaternion();
     private quaternion3_ = new Quaternion();
+    private quaternion4_ = new Quaternion();
+    private quaternion5_ = new Quaternion();
     private rotationMat_ = new Matrix3();
     private rotationMat2_ = new Matrix3();
     private lastStretchedSpeedFactor = Number.NaN;
@@ -332,6 +334,9 @@ export class SpriteBatch extends VFXBatch {
             // the leftover time puts it where it belongs now; without it the
             // particles visibly stutter on any display that is not exactly 60Hz.
             const residual = system.simulationResidual ?? 0;
+            // Turning is recorded per step rather than per second, so it is
+            // carried by the fraction of a step the frame is past, not by time.
+            const stepFraction = residual === 0 ? 0 : residual / (system.simulationStep ?? residual);
             let copiedPositionAndSize = false;
             if (store !== undefined && systemWorldSpace) {
                 if (residual > 0 && particleNum > 0) {
@@ -378,9 +383,19 @@ export class SpriteBatch extends VFXBatch {
                 const particle = particles[j] as SpriteParticle;
 
                 if (isMeshRender) {
+                    // Turning behaviors leave the last step's turn on the
+                    // particle; a fraction of it carries the mesh the rest of
+                    // the way to now.
+                    let own = particle.rotation as Quaternion;
+                    const step = particle.angularVelocity;
+                    if (stepFraction !== 0 && step instanceof Quaternion) {
+                        own = this.quaternion4_.copy(own).multiply(
+                            SpriteBatch.partialTurn(step, stepFraction, this.quaternion5_)
+                        );
+                    }
                     let q: Quaternion;
                     if (systemWorldSpace) {
-                        q = particle.rotation as Quaternion;
+                        q = own;
                     } else {
                         let parentQ: Quaternion;
                         if (particle.parentMatrix) {
@@ -389,7 +404,7 @@ export class SpriteBatch extends VFXBatch {
                             parentQ = rotation;
                         }
                         q = this.quaternion_;
-                        q.copy(parentQ).multiply(particle.rotation as Quaternion);
+                        q.copy(parentQ).multiply(own);
                     }
                     const ri = index * 4;
                     this.rotationBuffer[ri] = q.x;
@@ -397,7 +412,9 @@ export class SpriteBatch extends VFXBatch {
                     this.rotationBuffer[ri + 2] = q.z;
                     this.rotationBuffer[ri + 3] = q.w;
                 } else {
-                    this.rotationBuffer[index] = particle.rotation as number;
+                    const spin = particle.angularVelocity;
+                    this.rotationBuffer[index] =
+                        (particle.rotation as number) + (typeof spin === 'number' ? spin * residual : 0);
                 }
 
                 if (!copiedPositionAndSize) {
@@ -516,6 +533,27 @@ export class SpriteBatch extends VFXBatch {
             material.setFloat('speedFactor', clampedSpeedFactor);
             this.lastStretchedSpeedFactor = clampedSpeedFactor;
         }
+    }
+
+    /**
+     * The fraction `f` of a turn, as a normalised lerp from no rotation toward
+     * `step`, written into `out`.
+     *
+     * A true slerp would be exact, but `step` is one simulation step of turning
+     * and `f` is below 1, so the arc being split is small enough that the lerp
+     * is within a rounding error of it and costs a fraction as much.
+     */
+    private static partialTurn(step: Quaternion, f: number, out: Quaternion): Quaternion {
+        const x = step.x * f;
+        const y = step.y * f;
+        const z = step.z * f;
+        const w = 1 + (step.w - 1) * f;
+        const inverseLength = 1 / Math.sqrt(x * x + y * y + z * z + w * w);
+        out.x = x * inverseLength;
+        out.y = y * inverseLength;
+        out.z = z * inverseLength;
+        out.w = w * inverseLength;
+        return out;
     }
 
     /**
