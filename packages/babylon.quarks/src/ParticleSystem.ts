@@ -38,6 +38,8 @@ import {
     ParticleSystemEvent,
     ParticleSystemEventType,
     ParticleStore,
+    FusionStep,
+    planBehaviorFusion,
 } from 'quarks.core';
 import {ParticleEmitter} from './ParticleEmitter';
 import {RenderMode} from './VFXBatch';
@@ -226,6 +228,9 @@ export class ParticleSystem implements IParticleSystem {
     private qualityFactor = 1;
     private simulationAccumulator = 0;
     private destroyed = false;
+    /** Behaviors the cached plan was built from, compared by identity. */
+    private fusionPlan?: Array<Behavior>;
+    private fusionSteps: Array<FusionStep> = [];
     /** @internal **/
     _renderer?: BatchedRenderer;
 
@@ -844,6 +849,34 @@ export class ParticleSystem implements IParticleSystem {
         this.simulationAccumulator -= stepsToRun * SIMULATION_STEP;
     }
 
+    /**
+     * Execution plan for this system's behaviors, rebuilt when the list changes.
+     *
+     * Consecutive behaviors that can be compiled into one loop are merged, so
+     * the particles are walked once instead of once per behavior. The plan is
+     * keyed on the behavior instances, not their types: swapping one out has to
+     * change the generated code's indices.
+     */
+    private behaviorSteps(): Array<FusionStep> {
+        const behaviors = this.behaviors;
+        const cached = this.fusionPlan;
+        if (cached !== undefined && cached.length === behaviors.length) {
+            let same = true;
+            for (let i = 0; i < behaviors.length; i++) {
+                if (cached[i] !== behaviors[i]) {
+                    same = false;
+                    break;
+                }
+            }
+            if (same) {
+                return this.fusionSteps;
+            }
+        }
+        this.fusionPlan = behaviors.slice();
+        this.fusionSteps = planBehaviorFusion(behaviors);
+        return this.fusionSteps;
+    }
+
     /** Advances emission, behaviors, motion and culling by one fixed timestep. */
     private simulateStep(delta: number): void {
         if (!this.onlyUsedByOther) {
@@ -856,16 +889,26 @@ export class ParticleSystem implements IParticleSystem {
         const particleCount = this.particleNum;
         const isTrailMode = this.rendererSettings.renderMode === RenderMode.Trail;
         this.emitterShape.update(this, delta);
-        for (let j = 0; j < behaviorCount; j++) {
-            const behavior = behaviors[j];
-            behavior.frameUpdate(delta);
+        const steps = this.behaviorSteps();
+        for (let s = 0; s < steps.length; s++) {
+            const step = steps[s];
+            const stepBehaviors = step.behaviors;
+            for (let j = 0; j < stepBehaviors.length; j++) {
+                stepBehaviors[j].frameUpdate(delta);
+            }
+            // Nothing to update: skip, matching what the per-particle loop did.
+            // A behavior may set up state before its loop that is only valid
+            // once it has seen a particle.
+            if (particleCount === 0) {
+                continue;
+            }
+            if (step.run !== undefined) {
+                step.run(behaviors, particles, particleCount, delta);
+                continue;
+            }
+            const behavior = stepBehaviors[0];
             if (behavior.updateAll !== undefined) {
-                // Skip the call entirely when there is nothing to update, matching
-                // the per-particle loop below: a behavior may set up state before
-                // its loop that is only valid once it has seen a particle.
-                if (particleCount > 0) {
-                    behavior.updateAll(particles, particleCount, delta);
-                }
+                behavior.updateAll(particles, particleCount, delta);
                 continue;
             }
             for (let i = 0; i < particleCount; i++) {

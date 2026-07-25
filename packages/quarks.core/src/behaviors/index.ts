@@ -22,3 +22,4 @@ export * from './SizeBySpeed';
 export * from './RotationBySpeed';
 export * from './LimitSpeedOverLife';
 export * from './Behavior';
+export * from './BehaviorFusion';
