@@ -29,7 +29,10 @@ export class TrailBatch extends VFXBatch {
 
     constructor(settings: VFXBatchSettings, scene: Scene) {
         super(settings, scene);
-        this.maxParticles = 10000;
+        // Trail buffers hold two vertices per recorded sample and are the largest
+        // per-batch allocation in the library, so start small and let
+        // expandBuffers grow to whatever the batch actually needs.
+        this.maxParticles = 1024;
         this.setupBuffers();
         this.rebuildMaterial();
     }

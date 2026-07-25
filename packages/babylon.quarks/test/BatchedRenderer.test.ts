@@ -271,4 +271,57 @@ describe('BatchedRenderer', () => {
         renderer.dispose();
         orphan.dispose();
     });
+
+    it('keeps an orphaned batch warm briefly, then reclaims it', () => {
+        const renderer = new BatchedRenderer('batch-reclaim', scene);
+        const system = createSystem();
+        renderer.addSystem(system);
+        renderer.update(1 / 60);
+        expect(renderer.batches.length).toBe(1);
+
+        // Moves the system to a new batch and leaves the old one empty.
+        system.uTileCount = 4;
+        renderer.update(1 / 60);
+        expect(renderer.batches.length).toBe(2);
+
+        // Still kept around shortly after, so toggling back reuses it.
+        for (let i = 0; i < 5; i++) renderer.update(1 / 60);
+        expect(renderer.batches.length).toBe(2);
+
+        for (let i = 0; i < 200; i++) renderer.update(1 / 60);
+        expect(renderer.batches.length).toBe(1);
+        // The surviving batch is the one the system actually uses.
+        expect(renderer.batches[0].systems.has(system)).toBe(true);
+        expect(renderer.getBatchRenderStats()[0].particleCount).toBeGreaterThan(0);
+
+        renderer.dispose();
+        system.dispose();
+    });
+
+    it('remaps system batch indices when an earlier batch is reclaimed', () => {
+        const renderer = new BatchedRenderer('batch-remap', scene);
+        const dropped = createSystem();
+        renderer.addSystem(dropped);
+        renderer.update(1 / 60);
+
+        const kept = createSystem();
+        kept.uTileCount = 4;
+        renderer.addSystem(kept);
+        renderer.update(1 / 60);
+        expect(renderer.batches.length).toBe(2);
+
+        // Retire the first batch so the second one shifts down an index.
+        dropped.dispose();
+        for (let i = 0; i < 200; i++) renderer.update(1 / 60);
+        expect(renderer.batches.length).toBe(1);
+        expect(renderer.systemToBatchIndex.get(kept)).toBe(0);
+
+        // The remaining system must still be routed to a live batch.
+        kept.uTileCount = 8;
+        renderer.update(1 / 60);
+        expect(renderer.batches[renderer.systemToBatchIndex.get(kept)!].systems.has(kept)).toBe(true);
+
+        renderer.dispose();
+        kept.dispose();
+    });
 });

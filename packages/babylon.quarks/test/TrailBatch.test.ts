@@ -97,14 +97,15 @@ describe('TrailBatch', () => {
         renderer.addSystem(system);
 
         const batch = getTrailBatch(renderer);
-        expect((batch as any).maxParticles).toBe(10000);
+        const initialCapacity = (batch as any).maxParticles as number;
 
         for (let i = 0; i < 90; i++) {
             renderer.update(1 / 60);
         }
 
-        expect((batch as any).maxParticles).toBeGreaterThan(10000);
+        expect((batch as any).maxParticles).toBeGreaterThan(initialCapacity);
         expect(batch.mesh.isEnabled()).toBe(true);
+        expect(batch.mesh.subMeshes[0].indexCount).toBeGreaterThan(0);
 
         renderer.dispose();
         system.dispose();

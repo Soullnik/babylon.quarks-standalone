@@ -50,6 +50,14 @@ export class BatchedRenderer extends TransformNode {
     depthTexture: BaseTexture | null = null;
     /** Systems in insertion order — iterated every frame, unlike the map. */
     private systems: Array<IParticleSystem> = [];
+    /** Consecutive frames each batch has held no system, parallel to `batches`. */
+    private batchEmptyFrames: Array<number> = [];
+    /**
+     * How long an empty batch is kept before it is disposed. Systems that toggle
+     * a setting back and forth reuse the batch within this window instead of
+     * rebuilding a mesh and material every time.
+     */
+    private static readonly EMPTY_BATCH_GRACE_FRAMES = 120;
     private adaptivePerformanceState: AdaptivePerformanceState = {
         enabled: false,
         targetFrameMs: 16.7,
@@ -136,6 +144,7 @@ export class BatchedRenderer extends TransformNode {
         }
         batch.addSystem(system);
         this.batches.push(batch);
+        this.batchEmptyFrames.push(0);
         this.systemToBatchIndex.set(system, this.batches.length - 1);
     }
 
@@ -251,8 +260,38 @@ export class BatchedRenderer extends TransformNode {
 
     /** Rebuild instance buffers from current particle state without advancing simulation. */
     refreshBatches(): void {
+        const emptyFrames = this.batchEmptyFrames;
         for (let i = 0; i < this.batches.length; i++) {
-            this.batches[i].update();
+            const batch = this.batches[i];
+            if (batch.systems.size > 0) {
+                emptyFrames[i] = 0;
+                batch.update();
+                continue;
+            }
+            const framesEmpty = (emptyFrames[i] ?? 0) + 1;
+            emptyFrames[i] = framesEmpty;
+            if (framesEmpty === 1) {
+                // One last update clears the instance data left on screen.
+                batch.update();
+            } else if (framesEmpty > BatchedRenderer.EMPTY_BATCH_GRACE_FRAMES) {
+                // Nothing has used these settings for a while: give the mesh,
+                // material and GPU buffers back instead of re-uploading empty
+                // instance data forever.
+                this.removeBatch(i);
+                i--;
+            }
+        }
+    }
+
+    /** Disposes the batch at `index` and repairs the system→batch mapping. */
+    private removeBatch(index: number): void {
+        this.batches[index].dispose();
+        this.batches.splice(index, 1);
+        this.batchEmptyFrames.splice(index, 1);
+        for (const [system, batchIndex] of this.systemToBatchIndex) {
+            if (batchIndex > index) {
+                this.systemToBatchIndex.set(system, batchIndex - 1);
+            }
         }
     }
 
@@ -287,6 +326,7 @@ export class BatchedRenderer extends TransformNode {
             batch.dispose();
         }
         this.batches = [];
+        this.batchEmptyFrames.length = 0;
         this.systems.length = 0;
         this.systemToBatchIndex.clear();
         super.dispose();
