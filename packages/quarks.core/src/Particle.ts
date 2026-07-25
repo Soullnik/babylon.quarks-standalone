@@ -1,7 +1,8 @@
-import {Matrix4, Quaternion, Vector3, Vector4} from './math';
+import {Matrix4, Quaternion, Vector3, Vector3View, Vector4, Vector4View} from './math';
 import {EmissionState} from './IParticleSystem';
 import {LinkedList} from './util/LinkedList';
 import {GeneratorMemory} from './functions';
+import {ParticleStore} from './ParticleStore';
 
 export interface IParticle {
     /**
@@ -170,6 +171,10 @@ export class NodeParticle implements IParticle {
  * Particle implementation for sprite-based particle.
  */
 export class SpriteParticle implements Particle {
+    /** Column storage backing this particle's vector attributes. */
+    readonly store: ParticleStore;
+    /** Row this particle occupies in {@link store}. */
+    readonly storeIndex: number;
     /**
      * Parent matrix for transformation.
      * @type {Matrix4}
@@ -184,22 +189,22 @@ export class SpriteParticle implements Particle {
      * Initial color of the particle.
      * @type {Vector4}
      */
-    startColor: Vector4 = new Vector4();
+    startColor: Vector4;
     /**
      * Initial size of the particle.
      * @type {Vector3}
      */
-    startSize: Vector3 = new Vector3(1, 1, 1);
+    startSize: Vector3;
     /**
      * Position of the particle.
      * @type {Vector3}
      */
-    position: Vector3 = new Vector3();
+    position: Vector3;
     /**
      * Velocity of the particle.
      * @type {Vector3}
      */
-    velocity: Vector3 = new Vector3();
+    velocity: Vector3;
     /**
      * Age of the particle.
      * @type {number}
@@ -214,7 +219,7 @@ export class SpriteParticle implements Particle {
      * Size of the particle.
      * @type {Vector3}
      */
-    size = new Vector3(1, 1, 1);
+    size: Vector3;
     /**
      * Speed modifier of the particle.
      * @type {number}
@@ -236,12 +241,45 @@ export class SpriteParticle implements Particle {
      * Color of the particle.
      * @type {Vector4}
      */
-    color: Vector4 = new Vector4();
+    color: Vector4;
     /**
      * UV tile index.
      * @type {number}
      */
     uvTile = 0;
+
+    /**
+     * @param store - Column storage to bind to. A private single-row store is
+     * created when omitted, so a standalone `new SpriteParticle()` still works.
+     * @param storeIndex - Row this particle owns.
+     */
+    constructor(store: ParticleStore = new ParticleStore(1), storeIndex = 0) {
+        this.store = store;
+        this.storeIndex = storeIndex;
+        const offset3 = storeIndex * 3;
+        const offset4 = storeIndex * 4;
+        this.position = new Vector3View(store.position, offset3);
+        this.velocity = new Vector3View(store.velocity, offset3);
+        this.size = new Vector3View(store.size, offset3);
+        this.startSize = new Vector3View(store.startSize, offset3);
+        this.color = new Vector4View(store.color, offset4);
+        this.startColor = new Vector4View(store.startColor, offset4);
+        this.size.set(1, 1, 1);
+        this.startSize.set(1, 1, 1);
+    }
+
+    /** Re-points the vector views after the store grew its arrays. */
+    rebind(): void {
+        const store = this.store;
+        const offset3 = this.storeIndex * 3;
+        const offset4 = this.storeIndex * 4;
+        (this.position as Vector3View).bind(store.position, offset3);
+        (this.velocity as Vector3View).bind(store.velocity, offset3);
+        (this.size as Vector3View).bind(store.size, offset3);
+        (this.startSize as Vector3View).bind(store.startSize, offset3);
+        (this.color as Vector4View).bind(store.color, offset4);
+        (this.startColor as Vector4View).bind(store.startColor, offset4);
+    }
 
     /**
      * Indicates if the particle has died.
@@ -279,6 +317,10 @@ export class RecordState {
  * Particle implementation for trail-based particles.
  */
 export class TrailParticle implements Particle {
+    /** Column storage backing this particle's vector attributes. */
+    readonly store: ParticleStore;
+    /** Row this particle occupies in {@link store}. */
+    readonly storeIndex: number;
     /**
      * Parent matrix for transformation.
      * @type {Matrix4}
@@ -293,17 +335,17 @@ export class TrailParticle implements Particle {
      * Initial color of the particle.
      * @type {Vector4}
      */
-    startColor: Vector4 = new Vector4();
+    startColor: Vector4;
     /**
      * Initial size of the particle.
      * @type {Vector3}
      */
-    startSize: Vector3 = new Vector3(1,1,1);
+    startSize: Vector3;
     /**
      * Position of the particle.
      * @type {Vector3}
      */
-    position: Vector3 = new Vector3();
+    position: Vector3;
     /**
      * Local position of the particle.
      * @type {Vector3}
@@ -313,7 +355,7 @@ export class TrailParticle implements Particle {
      * Velocity of the particle.
      * @type {Vector3}
      */
-    velocity: Vector3 = new Vector3();
+    velocity: Vector3;
     /**
      * Age of the particle.
      * @type {number}
@@ -328,7 +370,7 @@ export class TrailParticle implements Particle {
      * Size of the particle.
      * @type {Vector3}
      */
-    size = new Vector3(1,1,1);
+    size: Vector3;
     /**
      * Length of the trail.
      * @type {number}
@@ -345,7 +387,7 @@ export class TrailParticle implements Particle {
      * Color of the particle.
      * @type {Vector4}
      */
-    color: Vector4 = new Vector4();
+    color: Vector4;
     /**
      * Previous states of the particle.
      *
@@ -373,6 +415,39 @@ export class TrailParticle implements Particle {
     historyHead = 0;
     /** Number of valid samples currently held. */
     historyCount = 0;
+
+    /**
+     * @param store - Column storage to bind to. A private single-row store is
+     * created when omitted, so a standalone `new TrailParticle()` still works.
+     * @param storeIndex - Row this particle owns.
+     */
+    constructor(store: ParticleStore = new ParticleStore(1), storeIndex = 0) {
+        this.store = store;
+        this.storeIndex = storeIndex;
+        const offset3 = storeIndex * 3;
+        const offset4 = storeIndex * 4;
+        this.position = new Vector3View(store.position, offset3);
+        this.velocity = new Vector3View(store.velocity, offset3);
+        this.size = new Vector3View(store.size, offset3);
+        this.startSize = new Vector3View(store.startSize, offset3);
+        this.color = new Vector4View(store.color, offset4);
+        this.startColor = new Vector4View(store.startColor, offset4);
+        this.size.set(1, 1, 1);
+        this.startSize.set(1, 1, 1);
+    }
+
+    /** Re-points the vector views after the store grew its arrays. */
+    rebind(): void {
+        const store = this.store;
+        const offset3 = this.storeIndex * 3;
+        const offset4 = this.storeIndex * 4;
+        (this.position as Vector3View).bind(store.position, offset3);
+        (this.velocity as Vector3View).bind(store.velocity, offset3);
+        (this.size as Vector3View).bind(store.size, offset3);
+        (this.startSize as Vector3View).bind(store.startSize, offset3);
+        (this.color as Vector4View).bind(store.color, offset4);
+        (this.startColor as Vector4View).bind(store.startColor, offset4);
+    }
 
     /**
      * Allocates the trail ring buffers, reusing them when the capacity is unchanged.

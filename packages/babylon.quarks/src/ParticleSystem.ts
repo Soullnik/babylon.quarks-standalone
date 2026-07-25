@@ -37,6 +37,7 @@ import {
     Vector3Generator,
     ParticleSystemEvent,
     ParticleSystemEventType,
+    ParticleStore,
 } from 'quarks.core';
 import {ParticleEmitter} from './ParticleEmitter';
 import {RenderMode} from './VFXBatch';
@@ -196,6 +197,8 @@ export class ParticleSystem implements IParticleSystem {
     particleNum: number;
     paused: boolean;
     particles: Array<Particle>;
+    /** Column storage shared by this system's particles. */
+    readonly store: ParticleStore = new ParticleStore(64);
     emitterShape: EmitterShape;
     emitter: ParticleEmitter;
     rendererSettings: VFXBatchSettings;
@@ -602,6 +605,25 @@ export class ParticleSystem implements IParticleSystem {
         this.qualityFactor = Math.max(0.1, Math.min(1, qualityFactor));
     }
 
+    /**
+     * Appends one particle to the pool, giving it the next row of the store.
+     *
+     * Growing the store replaces its arrays, so every particle already bound to
+     * it has to be re-pointed at the new ones.
+     */
+    private growParticlePool(isTrailMode: boolean): void {
+        const index = this.particles.length;
+        if (this.store.ensureCapacity(index + 1)) {
+            const particles = this.particles;
+            for (let i = 0; i < particles.length; i++) {
+                (particles[i] as SpriteParticle | TrailParticle).rebind();
+            }
+        }
+        this.particles.push(
+            isTrailMode ? new TrailParticle(this.store, index) : new SpriteParticle(this.store, index)
+        );
+    }
+
     private spawn(count: number, emissionState: EmissionState, matrix: Matrix4) {
         const translation = tempV;
         const scale = tempV2;
@@ -623,11 +645,7 @@ export class ParticleSystem implements IParticleSystem {
             emissionState.burstParticleIndex = i;
             this.particleNum++;
             if (this.particles.length < this.particleNum) {
-                if (isTrailMode) {
-                    this.particles.push(new TrailParticle());
-                } else {
-                    this.particles.push(new SpriteParticle());
-                }
+                this.growParticlePool(isTrailMode);
             }
             const particle = this.particles[this.particleNum - 1];
             particle.reset();

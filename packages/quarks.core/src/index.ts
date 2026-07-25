@@ -4,6 +4,7 @@ export * from './functions/';
 export * from './behaviors/';
 export * from './sequencers/';
 export * from './Particle';
+export * from './ParticleStore';
 export * from './Plugin';
 export * from './IParticleSystem';
 export * from './IPrefab';
