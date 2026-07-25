@@ -33,6 +33,25 @@ export class OrbitOverLife implements Behavior {
         particle.position.add(this.temp);
     }
 
+    updateAll(particles: Array<Particle>, count: number, delta: number): void {
+        const generator = this.orbitSpeed;
+        const axis = this.axis;
+        const temp = this.temp;
+        const rotation = this.rotation;
+        for (let i = 0; i < count; i++) {
+            const particle = particles[i];
+            if (particle.age >= particle.life) {
+                continue;
+            }
+            const position = particle.position;
+            temp.copy(position).projectOnVector(axis);
+            rotation.setFromAxisAngle(axis, generator.genValue(particle.memory, particle.age / particle.life) * delta);
+            position.sub(temp);
+            position.applyQuaternion(rotation);
+            position.add(temp);
+        }
+    }
+
     frameUpdate(delta: number): void {}
 
     toJSON(): any {

@@ -28,7 +28,10 @@ export class PiecewiseBezier extends PiecewiseFunction<Bezier> implements Functi
         }
         const startX = functions[index][1];
         const endX = index + 1 < count ? functions[index + 1][1] : 1;
-        return functions[index][0].genValue((t - startX) / (endX - startX));
+        const span = endX - startX;
+        // Adjacent curves can start at the same position; an empty span would
+        // divide to NaN, so evaluate at the curve's start.
+        return functions[index][0].genValue(span > 0 ? (t - startX) / span : 0);
     }
 
     toSVG(length: number, segments: number) {

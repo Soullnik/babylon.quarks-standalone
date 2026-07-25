@@ -45,7 +45,11 @@ export class Gradient implements FunctionColorGenerator {
             const from = colorKeys[colorIndex][0];
             const to = colorKeys[colorIndex + 1][0];
             const startX = colorKeys[colorIndex][1];
-            const ratio = (t - startX) / (colorKeys[colorIndex + 1][1] - startX);
+            const span = colorKeys[colorIndex + 1][1] - startX;
+            // Two keys can share a position — the default gradient does. Dividing
+            // by that empty span yields NaN, which reaches the vertex buffer and
+            // drops the particle for a frame; stay on the first key instead.
+            const ratio = span > 0 ? (t - startX) / span : 0;
             r = from.x + (to.x - from.x) * ratio;
             g = from.y + (to.y - from.y) * ratio;
             b = from.z + (to.z - from.z) * ratio;
@@ -60,7 +64,8 @@ export class Gradient implements FunctionColorGenerator {
         } else {
             const startX = alphaKeys[alphaIndex][1];
             const from = alphaKeys[alphaIndex][0];
-            a = from + (alphaKeys[alphaIndex + 1][0] - from) * ((t - startX) / (alphaKeys[alphaIndex + 1][1] - startX));
+            const span = alphaKeys[alphaIndex + 1][1] - startX;
+            a = from + (alphaKeys[alphaIndex + 1][0] - from) * (span > 0 ? (t - startX) / span : 0);
         }
 
         color.x = r;

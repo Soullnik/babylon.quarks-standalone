@@ -134,6 +134,19 @@ export class Noise implements Behavior {
         }
     }
 
+    updateAll(particles: Array<Particle>, count: number, delta: number): void {
+        // Each particle carries its own noise state and simplex generators, so
+        // there is nothing to hoist out of the body. The gain here is only that
+        // this call site sees one implementation and can be inlined, unlike the
+        // shared dispatch in the system.
+        for (let i = 0; i < count; i++) {
+            const particle = particles[i];
+            if (particle.age < particle.life) {
+                this.update(particle, delta);
+            }
+        }
+    }
+
     toJSON(): any {
         return {
             type: this.type,

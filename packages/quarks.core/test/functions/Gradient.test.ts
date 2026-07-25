@@ -134,4 +134,19 @@ describe('Gradient', () => {
         expect(color.z).toEqual(1);
         expect(color.w).toEqual(1);
     });
+
+    test('.genColor stays finite when two keys share a position', () => {
+        // The default gradient puts both colour keys at 0. Interpolating across
+        // that empty span used to divide by zero, and the NaN reached the vertex
+        // buffer and dropped the particle for a frame.
+        const gradient = new Gradient();
+        const color = new Vector4();
+        for (const t of [0, 0.5, 1]) {
+            gradient.genColor(memory, color, t);
+            expect(Number.isFinite(color.x)).toBe(true);
+            expect(Number.isFinite(color.y)).toBe(true);
+            expect(Number.isFinite(color.z)).toBe(true);
+            expect(Number.isFinite(color.w)).toBe(true);
+        }
+    });
 });

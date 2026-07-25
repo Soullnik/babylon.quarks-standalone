@@ -39,6 +39,28 @@ export class ForceOverLife implements Behavior {
         }
     }
 
+    updateAll(particles: Array<Particle>, count: number, delta: number): void {
+        const temp = this._temp;
+        const generatorX = this.x;
+        const generatorY = this.y;
+        const generatorZ = this.z;
+        // The space test is per system, not per particle.
+        const worldSpace = this.ps.worldSpace;
+        for (let i = 0; i < count; i++) {
+            const particle = particles[i];
+            if (particle.age >= particle.life) {
+                continue;
+            }
+            const memory = particle.memory;
+            const t = particle.age / particle.life;
+            temp.set(generatorX.genValue(memory, t), generatorY.genValue(memory, t), generatorZ.genValue(memory, t));
+            if (!worldSpace) {
+                temp.multiply(this._tempScale).applyQuaternion(this._tempQ);
+            }
+            particle.velocity.addScaledVector(temp, delta);
+        }
+    }
+
     toJSON(): any {
         return {
             type: this.type,
