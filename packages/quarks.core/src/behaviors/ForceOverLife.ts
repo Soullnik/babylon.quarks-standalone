@@ -10,7 +10,8 @@ import {IParticleSystem} from '../IParticleSystem';
 export class ForceOverLife implements Behavior {
     type = 'ForceOverLife';
     _temp = new Vector3();
-    ps!: IParticleSystem;
+    /** Learned in {@link initialize}, so undefined until this behavior sees a particle. */
+    ps?: IParticleSystem;
 
     initialize(particle: Particle, particleSystem: IParticleSystem): void {
         this.ps = particleSystem;
@@ -31,7 +32,9 @@ export class ForceOverLife implements Behavior {
             this.y.genValue(particle.memory, particle.age / particle.life),
             this.z.genValue(particle.memory, particle.age / particle.life)
         );
-        if (this.ps.worldSpace) {
+        // Undefined until initialize() has run for this behavior; treat an
+        // unknown system as world space rather than throwing.
+        if (this.ps === undefined || this.ps.worldSpace) {
             particle.velocity.addScaledVector(this._temp, delta);
         } else {
             this._temp.multiply(this._tempScale).applyQuaternion(this._tempQ);
@@ -40,12 +43,19 @@ export class ForceOverLife implements Behavior {
     }
 
     updateAll(particles: Array<Particle>, count: number, delta: number): void {
+        const system = this.ps;
+        // The system is only learned in initialize(), which has not run while the
+        // system is empty — a sub emitter waiting to be triggered, or a behavior
+        // added after the particles were spawned. There is nothing to apply yet.
+        if (system === undefined) {
+            return;
+        }
         const temp = this._temp;
         const generatorX = this.x;
         const generatorY = this.y;
         const generatorZ = this.z;
         // The space test is per system, not per particle.
-        const worldSpace = this.ps.worldSpace;
+        const worldSpace = system.worldSpace;
         for (let i = 0; i < count; i++) {
             const particle = particles[i];
             if (particle.age >= particle.life) {

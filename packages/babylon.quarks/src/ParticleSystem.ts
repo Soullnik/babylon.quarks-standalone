@@ -860,7 +860,12 @@ export class ParticleSystem implements IParticleSystem {
             const behavior = behaviors[j];
             behavior.frameUpdate(delta);
             if (behavior.updateAll !== undefined) {
-                behavior.updateAll(particles, particleCount, delta);
+                // Skip the call entirely when there is nothing to update, matching
+                // the per-particle loop below: a behavior may set up state before
+                // its loop that is only valid once it has seen a particle.
+                if (particleCount > 0) {
+                    behavior.updateAll(particles, particleCount, delta);
+                }
                 continue;
             }
             for (let i = 0; i < particleCount; i++) {

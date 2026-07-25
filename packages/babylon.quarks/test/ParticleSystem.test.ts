@@ -20,6 +20,7 @@ import {
     InheritVelocity,
     WidthOverLength,
     TrailParticle,
+    ForceOverLife,
 } from 'quarks.core';
 import {NullEngine} from '@babylonjs/core/Engines/nullEngine';
 import {Scene} from '@babylonjs/core/scene';
@@ -1114,6 +1115,44 @@ describe('ParticleSystem', () => {
         // Dead particles shed one sample per step until the trail is gone.
         expect(trail.historyCount).toBe(0);
         expect(ps.particleNum).toBe(0);
+    });
+});
+
+describe('ParticleSystem behavior batching', () => {
+    it('updates a system whose behaviors have never seen a particle', () => {
+        // Sub emitter systems sit empty until triggered, so their behaviors never
+        // run initialize(). A batched behavior must not assume otherwise.
+        const ps = new ParticleSystem({
+            scene,
+            onlyUsedByOther: true,
+            startLife: new ConstantValue(1),
+            emissionOverTime: new ConstantValue(0),
+            shape: new PointEmitter(),
+            behaviors: [new ForceOverLife(new ConstantValue(1), new ConstantValue(-2), new ConstantValue(0))],
+        });
+        expect(ps.particleNum).toBe(0);
+        expect(() => {
+            for (let i = 0; i < 5; i++) {
+                ps.update(1 / 60);
+            }
+        }).not.toThrow();
+    });
+
+    it('applies a batched force once the system does emit', () => {
+        const ps = new ParticleSystem({
+            scene,
+            worldSpace: true,
+            startLife: new ConstantValue(5),
+            startSpeed: new ConstantValue(0),
+            emissionOverTime: new ConstantValue(30),
+            shape: new PointEmitter(),
+            behaviors: [new ForceOverLife(new ConstantValue(0), new ConstantValue(-10), new ConstantValue(0))],
+        });
+        for (let i = 0; i < 10; i++) {
+            ps.update(1 / 60);
+        }
+        expect(ps.particleNum).toBeGreaterThan(0);
+        expect(ps.particles[0].velocity.y).toBeLessThan(0);
     });
 });
 
