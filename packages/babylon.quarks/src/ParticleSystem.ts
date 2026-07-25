@@ -856,6 +856,10 @@ export class ParticleSystem implements IParticleSystem {
         for (let j = 0; j < behaviorCount; j++) {
             const behavior = behaviors[j];
             behavior.frameUpdate(delta);
+            if (behavior.updateAll !== undefined) {
+                behavior.updateAll(particles, particleCount, delta);
+                continue;
+            }
             for (let i = 0; i < particleCount; i++) {
                 const particle = particles[i];
                 // Inlined `died` — this runs once per behavior per particle.

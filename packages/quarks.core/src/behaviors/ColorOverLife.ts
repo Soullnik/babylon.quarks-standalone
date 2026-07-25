@@ -24,6 +24,25 @@ export class ColorOverLife implements Behavior {
         color.w *= startColor.w;
     }
 
+    updateAll(particles: Array<Particle>, count: number, delta: number): void {
+        // Hoisting the generator makes genColor a monomorphic call site here,
+        // unlike the shared per-particle dispatch in the system.
+        const generator = this.color;
+        for (let i = 0; i < count; i++) {
+            const particle = particles[i];
+            if (particle.age >= particle.life) {
+                continue;
+            }
+            const color = particle.color;
+            const startColor = particle.startColor;
+            generator.genColor(particle.memory, color, particle.age / particle.life);
+            color.x *= startColor.x;
+            color.y *= startColor.y;
+            color.z *= startColor.z;
+            color.w *= startColor.w;
+        }
+    }
+
     frameUpdate(delta: number): void {}
 
     toJSON(): any {

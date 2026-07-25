@@ -35,6 +35,20 @@ export class FrameOverLife implements Behavior {
         }
     }
 
+    updateAll(particles: Array<Particle>, count: number, delta: number): void {
+        if (!this._frameIsBezier) {
+            return;
+        }
+        const generator = this._frame;
+        for (let i = 0; i < count; i++) {
+            const particle = particles[i];
+            if (particle.age >= particle.life) {
+                continue;
+            }
+            particle.uvTile = generator.genValue(particle.memory, particle.age / particle.life);
+        }
+    }
+
     frameUpdate(delta: number): void {}
 
     toJSON(): any {

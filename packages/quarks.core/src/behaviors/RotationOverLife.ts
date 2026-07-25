@@ -27,6 +27,17 @@ export class RotationOverLife implements Behavior {
         }
     }
 
+    updateAll(particles: Array<Particle>, count: number, delta: number): void {
+        const generator = this.angularVelocity as FunctionValueGenerator;
+        for (let i = 0; i < count; i++) {
+            const particle = particles[i];
+            if (particle.age >= particle.life || typeof particle.rotation !== 'number') {
+                continue;
+            }
+            particle.rotation += delta * generator.genValue(particle.memory, particle.age / particle.life);
+        }
+    }
+
     toJSON(): any {
         return {
             type: this.type,

@@ -32,6 +32,19 @@ export interface Behavior {
     type: string;
     initialize(particle: Particle, particleSystem: IParticleSystem): void;
     update(particle: Particle, delta: number): void;
+    /**
+     * Optional bulk form of {@link update}, applied to `particles[0..count)`.
+     *
+     * The per-particle `update` is reached through one call site shared by every
+     * behavior type, which leaves it megamorphic: V8 can neither inline it nor
+     * specialise the generator calls inside. A behavior that implements this
+     * instead gets one call per frame and a loop it owns, where those calls are
+     * monomorphic. Implementations must skip dead particles exactly as the
+     * per-particle path does, and must produce identical results.
+     *
+     * Behaviors that do not implement it keep working unchanged.
+     */
+    updateAll?(particles: Array<Particle>, count: number, delta: number): void;
     frameUpdate(delta: number): void;
     toJSON(): any;
     clone(): Behavior;

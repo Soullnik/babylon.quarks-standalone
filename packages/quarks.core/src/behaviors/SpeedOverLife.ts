@@ -17,6 +17,17 @@ export class SpeedOverLife implements Behavior {
     update(particle: Particle): void {
         particle.speedModifier = this.speed.genValue(particle.memory, particle.age / particle.life);
     }
+
+    updateAll(particles: Array<Particle>, count: number, delta: number): void {
+        const generator = this.speed;
+        for (let i = 0; i < count; i++) {
+            const particle = particles[i];
+            if (particle.age >= particle.life) {
+                continue;
+            }
+            particle.speedModifier = generator.genValue(particle.memory, particle.age / particle.life);
+        }
+    }
     toJSON(): any {
         return {
             type: this.type,

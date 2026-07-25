@@ -47,6 +47,37 @@ export class SizeOverLife implements Behavior {
             size.z = startSize.z * scale;
         }
     }
+
+    updateAll(particles: Array<Particle>, count: number, delta: number): void {
+        // Split by generator kind once per frame rather than per particle, so
+        // each loop keeps a single monomorphic genValue call site.
+        if (this._sizeIsVector3) {
+            const generator = this._size as Vector3Function;
+            for (let i = 0; i < count; i++) {
+                const particle = particles[i];
+                if (particle.age >= particle.life) {
+                    continue;
+                }
+                generator
+                    .genValue(particle.memory, particle.size, particle.age / particle.life)
+                    .multiply(particle.startSize);
+            }
+            return;
+        }
+        const generator = this._size as FunctionValueGenerator;
+        for (let i = 0; i < count; i++) {
+            const particle = particles[i];
+            if (particle.age >= particle.life) {
+                continue;
+            }
+            const scale = generator.genValue(particle.memory, particle.age / particle.life);
+            const size = particle.size;
+            const startSize = particle.startSize;
+            size.x = startSize.x * scale;
+            size.y = startSize.y * scale;
+            size.z = startSize.z * scale;
+        }
+    }
     toJSON(): any {
         return {
             type: this.type,

@@ -32,6 +32,25 @@ export class ApplyForce implements Behavior {
         velocity.z += direction.z * scale;
     }
 
+    updateAll(particles: Array<Particle>, count: number, delta: number): void {
+        // The force is identical for every particle, so the vector maths
+        // collapses to three constants computed once per frame.
+        const scale = this.magnitudeValue * delta;
+        const dx = this.direction.x * scale;
+        const dy = this.direction.y * scale;
+        const dz = this.direction.z * scale;
+        for (let i = 0; i < count; i++) {
+            const particle = particles[i];
+            if (particle.age >= particle.life) {
+                continue;
+            }
+            const velocity = particle.velocity;
+            velocity.x += dx;
+            velocity.y += dy;
+            velocity.z += dz;
+        }
+    }
+
     frameUpdate(delta: number): void {
         this.magnitudeValue = this.magnitude.genValue(this.memory);
     }
