@@ -13,7 +13,8 @@ export type InheritVelocityMode = 'initial' | 'current';
  */
 export class InheritVelocity implements Behavior {
     type = 'InheritVelocity';
-    ps!: IParticleSystem;
+    /** Learned in {@link initialize}, so undefined until this behavior sees a particle. */
+    ps?: IParticleSystem;
 
     constructor(
         public multiplier: FunctionValueGenerator | ValueGenerator = new ConstantValue(1),
@@ -47,7 +48,8 @@ export class InheritVelocity implements Behavior {
     }
 
     update(particle: Particle, delta: number): void {
-        if (this.mode !== 'current' || !this.ps.emitterVelocity) {
+        // ps is undefined until initialize() has run for this behavior.
+        if (this.mode !== 'current' || this.ps === undefined || !this.ps.emitterVelocity) {
             return;
         }
         this._temp.copy(this.ps.emitterVelocity);

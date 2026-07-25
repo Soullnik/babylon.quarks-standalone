@@ -91,6 +91,98 @@ function fragmentFor(behavior: Behavior, k: number): Fragment | null {
                 setup: `const g${k} = behaviors[${k}].speed;`,
                 body: `p.speedModifier = g${k}.genValue(p.memory, t);`,
             };
+        case 'ForceOverLife':
+            return {
+                setup: `const b${k} = behaviors[${k}];
+                    const gx${k} = b${k}.x, gy${k} = b${k}.y, gz${k} = b${k}.z;
+                    const tmp${k} = b${k}._temp, scale${k} = b${k}._tempScale, quat${k} = b${k}._tempQ;
+                    const local${k} = b${k}.ps !== undefined && !b${k}.ps.worldSpace;`,
+                body: `{tmp${k}.set(
+                        gx${k}.genValue(p.memory, t),
+                        gy${k}.genValue(p.memory, t),
+                        gz${k}.genValue(p.memory, t));
+                    if (local${k}) { tmp${k}.multiply(scale${k}).applyQuaternion(quat${k}); }
+                    p.velocity.addScaledVector(tmp${k}, delta);}`,
+            };
+        case 'LimitSpeedOverLife':
+            return {
+                setup: `const b${k} = behaviors[${k}];
+                    const g${k} = b${k}.speed;
+                    const dampen${k} = b${k}.dampen * delta * 20;`,
+                body: `{const v = p.velocity;
+                    const speed = v.length();
+                    const limit = g${k}.genValue(p.memory, t);
+                    if (speed > limit) {
+                        v.multiplyScalar(1 - ((speed - limit) / speed) * dampen${k});
+                    }}`,
+            };
+        case 'GravityForce':
+            return {
+                setup: `const b${k} = behaviors[${k}];
+                    const cx${k} = b${k}.center.x, cy${k} = b${k}.center.y, cz${k} = b${k}.center.z;
+                    const gm${k} = b${k}.magnitude * delta;`,
+                body: `{const pos = p.position;
+                    const dx = cx${k} - pos.x, dy = cy${k} - pos.y, dz = cz${k} - pos.z;
+                    const d2 = dx * dx + dy * dy + dz * dz;
+                    if (d2 > 0) {
+                        const s = gm${k} / (d2 * Math.sqrt(d2));
+                        const v = p.velocity;
+                        v.x += dx * s; v.y += dy * s; v.z += dz * s;
+                    }}`,
+            };
+        case 'ColorBySpeed':
+            return {
+                setup: `const b${k} = behaviors[${k}];
+                    const g${k} = b${k}.color;
+                    const lo${k} = b${k}.speedRange.a;
+                    const span${k} = b${k}.speedRange.b - lo${k};`,
+                body: `{const ts = (p.startSpeed - lo${k}) / span${k};
+                    const c = p.color, sc = p.startColor;
+                    g${k}.genColor(p.memory, c, ts);
+                    c.x *= sc.x; c.y *= sc.y; c.z *= sc.z; c.w *= sc.w;}`,
+            };
+        case 'SizeBySpeed':
+            return {
+                setup: `const b${k} = behaviors[${k}];
+                    const g${k} = b${k}.size;
+                    const lo${k} = b${k}.speedRange.a;
+                    const span${k} = b${k}.speedRange.b - lo${k};
+                    const vec3_${k} = g${k} instanceof deps.Vector3Function;`,
+                body: `{const ts = (p.startSpeed - lo${k}) / span${k};
+                    if (vec3_${k}) {
+                        g${k}.genValue(p.memory, p.size, ts).multiply(p.startSize);
+                    } else {
+                        const v = g${k}.genValue(p.memory, ts);
+                        const s = p.size, ss = p.startSize;
+                        s.x = ss.x * v; s.y = ss.y * v; s.z = ss.z * v;
+                    }}`,
+            };
+        case 'RotationBySpeed':
+            return {
+                setup: `const b${k} = behaviors[${k}];
+                    const g${k} = b${k}.angularVelocity;
+                    const lo${k} = b${k}.speedRange.a;
+                    const span${k} = b${k}.speedRange.b - lo${k};`,
+                body: `if (typeof p.rotation === 'number') {
+                        p.rotation += delta * g${k}.genValue(p.memory, (p.startSpeed - lo${k}) / span${k});
+                    }`,
+            };
+        case 'InheritVelocity':
+            return {
+                setup: `const b${k} = behaviors[${k}];
+                    const ps${k} = b${k}.ps;
+                    const velocity${k} = b${k}.mode === 'current' && ps${k} !== undefined
+                        ? ps${k}.emitterVelocity : undefined;
+                    const tmp${k} = b${k}._temp;
+                    const local${k} = velocity${k} !== undefined && !ps${k}.worldSpace;
+                    const scale${k} = b${k}._tempScaleInv, quat${k} = b${k}._tempQInv;
+                    const gm${k} = b${k}.multiplier;`,
+                body: `if (velocity${k} !== undefined) {
+                        tmp${k}.copy(velocity${k});
+                        if (local${k}) { tmp${k}.multiply(scale${k}).applyQuaternion(quat${k}); }
+                        p.position.addScaledVector(tmp${k}, gm${k}.genValue(p.memory, t) * delta);
+                    }`,
+            };
         default:
             return null;
     }

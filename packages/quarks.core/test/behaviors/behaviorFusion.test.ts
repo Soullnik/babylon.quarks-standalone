@@ -7,6 +7,13 @@ import {
     FrameOverLife,
     Gradient,
     GravityForce,
+    LimitSpeedOverLife,
+    OrbitOverLife,
+    ColorBySpeed,
+    SizeBySpeed,
+    RotationBySpeed,
+    ForceOverLife,
+    IntervalValue,
     IParticleSystem,
     Matrix4,
     Noise,
@@ -140,7 +147,7 @@ describe('behavior fusion', () => {
 
     it('keeps an unknown behavior on its own pass, in its original place', () => {
         const before = new ColorOverLife(new Gradient());
-        const middle = new GravityForce(new Vector3(0, 5, 0), 4); // not fusable
+        const middle = new OrbitOverLife(new ConstantValue(1), new Vector3(0, 1, 0)); // not fusable
         const afterA = new ApplyForce(new Vector3(0, -1, 0), new ConstantValue(9.8));
         const afterB = new SpeedOverLife(new PiecewiseBezier([[new Bezier(1, 1, 1, 1), 0]]));
 
@@ -225,5 +232,39 @@ describe('behavior fusion', () => {
         for (const p of particles) size.initialize(p);
         runPlan(behaviors, particles, DELTA);
         expect(particles[0].size.x).toBeCloseTo(particles[0].startSize.x, 6);
+    });
+    it('matches the separate path for the force and by-speed behaviors', () => {
+        const build = (): Behavior[] => [
+            new ForceOverLife(new ConstantValue(1), new ConstantValue(-2), new ConstantValue(0.5)),
+            new LimitSpeedOverLife(new PiecewiseBezier([[new Bezier(2, 2, 2, 2), 0]]), 0.5),
+            new GravityForce(new Vector3(0, 5, 0), 4),
+            new ColorBySpeed(new Gradient(), new IntervalValue(0, 5)),
+            new SizeBySpeed(new PiecewiseBezier([[new Bezier(1, 0.8, 0.4, 0), 0]]), new IntervalValue(0, 5)),
+            new RotationBySpeed(new ConstantValue(2), new IntervalValue(0, 5)),
+        ];
+        const fusedBehaviors = build();
+        const separateBehaviors = build();
+        const fused = makePool(COUNT);
+        const separate = makePool(COUNT);
+        for (const p of [...fused, ...separate]) p.startSpeed = 1 + p.position.x * 0.3;
+        for (const p of fused) for (const b of fusedBehaviors) b.initialize(p, system);
+        for (const p of separate) for (const b of separateBehaviors) b.initialize(p, system);
+
+        expect(planBehaviorFusion(fusedBehaviors)).toHaveLength(1);
+
+        for (let frame = 0; frame < 3; frame++) {
+            runPlan(fusedBehaviors, fused, DELTA);
+            runSeparately(separateBehaviors, separate, DELTA);
+            for (let i = 0; i < COUNT; i++) {
+                fused[i].age += DELTA;
+                separate[i].age += DELTA;
+            }
+        }
+
+        const expected = snapshot(separate);
+        const actual = snapshot(fused);
+        for (let i = 0; i < expected.length; i++) {
+            expect(actual[i]).toBeCloseTo(expected[i], 6);
+        }
     });
 });
