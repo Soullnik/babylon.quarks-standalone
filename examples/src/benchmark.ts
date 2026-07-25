@@ -24,9 +24,21 @@ const LIFETIME = 2;
 const EMITTER_RING_RADIUS = 3;
 const CONE_RADIUS = 0.2;
 const CONE_ANGLE = 0.5;
-const WARMUP_FRAMES = 90;
-const MEASURE_FRAMES = 240;
-const SWEEP_COUNTS = [2000, 10000, 30000];
+const PARTICLE_COUNT_OPTIONS = [2000, 5000, 10000, 20000, 50000, 100000, 200000, 300000];
+const DEFAULT_SWEEP_COUNTS = [2000, 10000, 30000];
+
+const query = new URLSearchParams(window.location.search);
+const numberList = (raw: string | null, fallback: number[]): number[] => {
+    const parsed = (raw ?? '')
+        .split(',')
+        .map((part) => parseInt(part, 10))
+        .filter((value) => Number.isFinite(value) && value > 0);
+    return parsed.length > 0 ? parsed : fallback;
+};
+
+const WARMUP_FRAMES = numberList(query.get('warmup'), [90])[0];
+const MEASURE_FRAMES = numberList(query.get('frames'), [240])[0];
+const SWEEP_COUNTS = numberList(query.get('counts'), DEFAULT_SWEEP_COUNTS);
 
 const COLOR_START = {r: 1, g: 0.7, b: 0.3, a: 1};
 const COLOR_END = {r: 0.6, g: 0.2, b: 0.05, a: 0};
@@ -415,6 +427,13 @@ async function runSweep() {
     startRun(backendSelect.value, currentConfig());
 }
 
+declare global {
+    interface Window {
+        benchmarkResults?: RunResult[];
+        benchmarkDone?: boolean;
+    }
+}
+
 function applySelection() {
     if (sweepRunning) {
         return;
@@ -433,11 +452,11 @@ fillSelect(backendSelect, [
 ]);
 fillSelect(
     countSelect,
-    [2000, 5000, 10000, 20000, 50000].map((count) => ({value: String(count), label: count.toLocaleString("en-US")}))
+    PARTICLE_COUNT_OPTIONS.map((count) => ({value: String(count), label: count.toLocaleString("en-US")}))
 );
 countSelect.value = "10000";
 fillSelect(emittersSelect, [1, 4, 16].map((count) => ({value: String(count), label: String(count)})));
-emittersSelect.value = "4";
+emittersSelect.value = String(numberList(query.get('emitters'), [4])[0]);
 
 backendSelect.addEventListener("change", applySelection);
 countSelect.addEventListener("change", applySelection);
@@ -452,3 +471,17 @@ copyResultsButton.addEventListener("click", () => {
 window.addEventListener("resize", () => engine.resize());
 
 applySelection();
+
+/**
+ * Headless hook: `?autorun=1` runs the sweep on load and publishes the results
+ * on `window`, so browser automation can read the same numbers the panel shows.
+ * `counts`, `emitters`, `warmup` and `frames` override the sweep parameters.
+ * Runs last so the controls it reads are already populated.
+ */
+if (query.get("autorun") !== null) {
+    window.benchmarkDone = false;
+    void runSweep().then(() => {
+        window.benchmarkResults = sweepResults;
+        window.benchmarkDone = true;
+    });
+}
