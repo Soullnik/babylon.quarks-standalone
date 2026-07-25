@@ -1,5 +1,6 @@
 import {
     ApplyForce,
+    AxisAngleGenerator,
     Behavior,
     Bezier,
     ColorOverLife,
@@ -20,12 +21,16 @@ import {
     Particle,
     ParticleStore,
     PiecewiseBezier,
+    Quaternion,
+    Rotation3DOverLife,
     RotationOverLife,
     SizeOverLife,
     SpeedOverLife,
     SpriteParticle,
     Vector3,
     Vector3Function,
+    VelocityOverLife,
+    WidthOverLength,
     planBehaviorFusion,
 } from '../../src';
 
@@ -147,7 +152,8 @@ describe('behavior fusion', () => {
 
     it('keeps an unknown behavior on its own pass, in its original place', () => {
         const before = new ColorOverLife(new Gradient());
-        const middle = new OrbitOverLife(new ConstantValue(1), new Vector3(0, 1, 0)); // not fusable
+        // Not fusable, and inert for sprite particles.
+        const middle = new WidthOverLength(new PiecewiseBezier([[new Bezier(1, 1, 1, 1), 0]]));
         const afterA = new ApplyForce(new Vector3(0, -1, 0), new ConstantValue(9.8));
         const afterB = new SpeedOverLife(new PiecewiseBezier([[new Bezier(1, 1, 1, 1), 0]]));
 
@@ -233,6 +239,72 @@ describe('behavior fusion', () => {
         runPlan(behaviors, particles, DELTA);
         expect(particles[0].size.x).toBeCloseTo(particles[0].startSize.x, 6);
     });
+    it('matches the separate path for the quaternion behaviors', () => {
+        // A rotated, scaled, off-origin emitter, so the world/local conversions
+        // and the orbit pivot are all doing something.
+        const matrixWorld = new Matrix4().compose(
+            new Vector3(3, -1, 2),
+            new Quaternion().setFromAxisAngle(new Vector3(0, 1, 0), 0.7),
+            new Vector3(2, 2, 2)
+        );
+        const worldSystem = {worldSpace: true, emitter: {matrixWorld}} as unknown as IParticleSystem;
+
+        const build = (): Behavior[] => [
+            new OrbitOverLife(new PiecewiseBezier([[new Bezier(1.5, 1.2, 0.9, 0.6), 0]]), new Vector3(0, 1, 0)),
+            new VelocityOverLife(
+                new ConstantValue(0.5),
+                new ConstantValue(-1),
+                new ConstantValue(0.25),
+                new ConstantValue(0.8),
+                new ConstantValue(0),
+                new ConstantValue(0.3),
+                'local'
+            ),
+            new Rotation3DOverLife(new AxisAngleGenerator(new Vector3(0, 0, 1), new ConstantValue(2))),
+        ];
+        const fusedBehaviors = build();
+        const separateBehaviors = build();
+        const fused = makePool(COUNT);
+        const separate = makePool(COUNT);
+        const startPositions = fused.map((p) => p.position.clone());
+        // Rotation3DOverLife only touches particles that rotate by quaternion.
+        for (const p of [...fused, ...separate]) {
+            p.rotation = new Quaternion();
+        }
+        for (const p of fused) for (const b of fusedBehaviors) b.initialize(p, worldSystem);
+        for (const p of separate) for (const b of separateBehaviors) b.initialize(p, worldSystem);
+
+        expect(planBehaviorFusion(fusedBehaviors)).toHaveLength(1);
+
+        for (let frame = 0; frame < 3; frame++) {
+            runPlan(fusedBehaviors, fused, DELTA);
+            runSeparately(separateBehaviors, separate, DELTA);
+            for (let i = 0; i < COUNT; i++) {
+                fused[i].age += DELTA;
+                separate[i].age += DELTA;
+            }
+        }
+
+        const expected = snapshot(separate);
+        const actual = snapshot(fused);
+        for (let i = 0; i < expected.length; i++) {
+            expect(actual[i]).toBeCloseTo(expected[i], 6);
+        }
+        for (let i = 0; i < COUNT; i++) {
+            const a = fused[i].rotation as Quaternion;
+            const b = separate[i].rotation as Quaternion;
+            expect(a.x).toBeCloseTo(b.x, 6);
+            expect(a.y).toBeCloseTo(b.y, 6);
+            expect(a.z).toBeCloseTo(b.z, 6);
+            expect(a.w).toBeCloseTo(b.w, 6);
+            // ...and actually turned, rather than matching at the identity.
+            expect(a.w).toBeLessThan(1);
+            // ...and the particles actually moved, so the match is not two
+            // no-ops agreeing with each other.
+            expect(fused[i].position.distanceTo(startPositions[i])).toBeGreaterThan(1e-3);
+        }
+    });
+
     it('matches the separate path for the force and by-speed behaviors', () => {
         const build = (): Behavior[] => [
             new ForceOverLife(new ConstantValue(1), new ConstantValue(-2), new ConstantValue(0.5)),

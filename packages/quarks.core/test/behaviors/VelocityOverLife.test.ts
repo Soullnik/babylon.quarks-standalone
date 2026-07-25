@@ -136,6 +136,32 @@ describe('VelocityOverLife', () => {
         expect(particle.position.z).toBeCloseTo(0);
     });
 
+    test('orbital rotation in world space turns around the emitter axes, not the world axes', () => {
+        const behavior = new VelocityOverLife(
+            new ConstantValue(0),
+            new ConstantValue(0),
+            new ConstantValue(0),
+            new ConstantValue(Math.PI / 2),
+            new ConstantValue(0),
+            new ConstantValue(0)
+        );
+        // Emitter turned 90° about +Z, so its own +X axis points along world +Y.
+        const matrix = new Matrix4().makeRotationZ(Math.PI / 2);
+        const ps = makePS(true, matrix);
+        const particle = makeParticle();
+        particle.position.set(0, 0, 1);
+
+        behavior.initialize(particle, ps);
+        behavior.frameUpdate(1);
+        behavior.update(particle, 1);
+
+        // Turning +Z by 90° around +Y gives +X. Around the world +X it would
+        // have gone to -Y instead.
+        expect(particle.position.x).toBeCloseTo(1);
+        expect(particle.position.y).toBeCloseTo(0);
+        expect(particle.position.z).toBeCloseTo(0);
+    });
+
     test('.toJSON / .fromJSON round-trip', () => {
         const behavior = new VelocityOverLife(
             new ConstantValue(1),

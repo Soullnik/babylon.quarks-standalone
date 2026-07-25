@@ -37,7 +37,15 @@ export class VelocityOverLife implements Behavior {
     _tempScale = new Vector3(1, 1, 1);
     _tempScaleInv = new Vector3(1, 1, 1);
     _tempRot = new Quaternion();
-    _tempAxis = new Vector3();
+    /**
+     * Axes the orbital speeds turn around, refreshed once per frame by
+     * {@link frameUpdate}. In world space they are the emitter's axes, which
+     * only change when the emitter does — so they are hoisted out of the
+     * per-particle work rather than rebuilt for every particle.
+     */
+    _axisX = new Vector3(1, 0, 0);
+    _axisY = new Vector3(0, 1, 0);
+    _axisZ = new Vector3(0, 0, 1);
 
     initialize(particle: Particle, particleSystem: IParticleSystem): void {
         this.ps = particleSystem;
@@ -54,6 +62,14 @@ export class VelocityOverLife implements Behavior {
             this.ps.emitter.matrixWorld.decompose(this._tempEmitterPos, this._tempQ, this._tempScale);
             this._tempQInv.copy(this._tempQ).invert();
             this._tempScaleInv.set(1 / this._tempScale.x, 1 / this._tempScale.y, 1 / this._tempScale.z);
+            this._axisX.copy(UNIT_X);
+            this._axisY.copy(UNIT_Y);
+            this._axisZ.copy(UNIT_Z);
+            if (this.ps.worldSpace) {
+                this._axisX.applyQuaternion(this._tempQ);
+                this._axisY.applyQuaternion(this._tempQ);
+                this._axisZ.applyQuaternion(this._tempQ);
+            }
         }
     }
 
@@ -80,28 +96,23 @@ export class VelocityOverLife implements Behavior {
         const angleY = this.orbitalY.genValue(particle.memory, t) * delta;
         const angleZ = this.orbitalZ.genValue(particle.memory, t) * delta;
         if (angleX !== 0 || angleY !== 0 || angleZ !== 0) {
-            const worldPivot = worldSpace;
-            if (worldPivot) {
+            if (worldSpace) {
                 particle.position.sub(this._tempEmitterPos);
             }
-            this.orbit(particle.position, UNIT_X, angleX, worldPivot);
-            this.orbit(particle.position, UNIT_Y, angleY, worldPivot);
-            this.orbit(particle.position, UNIT_Z, angleZ, worldPivot);
-            if (worldPivot) {
+            this.orbit(particle.position, this._axisX, angleX);
+            this.orbit(particle.position, this._axisY, angleY);
+            this.orbit(particle.position, this._axisZ, angleZ);
+            if (worldSpace) {
                 particle.position.add(this._tempEmitterPos);
             }
         }
     }
 
-    private orbit(position: Vector3, axis: Vector3, angle: number, worldAxes: boolean): void {
+    private orbit(position: Vector3, axis: Vector3, angle: number): void {
         if (angle === 0) {
             return;
         }
-        this._tempAxis.copy(axis);
-        if (worldAxes) {
-            this._tempAxis.applyQuaternion(this._tempQ);
-        }
-        this._tempRot.setFromAxisAngle(this._tempAxis, angle);
+        this._tempRot.setFromAxisAngle(axis, angle);
         position.applyQuaternion(this._tempRot);
     }
 

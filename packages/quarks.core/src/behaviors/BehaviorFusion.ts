@@ -1,6 +1,7 @@
 import {Behavior} from './Behavior';
 import {Particle} from '../Particle';
 import {PiecewiseBezier, Vector3Function} from '../functions';
+import {Quaternion} from '../math';
 
 /**
  * Compiles a run of behaviors into a single loop over the particles.
@@ -26,8 +27,8 @@ export interface FusionStep {
     run?: FusedPass;
 }
 
-/** Constructors the generated code needs to test a generator's kind. */
-const DEPS = {PiecewiseBezier, Vector3Function};
+/** Constructors the generated code needs to test a generator's or a particle's kind. */
+const DEPS = {PiecewiseBezier, Vector3Function, Quaternion};
 
 interface Fragment {
     /** Hoisted out of the loop; runs once per pass. */
@@ -166,6 +167,63 @@ function fragmentFor(behavior: Behavior, k: number): Fragment | null {
                 body: `if (typeof p.rotation === 'number') {
                         p.rotation += delta * g${k}.genValue(p.memory, (p.startSpeed - lo${k}) / span${k});
                     }`,
+            };
+        case 'OrbitOverLife':
+            return {
+                setup: `const b${k} = behaviors[${k}];
+                    const g${k} = b${k}.orbitSpeed;
+                    const axis${k} = b${k}.axis, tmp${k} = b${k}.temp, rot${k} = b${k}.rotation;`,
+                body: `{const pos = p.position;
+                    tmp${k}.copy(pos).projectOnVector(axis${k});
+                    rot${k}.setFromAxisAngle(axis${k}, g${k}.genValue(p.memory, t) * delta);
+                    pos.sub(tmp${k});
+                    pos.applyQuaternion(rot${k});
+                    pos.add(tmp${k});}`,
+            };
+        case 'Rotation3DOverLife':
+            return {
+                setup: `const b${k} = behaviors[${k}];
+                    const g${k} = b${k}.angularVelocity;
+                    const q${k} = b${k}.tempQuat;`,
+                // Only particles whose rotation is a quaternion take part; a
+                // sprite billboard rotating by an angle is left alone, exactly
+                // as the behavior's own update does.
+                body: `{const r = p.rotation;
+                    if (r instanceof deps.Quaternion) {
+                        g${k}.genValue(p.memory, q${k}, delta, t);
+                        r.multiply(q${k});
+                    }}`,
+            };
+        case 'VelocityOverLife':
+            return {
+                setup: `const b${k} = behaviors[${k}];
+                    const lx${k} = b${k}.linearX, ly${k} = b${k}.linearY, lz${k} = b${k}.linearZ;
+                    const ox${k} = b${k}.orbitalX, oy${k} = b${k}.orbitalY, oz${k} = b${k}.orbitalZ;
+                    const tmp${k} = b${k}._temp, rot${k} = b${k}._tempRot;
+                    const ax${k} = b${k}._axisX, ay${k} = b${k}._axisY, az${k} = b${k}._axisZ;
+                    const pivot${k} = b${k}._tempEmitterPos;
+                    const world${k} = b${k}.ps !== undefined && b${k}.ps.worldSpace;
+                    const toWorld${k} = world${k} && b${k}.space === 'local';
+                    const convert${k} = toWorld${k} || (!world${k} && b${k}.space === 'world');
+                    const scale${k} = toWorld${k} ? b${k}._tempScale : b${k}._tempScaleInv;
+                    const quat${k} = toWorld${k} ? b${k}._tempQ : b${k}._tempQInv;`,
+                body: `{const pos = p.position;
+                    tmp${k}.set(
+                        lx${k}.genValue(p.memory, t),
+                        ly${k}.genValue(p.memory, t),
+                        lz${k}.genValue(p.memory, t));
+                    if (convert${k}) { tmp${k}.multiply(scale${k}).applyQuaternion(quat${k}); }
+                    pos.addScaledVector(tmp${k}, delta);
+                    const rx = ox${k}.genValue(p.memory, t) * delta;
+                    const ry = oy${k}.genValue(p.memory, t) * delta;
+                    const rz = oz${k}.genValue(p.memory, t) * delta;
+                    if (rx !== 0 || ry !== 0 || rz !== 0) {
+                        if (world${k}) { pos.sub(pivot${k}); }
+                        if (rx !== 0) { rot${k}.setFromAxisAngle(ax${k}, rx); pos.applyQuaternion(rot${k}); }
+                        if (ry !== 0) { rot${k}.setFromAxisAngle(ay${k}, ry); pos.applyQuaternion(rot${k}); }
+                        if (rz !== 0) { rot${k}.setFromAxisAngle(az${k}, rz); pos.applyQuaternion(rot${k}); }
+                        if (world${k}) { pos.add(pivot${k}); }
+                    }}`,
             };
         case 'InheritVelocity':
             return {
