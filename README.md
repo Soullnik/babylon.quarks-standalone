@@ -88,6 +88,8 @@ scene.onBeforeRenderObservable.add(() => {
 });
 ```
 
+Disabling an emitter (`system.emitter.visible = false`, or `setEnabled(false)` on the node) freezes that system: it is neither drawn nor simulated, and it picks up where it left off when re-enabled. This matches Unity's behaviour for a disabled Particle System, and makes parked effects in a VFX pool free.
+
 For the Babylon.js Playground or plain `<script>` usage there is a UMD bundle exposed as the `BabylonQuarks` global — see the [package README](packages/babylon.quarks/README.md#use-in-the-babylonjs-playground) for a paste-ready Playground snippet:
 
 ```js

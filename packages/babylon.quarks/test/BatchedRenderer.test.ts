@@ -272,6 +272,34 @@ describe('BatchedRenderer', () => {
         orphan.dispose();
     });
 
+    it('freezes systems whose emitter is disabled and resumes them on enable', () => {
+        const renderer = new BatchedRenderer('hidden-sim', scene);
+        const system = createSystem();
+        renderer.addSystem(system);
+        for (let i = 0; i < 30; i++) renderer.update(1 / 60);
+
+        const particlesWhenHidden = system.particleNum;
+        expect(particlesWhenHidden).toBeGreaterThan(0);
+        const frozenAge = system.particles[0].age;
+        const frozenTime = system.time;
+
+        system.emitter.visible = false;
+        for (let i = 0; i < 30; i++) renderer.update(1 / 60);
+        expect(system.particleNum).toBe(particlesWhenHidden);
+        expect(system.particles[0].age).toBe(frozenAge);
+        expect(system.time).toBe(frozenTime);
+        // Nothing of a hidden system reaches the GPU either.
+        expect(renderer.getBatchRenderStats()[0].instanceCount).toBe(0);
+
+        system.emitter.visible = true;
+        renderer.update(1 / 60);
+        expect(system.particles[0].age).toBeGreaterThan(frozenAge);
+        expect(renderer.getBatchRenderStats()[0].instanceCount).toBeGreaterThan(0);
+
+        renderer.dispose();
+        system.dispose();
+    });
+
     it('keeps an orphaned batch warm briefly, then reclaims it', () => {
         const renderer = new BatchedRenderer('batch-reclaim', scene);
         const system = createSystem();

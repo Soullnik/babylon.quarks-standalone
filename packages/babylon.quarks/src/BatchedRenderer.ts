@@ -230,7 +230,12 @@ export class BatchedRenderer extends TransformNode {
         const systems = this.systems;
         for (let i = 0; i < systems.length; i++) {
             const system = systems[i];
-            (system as ParticleSystem).update(delta);
+            // A disabled emitter holds its particles frozen instead of simulating
+            // them unseen, matching how Unity treats a disabled ParticleSystem.
+            // Pooled effects parked with setEnabled(false) then cost nothing.
+            if (system.emitter.visible) {
+                (system as ParticleSystem).update(delta);
+            }
             // An autoDestroy system disposes itself from inside update and drops
             // out of the list; stay on the slot it vacated.
             if (systems[i] !== system) {
