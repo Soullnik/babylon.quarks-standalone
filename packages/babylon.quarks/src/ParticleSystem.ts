@@ -874,20 +874,32 @@ export class ParticleSystem implements IParticleSystem {
 
         const followLocalOrigin =
             isTrailMode && (this.rendererEmitterSettings as TrailSettings).followLocalOrigin;
-        const emitterMatrix = this.emitter.matrixWorld;
-        for (let i = 0; i < particleCount; i++) {
-            const particle = particles[i];
-            if (followLocalOrigin && (particle as TrailParticle).localPosition) {
-                particle.position.copy((particle as TrailParticle).localPosition!);
-                if (particle.parentMatrix) {
-                    particle.position.applyMatrix4(particle.parentMatrix);
+        if (followLocalOrigin) {
+            const emitterMatrix = this.emitter.matrixWorld;
+            for (let i = 0; i < particleCount; i++) {
+                const particle = particles[i];
+                if ((particle as TrailParticle).localPosition) {
+                    particle.position.copy((particle as TrailParticle).localPosition!);
+                    particle.position.applyMatrix4(particle.parentMatrix ?? emitterMatrix);
                 } else {
-                    particle.position.applyMatrix4(emitterMatrix);
+                    particle.position.addScaledVector(particle.velocity, delta * particle.speedModifier);
                 }
-            } else {
-                particle.position.addScaledVector(particle.velocity, delta * particle.speedModifier);
+                particle.age += delta;
             }
-            particle.age += delta;
+        } else {
+            // Live particles own rows [0, particleNum), so integrate straight
+            // over the position and velocity columns instead of stepping through
+            // the vector views of each particle.
+            const positions = this.store.position;
+            const velocities = this.store.velocity;
+            for (let i = 0, offset = 0; i < particleCount; i++, offset += 3) {
+                const particle = particles[i];
+                const step = delta * particle.speedModifier;
+                positions[offset] += velocities[offset] * step;
+                positions[offset + 1] += velocities[offset + 1] * step;
+                positions[offset + 2] += velocities[offset + 2] * step;
+                particle.age += delta;
+            }
         }
 
         if (isTrailMode) {
