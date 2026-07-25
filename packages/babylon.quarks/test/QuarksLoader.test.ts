@@ -876,4 +876,32 @@ describe('QuarksLoader matrix decomposition', () => {
         scene.dispose();
         engine.dispose();
     });
+    it('warns about an image entry that is not an image', () => {
+        // A Unity built-in texture exports as its virtual asset path, which
+        // otherwise just fails to load with no hint as to why.
+        const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+        try {
+            const engine = new NullEngine();
+            const scene = new Scene(engine);
+            const loader = new QuarksLoader(scene);
+            loader.parse({
+                metadata: {version: 4.5, type: 'Object'},
+                images: [
+                    {uuid: 'img-broken', url: 'Resources/unity_builtin_extra'},
+                    {uuid: 'img-ok', url: 'textures/spark.png'},
+                    {uuid: 'img-inline', url: 'data:image/png;base64,AAAA'},
+                ],
+                textures: [],
+                materials: [],
+                geometries: [],
+                object: {uuid: 'n0', type: 'Group', name: 'root'},
+            } as any);
+            const messages = warn.mock.calls.map((c) => String(c[0]));
+            expect(messages.filter((m) => m.includes('unity_builtin_extra'))).toHaveLength(1);
+            expect(messages.filter((m) => m.includes('spark.png'))).toHaveLength(0);
+            expect(messages.filter((m) => m.includes('data:image'))).toHaveLength(0);
+        } finally {
+            warn.mockRestore();
+        }
+    });
 });

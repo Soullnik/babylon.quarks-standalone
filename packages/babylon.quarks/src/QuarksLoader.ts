@@ -255,8 +255,30 @@ export class QuarksLoader {
     private parseImages(images: any[], baseUrl: string, _meta: LoadedMeta): void {
         (this as any)._images = {};
         for (const img of images) {
+            if (img.url) {
+                QuarksLoader.warnIfNotAnImageUrl(img.url);
+            }
             (this as any)._images[img.uuid] = img.url ? this.resolveImageUrl(baseUrl, img.url) : null;
         }
+    }
+
+    /**
+     * Flags an image entry that is plainly not an image, which otherwise only
+     * shows up as a texture that silently fails to load.
+     *
+     * The case worth naming: an exporter that could not embed a texture falls
+     * back to writing the source asset's path, and a Unity built-in texture
+     * reports a virtual path such as `Resources/unity_builtin_extra` that no
+     * file backs.
+     */
+    private static warnIfNotAnImageUrl(url: string): void {
+        if (/^(data|blob):/i.test(url) || /\.(png|jpe?g|webp|gif|bmp|ktx2?|dds|env|basis)(\?|#|$)/i.test(url)) {
+            return;
+        }
+        console.warn(
+            `[QuarksLoader] Image "${url}" does not look like an image; its texture will fail to load. ` +
+                'This usually means the effect was exported without embedding that texture.'
+        );
     }
 
     /**

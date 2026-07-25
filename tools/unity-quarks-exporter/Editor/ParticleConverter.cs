@@ -123,10 +123,17 @@ namespace BabylonQuarks.UnityExporter
         {
             float g = ConstantOf(main.gravityModifier);
             if (Mathf.Abs(g) < 1e-5f) return;
+            // Gravity pulls along world -Y whatever the emitter's own rotation is,
+            // so it has to be a world-space force. ApplyForce adds its direction
+            // straight to the velocity, which for a local-space system means the
+            // emitter's rotation turns it: a particle system carrying Unity's usual
+            // -90 degrees about X had its gravity pushing along world Z instead of
+            // down. ForceOverLife is the behavior that undoes the emitter transform.
             behaviors.Add(new JObject()
-                .Set("type", "ApplyForce")
-                .Set("direction", Vec3(0, -1, 0))
-                .Set("magnitude", ValueConverter.Constant(9.81f * g)));
+                .Set("type", "ForceOverLife")
+                .Set("x", ValueConverter.Constant(0f))
+                .Set("y", ValueConverter.Constant(-9.81f * g))
+                .Set("z", ValueConverter.Constant(0f)));
         }
 
         // ---- Emission --------------------------------------------------------------------

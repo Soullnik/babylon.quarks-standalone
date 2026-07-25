@@ -104,23 +104,94 @@ namespace BabylonQuarks.UnityExporter
         private string ResolveTextureUrl(Texture tex)
         {
             string path = AssetDatabase.GetAssetPath(tex);
-            if (EmbedTextures && !string.IsNullOrEmpty(path) && File.Exists(path))
+            if (EmbedTextures)
             {
-                try
+                // Only the source file of a format a browser can decode is worth
+                // embedding as-is.
+                if (!string.IsNullOrEmpty(path) && File.Exists(path) && IsWebImageFile(path))
                 {
-                    byte[] bytes = File.ReadAllBytes(path);
-                    string ext = Path.GetExtension(path).ToLowerInvariant();
-                    string mime = ext == ".jpg" || ext == ".jpeg" ? "image/jpeg"
-                        : ext == ".webp" ? "image/webp"
-                        : "image/png";
-                    return "data:" + mime + ";base64," + Convert.ToBase64String(bytes);
+                    try
+                    {
+                        byte[] bytes = File.ReadAllBytes(path);
+                        return "data:" + MimeTypeOf(path) + ";base64," + Convert.ToBase64String(bytes);
+                    }
+                    catch (Exception e)
+                    {
+                        Debug.LogWarning($"[Quarks Exporter] Could not embed texture '{tex.name}': {e.Message}");
+                    }
                 }
-                catch (Exception e)
+
+                // Everything else goes through the GPU copy: textures Unity keeps
+                // in its built-in bundle (Default-Particle and friends) report a
+                // virtual path with no file behind it, and authoring formats like
+                // .tga or .psd are not something a browser can decode. Both used to
+                // fall through to the branch below and export the asset path as if
+                // it were an image url.
+                string encoded = EncodeTextureToPngDataUrl(tex);
+                if (!string.IsNullOrEmpty(encoded))
                 {
-                    Debug.LogWarning($"[Quarks Exporter] Could not embed texture '{tex.name}': {e.Message}");
+                    return encoded;
                 }
+                Debug.LogWarning(
+                    $"[Quarks Exporter] Texture '{tex.name}' could not be embedded; the effect will reference '{path}' and will not load outside Unity.");
             }
             return !string.IsNullOrEmpty(path) ? path : tex.name;
+        }
+
+        private static bool IsWebImageFile(string path)
+        {
+            string ext = Path.GetExtension(path).ToLowerInvariant();
+            return ext == ".png" || ext == ".jpg" || ext == ".jpeg" || ext == ".webp";
+        }
+
+        private static string MimeTypeOf(string path)
+        {
+            string ext = Path.GetExtension(path).ToLowerInvariant();
+            return ext == ".jpg" || ext == ".jpeg" ? "image/jpeg"
+                : ext == ".webp" ? "image/webp"
+                : "image/png";
+        }
+
+        /// <summary>
+        /// Re-encodes any texture to a PNG data URI by way of a render texture.
+        /// Works for built-in, compressed and non-readable textures, none of which
+        /// can be read from disk or through <c>EncodeToPNG</c> directly.
+        /// </summary>
+        private static string EncodeTextureToPngDataUrl(Texture tex)
+        {
+            if (tex == null || tex.width <= 0 || tex.height <= 0)
+            {
+                return null;
+            }
+
+            RenderTexture previous = RenderTexture.active;
+            RenderTexture rt = RenderTexture.GetTemporary(
+                tex.width, tex.height, 0, RenderTextureFormat.ARGB32, RenderTextureReadWrite.sRGB);
+            Texture2D readable = null;
+            try
+            {
+                Graphics.Blit(tex, rt);
+                RenderTexture.active = rt;
+                readable = new Texture2D(tex.width, tex.height, TextureFormat.RGBA32, false);
+                readable.ReadPixels(new Rect(0, 0, tex.width, tex.height), 0, 0);
+                readable.Apply();
+                byte[] png = readable.EncodeToPNG();
+                return png == null ? null : "data:image/png;base64," + Convert.ToBase64String(png);
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning($"[Quarks Exporter] Could not re-encode texture '{tex.name}': {e.Message}");
+                return null;
+            }
+            finally
+            {
+                RenderTexture.active = previous;
+                RenderTexture.ReleaseTemporary(rt);
+                if (readable != null)
+                {
+                    UnityEngine.Object.DestroyImmediate(readable);
+                }
+            }
         }
 
         // ---- mesh geometry (Mesh render mode) ------------------------------------------
