@@ -17,7 +17,8 @@ const UNIT_Z = new Vector3(0, 0, 1);
  */
 export class VelocityOverLife implements Behavior {
     type = 'VelocityOverLife';
-    ps!: IParticleSystem;
+    /** Learned in {@link initialize}, so undefined until this behavior sees a particle. */
+    ps?: IParticleSystem;
 
     constructor(
         public linearX: FunctionValueGenerator | ValueGenerator = new ConstantValue(0),
@@ -63,10 +64,14 @@ export class VelocityOverLife implements Behavior {
             this.linearY.genValue(particle.memory, t),
             this.linearZ.genValue(particle.memory, t)
         );
+        // The system is undefined until initialize() has run for this behavior;
+        // an unknown one is treated as world space rather than throwing, which
+        // is also what frameUpdate's guard assumes.
+        const worldSpace = this.ps !== undefined && this.ps.worldSpace;
         // Convert the authored space into the particle simulation space.
-        if (this.ps.worldSpace && this.space === 'local') {
+        if (worldSpace && this.space === 'local') {
             this._temp.multiply(this._tempScale).applyQuaternion(this._tempQ);
-        } else if (!this.ps.worldSpace && this.space === 'world') {
+        } else if (!worldSpace && this.space === 'world') {
             this._temp.multiply(this._tempScaleInv).applyQuaternion(this._tempQInv);
         }
         particle.position.addScaledVector(this._temp, delta);
@@ -75,7 +80,7 @@ export class VelocityOverLife implements Behavior {
         const angleY = this.orbitalY.genValue(particle.memory, t) * delta;
         const angleZ = this.orbitalZ.genValue(particle.memory, t) * delta;
         if (angleX !== 0 || angleY !== 0 || angleZ !== 0) {
-            const worldPivot = this.ps.worldSpace;
+            const worldPivot = worldSpace;
             if (worldPivot) {
                 particle.position.sub(this._tempEmitterPos);
             }
