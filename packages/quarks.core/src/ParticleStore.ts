@@ -58,6 +58,48 @@ export class ParticleStore {
         return true;
     }
 
+    /**
+     * Exchanges the contents of two rows.
+     *
+     * Used to keep row order aligned with the owning system's particle order, so
+     * the live particles stay a contiguous range that a renderer can copy in one
+     * go rather than gathering particle by particle.
+     */
+    swapRows(a: number, b: number): void {
+        if (a === b) {
+            return;
+        }
+        const a3 = a * 3;
+        const b3 = b * 3;
+        ParticleStore.swap3(this.position, a3, b3);
+        ParticleStore.swap3(this.velocity, a3, b3);
+        ParticleStore.swap3(this.size, a3, b3);
+        ParticleStore.swap3(this.startSize, a3, b3);
+        const a4 = a * 4;
+        const b4 = b * 4;
+        ParticleStore.swap4(this.color, a4, b4);
+        ParticleStore.swap4(this.startColor, a4, b4);
+    }
+
+    private static swap3(data: Float32Array, a: number, b: number): void {
+        let temp = data[a];
+        data[a] = data[b];
+        data[b] = temp;
+        temp = data[a + 1];
+        data[a + 1] = data[b + 1];
+        data[b + 1] = temp;
+        temp = data[a + 2];
+        data[a + 2] = data[b + 2];
+        data[b + 2] = temp;
+    }
+
+    private static swap4(data: Float32Array, a: number, b: number): void {
+        ParticleStore.swap3(data, a, b);
+        const temp = data[a + 3];
+        data[a + 3] = data[b + 3];
+        data[b + 3] = temp;
+    }
+
     private static grow(source: Float32Array, length: number): Float32Array {
         const grown = new Float32Array(length);
         grown.set(source);

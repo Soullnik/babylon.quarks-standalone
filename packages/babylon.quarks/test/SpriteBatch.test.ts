@@ -5,7 +5,7 @@ import {ShaderMaterial} from '@babylonjs/core/Materials/shaderMaterial';
 import {RawTexture} from '@babylonjs/core/Materials/Textures/rawTexture';
 import {FreeCamera} from '@babylonjs/core/Cameras/freeCamera';
 import {Vector3} from '@babylonjs/core/Maths/math.vector';
-import {ConstantColor, ConstantValue, Matrix4, PointEmitter, Vector4} from 'quarks.core';
+import {ConstantColor, ConstantValue, IntervalValue, Matrix4, PointEmitter, Vector4} from 'quarks.core';
 import {BatchedRenderer} from '../src/BatchedRenderer';
 import {ParticleSystem} from '../src/ParticleSystem';
 import {SpriteBatch} from '../src/SpriteBatch';
@@ -354,6 +354,53 @@ describe('SpriteBatch', () => {
         renderer.addSystem(system);
         renderer.update(1 / 60);
         expect(getSpriteBatch(renderer).mesh.forcedInstanceCount).toBeGreaterThan(0);
+        renderer.dispose();
+        system.dispose();
+    });
+    it('range-copies world space attributes identically to the per-particle path', () => {
+        const renderer = new BatchedRenderer('sprite-bulk', scene);
+        const system = createSpriteSystem({worldSpace: true, startSpeed: new ConstantValue(3)});
+        renderer.addSystem(system);
+        for (let i = 0; i < 20; i++) {
+            renderer.update(1 / 60);
+        }
+
+        const batch = getSpriteBatch(renderer) as any;
+        expect(system.particleNum).toBeGreaterThan(1);
+        for (let i = 0; i < system.particleNum; i++) {
+            const particle = system.particles[i];
+            expect(batch.offsetBuffer[i * 3]).toBeCloseTo(particle.position.x, 5);
+            expect(batch.offsetBuffer[i * 3 + 1]).toBeCloseTo(particle.position.y, 5);
+            expect(batch.offsetBuffer[i * 3 + 2]).toBeCloseTo(particle.position.z, 5);
+            expect(batch.sizeBuffer[i * 3]).toBeCloseTo(particle.size.x, 5);
+            expect(batch.colorBuffer[i * 4 + 3]).toBeCloseTo(particle.color.w, 5);
+        }
+
+        renderer.dispose();
+        system.dispose();
+    });
+
+    it('keeps store rows aligned with particle slots as particles die', () => {
+        const renderer = new BatchedRenderer('sprite-rows', scene);
+        const system = createSpriteSystem({
+            startLife: new IntervalValue(0.1, 0.6),
+            emissionOverTime: new ConstantValue(300),
+            worldSpace: true,
+        });
+        renderer.addSystem(system);
+        for (let i = 0; i < 60; i++) {
+            renderer.update(1 / 60);
+        }
+        expect(system.particleNum).toBeGreaterThan(1);
+
+        for (let i = 0; i < system.particleNum; i++) {
+            const particle = system.particles[i] as any;
+            // Slot k must own row k, and its views must read that row.
+            expect(particle.storeIndex).toBe(i);
+            expect(system.store.position[i * 3]).toBeCloseTo(particle.position.x, 5);
+            expect(system.store.color[i * 4 + 3]).toBeCloseTo(particle.color.w, 5);
+        }
+
         renderer.dispose();
         system.dispose();
     });

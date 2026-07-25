@@ -174,7 +174,7 @@ export class SpriteParticle implements Particle {
     /** Column storage backing this particle's vector attributes. */
     readonly store: ParticleStore;
     /** Row this particle occupies in {@link store}. */
-    readonly storeIndex: number;
+    storeIndex: number;
     /**
      * Parent matrix for transformation.
      * @type {Matrix4}
@@ -268,6 +268,15 @@ export class SpriteParticle implements Particle {
         this.startSize.set(1, 1, 1);
     }
 
+    /**
+     * Moves this particle onto a different store row. The caller is responsible
+     * for having moved the row contents too.
+     */
+    setStoreIndex(index: number): void {
+        this.storeIndex = index;
+        this.rebind();
+    }
+
     /** Re-points the vector views after the store grew its arrays. */
     rebind(): void {
         const store = this.store;
@@ -320,7 +329,7 @@ export class TrailParticle implements Particle {
     /** Column storage backing this particle's vector attributes. */
     readonly store: ParticleStore;
     /** Row this particle occupies in {@link store}. */
-    readonly storeIndex: number;
+    storeIndex: number;
     /**
      * Parent matrix for transformation.
      * @type {Matrix4}
@@ -434,6 +443,15 @@ export class TrailParticle implements Particle {
         this.startColor = new Vector4View(store.startColor, offset4);
         this.size.set(1, 1, 1);
         this.startSize.set(1, 1, 1);
+    }
+
+    /**
+     * Moves this particle onto a different store row. The caller is responsible
+     * for having moved the row contents too.
+     */
+    setStoreIndex(index: number): void {
+        this.storeIndex = index;
+        this.rebind();
     }
 
     /** Re-points the vector views after the store grew its arrays. */

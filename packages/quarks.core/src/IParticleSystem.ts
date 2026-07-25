@@ -1,5 +1,6 @@
 import {Matrix4, Vector3} from './math';
 import {IParticle} from './Particle';
+import {ParticleStore} from './ParticleStore';
 import {FunctionValueGenerator, ValueGenerator} from './functions';
 export interface EmissionState {
     burstIndex: number;
@@ -99,6 +100,13 @@ export interface ParticleSystemEvent {
 
 export interface IParticleSystem {
 
+    /**
+     * Column storage backing the particles' vector attributes, when the
+     * implementation uses one. Rows `[0, particleNum)` hold the live particles
+     * in the same order as `particles`, so a renderer can read them as ranges.
+     * @type {ParticleStore}
+     */
+    store?: ParticleStore;
     /**
      * Whether the ParticleSystem should be automatically disposed when it finishes emitting particles.
      * @type {string}

@@ -313,6 +313,20 @@ export class SpriteBatch extends VFXBatch {
                     : stretchedSettings.speedFactor;
             const lengthFactor = stretchedSettings?.lengthFactor ?? 0;
 
+            // Live particles occupy store rows [0, particleNum) in the same order
+            // this loop writes them, so attributes that need no per-particle
+            // transform can be copied as one range instead of gathered.
+            const store = system.store;
+            const copiedColor = store !== undefined;
+            if (copiedColor) {
+                this.colorBuffer.set(store!.color.subarray(0, particleNum * 4), index * 4);
+            }
+            const copiedPositionAndSize = store !== undefined && systemWorldSpace;
+            if (copiedPositionAndSize) {
+                this.offsetBuffer.set(store!.position.subarray(0, particleNum * 3), index * 3);
+                this.sizeBuffer.set(store!.size.subarray(0, particleNum * 3), index * 3);
+            }
+
             for (let j = 0; j < particleNum; j++, index++) {
                 const particle = particles[j] as SpriteParticle;
 
@@ -339,46 +353,50 @@ export class SpriteBatch extends VFXBatch {
                     this.rotationBuffer[index] = particle.rotation as number;
                 }
 
-                const position = particle.position;
-                let px = position.x;
-                let py = position.y;
-                let pz = position.z;
-                if (!systemWorldSpace) {
-                    // Inlined point transform: this is the default (local space)
-                    // path and runs for every particle every frame.
-                    const me = (particle.parentMatrix ?? emitterMatrix).elements;
-                    const w = 1 / (me[3] * px + me[7] * py + me[11] * pz + me[15]);
-                    const tx = (me[0] * px + me[4] * py + me[8] * pz + me[12]) * w;
-                    const ty = (me[1] * px + me[5] * py + me[9] * pz + me[13]) * w;
-                    pz = (me[2] * px + me[6] * py + me[10] * pz + me[14]) * w;
-                    px = tx;
-                    py = ty;
+                if (!copiedPositionAndSize) {
+                    const position = particle.position;
+                    let px = position.x;
+                    let py = position.y;
+                    let pz = position.z;
+                    if (!systemWorldSpace) {
+                        // Inlined point transform: this is the default (local space)
+                        // path and runs for every particle every frame.
+                        const me = (particle.parentMatrix ?? emitterMatrix).elements;
+                        const w = 1 / (me[3] * px + me[7] * py + me[11] * pz + me[15]);
+                        const tx = (me[0] * px + me[4] * py + me[8] * pz + me[12]) * w;
+                        const ty = (me[1] * px + me[5] * py + me[9] * pz + me[13]) * w;
+                        pz = (me[2] * px + me[6] * py + me[10] * pz + me[14]) * w;
+                        px = tx;
+                        py = ty;
+                    }
+
+                    const oi = index * 3;
+                    this.offsetBuffer[oi] = px;
+                    this.offsetBuffer[oi + 1] = py;
+                    this.offsetBuffer[oi + 2] = pz;
+
+                    const size = particle.size;
+                    const si = index * 3;
+                    // Particle size is already in world units when the system is in world
+                    // space or the particle carries its own parent transform.
+                    if (systemWorldSpace || particle.parentMatrix) {
+                        this.sizeBuffer[si] = size.x;
+                        this.sizeBuffer[si + 1] = size.y;
+                        this.sizeBuffer[si + 2] = size.z;
+                    } else {
+                        this.sizeBuffer[si] = size.x * absScaleX;
+                        this.sizeBuffer[si + 1] = size.y * absScaleY;
+                        this.sizeBuffer[si + 2] = size.z * absScaleZ;
+                    }
                 }
 
-                const oi = index * 3;
-                this.offsetBuffer[oi] = px;
-                this.offsetBuffer[oi + 1] = py;
-                this.offsetBuffer[oi + 2] = pz;
-
-                const color = particle.color;
-                const ci = index * 4;
-                this.colorBuffer[ci] = color.x;
-                this.colorBuffer[ci + 1] = color.y;
-                this.colorBuffer[ci + 2] = color.z;
-                this.colorBuffer[ci + 3] = color.w;
-
-                const size = particle.size;
-                const si = index * 3;
-                // Particle size is already in world units when the system is in world
-                // space or the particle carries its own parent transform.
-                if (systemWorldSpace || particle.parentMatrix) {
-                    this.sizeBuffer[si] = size.x;
-                    this.sizeBuffer[si + 1] = size.y;
-                    this.sizeBuffer[si + 2] = size.z;
-                } else {
-                    this.sizeBuffer[si] = size.x * absScaleX;
-                    this.sizeBuffer[si + 1] = size.y * absScaleY;
-                    this.sizeBuffer[si + 2] = size.z * absScaleZ;
+                if (!copiedColor) {
+                    const color = particle.color;
+                    const ci = index * 4;
+                    this.colorBuffer[ci] = color.x;
+                    this.colorBuffer[ci + 1] = color.y;
+                    this.colorBuffer[ci + 2] = color.z;
+                    this.colorBuffer[ci + 3] = color.w;
                 }
 
                 this.uvTileBuffer[index] = particle.uvTile;

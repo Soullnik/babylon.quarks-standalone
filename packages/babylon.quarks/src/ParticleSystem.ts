@@ -52,6 +52,9 @@ export interface BurstParameters {
     probability: number;
 }
 
+/** Particle backed by a {@link ParticleStore} row, as this system always creates. */
+type StoreBackedParticle = Particle & {storeIndex: number; setStoreIndex(index: number): void};
+
 const UP = new Vector3(0, 0, 1);
 const tempQ = new Quaternion();
 const tempV = new Vector3();
@@ -894,12 +897,23 @@ export class ParticleSystem implements IParticleSystem {
         }
 
         const notifyDeaths = this.hasListeners('particleDied');
+        const store = this.store;
         let liveParticleCount = this.particleNum;
         for (let i = 0; i < liveParticleCount; i++) {
             const particle = particles[i];
             if (particle.age >= particle.life && (!isTrailMode || (particle as TrailParticle).historyCount === 0)) {
-                particles[i] = particles[liveParticleCount - 1];
-                particles[liveParticleCount - 1] = particle;
+                const last = liveParticleCount - 1;
+                const survivor = particles[last] as StoreBackedParticle;
+                particles[i] = survivor;
+                particles[last] = particle;
+                // Move the rows along with the particles so slot k always owns
+                // row k. Live particles then stay one contiguous range, which is
+                // what lets the renderer copy them without gathering.
+                if (i !== last) {
+                    store.swapRows(i, last);
+                    survivor.setStoreIndex(i);
+                    (particle as StoreBackedParticle).setStoreIndex(last);
+                }
                 liveParticleCount--;
                 i--;
                 if (notifyDeaths) {
