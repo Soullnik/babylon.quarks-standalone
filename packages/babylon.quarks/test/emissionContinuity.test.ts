@@ -66,6 +66,11 @@ describe('emission continuity at whole-number occupancy', () => {
     // is aged by that same step, so its life ends one step before the emitter
     // refills and the count drops to zero for one frame per period.
     //
+    // Written as `failing` rather than skipped on purpose. Skipping would go
+    // green and be forgotten; this keeps the assertion running, expects it to
+    // fail, and turns the suite red the day it starts passing — which is the
+    // day someone should delete this comment and the `.failing`.
+    //
     // The obvious fix — leaving a newborn alone until the next step — was tried
     // and reverted: it makes `age === 0` true on two consecutive steps, so every
     // sub emitter in Birth mode fires twice, and it freezes each particle for
@@ -73,9 +78,8 @@ describe('emission continuity at whole-number occupancy', () => {
     //
     // The fix belongs on the death boundary instead (`age > life` rather than
     // `>=`), which needs the same comparison in the behaviors and in the fused
-    // pass to move with it. Until then this is skipped rather than deleted, so
-    // the knowledge does not go with it.
-    it.skip('never empties an emitter of one a second living a second', () => {
+    // pass to move with it.
+    it.failing('never empties an emitter of one a second living a second', () => {
         expect(blankFrames(makeSystem(1, 1), 20)).toBe(0);
     });
 
