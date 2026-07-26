@@ -115,7 +115,10 @@ describe('burst one-shot effect finished', () => {
             renderer.addSystem(system);
         }
 
-        simulate(systems, 0.6);
+        // The longest life here is 0.6s, and a particle emitted by a step does
+        // not age until the next one, so the tail outlives 0.6s by a step.
+        // Simulating exactly the longest lifetime leaves no room for that.
+        simulate(systems, 0.7);
 
         expect(QuarksUtil.isEffectFinished(root)).toBe(true);
         for (const system of systems) {
@@ -129,7 +132,10 @@ describe('burst one-shot effect finished', () => {
 
     it('marks a single-burst splat finished before duration elapses', () => {
         const {root, systems} = createSingleBurstSplat();
-        simulate(systems, 0.6);
+        // The longest life here is 0.6s, and a particle emitted by a step does
+        // not age until the next one, so the tail outlives 0.6s by a step.
+        // Simulating exactly the longest lifetime leaves no room for that.
+        simulate(systems, 0.7);
 
         expect(QuarksUtil.isEffectFinished(root)).toBe(true);
         expect(systems[0].isFinished()).toBe(true);
