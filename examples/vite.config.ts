@@ -11,6 +11,8 @@ export default defineConfig({
     base,
     server: {
         port: 8000,
+        // Cloudflare quick tunnels hit Vite with a *.trycloudflare.com Host header.
+        allowedHosts: true,
     },
     preview: {
         port: 8000,

@@ -3,13 +3,18 @@ import {ArcRotateCamera} from "@babylonjs/core/Cameras/arcRotateCamera";
 import {HemisphericLight} from "@babylonjs/core/Lights/hemisphericLight";
 import {Vector3 as BVector3} from "@babylonjs/core/Maths/math.vector";
 import {Color4} from "@babylonjs/core/Maths/math.color";
-import {BatchedRenderer, ParticleSystem} from "babylon.quarks";
+import {ShaderMaterial} from "@babylonjs/core/Materials/shaderMaterial";
+import {Logger} from "@babylonjs/core/Misc/logger";
+import {BatchedRenderer, ParticleSystem, RenderMode} from "babylon.quarks";
 import {loadQuarksFromJson} from "./loadQuarksJson";
 import {createEngineFromQuery} from "./shared/engineFactory";
 import {ensurePortableTextureUrl, serializeEffectForest} from "babylon.quarks-editor";
 import type {TransformNode} from "@babylonjs/core/Meshes/transformNode";
 import {demos} from "./registry";
 import type {DemoContext, DemoDefinition, DemoState} from "./types";
+import {installPhoneDebugLog, mountPhoneDebugLogUi, phoneLog} from "./debugPhoneLog";
+
+installPhoneDebugLog();
 
 const GITHUB_BASE = "https://github.com/Soullnik/babylon.quarks-standalone/blob/main/";
 const DROPPED_JSON_DEMO_KEY = "__dropped_json__";
@@ -20,6 +25,7 @@ const demoSelect = document.getElementById("demo-select") as HTMLSelectElement;
 const jsonFileInput = document.getElementById("json-file-input") as HTMLInputElement | null;
 const dropOverlay = document.getElementById("drop-overlay");
 const engine = await createEngineFromQuery(canvas);
+phoneLog("INF", "engine ready", engine.isWebGPU ? "webgpu" : "webgl", (engine as any).webGLVersion ?? "");
 
 let scene: Scene;
 let camera: ArcRotateCamera;
@@ -31,6 +37,7 @@ let demoState: DemoState = {};
 let loadToken = 0;
 let frameCount = 0;
 let lastFpsTime = performance.now();
+let lastMeshDiagTime = 0;
 let dragDepth = 0;
 
 const droppedJsonDemo: DemoDefinition = {
@@ -179,6 +186,7 @@ async function loadDemo(index: number) {
     createBaseScene();
     activeDemo = demos[index];
     hideDroppedJsonOption();
+    phoneLog("INF", "loadDemo", activeDemo.key);
     try {
         await activeDemo.init({scene, camera, batchRenderer, systems, demoState});
         if (token !== loadToken) {
@@ -188,15 +196,114 @@ async function loadDemo(index: number) {
         updateDemoSelectValue();
         window.location.hash = "#" + activeDemo.key;
         updateSourceLink();
+        dumpMeshDiagnostics("after-init");
     } catch (e) {
         if (token !== loadToken) {
             return;
         }
         console.error("Error loading demo:", e);
+        phoneLog("ERR", "loadDemo failed", e);
         const title = document.getElementById("demo-name");
         if (title) {
             title.textContent = "Error: " + (e as Error).message;
         }
+    }
+}
+
+/** Temporary: dump mesh batch / shader readiness for iOS debugging. */
+function dumpMeshDiagnostics(reason: string) {
+    try {
+        phoneLog("INF", "mesh-diag", reason, "demo=", activeDemo?.key ?? "none");
+        phoneLog(
+            "INF",
+            "systems",
+            systems.length,
+            "particles",
+            systems.reduce((sum, system) => sum + system.particleNum, 0)
+        );
+        if (!batchRenderer) {
+            phoneLog("WRN", "no batchRenderer");
+            return;
+        }
+        phoneLog("INF", "batches", batchRenderer.batches.length);
+        for (let i = 0; i < batchRenderer.batches.length; i++) {
+            const batch = batchRenderer.batches[i];
+            const settings = batch.settings;
+            const mesh = batch.mesh;
+            const mat = mesh.material;
+            phoneLog(
+                "INF",
+                `batch[${i}]`,
+                "mode",
+                settings.renderMode,
+                "instances",
+                mesh.forcedInstanceCount,
+                "enabled",
+                mesh.isEnabled(),
+                "visible",
+                mesh.isVisible,
+                "hasEnv",
+                !!settings.reflectionTexture,
+                "envCube",
+                !!settings.reflectionTexture?.isCube,
+                "envReady",
+                settings.reflectionTexture ? settings.reflectionTexture.isReady() : "n/a",
+                "envLevel",
+                settings.reflectionLevel
+            );
+            if (mat instanceof ShaderMaterial) {
+                const defines = (mat as any).options?.defines ?? [];
+                const effect = mat.getEffect();
+                phoneLog(
+                    "INF",
+                    `batch[${i}] mat`,
+                    mat.name,
+                    "ready",
+                    mat.isReady(mesh),
+                    "defines",
+                    defines.join(","),
+                    "effect",
+                    effect ? "yes" : "no",
+                    "compiled",
+                    effect?.isReady() ?? false
+                );
+                const err =
+                    (effect as any)?.getCompilationError?.() ||
+                    (effect as any)?._compilationError ||
+                    (mat as any)._compilationError;
+                if (err) {
+                    phoneLog("ERR", `batch[${i}] shader error`, err);
+                }
+            } else {
+                phoneLog("WRN", `batch[${i}] material`, mat?.getClassName?.() ?? mat);
+            }
+            for (const system of batch.systems) {
+                const ps = system as ParticleSystem;
+                if (ps.rendererSettings?.renderMode === RenderMode.Mesh) {
+                    phoneLog(
+                        "INF",
+                        "mesh-system",
+                        "num",
+                        ps.particleNum,
+                        "paused",
+                        ps.paused,
+                        "emitEnded",
+                        (ps as any).emitEnded,
+                        "geom",
+                        ps.rendererSettings.instancingGeometry?.length,
+                        "normals",
+                        ps.rendererSettings.instancingNormals?.length
+                    );
+                }
+            }
+        }
+        const gl = (engine as any)._gl as WebGLRenderingContext | undefined;
+        if (gl) {
+            const glErr = gl.getError();
+            phoneLog("INF", "webgl getError", glErr);
+        }
+    } catch (e) {
+        phoneLog("ERR", "dumpMeshDiagnostics failed", e);
     }
 }
 
@@ -375,6 +482,20 @@ if (window.location.hash) {
 }
 
 setupJsonImportUi();
+mountPhoneDebugLogUi();
+window.addEventListener("phone-debug-dump", () => dumpMeshDiagnostics("manual"));
+
+const originalLoggerError = Logger.Error.bind(Logger);
+Logger.Error = (...args: any[]) => {
+    phoneLog("ERR", "BJS", ...args);
+    return originalLoggerError(...args);
+};
+const originalLoggerWarn = Logger.Warn.bind(Logger);
+Logger.Warn = (...args: any[]) => {
+    phoneLog("WRN", "BJS", ...args);
+    return originalLoggerWarn(...args);
+};
+
 loadDemo(demoIndex);
 
 engine.runRenderLoop(() => {
@@ -409,10 +530,24 @@ engine.runRenderLoop(() => {
             lastFpsTime = now;
         }
 
+        // Auto-dump mesh diagnostics a few times while on MeshMaterialDemo.
+        if (activeDemo.key === "MeshMaterialDemo" && now - lastMeshDiagTime > 2500) {
+            lastMeshDiagTime = now;
+            dumpMeshDiagnostics("periodic");
+        }
+
         scene.render();
     } catch (e) {
         console.error("Render error:", e);
+        phoneLog("ERR", "Render error", e);
     }
 });
 
 window.addEventListener("resize", () => engine.resize());
+canvas.addEventListener("webglcontextlost", (event) => {
+    event.preventDefault();
+    phoneLog("ERR", "webglcontextlost");
+});
+canvas.addEventListener("webglcontextrestored", () => {
+    phoneLog("WRN", "webglcontextrestored");
+});
