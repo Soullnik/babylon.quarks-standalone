@@ -923,12 +923,6 @@ export class ParticleSystem implements IParticleSystem {
 
     /** Advances emission, behaviors, motion and culling by one fixed timestep. */
     private simulateStep(delta: number): void {
-        // Particles emitted by this step have not lived through it. Ageing them
-        // anyway makes a lifetime end one step before the emitter refills, which
-        // for any effect whose rate times lifetime is a whole number — one a
-        // second living a second, five a second living a fifth — leaves exactly
-        // one frame per period with nothing on screen. It reads as a blink.
-        const alreadyLiving = this.particleNum;
         if (!this.onlyUsedByOther) {
             this.emit(delta, this.emissionState, this.emitter.matrixWorld);
         }
@@ -959,9 +953,6 @@ export class ParticleSystem implements IParticleSystem {
         }
         columns.previousColor.set(columns.color.subarray(0, particleCount * 4));
 
-        // Rows [0, alreadyLiving) existed before this step; anything past that
-        // was emitted by it and starts its life at the next one.
-        const aging = alreadyLiving < particleCount ? alreadyLiving : particleCount;
         this.emitterShape.update(this, delta);
         const steps = this.behaviorSteps();
         for (let s = 0; s < steps.length; s++) {
@@ -998,7 +989,7 @@ export class ParticleSystem implements IParticleSystem {
             isTrailMode && (this.rendererEmitterSettings as TrailSettings).followLocalOrigin;
         if (followLocalOrigin) {
             const emitterMatrix = this.emitter.matrixWorld;
-            for (let i = 0; i < aging; i++) {
+            for (let i = 0; i < particleCount; i++) {
                 const particle = particles[i];
                 if ((particle as TrailParticle).localPosition) {
                     particle.position.copy((particle as TrailParticle).localPosition!);
@@ -1015,7 +1006,7 @@ export class ParticleSystem implements IParticleSystem {
             const velocities = this.store.velocity;
             const scalars = this.store.scalars;
             const stride = ParticleStore.SCALAR_STRIDE;
-            for (let i = 0, offset = 0, scalar = 0; i < aging; i++, offset += 3, scalar += stride) {
+            for (let i = 0, offset = 0, scalar = 0; i < particleCount; i++, offset += 3, scalar += stride) {
                 const step = delta * scalars[scalar + ParticleStore.SPEED_MODIFIER];
                 positions[offset] += velocities[offset] * step;
                 positions[offset + 1] += velocities[offset + 1] * step;
