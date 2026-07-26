@@ -141,4 +141,85 @@ describe('sub emitter update order', () => {
         const order = (renderer as unknown as {orderSystems(): unknown[]}).orderSystems();
         expect(order.indexOf(parent)).toBeLessThan(order.indexOf(child));
     });
+
+    it('does not leave sub particles at startColour when the child clock paused empty', () => {
+        // onlyUsedByOther + non-looping finishes the moment it hits zero particles.
+        // Skipping update then froze its fixed-step accumulator while the parent
+        // kept ticking — next refill sat at age 0 / startColour for a frame or
+        // more wherever the parent was, which is the random white trail flashes
+        // in subEmitter2. Jittered dt is what opens the phase gap.
+        const child = new ParticleSystem({
+            scene,
+            duration: 0.3,
+            looping: false,
+            worldSpace: true,
+            onlyUsedByOther: true,
+            startLife: new ConstantValue(0.2),
+            startSpeed: new ConstantValue(0),
+            startSize: new ConstantValue(1),
+            startColor: new ConstantColor(new Vector4(1, 1, 1, 1)),
+            emissionOverTime: new ConstantValue(30),
+            emissionBursts: [],
+            shape: new PointEmitter(),
+            renderMode: RenderMode.BillBoard,
+            behaviors: [
+                new ColorOverLife(
+                    new Gradient(
+                        [
+                            [new QVector3(0, 0, 1), 0],
+                            [new QVector3(0, 0, 1), 1],
+                        ],
+                        [
+                            [1, 0],
+                            [0, 1],
+                        ]
+                    )
+                ),
+            ],
+        });
+        const parent = new ParticleSystem({
+            scene,
+            duration: 100,
+            looping: true,
+            worldSpace: true,
+            startLife: new ConstantValue(0.5),
+            startSpeed: new ConstantValue(8),
+            startSize: new ConstantValue(1),
+            startColor: new ConstantColor(new Vector4(1, 1, 1, 1)),
+            emissionOverTime: new ConstantValue(6),
+            emissionBursts: [],
+            shape: new SphereEmitter(),
+            renderMode: RenderMode.BillBoard,
+        });
+        const childEmitter = new ParticleEmitter(child);
+        childEmitter.parent = parent.emitter;
+        parent.addBehavior(
+            new EmitSubParticleSystem(parent, false, childEmitter, SubParticleEmitMode.Birth)
+        );
+
+        const renderer = new BatchedRenderer('sub-phase', scene);
+        renderer.addSystem(child);
+        renderer.addSystem(parent);
+        parent.play();
+        child.play();
+
+        let unstyled = 0;
+        let ageZero = 0;
+        let seen = 0;
+        const deltas = [1 / 90, 1 / 45, 1 / 120, 1 / 75, 0.03];
+        for (let i = 0; i < 400; i++) {
+            renderer.update(deltas[i % deltas.length]);
+            for (let j = 0; j < child.particleNum; j++) {
+                seen++;
+                const particle = child.particles[j];
+                if (particle.age === 0) ageZero++;
+                if (isStartColour(particle.color)) unstyled++;
+            }
+        }
+
+        expect(seen).toBeGreaterThan(50);
+        expect(ageZero).toBe(0);
+        expect(unstyled).toBe(0);
+        renderer.dispose();
+    });
 });

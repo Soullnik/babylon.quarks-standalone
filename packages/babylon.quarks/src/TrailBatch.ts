@@ -416,9 +416,9 @@ export class TrailBatch extends VFXBatch {
                     let tipY = position.y + (position.y - previousHead.y) * stepFraction;
                     let tipZ = position.z + (position.z - previousHead.z) * stepFraction;
                     const headIndex = index - 2;
-                    let headX = this.positionBuffer[headIndex * 3];
-                    let headY = this.positionBuffer[headIndex * 3 + 1];
-                    let headZ = this.positionBuffer[headIndex * 3 + 2];
+                    const headX = this.positionBuffer[headIndex * 3];
+                    const headY = this.positionBuffer[headIndex * 3 + 1];
+                    const headZ = this.positionBuffer[headIndex * 3 + 2];
 
                     if (!systemWorldSpace) {
                         const w = 1 / (m03 * tipX + m13 * tipY + m23 * tipZ + m33);
