@@ -69,7 +69,18 @@ export class TrailBatch extends VFXBatch {
         this.mesh.setVerticesData(VertexBuffer.PositionKind, this.positionBuffer, true);
         this.mesh.setVerticesData(VertexBuffer.UVKind, this.uvBuffer, true);
         this.mesh.setVerticesData(VertexBuffer.ColorKind, this.colorBuffer, true, 4);
-        this.mesh.setIndices(this.indexBuffer.subarray(0, 6), null, true);
+        // The whole array, not just the dummy triangle: this call is what sizes
+        // the GPU index buffer, and updateIndices later writes into it without
+        // resizing it. Handing it six indices here left a 24 byte buffer that
+        // every later frame overran — WebGL tolerated it, WebGPU rejects the
+        // draw outright ("index range does not fit in index buffer size").
+        // The vertex buffers above are already created at full capacity; this
+        // was the one that was not.
+        this.mesh.setIndices(this.indexBuffer, null, true);
+        if (this.mesh.subMeshes && this.mesh.subMeshes.length > 0) {
+            // Until the first update, only the dummy triangle is real.
+            this.mesh.subMeshes[0].indexCount = 6;
+        }
         const engine = this.scene.getEngine();
         this.previousVB = new VertexBuffer(engine, this.previousBuffer, 'previous', true, false, 3, false);
         this.nextVB = new VertexBuffer(engine, this.nextBuffer, 'next', true, false, 3, false);
