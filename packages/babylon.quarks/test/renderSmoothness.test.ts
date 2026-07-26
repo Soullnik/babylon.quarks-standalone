@@ -3,9 +3,12 @@ import {
     ConstantColor,
     ConstantValue,
     PointEmitter,
+    Bezier,
     OrbitOverLife,
+    PiecewiseBezier,
     Rotation3DOverLife,
     RotationOverLife,
+    SizeOverLife,
     TrailParticle,
     Vector3 as QVector3,
     Vector4,
@@ -197,6 +200,53 @@ describe('render-time smoothness', () => {
         const largest = Math.max(...moves);
         expect(smallest).toBeGreaterThan(0);
         expect(largest / smallest).toBeLessThan(1.1);
+        renderer.dispose();
+    });
+
+    it('keeps a short-lived particle fading and shrinking every frame', () => {
+        // Explosion layers live a fifth of a second — a dozen steps in total —
+        // so a whole step of fade lands on one frame and none on the next.
+        // Size and colour are read off a curve rather than integrated, so the
+        // only way to continue them is to have kept what the step produced.
+        const LIFE = 0.2;
+        const system = new ParticleSystem({
+            scene,
+            duration: 100,
+            looping: true,
+            worldSpace: true,
+            startLife: new ConstantValue(LIFE),
+            startSpeed: new ConstantValue(0),
+            startSize: new ConstantValue(2),
+            startColor: new ConstantColor(new Vector4(1, 1, 1, 1)),
+            emissionOverTime: new ConstantValue(300),
+            shape: new PointEmitter(),
+            renderMode: RenderMode.BillBoard,
+            behaviors: [new SizeOverLife(new PiecewiseBezier([[new Bezier(1, 0.7, 0.35, 0), 0]]))],
+        });
+        const renderer = new BatchedRenderer('smoothness-fade', scene);
+        renderer.addSystem(system);
+        system.play();
+        for (let i = 0; i < 30; i++) renderer.update(1 / 60);
+
+        const sizes = () => (renderer.batches[0] as unknown as {sizeBuffer: Float32Array}).sizeBuffer;
+        let previous = {size: sizes()[0], who: system.particles[0]};
+        const changes: number[] = [];
+        for (let i = 0; i < 40; i++) {
+            renderer.update(1 / 120);
+            const who = system.particles[0];
+            const size = sizes()[0];
+            // Rows are recycled constantly at this lifetime; only compare a row
+            // that still holds the same particle, and only once that particle
+            // has a whole step behind it — one born this frame has nothing to
+            // continue yet, correctly.
+            if (who === previous.who && who.age > 1 / 60) changes.push(Math.abs(size - previous.size));
+            previous = {size, who};
+        }
+
+        expect(changes.length).toBeGreaterThan(10);
+        // Every frame moves the size along. Before this, half of them did not.
+        const frozen = changes.filter((c) => c < 1e-6).length;
+        expect(frozen).toBe(0);
         renderer.dispose();
     });
 

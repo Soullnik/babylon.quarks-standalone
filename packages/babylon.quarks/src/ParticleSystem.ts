@@ -934,7 +934,10 @@ export class ParticleSystem implements IParticleSystem {
         // then starts from where it was born rather than from whatever the row
         // held before, and so is drawn at the emitter instead of jumping.
         const columns = this.store;
-        columns.previousPosition.set(columns.position.subarray(0, particleCount * 3));
+        const vector3Rows = particleCount * 3;
+        columns.previousPosition.set(columns.position.subarray(0, vector3Rows));
+        columns.previousSize.set(columns.size.subarray(0, vector3Rows));
+        columns.previousColor.set(columns.color.subarray(0, particleCount * 4));
 
         this.emitterShape.update(this, delta);
         const steps = this.behaviorSteps();

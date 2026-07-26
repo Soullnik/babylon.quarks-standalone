@@ -328,9 +328,6 @@ export class SpriteBatch extends VFXBatch {
             // transform can be copied as one range instead of gathered.
             const store = system.store;
             const copiedColor = store !== undefined;
-            if (copiedColor) {
-                this.colorBuffer.set(store!.color.subarray(0, particleNum * 4), index * 4);
-            }
             // Particles only carry their own parent transform when the system
             // emits through another one; otherwise the whole range shares the
             // emitter's matrix and can be transformed in place after the copy.
@@ -347,6 +344,13 @@ export class SpriteBatch extends VFXBatch {
             // leaves every one of those stuttering exactly as before.
             const residual = system.simulationResidual ?? 0;
             const stepFraction = residual === 0 ? 0 : residual / (system.simulationStep ?? residual);
+            if (copiedColor) {
+                if (stepFraction > 0 && particleNum > 0) {
+                    SpriteBatch.continueColor(this.colorBuffer, index * 4, store!, particleNum, stepFraction);
+                } else {
+                    this.colorBuffer.set(store!.color.subarray(0, particleNum * 4), index * 4);
+                }
+            }
             let copiedPositionAndSize = false;
             if (store !== undefined && systemWorldSpace) {
                 if (stepFraction > 0 && particleNum > 0) {
@@ -354,7 +358,11 @@ export class SpriteBatch extends VFXBatch {
                 } else {
                     this.offsetBuffer.set(store.position.subarray(0, particleNum * 3), index * 3);
                 }
-                this.sizeBuffer.set(store.size.subarray(0, particleNum * 3), index * 3);
+                if (stepFraction > 0 && particleNum > 0) {
+                    SpriteBatch.continueVector3(this.sizeBuffer, index * 3, store.size, store.previousSize, particleNum, stepFraction);
+                } else {
+                    this.sizeBuffer.set(store.size.subarray(0, particleNum * 3), index * 3);
+                }
                 copiedPositionAndSize = true;
             } else if (sharedTransform && particleNum > 0) {
                 const base = index * 3;
@@ -380,7 +388,11 @@ export class SpriteBatch extends VFXBatch {
                     offsets[o + 2] = (m02 * px + m12 * py + m22 * pz + m32) * w;
                 }
                 const sizes = this.sizeBuffer;
-                sizes.set(store!.size.subarray(0, particleNum * 3), base);
+                if (stepFraction > 0) {
+                    SpriteBatch.continueVector3(sizes, base, store!.size, store!.previousSize, particleNum, stepFraction);
+                } else {
+                    sizes.set(store!.size.subarray(0, particleNum * 3), base);
+                }
                 for (let o = base; o < end; o += 3) {
                     sizes[o] *= absScaleX;
                     sizes[o + 1] *= absScaleY;
@@ -563,6 +575,53 @@ export class SpriteBatch extends VFXBatch {
         out.z = z * inverseLength;
         out.w = w * inverseLength;
         return out;
+    }
+
+    /**
+     * Continues a three-component column by `fraction` of the step it just took,
+     * never below zero.
+     *
+     * Size fades to nothing at the end of a life, so the last step before death
+     * can point past zero; a negative size turns a sprite inside out.
+     */
+    private static continueVector3(
+        target: Float32Array,
+        base: number,
+        current: Float32Array,
+        previous: Float32Array,
+        count: number,
+        fraction: number
+    ): void {
+        for (let i = 0, o = 0; i < count; i++, o += 3) {
+            const x = current[o] + (current[o] - previous[o]) * fraction;
+            const y = current[o + 1] + (current[o + 1] - previous[o + 1]) * fraction;
+            const z = current[o + 2] + (current[o + 2] - previous[o + 2]) * fraction;
+            target[base + o] = x > 0 ? x : 0;
+            target[base + o + 1] = y > 0 ? y : 0;
+            target[base + o + 2] = z > 0 ? z : 0;
+        }
+    }
+
+    /** The same for colour, whose alpha runs out at the end of a life too. */
+    private static continueColor(
+        target: Float32Array,
+        base: number,
+        store: ParticleStore,
+        count: number,
+        fraction: number
+    ): void {
+        const current = store.color;
+        const previous = store.previousColor;
+        for (let i = 0, o = 0; i < count; i++, o += 4) {
+            const r = current[o] + (current[o] - previous[o]) * fraction;
+            const g = current[o + 1] + (current[o + 1] - previous[o + 1]) * fraction;
+            const b = current[o + 2] + (current[o + 2] - previous[o + 2]) * fraction;
+            const a = current[o + 3] + (current[o + 3] - previous[o + 3]) * fraction;
+            target[base + o] = r > 0 ? r : 0;
+            target[base + o + 1] = g > 0 ? g : 0;
+            target[base + o + 2] = b > 0 ? b : 0;
+            target[base + o + 3] = a > 0 ? a : 0;
+        }
     }
 
     /**

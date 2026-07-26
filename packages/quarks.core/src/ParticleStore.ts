@@ -27,6 +27,15 @@ export class ParticleStore {
      * velocity, is to have kept where it started.
      */
     previousPosition: Float32Array;
+    /**
+     * Size and colour at the start of the current step, for the same reason as
+     * {@link previousPosition}. These are read off a curve at `age / life`
+     * rather than integrated, and at the lifetimes an explosion uses — a fifth
+     * of a second, a dozen steps in total — a whole step of fade lands on one
+     * frame and none on the next.
+     */
+    previousSize: Float32Array;
+    previousColor: Float32Array;
     velocity: Float32Array;
     size: Float32Array;
     startSize: Float32Array;
@@ -53,6 +62,8 @@ export class ParticleStore {
         this.capacity = Math.max(1, capacity);
         this.position = new Float32Array(this.capacity * 3);
         this.previousPosition = new Float32Array(this.capacity * 3);
+        this.previousSize = new Float32Array(this.capacity * 3);
+        this.previousColor = new Float32Array(this.capacity * 4);
         this.velocity = new Float32Array(this.capacity * 3);
         this.size = new Float32Array(this.capacity * 3);
         this.startSize = new Float32Array(this.capacity * 3);
@@ -78,6 +89,8 @@ export class ParticleStore {
         }
         this.position = ParticleStore.grow(this.position, capacity * 3);
         this.previousPosition = ParticleStore.grow(this.previousPosition, capacity * 3);
+        this.previousSize = ParticleStore.grow(this.previousSize, capacity * 3);
+        this.previousColor = ParticleStore.grow(this.previousColor, capacity * 4);
         this.velocity = ParticleStore.grow(this.velocity, capacity * 3);
         this.size = ParticleStore.grow(this.size, capacity * 3);
         this.startSize = ParticleStore.grow(this.startSize, capacity * 3);
@@ -103,12 +116,14 @@ export class ParticleStore {
         const b3 = b * 3;
         ParticleStore.swap3(this.position, a3, b3);
         ParticleStore.swap3(this.previousPosition, a3, b3);
+        ParticleStore.swap3(this.previousSize, a3, b3);
         ParticleStore.swap3(this.velocity, a3, b3);
         ParticleStore.swap3(this.size, a3, b3);
         ParticleStore.swap3(this.startSize, a3, b3);
         const a4 = a * 4;
         const b4 = b * 4;
         ParticleStore.swap4(this.color, a4, b4);
+        ParticleStore.swap4(this.previousColor, a4, b4);
         ParticleStore.swap4(this.startColor, a4, b4);
         ParticleStore.swap3(this.scalars, a * ParticleStore.SCALAR_STRIDE, b * ParticleStore.SCALAR_STRIDE);
     }
