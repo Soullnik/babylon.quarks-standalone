@@ -13,6 +13,8 @@
  * here would add an indirection rather than remove one.
  */
 export class ParticleStore {
+    private static readonly EMPTY = new Float32Array(0);
+
     /** Number of particle rows the arrays can hold. */
     capacity: number;
 
@@ -36,6 +38,17 @@ export class ParticleStore {
      */
     previousSize: Float32Array;
     previousColor: Float32Array;
+    /**
+     * Velocity at the start of the current step. A stretched billboard's shape
+     * is its velocity — the streak points along it and is as long as it — so a
+     * velocity that only changes on steps makes the sprite's outline pop at the
+     * step rate even while its position moves smoothly.
+     *
+     * Empty until {@link keepPreviousVelocity} asks for it, because only that
+     * one render mode reads it and an unused column is not free: it sits
+     * between the columns that are hot and costs them their locality.
+     */
+    previousVelocity: Float32Array = ParticleStore.EMPTY;
     velocity: Float32Array;
     size: Float32Array;
     startSize: Float32Array;
@@ -90,6 +103,9 @@ export class ParticleStore {
         this.position = ParticleStore.grow(this.position, capacity * 3);
         this.previousPosition = ParticleStore.grow(this.previousPosition, capacity * 3);
         this.previousSize = ParticleStore.grow(this.previousSize, capacity * 3);
+        if (this.previousVelocity.length > 0) {
+            this.previousVelocity = ParticleStore.grow(this.previousVelocity, capacity * 3);
+        }
         this.previousColor = ParticleStore.grow(this.previousColor, capacity * 4);
         this.velocity = ParticleStore.grow(this.velocity, capacity * 3);
         this.size = ParticleStore.grow(this.size, capacity * 3);
@@ -108,6 +124,19 @@ export class ParticleStore {
      * the live particles stay a contiguous range that a renderer can copy in one
      * go rather than gathering particle by particle.
      */
+    /**
+     * Starts keeping {@link previousVelocity}. Harmless to call every step;
+     * returns true on the call that allocated, which replaces the array and so
+     * leaves every particle's view of it pointing at the old one.
+     */
+    keepPreviousVelocity(): boolean {
+        if (this.previousVelocity.length >= this.capacity * 3) {
+            return false;
+        }
+        this.previousVelocity = new Float32Array(this.capacity * 3);
+        return true;
+    }
+
     swapRows(a: number, b: number): void {
         if (a === b) {
             return;
@@ -117,6 +146,9 @@ export class ParticleStore {
         ParticleStore.swap3(this.position, a3, b3);
         ParticleStore.swap3(this.previousPosition, a3, b3);
         ParticleStore.swap3(this.previousSize, a3, b3);
+        if (this.previousVelocity.length > 0) {
+            ParticleStore.swap3(this.previousVelocity, a3, b3);
+        }
         ParticleStore.swap3(this.velocity, a3, b3);
         ParticleStore.swap3(this.size, a3, b3);
         ParticleStore.swap3(this.startSize, a3, b3);

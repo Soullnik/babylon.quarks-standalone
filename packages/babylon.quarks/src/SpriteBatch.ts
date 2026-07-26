@@ -489,16 +489,22 @@ export class SpriteBatch extends VFXBatch {
                 this.uvTileBuffer[index] = particle.uvTile;
 
                 if (isStretchedRender && this.velocityBuffer) {
-                    let vel: Vector3;
-                    if (systemWorldSpace) {
-                        vel = particle.velocity;
-                    } else {
-                        vel = this.vector_;
+                    // The streak points along the velocity and is as long as it,
+                    // so a velocity frozen between steps makes the sprite's
+                    // outline pop at the step rate while its position glides.
+                    const velocity = particle.velocity;
+                    const previousVelocity = particle.previousVelocity;
+                    const vx = velocity.x + (velocity.x - previousVelocity.x) * stepFraction;
+                    const vy = velocity.y + (velocity.y - previousVelocity.y) * stepFraction;
+                    const vz = velocity.z + (velocity.z - previousVelocity.z) * stepFraction;
+                    let vel: Vector3 = this.vector_;
+                    vel.set(vx, vy, vz);
+                    if (!systemWorldSpace) {
                         if (particle.parentMatrix) {
                             this.rotationMat2_.setFromMatrix4(particle.parentMatrix);
-                            vel.copy(particle.velocity).applyMatrix3(this.rotationMat2_);
+                            vel.applyMatrix3(this.rotationMat2_);
                         } else {
-                            vel.copy(particle.velocity).applyMatrix3(this.rotationMat_);
+                            vel.applyMatrix3(this.rotationMat_);
                         }
                     }
                     const vi = index * 4;

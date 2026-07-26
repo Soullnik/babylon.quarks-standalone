@@ -619,13 +619,18 @@ export class ParticleSystem implements IParticleSystem {
      * Growing the store replaces its arrays, so every particle already bound to
      * it has to be re-pointed at the new ones.
      */
+    /** Points every particle at the store's columns again, after any were replaced. */
+    private rebindParticles(): void {
+        const particles = this.particles;
+        for (let i = 0; i < particles.length; i++) {
+            (particles[i] as SpriteParticle | TrailParticle).rebind();
+        }
+    }
+
     private growParticlePool(isTrailMode: boolean): void {
         const index = this.particles.length;
         if (this.store.ensureCapacity(index + 1)) {
-            const particles = this.particles;
-            for (let i = 0; i < particles.length; i++) {
-                (particles[i] as SpriteParticle | TrailParticle).rebind();
-            }
+            this.rebindParticles();
         }
         this.particles.push(
             isTrailMode ? new TrailParticle(this.store, index) : new SpriteParticle(this.store, index)
@@ -933,6 +938,9 @@ export class ParticleSystem implements IParticleSystem {
         const behaviorCount = behaviors.length;
         const particleCount = this.particleNum;
         const isTrailMode = this.rendererSettings.renderMode === RenderMode.Trail;
+        // Only stretched billboards draw from velocity, and only they pay for
+        // keeping the previous one.
+        const stretched = this.rendererSettings.renderMode === RenderMode.StretchedBillBoard;
 
         // Remember where everything starts this step, so the renderer can carry
         // the motion the step produces on into the part of the frame that comes
@@ -943,6 +951,12 @@ export class ParticleSystem implements IParticleSystem {
         const vector3Rows = particleCount * 3;
         columns.previousPosition.set(columns.position.subarray(0, vector3Rows));
         columns.previousSize.set(columns.size.subarray(0, vector3Rows));
+        if (stretched) {
+            if (columns.keepPreviousVelocity()) {
+                this.rebindParticles();
+            }
+            columns.previousVelocity.set(columns.velocity.subarray(0, vector3Rows));
+        }
         columns.previousColor.set(columns.color.subarray(0, particleCount * 4));
 
         // Rows [0, alreadyLiving) existed before this step; anything past that

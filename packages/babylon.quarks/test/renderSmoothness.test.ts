@@ -1,4 +1,5 @@
 import {
+    ApplyForce,
     AxisAngleGenerator,
     ConstantColor,
     ConstantValue,
@@ -247,6 +248,58 @@ describe('render-time smoothness', () => {
         // Every frame moves the size along. Before this, half of them did not.
         const frozen = changes.filter((c) => c < 1e-6).length;
         expect(frozen).toBe(0);
+        renderer.dispose();
+    });
+
+    it('keeps a stretched billboard the right length between steps', () => {
+        // A stretched billboard's shape is its velocity: the streak points along
+        // it and is as long as it. A velocity frozen between steps makes the
+        // outline pop at the step rate while the position glides.
+        const system = new ParticleSystem({
+            scene,
+            duration: 100,
+            looping: true,
+            worldSpace: true,
+            startLife: new ConstantValue(50),
+            startSpeed: new ConstantValue(30),
+            startSize: new ConstantValue(1),
+            startColor: new ConstantColor(new Vector4(1, 1, 1, 1)),
+            emissionOverTime: new ConstantValue(0),
+            emissionBursts: [{time: 0, count: new ConstantValue(1), cycle: 1, interval: 0, probability: 1}],
+            shape: new PointEmitter(),
+            renderMode: RenderMode.StretchedBillBoard,
+            rendererEmitterSettings: {speedFactor: 1, lengthFactor: 0},
+            behaviors: [new ApplyForce(new QVector3(0, 0, -1), new ConstantValue(20))],
+        });
+        const renderer = new BatchedRenderer('smoothness-stretch', scene);
+        renderer.addSystem(system);
+        system.play();
+        renderer.update(1 / 60);
+        const particle = system.particles[0];
+        particle.position.set(0, 0, 0);
+        particle.velocity.set(0, 0, 30);
+        particle.speedModifier = 1;
+        renderer.update(1 / 60);
+
+        const streak = () => {
+            const v = (renderer.batches[0] as unknown as {velocityBuffer: Float32Array}).velocityBuffer;
+            return Math.hypot(v[0], v[1], v[2]);
+        };
+        let previous = streak();
+        const changes: number[] = [];
+        for (let i = 0; i < 20; i++) {
+            renderer.update(1 / 120);
+            const now = streak();
+            changes.push(Math.abs(now - previous));
+            previous = now;
+        }
+
+        // A constant force shortens the streak at a constant rate, so no frame
+        // may leave it unchanged and none may move it twice as far.
+        const smallest = Math.min(...changes);
+        const largest = Math.max(...changes);
+        expect(smallest).toBeGreaterThan(0);
+        expect(largest / smallest).toBeLessThan(1.1);
         renderer.dispose();
     });
 
