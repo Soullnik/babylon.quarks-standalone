@@ -2,6 +2,7 @@ export default /* wgsl */ `
 varying vUV: vec2f;
 varying vColor: vec4f;
 varying vNormal: vec3f;
+varying vWorldPos: vec3f;
 
 uniform lightDirection: vec3f;
 uniform lightColor: vec3f;
@@ -15,6 +16,13 @@ varying vTileBlend: f32;
 #ifdef USE_MAP
 var mapSampler: sampler;
 var map: texture_2d<f32>;
+#endif
+
+#ifdef USE_ENVMAP
+var reflectionCubeSampler: sampler;
+var reflectionCube: texture_cube<f32>;
+uniform eyePosition: vec3f;
+uniform reflectionLevel: f32;
 #endif
 
 #ifdef SOFT_PARTICLES
@@ -54,7 +62,18 @@ fn main(input: FragmentInputs) -> FragmentOutputs {
     let NdotL = max(dot(N, L), 0.0);
     let litColor = uniforms.ambientColor + uniforms.lightColor * NdotL;
 
-    var finalColor = vec4f(baseColor.rgb * litColor, baseColor.a);
+    // Same composition as the GLSL mesh fragment — Standard-like diffuse lighting
+    // plus cubic reflection sampled with Babylon's computeCubicCoords formula.
+    var color = baseColor.rgb * litColor;
+
+#ifdef USE_ENVMAP
+    let viewDir = normalize(fragmentInputs.vWorldPos - uniforms.eyePosition);
+    let reflectionCoords = reflect(viewDir, N);
+    let reflectionColor = textureSample(reflectionCube, reflectionCubeSampler, reflectionCoords).rgb * uniforms.reflectionLevel;
+    color += reflectionColor;
+#endif
+
+    var finalColor = vec4f(color, baseColor.a);
 
 #ifdef SOFT_PARTICLES
     var p2 = fragmentInputs.projPosition.xy / fragmentInputs.projPosition.w;

@@ -16,27 +16,41 @@ import {
     EulerGenerator,
     Rotation3DOverLife,
     Vector4,
-    Vector3,
 } from 'babylon.quarks';
 
 export function init({scene, camera, batchRenderer, systems}: DemoContext) {
     camera.setPosition(new BVector3(0, 6, 16));
 
+    // Six face files go in CubeTexture's `files` slot (5th arg / options.files),
+    // not extensions — otherwise Babylon builds the wrong URLs.
+    const envMap = CubeTexture.CreateFromImages(
+        [
+            'textures/cube/posx.jpg',
+            'textures/cube/posy.jpg',
+            'textures/cube/posz.jpg',
+            'textures/cube/negx.jpg',
+            'textures/cube/negy.jpg',
+            'textures/cube/negz.jpg',
+        ],
+        scene
+    );
+
+    // StandardMaterial is the public API surface: applyMaterialSettings reads
+    // reflectionTexture into the mesh batch. Do not assign it to a scene mesh —
+    // compiling Standard + cubemap on a dummy mesh has broken draws on iOS WebKit
+    // while the particle count still ticks.
     const meshMaterial = new StandardMaterial('meshParticleMaterial', scene);
     meshMaterial.backFaceCulling = false;
     meshMaterial.alpha = 0.95;
-    meshMaterial.reflectionTexture = new CubeTexture('textures/cube/', scene, [
-        'posx.jpg',
-        'posy.jpg',
-        'posz.jpg',
-        'negx.jpg',
-        'negy.jpg',
-        'negz.jpg',
-    ]);
+    meshMaterial.reflectionTexture = envMap;
 
-    const particleMesh = MeshBuilder.CreateCapsule('meshParticleGeo', {radius: 1, height: 3, tessellation: 12, subdivisions: 3}, scene);
-    particleMesh.material = meshMaterial;
+    const particleMesh = MeshBuilder.CreateCapsule(
+        'meshParticleGeo',
+        {radius: 1, height: 3, tessellation: 12, subdivisions: 3},
+        scene
+    );
     particleMesh.isVisible = false;
+    particleMesh.setEnabled(false);
     const positions = particleMesh.getVerticesData(VertexBuffer.PositionKind);
     const normals = particleMesh.getVerticesData(VertexBuffer.NormalKind);
     const indices = particleMesh.getIndices();
@@ -65,8 +79,8 @@ export function init({scene, camera, batchRenderer, systems}: DemoContext) {
         transparent: true,
         blendMode: Constants.ALPHA_COMBINE,
         startTileIndex: new ConstantValue(0),
-        uTileCount: 10,
-        vTileCount: 10,
+        uTileCount: 1,
+        vTileCount: 1,
         renderOrder: 0,
     });
     meshSystem.addBehavior(

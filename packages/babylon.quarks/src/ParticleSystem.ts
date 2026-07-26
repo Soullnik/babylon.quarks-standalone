@@ -491,6 +491,8 @@ export class ParticleSystem implements IParticleSystem {
             materialDepthWrite: parameters.depthWrite ?? false,
             materialAlphaTest: parameters.alphaTest ?? 0,
             texture: parameters.texture ?? null,
+            reflectionTexture: null,
+            reflectionLevel: 1,
             layerMask: parameters.layerMask ?? 0x0FFFFFFF,
         };
         if (this.rendererSettings.renderMode === RenderMode.Mesh && !this.rendererSettings.instancingNormals) {
@@ -563,6 +565,13 @@ export class ParticleSystem implements IParticleSystem {
                     material?.baseTexture ??
                     this.rendererSettings.texture ??
                     null);
+        const resolvedReflection =
+            material?.reflectionTexture ??
+            material?.environmentTexture ??
+            this.rendererSettings.reflectionTexture ??
+            null;
+        const resolvedReflectionLevel =
+            typeof resolvedReflection?.level === 'number' ? resolvedReflection.level : 1;
         const resolvedBlendMode =
             overrides.blendMode ??
             (typeof material?.alphaMode === 'number' ? material.alphaMode : this.rendererSettings.materialBlendMode);
@@ -594,6 +603,8 @@ export class ParticleSystem implements IParticleSystem {
                     : this.rendererSettings.materialAlphaTest);
 
         this.rendererSettings.texture = resolvedTexture;
+        this.rendererSettings.reflectionTexture = resolvedReflection;
+        this.rendererSettings.reflectionLevel = resolvedReflectionLevel;
         this.rendererSettings.materialBlendMode = resolvedBlendMode;
         this.rendererSettings.materialTransparent = resolvedTransparent;
         this.rendererSettings.materialDepthTest = resolvedDepthTest;

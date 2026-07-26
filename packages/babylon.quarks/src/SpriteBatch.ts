@@ -156,6 +156,13 @@ export class SpriteBatch extends VFXBatch {
         if (this.settings.texture) {
             defines.push('USE_MAP');
         }
+        const useEnvMap =
+            this.settings.renderMode === RenderMode.Mesh &&
+            !!this.settings.reflectionTexture &&
+            this.settings.reflectionTexture.isCube;
+        if (useEnvMap) {
+            defines.push('USE_ENVMAP');
+        }
         if (this.settings.uTileCount > 1 || this.settings.vTileCount > 1) {
             defines.push('UV_TILE');
         }
@@ -196,6 +203,11 @@ export class SpriteBatch extends VFXBatch {
         if (this.settings.texture) {
             samplers.push('map');
         }
+        if (useEnvMap) {
+            samplers.push('reflectionCube');
+            uniforms.push('eyePosition');
+            uniforms.push('reflectionLevel');
+        }
         if (this.settings.renderMode === RenderMode.StretchedBillBoard) {
             uniforms.push('speedFactor');
         }
@@ -227,6 +239,19 @@ export class SpriteBatch extends VFXBatch {
 
         if (this.settings.texture) {
             mat.setTexture('map', this.settings.texture);
+        }
+        if (useEnvMap && this.settings.reflectionTexture) {
+            mat.setTexture('reflectionCube', this.settings.reflectionTexture);
+            mat.setFloat('reflectionLevel', this.settings.reflectionLevel);
+            const eyePosition = new BVector3();
+            mat.onBindObservable.add(() => {
+                const camera = this.scene.activeCamera;
+                if (!camera) {
+                    return;
+                }
+                eyePosition.copyFrom(camera.globalPosition);
+                mat.setVector3('eyePosition', eyePosition);
+            });
         }
         if (this.settings.uTileCount > 1 || this.settings.vTileCount > 1) {
             mat.setFloat('tileCountX', this.settings.uTileCount);

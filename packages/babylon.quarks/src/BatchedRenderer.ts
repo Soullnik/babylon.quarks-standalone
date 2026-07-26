@@ -27,6 +27,14 @@ export interface VFXBatchSettings {
     materialDepthWrite: boolean;
     materialAlphaTest: number;
     texture: Texture | null;
+    /**
+     * Cubemap (or other reflection texture) harvested from a Babylon material's
+     * `reflectionTexture`. Mesh batches sample it like StandardMaterial cubic
+     * reflection; other render modes ignore it.
+     */
+    reflectionTexture: BaseTexture | null;
+    /** Multiplier for the reflection sample — mirrors `texture.level`. */
+    reflectionLevel: number;
     layerMask: number;
 }
 
@@ -99,6 +107,8 @@ export class BatchedRenderer extends TransformNode {
             a.materialDepthWrite === b.materialDepthWrite &&
             a.materialAlphaTest === b.materialAlphaTest &&
             a.texture === b.texture &&
+            a.reflectionTexture === b.reflectionTexture &&
+            a.reflectionLevel === b.reflectionLevel &&
             a.renderMode === b.renderMode &&
             a.blendTiles === b.blendTiles &&
             a.softParticles === b.softParticles &&

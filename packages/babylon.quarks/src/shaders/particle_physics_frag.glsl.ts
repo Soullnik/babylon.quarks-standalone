@@ -2,6 +2,7 @@ export default /* glsl */ `
 varying vec2 vUV;
 varying vec4 vColor;
 varying vec3 vNormal;
+varying vec3 vWorldPos;
 
 uniform vec3 lightDirection;
 uniform vec3 lightColor;
@@ -14,6 +15,12 @@ varying float vTileBlend;
 
 #ifdef USE_MAP
 uniform sampler2D map;
+#endif
+
+#ifdef USE_ENVMAP
+uniform samplerCube reflectionCube;
+uniform vec3 eyePosition;
+uniform float reflectionLevel;
 #endif
 
 #ifdef SOFT_PARTICLES
@@ -51,7 +58,19 @@ void main() {
     float NdotL = max(dot(N, L), 0.0);
     vec3 litColor = ambientColor + lightColor * NdotL;
 
-    gl_FragColor = vec4(baseColor.rgb * litColor, baseColor.a);
+    // Matches Babylon StandardMaterial's default lit diffuse term, then adds
+    // cubic reflection the same way default.fragment does for REFLECTIONMAP_CUBIC:
+    // reflect(normalize(worldPos - eye), N), sample cube, scale by level.
+    vec3 color = baseColor.rgb * litColor;
+
+#ifdef USE_ENVMAP
+    vec3 viewDir = normalize(vWorldPos - eyePosition);
+    vec3 reflectionCoords = reflect(viewDir, N);
+    vec3 reflectionColor = textureCube(reflectionCube, reflectionCoords).rgb * reflectionLevel;
+    color += reflectionColor;
+#endif
+
+    gl_FragColor = vec4(color, baseColor.a);
 
 #ifdef SOFT_PARTICLES
     vec2 p2 = projPosition.xy / projPosition.w;
