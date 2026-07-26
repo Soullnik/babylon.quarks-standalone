@@ -3,6 +3,7 @@ import {
     ConstantColor,
     ConstantValue,
     PointEmitter,
+    OrbitOverLife,
     Rotation3DOverLife,
     RotationOverLife,
     TrailParticle,
@@ -76,7 +77,11 @@ function setup(worldSpace = true) {
     particle.position.set(0, 0, 0);
     particle.velocity.set(0, 0, SPEED);
     particle.speedModifier = 1;
-    renderer.refreshBatches(); // so the drawn state reflects the pinned particle
+    // One whole step after pinning: the renderer continues the motion the last
+    // step actually produced, so the last step has to be a real one. Pinning a
+    // particle and reading straight away describes a step that never ran.
+    renderer.update(1 / 60);
+    renderer.refreshBatches();
     return {system, renderer, particle};
 }
 
@@ -104,6 +109,7 @@ describe('render-time smoothness', () => {
 
     it('draws where wall-clock time says, while the simulation lags behind', () => {
         const {system, renderer} = setup();
+        const startZ = drawnZ(renderer);
         let elapsed = 0;
         for (let i = 0; i < 60; i++) {
             const delta = 1 / 90;
@@ -111,7 +117,7 @@ describe('render-time smoothness', () => {
             elapsed += delta;
             // The drawn position tracks wall-clock time, while the simulated one
             // lags by up to a step.
-            expect(drawnZ(renderer)).toBeCloseTo(elapsed * SPEED, 5);
+            expect(drawnZ(renderer) - startZ).toBeCloseTo(elapsed * SPEED, 5);
             expect(system.particles[0].position.z).toBeLessThanOrEqual(drawnZ(renderer) + 1e-6);
         }
         renderer.dispose();
@@ -146,6 +152,51 @@ describe('render-time smoothness', () => {
             expect(now - previous).toBeCloseTo(delta * SPEED, 5);
             previous = now;
         }
+        renderer.dispose();
+    });
+
+    it('carries motion that no velocity describes, like an orbit', () => {
+        // The gap this closes: plenty of behaviors move a particle by writing
+        // its position — orbits, noise, turbulence, anything a plugin does.
+        // Continuing along the velocity leaves every one of them stuttering,
+        // because their velocity is zero the whole time.
+        const system = makeSystem();
+        system.behaviors.push(new OrbitOverLife(new ConstantValue(2), new QVector3(0, 1, 0)));
+        const renderer = new BatchedRenderer('smoothness-orbit', scene);
+        renderer.addSystem(system);
+        system.play();
+        renderer.update(1 / 60);
+        const particle = system.particles[0];
+        particle.position.set(5, 0, 0);
+        particle.velocity.set(0, 0, 0);
+        particle.speedModifier = 1;
+        for (const behavior of system.behaviors) behavior.initialize(particle, system);
+        renderer.update(1 / 60);
+        renderer.refreshBatches();
+
+        const drawnX = () => (renderer.batches[0] as unknown as {offsetBuffer: Float32Array}).offsetBuffer[0];
+        const drawn = () => {
+            const b = (renderer.batches[0] as unknown as {offsetBuffer: Float32Array}).offsetBuffer;
+            return [b[0], b[1], b[2]];
+        };
+        expect(particle.velocity.length()).toBe(0);
+
+        let previous = drawn();
+        const moves: number[] = [];
+        for (let i = 0; i < 16; i++) {
+            renderer.update(1 / 120);
+            const now = drawn();
+            moves.push(Math.hypot(now[0] - previous[0], now[1] - previous[1], now[2] - previous[2]));
+            previous = now;
+        }
+        void drawnX;
+
+        // Every frame moves, and by about the same amount: a frame that ran no
+        // step must still show half a step's worth of orbit.
+        const smallest = Math.min(...moves);
+        const largest = Math.max(...moves);
+        expect(smallest).toBeGreaterThan(0);
+        expect(largest / smallest).toBeLessThan(1.1);
         renderer.dispose();
     });
 
@@ -343,7 +394,8 @@ describe('render-time smoothness', () => {
         // has to be exactly N steps of motion.
         const {system, renderer} = setup();
         for (let i = 0; i < 30; i++) renderer.update(1 / 60);
-        expect(system.particles[0].position.z).toBeCloseTo((30 / 60) * SPEED, 4);
+        // 30 steps here, plus the one setup ran to give the renderer real motion.
+        expect(system.particles[0].position.z).toBeCloseTo((31 / 60) * SPEED, 4);
         expect(system.simulationResidual).toBeLessThan(1 / 60);
         renderer.dispose();
     });

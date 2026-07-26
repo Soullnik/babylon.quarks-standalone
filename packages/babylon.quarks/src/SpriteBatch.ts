@@ -337,17 +337,20 @@ export class SpriteBatch extends VFXBatch {
             const sharedTransform = store !== undefined && system.onlyUsedByOther !== true;
             // The simulation runs on a fixed step that the display does not
             // share, so the last step is usually in the past by the time the
-            // frame is drawn. Carrying each particle along its own velocity for
-            // the leftover time puts it where it belongs now; without it the
-            // particles visibly stutter on any display that is not exactly 60Hz.
+            // frame is drawn. Continuing the motion that step produced puts each
+            // particle where it belongs now; without it they visibly stutter on
+            // any display that is not exactly 60Hz and in phase.
+            //
+            // The motion is measured, not predicted from velocity: plenty of
+            // behaviors move a particle by writing its position — orbits, noise,
+            // turbulence, anything a plugin does — and a velocity based guess
+            // leaves every one of those stuttering exactly as before.
             const residual = system.simulationResidual ?? 0;
-            // Turning is recorded per step rather than per second, so it is
-            // carried by the fraction of a step the frame is past, not by time.
             const stepFraction = residual === 0 ? 0 : residual / (system.simulationStep ?? residual);
             let copiedPositionAndSize = false;
             if (store !== undefined && systemWorldSpace) {
-                if (residual > 0 && particleNum > 0) {
-                    SpriteBatch.extrapolate(this.offsetBuffer, index * 3, store, particleNum, residual);
+                if (stepFraction > 0 && particleNum > 0) {
+                    SpriteBatch.extrapolate(this.offsetBuffer, index * 3, store, particleNum, stepFraction);
                 } else {
                     this.offsetBuffer.set(store.position.subarray(0, particleNum * 3), index * 3);
                 }
@@ -357,8 +360,8 @@ export class SpriteBatch extends VFXBatch {
                 const base = index * 3;
                 const end = base + particleNum * 3;
                 const offsets = this.offsetBuffer;
-                if (residual > 0) {
-                    SpriteBatch.extrapolate(offsets, base, store!, particleNum, residual);
+                if (stepFraction > 0) {
+                    SpriteBatch.extrapolate(offsets, base, store!, particleNum, stepFraction);
                 } else {
                     offsets.set(store!.position.subarray(0, particleNum * 3), base);
                 }
@@ -426,11 +429,10 @@ export class SpriteBatch extends VFXBatch {
 
                 if (!copiedPositionAndSize) {
                     const position = particle.position;
-                    const velocity = particle.velocity;
-                    const advance = residual * particle.speedModifier;
-                    let px = position.x + velocity.x * advance;
-                    let py = position.y + velocity.y * advance;
-                    let pz = position.z + velocity.z * advance;
+                    const previous = particle.previousPosition;
+                    let px = position.x + (position.x - previous.x) * stepFraction;
+                    let py = position.y + (position.y - previous.y) * stepFraction;
+                    let pz = position.z + (position.z - previous.z) * stepFraction;
                     if (!systemWorldSpace) {
                         // Inlined point transform: this is the default (local space)
                         // path and runs for every particle every frame.
@@ -564,31 +566,35 @@ export class SpriteBatch extends VFXBatch {
     }
 
     /**
-     * Writes rows `[0, count)` of the store's positions into `target` at
-     * `base`, each carried along its own velocity for `residual` seconds.
+     * Writes rows `[0, count)` of the store's positions into `target` at `base`,
+     * each carried on by `fraction` of the step it just took.
      *
-     * This is the same integration the next simulation step performs, so for a
-     * particle under constant velocity the drawn path is exactly the continuous
-     * one. A particle whose motion comes from somewhere else — a force about to
-     * change its velocity, a behavior that displaces it directly — is off by
-     * whatever that adds over less than one step.
+     * Continuing the measured last step covers every way a particle can move —
+     * velocity integration, an orbit, noise, a plugin's own behavior — because
+     * it reads what happened rather than predicting from one term of it. Over
+     * less than a step it is a straight line through a path that may curve,
+     * which for a sixtieth of a second is well under a pixel.
+     *
+     * A particle born during the step has the same position on both sides and
+     * so does not move at all, which is what puts it at the emitter rather than
+     * a step's travel away from it.
      */
     private static extrapolate(
         target: Float32Array,
         base: number,
         store: ParticleStore,
         count: number,
-        residual: number
+        fraction: number
     ): void {
         const positions = store.position;
-        const velocities = store.velocity;
-        const scalars = store.scalars;
-        const stride = ParticleStore.SCALAR_STRIDE;
-        for (let i = 0, o = 0, s = ParticleStore.SPEED_MODIFIER; i < count; i++, o += 3, s += stride) {
-            const advance = residual * scalars[s];
-            target[base + o] = positions[o] + velocities[o] * advance;
-            target[base + o + 1] = positions[o + 1] + velocities[o + 1] * advance;
-            target[base + o + 2] = positions[o + 2] + velocities[o + 2] * advance;
+        const previous = store.previousPosition;
+        for (let i = 0, o = 0; i < count; i++, o += 3) {
+            const x = positions[o];
+            const y = positions[o + 1];
+            const z = positions[o + 2];
+            target[base + o] = x + (x - previous[o]) * fraction;
+            target[base + o + 1] = y + (y - previous[o + 1]) * fraction;
+            target[base + o + 2] = z + (z - previous[o + 2]) * fraction;
         }
     }
 

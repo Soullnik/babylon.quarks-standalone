@@ -17,6 +17,16 @@ export class ParticleStore {
     capacity: number;
 
     position: Float32Array;
+    /**
+     * Where each particle was when the current simulation step began.
+     *
+     * The step is fixed while frames are not, so a frame is usually drawn some
+     * way past the last step. The renderer closes that gap by continuing the
+     * motion the last step produced — and the only way to know that motion for
+     * every kind of behavior, not just the ones that move a particle by its
+     * velocity, is to have kept where it started.
+     */
+    previousPosition: Float32Array;
     velocity: Float32Array;
     size: Float32Array;
     startSize: Float32Array;
@@ -42,6 +52,7 @@ export class ParticleStore {
     constructor(capacity = 64) {
         this.capacity = Math.max(1, capacity);
         this.position = new Float32Array(this.capacity * 3);
+        this.previousPosition = new Float32Array(this.capacity * 3);
         this.velocity = new Float32Array(this.capacity * 3);
         this.size = new Float32Array(this.capacity * 3);
         this.startSize = new Float32Array(this.capacity * 3);
@@ -66,6 +77,7 @@ export class ParticleStore {
             capacity *= 2;
         }
         this.position = ParticleStore.grow(this.position, capacity * 3);
+        this.previousPosition = ParticleStore.grow(this.previousPosition, capacity * 3);
         this.velocity = ParticleStore.grow(this.velocity, capacity * 3);
         this.size = ParticleStore.grow(this.size, capacity * 3);
         this.startSize = ParticleStore.grow(this.startSize, capacity * 3);
@@ -90,6 +102,7 @@ export class ParticleStore {
         const a3 = a * 3;
         const b3 = b * 3;
         ParticleStore.swap3(this.position, a3, b3);
+        ParticleStore.swap3(this.previousPosition, a3, b3);
         ParticleStore.swap3(this.velocity, a3, b3);
         ParticleStore.swap3(this.size, a3, b3);
         ParticleStore.swap3(this.startSize, a3, b3);

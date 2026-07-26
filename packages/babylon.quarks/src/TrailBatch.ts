@@ -247,6 +247,10 @@ export class TrailBatch extends VFXBatch {
             const residual = (system.rendererEmitterSettings as TrailSettings).followLocalOrigin
                 ? 0
                 : (system.simulationResidual ?? 0);
+            // Measured from the step the particle just took, not from its
+            // velocity: a trail pulled along by an orbit or by a plugin's own
+            // behavior has motion no velocity term describes.
+            const stepFraction = residual === 0 ? 0 : residual / (system.simulationStep ?? residual);
 
             for (let j = 0; j < particleNum; j++) {
                 const particle = particles[j] as TrailParticle;
@@ -255,10 +259,11 @@ export class TrailBatch extends VFXBatch {
                     continue;
                 }
                 const newest = particleHistoryLength - 1;
-                const advance = residual * particle.speedModifier;
-                const headX = particle.velocity.x * advance;
-                const headY = particle.velocity.y * advance;
-                const headZ = particle.velocity.z * advance;
+                const advance = stepFraction;
+                const previousHead = particle.previousPosition;
+                const headX = (particle.position.x - previousHead.x) * advance;
+                const headY = (particle.position.y - previousHead.y) * advance;
+                const headZ = (particle.position.z - previousHead.z) * advance;
                 const historyCapacity = particle.historyCapacity;
                 const historyPositions = particle.historyPositions;
                 const historySizes = particle.historySizes;

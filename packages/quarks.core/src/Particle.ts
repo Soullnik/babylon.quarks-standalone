@@ -58,6 +58,13 @@ export interface IParticle {
 
 export interface Particle extends IParticle {
     /**
+     * Where the particle was when the current simulation step began, when the
+     * implementation keeps it. A renderer draws between fixed steps and uses
+     * this to continue the motion the last step produced, whatever produced it.
+     * @type {Vector3}
+     */
+    previousPosition?: Vector3;
+    /**
      * How fast the particle is turning, as the behavior that turns it last left
      * it: a rate in radians per second for a particle that rotates by an angle,
      * or one simulation step's turn for one that rotates by quaternion.
@@ -211,6 +218,12 @@ export class SpriteParticle implements Particle {
      */
     position: Vector3;
     /**
+     * Where this particle was when the current simulation step began; see
+     * {@link Particle.previousPosition}.
+     * @type {Vector3}
+     */
+    previousPosition: Vector3;
+    /**
      * Velocity of the particle.
      * @type {Vector3}
      */
@@ -293,6 +306,7 @@ export class SpriteParticle implements Particle {
         const offset3 = storeIndex * 3;
         const offset4 = storeIndex * 4;
         this.position = new Vector3View(store.position, offset3);
+        this.previousPosition = new Vector3View(store.previousPosition, offset3);
         this.velocity = new Vector3View(store.velocity, offset3);
         this.size = new Vector3View(store.size, offset3);
         this.startSize = new Vector3View(store.startSize, offset3);
@@ -321,6 +335,7 @@ export class SpriteParticle implements Particle {
         const offset3 = this.storeIndex * 3;
         const offset4 = this.storeIndex * 4;
         (this.position as Vector3View).bind(store.position, offset3);
+        (this.previousPosition as Vector3View).bind(store.previousPosition, offset3);
         (this.velocity as Vector3View).bind(store.velocity, offset3);
         (this.size as Vector3View).bind(store.size, offset3);
         (this.startSize as Vector3View).bind(store.startSize, offset3);
@@ -395,6 +410,12 @@ export class TrailParticle implements Particle {
      * @type {Vector3}
      */
     position: Vector3;
+    /**
+     * Where this particle was when the current simulation step began; see
+     * {@link Particle.previousPosition}.
+     * @type {Vector3}
+     */
+    previousPosition: Vector3;
     /**
      * Local position of the particle.
      * @type {Vector3}
@@ -499,6 +520,7 @@ export class TrailParticle implements Particle {
         const offset3 = storeIndex * 3;
         const offset4 = storeIndex * 4;
         this.position = new Vector3View(store.position, offset3);
+        this.previousPosition = new Vector3View(store.previousPosition, offset3);
         this.velocity = new Vector3View(store.velocity, offset3);
         this.size = new Vector3View(store.size, offset3);
         this.startSize = new Vector3View(store.startSize, offset3);
@@ -527,6 +549,7 @@ export class TrailParticle implements Particle {
         const offset3 = this.storeIndex * 3;
         const offset4 = this.storeIndex * 4;
         (this.position as Vector3View).bind(store.position, offset3);
+        (this.previousPosition as Vector3View).bind(store.previousPosition, offset3);
         (this.velocity as Vector3View).bind(store.velocity, offset3);
         (this.size as Vector3View).bind(store.size, offset3);
         (this.startSize as Vector3View).bind(store.startSize, offset3);

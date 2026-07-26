@@ -927,6 +927,15 @@ export class ParticleSystem implements IParticleSystem {
         const behaviorCount = behaviors.length;
         const particleCount = this.particleNum;
         const isTrailMode = this.rendererSettings.renderMode === RenderMode.Trail;
+
+        // Remember where everything starts this step, so the renderer can carry
+        // the motion the step produces on into the part of the frame that comes
+        // after it. Taken after emission on purpose: a particle born this step
+        // then starts from where it was born rather than from whatever the row
+        // held before, and so is drawn at the emitter instead of jumping.
+        const columns = this.store;
+        columns.previousPosition.set(columns.position.subarray(0, particleCount * 3));
+
         this.emitterShape.update(this, delta);
         const steps = this.behaviorSteps();
         for (let s = 0; s < steps.length; s++) {
