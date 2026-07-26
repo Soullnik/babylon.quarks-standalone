@@ -214,7 +214,13 @@ export class TrailBatch extends VFXBatch {
             const system = visibleSystems[s];
             const particles = system.particles;
             for (let j = 0; j < system.particleNum; j++) {
-                particleCount += (particles[j] as TrailParticle).historyCount * 2;
+                const historyCount = (particles[j] as TrailParticle).historyCount;
+                if (historyCount === 0) {
+                    continue;
+                }
+                // +2 reserves the live tip vertex pair that frames between
+                // simulation steps append ahead of the recorded head.
+                particleCount += historyCount * 2 + 2;
             }
         }
         if (particleCount > this.maxParticles) {
@@ -239,9 +245,15 @@ export class TrailBatch extends VFXBatch {
             const systemWorldSpace = system.worldSpace;
             const objectScale = (Math.abs(scale.x) + Math.abs(scale.y) + Math.abs(scale.z)) / 3;
             // A ribbon's samples were recorded at past steps and stay where they
-            // were; only its newest sample is the particle, and that one has
-            // moved on since the step that recorded it. Leaving it behind makes
-            // the whole trail stutter on frames that ran no step. A trail pinned
+            // were. The particle itself has moved on since the step that wrote
+            // the newest sample, so frames that run no step would freeze the
+            // whole trail if that head were left behind. Moving the recorded
+            // head forward to catch up stretches the last segment from one
+            // step of travel to almost two, then snaps it back when the next
+            // step lands — a rubber-band the eye reads as lost smoothness,
+            // especially at 120Hz where every other frame is between steps.
+            // Appending a live tip ahead of the recorded samples keeps the
+            // body still and the tip moving without that pulse. A trail pinned
             // to the emitter's origin is driven by the emitter's transform
             // rather than by the particle's velocity, so it is left alone.
             const residual = (system.rendererEmitterSettings as TrailSettings).followLocalOrigin
@@ -258,12 +270,6 @@ export class TrailBatch extends VFXBatch {
                 if (particleHistoryLength === 0) {
                     continue;
                 }
-                const newest = particleHistoryLength - 1;
-                const advance = stepFraction;
-                const previousHead = particle.previousPosition;
-                const headX = (particle.position.x - previousHead.x) * advance;
-                const headY = (particle.position.y - previousHead.y) * advance;
-                const headZ = (particle.position.z - previousHead.z) * advance;
                 const historyCapacity = particle.historyCapacity;
                 const historyPositions = particle.historyPositions;
                 const historySizes = particle.historySizes;
@@ -304,30 +310,6 @@ export class TrailBatch extends VFXBatch {
                     let nextX = historyPositions[nextPosIndex];
                     let nextY = historyPositions[nextPosIndex + 1];
                     let nextZ = historyPositions[nextPosIndex + 2];
-
-                    // The head shows up as `current` on the last sample and as
-                    // `next` on the one before it, and is its own `previous`
-                    // when the ribbon is a single sample long. It has to be
-                    // carried forward in every one of those, or the shader
-                    // builds this segment's direction from two different
-                    // versions of the same point.
-                    if (advance !== 0) {
-                        if (i === newest) {
-                            currentX += headX;
-                            currentY += headY;
-                            currentZ += headZ;
-                            if (newest === 0) {
-                                previousX += headX;
-                                previousY += headY;
-                                previousZ += headZ;
-                            }
-                        }
-                        if (i >= newest - 1) {
-                            nextX += headX;
-                            nextY += headY;
-                            nextZ += headZ;
-                        }
-                    }
 
                     const currentSize = historySizes[currentSlot];
                     const currentColorIndex = currentSlot * 4;
@@ -423,6 +405,103 @@ export class TrailBatch extends VFXBatch {
                         this.indexBuffer[triangles * 3 + 2] = index + 3;
                         triangles++;
                     }
+                }
+
+                // Live tip: same place a sprite would be drawn this frame, past
+                // the last recorded sample. The recorded ribbon stays put.
+                if (stepFraction !== 0) {
+                    const previousHead = particle.previousPosition;
+                    const position = particle.position;
+                    let tipX = position.x + (position.x - previousHead.x) * stepFraction;
+                    let tipY = position.y + (position.y - previousHead.y) * stepFraction;
+                    let tipZ = position.z + (position.z - previousHead.z) * stepFraction;
+                    const headIndex = index - 2;
+                    let headX = this.positionBuffer[headIndex * 3];
+                    let headY = this.positionBuffer[headIndex * 3 + 1];
+                    let headZ = this.positionBuffer[headIndex * 3 + 2];
+
+                    if (!systemWorldSpace) {
+                        const w = 1 / (m03 * tipX + m13 * tipY + m23 * tipZ + m33);
+                        const tx = (m00 * tipX + m10 * tipY + m20 * tipZ + m30) * w;
+                        const ty = (m01 * tipX + m11 * tipY + m21 * tipZ + m31) * w;
+                        tipZ = (m02 * tipX + m12 * tipY + m22 * tipZ + m32) * w;
+                        tipX = tx;
+                        tipY = ty;
+                    }
+
+                    const tipPi = index * 3;
+                    this.positionBuffer[tipPi] = tipX;
+                    this.positionBuffer[tipPi + 1] = tipY;
+                    this.positionBuffer[tipPi + 2] = tipZ;
+                    this.positionBuffer[tipPi + 3] = tipX;
+                    this.positionBuffer[tipPi + 4] = tipY;
+                    this.positionBuffer[tipPi + 5] = tipZ;
+
+                    this.previousBuffer[tipPi] = headX;
+                    this.previousBuffer[tipPi + 1] = headY;
+                    this.previousBuffer[tipPi + 2] = headZ;
+                    this.previousBuffer[tipPi + 3] = headX;
+                    this.previousBuffer[tipPi + 4] = headY;
+                    this.previousBuffer[tipPi + 5] = headZ;
+
+                    this.nextBuffer[tipPi] = tipX;
+                    this.nextBuffer[tipPi + 1] = tipY;
+                    this.nextBuffer[tipPi + 2] = tipZ;
+                    this.nextBuffer[tipPi + 3] = tipX;
+                    this.nextBuffer[tipPi + 4] = tipY;
+                    this.nextBuffer[tipPi + 5] = tipZ;
+
+                    // The recorded head's `next` was itself; point it at the tip
+                    // so the shader builds the live segment from one version of
+                    // each endpoint.
+                    const headPi = headIndex * 3;
+                    this.nextBuffer[headPi] = tipX;
+                    this.nextBuffer[headPi + 1] = tipY;
+                    this.nextBuffer[headPi + 2] = tipZ;
+                    this.nextBuffer[headPi + 3] = tipX;
+                    this.nextBuffer[headPi + 4] = tipY;
+                    this.nextBuffer[headPi + 5] = tipZ;
+
+                    this.sideBuffer[index] = 1;
+                    this.sideBuffer[index + 1] = -1;
+
+                    const tipSize = particle.size.x;
+                    if (systemWorldSpace || particle.parentMatrix) {
+                        this.widthBuffer[index] = tipSize;
+                        this.widthBuffer[index + 1] = tipSize;
+                    } else {
+                        this.widthBuffer[index] = tipSize * objectScale;
+                        this.widthBuffer[index + 1] = tipSize * objectScale;
+                    }
+
+                    const tipUi = index * 2;
+                    const tipU = (1 + col) * tileWidth;
+                    this.uvBuffer[tipUi] = tipU;
+                    this.uvBuffer[tipUi + 1] = (vTileCount - row - 1) * tileHeight;
+                    this.uvBuffer[tipUi + 2] = tipU;
+                    this.uvBuffer[tipUi + 3] = (vTileCount - row) * tileHeight;
+
+                    const tipColor = particle.color;
+                    const tipCi = index * 4;
+                    this.colorBuffer[tipCi] = tipColor.x;
+                    this.colorBuffer[tipCi + 1] = tipColor.y;
+                    this.colorBuffer[tipCi + 2] = tipColor.z;
+                    this.colorBuffer[tipCi + 3] = tipColor.w;
+                    this.colorBuffer[tipCi + 4] = tipColor.x;
+                    this.colorBuffer[tipCi + 5] = tipColor.y;
+                    this.colorBuffer[tipCi + 6] = tipColor.z;
+                    this.colorBuffer[tipCi + 7] = tipColor.w;
+
+                    this.indexBuffer[triangles * 3] = headIndex;
+                    this.indexBuffer[triangles * 3 + 1] = headIndex + 1;
+                    this.indexBuffer[triangles * 3 + 2] = index;
+                    triangles++;
+                    this.indexBuffer[triangles * 3] = index;
+                    this.indexBuffer[triangles * 3 + 1] = headIndex + 1;
+                    this.indexBuffer[triangles * 3 + 2] = index + 1;
+                    triangles++;
+
+                    index += 2;
                 }
             }
         }

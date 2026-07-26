@@ -421,58 +421,88 @@ describe('render-time smoothness', () => {
         const positions = (renderer: BatchedRenderer) =>
             (renderer.batches[0] as unknown as {positionBuffer: Float32Array}).positionBuffer;
 
-        /** Z of the newest ribbon sample, which is written last. */
-        const headZ = (renderer: BatchedRenderer, particle: TrailParticle) =>
-            positions(renderer)[(particle.historyCount - 1) * 2 * 3 + 2];
+        /**
+         * Z of the newest ribbon sample written this frame. Between steps that
+         * is the live tip past the recorded head; on a step boundary it is the
+         * recorded head itself.
+         */
+        const headZ = (renderer: BatchedRenderer, particle: TrailParticle, residual: number) => {
+            const sample = particle.historyCount - 1 + (residual > 0 ? 1 : 0);
+            return positions(renderer)[sample * 2 * 3 + 2];
+        };
+
+        /** Length of the last recorded segment (second-newest → newest). */
+        const recordedTailLength = (renderer: BatchedRenderer, particle: TrailParticle) => {
+            const newest = particle.historyCount - 1;
+            const a = newest * 2 * 3 + 2;
+            const b = (newest - 1) * 2 * 3 + 2;
+            return Math.abs(positions(renderer)[a] - positions(renderer)[b]);
+        };
 
         it('keeps the ribbon head moving on frames that run no simulation step', () => {
-            const {renderer, particle} = setupTrail();
+            const {system, renderer, particle} = setupTrail();
             const delta = 1 / 120;
-            let previous = headZ(renderer, particle);
+            let previous = headZ(renderer, particle, system.simulationResidual ?? 0);
             for (let i = 0; i < 12; i++) {
                 renderer.update(delta);
-                const now = headZ(renderer, particle);
+                const now = headZ(renderer, particle, system.simulationResidual ?? 0);
                 expect(now - previous).toBeCloseTo(delta * SPEED, 5);
                 previous = now;
             }
             renderer.dispose();
         });
 
-        it('leaves the samples behind the head where they were recorded', () => {
+        it('leaves every recorded sample where it was, including the head', () => {
+            // The live tip is appended past the recorded ribbon; stretching the
+            // recorded head instead pulses the last segment once per step.
             const {renderer, particle} = setupTrail();
-            const before = positions(renderer).slice(0, (particle.historyCount - 1) * 2 * 3);
-            renderer.update(1 / 120); // no simulation step, so only the head may move
-            const after = positions(renderer).slice(0, (particle.historyCount - 1) * 2 * 3);
+            const before = positions(renderer).slice(0, particle.historyCount * 2 * 3);
+            renderer.update(1 / 120); // no simulation step
+            const after = positions(renderer).slice(0, particle.historyCount * 2 * 3);
             expect(Array.from(after)).toEqual(Array.from(before));
             renderer.dispose();
         });
 
-        it('feeds the head to the shader consistently as current, previous and next', () => {
-            // The ribbon direction comes from neighbouring samples, so a head
-            // carried forward in one buffer but not the others would twist it.
+        it('does not stretch the last recorded segment between steps', () => {
             const {renderer, particle} = setupTrail();
+            const before = recordedTailLength(renderer, particle);
+            for (let i = 0; i < 8; i++) {
+                renderer.update(1 / 120);
+                expect(recordedTailLength(renderer, particle)).toBeCloseTo(before, 5);
+            }
+            renderer.dispose();
+        });
+
+        it('feeds the live tip to the shader consistently as current, previous and next', () => {
+            // The ribbon direction comes from neighbouring samples, so a tip
+            // carried in one buffer but not the others would twist it.
+            const {system, renderer, particle} = setupTrail();
             renderer.update(1 / 120);
+            expect(system.simulationResidual ?? 0).toBeGreaterThan(0);
             const buffers = renderer.batches[0] as unknown as {
                 positionBuffer: Float32Array;
                 previousBuffer: Float32Array;
                 nextBuffer: Float32Array;
             };
-            const last = particle.historyCount - 1;
-            const headOffset = last * 2 * 3;
-            const beforeHeadOffset = (last - 1) * 2 * 3;
-            // The head is its own `next` on the final sample...
-            expect(buffers.nextBuffer[headOffset + 2]).toBeCloseTo(buffers.positionBuffer[headOffset + 2], 6);
-            // ...and the `next` of the sample before it.
-            expect(buffers.nextBuffer[beforeHeadOffset + 2]).toBeCloseTo(buffers.positionBuffer[headOffset + 2], 6);
+            const tip = particle.historyCount; // appended past the recorded head
+            const recordedHead = particle.historyCount - 1;
+            const tipOffset = tip * 2 * 3;
+            const headOffset = recordedHead * 2 * 3;
+            // The tip is its own `next`...
+            expect(buffers.nextBuffer[tipOffset + 2]).toBeCloseTo(buffers.positionBuffer[tipOffset + 2], 6);
+            // ...and the `next` of the recorded head behind it.
+            expect(buffers.nextBuffer[headOffset + 2]).toBeCloseTo(buffers.positionBuffer[tipOffset + 2], 6);
+            // ...and its `previous` is that recorded head.
+            expect(buffers.previousBuffer[tipOffset + 2]).toBeCloseTo(buffers.positionBuffer[headOffset + 2], 6);
             renderer.dispose();
         });
 
         it('leaves a ribbon pinned to the emitter origin alone', () => {
             // Those follow the emitter transform, not the particle's velocity.
-            const {renderer, particle} = setupTrail(true);
-            const before = headZ(renderer, particle);
+            const {system, renderer, particle} = setupTrail(true);
+            const before = headZ(renderer, particle, system.simulationResidual ?? 0);
             renderer.update(1 / 120);
-            expect(headZ(renderer, particle)).toBeCloseTo(before, 6);
+            expect(headZ(renderer, particle, system.simulationResidual ?? 0)).toBeCloseTo(before, 6);
             renderer.dispose();
         });
     });
