@@ -1427,6 +1427,8 @@ export class ParticleSystem implements IParticleSystem {
 
     addBehavior(behavior: Behavior) {
         this.behaviors.push(behavior);
+        // A sub emitter added here changes which system has to update first.
+        this._renderer?._invalidateUpdateOrder();
     }
 
     getRendererSettings(): VFXBatchSettings {
