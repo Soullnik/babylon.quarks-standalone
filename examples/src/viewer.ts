@@ -486,14 +486,14 @@ mountPhoneDebugLogUi();
 window.addEventListener("phone-debug-dump", () => dumpMeshDiagnostics("manual"));
 
 const originalLoggerError = Logger.Error.bind(Logger);
-Logger.Error = (...args: any[]) => {
-    phoneLog("ERR", "BJS", ...args);
-    return originalLoggerError(...args);
+Logger.Error = (message: string | any[], limit?: number) => {
+    phoneLog("ERR", "BJS", message);
+    originalLoggerError(message, limit);
 };
 const originalLoggerWarn = Logger.Warn.bind(Logger);
-Logger.Warn = (...args: any[]) => {
-    phoneLog("WRN", "BJS", ...args);
-    return originalLoggerWarn(...args);
+Logger.Warn = (message: string | any[], limit?: number) => {
+    phoneLog("WRN", "BJS", message);
+    originalLoggerWarn(message, limit);
 };
 
 loadDemo(demoIndex);
