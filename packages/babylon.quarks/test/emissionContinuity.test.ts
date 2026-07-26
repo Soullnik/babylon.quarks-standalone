@@ -71,14 +71,25 @@ describe('emission continuity at whole-number occupancy', () => {
     // fail, and turns the suite red the day it starts passing — which is the
     // day someone should delete this comment and the `.failing`.
     //
-    // The obvious fix — leaving a newborn alone until the next step — was tried
-    // and reverted: it makes `age === 0` true on two consecutive steps, so every
-    // sub emitter in Birth mode fires twice, and it freezes each particle for
-    // its first frame, which is visible at the start of a fast trail.
+    // Two fixes have been tried and neither is it.
     //
-    // The fix belongs on the death boundary instead (`age > life` rather than
-    // `>=`), which needs the same comparison in the behaviors and in the fused
-    // pass to move with it.
+    // Leaving a newborn unaged until the next step: reverted. It makes
+    // `age === 0` true on two consecutive steps, so every sub emitter in Birth
+    // mode fires twice, and it freezes each particle for its first frame, which
+    // is visible at the start of a fast trail.
+    //
+    // Moving the death boundary from `age >= life` to `age > life`, in all
+    // fifteen places that hold it: reverted, because it changes nothing here.
+    // Sixty additions of 1/60 land on 1.0000000000000013, already past the life,
+    // so both comparisons fire on the same step. The boundary is not the issue.
+    //
+    // What is: the age and the emission accumulator run in lockstep but one step
+    // apart. Instrumented on this configuration they read the same value on
+    // consecutive frames — age 0.983333 as the particle dies, waitEmiting
+    // 0.983333 one frame later. The particle ages on the step that emitted it,
+    // while the emitter's interval starts on the step after it fired. Aligning
+    // them means shifting one of the two by a step, and both known ways of doing
+    // that break something else.
     it.failing('never empties an emitter of one a second living a second', () => {
         expect(blankFrames(makeSystem(1, 1), 20)).toBe(0);
     });
