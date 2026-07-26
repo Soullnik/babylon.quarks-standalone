@@ -61,3 +61,62 @@ describe('trail index buffer', () => {
         renderer.dispose();
     });
 });
+
+describe('trail draws when it has nothing to show', () => {
+    let engine: NullEngine;
+    let scene: Scene;
+
+    beforeEach(() => {
+        engine = new NullEngine();
+        scene = new Scene(engine);
+    });
+
+    afterEach(() => {
+        scene.dispose();
+        engine.dispose();
+    });
+
+    it('never submits a draw of zero indices', () => {
+        // A looping effect spends the gap between passes with no trail geometry
+        // at all. A zero-index draw is still submitted, and WebGPU warns about
+        // it once per frame for the whole gap.
+        const system = new ParticleSystem({
+            scene,
+            duration: 1,
+            looping: false,
+            worldSpace: true,
+            startLife: new ConstantValue(0.5),
+            startSpeed: new IntervalValue(5, 10),
+            startSize: new ConstantValue(1),
+            startColor: new ConstantColor(new Vector4(1, 1, 1, 1)),
+            emissionOverTime: new ConstantValue(20),
+            shape: new SphereEmitter(),
+            renderMode: RenderMode.Trail,
+            rendererEmitterSettings: {startLength: new ConstantValue(6), followLocalOrigin: false},
+        });
+        const renderer = new BatchedRenderer('trail-empty', scene);
+        renderer.addSystem(system);
+        const batch = renderer.batches[0] as VFXBatch;
+        system.play();
+
+        let sawGeometry = false;
+        let sawEmpty = false;
+        for (let i = 0; i < 240; i++) {
+            renderer.update(1 / 60);
+            const submesh = batch.mesh.subMeshes[0];
+            expect(submesh.indexCount).toBeGreaterThan(0);
+            if (system.particleNum > 0) sawGeometry = true;
+            else if (sawGeometry) sawEmpty = true;
+        }
+        // The run has to actually cover both states for the assertion to mean
+        // anything: trails drawn, then the effect finished and nothing left.
+        expect(sawGeometry).toBe(true);
+        expect(sawEmpty).toBe(true);
+
+        // ...and what it draws while empty collapses to a single point.
+        const indices = batch.mesh.getIndices()!;
+        expect(Array.from(indices.slice(0, 6))).toEqual([0, 0, 0, 0, 0, 0]);
+
+        renderer.dispose();
+    });
+});

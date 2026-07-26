@@ -25,6 +25,8 @@ export class TrailBatch extends VFXBatch {
     private widthBuffer!: Float32Array;
     private colorBuffer!: Float32Array;
     private indexBuffer!: Uint32Array;
+    /** True while the batch is parked on the degenerate draw, see uploadGeometry. */
+    private drawsNothing = false;
     private previousVB!: VertexBuffer;
     private nextVB!: VertexBuffer;
     private sideVB!: VertexBuffer;
@@ -77,6 +79,7 @@ export class TrailBatch extends VFXBatch {
         // The vertex buffers above are already created at full capacity; this
         // was the one that was not.
         this.mesh.setIndices(this.indexBuffer, null, true);
+        this.drawsNothing = false;
         if (this.mesh.subMeshes && this.mesh.subMeshes.length > 0) {
             // Until the first update, only the dummy triangle is real.
             this.mesh.subMeshes[0].indexCount = 6;
@@ -445,16 +448,46 @@ export class TrailBatch extends VFXBatch {
             if (colorVB) colorVB.update(this.colorBuffer.subarray(0, index * 4));
 
             if (this.mesh.subMeshes && this.mesh.subMeshes.length > 0) {
-                const meshBoundingInfo = this.mesh.getBoundingInfo();
-                for (const subMesh of this.mesh.subMeshes) {
-                    (subMesh as any)._boundingInfo = meshBoundingInfo;
-                }
+                this.adoptMeshBounds();
                 this.mesh.subMeshes[0].indexCount = triangles * 3;
                 this.mesh.subMeshes[0].verticesCount = index;
             }
+            this.drawsNothing = false;
         } else if (this.mesh.subMeshes && this.mesh.subMeshes.length > 0) {
-            this.mesh.subMeshes[0].indexCount = 0;
-            this.mesh.subMeshes[0].verticesCount = 0;
+            // Nothing to draw. Leaving the count at zero still submits the draw,
+            // and WebGPU complains about it once per frame for as long as the
+            // batch stays empty — which, for a looping effect, is every gap
+            // between passes. Disabling the mesh instead costs a frame coming
+            // back, the flicker the sprite batch already works around.
+            //
+            // So draw a triangle whose corners are all the same vertex: it is a
+            // legal draw that rasterises nothing, whatever stale geometry is
+            // still in the buffers. Only written on the way into empty, not on
+            // every empty frame.
+            if (!this.drawsNothing) {
+                this.indexBuffer.fill(0, 0, 6);
+                this.mesh.updateIndices(this.indexBuffer.subarray(0, 6));
+                this.adoptMeshBounds();
+                this.drawsNothing = true;
+            }
+            this.mesh.subMeshes[0].indexCount = 6;
+            this.mesh.subMeshes[0].verticesCount = 1;
+        }
+    }
+
+    /**
+     * Points every sub mesh at the mesh's own bounds.
+     *
+     * Updating indices rebuilds the sub meshes, and a fresh one computes its
+     * bounds from the vertex data — which this batch keeps deliberately stale
+     * beyond the range it draws. Transparent sorting reads those bounds every
+     * frame, so they have to be replaced again after every index update, not
+     * only when the geometry is built.
+     */
+    private adoptMeshBounds(): void {
+        const meshBoundingInfo = this.mesh.getBoundingInfo();
+        for (const subMesh of this.mesh.subMeshes) {
+            (subMesh as any)._boundingInfo = meshBoundingInfo;
         }
     }
 
