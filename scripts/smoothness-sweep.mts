@@ -181,11 +181,18 @@ function sample(renderer: BatchedRenderer, renderMode: RenderMode, particle?: Pa
     const batch = renderer.batches[0] as unknown as Record<string, Float32Array | undefined>;
     const out = new Map<Attribute, number[]>();
     if (renderMode === RenderMode.Trail) {
-        // The newest sample, not the oldest: the rest of a ribbon is recorded
-        // history and is meant to stay where it was put.
+        // The newest sample drawn this frame, not the oldest: the rest of a
+        // ribbon is recorded history and is meant to stay where it was put.
+        // Between steps that newest sample is the live tip past the recorded
+        // head; on a step boundary it is the recorded head itself. The mesh
+        // vertex count is the number of sides written (two per sample).
         const positions = batch.positionBuffer;
+        const meshVerts =
+            (renderer.batches[0] as unknown as {mesh?: {subMeshes?: Array<{verticesCount: number}>}})
+                .mesh?.subMeshes?.[0]?.verticesCount ?? 0;
         const history = (particle as unknown as {historyCount?: number})?.historyCount ?? 0;
-        const head = Math.max(0, history - 1) * 2 * 3;
+        const tipSample = meshVerts > 0 ? Math.max(0, meshVerts / 2 - 1) : Math.max(0, history - 1);
+        const head = tipSample * 2 * 3;
         out.set('ribbon', positions ? Array.from(positions.subarray(head, head + 3)) : []);
         return out;
     }

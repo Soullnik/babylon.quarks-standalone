@@ -17,6 +17,8 @@ namespace BabylonQuarks.UnityExporter
             string materialUuid = ctx.AddMaterialForRenderer(renderer);
             int renderMode = MapRenderMode(renderer.renderMode);
             string geometryUuid = renderMode == 2 && renderer.mesh != null ? ctx.AddGeometryForMesh(renderer.mesh) : null;
+            JToken emissionOverTime = EmissionRate(ps, true);
+            JToken startLife = AvoidKnifeEdgeLifetime(main.startLifetime, ps.emission);
 
             var obj = new JObject()
                 .Set("version", "3.0")
@@ -26,12 +28,12 @@ namespace BabylonQuarks.UnityExporter
                 .Set("duration", main.duration)
                 .Set("startDelay", ValueConverter.Curve(main.startDelay))
                 .Set("shape", BuildShape(ps.shape, ctx))
-                .Set("startLife", ValueConverter.Curve(main.startLifetime))
+                .Set("startLife", startLife)
                 .Set("startSpeed", ValueConverter.Curve(main.startSpeed))
                 .Set("startRotation", BuildStartRotation(main, renderMode))
                 .Set("startSize", BuildStartSize(main))
                 .Set("startColor", ValueConverter.StartColor(main.startColor))
-                .Set("emissionOverTime", EmissionRate(ps, true))
+                .Set("emissionOverTime", emissionOverTime)
                 .Set("emissionOverDistance", EmissionRate(ps, false))
                 .Set("emissionBursts", BuildBursts(ps))
                 .Set("onlyUsedByOther", ctx.IsSubTarget(ps))
@@ -143,6 +145,32 @@ namespace BabylonQuarks.UnityExporter
             var e = ps.emission;
             if (!e.enabled) return ValueConverter.Constant(0);
             return ValueConverter.Curve(overTime ? e.rateOverTime : e.rateOverDistance);
+        }
+
+        /// <summary>
+        /// When constant rate × constant life is a whole number, the quarks fixed
+        /// 1/60 step leaves one blank frame per period (age and emission sit one
+        /// step apart). Unity softens the same edge with "life 1.01"; we add one
+        /// simulation step of lifetime so occupancy is never exactly integer.
+        /// Curves and ranges are left alone — only the constant/constant case is
+        /// unambiguous enough to nudge.
+        /// </summary>
+        private static JToken AvoidKnifeEdgeLifetime(ParticleSystem.MinMaxCurve lifeCurve, ParticleSystem.EmissionModule emission)
+        {
+            JToken life = ValueConverter.Curve(lifeCurve);
+            if (!emission.enabled) return life;
+            if (lifeCurve.mode != ParticleSystemCurveMode.Constant) return life;
+            if (emission.rateOverTime.mode != ParticleSystemCurveMode.Constant) return life;
+
+            float lifeValue = lifeCurve.constant;
+            float rateValue = emission.rateOverTime.constant;
+            float occupancy = rateValue * lifeValue;
+            if (occupancy <= 0f) return life;
+
+            float nearest = Mathf.Round(occupancy);
+            if (Mathf.Abs(occupancy - nearest) > 1e-3f) return life;
+
+            return ValueConverter.Constant(lifeValue + 1f / 60f);
         }
 
         private static JToken BuildBursts(ParticleSystem ps)

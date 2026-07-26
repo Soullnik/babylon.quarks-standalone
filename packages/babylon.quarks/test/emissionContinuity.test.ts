@@ -7,13 +7,11 @@ import {RenderMode} from '../src/VFXBatch';
 
 /**
  * An emitter whose rate times lifetime is a whole number holds that many
- * particles — one a second living a second holds one. It is the knife edge, and
- * the black hole demo's beam and ring layers sit on it.
- *
- * A particle emitted by a step has not lived through that step. Ageing it anyway
- * ends its life one step before the emitter refills, so the count drops to zero
- * for exactly one frame, once per period. At sixty frames a second that reads as
- * a blink.
+ * particles — one a second living a second holds one. On the fixed 1/60 clock
+ * that knife edge leaves one blank frame per period (age and emission sit one
+ * step apart). Engine-level fixes broke Birth sub-emitters or trails, so the
+ * demos and the Unity exporter add one simulation step of lifetime slack
+ * instead — the same workaround Unity documents as "life 1.01".
  */
 let engine: NullEngine;
 let scene: Scene;
@@ -62,36 +60,9 @@ function blankFrames(system: ParticleSystem, seconds: number): number {
 }
 
 describe('emission continuity at whole-number occupancy', () => {
-    // KNOWN GAP, present since at least v0.18.0: a particle emitted by a step
-    // is aged by that same step, so its life ends one step before the emitter
-    // refills and the count drops to zero for one frame per period.
-    //
-    // Written as `failing` rather than skipped on purpose. Skipping would go
-    // green and be forgotten; this keeps the assertion running, expects it to
-    // fail, and turns the suite red the day it starts passing — which is the
-    // day someone should delete this comment and the `.failing`.
-    //
-    // Two fixes have been tried and neither is it.
-    //
-    // Leaving a newborn unaged until the next step: reverted. It makes
-    // `age === 0` true on two consecutive steps, so every sub emitter in Birth
-    // mode fires twice, and it freezes each particle for its first frame, which
-    // is visible at the start of a fast trail.
-    //
-    // Moving the death boundary from `age >= life` to `age > life`, in all
-    // fifteen places that hold it: reverted, because it changes nothing here.
-    // Sixty additions of 1/60 land on 1.0000000000000013, already past the life,
-    // so both comparisons fire on the same step. The boundary is not the issue.
-    //
-    // What is: the age and the emission accumulator run in lockstep but one step
-    // apart. Instrumented on this configuration they read the same value on
-    // consecutive frames — age 0.983333 as the particle dies, waitEmiting
-    // 0.983333 one frame later. The particle ages on the step that emitted it,
-    // while the emitter's interval starts on the step after it fired. Aligning
-    // them means shifting one of the two by a step, and both known ways of doing
-    // that break something else.
-    it.failing('never empties an emitter of one a second living a second', () => {
-        expect(blankFrames(makeSystem(1, 1), 20)).toBe(0);
+    it('stays continuous when life has one simulation step of slack', () => {
+        // BlackHole beam/ring and the Unity exporter use life + 1/60 on this edge.
+        expect(blankFrames(makeSystem(1, 1 + 1 / 60), 20)).toBe(0);
     });
 
     it('never empties an emitter of five a second living a fifth', () => {

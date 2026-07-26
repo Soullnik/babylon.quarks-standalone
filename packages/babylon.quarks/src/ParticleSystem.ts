@@ -663,6 +663,10 @@ export class ParticleSystem implements IParticleSystem {
             const particle = this.particles[this.particleNum - 1];
             particle.reset();
             particle.speedModifier = 1;
+            // Parent EmitSub can refill an onlyUsedByOther system after it had
+            // already finished empty; clear the flag so update does not treat it
+            // as done while it has live particles again.
+            this.finishedEventFired = false;
             this.startColor.startGen(particle.memory);
             this.startColor.genColor(particle.memory, particle.startColor, this.emissionState.time);
             particle.color.copy(particle.startColor);
@@ -813,6 +817,20 @@ export class ParticleSystem implements IParticleSystem {
         }
 
         if (!this.looping && this.finishedEventFired && this.particleNum === 0) {
+            // Still tick the fixed-step clock. A sub-emitter target
+            // (onlyUsedByOther) goes empty between parent bursts; skipping the
+            // accumulator here desyncs it from the parent, so the next particles
+            // the parent emits into it sit at age 0 / startColor until the phase
+            // catches up — white flashes scattered wherever the parent was.
+            if (delta > 0.1) {
+                delta = 0.1;
+            }
+            this.simulationAccumulator += delta;
+            const stepsToRun = Math.min(
+                MAX_SIMULATION_STEPS_PER_FRAME,
+                Math.floor((this.simulationAccumulator + 1e-9) / SIMULATION_STEP)
+            );
+            this.simulationAccumulator -= stepsToRun * SIMULATION_STEP;
             return;
         }
 
