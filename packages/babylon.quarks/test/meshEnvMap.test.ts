@@ -108,11 +108,13 @@ describe('mesh particle environment map', () => {
         expect(defines).toContain('USE_MAP');
         expect(defines).not.toContain('USE_ENVMAP_ATLAS');
 
-        (window as any).__QUARKS_MESH_ENV__ = true;
+        const root = globalThis as {__QUARKS_MESH_ENV__?: boolean; window?: unknown};
+        root.window = root;
+        root.__QUARKS_MESH_ENV__ = true;
         (renderer.batches[0] as SpriteBatch).rebuildMaterial();
         defines = (renderer.batches[0].mesh.material as any).options.defines as string[];
         expect(defines).toContain('USE_ENVMAP_ATLAS');
-        delete (window as any).__QUARKS_MESH_ENV__;
+        delete root.__QUARKS_MESH_ENV__;
 
         renderer.dispose();
         system.dispose();
