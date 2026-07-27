@@ -1,20 +1,18 @@
-import {Mesh} from '@babylonjs/core/Meshes/mesh';
 import {VertexBuffer} from '@babylonjs/core/Buffers/buffer';
-import {Effect} from '@babylonjs/core/Materials/effect';
-import {ShaderMaterial} from '@babylonjs/core/Materials/shaderMaterial';
-import {Scene} from '@babylonjs/core/scene';
 import {BoundingInfo} from '@babylonjs/core/Culling/boundingInfo';
-import {Vector3 as BVector3} from '@babylonjs/core/Maths/math.vector';
-import {Vector2 as BVector2} from '@babylonjs/core/Maths/math.vector';
 import {Constants} from '@babylonjs/core/Engines/constants';
+import {ShaderMaterial} from '@babylonjs/core/Materials/shaderMaterial';
+import {Vector2 as BVector2, Vector3 as BVector3} from '@babylonjs/core/Maths/math.vector';
+import {Mesh} from '@babylonjs/core/Meshes/mesh';
+import {Scene} from '@babylonjs/core/scene';
 import {IParticleSystem, Matrix4, Quaternion, TrailParticle, TrailSettings, Vector3} from 'quarks.core';
-import {VFXBatch, RenderMode} from './VFXBatch';
 import {VFXBatchSettings} from './BatchedRenderer';
-import trail_vert from './shaders/trail_vert.glsl';
-import trail_frag from './shaders/trail_frag.glsl';
-import trail_vert_wgsl from './shaders/trail_vert.wgsl';
-import trail_frag_wgsl from './shaders/trail_frag.wgsl';
 import {registerShaders, shaderLanguageFor} from './shaders/shaderLanguageSupport';
+import trail_frag from './shaders/trail_frag.glsl';
+import trail_frag_wgsl from './shaders/trail_frag.wgsl';
+import trail_vert from './shaders/trail_vert.glsl';
+import trail_vert_wgsl from './shaders/trail_vert.wgsl';
+import {VFXBatch} from './VFXBatch';
 
 export class TrailBatch extends VFXBatch {
     private positionBuffer!: Float32Array;
@@ -60,12 +58,24 @@ export class TrailBatch extends VFXBatch {
         this.indexBuffer = new Uint32Array(this.maxParticles * 6);
 
         // Initialize with full-capacity buffers (updatable) and a dummy triangle
-        this.positionBuffer[0] = 0; this.positionBuffer[1] = 0; this.positionBuffer[2] = 0;
-        this.positionBuffer[3] = 1; this.positionBuffer[4] = 0; this.positionBuffer[5] = 0;
-        this.positionBuffer[6] = 0; this.positionBuffer[7] = 1; this.positionBuffer[8] = 0;
-        this.positionBuffer[9] = 1; this.positionBuffer[10] = 1; this.positionBuffer[11] = 0;
-        this.indexBuffer[0] = 0; this.indexBuffer[1] = 1; this.indexBuffer[2] = 2;
-        this.indexBuffer[3] = 1; this.indexBuffer[4] = 3; this.indexBuffer[5] = 2;
+        this.positionBuffer[0] = 0;
+        this.positionBuffer[1] = 0;
+        this.positionBuffer[2] = 0;
+        this.positionBuffer[3] = 1;
+        this.positionBuffer[4] = 0;
+        this.positionBuffer[5] = 0;
+        this.positionBuffer[6] = 0;
+        this.positionBuffer[7] = 1;
+        this.positionBuffer[8] = 0;
+        this.positionBuffer[9] = 1;
+        this.positionBuffer[10] = 1;
+        this.positionBuffer[11] = 0;
+        this.indexBuffer[0] = 0;
+        this.indexBuffer[1] = 1;
+        this.indexBuffer[2] = 2;
+        this.indexBuffer[3] = 1;
+        this.indexBuffer[4] = 3;
+        this.indexBuffer[5] = 2;
 
         // Set standard vertex data with full buffer capacity (updatable)
         this.mesh.setVerticesData(VertexBuffer.PositionKind, this.positionBuffer, true);
@@ -138,14 +148,24 @@ export class TrailBatch extends VFXBatch {
         );
 
         const attributes = ['position', 'previous', 'next', 'side', 'width', 'uv', 'color'];
-        const uniforms = ['world', 'view', 'projection', 'worldViewProjection', 'lineWidth', 'resolution', 'sizeAttenuation'];
+        const uniforms = [
+            'world',
+            'view',
+            'projection',
+            'worldViewProjection',
+            'lineWidth',
+            'resolution',
+            'sizeAttenuation',
+        ];
         const samplers: string[] = [];
 
         if (this.settings.texture) {
             samplers.push('map');
         }
 
-        const mat = new ShaderMaterial(shaderName, this.scene,
+        const mat = new ShaderMaterial(
+            shaderName,
+            this.scene,
             {vertex: shaderName, fragment: shaderName},
             {
                 attributes,
@@ -278,10 +298,22 @@ export class TrailBatch extends VFXBatch {
                 const row = Math.floor(particle.uvTile / vTileCount + 0.001);
                 const particleMatrix = particle.parentMatrix as unknown as Matrix4 | undefined;
                 const me = (particleMatrix ?? emitterMatrix).elements;
-                const m00 = me[0], m01 = me[1], m02 = me[2], m03 = me[3];
-                const m10 = me[4], m11 = me[5], m12 = me[6], m13 = me[7];
-                const m20 = me[8], m21 = me[9], m22 = me[10], m23 = me[11];
-                const m30 = me[12], m31 = me[13], m32 = me[14], m33 = me[15];
+                const m00 = me[0],
+                    m01 = me[1],
+                    m02 = me[2],
+                    m03 = me[3];
+                const m10 = me[4],
+                    m11 = me[5],
+                    m12 = me[6],
+                    m13 = me[7];
+                const m20 = me[8],
+                    m21 = me[9],
+                    m22 = me[10],
+                    m23 = me[11];
+                const m30 = me[12],
+                    m31 = me[13],
+                    m32 = me[14],
+                    m33 = me[15];
                 const invHistoryLength = 1 / particleHistoryLength;
 
                 // Walk the ring buffer oldest-first with hand-rolled wrapping so the

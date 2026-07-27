@@ -1,5 +1,3 @@
-
-
 export interface IAnimationData {
     /** Start time in seconds */
     startTime: number;

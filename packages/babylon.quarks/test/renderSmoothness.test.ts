@@ -1,23 +1,23 @@
+import {NullEngine} from '@babylonjs/core/Engines/nullEngine';
+import {Scene} from '@babylonjs/core/scene';
 import {
     ApplyForce,
     AxisAngleGenerator,
+    Bezier,
     ConstantColor,
     ConstantValue,
-    PointEmitter,
-    Bezier,
     OrbitOverLife,
     PiecewiseBezier,
+    PointEmitter,
+    Vector3 as QVector3,
     Rotation3DOverLife,
     RotationOverLife,
     SizeOverLife,
     TrailParticle,
-    Vector3 as QVector3,
     Vector4,
 } from 'quarks.core';
-import {NullEngine} from '@babylonjs/core/Engines/nullEngine';
-import {Scene} from '@babylonjs/core/scene';
-import {ParticleSystem} from '../src/ParticleSystem';
 import {BatchedRenderer} from '../src/BatchedRenderer';
+import {ParticleSystem} from '../src/ParticleSystem';
 import {RenderMode} from '../src/VFXBatch';
 
 /**

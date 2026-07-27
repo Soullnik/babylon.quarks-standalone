@@ -38,9 +38,15 @@ const results = await compiler.evaluate(async (cases) => {
     const device = await adapter.requestDevice();
     const out = [];
     for (const c of cases) {
-        if (c.error) { out.push({name: c.name, ok: false, error: c.error}); continue; }
+        if (c.error) {
+            out.push({name: c.name, ok: false, error: c.error});
+            continue;
+        }
         let error = null;
-        for (const [stage, code] of [['vertex', c.vertex], ['fragment', c.fragment]]) {
+        for (const [stage, code] of [
+            ['vertex', c.vertex],
+            ['fragment', c.fragment],
+        ]) {
             const info = await device.createShaderModule({code}).getCompilationInfo();
             const errs = info.messages.filter((m) => m.type === 'error');
             if (errs.length) {
@@ -59,7 +65,9 @@ await browser.close();
 const selfTest = results.find((r) => r.name.startsWith('SELF-TEST'));
 const real = results.filter((r) => r !== selfTest);
 const bad = real.filter((r) => !r.ok);
-console.log(selfTest && !selfTest.ok ? 'harness self-test failed to compile, as it must' : 'HARNESS BROKEN: self-test compiled');
+console.log(
+    selfTest && !selfTest.ok ? 'harness self-test failed to compile, as it must' : 'HARNESS BROKEN: self-test compiled'
+);
 console.log(`${real.length - bad.length}/${real.length} shader variants compiled`);
 for (const r of bad) console.log(`FAIL ${r.name}\n     ${String(r.error).slice(0, 400)}`);
 process.exit(bad.length === 0 && selfTest && !selfTest.ok ? 0 : 1);

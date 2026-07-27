@@ -23,8 +23,8 @@
  * meant to hold still between frames — so they are listed as accepted rather
  * than hidden, and the report says which is which.
  */
-import {Logger} from '@babylonjs/core/Misc/logger';
 import {NullEngine} from '@babylonjs/core/Engines/nullEngine';
+import {Logger} from '@babylonjs/core/Misc/logger';
 import {Scene} from '@babylonjs/core/scene';
 import {
     ApplyForce,
@@ -57,8 +57,8 @@ import {
     Vector4,
     VelocityOverLife,
 } from 'quarks.core';
-import {ParticleSystem} from '../packages/babylon.quarks/src/ParticleSystem';
 import {BatchedRenderer} from '../packages/babylon.quarks/src/BatchedRenderer';
+import {ParticleSystem} from '../packages/babylon.quarks/src/ParticleSystem';
 import {RenderMode} from '../packages/babylon.quarks/src/VFXBatch';
 
 /** Attributes the sprite batch uploads, by the buffer they land in. */
@@ -120,10 +120,17 @@ function cases(): Case[] {
         sprite('SpeedOverLife', () => [new SpeedOverLife(curve())]),
         sprite('ApplyForce', () => [new ApplyForce(new Vector3(0, -1, 0), new ConstantValue(20))]),
         sprite('GravityForce', () => [new GravityForce(new Vector3(0, 8, 0), 30)]),
-        sprite('LimitSpeedOverLife', () => [new LimitSpeedOverLife(new PiecewiseBezier([[new Bezier(8, 6, 4, 2), 0]]), 0.5)]),
+        sprite('LimitSpeedOverLife', () => [
+            new LimitSpeedOverLife(new PiecewiseBezier([[new Bezier(8, 6, 4, 2), 0]]), 0.5),
+        ]),
         sprite('OrbitOverLife', () => [new OrbitOverLife(new ConstantValue(3), new Vector3(0, 1, 0))]),
         sprite('VelocityOverLife', () => [
-            new VelocityOverLife(new ConstantValue(2), new ConstantValue(1), new ConstantValue(0), new ConstantValue(1)),
+            new VelocityOverLife(
+                new ConstantValue(2),
+                new ConstantValue(1),
+                new ConstantValue(0),
+                new ConstantValue(1)
+            ),
         ]),
         sprite('Noise', () => [new Noise(new ConstantValue(2), new ConstantValue(4))]),
         sprite('TurbulenceField', () => [
@@ -133,8 +140,11 @@ function cases(): Case[] {
         sprite('SizeBySpeed', () => [new SizeBySpeed(curve(), new IntervalValue(0, 30))]),
         sprite('RotationBySpeed', () => [new RotationBySpeed(new ConstantValue(4), new IntervalValue(0, 30))]),
         sprite('a plugin moving position', () => [new PluginDrift()]),
-        sprite('stretched, decelerating', () => [new ApplyForce(new Vector3(0, 0, -1), new ConstantValue(20))],
-            RenderMode.StretchedBillBoard),
+        sprite(
+            'stretched, decelerating',
+            () => [new ApplyForce(new Vector3(0, 0, -1), new ConstantValue(20))],
+            RenderMode.StretchedBillBoard
+        ),
         {
             name: 'mesh, Rotation3DOverLife',
             renderMode: RenderMode.Mesh,
@@ -188,8 +198,8 @@ function sample(renderer: BatchedRenderer, renderMode: RenderMode, particle?: Pa
         // vertex count is the number of sides written (two per sample).
         const positions = batch.positionBuffer;
         const meshVerts =
-            (renderer.batches[0] as unknown as {mesh?: {subMeshes?: Array<{verticesCount: number}>}})
-                .mesh?.subMeshes?.[0]?.verticesCount ?? 0;
+            (renderer.batches[0] as unknown as {mesh?: {subMeshes?: Array<{verticesCount: number}>}}).mesh
+                ?.subMeshes?.[0]?.verticesCount ?? 0;
         const history = (particle as unknown as {historyCount?: number})?.historyCount ?? 0;
         const tipSample = meshVerts > 0 ? Math.max(0, meshVerts / 2 - 1) : Math.max(0, history - 1);
         const head = tipSample * 2 * 3;

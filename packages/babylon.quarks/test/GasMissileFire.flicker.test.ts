@@ -1,14 +1,6 @@
 import {NullEngine} from '@babylonjs/core/Engines/nullEngine';
 import {Scene} from '@babylonjs/core/scene';
-import {
-    Bezier,
-    ConstantColor,
-    ConstantValue,
-    PiecewiseBezier,
-    PointEmitter,
-    SizeOverLife,
-    Vector4,
-} from 'quarks.core';
+import {Bezier, ConstantColor, ConstantValue, PiecewiseBezier, PointEmitter, SizeOverLife, Vector4} from 'quarks.core';
 import {BatchedRenderer} from '../src/BatchedRenderer';
 import {ParticleSystem} from '../src/ParticleSystem';
 import {RenderMode} from '../src/VFXBatch';

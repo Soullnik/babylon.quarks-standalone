@@ -1,0 +1,9 @@
+dist
+node_modules
+coverage
+.husky
+package-lock.json
+*.unitypackage
+.claude
+examples/public
+docs

@@ -1,29 +1,29 @@
-import type { DemoContext } from '../types';
-import '@babylonjs/loaders';
+import {VertexBuffer} from '@babylonjs/core/Buffers/buffer';
+import {Constants} from '@babylonjs/core/Engines/constants';
 import {ImportMeshAsync} from '@babylonjs/core/Loading/sceneLoader';
-import {Mesh} from '@babylonjs/core/Meshes/mesh';
 import {PBRMaterial} from '@babylonjs/core/Materials/PBR/pbrMaterial';
 import {StandardMaterial} from '@babylonjs/core/Materials/standardMaterial';
-import {VertexBuffer} from '@babylonjs/core/Buffers/buffer';
 import {Texture} from '@babylonjs/core/Materials/Textures/texture';
 import {Vector3 as BVector3} from '@babylonjs/core/Maths/math.vector';
-import {Constants} from '@babylonjs/core/Engines/constants';
+import {Mesh} from '@babylonjs/core/Meshes/mesh';
+import '@babylonjs/loaders';
 import {
-    ParticleSystem,
-    RenderMode,
+    AxisAngleGenerator,
+    Bezier,
+    ConstantColor,
     ConstantValue,
     IntervalValue,
-    ConstantColor,
+    ParticleSystem,
+    PiecewiseBezier,
     PointEmitter,
     RandomQuatGenerator,
-    PiecewiseBezier,
-    Bezier,
-    Vector4,
-    Vector3,
-    AxisAngleGenerator,
+    RenderMode,
     Rotation3DOverLife,
     SpeedOverLife,
+    Vector3,
+    Vector4,
 } from 'babylon.quarks';
+import type {DemoContext} from '../types';
 
 const alphaTestConfig = {
     name: 'AlphaTest',
@@ -124,11 +124,7 @@ export async function init({scene, camera, batchRenderer, systems}: DemoContext)
         )
     );
     const speedCurve = alphaTestConfig.speedOverLifeCurve as [number, number, number, number];
-    leaves.addBehavior(
-        new SpeedOverLife(
-            new PiecewiseBezier([[new Bezier(...speedCurve), 0]])
-        )
-    );
+    leaves.addBehavior(new SpeedOverLife(new PiecewiseBezier([[new Bezier(...speedCurve), 0]])));
     leaves.emitter.position = new BVector3(alphaTestConfig.emitterOffsetX, 0, 0);
 
     batchRenderer.addSystem(leaves);

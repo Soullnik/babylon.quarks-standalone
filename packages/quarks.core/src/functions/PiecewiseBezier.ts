@@ -1,8 +1,8 @@
-import {FunctionValueGenerator} from './ValueGenerator';
-import {PiecewiseFunction} from './PiecewiseFunction';
 import {Bezier} from './Bezier';
 import {FunctionJSON} from './FunctionJSON';
 import {GeneratorMemory} from './GeneratorMemory';
+import {PiecewiseFunction} from './PiecewiseFunction';
+import {FunctionValueGenerator} from './ValueGenerator';
 
 export class PiecewiseBezier extends PiecewiseFunction<Bezier> implements FunctionValueGenerator {
     /** Sample count of the table built by {@link refreshTable}. */

@@ -1,6 +1,6 @@
-import {Behavior} from './Behavior';
 import {Particle, TrailParticle} from '../Particle';
 import {FunctionValueGenerator, ValueGeneratorFromJSON} from '../functions/ValueGenerator';
+import {Behavior} from './Behavior';
 
 /**
  * Apply width to particles based on their length.

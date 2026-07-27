@@ -1,8 +1,8 @@
-import {Matrix4, Quaternion, Vector3, Vector3View, Vector4, Vector4View} from './math';
-import {EmissionState} from './IParticleSystem';
-import {LinkedList} from './util/LinkedList';
 import {GeneratorMemory} from './functions';
+import {EmissionState} from './IParticleSystem';
+import {Matrix4, Quaternion, Vector3, Vector3View, Vector4, Vector4View} from './math';
 import {ParticleStore} from './ParticleStore';
+import {LinkedList} from './util/LinkedList';
 
 export interface IParticle {
     /**
@@ -143,7 +143,7 @@ export class NodeParticle implements IParticle {
      * Size of the particle.
      * @type {Vector3}
      */
-    size : Vector3 = new Vector3();
+    size: Vector3 = new Vector3();
     /**
      * Angular velocity of the particle.
      * @type {number | Quaternion}

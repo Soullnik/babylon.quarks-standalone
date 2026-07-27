@@ -1,8 +1,8 @@
-import {IAnimationData, IPrefab} from 'quarks.core';
 import {TransformNode} from '@babylonjs/core/Meshes/transformNode';
 import {Scene} from '@babylonjs/core/scene';
-import {ParticleEmitter} from './ParticleEmitter';
+import {IAnimationData, IPrefab} from 'quarks.core';
 import {BatchedRenderer} from './BatchedRenderer';
+import {ParticleEmitter} from './ParticleEmitter';
 
 export interface QuarksTimelineClip {
     uuid?: string;
@@ -50,12 +50,7 @@ export class QuarksPrefab extends TransformNode implements IPrefab {
         this._batchedRenderer = renderer;
     }
 
-    addParticleSystemAnimation(
-        emitter: ParticleEmitter,
-        startTime = 0,
-        duration = 0,
-        loop = false
-    ): AnimationData {
+    addParticleSystemAnimation(emitter: ParticleEmitter, startTime = 0, duration = 0, loop = false): AnimationData {
         const animationDuration = duration > 0 ? duration : emitter.system.duration;
         const data: AnimationData = {
             startTime,
@@ -78,7 +73,7 @@ export class QuarksPrefab extends TransformNode implements IPrefab {
         loop = false,
         clipUUID?: string
     ): AnimationData {
-        const animationDuration = duration > 0 ? duration : clip?.duration ?? 0;
+        const animationDuration = duration > 0 ? duration : (clip?.duration ?? 0);
         const data: AnimationData = {
             startTime,
             duration: animationDuration,
@@ -260,7 +255,7 @@ export class QuarksPrefab extends TransformNode implements IPrefab {
                 duration: animation.duration,
                 type: animation.type,
                 targetUUID: (animation.target as any)._quarksUUID ?? animation.target.uniqueId.toString(),
-                clipUUID: animation.type === 'three' ? animation.clipUUID ?? animation.clip?.uuid : undefined,
+                clipUUID: animation.type === 'three' ? (animation.clipUUID ?? animation.clip?.uuid) : undefined,
                 loop: animation.loop,
             })),
         };
@@ -269,7 +264,9 @@ export class QuarksPrefab extends TransformNode implements IPrefab {
     static fromJSON(json: any, scene?: Scene): QuarksPrefab {
         const prefab = new QuarksPrefab(json.name || 'QuarksPrefab', scene);
         if (Array.isArray(json.animationData)) {
-            prefab._tempAnimationJSON = json.animationData.filter((item: any) => item?.type === 'ps' || item?.type === 'three');
+            prefab._tempAnimationJSON = json.animationData.filter(
+                (item: any) => item?.type === 'ps' || item?.type === 'three'
+            );
         }
         return prefab;
     }

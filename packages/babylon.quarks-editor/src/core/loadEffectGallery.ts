@@ -1,6 +1,6 @@
-import type {ParticleSystem} from 'babylon.quarks';
-import type {Scene} from '@babylonjs/core/scene';
 import {TransformNode} from '@babylonjs/core/Meshes/transformNode';
+import type {Scene} from '@babylonjs/core/scene';
+import type {ParticleSystem} from 'babylon.quarks';
 import {EffectBinding} from './binding';
 import {disposeLoadedEffect, parseEffectFromJson} from './loadEffect';
 
@@ -105,7 +105,11 @@ export async function loadEffectGallery(
 /** Builds an edit binding for one catalog entry without unloading the rest. */
 export function bindingFromGalleryEntry(entry: GalleryEntry): EffectBinding {
     const main = entry.systems.find((s) => !s.onlyUsedByOther) ?? entry.systems[0];
-    return new EffectBinding(main, entry.systems.filter((s) => s !== main), entry.root);
+    return new EffectBinding(
+        main,
+        entry.systems.filter((s) => s !== main),
+        entry.root
+    );
 }
 
 /** Merges newly loaded catalog entries, skipping duplicate paths. */

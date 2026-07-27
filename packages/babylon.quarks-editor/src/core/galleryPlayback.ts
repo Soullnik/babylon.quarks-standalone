@@ -1,5 +1,5 @@
-import type {GalleryEntry} from './loadEffectGallery';
 import {QuarksUtil} from 'babylon.quarks';
+import type {GalleryEntry} from './loadEffectGallery';
 
 function isPreviewEntry(entry: GalleryEntry, previewRootIds: ReadonlySet<number>): boolean {
     return entry.inScene && previewRootIds.has(entry.root.uniqueId);

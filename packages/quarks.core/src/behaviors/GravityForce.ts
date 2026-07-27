@@ -1,6 +1,6 @@
-import {Behavior} from './Behavior';
 import {Particle} from '../Particle';
 import {Vector3} from '../math';
+import {Behavior} from './Behavior';
 
 /**
  * Apply a gravity force to particles.

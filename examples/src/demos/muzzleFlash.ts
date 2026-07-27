@@ -1,23 +1,23 @@
-import type { DemoContext } from '../types';
-import {Vector3 as BVector3} from '@babylonjs/core/Maths/math.vector';
 import {Constants} from '@babylonjs/core/Engines/constants';
+import {Vector3 as BVector3} from '@babylonjs/core/Maths/math.vector';
 import {
-    ParticleSystem,
-    RenderMode,
-    ConstantValue,
-    IntervalValue,
-    ConstantColor,
-    PointEmitter,
-    ConeEmitter,
-    SizeOverLife,
-    RotationOverLife,
-    FrameOverLife,
-    PiecewiseBezier,
     Bezier,
+    ConeEmitter,
+    ConstantColor,
+    ConstantValue,
+    FrameOverLife,
+    IntervalValue,
+    ParticleSystem,
+    PiecewiseBezier,
+    PointEmitter,
     RandomColor,
+    RenderMode,
+    RotationOverLife,
+    SizeOverLife,
     Vector4,
 } from 'babylon.quarks';
 import {createColorOverLifeRange, createSharedTexture} from '../shared/common';
+import type {DemoContext} from '../types';
 
 export function init({scene, camera, batchRenderer, systems}: DemoContext) {
     camera.setPosition(new BVector3(0, 10, 10));
@@ -105,7 +105,9 @@ export function init({scene, camera, batchRenderer, systems}: DemoContext) {
         };
 
         const muzzle1 = new ParticleSystem(muzzleConfig);
-        muzzle1.addBehavior(createColorOverLifeRange(new Vector4(1, 0.3882312, 0.125, 1), new Vector4(1, 0.826827, 0.3014706, 1)));
+        muzzle1.addBehavior(
+            createColorOverLifeRange(new Vector4(1, 0.3882312, 0.125, 1), new Vector4(1, 0.826827, 0.3014706, 1))
+        );
         muzzle1.addBehavior(new SizeOverLife(new PiecewiseBezier([[new Bezier(1, 0.95, 0.75, 0), 0]])));
         muzzle1.addBehavior(new FrameOverLife(new PiecewiseBezier([[new Bezier(91, 94, 97, 100), 0]])));
         muzzle1.emitter.position = position.clone();
@@ -114,7 +116,9 @@ export function init({scene, camera, batchRenderer, systems}: DemoContext) {
         systems.push(muzzle1);
 
         const muzzle2 = new ParticleSystem(muzzleConfig);
-        muzzle2.addBehavior(createColorOverLifeRange(new Vector4(1, 0.3882312, 0.125, 1), new Vector4(1, 0.826827, 0.3014706, 1)));
+        muzzle2.addBehavior(
+            createColorOverLifeRange(new Vector4(1, 0.3882312, 0.125, 1), new Vector4(1, 0.826827, 0.3014706, 1))
+        );
         muzzle2.addBehavior(new SizeOverLife(new PiecewiseBezier([[new Bezier(1, 0.95, 0.75, 0), 0]])));
         muzzle2.addBehavior(new FrameOverLife(new PiecewiseBezier([[new Bezier(91, 94, 97, 100), 0]])));
         muzzle2.emitter.position = position.clone();

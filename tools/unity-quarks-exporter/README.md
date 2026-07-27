@@ -19,9 +19,9 @@ Pick one:
   (e.g. `Assets/QuarksExporter/Editor/`). The scripts are editor-only (guarded by the assembly
   definition), so they never ship in a build.
 - **As a local UPM package** — in `Packages/manifest.json` add:
-  ```json
-  "com.babylonquarks.unity-exporter": "file:../path/to/tools/unity-quarks-exporter"
-  ```
+    ```json
+    "com.babylonquarks.unity-exporter": "file:../path/to/tools/unity-quarks-exporter"
+    ```
 
 Requires Unity **2020.3+**.
 
@@ -46,10 +46,10 @@ Requires Unity **2020.3+**.
 Load the result in Babylon.js:
 
 ```ts
-import { QuarksLoader } from "babylon.quarks";
+import {QuarksLoader} from 'babylon.quarks';
 
-const loader = new QuarksLoader(scene, { baseUrl: "" });
-const root = loader.parse(await (await fetch("Explosion.json")).json());
+const loader = new QuarksLoader(scene, {baseUrl: ''});
+const root = loader.parse(await (await fetch('Explosion.json')).json());
 root.parent = batchedRenderer; // your BatchedRenderer
 ```
 
@@ -60,24 +60,24 @@ death-triggered spark sub-emitter).
 
 ## What gets exported
 
-| Unity module | Quarks mapping |
-| --- | --- |
-| **Main** | duration, loop, prewarm, start delay/lifetime/speed/size (incl. 3D size), start rotation, start color (constant / two colors / gradient / two gradients), simulation space → `worldSpace`, gravity → `ApplyForce` |
-| **Emission** | rate over time, rate over distance, bursts (time / count / cycles / interval / probability) |
-| **Shape** | Cone, Sphere, Hemisphere, Circle, Donut (radius, angle, arc, thickness), **Mesh** → `mesh_surface`, randomize direction → `ChangeEmitDirection` |
-| **Color over Lifetime** | `ColorOverLife` (gradient) |
-| **Size over Lifetime** | `SizeOverLife` (curve → piecewise Bézier) |
-| **Rotation over Lifetime** | `RotationOverLife` (deg→rad) |
-| **Velocity over Lifetime** | `VelocityOverLife` (linear + orbital XYZ, local/world) |
-| **Inherit Velocity** | `InheritVelocity` (multiplier + initial/current) |
-| **Limit Velocity over Lifetime** | `LimitSpeedOverLife` (limit + dampen) |
-| **Force over Lifetime** | `ForceOverLife` (XYZ) |
-| **Color / Size / Rotation by Speed** | `ColorBySpeed` / `SizeBySpeed` / `RotationBySpeed` (+ speed range) |
-| **Noise** | `Noise` (frequency + strength) |
-| **Collision** | `ApplyCollision` (bounce; collider is host-provided) |
-| **Texture Sheet Animation** | tiles U/V, start tile, `FrameOverLife` sweep |
-| **Sub Emitters** | child systems wired via `EmitSubParticleSystem` (birth/death → quarks modes) |
-| **Renderer** | render mode (billboard ×4 / stretched / mesh), sort order, mesh geometry (positions / indices / uvs / **normals**), material blend mode + main texture (embedded), optional **reflectionAtlas** (3×2 cubemap bake) + reflectionLevel when the material has a Cubemap |
+| Unity module                         | Quarks mapping                                                                                                                                                                                                                                                       |
+| ------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Main**                             | duration, loop, prewarm, start delay/lifetime/speed/size (incl. 3D size), start rotation, start color (constant / two colors / gradient / two gradients), simulation space → `worldSpace`, gravity → `ApplyForce`                                                    |
+| **Emission**                         | rate over time, rate over distance, bursts (time / count / cycles / interval / probability)                                                                                                                                                                          |
+| **Shape**                            | Cone, Sphere, Hemisphere, Circle, Donut (radius, angle, arc, thickness), **Mesh** → `mesh_surface`, randomize direction → `ChangeEmitDirection`                                                                                                                      |
+| **Color over Lifetime**              | `ColorOverLife` (gradient)                                                                                                                                                                                                                                           |
+| **Size over Lifetime**               | `SizeOverLife` (curve → piecewise Bézier)                                                                                                                                                                                                                            |
+| **Rotation over Lifetime**           | `RotationOverLife` (deg→rad)                                                                                                                                                                                                                                         |
+| **Velocity over Lifetime**           | `VelocityOverLife` (linear + orbital XYZ, local/world)                                                                                                                                                                                                               |
+| **Inherit Velocity**                 | `InheritVelocity` (multiplier + initial/current)                                                                                                                                                                                                                     |
+| **Limit Velocity over Lifetime**     | `LimitSpeedOverLife` (limit + dampen)                                                                                                                                                                                                                                |
+| **Force over Lifetime**              | `ForceOverLife` (XYZ)                                                                                                                                                                                                                                                |
+| **Color / Size / Rotation by Speed** | `ColorBySpeed` / `SizeBySpeed` / `RotationBySpeed` (+ speed range)                                                                                                                                                                                                   |
+| **Noise**                            | `Noise` (frequency + strength)                                                                                                                                                                                                                                       |
+| **Collision**                        | `ApplyCollision` (bounce; collider is host-provided)                                                                                                                                                                                                                 |
+| **Texture Sheet Animation**          | tiles U/V, start tile, `FrameOverLife` sweep                                                                                                                                                                                                                         |
+| **Sub Emitters**                     | child systems wired via `EmitSubParticleSystem` (birth/death → quarks modes)                                                                                                                                                                                         |
+| **Renderer**                         | render mode (billboard ×4 / stretched / mesh), sort order, mesh geometry (positions / indices / uvs / **normals**), material blend mode + main texture (embedded), optional **reflectionAtlas** (3×2 cubemap bake) + reflectionLevel when the material has a Cubemap |
 
 Curves convert per-segment with a Hermite→Bézier transform so tangents are preserved; Unity
 gradients sample both color and alpha keys.
@@ -92,7 +92,7 @@ gradients sample both color and alpha keys.
   want it as an emission source. Box / Edge shapes still fall back to a point emitter.
 - **Collision:** only `bounce` is exported. quarks resolves collisions against a host-provided
   collider (e.g. the editor's ground plane), so Unity's collision planes/world aren't carried over.
-- **3D rotation:** 3D *start* rotation is exported as an Euler generator for **Mesh** render mode
+- **3D rotation:** 3D _start_ rotation is exported as an Euler generator for **Mesh** render mode
   (billboards can't tilt, so they use the Z angle only). Rotation **over lifetime** still exports
   the Z axis only.
 - **Texture Sheet Animation:** the frame animation is exported as a full linear sweep over the

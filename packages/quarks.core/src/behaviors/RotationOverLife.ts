@@ -1,6 +1,6 @@
-import {Behavior} from './Behavior';
 import {Particle} from '../Particle';
 import {FunctionValueGenerator, ValueGenerator, ValueGeneratorFromJSON} from '../functions/ValueGenerator';
+import {Behavior} from './Behavior';
 
 /**
  * Apply rotation to particles over their life.

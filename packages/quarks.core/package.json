@@ -1,47 +1,47 @@
 {
-  "name": "quarks.core",
-  "version": "0.19.0",
-  "description": "Core library for Quarks VFX / Particle System Library",
-  "type": "module",
-  "types": "./dist/types/index.d.ts",
-  "main": "./dist/quarks.core.cjs",
-  "module": "./dist/quarks.core.esm.js",
-  "exports": {
-    ".": {
-      "import": "./dist/quarks.core.esm.js",
-      "require": "./dist/quarks.core.cjs",
-      "types": "./dist/types/index.d.ts"
-    }
-  },
-  "files": [
-    "dist",
-    "src",
-    "LICENSE"
-  ],
-  "scripts": {
-    "clean": "rimraf dist .rollup.cache tsconfig.tsbuildinfo",
-    "build:types": "tsc --emitDeclarationOnly",
-    "build:js": "cross-env NODE_ENV=production rollup -c",
-    "build": "npm run clean && npm run build:types && npm run build:js",
-    "test": "jest",
-    "prettier": "prettier --write --ignore-unknown **/*.ts"
-  },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/Alchemist0823/three.quarks.git"
-  },
-  "keywords": [
-    "particle",
-    "library",
-    "3d",
-    "game",
-    "performance",
-    "math"
-  ],
-  "author": "Alchemist0823 <the.forrest.sun@gmail.com>",
-  "license": "MIT",
-  "bugs": {
-    "url": "https://github.com/Alchemist0823/three.quarks/issues"
-  },
-  "homepage": "https://quarks.art"
+    "name": "quarks.core",
+    "version": "0.19.0",
+    "description": "Core library for Quarks VFX / Particle System Library",
+    "type": "module",
+    "types": "./dist/types/index.d.ts",
+    "main": "./dist/quarks.core.cjs",
+    "module": "./dist/quarks.core.esm.js",
+    "exports": {
+        ".": {
+            "import": "./dist/quarks.core.esm.js",
+            "require": "./dist/quarks.core.cjs",
+            "types": "./dist/types/index.d.ts"
+        }
+    },
+    "files": [
+        "dist",
+        "src",
+        "LICENSE"
+    ],
+    "scripts": {
+        "clean": "rimraf dist .rollup.cache tsconfig.tsbuildinfo",
+        "build:types": "tsc --emitDeclarationOnly",
+        "build:js": "cross-env NODE_ENV=production rollup -c",
+        "build": "npm run clean && npm run build:types && npm run build:js",
+        "test": "jest",
+        "prettier": "prettier --write \"src/**/*.ts\""
+    },
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/Alchemist0823/three.quarks.git"
+    },
+    "keywords": [
+        "particle",
+        "library",
+        "3d",
+        "game",
+        "performance",
+        "math"
+    ],
+    "author": "Alchemist0823 <the.forrest.sun@gmail.com>",
+    "license": "MIT",
+    "bugs": {
+        "url": "https://github.com/Alchemist0823/three.quarks/issues"
+    },
+    "homepage": "https://quarks.art"
 }

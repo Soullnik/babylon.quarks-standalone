@@ -1,7 +1,7 @@
-import {demoManifest} from "./demoManifest";
-import type {DemoContext, DemoDefinition, DemoModule} from "./types";
+import {demoManifest} from './demoManifest';
+import type {DemoContext, DemoDefinition, DemoModule} from './types';
 
-const demoModules = import.meta.glob<DemoModule>("./demos/*.ts", {eager: true});
+const demoModules = import.meta.glob<DemoModule>('./demos/*.ts', {eager: true});
 
 function getDemoModule(moduleId: string): DemoModule {
     const modulePath = `./demos/${moduleId}.ts`;
@@ -41,7 +41,7 @@ function updateMuzzleFlash(ctx: DemoContext, delta: number) {
     demoState.refreshIndex = refreshIndex;
 }
 
-const frameOverrides: Partial<Record<string, DemoDefinition["onFrame"]>> = {
+const frameOverrides: Partial<Record<string, DemoDefinition['onFrame']>> = {
     MuzzleFlashDemo: updateMuzzleFlash,
 };
 

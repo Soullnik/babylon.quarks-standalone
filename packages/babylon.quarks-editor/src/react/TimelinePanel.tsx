@@ -1,15 +1,10 @@
-import React, {useMemo, useRef, useState} from 'react';
-import {
-    ArrowPathIcon,
-    ForwardIcon,
-    PauseIcon,
-    PlayIcon,
-    RectangleGroupIcon,
-} from '@heroicons/react/24/solid';
-import type {ParticleSystem, BatchedRenderer} from 'babylon.quarks';
-import type {Scene} from '@babylonjs/core/scene';
 import type {TransformNode} from '@babylonjs/core/Meshes/transformNode';
+import type {Scene} from '@babylonjs/core/scene';
+import {ArrowPathIcon, ForwardIcon, PauseIcon, PlayIcon, RectangleGroupIcon} from '@heroicons/react/24/solid';
+import type {BatchedRenderer, ParticleSystem} from 'babylon.quarks';
+import React, {useMemo, useRef, useState} from 'react';
 import type {EffectBinding} from '../core/binding';
+import {groupNodes} from '../core/groups';
 import {
     clearFocusFinished,
     getFocusElapsed,
@@ -18,7 +13,6 @@ import {
     setFocusElapsed,
     type PlaybackState,
 } from '../core/playback';
-import {groupNodes} from '../core/groups';
 import {pauseFocus, playFocus, scrubFocusTo, scrubFocusToSettled} from '../core/scrub';
 import {computeTimelineRows, computeTimelineSpan} from '../core/timeline';
 import {TimelineTrackRow} from './TimelineTrackRow';
@@ -64,7 +58,21 @@ function pickTickInterval(pxPerSecond: number): number {
  * apply only to the focused effect without stopping other previews.
  */
 export function TimelinePanel(props: TimelinePanelProps): React.ReactElement {
-    const {binding, selectedNode, onSelectNode, scene, renderer, playbackRef, playheadRef, counterRef, stagePlaying, setStagePlaying, speed, setSpeed, playbackEnabled = true} = props;
+    const {
+        binding,
+        selectedNode,
+        onSelectNode,
+        scene,
+        renderer,
+        playbackRef,
+        playheadRef,
+        counterRef,
+        stagePlaying,
+        setStagePlaying,
+        speed,
+        setSpeed,
+        playbackEnabled = true,
+    } = props;
 
     const [bodyWidthPx, setBodyWidthPx] = useState(600);
     const [collapsedGroups, setCollapsedGroups] = useState<Set<TransformNode>>(() => new Set());
@@ -168,7 +176,18 @@ export function TimelinePanel(props: TimelinePanelProps): React.ReactElement {
         };
         raf = requestAnimationFrame(tick);
         return () => cancelAnimationFrame(raf);
-    }, [pxPerSecond, timelineSpan, anyLooping, playbackRef, playheadRef, focusRootId, playbackEnabled, binding, scene, renderer]);
+    }, [
+        pxPerSecond,
+        timelineSpan,
+        anyLooping,
+        playbackRef,
+        playheadRef,
+        focusRootId,
+        playbackEnabled,
+        binding,
+        scene,
+        renderer,
+    ]);
 
     const visibleRows = useMemo(() => {
         let hideUntilDepth: number | null = null;
@@ -295,7 +314,15 @@ export function TimelinePanel(props: TimelinePanelProps): React.ReactElement {
                 color: theme.text,
             }}
         >
-            <div style={{display: 'flex', alignItems: 'center', gap: 6, padding: '6px 10px', borderBottom: `1px solid ${theme.border}`}}>
+            <div
+                style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    padding: '6px 10px',
+                    borderBottom: `1px solid ${theme.border}`,
+                }}
+            >
                 <button
                     className="qe-hover"
                     style={{...overlayButton, opacity: playbackEnabled ? 1 : 0.45}}
@@ -341,9 +368,23 @@ export function TimelinePanel(props: TimelinePanelProps): React.ReactElement {
                         </option>
                     ))}
                 </select>
-                <span ref={counterRef} style={{fontSize: 12, color: theme.textDim, fontVariantNumeric: 'tabular-nums', paddingLeft: 4, minWidth: 120}} />
+                <span
+                    ref={counterRef}
+                    style={{
+                        fontSize: 12,
+                        color: theme.textDim,
+                        fontVariantNumeric: 'tabular-nums',
+                        paddingLeft: 4,
+                        minWidth: 120,
+                    }}
+                />
                 {groupSelection.size >= 2 && (
-                    <button className="qe-hover" style={overlayButton} title="Group the checked rows" onClick={groupSelectedNodes}>
+                    <button
+                        className="qe-hover"
+                        style={overlayButton}
+                        title="Group the checked rows"
+                        onClick={groupSelectedNodes}
+                    >
                         <RectangleGroupIcon style={iconStyle(14)} />
                         Group ({groupSelection.size})
                     </button>
@@ -385,7 +426,12 @@ export function TimelinePanel(props: TimelinePanelProps): React.ReactElement {
                             <div style={{height: RULER_HEIGHT}} />
                             <div
                                 className="qe-hover-bg"
-                                style={{position: 'relative', height: RULER_HEIGHT, cursor: 'ew-resize', overflow: 'hidden'}}
+                                style={{
+                                    position: 'relative',
+                                    height: RULER_HEIGHT,
+                                    cursor: 'ew-resize',
+                                    overflow: 'hidden',
+                                }}
                                 onPointerDown={(e) => {
                                     playbackRef.current.scrubbing = true;
                                     (e.target as Element).setPointerCapture(e.pointerId);
@@ -400,7 +446,19 @@ export function TimelinePanel(props: TimelinePanelProps): React.ReactElement {
                                 }}
                             >
                                 {ticks.map((t) => (
-                                    <div key={t} style={{position: 'absolute', left: TIMELINE_INSET + t * pxPerSecond, top: 0, bottom: 0, borderLeft: `1px solid ${theme.border}`, fontSize: 10, color: theme.textDim, paddingLeft: 3}}>
+                                    <div
+                                        key={t}
+                                        style={{
+                                            position: 'absolute',
+                                            left: TIMELINE_INSET + t * pxPerSecond,
+                                            top: 0,
+                                            bottom: 0,
+                                            borderLeft: `1px solid ${theme.border}`,
+                                            fontSize: 10,
+                                            color: theme.textDim,
+                                            paddingLeft: 3,
+                                        }}
+                                    >
                                         {t}s
                                     </div>
                                 ))}
@@ -434,16 +492,31 @@ export function TimelinePanel(props: TimelinePanelProps): React.ReactElement {
                                         pxPerSecond={pxPerSecond}
                                         offsetPx={TIMELINE_INSET}
                                         collapsed={row.kind === 'group' && collapsedGroups.has(row.node)}
-                                        onToggleCollapse={row.kind === 'group' ? () => toggleCollapse(row.node) : undefined}
+                                        onToggleCollapse={
+                                            row.kind === 'group' ? () => toggleCollapse(row.node) : undefined
+                                        }
                                         hidden={row.kind === 'track' && hiddenSystems.has(row.system)}
-                                        onToggleVisible={row.kind === 'track' ? () => toggleVisible(row.system) : undefined}
+                                        onToggleVisible={
+                                            row.kind === 'track' ? () => toggleVisible(row.system) : undefined
+                                        }
                                         groupSelected={groupSelection.has(row.node)}
                                         onToggleGroupSelect={() => toggleGroupSelect(row.node)}
                                     />
                                 ))}
                             </div>
                         </div>
-                        <div style={{position: 'absolute', top: 0, bottom: 0, left: LABEL_WIDTH, width: 1, background: theme.border, pointerEvents: 'none', zIndex: 3}} />
+                        <div
+                            style={{
+                                position: 'absolute',
+                                top: 0,
+                                bottom: 0,
+                                left: LABEL_WIDTH,
+                                width: 1,
+                                background: theme.border,
+                                pointerEvents: 'none',
+                                zIndex: 3,
+                            }}
+                        />
                         <div
                             ref={playheadRef}
                             style={{

@@ -1,31 +1,31 @@
-import {demoManifest} from "./demoManifest";
-import type {DemoManifestEntry} from "./types";
+import {demoManifest} from './demoManifest';
+import type {DemoManifestEntry} from './types';
 
 function loadHeroBackground() {
-    import("./heroBackground")
+    import('./heroBackground')
         .then(({mountIndexHeroBackground}) => {
             mountIndexHeroBackground();
         })
         .catch((err) => {
-            console.warn("Hero background could not start:", err);
+            console.warn('Hero background could not start:', err);
         });
 }
 
-if (typeof window !== "undefined") {
+if (typeof window !== 'undefined') {
     window.requestAnimationFrame(() => loadHeroBackground());
 }
 
-const demosContainer = document.getElementById("demos-grid");
-const searchInput = document.getElementById("search");
-const statsText = document.getElementById("stats");
+const demosContainer = document.getElementById('demos-grid');
+const searchInput = document.getElementById('search');
+const statsText = document.getElementById('stats');
 
 /**
  * Builds deterministic preview filename from demo key.
  */
 function getPreviewFilename(demoKey: string) {
     return demoKey
-        .replace(/Demo$/u, "")
-        .replace(/([a-z0-9])([A-Z])/g, "$1-$2")
+        .replace(/Demo$/u, '')
+        .replace(/([a-z0-9])([A-Z])/g, '$1-$2')
         .toLowerCase();
 }
 
@@ -33,10 +33,9 @@ function getPreviewFilename(demoKey: string) {
  * Builds the demo card markup for the gallery.
  */
 function createDemoCard(demo: DemoManifestEntry) {
-    const previewGradient =
-        demo.preview?.gradient ?? "linear-gradient(135deg, #4d6dbd 0%, #26385f 100%)";
+    const previewGradient = demo.preview?.gradient ?? 'linear-gradient(135deg, #4d6dbd 0%, #26385f 100%)';
     const previewImagePath = `./previews/${getPreviewFilename(demo.key)}.png`;
-    const tags = demo.tags.map((tag) => `<span class="tag">${tag}</span>`).join("");
+    const tags = demo.tags.map((tag) => `<span class="tag">${tag}</span>`).join('');
     return `
     <article class="card">
       <div class="preview" style="background:${previewGradient}">
@@ -59,7 +58,7 @@ function filterDemos(query: string) {
         return demoManifest;
     }
     return demoManifest.filter((demo) => {
-        const searchableText = `${demo.name} ${demo.tags.join(" ")}`.toLowerCase();
+        const searchableText = `${demo.name} ${demo.tags.join(' ')}`.toLowerCase();
         return searchableText.includes(normalizedQuery);
     });
 }
@@ -67,17 +66,17 @@ function filterDemos(query: string) {
 /**
  * Renders filtered gallery content and count summary.
  */
-function renderDemos(query = "") {
+function renderDemos(query = '') {
     const filteredDemos = filterDemos(query);
     if (demosContainer) {
-        demosContainer.innerHTML = filteredDemos.map(createDemoCard).join("");
+        demosContainer.innerHTML = filteredDemos.map(createDemoCard).join('');
     }
     if (statsText) {
         statsText.textContent = `${filteredDemos.length} / ${demoManifest.length} demos`;
     }
 }
 
-searchInput?.addEventListener("input", (event) => {
+searchInput?.addEventListener('input', (event) => {
     renderDemos((event.target as HTMLInputElement).value);
 });
 

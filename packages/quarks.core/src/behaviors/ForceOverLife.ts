@@ -1,8 +1,8 @@
-import {Behavior} from './Behavior';
+import {IParticleSystem} from '../IParticleSystem';
 import {Particle} from '../Particle';
 import {FunctionValueGenerator, ValueGenerator, ValueGeneratorFromJSON} from '../functions';
 import {Quaternion, Vector3} from '../math';
-import {IParticleSystem} from '../IParticleSystem';
+import {Behavior} from './Behavior';
 
 /**
  * Apply a force to particles over their life.

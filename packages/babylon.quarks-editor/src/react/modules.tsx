@@ -1,6 +1,7 @@
-import React, {useMemo, useState} from 'react';
-import {Mesh} from '@babylonjs/core/Meshes/mesh';
 import {Texture} from '@babylonjs/core/Materials/Textures/texture';
+import {Mesh} from '@babylonjs/core/Meshes/mesh';
+import {PlusIcon, XMarkIcon} from '@heroicons/react/24/solid';
+import type {Behavior, ParticleSystem} from 'babylon.quarks';
 import {
     ColorOverLife,
     ConstantColor,
@@ -16,7 +17,7 @@ import {
     Vector3Function,
     Vector4,
 } from 'babylon.quarks';
-import type {Behavior, ParticleSystem} from 'babylon.quarks';
+import React, {useMemo, useState} from 'react';
 import {EffectBinding} from '../core/binding';
 import {
     DEFAULT_GRADIENT_STOPS,
@@ -27,20 +28,26 @@ import {
     readGradientStops,
     rgbToHex,
 } from '../core/colors';
-import {DEFAULT_SHAPE_PARAMS, SHAPE_PARAM_KEYS, SHAPE_TYPES, createShape, getShapeType, readShapeParams} from '../core/shapes';
-import type {ShapeType} from '../core/shapes';
-import {buildCurve, buildScalar, readPieces, readScalar} from '../core/values';
 import {applyRendererMaterial, getMaterialLabel} from '../core/material';
+import type {ShapeType} from '../core/shapes';
+import {
+    DEFAULT_SHAPE_PARAMS,
+    SHAPE_PARAM_KEYS,
+    SHAPE_TYPES,
+    createShape,
+    getShapeType,
+    readShapeParams,
+} from '../core/shapes';
+import {buildCurve, buildScalar, readPieces, readScalar} from '../core/values';
 import {CurveEditor} from './CurveEditor';
 import {GradientEditor} from './GradientEditor';
+import {InspectorInfoIcon} from './InspectorInfoIcon';
 import {ModuleSection} from './ModuleSection';
 import {PromptDialog} from './PromptDialog';
-import {CheckboxField, NumberField, Row, SelectField} from './fields';
 import {ValueField} from './ValueField';
+import {CheckboxField, NumberField, Row, SelectField} from './fields';
 import {iconStyle} from './icons';
 import {theme} from './theme';
-import {PlusIcon, XMarkIcon} from '@heroicons/react/24/solid';
-import {InspectorInfoIcon} from './InspectorInfoIcon';
 
 interface ModuleProps {
     binding: EffectBinding;
@@ -50,12 +57,11 @@ const MESH_QUAD_POSITIONS = new Float32Array([-0.5, -0.5, 0, 0.5, -0.5, 0, 0.5, 
 const MESH_QUAD_INDICES = new Uint32Array([0, 1, 2, 0, 2, 3]);
 const MESH_QUAD_UVS = new Float32Array([0, 0, 1, 0, 1, 1, 0, 1]);
 const MESH_CUBE_POSITIONS = new Float32Array([
-    -0.5, -0.5, -0.5, 0.5, -0.5, -0.5, 0.5, 0.5, -0.5, -0.5, 0.5, -0.5,
-    -0.5, -0.5, 0.5, 0.5, -0.5, 0.5, 0.5, 0.5, 0.5, -0.5, 0.5, 0.5,
+    -0.5, -0.5, -0.5, 0.5, -0.5, -0.5, 0.5, 0.5, -0.5, -0.5, 0.5, -0.5, -0.5, -0.5, 0.5, 0.5, -0.5, 0.5, 0.5, 0.5, 0.5,
+    -0.5, 0.5, 0.5,
 ]);
 const MESH_CUBE_INDICES = new Uint32Array([
-    0, 1, 2, 0, 2, 3, 4, 6, 5, 4, 7, 6, 0, 4, 5, 0, 5, 1,
-    3, 2, 6, 3, 6, 7, 0, 3, 7, 0, 7, 4, 1, 5, 6, 1, 6, 2,
+    0, 1, 2, 0, 2, 3, 4, 6, 5, 4, 7, 6, 0, 4, 5, 0, 5, 1, 3, 2, 6, 3, 6, 7, 0, 3, 7, 0, 7, 4, 1, 5, 6, 1, 6, 2,
 ]);
 
 function arraysEqual(a: ArrayLike<number>, b: ArrayLike<number>): boolean {
@@ -105,7 +111,14 @@ function ColorInput(props: {value: Vector4; onChange: (next: Vector4) => void}) 
                     const rgb = hexToRgb(e.target.value);
                     onChange(new Vector4(rgb.r, rgb.g, rgb.b, value.w));
                 }}
-                style={{width: 42, height: 24, border: 'none', background: 'transparent', padding: 0, cursor: 'pointer'}}
+                style={{
+                    width: 42,
+                    height: 24,
+                    border: 'none',
+                    background: 'transparent',
+                    padding: 0,
+                    cursor: 'pointer',
+                }}
             />
             <NumberField
                 value={value.w}
@@ -122,18 +135,26 @@ export function MainModule({binding}: ModuleProps) {
     const startColor = system.startColor;
     const colorMode = startColor instanceof RandomColor ? 'random' : 'constant';
     const colorA =
-        startColor instanceof RandomColor ? (startColor as never as {a: Vector4}).a
-        : startColor instanceof ConstantColor ? startColor.color
-        : new Vector4(1, 1, 1, 1);
-    const colorB = startColor instanceof RandomColor ? (startColor as never as {b: Vector4}).b : new Vector4(1, 0.5, 0.2, 1);
+        startColor instanceof RandomColor
+            ? (startColor as never as {a: Vector4}).a
+            : startColor instanceof ConstantColor
+              ? startColor.color
+              : new Vector4(1, 1, 1, 1);
+    const colorB =
+        startColor instanceof RandomColor ? (startColor as never as {b: Vector4}).b : new Vector4(1, 0.5, 0.2, 1);
     const rotation = system.startRotation;
     const isEuler = rotation instanceof EulerGenerator;
     const rotationMode =
-        rotation instanceof RandomQuatGenerator ? '3d'
-        : isEuler ? 'euler'
-        : readScalar(rotation as never).mode === 'random' ? 'random'
-        : 'angle';
-    const rotationState = readScalar(rotation instanceof RandomQuatGenerator || isEuler ? undefined : (rotation as never));
+        rotation instanceof RandomQuatGenerator
+            ? '3d'
+            : isEuler
+              ? 'euler'
+              : readScalar(rotation as never).mode === 'random'
+                ? 'random'
+                : 'angle';
+    const rotationState = readScalar(
+        rotation instanceof RandomQuatGenerator || isEuler ? undefined : (rotation as never)
+    );
     const eulerAngles = {
         x: isEuler ? readScalar((rotation as EulerGenerator).angleX as never).value : 0,
         y: isEuler ? readScalar((rotation as EulerGenerator).angleY as never).value : 0,
@@ -151,13 +172,19 @@ export function MainModule({binding}: ModuleProps) {
     const startSize = system.startSize as unknown as {type?: string; x?: never; y?: never; z?: never};
     const size3D = startSize.type === 'vec3function';
     const colorGenMode =
-        startColor instanceof RandomColorBetweenGradient ? 'gradient2'
-        : startColor instanceof Gradient ? 'gradient'
-        : colorMode;
+        startColor instanceof RandomColorBetweenGradient
+            ? 'gradient2'
+            : startColor instanceof Gradient
+              ? 'gradient'
+              : colorMode;
     return (
         <ModuleSection title="Main">
             <Row label="Duration">
-                <NumberField value={system.duration} min={0.05} onChange={(v) => binding.apply((s) => (s.duration = v))} />
+                <NumberField
+                    value={system.duration}
+                    min={0.05}
+                    onChange={(v) => binding.apply((s) => (s.duration = v))}
+                />
             </Row>
             <Row label="Looping">
                 <CheckboxField value={system.looping} onChange={(v) => binding.apply((s) => (s.looping = v))} />
@@ -280,7 +307,8 @@ export function MainModule({binding}: ModuleProps) {
                         value={colorA}
                         onChange={(next) =>
                             binding.apply((s) => {
-                                s.startColor = colorGenMode === 'random' ? new RandomColor(next, colorB) : new ConstantColor(next);
+                                s.startColor =
+                                    colorGenMode === 'random' ? new RandomColor(next, colorB) : new ConstantColor(next);
                             })
                         }
                     />
@@ -339,7 +367,11 @@ export function MainModule({binding}: ModuleProps) {
                                 mode === '3d'
                                     ? new RandomQuatGenerator()
                                     : mode === 'euler'
-                                      ? new EulerGenerator(new ConstantValue(eulerAngles.x), new ConstantValue(eulerAngles.y), new ConstantValue(eulerAngles.z))
+                                      ? new EulerGenerator(
+                                            new ConstantValue(eulerAngles.x),
+                                            new ConstantValue(eulerAngles.y),
+                                            new ConstantValue(eulerAngles.z)
+                                        )
                                       : mode === 'random'
                                         ? new IntervalValue(0, Math.PI * 2)
                                         : new ConstantValue(rotationState.value);
@@ -371,12 +403,16 @@ export function MainModule({binding}: ModuleProps) {
                         <NumberField
                             value={rotationState.min}
                             step={0.1}
-                            onChange={(v) => binding.apply((s) => (s.startRotation = new IntervalValue(v, rotationState.max)))}
+                            onChange={(v) =>
+                                binding.apply((s) => (s.startRotation = new IntervalValue(v, rotationState.max)))
+                            }
                         />
                         <NumberField
                             value={rotationState.max}
                             step={0.1}
-                            onChange={(v) => binding.apply((s) => (s.startRotation = new IntervalValue(rotationState.min, v)))}
+                            onChange={(v) =>
+                                binding.apply((s) => (s.startRotation = new IntervalValue(rotationState.min, v)))
+                            }
                         />
                     </div>
                 </Row>
@@ -410,7 +446,14 @@ export function EmissionModule({binding}: ModuleProps) {
                         <span style={{fontSize: 11.5, color: '#9eb9ff'}}>Burst {i + 1}</span>
                         <button
                             className="qe-hover"
-                            style={{background: 'none', border: 'none', color: '#e08c8c', cursor: 'pointer', padding: 0, display: 'inline-flex'}}
+                            style={{
+                                background: 'none',
+                                border: 'none',
+                                color: '#e08c8c',
+                                cursor: 'pointer',
+                                padding: 0,
+                                display: 'inline-flex',
+                            }}
                             title="Remove burst"
                             onClick={() => binding.apply((s) => s.emissionBursts.splice(i, 1))}
                         >
@@ -419,14 +462,20 @@ export function EmissionModule({binding}: ModuleProps) {
                     </div>
                     <div style={{display: 'flex', flexDirection: 'column', gap: 2, marginTop: 4}}>
                         <Row label="Time">
-                            <NumberField value={burst.time} min={0} onChange={(time) => binding.apply(() => (burst.time = time))} />
+                            <NumberField
+                                value={burst.time}
+                                min={0}
+                                onChange={(time) => binding.apply(() => (burst.time = time))}
+                            />
                         </Row>
                         <Row label="Count">
                             <NumberField
                                 value={readScalar(burst.count as never).value}
                                 min={0}
                                 step={1}
-                                onChange={(count) => binding.apply(() => (burst.count = new ConstantValue(Math.round(count))))}
+                                onChange={(count) =>
+                                    binding.apply(() => (burst.count = new ConstantValue(Math.round(count))))
+                                }
                             />
                         </Row>
                         <Row label="Cycles">
@@ -438,7 +487,11 @@ export function EmissionModule({binding}: ModuleProps) {
                             />
                         </Row>
                         <Row label="Interval">
-                            <NumberField value={burst.interval} min={0.01} onChange={(v) => binding.apply(() => (burst.interval = v))} />
+                            <NumberField
+                                value={burst.interval}
+                                min={0.01}
+                                onChange={(v) => binding.apply(() => (burst.interval = v))}
+                            />
                         </Row>
                         <Row label="Probability">
                             <NumberField
@@ -468,7 +521,13 @@ export function EmissionModule({binding}: ModuleProps) {
                 }}
                 onClick={() =>
                     binding.apply((s) =>
-                        s.emissionBursts.push({time: 0, count: new ConstantValue(20), cycle: 1, interval: 0.01, probability: 1})
+                        s.emissionBursts.push({
+                            time: 0,
+                            count: new ConstantValue(20),
+                            cycle: 1,
+                            interval: 0.01,
+                            probability: 1,
+                        })
                     )
                 }
             >
@@ -508,7 +567,9 @@ export function ShapeModule({binding}: ModuleProps) {
                     <NumberField
                         value={params[key] as number}
                         min={0}
-                        onChange={(v) => binding.apply((s) => (s.emitterShape = createShape(type, {...params, [key]: v})))}
+                        onChange={(v) =>
+                            binding.apply((s) => (s.emitterShape = createShape(type, {...params, [key]: v})))
+                        }
                     />
                 </Row>
             ))}
@@ -521,7 +582,8 @@ export function ShapeModule({binding}: ModuleProps) {
                             ...meshOptions.map((m) => ({value: String(m.uniqueId), label: m.name})),
                         ]}
                         onChange={(id) => {
-                            const mesh = id === '__none' ? undefined : meshOptions.find((m) => String(m.uniqueId) === id);
+                            const mesh =
+                                id === '__none' ? undefined : meshOptions.find((m) => String(m.uniqueId) === id);
                             binding.apply((s) => (s.emitterShape = createShape('mesh_surface', {...params, mesh})));
                         }}
                     />
@@ -538,7 +600,9 @@ export function ShapeModule({binding}: ModuleProps) {
                                 {value: 2, label: 'Ping-pong'},
                                 {value: 3, label: 'Burst spread'},
                             ]}
-                            onChange={(mode) => binding.apply((s) => (s.emitterShape = createShape(type, {...params, mode})))}
+                            onChange={(mode) =>
+                                binding.apply((s) => (s.emitterShape = createShape(type, {...params, mode})))
+                            }
                         />
                     </Row>
                     <Row label="Spread">
@@ -546,7 +610,9 @@ export function ShapeModule({binding}: ModuleProps) {
                             value={params.spread}
                             min={0}
                             step={0.05}
-                            onChange={(spread) => binding.apply((s) => (s.emitterShape = createShape(type, {...params, spread})))}
+                            onChange={(spread) =>
+                                binding.apply((s) => (s.emitterShape = createShape(type, {...params, spread})))
+                            }
                         />
                     </Row>
                 </>
@@ -558,7 +624,9 @@ export function ShapeModule({binding}: ModuleProps) {
 export function SizeOverLifeModule({binding}: ModuleProps) {
     const system = binding.system;
     const behavior = findBehavior<SizeOverLife>(system.behaviors, 'SizeOverLife');
-    const curve = behavior ? readScalar(behavior.size as never).curve : ([0.2, 1, 1, 0.4] as [number, number, number, number]);
+    const curve = behavior
+        ? readScalar(behavior.size as never).curve
+        : ([0.2, 1, 1, 0.4] as [number, number, number, number]);
     return (
         <ModuleSection
             title="Size over Lifetime"
@@ -567,7 +635,9 @@ export function SizeOverLifeModule({binding}: ModuleProps) {
                 binding.apply((s) => {
                     removeBehavior(s, 'SizeOverLife');
                     if (enabled) {
-                        s.addBehavior(new SizeOverLife(buildScalar({mode: 'curve', value: 1, min: 0, max: 1, curve}) as never));
+                        s.addBehavior(
+                            new SizeOverLife(buildScalar({mode: 'curve', value: 1, min: 0, max: 1, curve}) as never)
+                        );
                     }
                 })
             }
@@ -644,7 +714,15 @@ export type GeometryData = Omit<GeometryOption, 'label'>;
  * isometric rotation, scales them to fit, and strokes the triangle edges on a 2D canvas — enough
  * for the user to recognise which mesh they picked without spinning up a second Babylon scene.
  */
-function MeshPreview({positions, indices, size = 96}: {positions: Float32Array; indices?: ArrayLike<number>; size?: number}) {
+function MeshPreview({
+    positions,
+    indices,
+    size = 96,
+}: {
+    positions: Float32Array;
+    indices?: ArrayLike<number>;
+    size?: number;
+}) {
     const canvasRef = React.useRef<HTMLCanvasElement>(null);
     React.useEffect(() => {
         const canvas = canvasRef.current;
@@ -657,11 +735,19 @@ function MeshPreview({positions, indices, size = 96}: {positions: Float32Array; 
         }
         const n = positions.length / 3;
         // Fixed iso rotation (yaw ~35°, pitch ~30°) so depth reads clearly.
-        const cy = Math.cos(0.6), sy = Math.sin(0.6), cx = Math.cos(0.52), sx = Math.sin(0.52);
+        const cy = Math.cos(0.6),
+            sy = Math.sin(0.6),
+            cx = Math.cos(0.52),
+            sx = Math.sin(0.52);
         const pts: Array<[number, number]> = [];
-        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+        let minX = Infinity,
+            minY = Infinity,
+            maxX = -Infinity,
+            maxY = -Infinity;
         for (let i = 0; i < n; i++) {
-            const x = positions[i * 3], y = positions[i * 3 + 1], z = positions[i * 3 + 2];
+            const x = positions[i * 3],
+                y = positions[i * 3 + 1],
+                z = positions[i * 3 + 2];
             const rx = x * cy - z * sy;
             const rz = x * sy + z * cy;
             const ry = y * cx - rz * sx;
@@ -757,19 +843,24 @@ export function RendererModule({
                 <>
                     <Row label="Trail length">
                         <NumberField
-                            value={readScalar((system.rendererEmitterSettings as {startLength?: never}).startLength).value}
+                            value={
+                                readScalar((system.rendererEmitterSettings as {startLength?: never}).startLength).value
+                            }
                             min={1}
                             step={1}
                             onChange={(v) =>
                                 binding.apply((s) => {
-                                    (s.rendererEmitterSettings as {startLength?: unknown}).startLength = new ConstantValue(Math.round(v));
+                                    (s.rendererEmitterSettings as {startLength?: unknown}).startLength =
+                                        new ConstantValue(Math.round(v));
                                 })
                             }
                         />
                     </Row>
                     <Row label="Follow origin">
                         <CheckboxField
-                            value={!!(system.rendererEmitterSettings as {followLocalOrigin?: boolean}).followLocalOrigin}
+                            value={
+                                !!(system.rendererEmitterSettings as {followLocalOrigin?: boolean}).followLocalOrigin
+                            }
                             onChange={(v) =>
                                 binding.apply((s) => {
                                     (s.rendererEmitterSettings as {followLocalOrigin?: boolean}).followLocalOrigin = v;
@@ -785,14 +876,22 @@ export function RendererModule({
                         <NumberField
                             value={(system.rendererEmitterSettings as {speedFactor?: number}).speedFactor ?? 0}
                             step={0.1}
-                            onChange={(v) => binding.apply((s) => ((s.rendererEmitterSettings as {speedFactor?: number}).speedFactor = v))}
+                            onChange={(v) =>
+                                binding.apply(
+                                    (s) => ((s.rendererEmitterSettings as {speedFactor?: number}).speedFactor = v)
+                                )
+                            }
                         />
                     </Row>
                     <Row label="Length factor">
                         <NumberField
                             value={(system.rendererEmitterSettings as {lengthFactor?: number}).lengthFactor ?? 2}
                             step={0.1}
-                            onChange={(v) => binding.apply((s) => ((s.rendererEmitterSettings as {lengthFactor?: number}).lengthFactor = v))}
+                            onChange={(v) =>
+                                binding.apply(
+                                    (s) => ((s.rendererEmitterSettings as {lengthFactor?: number}).lengthFactor = v)
+                                )
+                            }
                         />
                     </Row>
                 </>
@@ -812,7 +911,10 @@ export function RendererModule({
                 }}
             >
                 Material
-                <InspectorInfoIcon content="Shader and blending settings applied to the particle sprite or mesh." size={12} />
+                <InspectorInfoIcon
+                    content="Shader and blending settings applied to the particle sprite or mesh."
+                    size={12}
+                />
             </div>
             {materialLabel ? (
                 <Row label="Source">
@@ -920,8 +1022,7 @@ export function RendererModule({
                             objectFit: 'contain',
                             borderRadius: 6,
                             border: '1px solid #2b3761',
-                            background:
-                                'repeating-conic-gradient(#2a3252 0% 25%, #171d33 0% 50%) 0 0 / 12px 12px',
+                            background: 'repeating-conic-gradient(#2a3252 0% 25%, #171d33 0% 50%) 0 0 / 12px 12px',
                         }}
                     />
                 )}
@@ -1022,16 +1123,31 @@ export function RendererModule({
                     );
                 })()}
             <Row label="Render order">
-                <NumberField value={system.renderOrder} step={1} onChange={(v) => binding.apply((s) => (s.renderOrder = Math.round(v)))} />
+                <NumberField
+                    value={system.renderOrder}
+                    step={1}
+                    onChange={(v) => binding.apply((s) => (s.renderOrder = Math.round(v)))}
+                />
             </Row>
             <Row label="Soft particles">
-                <CheckboxField value={system.softParticles} onChange={(v) => binding.apply((s) => (s.softParticles = v))} />
+                <CheckboxField
+                    value={system.softParticles}
+                    onChange={(v) => binding.apply((s) => (s.softParticles = v))}
+                />
             </Row>
             {system.softParticles && (
                 <Row label="Fade near/far">
                     <div style={{display: 'flex', gap: 6}}>
-                        <NumberField value={system.softNearFade} min={0} onChange={(v) => binding.apply((s) => (s.softNearFade = v))} />
-                        <NumberField value={system.softFarFade} min={0} onChange={(v) => binding.apply((s) => (s.softFarFade = v))} />
+                        <NumberField
+                            value={system.softNearFade}
+                            min={0}
+                            onChange={(v) => binding.apply((s) => (s.softNearFade = v))}
+                        />
+                        <NumberField
+                            value={system.softFarFade}
+                            min={0}
+                            onChange={(v) => binding.apply((s) => (s.softFarFade = v))}
+                        />
                     </div>
                 </Row>
             )}

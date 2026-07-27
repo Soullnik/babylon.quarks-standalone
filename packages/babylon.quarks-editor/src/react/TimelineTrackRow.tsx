@@ -1,4 +1,4 @@
-import React, {useState} from 'react';
+import type {TransformNode} from '@babylonjs/core/Meshes/transformNode';
 import {
     CheckIcon,
     ChevronDownIcon,
@@ -12,11 +12,11 @@ import {
     XMarkIcon,
 } from '@heroicons/react/24/solid';
 import type {ParticleSystem} from 'babylon.quarks';
-import type {TransformNode} from '@babylonjs/core/Meshes/transformNode';
+import React, {useState} from 'react';
 import type {EffectBinding} from '../core/binding';
 import {buildEffectTree, collectSystems} from '../core/effectTree';
-import {createChildSystem, removeSystems} from '../core/systems';
 import {ungroupNode} from '../core/groups';
+import {createChildSystem, removeSystems} from '../core/systems';
 import type {TimelineRow} from '../core/timeline';
 import {PromptDialog} from './PromptDialog';
 import {iconStyle} from './icons';
@@ -56,7 +56,20 @@ const checkboxButton: React.CSSProperties = {...iconButton, width: 12, height: 1
 
 /** One row of the timeline: a label cell (name + actions) and, for tracks, a bar cell. */
 export function TimelineTrackRow(props: TimelineTrackRowProps): React.ReactElement {
-    const {row, binding, selected, onSelectNode, pxPerSecond, offsetPx, collapsed, onToggleCollapse, hidden, onToggleVisible, groupSelected, onToggleGroupSelect} = props;
+    const {
+        row,
+        binding,
+        selected,
+        onSelectNode,
+        pxPerSecond,
+        offsetPx,
+        collapsed,
+        onToggleCollapse,
+        hidden,
+        onToggleVisible,
+        groupSelected,
+        onToggleGroupSelect,
+    } = props;
     const [renaming, setRenaming] = useState(false);
 
     const isRoot = row.node === binding.root;
@@ -100,7 +113,16 @@ export function TimelineTrackRow(props: TimelineTrackRowProps): React.ReactEleme
                             {groupSelected ? (
                                 <CheckIcon style={iconStyle(12)} />
                             ) : (
-                                <span style={{width: 10, height: 10, border: `1px solid currentColor`, borderRadius: 2, display: 'block', boxSizing: 'border-box'}} />
+                                <span
+                                    style={{
+                                        width: 10,
+                                        height: 10,
+                                        border: `1px solid currentColor`,
+                                        borderRadius: 2,
+                                        display: 'block',
+                                        boxSizing: 'border-box',
+                                    }}
+                                />
                             )}
                         </button>
                     )}
@@ -113,7 +135,11 @@ export function TimelineTrackRow(props: TimelineTrackRowProps): React.ReactEleme
                             onToggleCollapse?.();
                         }}
                     >
-                        {collapsed ? <ChevronRightIcon style={iconStyle(12)} /> : <ChevronDownIcon style={iconStyle(12)} />}
+                        {collapsed ? (
+                            <ChevronRightIcon style={iconStyle(12)} />
+                        ) : (
+                            <ChevronDownIcon style={iconStyle(12)} />
+                        )}
                     </span>
                     <span style={{flex: 1, overflow: 'hidden', textOverflow: 'ellipsis'}}>{row.name}</span>
                     <button
@@ -139,10 +165,15 @@ export function TimelineTrackRow(props: TimelineTrackRowProps): React.ReactEleme
                         <PlusIcon style={iconStyle(13)} />
                     </button>
                     {!isRoot && (
-                        <button className="qe-hover" title="Rename" style={{...iconButton, color: theme.textDim}} onClick={(e) => {
-                            e.stopPropagation();
-                            setRenaming(true);
-                        }}>
+                        <button
+                            className="qe-hover"
+                            title="Rename"
+                            style={{...iconButton, color: theme.textDim}}
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                setRenaming(true);
+                            }}
+                        >
                             <PencilSquareIcon style={iconStyle(12)} />
                         </button>
                     )}
@@ -166,7 +197,9 @@ export function TimelineTrackRow(props: TimelineTrackRowProps): React.ReactEleme
                             style={{...iconButton, color: '#e08c8c'}}
                             onClick={(e) => {
                                 e.stopPropagation();
-                                removeSystems(binding, collectSystems(buildEffectTree(row.node)), (s) => onSelectNode(s.emitter));
+                                removeSystems(binding, collectSystems(buildEffectTree(row.node)), (s) =>
+                                    onSelectNode(s.emitter)
+                                );
                                 binding.apply(() => row.node.dispose(true, false));
                             }}
                         >
@@ -174,7 +207,11 @@ export function TimelineTrackRow(props: TimelineTrackRowProps): React.ReactEleme
                         </button>
                     )}
                 </div>
-                <div className="qe-hover-bg" style={{height: ROW_HEIGHT, borderTop: `1px solid ${theme.border}`}} onClick={() => onSelectNode(row.node)} />
+                <div
+                    className="qe-hover-bg"
+                    style={{height: ROW_HEIGHT, borderTop: `1px solid ${theme.border}`}}
+                    onClick={() => onSelectNode(row.node)}
+                />
                 {renaming && (
                     <PromptDialog
                         title="Rename"
@@ -214,7 +251,16 @@ export function TimelineTrackRow(props: TimelineTrackRowProps): React.ReactEleme
                         {groupSelected ? (
                             <CheckIcon style={iconStyle(12)} />
                         ) : (
-                            <span style={{width: 10, height: 10, border: `1px solid currentColor`, borderRadius: 2, display: 'block', boxSizing: 'border-box'}} />
+                            <span
+                                style={{
+                                    width: 10,
+                                    height: 10,
+                                    border: `1px solid currentColor`,
+                                    borderRadius: 2,
+                                    display: 'block',
+                                    boxSizing: 'border-box',
+                                }}
+                            />
                         )}
                     </button>
                 )}
@@ -237,10 +283,15 @@ export function TimelineTrackRow(props: TimelineTrackRowProps): React.ReactEleme
                     {system.onlyUsedByOther ? ' (sub)' : ''}
                 </span>
                 {!isRoot && (
-                    <button className="qe-hover" title="Rename" style={{...iconButton, color: theme.textDim}} onClick={(e) => {
-                        e.stopPropagation();
-                        setRenaming(true);
-                    }}>
+                    <button
+                        className="qe-hover"
+                        title="Rename"
+                        style={{...iconButton, color: theme.textDim}}
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            setRenaming(true);
+                        }}
+                    >
                         <PencilSquareIcon style={iconStyle(12)} />
                     </button>
                 )}
@@ -306,7 +357,9 @@ export function TimelineTrackRow(props: TimelineTrackRowProps): React.ReactEleme
                     }}
                 >
                     {row.looping && (
-                        <span style={{position: 'absolute', right: 4, top: -1, fontSize: 10, color: theme.text}}>⟳</span>
+                        <span style={{position: 'absolute', right: 4, top: -1, fontSize: 10, color: theme.text}}>
+                            ⟳
+                        </span>
                     )}
                 </div>
             </div>

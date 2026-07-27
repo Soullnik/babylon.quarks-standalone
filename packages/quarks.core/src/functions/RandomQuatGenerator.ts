@@ -1,7 +1,7 @@
 import {Quaternion} from '../math';
 import {FunctionJSON} from './FunctionJSON';
-import {RotationGenerator} from './RotationGenerator';
 import {GeneratorMemory} from './GeneratorMemory';
+import {RotationGenerator} from './RotationGenerator';
 
 export class RandomQuatGenerator implements RotationGenerator {
     type: 'rotation';

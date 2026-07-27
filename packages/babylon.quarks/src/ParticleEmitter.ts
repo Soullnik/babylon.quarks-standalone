@@ -1,6 +1,6 @@
 import {TransformNode} from '@babylonjs/core/Meshes/transformNode';
 import {Scene} from '@babylonjs/core/scene';
-import {Matrix4, IParticleSystem, SerializationOptions} from 'quarks.core';
+import {IParticleSystem, Matrix4, SerializationOptions} from 'quarks.core';
 
 export class ParticleEmitter extends TransformNode {
     system: IParticleSystem;
@@ -21,10 +21,22 @@ export class ParticleEmitter extends TransformNode {
         this._matrixWorldFlag = flag;
         const e = this._matrixWorld.elements;
         const s = m.m;
-        e[0] = s[0]; e[1] = s[1]; e[2] = s[2]; e[3] = s[3];
-        e[4] = s[4]; e[5] = s[5]; e[6] = s[6]; e[7] = s[7];
-        e[8] = s[8]; e[9] = s[9]; e[10] = s[10]; e[11] = s[11];
-        e[12] = s[12]; e[13] = s[13]; e[14] = s[14]; e[15] = s[15];
+        e[0] = s[0];
+        e[1] = s[1];
+        e[2] = s[2];
+        e[3] = s[3];
+        e[4] = s[4];
+        e[5] = s[5];
+        e[6] = s[6];
+        e[7] = s[7];
+        e[8] = s[8];
+        e[9] = s[9];
+        e[10] = s[10];
+        e[11] = s[11];
+        e[12] = s[12];
+        e[13] = s[13];
+        e[14] = s[14];
+        e[15] = s[15];
         return this._matrixWorld;
     }
 
@@ -84,11 +96,11 @@ export class ParticleEmitter extends TransformNode {
             rotation: [this.rotation.x, this.rotation.y, this.rotation.z],
             quaternion: this.rotationQuaternion
                 ? [
-                    this.rotationQuaternion.x,
-                    this.rotationQuaternion.y,
-                    this.rotationQuaternion.z,
-                    this.rotationQuaternion.w,
-                ]
+                      this.rotationQuaternion.x,
+                      this.rotationQuaternion.y,
+                      this.rotationQuaternion.z,
+                      this.rotationQuaternion.w,
+                  ]
                 : undefined,
             scale: [this.scaling.x, this.scaling.y, this.scaling.z],
             visible: this.isEnabled(),

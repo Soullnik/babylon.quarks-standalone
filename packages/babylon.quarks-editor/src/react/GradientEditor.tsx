@@ -1,4 +1,4 @@
-import React, {useRef, useState} from 'react';
+import {useRef, useState} from 'react';
 import {GradientStop, hexToRgb, rgbToHex, stopsToCssGradient} from '../core/colors';
 import {NumberField, Row} from './fields';
 import {buttonStyle, theme} from './theme';
@@ -99,14 +99,31 @@ export function GradientEditor(props: {stops: GradientStop[]; onChange: (stops: 
                             className="qe-hover"
                             value={rgbToHex(current.r, current.g, current.b)}
                             onChange={(e) => updateStop(selected, hexToRgb(e.target.value))}
-                            style={{width: 42, height: 24, border: 'none', background: 'transparent', padding: 0, cursor: 'pointer'}}
+                            style={{
+                                width: 42,
+                                height: 24,
+                                border: 'none',
+                                background: 'transparent',
+                                padding: 0,
+                                cursor: 'pointer',
+                            }}
                         />
                     </Row>
                     <Row label="Stop alpha">
-                        <NumberField value={current.a} min={0} step={0.05} onChange={(a) => updateStop(selected, {a: Math.min(1, a)})} />
+                        <NumberField
+                            value={current.a}
+                            min={0}
+                            step={0.05}
+                            onChange={(a) => updateStop(selected, {a: Math.min(1, a)})}
+                        />
                     </Row>
                     <Row label="Stop position">
-                        <NumberField value={current.pos} min={0} step={0.05} onChange={(pos) => updateStop(selected, {pos: Math.min(1, pos)})} />
+                        <NumberField
+                            value={current.pos}
+                            min={0}
+                            step={0.05}
+                            onChange={(pos) => updateStop(selected, {pos: Math.min(1, pos)})}
+                        />
                     </Row>
                     {stops.length > 2 && (
                         <button

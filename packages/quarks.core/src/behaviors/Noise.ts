@@ -1,9 +1,9 @@
-import {Behavior} from './Behavior';
 import {Particle} from '../Particle';
-import {Quaternion, Vector3} from '../math';
-import SimplexNoise from '../util/SimplexNoise';
 import {ConstantValue, FunctionValueGenerator, ValueGenerator, ValueGeneratorFromJSON} from '../functions';
+import {Quaternion, Vector3} from '../math';
 import {randomInt} from '../util/MathUtil';
+import SimplexNoise from '../util/SimplexNoise';
+import {Behavior} from './Behavior';
 
 const GENERATOR_COUNT = 100;
 const generators: Array<SimplexNoise | undefined> = new Array(GENERATOR_COUNT);

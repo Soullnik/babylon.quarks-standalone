@@ -1,7 +1,7 @@
+import {FunctionValueGenerator, ValueGenerator} from './functions';
 import {Matrix4, Vector3} from './math';
 import {IParticle} from './Particle';
 import {ParticleStore} from './ParticleStore';
-import {FunctionValueGenerator, ValueGenerator} from './functions';
 export interface EmissionState {
     burstIndex: number;
     burstWaveIndex: number;
@@ -14,9 +14,7 @@ export interface EmissionState {
     previousWorldPos?: Vector3;
 }
 
-export interface Resource {
-
-}
+export interface Resource {}
 
 export interface JsonMetaData {
     textures: {[uuid: string]: Resource};
@@ -91,7 +89,7 @@ export interface IEmitter {
     matrixWorld: any; //type is annoying
 }
 
-export type ParticleSystemEventType = "emitEnd" | "finished" | "destroy" | "particleDied";
+export type ParticleSystemEventType = 'emitEnd' | 'finished' | 'destroy' | 'particleDied';
 export interface ParticleSystemEvent {
     type: ParticleSystemEventType;
     particleSystem: IParticleSystem;
@@ -99,7 +97,6 @@ export interface ParticleSystemEvent {
 }
 
 export interface IParticleSystem {
-
     /**
      * Column storage backing the particles' vector attributes, when the
      * implementation uses one. Rows `[0, particleNum)` hold the live particles
@@ -201,7 +198,7 @@ export interface IParticleSystem {
 
     emit(delta: number, subEmissionState: EmissionState, matrix: Matrix4): void;
 
-    addEventListener(event: ParticleSystemEventType, callback: (event: ParticleSystemEvent)=>void): void;
-    removeEventListener(event: ParticleSystemEventType, callback: (event: ParticleSystemEvent)=>void): void;
+    addEventListener(event: ParticleSystemEventType, callback: (event: ParticleSystemEvent) => void): void;
+    removeEventListener(event: ParticleSystemEventType, callback: (event: ParticleSystemEvent) => void): void;
     removeAllEventListeners(event: ParticleSystemEventType): void;
 }

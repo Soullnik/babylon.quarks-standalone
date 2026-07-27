@@ -1,7 +1,7 @@
-import {Behavior} from './Behavior';
 import {Particle, SpriteParticle} from '../Particle';
-import {Quaternion} from '../math';
 import {RotationGenerator, RotationGeneratorFromJSON} from '../functions';
+import {Quaternion} from '../math';
+import {Behavior} from './Behavior';
 
 /**
  * Apply rotation to particles over their life.

@@ -1,20 +1,20 @@
-import type { DemoContext } from '../types';
-import {Vector3 as BVector3} from '@babylonjs/core/Maths/math.vector';
 import {Constants} from '@babylonjs/core/Engines/constants';
+import {Vector3 as BVector3} from '@babylonjs/core/Maths/math.vector';
 import {
-    ParticleSystem,
-    RenderMode,
-    ConstantValue,
-    ConstantColor,
-    PointEmitter,
-    SphereEmitter,
     ColorOverLife,
-    Vector4,
-    Vector3,
+    ConstantColor,
+    ConstantValue,
     Gradient,
     OrbitOverLife,
+    ParticleSystem,
+    PointEmitter,
+    RenderMode,
+    SphereEmitter,
+    Vector3,
+    Vector4,
 } from 'babylon.quarks';
 import {createSharedTexture} from '../shared/common';
+import type {DemoContext} from '../types';
 
 export function init({scene, camera, batchRenderer, systems}: DemoContext) {
     camera.setPosition(new BVector3(0, 6, 22));

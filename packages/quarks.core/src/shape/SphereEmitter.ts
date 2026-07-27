@@ -1,6 +1,3 @@
-import {EmitterMode, EmitterShape, getValueFromEmitterMode, ShapeJSON} from './EmitterUtil';
-import {Particle} from '../Particle';
-import {MathUtils, Matrix3, Matrix4, Quaternion, Vector3} from '../math';
 import {
     ConstantValue,
     FunctionValueGenerator,
@@ -9,7 +6,10 @@ import {
     ValueGeneratorFromJSON,
 } from '../functions';
 import {EmissionState, IParticleSystem} from '../IParticleSystem';
-import { UP_VEC3, ZERO_VEC3 } from '../util/MathUtil';
+import {MathUtils, Matrix4, Quaternion} from '../math';
+import {Particle} from '../Particle';
+import {UP_VEC3, ZERO_VEC3} from '../util/MathUtil';
+import {EmitterMode, EmitterShape, getValueFromEmitterMode, ShapeJSON} from './EmitterUtil';
 
 /**
  * Interface representing the parameters for a sphere emitter.

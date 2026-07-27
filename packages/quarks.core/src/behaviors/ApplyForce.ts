@@ -1,7 +1,7 @@
-import {Behavior} from './Behavior';
 import {Particle} from '../Particle';
-import {FunctionValueGenerator, ValueGenerator, ValueGeneratorFromJSON} from '../functions';
+import {ValueGenerator, ValueGeneratorFromJSON} from '../functions';
 import {Vector3} from '../math';
+import {Behavior} from './Behavior';
 
 /**
  * Apply a global force to particles.

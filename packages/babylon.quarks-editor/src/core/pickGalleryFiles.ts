@@ -29,7 +29,10 @@ async function readJsonFilesFromDirectory(dir: DirectoryHandleWithEntries, prefi
         }
         if (entry.kind === 'directory') {
             files.push(
-                ...(await readJsonFilesFromDirectory(entry as unknown as DirectoryHandleWithEntries, `${prefix}${name}/`))
+                ...(await readJsonFilesFromDirectory(
+                    entry as unknown as DirectoryHandleWithEntries,
+                    `${prefix}${name}/`
+                ))
             );
         }
     }

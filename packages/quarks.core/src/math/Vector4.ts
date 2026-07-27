@@ -1,5 +1,5 @@
-import {Matrix4} from './Matrix4';
 import {Matrix3} from './Matrix3';
+import {Matrix4} from './Matrix4';
 import {Quaternion} from './Quaternion';
 
 class Vector4 {
@@ -124,7 +124,6 @@ class Vector4 {
 
         return this;
     }
-
 
     add(v: Vector4): Vector4 {
         this.x += v.x;

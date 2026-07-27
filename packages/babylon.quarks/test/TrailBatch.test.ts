@@ -1,12 +1,12 @@
-import {NullEngine} from '@babylonjs/core/Engines/nullEngine';
-import {Scene} from '@babylonjs/core/scene';
 import {Constants} from '@babylonjs/core/Engines/constants';
+import {NullEngine} from '@babylonjs/core/Engines/nullEngine';
 import {ShaderMaterial} from '@babylonjs/core/Materials/shaderMaterial';
 import {RawTexture} from '@babylonjs/core/Materials/Textures/rawTexture';
+import {Scene} from '@babylonjs/core/scene';
 import {ConstantColor, ConstantValue, PointEmitter, Vector4} from 'quarks.core';
 import {BatchedRenderer} from '../src/BatchedRenderer';
-import {TrailBatch} from '../src/TrailBatch';
 import {ParticleSystem} from '../src/ParticleSystem';
+import {TrailBatch} from '../src/TrailBatch';
 import {RenderMode} from '../src/VFXBatch';
 
 describe('TrailBatch', () => {

@@ -1,8 +1,8 @@
-import {FunctionColorGenerator} from './ColorGenerator';
 import {Vector4} from '../math';
+import {FunctionColorGenerator} from './ColorGenerator';
 import {FunctionJSON} from './FunctionJSON';
-import {Gradient} from './Gradient';
 import {GeneratorMemory} from './GeneratorMemory';
+import {Gradient} from './Gradient';
 
 const tempColor: Vector4 = new Vector4();
 

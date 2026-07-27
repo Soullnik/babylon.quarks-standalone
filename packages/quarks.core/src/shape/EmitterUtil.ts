@@ -1,5 +1,5 @@
-import {Particle} from '../Particle';
 import {EmissionState, IParticleSystem} from '../IParticleSystem';
+import {Particle} from '../Particle';
 
 export interface ShapeJSON {
     type: string;

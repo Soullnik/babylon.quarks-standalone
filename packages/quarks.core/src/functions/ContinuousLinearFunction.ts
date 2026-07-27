@@ -1,5 +1,5 @@
-import {FunctionJSON} from './FunctionJSON';
 import {JSONToValue, ValueToJSON} from '../util/JSONUtil';
+import {FunctionJSON} from './FunctionJSON';
 
 interface ObjectValueType<T> {
     copy(value: T): ObjectValueType<T>;
@@ -68,7 +68,7 @@ export class ContinuousLinearFunction<T extends ObjectValueType<T> | number> {
             // Neighbouring keys may sit at the same position; an empty span would
             // divide to NaN, so hold the first key's value instead.
             const span = keys[index + 1][1] - startX;
-            return ((((keys[index + 1][0] as number) - a) * (span > 0 ? (t - startX) / span : 0) + a) as T);
+            return (((keys[index + 1][0] as number) - a) * (span > 0 ? (t - startX) / span : 0) + a) as T;
         } else {
             if (index === -1) {
                 return (value as ObjectValueType<T>).copy(keys[0][0]) as T;

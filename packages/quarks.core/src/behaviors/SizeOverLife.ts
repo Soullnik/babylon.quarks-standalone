@@ -1,11 +1,6 @@
-import {Behavior} from './Behavior';
 import {Particle} from '../Particle';
-import {
-    FunctionValueGenerator,
-    GeneratorFromJSON,
-    Vector3Function,
-    Vector3Generator,
-} from '../functions';
+import {FunctionValueGenerator, GeneratorFromJSON, Vector3Function, Vector3Generator} from '../functions';
+import {Behavior} from './Behavior';
 
 /**
  *  Apply size to particles based on their life.

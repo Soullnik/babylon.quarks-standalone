@@ -1,48 +1,56 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Effect Editor — Babylon.quarks particle editor for Babylon.js</title>
-    <meta name="description" content="A Shuriken-style visual particle effect editor for Babylon.js. Build effects with a module inspector, curves, gradients and a timeline, then export to Babylon.quarks JSON." />
-    <meta name="keywords" content="babylon.js particle editor, babylonjs vfx editor, shuriken editor, particle system editor" />
-    <meta name="theme-color" content="#0b1020" />
-    <link rel="icon" type="image/png" href="./logo.png" />
-    <link rel="icon" href="./favicon.ico" sizes="any" />
-    <link rel="apple-touch-icon" href="./apple-touch-icon.png" />
-    <link rel="canonical" href="https://soullnik.github.io/babylon.quarks-standalone/editor.html" />
-    <meta property="og:type" content="website" />
-    <meta property="og:site_name" content="Babylon.quarks" />
-    <meta property="og:title" content="Effect Editor — Babylon.quarks for Babylon.js" />
-    <meta property="og:description" content="A Shuriken-style visual particle effect editor for Babylon.js — inspector, curves, gradients, timeline, and JSON export." />
-    <meta property="og:url" content="https://soullnik.github.io/babylon.quarks-standalone/editor.html" />
-    <meta property="og:image" content="https://soullnik.github.io/babylon.quarks-standalone/og-image.png" />
-    <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="Effect Editor — Babylon.quarks for Babylon.js" />
-    <meta name="twitter:description" content="A Shuriken-style visual particle effect editor for Babylon.js." />
-    <meta name="twitter:image" content="https://soullnik.github.io/babylon.quarks-standalone/og-image.png" />
-    <style>
-        :root {
-            color-scheme: dark;
-        }
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Effect Editor — Babylon.quarks particle editor for Babylon.js</title>
+        <meta
+            name="description"
+            content="A Shuriken-style visual particle effect editor for Babylon.js. Build effects with a module inspector, curves, gradients and a timeline, then export to Babylon.quarks JSON."
+        />
+        <meta
+            name="keywords"
+            content="babylon.js particle editor, babylonjs vfx editor, shuriken editor, particle system editor"
+        />
+        <meta name="theme-color" content="#0b1020" />
+        <link rel="icon" type="image/png" href="./logo.png" />
+        <link rel="icon" href="./favicon.ico" sizes="any" />
+        <link rel="apple-touch-icon" href="./apple-touch-icon.png" />
+        <link rel="canonical" href="https://soullnik.github.io/babylon.quarks-standalone/editor.html" />
+        <meta property="og:type" content="website" />
+        <meta property="og:site_name" content="Babylon.quarks" />
+        <meta property="og:title" content="Effect Editor — Babylon.quarks for Babylon.js" />
+        <meta
+            property="og:description"
+            content="A Shuriken-style visual particle effect editor for Babylon.js — inspector, curves, gradients, timeline, and JSON export."
+        />
+        <meta property="og:url" content="https://soullnik.github.io/babylon.quarks-standalone/editor.html" />
+        <meta property="og:image" content="https://soullnik.github.io/babylon.quarks-standalone/og-image.png" />
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content="Effect Editor — Babylon.quarks for Babylon.js" />
+        <meta name="twitter:description" content="A Shuriken-style visual particle effect editor for Babylon.js." />
+        <meta name="twitter:image" content="https://soullnik.github.io/babylon.quarks-standalone/og-image.png" />
+        <style>
+            :root {
+                color-scheme: dark;
+            }
 
-        html,
-        body {
-            margin: 0;
-            height: 100%;
-            background: #070b16;
-            overflow: hidden;
-        }
+            html,
+            body {
+                margin: 0;
+                height: 100%;
+                background: #070b16;
+                overflow: hidden;
+            }
 
-        #editor-host {
-            width: 100vw;
-            height: 100vh;
-        }
-
-    </style>
-</head>
-<body>
-    <div id="editor-host"></div>
-    <script type="module" src="./src/editorApp.tsx"></script>
-</body>
+            #editor-host {
+                width: 100vw;
+                height: 100vh;
+            }
+        </style>
+    </head>
+    <body>
+        <div id="editor-host"></div>
+        <script type="module" src="./src/editorApp.tsx"></script>
+    </body>
 </html>

@@ -1,15 +1,15 @@
+import {Constants} from '@babylonjs/core/Engines/constants';
 import {NullEngine} from '@babylonjs/core/Engines/nullEngine';
-import {Scene} from '@babylonjs/core/scene';
 import {StandardMaterial} from '@babylonjs/core/Materials/standardMaterial';
 import {Texture} from '@babylonjs/core/Materials/Textures/texture';
-import {Constants} from '@babylonjs/core/Engines/constants';
+import {Scene} from '@babylonjs/core/scene';
 import {ConstantColor, ConstantValue, PointEmitter, Vector4} from 'quarks.core';
 import {BatchedRenderer} from '../src/BatchedRenderer';
+import * as envAtlas from '../src/envAtlas';
+import {cacheEnvAtlas, cubeFaceUrls, getCachedEnvAtlas} from '../src/envAtlas';
 import {ParticleSystem} from '../src/ParticleSystem';
 import {SpriteBatch} from '../src/SpriteBatch';
 import {RenderMode} from '../src/VFXBatch';
-import * as envAtlas from '../src/envAtlas';
-import {cacheEnvAtlas, cubeFaceUrls, getCachedEnvAtlas} from '../src/envAtlas';
 
 describe('mesh particle environment map', () => {
     let engine: NullEngine;

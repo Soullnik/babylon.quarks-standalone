@@ -1,12 +1,12 @@
+import {BaseTexture} from '@babylonjs/core/Materials/Textures/baseTexture';
+import {Texture} from '@babylonjs/core/Materials/Textures/texture';
 import {TransformNode} from '@babylonjs/core/Meshes/transformNode';
 import {Scene} from '@babylonjs/core/scene';
-import {Texture} from '@babylonjs/core/Materials/Textures/texture';
-import {BaseTexture} from '@babylonjs/core/Materials/Textures/baseTexture';
 import {EmitSubParticleSystem, IParticleSystem} from 'quarks.core';
-import {VFXBatch, RenderMode, StoredBatchSettings} from './VFXBatch';
+import {ParticleSystem} from './ParticleSystem';
 import {SpriteBatch} from './SpriteBatch';
 import {TrailBatch} from './TrailBatch';
-import {ParticleSystem} from './ParticleSystem';
+import {RenderMode, StoredBatchSettings, VFXBatch} from './VFXBatch';
 
 export interface VFXBatchSettings {
     instancingGeometry: Float32Array;
@@ -58,10 +58,7 @@ export interface AdaptivePerformanceOptions {
 }
 
 /** True when both face lists are the same six texture references (or both empty). */
-function reflectionFacesEqual(
-    a: BaseTexture[] | null | undefined,
-    b: BaseTexture[] | null | undefined
-): boolean {
+function reflectionFacesEqual(a: BaseTexture[] | null | undefined, b: BaseTexture[] | null | undefined): boolean {
     if (a === b) {
         return true;
     }

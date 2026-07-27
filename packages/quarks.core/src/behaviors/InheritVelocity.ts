@@ -1,8 +1,8 @@
-import {Behavior} from './Behavior';
+import {IParticleSystem} from '../IParticleSystem';
 import {Particle} from '../Particle';
 import {ConstantValue, FunctionValueGenerator, ValueGenerator, ValueGeneratorFromJSON} from '../functions';
 import {Quaternion, Vector3} from '../math';
-import {IParticleSystem} from '../IParticleSystem';
+import {Behavior} from './Behavior';
 
 export type InheritVelocityMode = 'initial' | 'current';
 
@@ -78,7 +78,9 @@ export class InheritVelocity implements Behavior {
 
     static fromJSON(json: any): Behavior {
         return new InheritVelocity(
-            json.multiplier ? (ValueGeneratorFromJSON(json.multiplier) as FunctionValueGenerator) : new ConstantValue(1),
+            json.multiplier
+                ? (ValueGeneratorFromJSON(json.multiplier) as FunctionValueGenerator)
+                : new ConstantValue(1),
             json.mode === 'current' ? 'current' : 'initial'
         );
     }

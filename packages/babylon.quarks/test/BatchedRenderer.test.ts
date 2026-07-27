@@ -1,13 +1,13 @@
-import {NullEngine} from '@babylonjs/core/Engines/nullEngine';
-import {Scene} from '@babylonjs/core/scene';
 import {Constants} from '@babylonjs/core/Engines/constants';
+import {NullEngine} from '@babylonjs/core/Engines/nullEngine';
 import {RawTexture} from '@babylonjs/core/Materials/Textures/rawTexture';
+import {Scene} from '@babylonjs/core/scene';
 import {ConstantColor, ConstantValue, PointEmitter, Vector4} from 'quarks.core';
 import {BatchedRenderer} from '../src/BatchedRenderer';
 import {ParticleSystem} from '../src/ParticleSystem';
-import {RenderMode} from '../src/VFXBatch';
-import {TrailBatch} from '../src/TrailBatch';
 import {SpriteBatch} from '../src/SpriteBatch';
+import {TrailBatch} from '../src/TrailBatch';
+import {RenderMode} from '../src/VFXBatch';
 
 describe('BatchedRenderer', () => {
     let engine: NullEngine;
@@ -266,7 +266,11 @@ describe('BatchedRenderer', () => {
 
     it('deleteSystem ignores systems that were never registered', () => {
         const renderer = new BatchedRenderer('del-unknown', scene);
-        const orphan = new ParticleSystem({scene, startLife: new ConstantValue(1), emissionOverTime: new ConstantValue(0)});
+        const orphan = new ParticleSystem({
+            scene,
+            startLife: new ConstantValue(1),
+            emissionOverTime: new ConstantValue(0),
+        });
         renderer.deleteSystem(orphan);
         renderer.dispose();
         orphan.dispose();

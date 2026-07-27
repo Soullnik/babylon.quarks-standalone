@@ -1,8 +1,8 @@
-import {GeneratorMemory} from './GeneratorMemory';
-import {FunctionJSON} from './FunctionJSON';
 import {Vector3} from '../math';
-import {Vector3Function} from './Vector3Function';
 import {ConstantValue} from './ConstantValue';
+import {FunctionJSON} from './FunctionJSON';
+import {GeneratorMemory} from './GeneratorMemory';
+import {Vector3Function} from './Vector3Function';
 
 export interface Vector3Generator {
     type: 'vec3function';

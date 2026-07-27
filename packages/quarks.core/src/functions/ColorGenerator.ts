@@ -1,11 +1,11 @@
 import {Vector4} from '../math';
-import {FunctionJSON} from './FunctionJSON';
 import {ColorToJSON, JSONToColor} from '../util/JSONUtil';
-import {RandomColor} from './RandomColor';
 import {ColorRange} from './ColorRange';
-import {Gradient} from './Gradient';
-import {RandomColorBetweenGradient} from './RandomColorBetweenGradient';
+import {FunctionJSON} from './FunctionJSON';
 import {GeneratorMemory} from './GeneratorMemory';
+import {Gradient} from './Gradient';
+import {RandomColor} from './RandomColor';
+import {RandomColorBetweenGradient} from './RandomColorBetweenGradient';
 
 export interface ColorGenerator {
     type: 'value';

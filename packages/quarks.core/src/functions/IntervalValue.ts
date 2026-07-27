@@ -1,7 +1,7 @@
-import {ValueGenerator} from './ValueGenerator';
 import {MathUtils} from '../math';
 import {FunctionJSON} from './FunctionJSON';
 import {GeneratorMemory} from './GeneratorMemory';
+import {ValueGenerator} from './ValueGenerator';
 
 export class IntervalValue implements ValueGenerator {
     constructor(

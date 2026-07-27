@@ -1,13 +1,13 @@
-import type {ParticleSystem} from 'babylon.quarks';
 import {Color3} from '@babylonjs/core/Maths/math.color';
 import {Vector3} from '@babylonjs/core/Maths/math.vector';
-import {Mesh} from '@babylonjs/core/Meshes/mesh';
 import {LinesMesh} from '@babylonjs/core/Meshes/linesMesh';
+import {Mesh} from '@babylonjs/core/Meshes/mesh';
 import {MeshBuilder} from '@babylonjs/core/Meshes/meshBuilder';
 import {TransformNode} from '@babylonjs/core/Meshes/transformNode';
 import type {Scene} from '@babylonjs/core/scene';
-import {getShapeType, readShapeParams} from './shapes';
+import type {ParticleSystem} from 'babylon.quarks';
 import {EDITOR_SCENE_NODE_METADATA} from './editorScene';
+import {getShapeType, readShapeParams} from './shapes';
 
 const LINE_COLOR = new Color3(0.45, 0.82, 1);
 const DIRECTION_COLOR = new Color3(0.75, 0.92, 1);
@@ -125,7 +125,11 @@ function buildEmitterWireframe(system: ParticleSystem, scene: Scene): Mesh[] {
             for (let i = 0; i <= spokeCount; i++) {
                 const theta = (i / spokeCount) * arc;
                 const rim = arcPoint(radius, theta);
-                const dir = new Vector3(Math.sin(angle) * Math.cos(theta), Math.sin(angle) * Math.sin(theta), Math.cos(angle));
+                const dir = new Vector3(
+                    Math.sin(angle) * Math.cos(theta),
+                    Math.sin(angle) * Math.sin(theta),
+                    Math.cos(angle)
+                );
                 const travel = preview / Math.max(Math.cos(angle), 0.05);
                 lines(`wf-cone-ray-${i}`, [rim, rim.add(dir.scale(travel))], DIRECTION_COLOR);
             }

@@ -1,21 +1,20 @@
-import type { DemoContext } from '../types';
-import {Vector3 as BVector3} from '@babylonjs/core/Maths/math.vector';
 import {Constants} from '@babylonjs/core/Engines/constants';
 import {Texture} from '@babylonjs/core/Materials/Textures/texture';
+import {Vector3 as BVector3} from '@babylonjs/core/Maths/math.vector';
 import {
-    ParticleSystem,
-    ConstantValue,
-    IntervalValue,
-    GridEmitter,
-    RenderMode,
-    ConstantColor,
-    TextureSequencer,
     ApplySequences,
+    ConstantValue,
+    GridEmitter,
+    IntervalValue,
+    ParticleSystem,
     RandomColor,
+    RenderMode,
+    TextureSequencer,
     Vector3,
     Vector4,
 } from 'babylon.quarks';
 import {SHARED_ASSETS} from '../shared/common';
+import type {DemoContext} from '../types';
 
 function loadImage(src) {
     return new Promise((resolve, reject) => {

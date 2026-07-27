@@ -1,9 +1,7 @@
 import {Node} from '@babylonjs/core/node';
-import {TransformNode} from '@babylonjs/core/Meshes/transformNode';
+import {BatchedRenderer} from './BatchedRenderer';
 import {ParticleEmitter} from './ParticleEmitter';
 import {ParticleSystem} from './ParticleSystem';
-import {BatchedRenderer} from './BatchedRenderer';
-import {IParticleSystem} from 'quarks.core';
 
 export class QuarksUtil {
     static runOnAllParticleEmitters(root: Node, callback: (emitter: ParticleEmitter) => void): void {

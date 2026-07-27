@@ -1,14 +1,14 @@
-import {Texture} from "@babylonjs/core/Materials/Textures/texture";
-import type {Scene} from "@babylonjs/core/scene";
-import {ColorOverLife, ColorRange, type FunctionColorGenerator, Vector4} from "babylon.quarks";
+import {Texture} from '@babylonjs/core/Materials/Textures/texture';
+import type {Scene} from '@babylonjs/core/scene';
+import {ColorOverLife, ColorRange, type FunctionColorGenerator, Vector4} from 'babylon.quarks';
 
 export const SHARED_ASSETS = {
-    atlas: "textures/texture1.png",
-    atlasSecondary: "textures/texture2.png",
-    defaultParticle: "textures/particle_default.png",
-    smoke: "textures/cfxr smoke cloud x4.png",
-    sequenceText: "textures/text_texture.png",
-    sequenceLogo: "textures/logo_texture.png",
+    atlas: 'textures/texture1.png',
+    atlasSecondary: 'textures/texture2.png',
+    defaultParticle: 'textures/particle_default.png',
+    smoke: 'textures/cfxr smoke cloud x4.png',
+    sequenceText: 'textures/text_texture.png',
+    sequenceLogo: 'textures/logo_texture.png',
 };
 
 /** ColorOverLife helper: ColorRange is a value generator but typed as function-only in quarks.core. */

@@ -1,8 +1,8 @@
 //import {WebGLCoordinateSystem, WebGPUCoordinateSystem} from 'constants.js';
-import {Vector3} from './Vector3';
-import {Matrix3} from './Matrix3';
 import {Euler} from './Euler';
+import {Matrix3} from './Matrix3';
 import {Quaternion} from './Quaternion';
+import {Vector3} from './Vector3';
 
 export const WebGLCoordinateSystem = 2000;
 export const WebGPUCoordinateSystem = 2001;
@@ -11,14 +11,30 @@ class Matrix4 {
     elements: number[];
     declare readonly isMatrix4: boolean;
 
-    constructor(n11?: number, n12?: number, n13?: number, n14?: number, n21?: number, n22?: number, n23?: number, n24?: number, n31?: number, n32?: number, n33?: number, n34?: number, n41?: number, n42?: number, n43?: number, n44?: number) {
+    constructor(
+        n11?: number,
+        n12?: number,
+        n13?: number,
+        n14?: number,
+        n21?: number,
+        n22?: number,
+        n23?: number,
+        n24?: number,
+        n31?: number,
+        n32?: number,
+        n33?: number,
+        n34?: number,
+        n41?: number,
+        n42?: number,
+        n43?: number,
+        n44?: number
+    ) {
         this.elements = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
 
         if (n11 !== undefined) {
             this.set(n11, n12!, n13!, n14!, n21!, n22!, n23!, n24!, n31!, n32!, n33!, n34!, n41!, n42!, n43!, n44!);
         }
     }
-
 
     /**
      * @deprecated Use {@link Matrix4#copyPosition .copyPosition()} instead.
@@ -46,7 +62,24 @@ class Matrix4 {
         return this.makeRotationFromQuaternion(q);
     }
 
-    set(n11: number, n12: number, n13: number, n14: number, n21: number, n22: number, n23: number, n24: number, n31: number, n32: number, n33: number, n34: number, n41: number, n42: number, n43: number, n44: number) {
+    set(
+        n11: number,
+        n12: number,
+        n13: number,
+        n14: number,
+        n21: number,
+        n22: number,
+        n23: number,
+        n24: number,
+        n31: number,
+        n32: number,
+        n33: number,
+        n34: number,
+        n41: number,
+        n42: number,
+        n43: number,
+        n44: number
+    ) {
         const te = this.elements;
 
         te[0] = n11;
@@ -861,7 +894,7 @@ class Matrix4 {
         return this;
     }
 
-    decompose(position: Vector3, quaternion: Quaternion, scale: Vector3)  {
+    decompose(position: Vector3, quaternion: Quaternion, scale: Vector3) {
         const te = this.elements;
 
         let sx = _v1.set(te[0], te[1], te[2]).length();
@@ -904,7 +937,15 @@ class Matrix4 {
         return this;
     }
 
-    makePerspective(left: number, right: number, top: number, bottom: number, near: number, far: number, coordinateSystem = WebGLCoordinateSystem) {
+    makePerspective(
+        left: number,
+        right: number,
+        top: number,
+        bottom: number,
+        near: number,
+        far: number,
+        coordinateSystem = WebGLCoordinateSystem
+    ) {
         const te = this.elements;
         const x = (2 * near) / (right - left);
         const y = (2 * near) / (top - bottom);
@@ -944,7 +985,15 @@ class Matrix4 {
         return this;
     }
 
-    makeOrthographic(left: number, right: number, top: number, bottom: number, near: number, far: number, coordinateSystem = WebGLCoordinateSystem) {
+    makeOrthographic(
+        left: number,
+        right: number,
+        top: number,
+        bottom: number,
+        near: number,
+        far: number,
+        coordinateSystem = WebGLCoordinateSystem
+    ) {
         const te = this.elements;
         const w = 1.0 / (right - left);
         const h = 1.0 / (top - bottom);

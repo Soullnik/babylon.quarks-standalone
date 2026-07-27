@@ -1,35 +1,33 @@
-import {
-    ConstantValue,
-    ConstantColor,
-    IntervalValue,
-    SphereEmitter,
-    PointEmitter,
-    ConeEmitter,
-    Vector4,
-    SizeOverLife,
-    PiecewiseBezier,
-    Bezier,
-    ColorOverLife,
-    Gradient,
-    AxisAngleGenerator,
-    Vector3 as QVector3,
-    Matrix4,
-    Vector3,
-    Quaternion as QRot,
-    VelocityOverLife,
-    InheritVelocity,
-    WidthOverLength,
-    TrailParticle,
-    ForceOverLife,
-} from 'quarks.core';
-import {NullEngine} from '@babylonjs/core/Engines/nullEngine';
-import {Scene} from '@babylonjs/core/scene';
 import {Constants} from '@babylonjs/core/Engines/constants';
+import {NullEngine} from '@babylonjs/core/Engines/nullEngine';
 import {StandardMaterial} from '@babylonjs/core/Materials/standardMaterial';
 import {RawTexture} from '@babylonjs/core/Materials/Textures/rawTexture';
+import {Scene} from '@babylonjs/core/scene';
+import {
+    AxisAngleGenerator,
+    Bezier,
+    ConeEmitter,
+    ConstantColor,
+    ConstantValue,
+    ForceOverLife,
+    InheritVelocity,
+    IntervalValue,
+    Matrix4,
+    PiecewiseBezier,
+    PointEmitter,
+    Quaternion as QRot,
+    Vector3 as QVector3,
+    SizeOverLife,
+    SphereEmitter,
+    TrailParticle,
+    Vector3,
+    Vector4,
+    VelocityOverLife,
+    WidthOverLength,
+} from 'quarks.core';
+import {BatchedRenderer} from '../src/BatchedRenderer';
 import {ParticleSystem} from '../src/ParticleSystem';
 import {RenderMode} from '../src/VFXBatch';
-import {BatchedRenderer} from '../src/BatchedRenderer';
 
 let engine: NullEngine;
 let scene: Scene;
@@ -128,15 +126,17 @@ describe('ParticleSystem', () => {
             startColor: new ConstantColor(new Vector4(1, 1, 1, 1)),
             emissionOverTime: new ConstantValue(10),
             shape: new SphereEmitter(),
-            behaviors: [
-                new SizeOverLife(new PiecewiseBezier([[new Bezier(1, 0.75, 0.5, 0), 0]])),
-            ],
+            behaviors: [new SizeOverLife(new PiecewiseBezier([[new Bezier(1, 0.75, 0.5, 0), 0]]))],
         });
         expect(ps.behaviors.length).toBe(1);
     });
 
     it('should pause and resume', () => {
-        const ps = new ParticleSystem({scene, startLife: new ConstantValue(1), emissionOverTime: new ConstantValue(10)});
+        const ps = new ParticleSystem({
+            scene,
+            startLife: new ConstantValue(1),
+            emissionOverTime: new ConstantValue(10),
+        });
         ps.pause();
         expect(ps.paused).toBe(true);
         ps.play();
@@ -680,7 +680,13 @@ describe('ParticleSystem', () => {
                     geo: {positions: new Float32Array(12), indices: new Uint32Array([0, 1, 2])},
                 },
                 materials: {
-                    mat: {transparent: true, alphaMode: Constants.ALPHA_ADD, depthTest: true, depthWrite: false, alphaTest: 0},
+                    mat: {
+                        transparent: true,
+                        alphaMode: Constants.ALPHA_ADD,
+                        depthTest: true,
+                        depthWrite: false,
+                        alphaTest: 0,
+                    },
                 },
             },
             {},
@@ -829,7 +835,13 @@ describe('ParticleSystem', () => {
             {
                 ...meta,
                 materials: {
-                    mat: {transparent: true, alphaMode: Constants.ALPHA_ADD, depthTest: true, depthWrite: false, alphaTest: 0},
+                    mat: {
+                        transparent: true,
+                        alphaMode: Constants.ALPHA_ADD,
+                        depthTest: true,
+                        depthWrite: false,
+                        alphaTest: 0,
+                    },
                 },
             },
             {},
@@ -843,7 +855,13 @@ describe('ParticleSystem', () => {
         const meta: any = {
             textures: {},
             materials: {
-                mat: {transparent: true, alphaMode: Constants.ALPHA_ADD, depthTest: true, depthWrite: false, alphaTest: 0},
+                mat: {
+                    transparent: true,
+                    alphaMode: Constants.ALPHA_ADD,
+                    depthTest: true,
+                    depthWrite: false,
+                    alphaTest: 0,
+                },
             },
             geometries: {
                 arc: {

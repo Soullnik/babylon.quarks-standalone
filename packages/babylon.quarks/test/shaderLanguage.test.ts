@@ -1,23 +1,23 @@
-import {Effect} from '@babylonjs/core/Materials/effect';
-import {ShaderStore} from '@babylonjs/core/Engines/shaderStore';
-import {ShaderLanguage} from '@babylonjs/core/Materials/shaderLanguage';
-import {NullEngine} from '@babylonjs/core/Engines/nullEngine';
-import {Scene} from '@babylonjs/core/scene';
 import type {AbstractEngine} from '@babylonjs/core/Engines/abstractEngine';
+import {NullEngine} from '@babylonjs/core/Engines/nullEngine';
+import {ShaderStore} from '@babylonjs/core/Engines/shaderStore';
+import {Effect} from '@babylonjs/core/Materials/effect';
+import {ShaderLanguage} from '@babylonjs/core/Materials/shaderLanguage';
+import {Scene} from '@babylonjs/core/scene';
 import {ConstantColor, ConstantValue, PointEmitter, Vector4} from 'quarks.core';
-import {registerShaders, shaderLanguageFor} from '../src/shaders/shaderLanguageSupport';
-import {ParticleSystem} from '../src/ParticleSystem';
 import {BatchedRenderer} from '../src/BatchedRenderer';
+import {ParticleSystem} from '../src/ParticleSystem';
+import {registerShaders, shaderLanguageFor} from '../src/shaders/shaderLanguageSupport';
 import {RenderMode} from '../src/VFXBatch';
 
-import particleVertGlsl from '../src/shaders/particle_vert.glsl';
-import particleVertWgsl from '../src/shaders/particle_vert.wgsl';
+import meshVertWgsl from '../src/shaders/local_particle_physics_vert.wgsl';
 import particleFragWgsl from '../src/shaders/particle_frag.wgsl';
 import particlePhysicsFragWgsl from '../src/shaders/particle_physics_frag.wgsl';
+import particleVertGlsl from '../src/shaders/particle_vert.glsl';
+import particleVertWgsl from '../src/shaders/particle_vert.wgsl';
 import stretchedVertWgsl from '../src/shaders/stretched_bb_particle_vert.wgsl';
-import meshVertWgsl from '../src/shaders/local_particle_physics_vert.wgsl';
-import trailVertWgsl from '../src/shaders/trail_vert.wgsl';
 import trailFragWgsl from '../src/shaders/trail_frag.wgsl';
+import trailVertWgsl from '../src/shaders/trail_vert.wgsl';
 
 /**
  * WebGPU speaks WGSL. Handing it GLSL works, but only because Babylon downloads

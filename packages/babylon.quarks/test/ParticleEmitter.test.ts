@@ -1,9 +1,9 @@
 import {NullEngine} from '@babylonjs/core/Engines/nullEngine';
-import {Scene} from '@babylonjs/core/scene';
 import {Quaternion} from '@babylonjs/core/Maths/math.vector';
+import {Scene} from '@babylonjs/core/scene';
 import {ConstantValue} from 'quarks.core';
-import {ParticleSystem} from '../src/ParticleSystem';
 import {ParticleEmitter} from '../src/ParticleEmitter';
+import {ParticleSystem} from '../src/ParticleSystem';
 
 describe('ParticleEmitter parity helpers', () => {
     let engine: NullEngine;

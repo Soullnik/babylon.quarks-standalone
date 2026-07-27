@@ -1,7 +1,7 @@
-import {Effect} from '@babylonjs/core/Materials/effect';
-import {ShaderStore} from '@babylonjs/core/Engines/shaderStore';
-import {ShaderLanguage} from '@babylonjs/core/Materials/shaderLanguage';
 import type {AbstractEngine} from '@babylonjs/core/Engines/abstractEngine';
+import {ShaderStore} from '@babylonjs/core/Engines/shaderStore';
+import {Effect} from '@babylonjs/core/Materials/effect';
+import {ShaderLanguage} from '@babylonjs/core/Materials/shaderLanguage';
 
 /**
  * Picking the shader language a batch compiles in, and putting the source where
@@ -38,7 +38,12 @@ export function shaderLanguageFor(engine: AbstractEngine): ShaderLanguage {
  * depend on the render mode, so a fresh name per rebuild would grow the store
  * without bound and defeat Babylon's compiled-effect cache.
  */
-export function registerShaders(name: string, vertex: ShaderSources, fragment: ShaderSources, language: ShaderLanguage): void {
+export function registerShaders(
+    name: string,
+    vertex: ShaderSources,
+    fragment: ShaderSources,
+    language: ShaderLanguage
+): void {
     if (language === ShaderLanguage.WGSL) {
         ShaderStore.ShadersStoreWGSL[name + 'VertexShader'] = vertex.wgsl;
         ShaderStore.ShadersStoreWGSL[name + 'FragmentShader'] = fragment.wgsl;

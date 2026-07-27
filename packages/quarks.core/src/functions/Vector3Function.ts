@@ -1,7 +1,7 @@
-import {FunctionValueGenerator, ValueGenerator, ValueGeneratorFromJSON} from './ValueGenerator';
-import {GeneratorMemory} from './GeneratorMemory';
 import {Vector3} from '../math';
 import {FunctionJSON} from './FunctionJSON';
+import {GeneratorMemory} from './GeneratorMemory';
+import {FunctionValueGenerator, ValueGenerator, ValueGeneratorFromJSON} from './ValueGenerator';
 import {Vector3Generator} from './Vector3Generator';
 
 export class Vector3Function implements Vector3Generator {
@@ -10,7 +10,7 @@ export class Vector3Function implements Vector3Generator {
     constructor(
         public x: FunctionValueGenerator | ValueGenerator,
         public y: FunctionValueGenerator | ValueGenerator,
-        public z: FunctionValueGenerator | ValueGenerator,
+        public z: FunctionValueGenerator | ValueGenerator
     ) {
         this.type = 'vec3function';
     }
@@ -22,11 +22,7 @@ export class Vector3Function implements Vector3Generator {
     }
 
     genValue(memory: GeneratorMemory, vec: Vector3, t?: number): Vector3 {
-        return vec.set(
-            this.x.genValue(memory, t!),
-            this.y.genValue(memory, t!),
-            this.z.genValue(memory, t!)
-        );
+        return vec.set(this.x.genValue(memory, t!), this.y.genValue(memory, t!), this.z.genValue(memory, t!));
     }
 
     toJSON(): FunctionJSON {
@@ -42,7 +38,7 @@ export class Vector3Function implements Vector3Generator {
         return new Vector3Function(
             ValueGeneratorFromJSON(json.x) as FunctionValueGenerator,
             ValueGeneratorFromJSON(json.y) as FunctionValueGenerator,
-            ValueGeneratorFromJSON(json.z) as FunctionValueGenerator,
+            ValueGeneratorFromJSON(json.z) as FunctionValueGenerator
         );
     }
 

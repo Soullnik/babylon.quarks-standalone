@@ -1,8 +1,8 @@
-import {FunctionColorGenerator} from './ColorGenerator';
 import {Vector3, Vector4} from '../math';
+import {FunctionColorGenerator} from './ColorGenerator';
 import {ColorRange} from './ColorRange';
-import {FunctionJSON} from './FunctionJSON';
 import {ContinuousLinearFunction} from './ContinuousLinearFunction';
+import {FunctionJSON} from './FunctionJSON';
 import {GeneratorMemory} from './GeneratorMemory';
 
 /** Scratch colour used while sampling the gradient into its table. */

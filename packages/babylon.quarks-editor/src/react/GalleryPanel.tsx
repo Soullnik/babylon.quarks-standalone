@@ -1,5 +1,4 @@
-import React, {useCallback, useMemo, useRef, useState} from 'react';
-import {useVirtualizer} from '@tanstack/react-virtual';
+import type {TransformNode} from '@babylonjs/core/Meshes/transformNode';
 import {
     CheckCircleIcon,
     ChevronDownIcon,
@@ -9,8 +8,8 @@ import {
     SparklesIcon,
     XMarkIcon,
 } from '@heroicons/react/24/solid';
-import type {TransformNode} from '@babylonjs/core/Meshes/transformNode';
-import type {GalleryEntry, GalleryLoadProgress} from '../core/loadEffectGallery';
+import {useVirtualizer} from '@tanstack/react-virtual';
+import React, {useCallback, useMemo, useRef, useState} from 'react';
 import {setGalleryDragSession} from '../core/galleryDragSession';
 import {
     buildGalleryTree,
@@ -20,6 +19,7 @@ import {
     type GalleryFlatRow,
     type GalleryTreeFolder,
 } from '../core/galleryTree';
+import type {GalleryEntry, GalleryLoadProgress} from '../core/loadEffectGallery';
 import {iconStyle} from './icons';
 import {buttonStyle, hiddenFileInputStyle, inputStyle, theme} from './theme';
 
@@ -111,7 +111,15 @@ function EffectRow(props: {
                     {inPreview ? (
                         <CheckCircleIcon style={iconStyle(14)} />
                     ) : (
-                        <span style={{width: 10, height: 10, border: `1px solid currentColor`, borderRadius: 2, boxSizing: 'border-box'}} />
+                        <span
+                            style={{
+                                width: 10,
+                                height: 10,
+                                border: `1px solid currentColor`,
+                                borderRadius: 2,
+                                boxSizing: 'border-box',
+                            }}
+                        />
                     )}
                 </button>
             ) : (
@@ -166,7 +174,10 @@ function EffectRow(props: {
                 </span>
                 <span style={{overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'}}>{entry.name}</span>
                 {parkedOnStage && (
-                    <span title="On stage but not in preview" style={{flexShrink: 0, fontSize: 10, color: theme.textDim, letterSpacing: 0.3}}>
+                    <span
+                        title="On stage but not in preview"
+                        style={{flexShrink: 0, fontSize: 10, color: theme.textDim, letterSpacing: 0.3}}
+                    >
                         parked
                     </span>
                 )}
@@ -258,7 +269,9 @@ function FolderRow(props: {
             <span style={{width: 14, display: 'inline-flex', color: theme.accent}}>
                 {open ? <FolderOpenIcon style={iconStyle(14)} /> : <FolderIcon style={iconStyle(14)} />}
             </span>
-            <span style={{flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'}}>{node.name}</span>
+            <span style={{flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'}}>
+                {node.name}
+            </span>
             {effectCount > 0 && (
                 <span style={{fontSize: 11, fontWeight: 500, color: theme.textDim, flexShrink: 0}}>{effectCount}</span>
             )}
@@ -280,7 +293,16 @@ function VirtualGalleryTree(props: {
     onRemoveFromScene: (entry: GalleryEntry) => void;
     onToggleFolder: (path: string) => void;
 }): React.ReactElement {
-    const {rows, closedFolders, focusedRoot, previewRootIds, onFocus, onTogglePreview, onRemoveFromScene, onToggleFolder} = props;
+    const {
+        rows,
+        closedFolders,
+        focusedRoot,
+        previewRootIds,
+        onFocus,
+        onTogglePreview,
+        onRemoveFromScene,
+        onToggleFolder,
+    } = props;
     const scrollRef = useRef<HTMLDivElement>(null);
     const virtualizer = useVirtualizer({
         count: rows.length,
@@ -346,7 +368,19 @@ function VirtualGalleryTree(props: {
 
 /** Folder-tree catalog; import effects here and drag them into the viewport. */
 export function GalleryPanel(props: GalleryPanelProps): React.ReactElement {
-    const {entries, focusedRoot, previewRootIds, loading, folderInputRef, onFocus, onTogglePreview, onRemoveFromScene, onImportFiles, onImportFolder, onCreateDefault} = props;
+    const {
+        entries,
+        focusedRoot,
+        previewRootIds,
+        loading,
+        folderInputRef,
+        onFocus,
+        onTogglePreview,
+        onRemoveFromScene,
+        onImportFiles,
+        onImportFolder,
+        onCreateDefault,
+    } = props;
     const [query, setQuery] = useState('');
     const [closedFolders, setClosedFolders] = useState<Set<string>>(() => new Set());
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -380,7 +414,13 @@ export function GalleryPanel(props: GalleryPanelProps): React.ReactElement {
     return (
         <div style={{display: 'flex', flexDirection: 'column', gap: 10, height: '100%', minHeight: 0}}>
             <div style={{display: 'flex', flexWrap: 'wrap', gap: 6}}>
-                <button type="button" className="qe-hover" style={buttonStyle} disabled={isLoading} onClick={onCreateDefault}>
+                <button
+                    type="button"
+                    className="qe-hover"
+                    style={buttonStyle}
+                    disabled={isLoading}
+                    onClick={onCreateDefault}
+                >
                     New effect
                 </button>
                 <label
@@ -422,7 +462,10 @@ export function GalleryPanel(props: GalleryPanelProps): React.ReactElement {
                         opacity: isLoading ? 0.5 : 1,
                     }}
                     onClick={(e) => {
-                        if (typeof (window as Window & {showDirectoryPicker?: unknown}).showDirectoryPicker === 'function') {
+                        if (
+                            typeof (window as Window & {showDirectoryPicker?: unknown}).showDirectoryPicker ===
+                            'function'
+                        ) {
                             e.preventDefault();
                             onImportFolder();
                         }
@@ -483,7 +526,8 @@ export function GalleryPanel(props: GalleryPanelProps): React.ReactElement {
                         background: theme.sectionBg,
                     }}
                 >
-                    Catalog is empty. Click <strong>New effect</strong>, or <strong>Import effect</strong> / <strong>Import folder</strong>.
+                    Catalog is empty. Click <strong>New effect</strong>, or <strong>Import effect</strong> /{' '}
+                    <strong>Import folder</strong>.
                 </div>
             ) : filtered.length === 0 ? (
                 <div

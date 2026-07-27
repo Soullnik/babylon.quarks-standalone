@@ -1,23 +1,23 @@
-import type { DemoContext } from '../types';
-import {Vector3 as BVector3} from '@babylonjs/core/Maths/math.vector';
-import {StandardMaterial} from '@babylonjs/core/Materials/standardMaterial';
-import {Texture} from '@babylonjs/core/Materials/Textures/texture';
-import {CubeTexture} from '@babylonjs/core/Materials/Textures/cubeTexture';
-import {MeshBuilder} from '@babylonjs/core/Meshes/meshBuilder';
 import {VertexBuffer} from '@babylonjs/core/Buffers/buffer';
 import {Constants} from '@babylonjs/core/Engines/constants';
+import {StandardMaterial} from '@babylonjs/core/Materials/standardMaterial';
+import {CubeTexture} from '@babylonjs/core/Materials/Textures/cubeTexture';
+import {Texture} from '@babylonjs/core/Materials/Textures/texture';
+import {Vector3 as BVector3} from '@babylonjs/core/Maths/math.vector';
+import {MeshBuilder} from '@babylonjs/core/Meshes/meshBuilder';
 import {
-    ParticleSystem,
-    ConstantValue,
-    IntervalValue,
     ConeEmitter,
-    RenderMode,
     ConstantColor,
-    RandomQuatGenerator,
+    ConstantValue,
     EulerGenerator,
+    IntervalValue,
+    ParticleSystem,
+    RandomQuatGenerator,
+    RenderMode,
     Rotation3DOverLife,
     Vector4,
 } from 'babylon.quarks';
+import type {DemoContext} from '../types';
 
 const ENV_FACE_URLS = [
     'textures/cube/posx.jpg',

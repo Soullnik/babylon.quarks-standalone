@@ -1,6 +1,5 @@
-import React from 'react';
-import {EmitSubParticleSystem, SubParticleEmitMode} from 'babylon.quarks';
 import type {ParticleEmitter, ParticleSystem} from 'babylon.quarks';
+import {EmitSubParticleSystem, SubParticleEmitMode} from 'babylon.quarks';
 import {EffectBinding} from '../core/binding';
 import {findBehavior} from '../core/colors';
 import {createChildSystem} from '../core/systems';

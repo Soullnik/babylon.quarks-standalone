@@ -1,9 +1,8 @@
-import {CircularLinkedList, LinkedList} from "../../src/util/LinkedList";
-
+import {CircularLinkedList, LinkedList} from '../../src/util/LinkedList';
 
 describe('Linked List', function () {
     describe('Normal Linked List', function () {
-        test('values', function() {
+        test('values', function () {
             const list = new LinkedList<number>();
             list.push(1);
             list.push(10);
@@ -17,7 +16,7 @@ describe('Linked List', function () {
             cur = iter.next();
             expect(cur.value).toBe(undefined);
             expect(cur.done).toBe(true);
-        })
+        });
 
         test('basic', function () {
             const list = new LinkedList<number>();

@@ -1,14 +1,7 @@
-import {
-    ConstantColor,
-    ConstantValue,
-    IntervalValue,
-    PointEmitter,
-    SphereEmitter,
-    Vector4,
-} from 'quarks.core';
 import {NullEngine} from '@babylonjs/core/Engines/nullEngine';
-import {Scene} from '@babylonjs/core/scene';
 import {TransformNode} from '@babylonjs/core/Meshes/transformNode';
+import {Scene} from '@babylonjs/core/scene';
+import {ConstantColor, ConstantValue, IntervalValue, PointEmitter, SphereEmitter, Vector4} from 'quarks.core';
 import {BatchedRenderer} from '../src/BatchedRenderer';
 import {ParticleSystem} from '../src/ParticleSystem';
 import {QuarksUtil} from '../src/QuarksUtil';

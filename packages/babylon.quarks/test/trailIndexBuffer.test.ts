@@ -1,8 +1,8 @@
 import {NullEngine} from '@babylonjs/core/Engines/nullEngine';
 import {Scene} from '@babylonjs/core/scene';
 import {ConstantColor, ConstantValue, IntervalValue, SphereEmitter, Vector4} from 'quarks.core';
-import {ParticleSystem} from '../src/ParticleSystem';
 import {BatchedRenderer} from '../src/BatchedRenderer';
+import {ParticleSystem} from '../src/ParticleSystem';
 import {RenderMode, VFXBatch} from '../src/VFXBatch';
 
 /**

@@ -1,4 +1,4 @@
-import React, {useRef, useState} from 'react';
+import {useRef, useState} from 'react';
 import {CurvePiece, mergePieces, sampleCurve, splitPieces} from '../core/values';
 import {inputStyle, theme} from './theme';
 
@@ -17,7 +17,11 @@ interface PointRef {
  * drag inner keys horizontally, double-click the curve to add a key, double-click
  * a key to remove it (Unity-like).
  */
-export function CurveEditor(props: {pieces: CurvePiece[]; onChange: (pieces: CurvePiece[]) => void; maxValue?: number}) {
+export function CurveEditor(props: {
+    pieces: CurvePiece[];
+    onChange: (pieces: CurvePiece[]) => void;
+    maxValue?: number;
+}) {
     const svgRef = useRef<SVGSVGElement>(null);
     const drag = useRef<PointRef | null>(null);
     const [selected, setSelected] = useState<PointRef | null>(null);
@@ -29,7 +33,8 @@ export function CurveEditor(props: {pieces: CurvePiece[]; onChange: (pieces: Cur
     const spanEnd = (i: number) => (i + 1 < pieces.length ? pieces[i + 1].start : 1);
     const toX = (x: number) => PAD + x * (WIDTH - PAD * 2);
     const toY = (v: number) => HEIGHT - PAD - (v / max) * (HEIGHT - PAD * 2);
-    const fromY = (y: number) => Math.round(Math.min(max, Math.max(0, ((HEIGHT - PAD - y) / (HEIGHT - PAD * 2)) * max)) * 1000) / 1000;
+    const fromY = (y: number) =>
+        Math.round(Math.min(max, Math.max(0, ((HEIGHT - PAD - y) / (HEIGHT - PAD * 2)) * max)) * 1000) / 1000;
     const fromX = (px: number) => Math.min(1, Math.max(0, (px - PAD) / (WIDTH - PAD * 2)));
 
     // Control point positions: piece start key, two handles, plus the final end key.
@@ -50,7 +55,9 @@ export function CurveEditor(props: {pieces: CurvePiece[]; onChange: (pieces: Cur
         const end = spanEnd(i);
         for (let s = 0; s <= 16; s++) {
             const t = s / 16;
-            samples.push(`${toX(piece.start + t * (end - piece.start)).toFixed(1)},${toY(sampleCurve(piece.p, t)).toFixed(1)}`);
+            samples.push(
+                `${toX(piece.start + t * (end - piece.start)).toFixed(1)},${toY(sampleCurve(piece.p, t)).toFixed(1)}`
+            );
         }
     });
 
@@ -81,7 +88,9 @@ export function CurveEditor(props: {pieces: CurvePiece[]; onChange: (pieces: Cur
         props.onChange(next);
     };
 
-    const selectedPoint = selected ? points.find((pt) => pt.ref.piece === selected.piece && pt.ref.idx === selected.idx) : null;
+    const selectedPoint = selected
+        ? points.find((pt) => pt.ref.piece === selected.piece && pt.ref.idx === selected.idx)
+        : null;
 
     return (
         <div>
@@ -89,7 +98,13 @@ export function CurveEditor(props: {pieces: CurvePiece[]; onChange: (pieces: Cur
                 ref={svgRef}
                 width={WIDTH}
                 height={HEIGHT}
-                style={{background: 'rgba(5, 8, 18, 0.85)', border: `1px solid ${theme.border}`, borderRadius: 8, touchAction: 'none', display: 'block'}}
+                style={{
+                    background: 'rgba(5, 8, 18, 0.85)',
+                    border: `1px solid ${theme.border}`,
+                    borderRadius: 8,
+                    touchAction: 'none',
+                    display: 'block',
+                }}
                 onPointerMove={(e) => applyDrag(e.clientX, e.clientY)}
                 onPointerUp={(e) => {
                     drag.current = null;
@@ -104,7 +119,15 @@ export function CurveEditor(props: {pieces: CurvePiece[]; onChange: (pieces: Cur
                 }}
             >
                 {[0.25, 0.5, 0.75].map((f) => (
-                    <line key={f} x1={PAD} x2={WIDTH - PAD} y1={PAD + f * (HEIGHT - PAD * 2)} y2={PAD + f * (HEIGHT - PAD * 2)} stroke="#1c274a" strokeWidth={1} />
+                    <line
+                        key={f}
+                        x1={PAD}
+                        x2={WIDTH - PAD}
+                        y1={PAD + f * (HEIGHT - PAD * 2)}
+                        y2={PAD + f * (HEIGHT - PAD * 2)}
+                        stroke="#1c274a"
+                        strokeWidth={1}
+                    />
                 ))}
                 <polyline points={samples.join(' ')} fill="none" stroke={theme.curveStroke} strokeWidth={2} />
                 {points.map((pt) => (
@@ -148,7 +171,10 @@ export function CurveEditor(props: {pieces: CurvePiece[]; onChange: (pieces: Cur
                                 if (Number.isNaN(parsed)) {
                                     return;
                                 }
-                                const next = pieces.map((piece) => ({start: piece.start, p: [...piece.p] as CurvePiece['p']}));
+                                const next = pieces.map((piece) => ({
+                                    start: piece.start,
+                                    p: [...piece.p] as CurvePiece['p'],
+                                }));
                                 const {piece, idx} = selectedPoint.ref;
                                 if (idx === 0 && piece > 0) {
                                     next[piece - 1].p[3] = parsed;
@@ -157,10 +183,14 @@ export function CurveEditor(props: {pieces: CurvePiece[]; onChange: (pieces: Cur
                                 props.onChange(next);
                             }}
                         />
-                        <span style={{fontSize: 10.5, color: theme.textDim}}>t={Math.round(selectedPoint.x * 100) / 100}</span>
+                        <span style={{fontSize: 10.5, color: theme.textDim}}>
+                            t={Math.round(selectedPoint.x * 100) / 100}
+                        </span>
                     </>
                 ) : (
-                    <span style={{fontSize: 10.5, color: theme.textDim}}>dbl-click curve: add key · dbl-click key: remove</span>
+                    <span style={{fontSize: 10.5, color: theme.textDim}}>
+                        dbl-click curve: add key · dbl-click key: remove
+                    </span>
                 )}
             </div>
         </div>

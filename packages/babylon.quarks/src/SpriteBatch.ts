@@ -1,35 +1,33 @@
+import {VertexBuffer} from '@babylonjs/core/Buffers/buffer';
+import {Constants} from '@babylonjs/core/Engines/constants';
+import {ShaderMaterial} from '@babylonjs/core/Materials/shaderMaterial';
+import {RawTexture} from '@babylonjs/core/Materials/Textures/rawTexture';
+import {Vector2 as BVector2, Vector3 as BVector3, Vector4 as BVector4} from '@babylonjs/core/Maths/math.vector';
 import {Mesh} from '@babylonjs/core/Meshes/mesh';
 import {VertexData} from '@babylonjs/core/Meshes/mesh.vertexData';
-import {VertexBuffer} from '@babylonjs/core/Buffers/buffer';
-import {Effect} from '@babylonjs/core/Materials/effect';
-import {ShaderMaterial} from '@babylonjs/core/Materials/shaderMaterial';
 import {Scene} from '@babylonjs/core/scene';
-import {Constants} from '@babylonjs/core/Engines/constants';
-import {Vector2 as BVector2, Vector3 as BVector3, Vector4 as BVector4} from '@babylonjs/core/Maths/math.vector';
-import {RawTexture} from '@babylonjs/core/Materials/Textures/rawTexture';
 import {
-    Vector3,
-    Vector4,
-    Quaternion,
+    IParticleSystem,
     Matrix3,
+    ParticleStore,
+    Quaternion,
     SpriteParticle,
     StretchedBillBoardSettings,
-    IParticleSystem,
-    ParticleStore,
+    Vector3,
 } from 'quarks.core';
-import {VFXBatch, RenderMode} from './VFXBatch';
 import {VFXBatchSettings} from './BatchedRenderer';
-import particle_vert from './shaders/particle_vert.glsl';
-import particle_frag from './shaders/particle_frag.glsl';
-import particle_physics_frag from './shaders/particle_physics_frag.glsl';
-import stretched_bb_particle_vert from './shaders/stretched_bb_particle_vert.glsl';
 import local_particle_physics_vert from './shaders/local_particle_physics_vert.glsl';
-import particle_vert_wgsl from './shaders/particle_vert.wgsl';
-import particle_frag_wgsl from './shaders/particle_frag.wgsl';
-import particle_physics_frag_wgsl from './shaders/particle_physics_frag.wgsl';
-import stretched_bb_particle_vert_wgsl from './shaders/stretched_bb_particle_vert.wgsl';
 import local_particle_physics_vert_wgsl from './shaders/local_particle_physics_vert.wgsl';
+import particle_frag from './shaders/particle_frag.glsl';
+import particle_frag_wgsl from './shaders/particle_frag.wgsl';
+import particle_physics_frag from './shaders/particle_physics_frag.glsl';
+import particle_physics_frag_wgsl from './shaders/particle_physics_frag.wgsl';
+import particle_vert from './shaders/particle_vert.glsl';
+import particle_vert_wgsl from './shaders/particle_vert.wgsl';
 import {registerShaders, shaderLanguageFor, ShaderSources} from './shaders/shaderLanguageSupport';
+import stretched_bb_particle_vert from './shaders/stretched_bb_particle_vert.glsl';
+import stretched_bb_particle_vert_wgsl from './shaders/stretched_bb_particle_vert.wgsl';
+import {RenderMode, VFXBatch} from './VFXBatch';
 
 export class SpriteBatch extends VFXBatch {
     private static whiteTextureByScene = new WeakMap<Scene, RawTexture>();
@@ -254,7 +252,9 @@ export class SpriteBatch extends VFXBatch {
             uniforms.push('ambientColor');
         }
 
-        const mat = new ShaderMaterial(shaderName, this.scene,
+        const mat = new ShaderMaterial(
+            shaderName,
+            this.scene,
             {vertex: shaderName, fragment: shaderName},
             {
                 attributes,
@@ -290,7 +290,13 @@ export class SpriteBatch extends VFXBatch {
             mat.setFloat('speedFactor', this.settings.softNearFade > 0 ? this.settings.softNearFade : 1.0);
         }
         if (this.settings.softParticles) {
-            mat.setVector2('softParams', new BVector2(this.settings.softNearFade, 1.0 / Math.max(this.settings.softFarFade - this.settings.softNearFade, 0.0001)));
+            mat.setVector2(
+                'softParams',
+                new BVector2(
+                    this.settings.softNearFade,
+                    1.0 / Math.max(this.settings.softFarFade - this.settings.softNearFade, 0.0001)
+                )
+            );
             // Reused across binds: this runs on every draw call.
             const projParams = new BVector4(0, 0, 0, 0);
             mat.onBindObservable.add(() => {
@@ -413,7 +419,14 @@ export class SpriteBatch extends VFXBatch {
                     this.offsetBuffer.set(store.position.subarray(0, particleNum * 3), index * 3);
                 }
                 if (stepFraction !== 0 && particleNum > 0) {
-                    SpriteBatch.continueVector3(this.sizeBuffer, index * 3, store.size, store.previousSize, particleNum, stepFraction);
+                    SpriteBatch.continueVector3(
+                        this.sizeBuffer,
+                        index * 3,
+                        store.size,
+                        store.previousSize,
+                        particleNum,
+                        stepFraction
+                    );
                 } else {
                     this.sizeBuffer.set(store.size.subarray(0, particleNum * 3), index * 3);
                 }
@@ -428,10 +441,22 @@ export class SpriteBatch extends VFXBatch {
                     offsets.set(store!.position.subarray(0, particleNum * 3), base);
                 }
                 const me = emitterMatrix.elements;
-                const m00 = me[0], m01 = me[1], m02 = me[2], m03 = me[3];
-                const m10 = me[4], m11 = me[5], m12 = me[6], m13 = me[7];
-                const m20 = me[8], m21 = me[9], m22 = me[10], m23 = me[11];
-                const m30 = me[12], m31 = me[13], m32 = me[14], m33 = me[15];
+                const m00 = me[0],
+                    m01 = me[1],
+                    m02 = me[2],
+                    m03 = me[3];
+                const m10 = me[4],
+                    m11 = me[5],
+                    m12 = me[6],
+                    m13 = me[7];
+                const m20 = me[8],
+                    m21 = me[9],
+                    m22 = me[10],
+                    m23 = me[11];
+                const m30 = me[12],
+                    m31 = me[13],
+                    m32 = me[14],
+                    m33 = me[15];
                 for (let o = base; o < end; o += 3) {
                     const px = offsets[o];
                     const py = offsets[o + 1];
@@ -443,7 +468,14 @@ export class SpriteBatch extends VFXBatch {
                 }
                 const sizes = this.sizeBuffer;
                 if (stepFraction !== 0) {
-                    SpriteBatch.continueVector3(sizes, base, store!.size, store!.previousSize, particleNum, stepFraction);
+                    SpriteBatch.continueVector3(
+                        sizes,
+                        base,
+                        store!.size,
+                        store!.previousSize,
+                        particleNum,
+                        stepFraction
+                    );
                 } else {
                     sizes.set(store!.size.subarray(0, particleNum * 3), base);
                 }
@@ -465,9 +497,9 @@ export class SpriteBatch extends VFXBatch {
                     let own = particle.rotation as Quaternion;
                     const step = particle.angularVelocity;
                     if (stepFraction !== 0 && step instanceof Quaternion) {
-                        own = this.quaternion4_.copy(own).multiply(
-                            SpriteBatch.partialTurn(step, stepFraction, this.quaternion5_)
-                        );
+                        own = this.quaternion4_
+                            .copy(own)
+                            .multiply(SpriteBatch.partialTurn(step, stepFraction, this.quaternion5_));
                     }
                     let q: Quaternion;
                     if (systemWorldSpace) {

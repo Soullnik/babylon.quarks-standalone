@@ -1,23 +1,23 @@
-import type { DemoContext } from '../types';
-import {Vector3 as BVector3} from '@babylonjs/core/Maths/math.vector';
-import {MeshBuilder} from '@babylonjs/core/Meshes/meshBuilder';
+import {Constants} from '@babylonjs/core/Engines/constants';
+import {PointLight} from '@babylonjs/core/Lights/pointLight';
 import {StandardMaterial} from '@babylonjs/core/Materials/standardMaterial';
 import {Color3} from '@babylonjs/core/Maths/math.color';
-import {PointLight} from '@babylonjs/core/Lights/pointLight';
-import {Constants} from '@babylonjs/core/Engines/constants';
+import {Vector3 as BVector3} from '@babylonjs/core/Maths/math.vector';
+import {MeshBuilder} from '@babylonjs/core/Meshes/meshBuilder';
 import {
-    ParticleSystem,
+    Bezier,
+    ConeEmitter,
+    ConstantColor,
     ConstantValue,
     IntervalValue,
-    ConeEmitter,
-    RenderMode,
-    ConstantColor,
-    Vector4,
-    SpeedOverLife,
+    ParticleSystem,
     PiecewiseBezier,
-    Bezier,
+    RenderMode,
+    SpeedOverLife,
+    Vector4,
 } from 'babylon.quarks';
 import {createSharedTexture, SHARED_ASSETS} from '../shared/common';
+import type {DemoContext} from '../types';
 
 export function init({scene, camera, batchRenderer, systems, demoState}: DemoContext) {
     camera.setPosition(new BVector3(0, 10, 60));
@@ -32,7 +32,11 @@ export function init({scene, camera, batchRenderer, systems, demoState}: DemoCon
     ground.material = groundMat;
     ground.position.y = -0.02;
 
-    const routeRing = MeshBuilder.CreateTorus('followRoute', {diameter: 100, thickness: 0.18, tessellation: 128}, scene);
+    const routeRing = MeshBuilder.CreateTorus(
+        'followRoute',
+        {diameter: 100, thickness: 0.18, tessellation: 128},
+        scene
+    );
     const routeRingMat = new StandardMaterial('followRouteMat', scene);
     routeRingMat.diffuseColor = new Color3(0.22, 0.36, 0.66);
     routeRingMat.emissiveColor = new Color3(0.08, 0.16, 0.32);

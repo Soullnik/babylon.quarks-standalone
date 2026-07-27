@@ -1,8 +1,8 @@
-import {Behavior} from './Behavior';
 import {Particle} from '../Particle';
+import {IntervalValue} from '../functions';
 import {FunctionValueGenerator, ValueGenerator, ValueGeneratorFromJSON} from '../functions/ValueGenerator';
 import {Quaternion} from '../math';
-import {IntervalValue} from '../functions';
+import {Behavior} from './Behavior';
 
 /**
  * Apply rotation to particles based on their speed.

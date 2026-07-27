@@ -1,9 +1,9 @@
-import React, {useState} from 'react';
 import {ChevronDownIcon, ChevronRightIcon} from '@heroicons/react/24/solid';
+import React, {useState} from 'react';
+import {iconStyle} from './icons';
 import {getInspectorHint} from './inspectorHints';
 import {InspectorInfoIcon} from './InspectorInfoIcon';
 import {theme} from './theme';
-import {iconStyle} from './icons';
 
 /** Unity-style module foldout with an optional enable checkbox. */
 export function ModuleSection(props: {
@@ -58,7 +58,16 @@ export function ModuleSection(props: {
                         style={{width: 14, height: 14, accentColor: '#78a5ff', cursor: 'pointer'}}
                     />
                 )}
-                <span style={{color: dimmed ? theme.textDim : theme.text, fontSize: 13, fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 5}}>
+                <span
+                    style={{
+                        color: dimmed ? theme.textDim : theme.text,
+                        fontSize: 13,
+                        fontWeight: 600,
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 5,
+                    }}
+                >
                     {props.title}
                     {tooltip ? <InspectorInfoIcon content={tooltip} onClick={(e) => e.stopPropagation()} /> : null}
                 </span>

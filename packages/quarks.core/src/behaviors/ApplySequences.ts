@@ -1,8 +1,8 @@
-import {Behavior} from './Behavior';
 import {Particle} from '../Particle';
 import {Bezier, IntervalValue, ValueGeneratorFromJSON} from '../functions';
 import {Vector3} from '../math';
 import {Sequencer, SequencerFromJSON} from '../sequencers/Sequencer';
+import {Behavior} from './Behavior';
 
 /**
  * Apply sequences to particles.

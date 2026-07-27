@@ -1,13 +1,12 @@
-import type { DemoContext } from '../types';
-import {Vector3 as BVector3} from '@babylonjs/core/Maths/math.vector';
 import {Constants} from '@babylonjs/core/Engines/constants';
+import {Vector3 as BVector3} from '@babylonjs/core/Maths/math.vector';
 import {
-    ParticleSystem,
     ConstantValue,
     GridEmitter,
-    RenderMode,
-    RandomColor,
     loadPlugin,
+    ParticleSystem,
+    RandomColor,
+    RenderMode,
     ValueGeneratorFromJSON,
     Vector4,
     type Behavior,
@@ -19,6 +18,7 @@ import {
     type ValueGenerator,
 } from 'babylon.quarks';
 import {createSharedTexture} from '../shared/common';
+import type {DemoContext} from '../types';
 
 interface SinWaveJSON {
     type: string;
@@ -34,7 +34,11 @@ class SinWave implements Behavior {
     waveSize: number;
     time = 0;
 
-    constructor(frequency: ValueGenerator | FunctionValueGenerator, height: ValueGenerator | FunctionValueGenerator, waveSize: number) {
+    constructor(
+        frequency: ValueGenerator | FunctionValueGenerator,
+        height: ValueGenerator | FunctionValueGenerator,
+        waveSize: number
+    ) {
         this.frequency = frequency;
         this.height = height;
         this.waveSize = waveSize;
@@ -42,7 +46,11 @@ class SinWave implements Behavior {
 
     initialize() {}
 
-    private sampleValue(generator: ValueGenerator | FunctionValueGenerator, memory: GeneratorMemory, timeRatio: number): number {
+    private sampleValue(
+        generator: ValueGenerator | FunctionValueGenerator,
+        memory: GeneratorMemory,
+        timeRatio: number
+    ): number {
         if (generator.type === 'function') {
             return (generator as FunctionValueGenerator).genValue(memory, timeRatio);
         }
@@ -75,11 +83,7 @@ class SinWave implements Behavior {
     }
 
     static fromJSON(json: SinWaveJSON) {
-        return new SinWave(
-            ValueGeneratorFromJSON(json.frequency),
-            ValueGeneratorFromJSON(json.height),
-            json.waveSize
-        );
+        return new SinWave(ValueGeneratorFromJSON(json.frequency), ValueGeneratorFromJSON(json.height), json.waveSize);
     }
 
     clone() {

@@ -1,7 +1,7 @@
-import {ParticleEmitter} from 'babylon.quarks';
-import type {ParticleSystem} from 'babylon.quarks';
-import {TransformNode} from '@babylonjs/core/Meshes/transformNode';
 import {Matrix, Quaternion} from '@babylonjs/core/Maths/math.vector';
+import {TransformNode} from '@babylonjs/core/Meshes/transformNode';
+import type {ParticleSystem} from 'babylon.quarks';
+import {ParticleEmitter} from 'babylon.quarks';
 import {isEditorSceneNode} from './editorScene';
 
 /** A node in the editor's effect hierarchy: a Group (organizational) or a ParticleEmitter. */
@@ -72,7 +72,11 @@ function serializeNode(tree: EffectTreeNode, meta: SerializeMeta, fallbackUuid: 
         children: children.length > 0 ? children : undefined,
     };
     if (tree.system) {
-        return {...base, type: 'ParticleEmitter', ps: tree.system.toJSON(meta as never, {useUrlForImage: true} as never)};
+        return {
+            ...base,
+            type: 'ParticleEmitter',
+            ps: tree.system.toJSON(meta as never, {useUrlForImage: true} as never),
+        };
     }
     return {...base, type: 'Group'};
 }
@@ -118,8 +122,7 @@ function finishEnvelope(object: Record<string, unknown>, meta: SerializeMeta): s
         const url = tex?.url ?? tex?.name;
         const invertY = typeof tex?.invertY === 'boolean' ? tex.invertY : undefined;
         const isEnvAtlas =
-            tex?.name === 'quarksEnvAtlas' ||
-            (typeof tex?.name === 'string' && tex.name.endsWith('_envAtlas'));
+            tex?.name === 'quarksEnvAtlas' || (typeof tex?.name === 'string' && tex.name.endsWith('_envAtlas'));
         if (url) {
             const imageUuid = `${uuid}-image`;
             images.push({uuid: imageUuid, url});

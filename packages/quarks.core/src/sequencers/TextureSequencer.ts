@@ -1,5 +1,5 @@
-import {Sequencer} from './Sequencer';
 import {Vector2, Vector3} from '../math';
+import {Sequencer} from './Sequencer';
 
 export class TextureSequencer implements Sequencer {
     locations: Vector2[] = [];

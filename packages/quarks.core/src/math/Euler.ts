@@ -1,12 +1,12 @@
-import {Quaternion} from './Quaternion';
-import {Matrix4} from './Matrix4';
 import {clamp} from './MathUtils';
+import {Matrix4} from './Matrix4';
+import {Quaternion} from './Quaternion';
 import {Vector3} from './Vector3';
 
 const _matrix = /*@__PURE__*/ new Matrix4();
 const _quaternion = /*@__PURE__*/ new Quaternion();
 
-export type EulerOrder = 'XYZ' | 'YXZ' | 'ZXY' | 'ZYX' | 'YZX' | 'XZY' | 'XYX' | 'YZY'| 'ZXZ' | 'XZX' | 'YXY' | 'ZYZ';
+export type EulerOrder = 'XYZ' | 'YXZ' | 'ZXY' | 'ZYX' | 'YZX' | 'XZY' | 'XYX' | 'YZY' | 'ZXZ' | 'XZX' | 'YXY' | 'ZYZ';
 
 class Euler {
     _x: number;
@@ -246,7 +246,6 @@ class Euler {
         yield this._order;
     }
 }
-
 
 (Euler.prototype as any).isEuler = true;
 

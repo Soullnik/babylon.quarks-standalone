@@ -1,9 +1,8 @@
-import {RotationGenerator} from './RotationGenerator';
-import {Euler, Quaternion} from '../math';
-import {FunctionValueGenerator, ValueGenerator, ValueGeneratorFromJSON} from './ValueGenerator';
+import {Euler, EulerOrder, Quaternion} from '../math';
 import {FunctionJSON} from './FunctionJSON';
-import {EulerOrder} from '../math';
 import {GeneratorMemory} from './GeneratorMemory';
+import {RotationGenerator} from './RotationGenerator';
+import {FunctionValueGenerator, ValueGenerator, ValueGeneratorFromJSON} from './ValueGenerator';
 
 export class EulerGenerator implements RotationGenerator {
     type: 'rotation';

@@ -1,25 +1,25 @@
-import type { DemoContext } from '../types';
-import {Vector3 as BVector3} from '@babylonjs/core/Maths/math.vector';
 import {Constants} from '@babylonjs/core/Engines/constants';
+import {Vector3 as BVector3} from '@babylonjs/core/Maths/math.vector';
 import {
-    ParticleSystem,
-    RenderMode,
-    ConstantValue,
-    ConstantColor,
-    IntervalValue,
-    ConeEmitter,
-    SizeOverLife,
-    ColorOverLife,
-    ApplyForce,
     ApplyCollision,
-    PiecewiseBezier,
+    ApplyForce,
     Bezier,
+    ColorOverLife,
+    ConeEmitter,
+    ConstantColor,
+    ConstantValue,
     Gradient,
+    IntervalValue,
+    ParticleSystem,
+    PiecewiseBezier,
     RandomColorBetweenGradient,
-    Vector4,
+    RenderMode,
+    SizeOverLife,
     Vector3,
+    Vector4,
 } from 'babylon.quarks';
 import {createSharedTexture} from '../shared/common';
+import type {DemoContext} from '../types';
 
 export function init({scene, camera, batchRenderer, systems}: DemoContext) {
     camera.setPosition(new BVector3(0, 5, 20));
@@ -50,8 +50,26 @@ export function init({scene, camera, batchRenderer, systems}: DemoContext) {
     trail.addBehavior(
         new ColorOverLife(
             new RandomColorBetweenGradient(
-                new Gradient([[new Vector3(1, 0, 0), 0], [new Vector3(1, 0, 0), 1]], [[1, 0], [1, 1]]),
-                new Gradient([[new Vector3(0, 1, 0), 0], [new Vector3(0, 1, 0), 1]], [[1, 0], [1, 1]])
+                new Gradient(
+                    [
+                        [new Vector3(1, 0, 0), 0],
+                        [new Vector3(1, 0, 0), 1],
+                    ],
+                    [
+                        [1, 0],
+                        [1, 1],
+                    ]
+                ),
+                new Gradient(
+                    [
+                        [new Vector3(0, 1, 0), 0],
+                        [new Vector3(0, 1, 0), 1],
+                    ],
+                    [
+                        [1, 0],
+                        [1, 1],
+                    ]
+                )
             )
         )
     );

@@ -3,27 +3,28 @@ import {
     AxisAngleGenerator,
     Behavior,
     Bezier,
+    ColorBySpeed,
     ColorOverLife,
     ConstantValue,
+    ForceOverLife,
     FrameOverLife,
     Gradient,
     GravityForce,
-    LimitSpeedOverLife,
-    OrbitOverLife,
-    ColorBySpeed,
-    SizeBySpeed,
-    RotationBySpeed,
-    ForceOverLife,
     IntervalValue,
     IParticleSystem,
+    LimitSpeedOverLife,
     Matrix4,
     Noise,
+    OrbitOverLife,
     Particle,
     ParticleStore,
     PiecewiseBezier,
+    planBehaviorFusion,
     Quaternion,
     Rotation3DOverLife,
+    RotationBySpeed,
     RotationOverLife,
+    SizeBySpeed,
     SizeOverLife,
     SpeedOverLife,
     SpriteParticle,
@@ -31,7 +32,6 @@ import {
     Vector3Function,
     VelocityOverLife,
     WidthOverLength,
-    planBehaviorFusion,
 } from '../../src';
 
 const system = {
@@ -61,11 +61,21 @@ function snapshot(particles: Particle[]): number[] {
     const values: number[] = [];
     for (const p of particles) {
         values.push(
-            p.position.x, p.position.y, p.position.z,
-            p.velocity.x, p.velocity.y, p.velocity.z,
-            p.size.x, p.size.y, p.size.z,
-            p.color.x, p.color.y, p.color.z, p.color.w,
-            p.uvTile, p.speedModifier,
+            p.position.x,
+            p.position.y,
+            p.position.z,
+            p.velocity.x,
+            p.velocity.y,
+            p.velocity.z,
+            p.size.x,
+            p.size.y,
+            p.size.z,
+            p.color.x,
+            p.color.y,
+            p.color.z,
+            p.color.w,
+            p.uvTile,
+            p.speedModifier,
             typeof p.rotation === 'number' ? p.rotation : 0
         );
     }
@@ -196,9 +206,7 @@ describe('behavior fusion', () => {
     it('handles a vector-valued SizeOverLife inside a fused run', () => {
         const build = (): Behavior[] => [
             new ColorOverLife(new Gradient()),
-            new SizeOverLife(
-                new Vector3Function(new ConstantValue(0.5), new ConstantValue(2), new ConstantValue(3))
-            ),
+            new SizeOverLife(new Vector3Function(new ConstantValue(0.5), new ConstantValue(2), new ConstantValue(3))),
         ];
         const fusedBehaviors = build();
         const separateBehaviors = build();

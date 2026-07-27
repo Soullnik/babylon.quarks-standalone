@@ -1,9 +1,9 @@
-import {FunctionJSON} from './FunctionJSON';
 import {Quaternion} from '../math';
-import {RandomQuatGenerator} from './RandomQuatGenerator';
 import {AxisAngleGenerator} from './AxisAngleGenerator';
 import {EulerGenerator} from './EulerGenerator';
+import {FunctionJSON} from './FunctionJSON';
 import {GeneratorMemory} from './GeneratorMemory';
+import {RandomQuatGenerator} from './RandomQuatGenerator';
 
 export interface RotationGenerator {
     type: 'rotation';

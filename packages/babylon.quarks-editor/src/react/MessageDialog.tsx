@@ -39,7 +39,15 @@ export function MessageDialog(props: MessageDialogProps): React.ReactElement {
                 onClick={(e) => e.stopPropagation()}
             >
                 <div style={{fontSize: 14, fontWeight: 600, color: theme.text, marginBottom: 8}}>{title}</div>
-                <div style={{fontSize: 13, lineHeight: 1.5, color: theme.textDim, marginBottom: 14, whiteSpace: 'pre-wrap'}}>
+                <div
+                    style={{
+                        fontSize: 13,
+                        lineHeight: 1.5,
+                        color: theme.textDim,
+                        marginBottom: 14,
+                        whiteSpace: 'pre-wrap',
+                    }}
+                >
                     {message}
                 </div>
                 <div style={{display: 'flex', justifyContent: 'flex-end'}}>

@@ -1,52 +1,52 @@
-import {Scene} from '@babylonjs/core/scene';
-import {Texture} from '@babylonjs/core/Materials/Textures/texture';
-import {BaseTexture} from '@babylonjs/core/Materials/Textures/baseTexture';
 import {Constants} from '@babylonjs/core/Engines/constants';
+import {BaseTexture} from '@babylonjs/core/Materials/Textures/baseTexture';
+import {Texture} from '@babylonjs/core/Materials/Textures/texture';
+import {Scene} from '@babylonjs/core/scene';
 import {
     AxisAngleGenerator,
+    Behavior,
+    BehaviorFromJSON,
     ColorGenerator,
     ColorGeneratorFromJSON,
     ConstantColor,
     ConstantValue,
+    EmissionState,
+    EmitterFromJSON,
+    EmitterShape,
     FunctionColorGenerator,
     FunctionJSON,
     FunctionValueGenerator,
+    FusionStep,
     GeneratorFromJSON,
-    ValueGenerator,
-    ValueGeneratorFromJSON,
-    Behavior,
-    BehaviorFromJSON,
-    Particle,
-    SpriteParticle,
-    TrailParticle,
-    EmitterFromJSON,
-    EmitterShape,
-    SphereEmitter,
-    RendererEmitterSettings,
-    RotationGenerator,
-    IParticleSystem,
-    EmissionState,
     GeneratorMemory,
-    TrailSettings,
-    StretchedBillBoardSettings,
-    SerializationOptions,
-    Vector3,
-    Vector4,
+    IParticleSystem,
     Matrix3,
     Matrix4,
-    Quaternion,
-    Vector3Generator,
+    Particle,
+    ParticleStore,
     ParticleSystemEvent,
     ParticleSystemEventType,
-    ParticleStore,
-    FusionStep,
     planBehaviorFusion,
+    Quaternion,
+    RendererEmitterSettings,
+    RotationGenerator,
+    SerializationOptions,
+    SphereEmitter,
+    SpriteParticle,
+    StretchedBillBoardSettings,
+    TrailParticle,
+    TrailSettings,
+    ValueGenerator,
+    ValueGeneratorFromJSON,
+    Vector3,
+    Vector3Generator,
+    Vector4,
 } from 'quarks.core';
+import {BatchedRenderer, VFXBatchSettings} from './BatchedRenderer';
+import {ensureEnvAtlasFromCube, getCachedEnvAtlas} from './envAtlas';
+import {ensureTriangleIndices} from './geometryUtil';
 import {ParticleEmitter} from './ParticleEmitter';
 import {RenderMode} from './VFXBatch';
-import {BatchedRenderer, VFXBatchSettings} from './BatchedRenderer';
-import {ensureTriangleIndices} from './geometryUtil';
-import {ensureEnvAtlasFromCube, getCachedEnvAtlas} from './envAtlas';
 
 export interface BurstParameters {
     time: number;
@@ -74,12 +74,7 @@ const MAX_SIMULATION_STEPS_PER_FRAME = 8;
 // and keeps the well-tested "half a step is no step yet" behavior.
 const ROUND_TIE_BIAS = 1e-9;
 
-const DEFAULT_POSITIONS = new Float32Array([
-    -0.5, -0.5, 0,
-     0.5, -0.5, 0,
-     0.5,  0.5, 0,
-    -0.5,  0.5, 0,
-]);
+const DEFAULT_POSITIONS = new Float32Array([-0.5, -0.5, 0, 0.5, -0.5, 0, 0.5, 0.5, 0, -0.5, 0.5, 0]);
 const DEFAULT_UVS = new Float32Array([0, 0, 1, 0, 1, 1, 0, 1]);
 
 /** Zero UVs sized to a position buffer — missing/mismatched uv attrs → GL_INVALID_OPERATION on iOS. */
@@ -450,7 +445,7 @@ export class ParticleSystem implements IParticleSystem {
 
     constructor(parameters: ParticleSystemParameters) {
         this.sceneRef = parameters.scene;
-        this.layerMaskProxy = {mask: parameters.layerMask ?? 0x0FFFFFFF};
+        this.layerMaskProxy = {mask: parameters.layerMask ?? 0x0fffffff};
         Object.defineProperty(this.layerMaskProxy, 'mask', {
             enumerable: true,
             get: () => this.rendererSettings.layerMask,
@@ -493,9 +488,7 @@ export class ParticleSystem implements IParticleSystem {
             instancingIndices: parameters.instancingIndices ?? DEFAULT_INDICES,
             instancingUVs:
                 parameters.instancingUVs ??
-                (parameters.instancingGeometry
-                    ? fallbackUVsForPositions(parameters.instancingGeometry)
-                    : DEFAULT_UVS),
+                (parameters.instancingGeometry ? fallbackUVsForPositions(parameters.instancingGeometry) : DEFAULT_UVS),
             instancingNormals: parameters.instancingNormals,
             renderMode: parameters.renderMode ?? RenderMode.BillBoard,
             renderOrder: parameters.renderOrder ?? 0,
@@ -515,10 +508,12 @@ export class ParticleSystem implements IParticleSystem {
             reflectionLevel: 1,
             reflectionFaces: null,
             reflectionAtlas: null,
-            layerMask: parameters.layerMask ?? 0x0FFFFFFF,
+            layerMask: parameters.layerMask ?? 0x0fffffff,
         };
         if (this.rendererSettings.renderMode === RenderMode.Mesh && !this.rendererSettings.instancingNormals) {
-            this.rendererSettings.instancingNormals = ParticleSystem.createFallbackNormals(this.rendererSettings.instancingGeometry);
+            this.rendererSettings.instancingNormals = ParticleSystem.createFallbackNormals(
+                this.rendererSettings.instancingGeometry
+            );
         }
 
         this.materialRef = parameters.material ?? null;
@@ -582,19 +577,18 @@ export class ParticleSystem implements IParticleSystem {
             overrides.texture !== undefined
                 ? overrides.texture
                 : (material?.albedoTexture ??
-                    material?.diffuseTexture ??
-                    material?.emissiveTexture ??
-                    material?.opacityTexture ??
-                    material?.baseTexture ??
-                    this.rendererSettings.texture ??
-                    null);
+                  material?.diffuseTexture ??
+                  material?.emissiveTexture ??
+                  material?.opacityTexture ??
+                  material?.baseTexture ??
+                  this.rendererSettings.texture ??
+                  null);
         const resolvedReflection =
             material?.reflectionTexture ??
             material?.environmentTexture ??
             this.rendererSettings.reflectionTexture ??
             null;
-        const resolvedReflectionLevel =
-            typeof resolvedReflection?.level === 'number' ? resolvedReflection.level : 1;
+        const resolvedReflectionLevel = typeof resolvedReflection?.level === 'number' ? resolvedReflection.level : 1;
         const resolvedBlendMode =
             overrides.blendMode ??
             (typeof material?.alphaMode === 'number' ? material.alphaMode : this.rendererSettings.materialBlendMode);
@@ -603,8 +597,8 @@ export class ParticleSystem implements IParticleSystem {
             (typeof material?.needAlphaBlending === 'function'
                 ? material.needAlphaBlending()
                 : typeof material?.alpha === 'number'
-                    ? material.alpha < 1
-                    : this.rendererSettings.materialTransparent);
+                  ? material.alpha < 1
+                  : this.rendererSettings.materialTransparent);
         const resolvedDepthTest =
             overrides.depthTest ??
             (typeof material?.disableDepthTest === 'boolean'
@@ -615,8 +609,8 @@ export class ParticleSystem implements IParticleSystem {
             (typeof material?.disableDepthWrite === 'boolean'
                 ? !material.disableDepthWrite
                 : typeof material?.forceDepthWrite === 'boolean'
-                    ? material.forceDepthWrite
-                    : this.rendererSettings.materialDepthWrite);
+                  ? material.forceDepthWrite
+                  : this.rendererSettings.materialDepthWrite);
         const resolvedAlphaTest =
             overrides.alphaTest ??
             (() => {
@@ -640,16 +634,11 @@ export class ParticleSystem implements IParticleSystem {
         this.rendererSettings.texture = resolvedTexture;
         this.rendererSettings.reflectionTexture = resolvedReflection;
         this.rendererSettings.reflectionLevel =
-            typeof material?.reflectionLevel === 'number'
-                ? material.reflectionLevel
-                : resolvedReflectionLevel;
+            typeof material?.reflectionLevel === 'number' ? material.reflectionLevel : resolvedReflectionLevel;
         // Prefer an explicit atlas; otherwise build a 3×2 atlas from CubeTexture
         // face URLs (iOS-safe single sampler2D — not samplerCube / six faces).
         let resolvedAtlas =
-            material?.reflectionAtlas ??
-            overrides.reflectionAtlas ??
-            this.rendererSettings.reflectionAtlas ??
-            null;
+            material?.reflectionAtlas ?? overrides.reflectionAtlas ?? this.rendererSettings.reflectionAtlas ?? null;
         if (!resolvedAtlas && resolvedReflection?.isCube) {
             resolvedAtlas = getCachedEnvAtlas(resolvedReflection);
             if (!resolvedAtlas && this.sceneRef) {
@@ -682,9 +671,16 @@ export class ParticleSystem implements IParticleSystem {
         this.neededToUpdateRender = true;
     }
 
-    pause() { this.paused = true; }
-    play() { this.paused = false; }
-    stop() { this.restart(); this.pause(); }
+    pause() {
+        this.paused = true;
+    }
+    play() {
+        this.paused = false;
+    }
+    stop() {
+        this.restart();
+        this.pause();
+    }
 
     setQualityFactor(qualityFactor: number) {
         this.qualityFactor = Math.max(0.1, Math.min(1, qualityFactor));
@@ -709,9 +705,7 @@ export class ParticleSystem implements IParticleSystem {
         if (this.store.ensureCapacity(index + 1)) {
             this.rebindParticles();
         }
-        this.particles.push(
-            isTrailMode ? new TrailParticle(this.store, index) : new SpriteParticle(this.store, index)
-        );
+        this.particles.push(isTrailMode ? new TrailParticle(this.store, index) : new SpriteParticle(this.store, index));
     }
 
     private spawn(count: number, emissionState: EmissionState, matrix: Matrix4) {
@@ -930,10 +924,7 @@ export class ParticleSystem implements IParticleSystem {
         const emitterElements = this.emitter.matrixWorld.elements;
         this.tempEmitterPos.set(emitterElements[12], emitterElements[13], emitterElements[14]);
         if (this.previousEmitterPos !== undefined && delta > 0) {
-            this.emitterVelocity
-                .copy(this.tempEmitterPos)
-                .sub(this.previousEmitterPos)
-                .divideScalar(delta);
+            this.emitterVelocity.copy(this.tempEmitterPos).sub(this.previousEmitterPos).divideScalar(delta);
         }
         (this.previousEmitterPos ??= new Vector3()).copy(this.tempEmitterPos);
 
@@ -1093,8 +1084,7 @@ export class ParticleSystem implements IParticleSystem {
             }
         }
 
-        const followLocalOrigin =
-            isTrailMode && (this.rendererEmitterSettings as TrailSettings).followLocalOrigin;
+        const followLocalOrigin = isTrailMode && (this.rendererEmitterSettings as TrailSettings).followLocalOrigin;
         if (followLocalOrigin) {
             const emitterMatrix = this.emitter.matrixWorld;
             for (let i = 0; i < particleCount; i++) {
@@ -1242,7 +1232,11 @@ export class ParticleSystem implements IParticleSystem {
         }
 
         if (emissionState.previousWorldPos === undefined) emissionState.previousWorldPos = new Vector3();
-        emissionState.previousWorldPos.set(emitterMatrix.elements[12], emitterMatrix.elements[13], emitterMatrix.elements[14]);
+        emissionState.previousWorldPos.set(
+            emitterMatrix.elements[12],
+            emitterMatrix.elements[13],
+            emitterMatrix.elements[14]
+        );
         emissionState.time += delta;
     }
 
@@ -1250,15 +1244,15 @@ export class ParticleSystem implements IParticleSystem {
         const isRootObject = metaData === undefined || typeof metaData === 'string';
         const meta: BabylonMetaData = isRootObject
             ? {
-                geometries: {},
-                materials: {},
-                textures: {},
-                images: {},
-                shapes: {},
-                skeletons: {},
-                animations: {},
-                nodes: {},
-            }
+                  geometries: {},
+                  materials: {},
+                  textures: {},
+                  images: {},
+                  shapes: {},
+                  skeletons: {},
+                  animations: {},
+                  nodes: {},
+              }
             : metaData;
 
         const geometryUUID = this.ensureGeometryMeta(meta);
@@ -1341,8 +1335,8 @@ export class ParticleSystem implements IParticleSystem {
         const materialTextureRef = materialMeta?.texture ?? json.texture;
         const texture =
             typeof materialTextureRef === 'string'
-                ? meta.textures?.[materialTextureRef] ?? null
-                : materialTextureRef ?? null;
+                ? (meta.textures?.[materialTextureRef] ?? null)
+                : (materialTextureRef ?? null);
         const resolvedGeometryEntry =
             typeof json.instancingGeometry === 'string'
                 ? meta.geometries?.[json.instancingGeometry]
@@ -1359,14 +1353,20 @@ export class ParticleSystem implements IParticleSystem {
             shape,
             startLife: ValueGeneratorFromJSON(json.startLife),
             startSpeed: ValueGeneratorFromJSON(json.startSpeed),
-            startRotation: GeneratorFromJSON(json.startRotation) as RotationGenerator | ValueGenerator | FunctionValueGenerator,
+            startRotation: GeneratorFromJSON(json.startRotation) as
+                | RotationGenerator
+                | ValueGenerator
+                | FunctionValueGenerator,
             startSize: GeneratorFromJSON(json.startSize) as Vector3Generator | ValueGenerator | FunctionValueGenerator,
             startColor: ColorGeneratorFromJSON(json.startColor) as ColorGenerator,
             emissionOverTime: ValueGeneratorFromJSON(json.emissionOverTime),
             emissionOverDistance: ValueGeneratorFromJSON(json.emissionOverDistance),
             emissionBursts: json.emissionBursts?.map((burst: any) => ({
                 time: burst.time,
-                count: typeof burst.count === 'number' ? new ConstantValue(burst.count) : ValueGeneratorFromJSON(burst.count),
+                count:
+                    typeof burst.count === 'number'
+                        ? new ConstantValue(burst.count)
+                        : ValueGeneratorFromJSON(burst.count),
                 probability: burst.probability ?? 1,
                 interval: burst.interval ?? 0.1,
                 cycle: burst.cycle ?? burst.cycleCount ?? 1,
@@ -1451,7 +1451,9 @@ export class ParticleSystem implements IParticleSystem {
             positions: Array.from(this.rendererSettings.instancingGeometry),
             indices: Array.from(this.rendererSettings.instancingIndices),
             uvs: this.rendererSettings.instancingUVs ? Array.from(this.rendererSettings.instancingUVs) : undefined,
-            normals: this.rendererSettings.instancingNormals ? Array.from(this.rendererSettings.instancingNormals) : undefined,
+            normals: this.rendererSettings.instancingNormals
+                ? Array.from(this.rendererSettings.instancingNormals)
+                : undefined,
         };
         return geometryUUID;
     }

@@ -1,22 +1,22 @@
-import type { DemoContext } from '../types';
-import {Vector3 as BVector3} from '@babylonjs/core/Maths/math.vector';
 import {Constants} from '@babylonjs/core/Engines/constants';
+import {Vector3 as BVector3} from '@babylonjs/core/Maths/math.vector';
 import {
-    ParticleSystem,
-    RenderMode,
+    Bezier,
+    ConeEmitter,
+    ConstantColor,
     ConstantValue,
     IntervalValue,
-    ConstantColor,
-    PointEmitter,
-    ConeEmitter,
-    SphereEmitter,
-    SizeOverLife,
-    PiecewiseBezier,
-    Bezier,
-    Vector4,
     OrbitOverLife,
+    ParticleSystem,
+    PiecewiseBezier,
+    PointEmitter,
+    RenderMode,
+    SizeOverLife,
+    SphereEmitter,
+    Vector4,
 } from 'babylon.quarks';
 import {createColorOverLifeRange, createSharedTexture} from '../shared/common';
+import type {DemoContext} from '../types';
 
 const REFRESH_INTERVAL = 2.2;
 
@@ -81,7 +81,14 @@ export function init({scene, camera, batchRenderer, systems, demoState}: DemoCon
         renderOrder: 0,
     };
     const glow = new ParticleSystem(glowParam);
-    glow.addBehavior(new SizeOverLife(new PiecewiseBezier([[new Bezier(0, 0.75, 0.9, 1), 0], [new Bezier(1, 0.9, 0.75, 0), 0.5]])));
+    glow.addBehavior(
+        new SizeOverLife(
+            new PiecewiseBezier([
+                [new Bezier(0, 0.75, 0.9, 1), 0],
+                [new Bezier(1, 0.9, 0.75, 0), 0.5],
+            ])
+        )
+    );
     glow.emitter.rotation.x = -Math.PI / 2;
     batchRenderer.addSystem(glow);
     systems.push(glow);
@@ -92,7 +99,14 @@ export function init({scene, camera, batchRenderer, systems, demoState}: DemoCon
         startSize: new IntervalValue(60, 80),
         renderMode: RenderMode.BillBoard,
     });
-    glow2.addBehavior(new SizeOverLife(new PiecewiseBezier([[new Bezier(0, 0.75, 0.9, 1), 0], [new Bezier(1, 0.9, 0.75, 0), 0.2]])));
+    glow2.addBehavior(
+        new SizeOverLife(
+            new PiecewiseBezier([
+                [new Bezier(0, 0.75, 0.9, 1), 0],
+                [new Bezier(1, 0.9, 0.75, 0), 0.2],
+            ])
+        )
+    );
     batchRenderer.addSystem(glow2);
     systems.push(glow2);
     tracked.push(glow2);
@@ -120,7 +134,14 @@ export function init({scene, camera, batchRenderer, systems, demoState}: DemoCon
         renderMode: RenderMode.BillBoard,
         renderOrder: 2,
     });
-    particle.addBehavior(new SizeOverLife(new PiecewiseBezier([[new Bezier(0, 0.75, 0.9, 1), 0], [new Bezier(1, 0.9, 0.75, 0), 0.5]])));
+    particle.addBehavior(
+        new SizeOverLife(
+            new PiecewiseBezier([
+                [new Bezier(0, 0.75, 0.9, 1), 0],
+                [new Bezier(1, 0.9, 0.75, 0), 0.5],
+            ])
+        )
+    );
     particle.addBehavior(
         new OrbitOverLife(new PiecewiseBezier([[new Bezier(0, Math.PI * 4 * 0.75, Math.PI * 4 * 0.9, Math.PI * 4), 0]]))
     );

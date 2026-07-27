@@ -1,68 +1,68 @@
 name: CI & Deploy
 
 on:
-  pull_request:
-  push:
-    branches:
-      - main
-  workflow_dispatch:
+    pull_request:
+    push:
+        branches:
+            - main
+    workflow_dispatch:
 
 permissions:
-  contents: read
-  pages: write
-  id-token: write
+    contents: read
+    pages: write
+    id-token: write
 
 jobs:
-  validate:
-    runs-on: ubuntu-latest
-    # Supersede older runs of the same branch/PR.
-    concurrency:
-      group: ci-${{ github.ref }}
-      cancel-in-progress: true
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+    validate:
+        runs-on: ubuntu-latest
+        # Supersede older runs of the same branch/PR.
+        concurrency:
+            group: ci-${{ github.ref }}
+            cancel-in-progress: true
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: npm
+            - name: Setup Node.js
+              uses: actions/setup-node@v4
+              with:
+                  node-version: 20
+                  cache: npm
 
-      - name: Install dependencies
-        run: npm ci
+            - name: Install dependencies
+              run: npm ci
 
-      - name: Validate build, tests and package artifacts
-        run: npm run check
+            - name: Validate build, tests and package artifacts
+              run: npm run check
 
-      # Pages build only on main / manual dispatch. Runs after `npm run check` because
-      # check's build:examples writes examples/dist and would otherwise wipe the docs.
-      - name: Build API docs
+            # Pages build only on main / manual dispatch. Runs after `npm run check` because
+            # check's build:examples writes examples/dist and would otherwise wipe the docs.
+            - name: Build API docs
+              if: github.event_name != 'pull_request'
+              run: npm run docs
+
+            - name: Configure Pages
+              if: github.event_name != 'pull_request'
+              uses: actions/configure-pages@v5
+
+            - name: Upload Pages artifact
+              if: github.event_name != 'pull_request'
+              uses: actions/upload-pages-artifact@v3
+              with:
+                  path: examples/dist
+
+    deploy:
+        needs: validate
         if: github.event_name != 'pull_request'
-        run: npm run docs
-
-      - name: Configure Pages
-        if: github.event_name != 'pull_request'
-        uses: actions/configure-pages@v5
-
-      - name: Upload Pages artifact
-        if: github.event_name != 'pull_request'
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: examples/dist
-
-  deploy:
-    needs: validate
-    if: github.event_name != 'pull_request'
-    runs-on: ubuntu-latest
-    # Never cancel an in-progress Pages deployment — that leaves it in a failed state.
-    concurrency:
-      group: pages
-      cancel-in-progress: false
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+        runs-on: ubuntu-latest
+        # Never cancel an in-progress Pages deployment — that leaves it in a failed state.
+        concurrency:
+            group: pages
+            cancel-in-progress: false
+        environment:
+            name: github-pages
+            url: ${{ steps.deployment.outputs.page_url }}
+        steps:
+            - name: Deploy to GitHub Pages
+              id: deployment
+              uses: actions/deploy-pages@v4

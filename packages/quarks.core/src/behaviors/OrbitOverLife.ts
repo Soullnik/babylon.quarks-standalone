@@ -1,7 +1,7 @@
-import {Behavior} from './Behavior';
 import {Particle} from '../Particle';
 import {FunctionValueGenerator, ValueGenerator, ValueGeneratorFromJSON} from '../functions';
 import {Quaternion, Vector3} from '../math';
+import {Behavior} from './Behavior';
 
 /**
  * Orbit particles around an axis over their life.

@@ -1,15 +1,15 @@
-import {NullEngine} from '@babylonjs/core/Engines/nullEngine';
 import {Constants} from '@babylonjs/core/Engines/constants';
-import {Scene} from '@babylonjs/core/scene';
+import {NullEngine} from '@babylonjs/core/Engines/nullEngine';
+import {Texture} from '@babylonjs/core/Materials/Textures/texture';
 import {Matrix, Quaternion, Vector3} from '@babylonjs/core/Maths/math.vector';
 import {Mesh} from '@babylonjs/core/Meshes/mesh';
-import {Texture} from '@babylonjs/core/Materials/Textures/texture';
+import {Scene} from '@babylonjs/core/scene';
 import {loadPlugin} from 'quarks.core';
-import {QuarksLoader} from '../src/QuarksLoader';
-import {QuarksPrefab} from '../src/QuarksPrefab';
+import {MeshSurfaceEmitterPlugin} from '../src/MeshSurfaceEmitter';
 import {ParticleEmitter} from '../src/ParticleEmitter';
 import {ParticleSystem} from '../src/ParticleSystem';
-import {MeshSurfaceEmitterPlugin} from '../src/MeshSurfaceEmitter';
+import {QuarksLoader} from '../src/QuarksLoader';
+import {QuarksPrefab} from '../src/QuarksPrefab';
 
 loadPlugin(MeshSurfaceEmitterPlugin);
 
@@ -55,12 +55,8 @@ describe('QuarksLoader matrix decomposition', () => {
         const loader = new QuarksLoader(scene);
 
         const root = loader.parse({
-            geometries: [
-                {uuid: 'plane', type: 'PlaneGeometry', width: 1, height: 1},
-            ],
-            materials: [
-                {uuid: 'mat', type: 'MeshBasicMaterial', transparent: true, blending: 1},
-            ],
+            geometries: [{uuid: 'plane', type: 'PlaneGeometry', width: 1, height: 1}],
+            materials: [{uuid: 'mat', type: 'MeshBasicMaterial', transparent: true, blending: 1}],
             object: {
                 uuid: 'root',
                 type: 'Group',
@@ -394,66 +390,65 @@ describe('QuarksLoader matrix decomposition', () => {
         const loader = new QuarksLoader(scene);
 
         const toInt32Bits = (value: number) => new Int32Array(new Float32Array([value]).buffer)[0];
-        const interleavedFloats = [
-            0, 0, 0, 0, 0, 0, 0, 1,
-            1, 0, 0, 1, 0, 0, 0, 1,
-            0, 1, 0, 0, 1, 0, 0, 1,
-        ];
+        const interleavedFloats = [0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0, 0, 1, 0, 0, 1];
         const packedInt32 = interleavedFloats.map(toInt32Bits);
 
-        const root = loader.parse({
-            images: [{uuid: 'img-1', url: 'textures/test.png'}],
-            textures: [
-                {
-                    uuid: 'tex-1',
-                    image: 'img-1',
-                    wrap: [1001, 1002],
-                    repeat: [2, 3],
-                    offset: [0.1, 0.2],
-                    rotation: 0.5,
-                },
-            ],
-            materials: [
-                {
-                    uuid: 'mat-1',
-                    map: 'tex-1',
-                    blending: 3,
-                    side: 1,
-                    depthTest: true,
-                    depthWrite: true,
-                    alphaTest: 0.25,
-                },
-            ],
-            geometries: [
-                {
-                    uuid: 'geo-1',
-                    type: 'BufferGeometry',
-                    data: {
-                        arrayBuffers: {ab1: packedInt32},
-                        interleavedBuffers: {ib1: {buffer: 'ab1', stride: 8}},
-                        attributes: {
-                            position: {isInterleavedBufferAttribute: true, data: 'ib1', offset: 0, itemSize: 3},
-                            uv: {isInterleavedBufferAttribute: true, data: 'ib1', offset: 3, itemSize: 2},
-                            normal: {isInterleavedBufferAttribute: true, data: 'ib1', offset: 5, itemSize: 3},
-                        },
-                        index: {type: 'Uint16Array', array: [0, 1, 2]},
-                    },
-                },
-            ],
-            object: {
-                uuid: 'root',
-                type: 'Group',
-                children: [
+        const root = loader.parse(
+            {
+                images: [{uuid: 'img-1', url: 'textures/test.png'}],
+                textures: [
                     {
-                        uuid: 'mesh-1',
-                        type: 'Mesh',
-                        name: 'interleaved-mesh',
-                        geometry: 'geo-1',
-                        material: ['mat-1'],
+                        uuid: 'tex-1',
+                        image: 'img-1',
+                        wrap: [1001, 1002],
+                        repeat: [2, 3],
+                        offset: [0.1, 0.2],
+                        rotation: 0.5,
                     },
                 ],
+                materials: [
+                    {
+                        uuid: 'mat-1',
+                        map: 'tex-1',
+                        blending: 3,
+                        side: 1,
+                        depthTest: true,
+                        depthWrite: true,
+                        alphaTest: 0.25,
+                    },
+                ],
+                geometries: [
+                    {
+                        uuid: 'geo-1',
+                        type: 'BufferGeometry',
+                        data: {
+                            arrayBuffers: {ab1: packedInt32},
+                            interleavedBuffers: {ib1: {buffer: 'ab1', stride: 8}},
+                            attributes: {
+                                position: {isInterleavedBufferAttribute: true, data: 'ib1', offset: 0, itemSize: 3},
+                                uv: {isInterleavedBufferAttribute: true, data: 'ib1', offset: 3, itemSize: 2},
+                                normal: {isInterleavedBufferAttribute: true, data: 'ib1', offset: 5, itemSize: 3},
+                            },
+                            index: {type: 'Uint16Array', array: [0, 1, 2]},
+                        },
+                    },
+                ],
+                object: {
+                    uuid: 'root',
+                    type: 'Group',
+                    children: [
+                        {
+                            uuid: 'mesh-1',
+                            type: 'Mesh',
+                            name: 'interleaved-mesh',
+                            geometry: 'geo-1',
+                            material: ['mat-1'],
+                        },
+                    ],
+                },
             },
-        }, 'https://cdn.example.com/base/');
+            'https://cdn.example.com/base/'
+        );
 
         const mesh = root.getChildren().find((node) => node.name === 'interleaved-mesh') as Mesh;
         expect(mesh).toBeInstanceOf(Mesh);
@@ -507,7 +502,10 @@ describe('QuarksLoader matrix decomposition', () => {
             ''
         );
 
-        const emitter = root instanceof ParticleEmitter ? root : (root.getChildren().find((n) => n instanceof ParticleEmitter) as ParticleEmitter);
+        const emitter =
+            root instanceof ParticleEmitter
+                ? root
+                : (root.getChildren().find((n) => n instanceof ParticleEmitter) as ParticleEmitter);
         expect(emitter).toBeInstanceOf(ParticleEmitter);
         expect((emitter.system as ParticleSystem).texture).toBeTruthy();
 
@@ -748,7 +746,12 @@ describe('QuarksLoader matrix decomposition', () => {
                     repeat: [1, 1],
                 },
             ],
-            images: [{uuid: 'img-1', url: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=='}],
+            images: [
+                {
+                    uuid: 'img-1',
+                    url: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+                },
+            ],
             object: {uuid: 'root', type: 'Group', children: []},
         });
 
@@ -766,7 +769,8 @@ describe('QuarksLoader matrix decomposition', () => {
         const scene = new Scene(engine);
         const loader = new QuarksLoader(scene);
 
-        const dataUri = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+        const dataUri =
+            'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
         const root = loader.parse(
             {
                 textures: [
@@ -787,7 +791,13 @@ describe('QuarksLoader matrix decomposition', () => {
                     type: 'Group',
                     children: [
                         {uuid: 'mesh-data', type: 'Mesh', name: 'mesh-data', geometry: 'plane', material: 'mat-data'},
-                        {uuid: 'mesh-relative', type: 'Mesh', name: 'mesh-relative', geometry: 'plane', material: 'mat-relative'},
+                        {
+                            uuid: 'mesh-relative',
+                            type: 'Mesh',
+                            name: 'mesh-relative',
+                            geometry: 'plane',
+                            material: 'mat-relative',
+                        },
                     ],
                 },
             },
@@ -797,7 +807,9 @@ describe('QuarksLoader matrix decomposition', () => {
         const meshData = root.getChildren().find((node) => node.name === 'mesh-data') as Mesh;
         const meshRelative = root.getChildren().find((node) => node.name === 'mesh-relative') as Mesh;
         expect((meshData.material as any).diffuseTexture.url).toBe(dataUri);
-        expect((meshRelative.material as any).diffuseTexture.url).toBe('https://cdn.example.com/base/textures/spark.png');
+        expect((meshRelative.material as any).diffuseTexture.url).toBe(
+            'https://cdn.example.com/base/textures/spark.png'
+        );
 
         scene.dispose();
         engine.dispose();

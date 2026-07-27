@@ -1,7 +1,7 @@
-import {Behavior} from './Behavior';
 import {Particle} from '../Particle';
 import {PiecewiseBezier, Vector3Function} from '../functions';
 import {Quaternion} from '../math';
+import {Behavior} from './Behavior';
 
 /**
  * Compiles a run of behaviors into a single loop over the particles.

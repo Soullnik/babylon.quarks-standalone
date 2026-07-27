@@ -1,47 +1,43 @@
-import React, {useEffect, useMemo, useReducer, useRef, useState, useCallback} from 'react';
-import {createRoot} from 'react-dom/client';
+import {ArcRotateCamera} from '@babylonjs/core/Cameras/arcRotateCamera';
+import {Engine} from '@babylonjs/core/Engines/engine';
+import {PointerEventTypes} from '@babylonjs/core/Events/pointerEvents';
+import {GizmoManager} from '@babylonjs/core/Gizmos/gizmoManager';
+import {DirectionalLight} from '@babylonjs/core/Lights/directionalLight';
+import {Color3, Color4} from '@babylonjs/core/Maths/math.color';
+import {Vector3 as BVector3} from '@babylonjs/core/Maths/math.vector';
+import type {Mesh} from '@babylonjs/core/Meshes/mesh';
+import {MeshBuilder} from '@babylonjs/core/Meshes/meshBuilder';
+import {TransformNode} from '@babylonjs/core/Meshes/transformNode';
+import {UtilityLayerRenderer} from '@babylonjs/core/Rendering/utilityLayerRenderer';
+import {Scene} from '@babylonjs/core/scene';
+import {GridMaterial} from '@babylonjs/materials/grid/gridMaterial';
 import {
     ArrowLeftIcon,
     ArrowPathIcon,
+    ArrowsPointingOutIcon,
     ArrowUturnLeftIcon,
     ArrowUturnRightIcon,
-    ArrowsPointingOutIcon,
     CubeTransparentIcon,
     CursorArrowRaysIcon,
     Square2StackIcon,
 } from '@heroicons/react/24/solid';
-import {PointerEventTypes} from '@babylonjs/core/Events/pointerEvents';
-import {Engine} from '@babylonjs/core/Engines/engine';
-import {Scene} from '@babylonjs/core/scene';
-import {ArcRotateCamera} from '@babylonjs/core/Cameras/arcRotateCamera';
-import {DirectionalLight} from '@babylonjs/core/Lights/directionalLight';
-import {Vector3 as BVector3} from '@babylonjs/core/Maths/math.vector';
-import {Color3, Color4} from '@babylonjs/core/Maths/math.color';
-import {MeshBuilder} from '@babylonjs/core/Meshes/meshBuilder';
-import {TransformNode} from '@babylonjs/core/Meshes/transformNode';
-import {GizmoManager} from '@babylonjs/core/Gizmos/gizmoManager';
-import {UtilityLayerRenderer} from '@babylonjs/core/Rendering/utilityLayerRenderer';
-import {GridMaterial} from '@babylonjs/materials/grid/gridMaterial';
-import {
-    BatchedRenderer,
-    ParticleSystem,
-    QuarksUtil,
-} from 'babylon.quarks';
+import {BatchedRenderer, ParticleSystem, QuarksUtil} from 'babylon.quarks';
+import React, {useCallback, useEffect, useMemo, useReducer, useRef, useState} from 'react';
+import {createRoot} from 'react-dom/client';
 import {EffectBinding} from '../core/binding';
-import {EffectHistory} from '../core/history';
 import {ensureGroundResolver} from '../core/collision';
 import {createGalleryDefaultEntry} from '../core/defaultEffect';
-import {loadEffectFromJson, disposeLoadedEffect, parseEffectFromJson} from '../core/loadEffect';
-import {applyGalleryPlayback, countActivePreviews, countGalleryParticles, hasActivePreview, pauseFinishedPreviews} from '../core/galleryPlayback';
-import {createPlaybackState, clearFocusFinished, getFocusElapsed, isFocusFinished, markFocusFinished, setFocusElapsed, type PlaybackState} from '../core/playback';
-import {pauseFocus, scrubFocusToSettled} from '../core/scrub';
-import {logRenderMismatch} from '../core/renderDebug';
-import {cancelGalleryCameraFocus, focusGalleryEntry} from '../core/galleryLayout';
-import {computeTimelineRows, computeTimelineSpan} from '../core/timeline';
-import {GalleryDropMarker} from '../core/galleryDropMarker';
-import {GallerySelectionMarker} from '../core/gallerySelectionMarker';
 import {EmitterShapeWireframes} from '../core/emitterShapeWireframe';
 import {getGalleryDragSession, setGalleryDragSession} from '../core/galleryDragSession';
+import {GalleryDropMarker} from '../core/galleryDropMarker';
+import {cancelGalleryCameraFocus, focusGalleryEntry} from '../core/galleryLayout';
+import {
+    applyGalleryPlayback,
+    countActivePreviews,
+    countGalleryParticles,
+    hasActivePreview,
+    pauseFinishedPreviews,
+} from '../core/galleryPlayback';
 import {
     clearGalleryEntrySimulation,
     pickGroundPosition,
@@ -49,20 +45,41 @@ import {
     placeGalleryEntryInScene,
     removeGalleryEntryFromScene,
 } from '../core/galleryScene';
+import {GallerySelectionMarker} from '../core/gallerySelectionMarker';
 import {describeGalleryDrag, GALLERY_DRAG_MIME, readGalleryDrag} from '../core/galleryTree';
-import {loadEffectGallery, collectJsonFiles, bindingFromGalleryEntry, mergeGalleryEntries, type GalleryEntry, type GalleryLoadProgress} from '../core/loadEffectGallery';
+import {EffectHistory} from '../core/history';
+import {disposeLoadedEffect, loadEffectFromJson, parseEffectFromJson} from '../core/loadEffect';
+import {
+    bindingFromGalleryEntry,
+    collectJsonFiles,
+    loadEffectGallery,
+    mergeGalleryEntries,
+    type GalleryEntry,
+    type GalleryLoadProgress,
+} from '../core/loadEffectGallery';
 import {pickGalleryJsonFiles} from '../core/pickGalleryFiles';
-import {GalleryViewportPicker} from '../core/viewportPicker';
+import {
+    clearFocusFinished,
+    createPlaybackState,
+    getFocusElapsed,
+    isFocusFinished,
+    markFocusFinished,
+    setFocusElapsed,
+    type PlaybackState,
+} from '../core/playback';
+import {logRenderMismatch} from '../core/renderDebug';
+import {pauseFocus, scrubFocusToSettled} from '../core/scrub';
+import {computeTimelineRows, computeTimelineSpan} from '../core/timeline';
 import {notifyTransformChanged} from '../core/transformStore';
+import {GalleryViewportPicker} from '../core/viewportPicker';
 import {EffectEditor} from './EffectEditor';
-import {PromptDialog} from './PromptDialog';
-import {MessageDialog} from './MessageDialog';
 import {GalleryPanel} from './GalleryPanel';
+import {MessageDialog} from './MessageDialog';
+import {PromptDialog} from './PromptDialog';
 import {TimelinePanel} from './TimelinePanel';
+import {iconStyle, type HeroIcon} from './icons';
 import type {GeometryData, GeometryOption, TextureOption} from './modules';
 import {buttonStyle, globalEditorStyles, theme} from './theme';
-import {iconStyle, type HeroIcon} from './icons';
-import type {Mesh} from '@babylonjs/core/Meshes/mesh';
 
 export interface EffectEditorHostHandle {
     binding: EffectBinding;
@@ -145,7 +162,9 @@ export function EffectEditorHost(props: EffectEditorHostProps) {
     const selectGalleryEntryRef = useRef<(entry: GalleryEntry) => void>(() => {});
     const toggleGalleryPreviewRef = useRef<(entry: GalleryEntry) => void>(() => {});
     const removeGalleryFromSceneRef = useRef<(entry: GalleryEntry) => void>(() => {});
-    const placeGalleryDropRef = useRef<(clientX: number, clientY: number, dataTransfer?: DataTransfer) => void>(() => {});
+    const placeGalleryDropRef = useRef<(clientX: number, clientY: number, dataTransfer?: DataTransfer) => void>(
+        () => {}
+    );
     const createGalleryDefaultRef = useRef<() => void>(() => {});
     const dropMarkerRef = useRef<GalleryDropMarker | null>(null);
     const selectionMarkerRef = useRef<GallerySelectionMarker | null>(null);
@@ -478,7 +497,9 @@ export function EffectEditorHost(props: EffectEditorHostProps) {
         const appendGalleryFromFiles = async (files: FileList | File[]) => {
             setGalleryLoading({done: 0, total: 0, loaded: 0, failed: 0});
 
-            const incoming = await loadEffectGallery(scene, files, galleryRoot, (progress) => setGalleryLoading(progress));
+            const incoming = await loadEffectGallery(scene, files, galleryRoot, (progress) =>
+                setGalleryLoading(progress)
+            );
             const {merged, added} = mergeGalleryEntries(galleryEntries, incoming, renderer);
 
             galleryEntries = merged;
@@ -541,10 +562,19 @@ export function EffectEditorHost(props: EffectEditorHostProps) {
             }
             if (current) {
                 const catalogEntry = stateRef.current?.galleryEntries.find((entry) => entry.root === current.root);
-                disposeEffect(current.root, [current.system, ...current.subSystems], renderer, catalogEntry?.inScene ?? true);
+                disposeEffect(
+                    current.root,
+                    [current.system, ...current.subSystems],
+                    renderer,
+                    catalogEntry?.inScene ?? true
+                );
             }
             const main = systems.find((s) => !s.onlyUsedByOther) ?? systems[0];
-            const next = new EffectBinding(main, systems.filter((s) => s !== main), root);
+            const next = new EffectBinding(
+                main,
+                systems.filter((s) => s !== main),
+                root
+            );
             setSelectedGalleryRoot(null);
             setPreviewRootIds([]);
             selectionMarker.hide();
@@ -667,7 +697,11 @@ export function EffectEditorHost(props: EffectEditorHostProps) {
 
             const previewIds = new Set(snapshot.previewRootIds);
             const binding = snapshot.binding;
-            if (binding && (binding.root.uniqueId !== focusTimelineMetaRef.current.rootId || binding.getRevision() !== focusTimelineMetaRef.current.revision)) {
+            if (
+                binding &&
+                (binding.root.uniqueId !== focusTimelineMetaRef.current.rootId ||
+                    binding.getRevision() !== focusTimelineMetaRef.current.revision)
+            ) {
                 const rows = computeTimelineRows(binding);
                 focusTimelineMetaRef.current = {
                     rootId: binding.root.uniqueId,
@@ -787,7 +821,14 @@ export function EffectEditorHost(props: EffectEditorHostProps) {
         gm.positionGizmoEnabled = gizmoMode === 'position';
         gm.rotationGizmoEnabled = gizmoMode === 'rotation';
         gm.scaleGizmoEnabled = gizmoMode === 'scale';
-        const activeGizmo = gizmoMode === 'position' ? gm.gizmos.positionGizmo : gizmoMode === 'rotation' ? gm.gizmos.rotationGizmo : gizmoMode === 'scale' ? gm.gizmos.scaleGizmo : null;
+        const activeGizmo =
+            gizmoMode === 'position'
+                ? gm.gizmos.positionGizmo
+                : gizmoMode === 'rotation'
+                  ? gm.gizmos.rotationGizmo
+                  : gizmoMode === 'scale'
+                    ? gm.gizmos.scaleGizmo
+                    : null;
         let dragRaf = 0;
         const scheduleTransformRefresh = () => {
             if (dragRaf !== 0) {
@@ -872,7 +913,11 @@ export function EffectEditorHost(props: EffectEditorHostProps) {
                     root.name = prev.name;
                 }
                 const main = systems.find((s) => !s.onlyUsedByOther) ?? systems[0];
-                const next = new EffectBinding(main, systems.filter((s) => s !== main), root);
+                const next = new EffectBinding(
+                    main,
+                    systems.filter((s) => s !== main),
+                    root
+                );
                 const oldRootId = current.root.uniqueId;
                 const updated = [...state.galleryEntries];
                 updated[entryIndex] = {name: prev.name, path: prev.path, root, systems, inScene: wasInScene};
@@ -905,7 +950,11 @@ export function EffectEditorHost(props: EffectEditorHostProps) {
                 }
                 disposeEffect(current.root, [current.system, ...current.subSystems], state.renderer);
                 const main = systems.find((s) => !s.onlyUsedByOther) ?? systems[0];
-                const next = new EffectBinding(main, systems.filter((s) => s !== main), root);
+                const next = new EffectBinding(
+                    main,
+                    systems.filter((s) => s !== main),
+                    root
+                );
                 next.root.parent = null;
                 state.history.attach(next);
                 next.subscribe(force);
@@ -927,7 +976,7 @@ export function EffectEditorHost(props: EffectEditorHostProps) {
     const activeSystem = binding ? (allSystems.find((s) => s.emitter === selectedNode) ?? binding.system) : null;
     const gizmoTargetLabel = gizmoNode?.name || 'Node';
     const selectedGalleryEntry = selectedGalleryRoot
-        ? gallery.find((entry) => entry.root === selectedGalleryRoot) ?? null
+        ? (gallery.find((entry) => entry.root === selectedGalleryRoot) ?? null)
         : null;
     /** Timeline is always shown when an effect is selected; playback only when it is on stage. */
     const showTimeline = Boolean(binding && activeSystem && state);
@@ -952,7 +1001,18 @@ export function EffectEditorHost(props: EffectEditorHostProps) {
     );
 
     return (
-        <div className="qe-root" style={{display: 'flex', flexDirection: 'column', width: '100%', height: '100%', fontFamily: theme.font, color: theme.text, background: '#070b16'}}>
+        <div
+            className="qe-root"
+            style={{
+                display: 'flex',
+                flexDirection: 'column',
+                width: '100%',
+                height: '100%',
+                fontFamily: theme.font,
+                color: theme.text,
+                background: '#070b16',
+            }}
+        >
             <style>{globalEditorStyles}</style>
             <div style={{display: 'flex', flex: 1, minHeight: 0}}>
                 <aside
@@ -974,7 +1034,16 @@ export function EffectEditorHost(props: EffectEditorHostProps) {
                             Drag into viewport to place · ✓ preview · × remove from stage
                         </div>
                     </div>
-                    <div style={{flex: 1, minHeight: 0, overflow: 'hidden', padding: '8px 12px 14px', display: 'flex', flexDirection: 'column'}}>
+                    <div
+                        style={{
+                            flex: 1,
+                            minHeight: 0,
+                            overflow: 'hidden',
+                            padding: '8px 12px 14px',
+                            display: 'flex',
+                            flexDirection: 'column',
+                        }}
+                    >
                         <GalleryPanel
                             entries={gallery}
                             focusedRoot={selectedGalleryRoot}
@@ -1028,7 +1097,10 @@ export function EffectEditorHost(props: EffectEditorHostProps) {
                         placeGalleryDropRef.current(e.clientX, e.clientY, e.dataTransfer);
                     }}
                 >
-                    <canvas ref={canvasRef} style={{width: '100%', height: '100%', display: 'block', touchAction: 'none', outline: 'none'}} />
+                    <canvas
+                        ref={canvasRef}
+                        style={{width: '100%', height: '100%', display: 'block', touchAction: 'none', outline: 'none'}}
+                    />
                     <div
                         style={{
                             position: 'absolute',
@@ -1073,7 +1145,8 @@ export function EffectEditorHost(props: EffectEditorHostProps) {
                                     whiteSpace: 'nowrap',
                                 }}
                             >
-                                Drop {galleryDragHover.count === 1 ? 'effect' : `${galleryDragHover.count} effects`} — {galleryDragHover.label}
+                                Drop {galleryDragHover.count === 1 ? 'effect' : `${galleryDragHover.count} effects`} —{' '}
+                                {galleryDragHover.label}
                             </div>
                         </div>
                     )}
@@ -1089,7 +1162,15 @@ export function EffectEditorHost(props: EffectEditorHostProps) {
                                 pointerEvents: 'none',
                             }}
                         >
-                            <div style={{background: theme.panelBg, border: `1px solid ${theme.border}`, borderRadius: 10, padding: '16px 22px', textAlign: 'center'}}>
+                            <div
+                                style={{
+                                    background: theme.panelBg,
+                                    border: `1px solid ${theme.border}`,
+                                    borderRadius: 10,
+                                    padding: '16px 22px',
+                                    textAlign: 'center',
+                                }}
+                            >
                                 <div style={{fontWeight: 600, marginBottom: 6}}>Loading gallery…</div>
                                 <div style={{fontSize: 13, color: theme.textDim}}>
                                     {galleryLoading.done} / {galleryLoading.total || '…'} files
@@ -1124,21 +1205,65 @@ export function EffectEditorHost(props: EffectEditorHostProps) {
                             {props.backLink.label.replace(/^←\s*/, '')}
                         </a>
                     )}
-                    <div style={{position: 'absolute', top: 12, right: 12, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6}}>
-                        <div style={{display: 'flex', gap: 4, background: theme.panelBg, border: `1px solid ${theme.border}`, borderRadius: 8, padding: 4}}>
-                            <button className="qe-hover" style={squareButtonStyle} title="Undo (Ctrl+Z)" disabled={!state?.history.canUndo || !binding} onClick={() => historyAction(state!.history.undo())}>
+                    <div
+                        style={{
+                            position: 'absolute',
+                            top: 12,
+                            right: 12,
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'flex-end',
+                            gap: 6,
+                        }}
+                    >
+                        <div
+                            style={{
+                                display: 'flex',
+                                gap: 4,
+                                background: theme.panelBg,
+                                border: `1px solid ${theme.border}`,
+                                borderRadius: 8,
+                                padding: 4,
+                            }}
+                        >
+                            <button
+                                className="qe-hover"
+                                style={squareButtonStyle}
+                                title="Undo (Ctrl+Z)"
+                                disabled={!state?.history.canUndo || !binding}
+                                onClick={() => historyAction(state!.history.undo())}
+                            >
                                 <ArrowUturnLeftIcon style={iconStyle(14)} />
                             </button>
-                            <button className="qe-hover" style={squareButtonStyle} title="Redo (Ctrl+Shift+Z)" disabled={!state?.history.canRedo || !binding} onClick={() => historyAction(state!.history.redo())}>
+                            <button
+                                className="qe-hover"
+                                style={squareButtonStyle}
+                                title="Redo (Ctrl+Shift+Z)"
+                                disabled={!state?.history.canRedo || !binding}
+                                onClick={() => historyAction(state!.history.redo())}
+                            >
                                 <ArrowUturnRightIcon style={iconStyle(14)} />
                             </button>
                         </div>
-                        <div style={{display: 'flex', flexDirection: 'column', gap: 4, background: theme.panelBg, border: `1px solid ${theme.border}`, borderRadius: 8, padding: 4}}>
+                        <div
+                            style={{
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: 4,
+                                background: theme.panelBg,
+                                border: `1px solid ${theme.border}`,
+                                borderRadius: 8,
+                                padding: 4,
+                            }}
+                        >
                             {GIZMO_MODE_BUTTONS.map((m) => (
                                 <button
                                     key={m.value}
                                     className="qe-hover"
-                                    style={{...squareButtonStyle, ...(gizmoMode === m.value ? activeSquareButtonStyle : {})}}
+                                    style={{
+                                        ...squareButtonStyle,
+                                        ...(gizmoMode === m.value ? activeSquareButtonStyle : {}),
+                                    }}
                                     title={m.title}
                                     onClick={() => setGizmoMode(m.value)}
                                 >
@@ -1146,10 +1271,23 @@ export function EffectEditorHost(props: EffectEditorHostProps) {
                                 </button>
                             ))}
                         </div>
-                        <div style={{display: 'flex', flexDirection: 'column', gap: 4, background: theme.panelBg, border: `1px solid ${theme.border}`, borderRadius: 8, padding: 4}}>
+                        <div
+                            style={{
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: 4,
+                                background: theme.panelBg,
+                                border: `1px solid ${theme.border}`,
+                                borderRadius: 8,
+                                padding: 4,
+                            }}
+                        >
                             <button
                                 className="qe-hover"
-                                style={{...squareButtonStyle, ...(showEmitterWireframes ? activeSquareButtonStyle : {})}}
+                                style={{
+                                    ...squareButtonStyle,
+                                    ...(showEmitterWireframes ? activeSquareButtonStyle : {}),
+                                }}
                                 title="Show emitter shape wireframes"
                                 disabled={!binding}
                                 onClick={() => setShowEmitterWireframes((on) => !on)}
@@ -1159,15 +1297,41 @@ export function EffectEditorHost(props: EffectEditorHostProps) {
                         </div>
                     </div>
                 </div>
-                <aside style={{width: 340, flexShrink: 0, borderLeft: `1px solid ${theme.border}`, background: theme.panelBg, display: 'flex', flexDirection: 'column', minHeight: 0}}>
+                <aside
+                    style={{
+                        width: 340,
+                        flexShrink: 0,
+                        borderLeft: `1px solid ${theme.border}`,
+                        background: theme.panelBg,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        minHeight: 0,
+                    }}
+                >
                     <div style={{padding: '12px 14px 10px', borderBottom: `1px solid ${theme.border}`}}>
-                        <div style={{fontSize: 11, fontWeight: 600, color: theme.textDim, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 6}}>
+                        <div
+                            style={{
+                                fontSize: 11,
+                                fontWeight: 600,
+                                color: theme.textDim,
+                                textTransform: 'uppercase',
+                                letterSpacing: 0.4,
+                                marginBottom: 6,
+                            }}
+                        >
                             Inspector
                         </div>
                         <div
                             className="qe-hover-bg"
                             title={binding ? 'Rename effect' : undefined}
-                            style={{fontSize: 16, fontWeight: 600, cursor: binding ? 'pointer' : 'default', borderRadius: 6, padding: '2px 4px', margin: '-2px -4px'}}
+                            style={{
+                                fontSize: 16,
+                                fontWeight: 600,
+                                cursor: binding ? 'pointer' : 'default',
+                                borderRadius: 6,
+                                padding: '2px 4px',
+                                margin: '-2px -4px',
+                            }}
                             onClick={() => binding && setRenamingRoot(true)}
                         >
                             {(binding?.root.name || props.title) ?? 'Effect editor'}
@@ -1190,7 +1354,9 @@ export function EffectEditorHost(props: EffectEditorHostProps) {
                                 disabled={!binding}
                                 onClick={() => {
                                     if (!binding) return;
-                                    const blob = new Blob([binding.exportJSON('EditorEffect')], {type: 'application/json'});
+                                    const blob = new Blob([binding.exportJSON('EditorEffect')], {
+                                        type: 'application/json',
+                                    });
                                     const link = document.createElement('a');
                                     link.href = URL.createObjectURL(blob);
                                     link.download = 'effect.json';
@@ -1201,7 +1367,12 @@ export function EffectEditorHost(props: EffectEditorHostProps) {
                                 Export
                             </button>
                             {props.onSave && (
-                                <button className="qe-hover" style={buttonStyle} disabled={!binding} onClick={() => binding && props.onSave!(binding.exportJSON('EditorEffect'))}>
+                                <button
+                                    className="qe-hover"
+                                    style={buttonStyle}
+                                    disabled={!binding}
+                                    onClick={() => binding && props.onSave!(binding.exportJSON('EditorEffect'))}
+                                >
                                     Save
                                 </button>
                             )}
@@ -1243,7 +1414,11 @@ export function EffectEditorHost(props: EffectEditorHostProps) {
                 />
             )}
             {messageDialog && (
-                <MessageDialog title={messageDialog.title} message={messageDialog.message} onClose={() => setMessageDialog(null)} />
+                <MessageDialog
+                    title={messageDialog.title}
+                    message={messageDialog.message}
+                    onClose={() => setMessageDialog(null)}
+                />
             )}
         </div>
     );

@@ -1,17 +1,14 @@
-import {Scene} from '@babylonjs/core/scene';
-import {TransformNode} from '@babylonjs/core/Meshes/transformNode';
-import {Mesh} from '@babylonjs/core/Meshes/mesh';
-import {VertexData} from '@babylonjs/core/Meshes/mesh.vertexData';
+import {Constants} from '@babylonjs/core/Engines/constants';
 import {Texture} from '@babylonjs/core/Materials/Textures/texture';
 import {StandardMaterial} from '@babylonjs/core/Materials/standardMaterial';
-import {Constants} from '@babylonjs/core/Engines/constants';
 import {Matrix, Quaternion, Vector3} from '@babylonjs/core/Maths/math.vector';
-import {
-    Behavior,
-    EmitSubParticleSystem,
-} from 'quarks.core';
-import {ParticleSystem} from './ParticleSystem';
+import {Mesh} from '@babylonjs/core/Meshes/mesh';
+import {VertexData} from '@babylonjs/core/Meshes/mesh.vertexData';
+import {TransformNode} from '@babylonjs/core/Meshes/transformNode';
+import {Scene} from '@babylonjs/core/scene';
+import {Behavior, EmitSubParticleSystem} from 'quarks.core';
 import {ParticleEmitter} from './ParticleEmitter';
+import {ParticleSystem} from './ParticleSystem';
 import {QuarksPrefab} from './QuarksPrefab';
 import {ensureTriangleIndices} from './geometryUtil';
 
@@ -194,7 +191,8 @@ export class QuarksLoader {
                 if (data.attributes.position?.isInterleavedBufferAttribute) {
                     const attr = data.attributes.position;
                     const buf = buffers[attr.data];
-                    if (buf) positions = this.extractInterleavedAttribute(buf.data, buf.stride, attr.offset, attr.itemSize);
+                    if (buf)
+                        positions = this.extractInterleavedAttribute(buf.data, buf.stride, attr.offset, attr.itemSize);
                 }
                 if (data.attributes.uv?.isInterleavedBufferAttribute) {
                     const attr = data.attributes.uv;
@@ -204,7 +202,8 @@ export class QuarksLoader {
                 if (data.attributes.normal?.isInterleavedBufferAttribute) {
                     const attr = data.attributes.normal;
                     const buf = buffers[attr.data];
-                    if (buf) normals = this.extractInterleavedAttribute(buf.data, buf.stride, attr.offset, attr.itemSize);
+                    if (buf)
+                        normals = this.extractInterleavedAttribute(buf.data, buf.stride, attr.offset, attr.itemSize);
                 }
             }
         } else if (data.attributes) {
@@ -304,8 +303,7 @@ export class QuarksLoader {
                 const texture = new Texture(imageUrl, this.scene, {
                     noMipmap,
                     invertY,
-                    samplingMode:
-                        typeof texDef.samplingMode === 'number' ? texDef.samplingMode : undefined,
+                    samplingMode: typeof texDef.samplingMode === 'number' ? texDef.samplingMode : undefined,
                 });
                 if (Array.isArray(texDef.wrap)) {
                     texture.wrapU = this.mapWrapMode(texDef.wrap[0]);
@@ -501,7 +499,12 @@ export class QuarksLoader {
             if (data.position) node.position.set(data.position[0], data.position[1], data.position[2]);
             if (data.scale) node.scaling.set(data.scale[0], data.scale[1], data.scale[2]);
             if (data.quaternion) {
-                node.rotationQuaternion = new Quaternion(data.quaternion[0], data.quaternion[1], data.quaternion[2], data.quaternion[3]);
+                node.rotationQuaternion = new Quaternion(
+                    data.quaternion[0],
+                    data.quaternion[1],
+                    data.quaternion[2],
+                    data.quaternion[3]
+                );
             } else if (data.rotation) {
                 node.rotation.set(data.rotation[0], data.rotation[1], data.rotation[2]);
             }

@@ -1,24 +1,24 @@
-import type { DemoContext } from '../types';
-import {Vector3 as BVector3} from '@babylonjs/core/Maths/math.vector';
 import {Constants} from '@babylonjs/core/Engines/constants';
+import {Vector3 as BVector3} from '@babylonjs/core/Maths/math.vector';
 import {
-    ParticleSystem,
-    RenderMode,
-    ConstantValue,
-    IntervalValue,
-    ConstantColor,
-    PointEmitter,
-    ConeEmitter,
-    SphereEmitter,
-    SizeOverLife,
-    FrameOverLife,
-    PiecewiseBezier,
     Bezier,
-    RandomColor,
-    Vector4,
+    ConeEmitter,
+    ConstantColor,
+    ConstantValue,
+    FrameOverLife,
+    IntervalValue,
     OrbitOverLife,
+    ParticleSystem,
+    PiecewiseBezier,
+    PointEmitter,
+    RandomColor,
+    RenderMode,
+    SizeOverLife,
+    SphereEmitter,
+    Vector4,
 } from 'babylon.quarks';
 import {createColorOverLifeRange, createSharedTexture} from '../shared/common';
+import type {DemoContext} from '../types';
 
 const REFRESH_INTERVAL = 1.8;
 

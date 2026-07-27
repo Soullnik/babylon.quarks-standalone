@@ -1,8 +1,8 @@
-import * as MathUtils from './MathUtils';
-import {Quaternion} from './Quaternion';
 import {Euler} from './Euler';
+import * as MathUtils from './MathUtils';
 import {Matrix3} from './Matrix3';
 import {Matrix4} from './Matrix4';
+import {Quaternion} from './Quaternion';
 
 class Vector3 {
     x: number;

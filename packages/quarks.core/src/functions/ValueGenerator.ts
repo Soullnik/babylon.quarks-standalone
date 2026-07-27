@@ -1,8 +1,8 @@
-import {FunctionJSON} from './FunctionJSON';
 import {ConstantValue} from './ConstantValue';
+import {FunctionJSON} from './FunctionJSON';
+import {GeneratorMemory} from './GeneratorMemory';
 import {IntervalValue} from './IntervalValue';
 import {PiecewiseBezier} from './PiecewiseBezier';
-import {GeneratorMemory} from './GeneratorMemory';
 
 /**
  * `startGen`/`genValue` follow the per-particle slot pattern documented in

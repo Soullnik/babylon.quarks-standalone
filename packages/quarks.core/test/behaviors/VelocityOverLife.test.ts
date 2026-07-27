@@ -5,8 +5,8 @@ import {
     Matrix4,
     PiecewiseBezier,
     SpriteParticle,
-    VelocityOverLife,
     Vector3,
+    VelocityOverLife,
 } from '../../src';
 
 const makePS = (worldSpace = false, matrixWorld = new Matrix4()) =>

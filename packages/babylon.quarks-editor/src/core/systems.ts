@@ -1,3 +1,4 @@
+import type {TransformNode} from '@babylonjs/core/Meshes/transformNode';
 import {
     ConeEmitter,
     ConstantColor,
@@ -7,7 +8,6 @@ import {
     RenderMode,
     Vector4,
 } from 'babylon.quarks';
-import type {TransformNode} from '@babylonjs/core/Meshes/transformNode';
 import type {EffectBinding} from './binding';
 
 export interface ChildSystemOptions {
@@ -35,7 +35,9 @@ export function createChildSystem(parent: ParticleSystem, options: ChildSystemOp
         startSize: new IntervalValue(0.05, 0.2),
         startColor: new ConstantColor(new Vector4(1, 0.9, 0.6, 1)),
         emissionOverTime: new ConstantValue(oneShot ? 0 : 30),
-        emissionBursts: oneShot ? [{time: 0, count: new ConstantValue(8), cycle: 1, interval: 0.01, probability: 1}] : [],
+        emissionBursts: oneShot
+            ? [{time: 0, count: new ConstantValue(8), cycle: 1, interval: 0.01, probability: 1}]
+            : [],
         shape: new ConeEmitter({radius: 0.1, angle: Math.PI / 3}),
         renderMode: RenderMode.BillBoard,
         texture: parent.texture ?? undefined,
@@ -70,7 +72,11 @@ export function unlinkSubEmitterReferences(systems: ParticleSystem[], removed: P
 }
 
 /** Disposes the given systems, first unlinking any sub-emitter behaviors that target them. */
-export function removeSystems(binding: EffectBinding, targets: ParticleSystem[], onSelect: (system: ParticleSystem) => void): void {
+export function removeSystems(
+    binding: EffectBinding,
+    targets: ParticleSystem[],
+    onSelect: (system: ParticleSystem) => void
+): void {
     // binding.system is "removable" too as long as some other top-level system can take over
     // as the new main — being main vs. sub is an internal bookkeeping detail, not something
     // that should make one arbitrary track un-deletable in the UI.

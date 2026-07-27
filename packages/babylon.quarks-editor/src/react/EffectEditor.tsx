@@ -1,16 +1,7 @@
-import React, {useSyncExternalStore} from 'react';
 import type {TransformNode} from '@babylonjs/core/Meshes/transformNode';
+import type {ParticleSystem} from 'babylon.quarks';
+import React, {useSyncExternalStore} from 'react';
 import {EffectBinding} from '../core/binding';
-import {ObjectModule} from './ObjectModule';
-import {
-    ColorOverLifeModule,
-    EmissionModule,
-    MainModule,
-    RendererModule,
-    ShapeModule,
-    SizeOverLifeModule,
-} from './modules';
-import type {GeometryData, GeometryOption, TextureOption} from './modules';
 import {
     CollisionModule,
     ColorBySpeedModule,
@@ -30,9 +21,18 @@ import {
     VelocityOverLifeModule,
     WidthOverTrailModule,
 } from './behaviorModules';
+import type {GeometryData, GeometryOption, TextureOption} from './modules';
+import {
+    ColorOverLifeModule,
+    EmissionModule,
+    MainModule,
+    RendererModule,
+    ShapeModule,
+    SizeOverLifeModule,
+} from './modules';
+import {ObjectModule} from './ObjectModule';
 import {SubEmittersModule} from './SubEmittersModule';
 import {theme} from './theme';
-import type {ParticleSystem} from 'babylon.quarks';
 
 export interface EffectEditorProps {
     binding: EffectBinding;
@@ -85,7 +85,8 @@ export function EffectEditor(props: EffectEditorProps) {
             <ObjectModule node={props.gizmoTargetNode} label={props.gizmoTargetLabel} />
             {!gizmoTargetIsEmitter && (
                 <div style={{fontSize: 11, color: theme.textDim, margin: '0 0 10px', lineHeight: 1.45}}>
-                    Modules below edit <strong>{activeSystem.emitter.name || 'particle system'}</strong>. Select its emitter in the timeline to move it with the gizmo.
+                    Modules below edit <strong>{activeSystem.emitter.name || 'particle system'}</strong>. Select its
+                    emitter in the timeline to move it with the gizmo.
                 </div>
             )}
             <MainModule binding={binding} />

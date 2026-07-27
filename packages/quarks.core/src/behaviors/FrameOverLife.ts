@@ -1,6 +1,6 @@
-import {Behavior} from './Behavior';
 import {Particle} from '../Particle';
 import {FunctionValueGenerator, PiecewiseBezier, ValueGeneratorFromJSON} from '../functions';
+import {Behavior} from './Behavior';
 
 /**
  * apply tile number of particle texture by particles' life.

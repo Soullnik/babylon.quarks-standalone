@@ -1,6 +1,6 @@
-import {Behavior} from './Behavior';
 import {Particle} from '../Particle';
 import {FunctionValueGenerator, ValueGeneratorFromJSON} from '../functions/ValueGenerator';
+import {Behavior} from './Behavior';
 
 /**
  * Apply speed to particles based on their life.

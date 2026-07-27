@@ -1,11 +1,15 @@
-import React from 'react';
 import {InformationCircleIcon} from '@heroicons/react/24/solid';
+import React from 'react';
 import {iconStyle} from './icons';
 import {theme} from './theme';
 import {Tooltip} from './Tooltip';
 
 /** Small info icon with a themed inspector tooltip. */
-export function InspectorInfoIcon(props: {content: string; size?: number; onClick?: (e: React.MouseEvent) => void}): React.ReactElement {
+export function InspectorInfoIcon(props: {
+    content: string;
+    size?: number;
+    onClick?: (e: React.MouseEvent) => void;
+}): React.ReactElement {
     const size = props.size ?? 13;
     return (
         <Tooltip content={props.content}>

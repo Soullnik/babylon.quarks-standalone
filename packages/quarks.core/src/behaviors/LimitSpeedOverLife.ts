@@ -1,6 +1,6 @@
-import {Behavior} from './Behavior';
 import {Particle} from '../Particle';
 import {FunctionValueGenerator, ValueGeneratorFromJSON} from '../functions';
+import {Behavior} from './Behavior';
 
 /**
  * Limit the speed of particles over their life.

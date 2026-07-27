@@ -1,6 +1,6 @@
-import {EmitterShape, ShapeJSON} from './EmitterUtil';
-import {Particle} from '../Particle';
 import {IParticleSystem} from '../IParticleSystem';
+import {Particle} from '../Particle';
+import {EmitterShape, ShapeJSON} from './EmitterUtil';
 
 /**
  * Interface representing the parameters for a grid emitter.

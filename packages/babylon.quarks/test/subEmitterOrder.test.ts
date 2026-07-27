@@ -8,14 +8,14 @@ import {
     Gradient,
     IntervalValue,
     PointEmitter,
+    Vector3 as QVector3,
     SphereEmitter,
     SubParticleEmitMode,
-    Vector3 as QVector3,
     Vector4,
 } from 'quarks.core';
-import {ParticleSystem} from '../src/ParticleSystem';
-import {ParticleEmitter} from '../src/ParticleEmitter';
 import {BatchedRenderer} from '../src/BatchedRenderer';
+import {ParticleEmitter} from '../src/ParticleEmitter';
+import {ParticleSystem} from '../src/ParticleSystem';
 import {RenderMode} from '../src/VFXBatch';
 
 /**
@@ -97,9 +97,7 @@ describe('sub emitter update order', () => {
         const parent = makeParent();
         const childEmitter = new ParticleEmitter(child);
         childEmitter.parent = parent.emitter;
-        parent.addBehavior(
-            new EmitSubParticleSystem(parent, false, childEmitter, SubParticleEmitMode.Birth)
-        );
+        parent.addBehavior(new EmitSubParticleSystem(parent, false, childEmitter, SubParticleEmitMode.Birth));
 
         const renderer = new BatchedRenderer('sub-order', scene);
         // Added child first on purpose: this is the order a loader produces when
@@ -131,9 +129,7 @@ describe('sub emitter update order', () => {
         const parent = makeParent();
         const childEmitter = new ParticleEmitter(child);
         childEmitter.parent = parent.emitter;
-        parent.addBehavior(
-            new EmitSubParticleSystem(parent, false, childEmitter, SubParticleEmitMode.Birth)
-        );
+        parent.addBehavior(new EmitSubParticleSystem(parent, false, childEmitter, SubParticleEmitMode.Birth));
 
         const renderer = new BatchedRenderer('sub-order-2', scene);
         renderer.addSystem(child);
@@ -193,9 +189,7 @@ describe('sub emitter update order', () => {
         });
         const childEmitter = new ParticleEmitter(child);
         childEmitter.parent = parent.emitter;
-        parent.addBehavior(
-            new EmitSubParticleSystem(parent, false, childEmitter, SubParticleEmitMode.Birth)
-        );
+        parent.addBehavior(new EmitSubParticleSystem(parent, false, childEmitter, SubParticleEmitMode.Birth));
 
         const renderer = new BatchedRenderer('sub-phase', scene);
         renderer.addSystem(child);

@@ -1,10 +1,15 @@
-
-import { ConstantValue, FunctionValueGenerator, GeneratorMemory, ValueGenerator, ValueGeneratorFromJSON } from "../functions";
-import { EmissionState, IParticleSystem } from "../IParticleSystem";
-import { Matrix4, Quaternion } from "../math";
-import { Particle } from "../Particle";
-import { UP_VEC3, ZERO_VEC3 } from "../util/MathUtil";
-import { EmitterMode, EmitterShape, getValueFromEmitterMode, ShapeJSON } from "./EmitterUtil";
+import {
+    ConstantValue,
+    FunctionValueGenerator,
+    GeneratorMemory,
+    ValueGenerator,
+    ValueGeneratorFromJSON,
+} from '../functions';
+import {EmissionState, IParticleSystem} from '../IParticleSystem';
+import {Matrix4, Quaternion} from '../math';
+import {Particle} from '../Particle';
+import {UP_VEC3, ZERO_VEC3} from '../util/MathUtil';
+import {EmitterMode, EmitterShape, getValueFromEmitterMode, ShapeJSON} from './EmitterUtil';
 
 /**
  * Interface representing the parameters for a rectangle emitter.
@@ -65,7 +70,7 @@ export class RectangleEmitter implements EmitterShape {
         this.spread = parameters.spread ?? 0;
         this.speed = parameters.speed ?? new ConstantValue(1);
         this.memory = [];
-        
+
         this._m1 = new Matrix4();
     }
 
@@ -85,20 +90,20 @@ export class RectangleEmitter implements EmitterShape {
         let x, y;
         if (point < this.width) {
             // Bottom edge
-            x = point - this.width/2;
-            y = -this.height/2;
+            x = point - this.width / 2;
+            y = -this.height / 2;
         } else if (point < this.width + this.height) {
             // Right edge
-            x = this.width/2;
-            y = point - this.width - this.height/2;
+            x = this.width / 2;
+            y = point - this.width - this.height / 2;
         } else if (point < 2 * this.width + this.height) {
             // Top edge
-            x = this.width/2 - (point - this.width - this.height);
-            y = this.height/2;
+            x = this.width / 2 - (point - this.width - this.height);
+            y = this.height / 2;
         } else {
             // Left edge
-            x = -this.width/2;
-            y = this.height/2 - (point - 2 * this.width - this.height);
+            x = -this.width / 2;
+            y = this.height / 2 - (point - 2 * this.width - this.height);
         }
 
         // Apply thickness - lerp from edge point toward center

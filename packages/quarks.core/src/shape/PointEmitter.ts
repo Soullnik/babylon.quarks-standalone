@@ -1,8 +1,8 @@
-import {EmitterShape, ShapeJSON} from './EmitterUtil';
-import {Particle} from '../Particle';
 import {IParticleSystem} from '../IParticleSystem';
-import { Matrix4, Quaternion } from '../math';
-import { UP_VEC3, ZERO_VEC3 } from '../util/MathUtil';
+import {Matrix4, Quaternion} from '../math';
+import {Particle} from '../Particle';
+import {UP_VEC3, ZERO_VEC3} from '../util/MathUtil';
+import {EmitterShape, ShapeJSON} from './EmitterUtil';
 
 /**
  * A point emitter emits particles from a single point.
@@ -11,7 +11,7 @@ export class PointEmitter implements EmitterShape {
     type = 'point';
 
     _m1: Matrix4;
-    
+
     constructor() {
         this._m1 = new Matrix4();
     }

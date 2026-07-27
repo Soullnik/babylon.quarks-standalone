@@ -1,6 +1,6 @@
-import {Scene} from '@babylonjs/core/scene';
 import {BaseTexture} from '@babylonjs/core/Materials/Textures/baseTexture';
 import {Texture} from '@babylonjs/core/Materials/Textures/texture';
+import {Scene} from '@babylonjs/core/scene';
 
 const atlasByCube = new WeakMap<BaseTexture, Texture>();
 const pendingByCube = new WeakMap<BaseTexture, Promise<Texture | null>>();
@@ -10,8 +10,8 @@ export function cubeFaceUrls(reflection: BaseTexture | null | undefined): string
     if (!reflection?.isCube) {
         return null;
     }
-    const files = (reflection as {files?: string[]; _files?: string[]}).files
-        ?? (reflection as {_files?: string[]})._files;
+    const files =
+        (reflection as {files?: string[]; _files?: string[]}).files ?? (reflection as {_files?: string[]})._files;
     return files?.length === 6 ? files.slice() : null;
 }
 

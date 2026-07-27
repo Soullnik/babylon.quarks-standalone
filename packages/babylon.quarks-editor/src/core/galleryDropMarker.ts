@@ -1,6 +1,6 @@
+import {StandardMaterial} from '@babylonjs/core/Materials/standardMaterial';
 import {Color3} from '@babylonjs/core/Maths/math.color';
 import {Vector3} from '@babylonjs/core/Maths/math.vector';
-import {StandardMaterial} from '@babylonjs/core/Materials/standardMaterial';
 import {Mesh} from '@babylonjs/core/Meshes/mesh';
 import {MeshBuilder} from '@babylonjs/core/Meshes/meshBuilder';
 import {TransformNode} from '@babylonjs/core/Meshes/transformNode';
@@ -15,7 +15,11 @@ export class GalleryDropMarker {
 
     constructor(scene: Scene) {
         this.root = new TransformNode('gallery-drop-root', scene);
-        this.disc = MeshBuilder.CreateDisc('gallery-drop-fill', {radius: 1, tessellation: 48, sideOrientation: Mesh.DOUBLESIDE}, scene);
+        this.disc = MeshBuilder.CreateDisc(
+            'gallery-drop-fill',
+            {radius: 1, tessellation: 48, sideOrientation: Mesh.DOUBLESIDE},
+            scene
+        );
         this.disc.parent = this.root;
         this.disc.rotation.x = Math.PI / 2;
 
