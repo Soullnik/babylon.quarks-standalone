@@ -6,7 +6,6 @@ import type {BatchedRenderer, ParticleSystem} from "babylon.quarks";
 export interface DemoState {
     totalTime?: number;
     refreshIndex?: number;
-    meshEnvEnabled?: boolean;
     explosion?: {elapsed: number; systems: ParticleSystem[]};
     subEmitter?: {elapsed: number; trackedSystems: ParticleSystem[]};
     droppedJsonPreview?: {elapsed: number; systems: ParticleSystem[]};

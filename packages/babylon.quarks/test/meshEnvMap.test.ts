@@ -77,7 +77,7 @@ describe('mesh particle environment map', () => {
         system.dispose();
     });
 
-    it('keeps USE_ENVMAP_ATLAS gated off unless SpriteBatch.meshEnvEnabled', () => {
+    it('enables USE_ENVMAP_ATLAS when reflectionAtlas is ready', () => {
         const atlas = new Texture('data:atlas2', scene, {
             noMipmap: true,
             invertY: false,
@@ -104,15 +104,9 @@ describe('mesh particle environment map', () => {
         renderer.addSystem(system);
         renderer.update(1 / 60);
 
-        let defines = (renderer.batches[0].mesh.material as any).options.defines as string[];
+        const defines = (renderer.batches[0].mesh.material as any).options.defines as string[];
         expect(defines).toContain('USE_MAP');
-        expect(defines).not.toContain('USE_ENVMAP_ATLAS');
-
-        SpriteBatch.meshEnvEnabled = true;
-        (renderer.batches[0] as SpriteBatch).rebuildMaterial();
-        defines = (renderer.batches[0].mesh.material as any).options.defines as string[];
         expect(defines).toContain('USE_ENVMAP_ATLAS');
-        SpriteBatch.meshEnvEnabled = false;
 
         renderer.dispose();
         system.dispose();

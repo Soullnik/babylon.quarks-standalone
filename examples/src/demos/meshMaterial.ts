@@ -38,11 +38,7 @@ function loadImage(url: string): Promise<HTMLImageElement> {
     });
 }
 
-/**
- * Packs the six cube faces into one 3×2 atlas. Kept ready for the temporary
- * "Try env" phone debug toggle — iOS WebKit still rejects atlas sampling with
- * GL_INVALID_OPERATION, so the demo stays lit-only until that is resolved.
- */
+/** Packs the six cube faces into one 3×2 atlas (px py pz / nx ny nz). */
 async function createEnvAtlas(scene: DemoContext['scene']): Promise<Texture> {
     const images = await Promise.all(ENV_FACE_URLS.map((url) => loadImage(url)));
     const size = images[0].width;
@@ -66,22 +62,17 @@ async function createEnvAtlas(scene: DemoContext['scene']): Promise<Texture> {
     return atlas;
 }
 
-export async function init({scene, camera, batchRenderer, systems, demoState}: DemoContext) {
+export async function init({scene, camera, batchRenderer, systems}: DemoContext) {
     camera.setPosition(new BVector3(0, 6, 16));
 
-    // Prebuild the atlas for the debug "Try env" path, but do not attach it
-    // unless explicitly requested — sampling it on iOS currently yields 1282.
-    const wantEnv = !!(demoState as {meshEnvEnabled?: boolean}).meshEnvEnabled;
-    const envAtlas = wantEnv ? await createEnvAtlas(scene) : null;
+    const envAtlas = await createEnvAtlas(scene);
 
     const meshMaterial = new StandardMaterial('meshParticleMaterial', scene);
     meshMaterial.backFaceCulling = false;
     meshMaterial.alpha = 1;
     meshMaterial.transparencyMode = null;
-    if (envAtlas) {
-        (meshMaterial as any).reflectionAtlas = envAtlas;
-        (meshMaterial as any).reflectionLevel = 1;
-    }
+    (meshMaterial as any).reflectionAtlas = envAtlas;
+    (meshMaterial as any).reflectionLevel = 1;
 
     // Same class of texture AlphaTest / SubEmitter use successfully on iPhone.
     const diffuse = new Texture('textures/particle_default.png', scene);
