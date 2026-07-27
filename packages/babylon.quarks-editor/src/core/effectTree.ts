@@ -46,7 +46,7 @@ export function collectSystems(tree: EffectTreeNode): ParticleSystem[] {
 }
 
 interface SerializeMeta {
-    textures: {[k: string]: {url?: string; name?: string}};
+    textures: {[k: string]: {url?: string; name?: string; invertY?: boolean}};
     materials: {[k: string]: {[key: string]: unknown}};
     geometries: {[k: string]: unknown};
 }
@@ -113,7 +113,7 @@ function finishEnvelope(object: Record<string, unknown>, meta: SerializeMeta): s
     // toJSON stashes live Texture instances and material records in meta; flatten them into
     // the serializable images/textures/materials arrays QuarksLoader expects.
     const images: Array<{uuid: string; url: string}> = [];
-    const textures: Array<{uuid: string; image?: string}> = [];
+    const textures: Array<{uuid: string; image?: string; invertY?: boolean; noMipmap?: boolean}> = [];
     for (const [uuid, tex] of Object.entries(meta.textures)) {
         const url = tex?.url ?? tex?.name;
         const invertY = typeof tex?.invertY === 'boolean' ? tex.invertY : undefined;
