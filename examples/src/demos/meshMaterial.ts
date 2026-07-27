@@ -2,6 +2,7 @@ import type { DemoContext } from '../types';
 import {Vector3 as BVector3} from '@babylonjs/core/Maths/math.vector';
 import {StandardMaterial} from '@babylonjs/core/Materials/standardMaterial';
 import {CubeTexture} from '@babylonjs/core/Materials/Textures/cubeTexture';
+import {Texture} from '@babylonjs/core/Materials/Textures/texture';
 import {MeshBuilder} from '@babylonjs/core/Meshes/meshBuilder';
 import {VertexBuffer} from '@babylonjs/core/Buffers/buffer';
 import {Constants} from '@babylonjs/core/Engines/constants';
@@ -21,8 +22,9 @@ import {
 export function init({scene, camera, batchRenderer, systems}: DemoContext) {
     camera.setPosition(new BVector3(0, 6, 16));
 
-    // Six face files go in CubeTexture's `files` slot (5th arg / options.files),
-    // not extensions — otherwise Babylon builds the wrong URLs.
+    // noMipmap: true — on iOS WebKit, a cube that expects mipmaps but never gets a
+    // complete chain throws GL_INVALID_OPERATION (1282) on every draw, so the
+    // particle batch is culled while the CPU count keeps moving.
     const envMap = CubeTexture.CreateFromImages(
         [
             'textures/cube/posx.jpg',
@@ -32,8 +34,11 @@ export function init({scene, camera, batchRenderer, systems}: DemoContext) {
             'textures/cube/negy.jpg',
             'textures/cube/negz.jpg',
         ],
-        scene
+        scene,
+        true
     );
+    envMap.coordinatesMode = Texture.CUBIC_MODE;
+    envMap.updateSamplingMode(Texture.LINEAR_LINEAR);
 
     // StandardMaterial is the public API surface: applyMaterialSettings reads
     // reflectionTexture into the mesh batch. Do not assign it to a scene mesh —
@@ -42,6 +47,7 @@ export function init({scene, camera, batchRenderer, systems}: DemoContext) {
     const meshMaterial = new StandardMaterial('meshParticleMaterial', scene);
     meshMaterial.backFaceCulling = false;
     meshMaterial.alpha = 0.95;
+    meshMaterial.transparencyMode = null;
     meshMaterial.reflectionTexture = envMap;
 
     const particleMesh = MeshBuilder.CreateCapsule(
@@ -78,6 +84,7 @@ export function init({scene, camera, batchRenderer, systems}: DemoContext) {
         renderMode: RenderMode.Mesh,
         transparent: true,
         blendMode: Constants.ALPHA_COMBINE,
+        alphaTest: 0,
         startTileIndex: new ConstantValue(0),
         uTileCount: 1,
         vTileCount: 1,

@@ -156,10 +156,27 @@ export class SpriteBatch extends VFXBatch {
         if (this.settings.texture) {
             defines.push('USE_MAP');
         }
+        // Only sample the cubemap once it is GPU-complete. Binding/sampling an
+        // incomplete cube (or one whose mip chain never finished) raises
+        // GL_INVALID_OPERATION (1282) on iOS WebKit and the draw is dropped —
+        // particles keep ticking but nothing appears.
+        const reflectionTexture = this.settings.reflectionTexture;
+        const envPending =
+            this.settings.renderMode === RenderMode.Mesh &&
+            !!reflectionTexture &&
+            reflectionTexture.isCube &&
+            !reflectionTexture.isReady();
+        if (envPending && reflectionTexture) {
+            const onLoad = (reflectionTexture as {onLoadObservable?: {addOnce: (cb: () => void) => void}}).onLoadObservable;
+            onLoad?.addOnce(() => {
+                this.rebuildMaterial();
+            });
+        }
         const useEnvMap =
             this.settings.renderMode === RenderMode.Mesh &&
-            !!this.settings.reflectionTexture &&
-            this.settings.reflectionTexture.isCube;
+            !!reflectionTexture &&
+            reflectionTexture.isCube &&
+            reflectionTexture.isReady();
         if (useEnvMap) {
             defines.push('USE_ENVMAP');
         }

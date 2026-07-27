@@ -596,11 +596,23 @@ export class ParticleSystem implements IParticleSystem {
                     : this.rendererSettings.materialDepthWrite);
         const resolvedAlphaTest =
             overrides.alphaTest ??
-            (typeof material?.alphaCutOff === 'number'
-                ? material.alphaCutOff
-                : typeof material?.alphaCutOffValue === 'number'
-                    ? material.alphaCutOffValue
-                    : this.rendererSettings.materialAlphaTest);
+            (() => {
+                // StandardMaterial always has alphaCutOff (default 0.4). Only treat it as
+                // particle alpha-test when the material is actually in an alpha-test mode —
+                // otherwise Mesh Material demos wrongly enable USE_ALPHATEST.
+                const mode = material?.transparencyMode;
+                const alphaTestMode = mode === 1 || mode === 3;
+                if (alphaTestMode && typeof material?.alphaCutOff === 'number') {
+                    return material.alphaCutOff;
+                }
+                if (alphaTestMode && typeof material?.alphaCutOffValue === 'number') {
+                    return material.alphaCutOffValue;
+                }
+                if (material) {
+                    return 0;
+                }
+                return this.rendererSettings.materialAlphaTest;
+            })();
 
         this.rendererSettings.texture = resolvedTexture;
         this.rendererSettings.reflectionTexture = resolvedReflection;

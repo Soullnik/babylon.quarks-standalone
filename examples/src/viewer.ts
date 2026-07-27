@@ -249,7 +249,11 @@ function dumpMeshDiagnostics(reason: string) {
                 "envReady",
                 settings.reflectionTexture ? settings.reflectionTexture.isReady() : "n/a",
                 "envLevel",
-                settings.reflectionLevel
+                settings.reflectionLevel,
+                "noMip",
+                (settings.reflectionTexture as any)?.noMipmap ?? (settings.reflectionTexture as any)?._noMipmap,
+                "samp",
+                settings.reflectionTexture?.samplingMode
             );
             if (mat instanceof ShaderMaterial) {
                 const defines = (mat as any).options?.defines ?? [];
@@ -299,8 +303,15 @@ function dumpMeshDiagnostics(reason: string) {
         }
         const gl = (engine as any)._gl as WebGLRenderingContext | undefined;
         if (gl) {
-            const glErr = gl.getError();
-            phoneLog("INF", "webgl getError", glErr);
+            // Drain the error queue so a sticky INVALID_OPERATION is distinguishable
+            // from a fresh one each dump.
+            let last = 0;
+            let err = gl.getError();
+            while (err !== gl.NO_ERROR) {
+                last = err;
+                err = gl.getError();
+            }
+            phoneLog("INF", "webgl lastError", last, last === 1282 ? "INVALID_OPERATION" : "");
         }
     } catch (e) {
         phoneLog("ERR", "dumpMeshDiagnostics failed", e);

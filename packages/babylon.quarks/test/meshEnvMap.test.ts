@@ -101,6 +101,7 @@ describe('mesh particle environment map', () => {
 
     it('enables USE_ENVMAP on the mesh ShaderMaterial when a cube map is present', () => {
         const env = makeEnv('shader');
+        jest.spyOn(env, 'isReady').mockReturnValue(true);
         const material = new StandardMaterial('env-shader', scene);
         material.reflectionTexture = env;
 
@@ -123,10 +124,32 @@ describe('mesh particle environment map', () => {
         const batch = renderer.batches[0] as SpriteBatch;
         const defines = (batch.mesh.material as any).options.defines as string[];
         expect(defines).toContain('USE_ENVMAP');
+        expect(defines).not.toContain('USE_ALPHATEST');
 
         renderer.dispose();
         system.dispose();
         material.dispose();
         env.dispose();
+    });
+
+    it('does not enable alpha-test from StandardMaterial default alphaCutOff', () => {
+        const material = new StandardMaterial('no-at', scene);
+        expect(material.alphaCutOff).toBeCloseTo(0.4, 5);
+        material.transparencyMode = null;
+
+        const system = new ParticleSystem({
+            scene,
+            startLife: new ConstantValue(1),
+            emissionOverTime: new ConstantValue(0),
+            renderMode: RenderMode.Mesh,
+            material,
+            transparent: true,
+            blendMode: Constants.ALPHA_COMBINE,
+        });
+
+        expect(system.getRendererSettings().materialAlphaTest).toBe(0);
+
+        system.dispose();
+        material.dispose();
     });
 });
