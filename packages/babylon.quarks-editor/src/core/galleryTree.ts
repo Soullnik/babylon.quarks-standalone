@@ -29,14 +29,19 @@ export function buildGalleryTree(entries: GalleryEntry[]): GalleryTreeNode[] {
 
     for (const entry of entries) {
         const normalized = entry.path.replace(/\\/g, '/');
-        const segments = normalized.replace(/\.json$/i, '').split('/').filter(Boolean);
+        const segments = normalized
+            .replace(/\.json$/i, '')
+            .split('/')
+            .filter(Boolean);
         const fileName = segments.pop() ?? entry.name;
         let level = roots;
         let pathSoFar = '';
 
         for (const segment of segments) {
             pathSoFar = pathSoFar ? `${pathSoFar}/${segment}` : segment;
-            let folder = level.find((node): node is GalleryTreeFolder => node.kind === 'folder' && node.name === segment);
+            let folder = level.find(
+                (node): node is GalleryTreeFolder => node.kind === 'folder' && node.name === segment
+            );
             if (!folder) {
                 folder = {kind: 'folder', name: segment, path: pathSoFar, children: []};
                 level.push(folder);
@@ -90,9 +95,7 @@ export function filterGalleryTree(nodes: GalleryTreeNode[], query: string): Gall
 
 export const GALLERY_DRAG_MIME = 'application/x-quarks-gallery-drop';
 
-export type GalleryDragPayload =
-    | {kind: 'effect'; id: number}
-    | {kind: 'folder'; path: string};
+export type GalleryDragPayload = {kind: 'effect'; id: number} | {kind: 'folder'; path: string};
 
 export function writeGalleryDrag(dataTransfer: DataTransfer, payload: GalleryDragPayload): void {
     dataTransfer.setData(GALLERY_DRAG_MIME, JSON.stringify(payload));

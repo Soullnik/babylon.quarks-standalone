@@ -7,7 +7,6 @@ class Vector2 {
     static isVector2 = true;
 
     constructor(x = 0, y = 0) {
-
         this.x = x;
         this.y = y;
     }

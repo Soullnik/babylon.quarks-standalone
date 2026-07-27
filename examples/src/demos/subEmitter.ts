@@ -1,7 +1,7 @@
-import type { DemoContext } from '../types';
 import {Vector3 as BVector3} from '@babylonjs/core/Maths/math.vector';
 import type {TransformNode} from '@babylonjs/core/Meshes/transformNode';
-import {QuarksLoader, ParticleEmitter, ParticleSystem} from 'babylon.quarks';
+import {ParticleEmitter, ParticleSystem, QuarksLoader} from 'babylon.quarks';
+import type {DemoContext} from '../types';
 
 async function loadEffectAndAttach({
     scene,
@@ -45,7 +45,15 @@ async function loadEffectAndAttach({
 export async function init({scene, camera, batchRenderer, systems, demoState}: DemoContext) {
     camera.setPosition(new BVector3(0, 8, 18));
     const trackedSystems: ParticleSystem[] = [];
-    await loadEffectAndAttach({scene, batchRenderer, systems, path: 'AcidBoiling.json', positionX: -5, scale: 2, trackedSystems});
+    await loadEffectAndAttach({
+        scene,
+        batchRenderer,
+        systems,
+        path: 'AcidBoiling.json',
+        positionX: -5,
+        scale: 2,
+        trackedSystems,
+    });
     await loadEffectAndAttach({scene, batchRenderer, systems, path: 'subEmitter2.json', positionX: 5, trackedSystems});
     demoState.subEmitter = {elapsed: 0, trackedSystems};
 }

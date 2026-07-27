@@ -1,24 +1,24 @@
-import {Scene} from "@babylonjs/core/scene";
-import {ArcRotateCamera} from "@babylonjs/core/Cameras/arcRotateCamera";
-import {HemisphericLight} from "@babylonjs/core/Lights/hemisphericLight";
-import {Vector3 as BVector3} from "@babylonjs/core/Maths/math.vector";
-import {Color4} from "@babylonjs/core/Maths/math.color";
-import {BatchedRenderer, ParticleSystem} from "babylon.quarks";
-import {loadQuarksFromJson} from "./loadQuarksJson";
-import {createEngineFromQuery} from "./shared/engineFactory";
-import {ensurePortableTextureUrl, serializeEffectForest} from "babylon.quarks-editor";
-import type {TransformNode} from "@babylonjs/core/Meshes/transformNode";
-import {demos} from "./registry";
-import type {DemoContext, DemoDefinition, DemoState} from "./types";
+import {ArcRotateCamera} from '@babylonjs/core/Cameras/arcRotateCamera';
+import {HemisphericLight} from '@babylonjs/core/Lights/hemisphericLight';
+import {Color4} from '@babylonjs/core/Maths/math.color';
+import {Vector3 as BVector3} from '@babylonjs/core/Maths/math.vector';
+import type {TransformNode} from '@babylonjs/core/Meshes/transformNode';
+import {Scene} from '@babylonjs/core/scene';
+import {BatchedRenderer, ParticleSystem} from 'babylon.quarks';
+import {ensurePortableTextureUrl, serializeEffectForest} from 'babylon.quarks-editor';
+import {loadQuarksFromJson} from './loadQuarksJson';
+import {demos} from './registry';
+import {createEngineFromQuery} from './shared/engineFactory';
+import type {DemoContext, DemoDefinition, DemoState} from './types';
 
-const GITHUB_BASE = "https://github.com/Soullnik/babylon.quarks-standalone/blob/main/";
-const DROPPED_JSON_DEMO_KEY = "__dropped_json__";
+const GITHUB_BASE = 'https://github.com/Soullnik/babylon.quarks-standalone/blob/main/';
+const DROPPED_JSON_DEMO_KEY = '__dropped_json__';
 const DROPPED_JSON_REFRESH_TIME = 2;
 
-const canvas = document.getElementById("renderer-canvas") as HTMLCanvasElement;
-const demoSelect = document.getElementById("demo-select") as HTMLSelectElement;
-const jsonFileInput = document.getElementById("json-file-input") as HTMLInputElement | null;
-const dropOverlay = document.getElementById("drop-overlay");
+const canvas = document.getElementById('renderer-canvas') as HTMLCanvasElement;
+const demoSelect = document.getElementById('demo-select') as HTMLSelectElement;
+const jsonFileInput = document.getElementById('json-file-input') as HTMLInputElement | null;
+const dropOverlay = document.getElementById('drop-overlay');
 const engine = await createEngineFromQuery(canvas);
 
 let scene: Scene;
@@ -35,12 +35,12 @@ let dragDepth = 0;
 
 const droppedJsonDemo: DemoDefinition = {
     key: DROPPED_JSON_DEMO_KEY,
-    name: "Dropped JSON",
-    module: "dropped",
-    sourcePath: "examples/src/viewer.ts",
-    description: "Preview a Quarks JSON file dropped or opened from disk.",
-    tags: ["import"],
-    preview: {icon: "JS", gradient: "linear-gradient(135deg, #6f90e9 0%, #1e2f72 100%)"},
+    name: 'Dropped JSON',
+    module: 'dropped',
+    sourcePath: 'examples/src/viewer.ts',
+    description: 'Preview a Quarks JSON file dropped or opened from disk.',
+    tags: ['import'],
+    preview: {icon: 'JS', gradient: 'linear-gradient(135deg, #6f90e9 0%, #1e2f72 100%)'},
     init: async () => {},
     onFrame: ({demoState: state}, delta) => {
         const preview = state.droppedJsonPreview;
@@ -65,7 +65,7 @@ const droppedJsonDemo: DemoDefinition = {
 function ensureDroppedJsonOption(label: string) {
     let option = demoSelect.querySelector(`option[value="${DROPPED_JSON_DEMO_KEY}"]`) as HTMLOptionElement | null;
     if (!option) {
-        option = document.createElement("option");
+        option = document.createElement('option');
         option.value = DROPPED_JSON_DEMO_KEY;
         demoSelect.insertBefore(option, demoSelect.firstChild);
     }
@@ -89,27 +89,27 @@ function createBaseScene() {
     scene.useRightHandedSystem = true;
     scene.clearColor = new Color4(0.05, 0.05, 0.08, 1);
 
-    camera = new ArcRotateCamera("camera", -Math.PI / 2, Math.PI / 3, 20, BVector3.Zero(), scene);
+    camera = new ArcRotateCamera('camera', -Math.PI / 2, Math.PI / 3, 20, BVector3.Zero(), scene);
     camera.attachControl(canvas, true);
     camera.minZ = 0.1;
-    new HemisphericLight("light", new BVector3(0, 1, 0), scene);
+    new HemisphericLight('light', new BVector3(0, 1, 0), scene);
 
-    batchRenderer = new BatchedRenderer("batchRenderer", scene);
+    batchRenderer = new BatchedRenderer('batchRenderer', scene);
     systems = [];
     demoState = {totalTime: 0, refreshIndex: 0};
 }
 
 function updateSourceLink() {
-    const sourceLink = document.getElementById("source-link") as HTMLAnchorElement | null;
+    const sourceLink = document.getElementById('source-link') as HTMLAnchorElement | null;
     if (!sourceLink || !activeDemo) {
         return;
     }
     if (activeDemo.key === DROPPED_JSON_DEMO_KEY) {
-        sourceLink.href = GITHUB_BASE + "packages/babylon.quarks/src/QuarksLoader.ts";
-        sourceLink.textContent = "Loader";
+        sourceLink.href = GITHUB_BASE + 'packages/babylon.quarks/src/QuarksLoader.ts';
+        sourceLink.textContent = 'Loader';
         return;
     }
-    sourceLink.textContent = "Source";
+    sourceLink.textContent = 'Source';
     sourceLink.href = GITHUB_BASE + activeDemo.sourcePath;
 }
 
@@ -120,7 +120,7 @@ function updateDemoSelectValue() {
 }
 
 function updateDemoTitle() {
-    const title = document.getElementById("demo-name");
+    const title = document.getElementById('demo-name');
     if (title && activeDemo) {
         title.textContent = activeDemo.name;
     }
@@ -128,14 +128,14 @@ function updateDemoTitle() {
 
 function setDropOverlayVisible(visible: boolean) {
     if (dropOverlay) {
-        dropOverlay.classList.toggle("is-visible", visible);
+        dropOverlay.classList.toggle('is-visible', visible);
     }
 }
 
 /** Loads a Quarks JSON file from disk into the viewer. */
 async function loadDroppedJsonFile(file: File) {
-    if (!file.name.toLowerCase().endsWith(".json")) {
-        throw new Error("Please choose a .json file exported from Quarks.");
+    if (!file.name.toLowerCase().endsWith('.json')) {
+        throw new Error('Please choose a .json file exported from Quarks.');
     }
 
     const token = ++loadToken;
@@ -156,7 +156,7 @@ async function loadDroppedJsonFile(file: File) {
     ensureDroppedJsonOption(file.name);
     updateDemoTitle();
     updateDemoSelectValue();
-    window.location.hash = "#" + DROPPED_JSON_DEMO_KEY;
+    window.location.hash = '#' + DROPPED_JSON_DEMO_KEY;
     updateSourceLink();
 }
 
@@ -167,7 +167,7 @@ function getJsonFileFromDataTransfer(dataTransfer: DataTransfer | null): File | 
     }
     for (let i = 0; i < dataTransfer.files.length; i++) {
         const file = dataTransfer.files[i];
-        if (file.name.toLowerCase().endsWith(".json")) {
+        if (file.name.toLowerCase().endsWith('.json')) {
             return file;
         }
     }
@@ -186,16 +186,16 @@ async function loadDemo(index: number) {
         }
         updateDemoTitle();
         updateDemoSelectValue();
-        window.location.hash = "#" + activeDemo.key;
+        window.location.hash = '#' + activeDemo.key;
         updateSourceLink();
     } catch (e) {
         if (token !== loadToken) {
             return;
         }
-        console.error("Error loading demo:", e);
-        const title = document.getElementById("demo-name");
+        console.error('Error loading demo:', e);
+        const title = document.getElementById('demo-name');
         if (title) {
-            title.textContent = "Error: " + (e as Error).message;
+            title.textContent = 'Error: ' + (e as Error).message;
         }
     }
 }
@@ -211,29 +211,29 @@ function previousDemo() {
 }
 
 function setupJsonImportUi() {
-    document.getElementById("openJsonBtn")?.addEventListener("click", () => {
+    document.getElementById('openJsonBtn')?.addEventListener('click', () => {
         jsonFileInput?.click();
     });
 
-    jsonFileInput?.addEventListener("change", async () => {
+    jsonFileInput?.addEventListener('change', async () => {
         const file = jsonFileInput.files?.[0];
-        jsonFileInput.value = "";
+        jsonFileInput.value = '';
         if (!file) {
             return;
         }
         try {
             await loadDroppedJsonFile(file);
         } catch (e) {
-            console.error("Error loading JSON file:", e);
-            const title = document.getElementById("demo-name");
+            console.error('Error loading JSON file:', e);
+            const title = document.getElementById('demo-name');
             if (title) {
-                title.textContent = "Error: " + (e as Error).message;
+                title.textContent = 'Error: ' + (e as Error).message;
             }
         }
     });
 
     const onDragEnter = (event: DragEvent) => {
-        if (!event.dataTransfer?.types.includes("Files")) {
+        if (!event.dataTransfer?.types.includes('Files')) {
             return;
         }
         event.preventDefault();
@@ -242,7 +242,7 @@ function setupJsonImportUi() {
     };
 
     const onDragLeave = (event: DragEvent) => {
-        if (!event.dataTransfer?.types.includes("Files")) {
+        if (!event.dataTransfer?.types.includes('Files')) {
             return;
         }
         event.preventDefault();
@@ -253,15 +253,15 @@ function setupJsonImportUi() {
     };
 
     const onDragOver = (event: DragEvent) => {
-        if (!event.dataTransfer?.types.includes("Files")) {
+        if (!event.dataTransfer?.types.includes('Files')) {
             return;
         }
         event.preventDefault();
-        event.dataTransfer.dropEffect = "copy";
+        event.dataTransfer.dropEffect = 'copy';
     };
 
     const onDrop = async (event: DragEvent) => {
-        if (!event.dataTransfer?.types.includes("Files")) {
+        if (!event.dataTransfer?.types.includes('Files')) {
             return;
         }
         event.preventDefault();
@@ -275,21 +275,21 @@ function setupJsonImportUi() {
         try {
             await loadDroppedJsonFile(file);
         } catch (e) {
-            console.error("Error loading dropped JSON:", e);
-            const title = document.getElementById("demo-name");
+            console.error('Error loading dropped JSON:', e);
+            const title = document.getElementById('demo-name');
             if (title) {
-                title.textContent = "Error: " + (e as Error).message;
+                title.textContent = 'Error: ' + (e as Error).message;
             }
         }
     };
 
-    window.addEventListener("dragenter", onDragEnter);
-    window.addEventListener("dragleave", onDragLeave);
-    window.addEventListener("dragover", onDragOver);
-    window.addEventListener("drop", onDrop);
+    window.addEventListener('dragenter', onDragEnter);
+    window.addEventListener('dragleave', onDragLeave);
+    window.addEventListener('dragover', onDragOver);
+    window.addEventListener('drop', onDrop);
 }
 
-document.getElementById("openInEditorBtn")?.addEventListener("click", async () => {
+document.getElementById('openInEditorBtn')?.addEventListener('click', async () => {
     if (systems.length === 0) {
         return;
     }
@@ -313,8 +313,8 @@ document.getElementById("openInEditorBtn")?.addEventListener("click", async () =
             await ensurePortableTextureUrl(system.texture);
         }
     }
-    sessionStorage.setItem("quarks-editor-effect", serializeEffectForest([...roots], activeDemo?.name ?? "DemoEffect"));
-    window.location.href = "./editor.html?effect=session";
+    sessionStorage.setItem('quarks-editor-effect', serializeEffectForest([...roots], activeDemo?.name ?? 'DemoEffect'));
+    window.location.href = './editor.html?effect=session';
 });
 
 // Debug/testing hook: reach the live demo systems from the console/smoke tests.
@@ -324,9 +324,9 @@ document.getElementById("openInEditorBtn")?.addEventListener("click", async () =
     },
 };
 
-document.getElementById("nextBtn")?.addEventListener("click", nextDemo);
-document.getElementById("previousBtn")?.addEventListener("click", previousDemo);
-demoSelect.addEventListener("change", (event) => {
+document.getElementById('nextBtn')?.addEventListener('click', nextDemo);
+document.getElementById('previousBtn')?.addEventListener('click', previousDemo);
+demoSelect.addEventListener('change', (event) => {
     const selectedKey = (event.target as HTMLSelectElement).value;
     if (selectedKey === DROPPED_JSON_DEMO_KEY) {
         return;
@@ -338,16 +338,16 @@ demoSelect.addEventListener("change", (event) => {
     }
 });
 
-document.addEventListener("keydown", (event) => {
-    if (event.key === "ArrowRight") {
+document.addEventListener('keydown', (event) => {
+    if (event.key === 'ArrowRight') {
         nextDemo();
     }
-    if (event.key === "ArrowLeft") {
+    if (event.key === 'ArrowLeft') {
         previousDemo();
     }
 });
 
-window.addEventListener("hashchange", () => {
+window.addEventListener('hashchange', () => {
     const hash = window.location.hash.substring(1);
     if (hash === DROPPED_JSON_DEMO_KEY) {
         return;
@@ -360,7 +360,7 @@ window.addEventListener("hashchange", () => {
 });
 
 demos.forEach((demoItem) => {
-    const option = document.createElement("option");
+    const option = document.createElement('option');
     option.value = demoItem.key;
     option.textContent = demoItem.name;
     demoSelect.appendChild(option);
@@ -375,6 +375,7 @@ if (window.location.hash) {
 }
 
 setupJsonImportUi();
+
 loadDemo(demoIndex);
 
 engine.runRenderLoop(() => {
@@ -393,7 +394,7 @@ engine.runRenderLoop(() => {
         for (const system of systems) {
             totalParticles += system.particleNum;
         }
-        const particleCount = document.getElementById("particleCount");
+        const particleCount = document.getElementById('particleCount');
         if (particleCount) {
             particleCount.textContent = totalParticles.toString();
         }
@@ -401,7 +402,7 @@ engine.runRenderLoop(() => {
         frameCount++;
         const now = performance.now();
         if (now - lastFpsTime >= 1000) {
-            const fps = document.getElementById("fps");
+            const fps = document.getElementById('fps');
             if (fps) {
                 fps.textContent = frameCount.toString();
             }
@@ -411,8 +412,8 @@ engine.runRenderLoop(() => {
 
         scene.render();
     } catch (e) {
-        console.error("Render error:", e);
+        console.error('Render error:', e);
     }
 });
 
-window.addEventListener("resize", () => engine.resize());
+window.addEventListener('resize', () => engine.resize());

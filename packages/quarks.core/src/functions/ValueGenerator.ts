@@ -1,8 +1,8 @@
-import {FunctionJSON} from './FunctionJSON';
 import {ConstantValue} from './ConstantValue';
+import {FunctionJSON} from './FunctionJSON';
+import {GeneratorMemory} from './GeneratorMemory';
 import {IntervalValue} from './IntervalValue';
 import {PiecewiseBezier} from './PiecewiseBezier';
-import {GeneratorMemory} from './GeneratorMemory';
 
 /**
  * `startGen`/`genValue` follow the per-particle slot pattern documented in
@@ -13,6 +13,8 @@ export interface ValueGenerator {
     type: 'value';
     startGen(memory: any): void;
     genValue(memory: any): number;
+    /** See FunctionValueGenerator.refreshTable. */
+    refreshTable?(): void;
     toJSON(): FunctionJSON;
     clone(): ValueGenerator;
 }
@@ -21,6 +23,13 @@ export interface FunctionValueGenerator {
     type: 'function';
     startGen(memory: GeneratorMemory): void;
     genValue(memory: GeneratorMemory, t: number): number;
+    /**
+     * Optional hook for generators that can precompute a sampled table of
+     * themselves. Called once per frame by behaviors that evaluate the
+     * generator per particle, before any genValue of that frame, so a curve
+     * edited between frames is picked up.
+     */
+    refreshTable?(): void;
     toJSON(): FunctionJSON;
     clone(): FunctionValueGenerator;
 }

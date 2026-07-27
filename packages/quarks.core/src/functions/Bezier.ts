@@ -2,16 +2,15 @@ export class Bezier {
     p: number[];
 
     constructor(p1: number, p2: number, p3: number, p4: number) {
-        this.p = [p1 ,p2, p3, p4];
+        this.p = [p1, p2, p3, p4];
     }
 
     genValue(t: number): number {
+        const p = this.p;
         const t2 = t * t;
-        const t3 = t * t * t;
         const mt = 1 - t;
         const mt2 = mt * mt;
-        const mt3 = mt2 * mt;
-        return this.p[0] * mt3 + this.p[1] * mt2 * t * 3 + this.p[2] * mt * t2 * 3 + this.p[3] * t3;
+        return p[0] * mt2 * mt + p[1] * mt2 * t * 3 + p[2] * mt * t2 * 3 + p[3] * t2 * t;
     }
 
     // get the coefficients of the polynomial's derivatives
@@ -36,7 +35,7 @@ export class Bezier {
         const a = mt * mt;
         const b = mt * t * 2;
         const c = t * t;
-        return  a * p[0] + b * p[1] + c * p[2];
+        return a * p[0] + b * p[1] + c * p[2];
         //return  a * (p[1] - p[0]) * 3 + b * (p[2] - p[1]) * 3 + c * (p[3] - p[2]) * 3;
     }
 
@@ -77,9 +76,9 @@ export class Bezier {
         // no shortcut: use "de Casteljau" iteration.
         const q = this.hull(t);
         const result = {
-            left : new Bezier(q[0], q[4], q[7], q[9]),
+            left: new Bezier(q[0], q[4], q[7], q[9]),
             right: new Bezier(q[9], q[8], q[6], q[3]),
-            span: q
+            span: q,
         };
         return result;
     }
@@ -90,14 +89,14 @@ export class Bezier {
 
     toJSON() {
         return {
-            p0 : this.p[0],
-            p1 : this.p[1],
-            p2 : this.p[2],
-            p3 : this.p[3],
+            p0: this.p[0],
+            p1: this.p[1],
+            p2: this.p[2],
+            p3: this.p[3],
         };
     }
 
-    static fromJSON(json: {p0: number, p1: number, p2: number, p3: number}): Bezier {
+    static fromJSON(json: {p0: number; p1: number; p2: number; p3: number}): Bezier {
         return new Bezier(json.p0, json.p1, json.p2, json.p3);
     }
 }

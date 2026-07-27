@@ -1,14 +1,7 @@
-import {
-    ConstantColor,
-    ConstantValue,
-    IntervalValue,
-    PointEmitter,
-    SphereEmitter,
-    Vector4,
-} from 'quarks.core';
 import {NullEngine} from '@babylonjs/core/Engines/nullEngine';
-import {Scene} from '@babylonjs/core/scene';
 import {TransformNode} from '@babylonjs/core/Meshes/transformNode';
+import {Scene} from '@babylonjs/core/scene';
+import {ConstantColor, ConstantValue, IntervalValue, PointEmitter, SphereEmitter, Vector4} from 'quarks.core';
 import {BatchedRenderer} from '../src/BatchedRenderer';
 import {ParticleSystem} from '../src/ParticleSystem';
 import {QuarksUtil} from '../src/QuarksUtil';
@@ -115,7 +108,9 @@ describe('burst one-shot effect finished', () => {
             renderer.addSystem(system);
         }
 
-        simulate(systems, 0.6);
+        // A little past the longest life in the effect, rather than exactly on
+        // it, so the assertion does not sit on the rounding.
+        simulate(systems, 0.7);
 
         expect(QuarksUtil.isEffectFinished(root)).toBe(true);
         for (const system of systems) {
@@ -129,7 +124,9 @@ describe('burst one-shot effect finished', () => {
 
     it('marks a single-burst splat finished before duration elapses', () => {
         const {root, systems} = createSingleBurstSplat();
-        simulate(systems, 0.6);
+        // A little past the longest life in the effect, rather than exactly on
+        // it, so the assertion does not sit on the rounding.
+        simulate(systems, 0.7);
 
         expect(QuarksUtil.isEffectFinished(root)).toBe(true);
         expect(systems[0].isFinished()).toBe(true);

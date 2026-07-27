@@ -1,19 +1,19 @@
-import type { DemoContext } from '../types';
-import {Vector3 as BVector3} from '@babylonjs/core/Maths/math.vector';
 import {Constants} from '@babylonjs/core/Engines/constants';
+import {Vector3 as BVector3} from '@babylonjs/core/Maths/math.vector';
 import {
-    ParticleSystem,
+    Bezier,
+    ConstantColor,
     ConstantValue,
     IntervalValue,
+    ParticleSystem,
+    PiecewiseBezier,
     PointEmitter,
     RenderMode,
-    ConstantColor,
-    PiecewiseBezier,
-    Bezier,
     SpeedOverLife,
     Vector4,
 } from 'babylon.quarks';
 import {createSharedTexture} from '../shared/common';
+import type {DemoContext} from '../types';
 
 function createSystem({
     scene,
@@ -24,9 +24,9 @@ function createSystem({
     position,
     speedFactor,
 }: {
-    scene: DemoContext["scene"];
-    batchRenderer: DemoContext["batchRenderer"];
-    systems: DemoContext["systems"];
+    scene: DemoContext['scene'];
+    batchRenderer: DemoContext['batchRenderer'];
+    systems: DemoContext['systems'];
     texture: ReturnType<typeof createSharedTexture>;
     renderMode: RenderMode;
     position: BVector3;
@@ -48,9 +48,8 @@ function createSystem({
         transparent: true,
         blendMode: Constants.ALPHA_COMBINE,
         renderOrder: 2,
-        rendererEmitterSettings: renderMode === RenderMode.StretchedBillBoard
-            ? {speedFactor: speedFactor ?? 0, lengthFactor: 2}
-            : undefined,
+        rendererEmitterSettings:
+            renderMode === RenderMode.StretchedBillBoard ? {speedFactor: speedFactor ?? 0, lengthFactor: 2} : undefined,
         speedFactor: speedFactor ?? 0,
         startTileIndex: new ConstantValue(0),
         uTileCount: 1,

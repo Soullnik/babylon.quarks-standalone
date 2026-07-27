@@ -1,7 +1,7 @@
-import {ParticleEmitter} from 'babylon.quarks';
-import type {ParticleSystem} from 'babylon.quarks';
-import {TransformNode} from '@babylonjs/core/Meshes/transformNode';
 import {Matrix, Quaternion} from '@babylonjs/core/Maths/math.vector';
+import {TransformNode} from '@babylonjs/core/Meshes/transformNode';
+import type {ParticleSystem} from 'babylon.quarks';
+import {ParticleEmitter} from 'babylon.quarks';
 import {isEditorSceneNode} from './editorScene';
 
 /** A node in the editor's effect hierarchy: a Group (organizational) or a ParticleEmitter. */
@@ -46,7 +46,7 @@ export function collectSystems(tree: EffectTreeNode): ParticleSystem[] {
 }
 
 interface SerializeMeta {
-    textures: {[k: string]: {url?: string; name?: string}};
+    textures: {[k: string]: {url?: string; name?: string; invertY?: boolean}};
     materials: {[k: string]: {[key: string]: unknown}};
     geometries: {[k: string]: unknown};
 }
@@ -72,7 +72,11 @@ function serializeNode(tree: EffectTreeNode, meta: SerializeMeta, fallbackUuid: 
         children: children.length > 0 ? children : undefined,
     };
     if (tree.system) {
-        return {...base, type: 'ParticleEmitter', ps: tree.system.toJSON(meta as never, {useUrlForImage: true} as never)};
+        return {
+            ...base,
+            type: 'ParticleEmitter',
+            ps: tree.system.toJSON(meta as never, {useUrlForImage: true} as never),
+        };
     }
     return {...base, type: 'Group'};
 }
@@ -113,13 +117,24 @@ function finishEnvelope(object: Record<string, unknown>, meta: SerializeMeta): s
     // toJSON stashes live Texture instances and material records in meta; flatten them into
     // the serializable images/textures/materials arrays QuarksLoader expects.
     const images: Array<{uuid: string; url: string}> = [];
-    const textures: Array<{uuid: string; image?: string}> = [];
+    const textures: Array<{uuid: string; image?: string; invertY?: boolean; noMipmap?: boolean}> = [];
     for (const [uuid, tex] of Object.entries(meta.textures)) {
         const url = tex?.url ?? tex?.name;
+        const invertY = typeof tex?.invertY === 'boolean' ? tex.invertY : undefined;
+        const isEnvAtlas =
+            tex?.name === 'quarksEnvAtlas' || (typeof tex?.name === 'string' && tex.name.endsWith('_envAtlas'));
         if (url) {
             const imageUuid = `${uuid}-image`;
             images.push({uuid: imageUuid, url});
-            textures.push({uuid, image: imageUuid});
+            const entry: {uuid: string; image?: string; invertY?: boolean; noMipmap?: boolean} = {
+                uuid,
+                image: imageUuid,
+            };
+            if (invertY === false || isEnvAtlas) {
+                entry.invertY = false;
+                entry.noMipmap = true;
+            }
+            textures.push(entry);
         } else {
             textures.push({uuid});
         }

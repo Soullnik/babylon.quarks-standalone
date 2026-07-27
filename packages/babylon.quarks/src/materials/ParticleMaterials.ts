@@ -1,6 +1,6 @@
-import {Scene} from '@babylonjs/core/scene';
 import {PBRMaterial} from '@babylonjs/core/Materials/PBR/pbrMaterial';
 import {StandardMaterial} from '@babylonjs/core/Materials/standardMaterial';
+import {Scene} from '@babylonjs/core/scene';
 
 export type BabylonParticleMaterialParameters = Record<string, any>;
 

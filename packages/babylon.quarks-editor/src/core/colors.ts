@@ -1,5 +1,5 @@
-import {ColorOverLife, Gradient, Vector3, Vector4} from 'babylon.quarks';
 import type {Behavior} from 'babylon.quarks';
+import {ColorOverLife, Gradient, Vector3, Vector4} from 'babylon.quarks';
 
 /** One RGBA stop of the editable gradient (all channels 0..1, pos 0..1). */
 export interface GradientStop {

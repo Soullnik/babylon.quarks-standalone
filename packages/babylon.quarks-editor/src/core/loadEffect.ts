@@ -1,8 +1,8 @@
-import {ParticleEmitter, QuarksLoader, QuarksUtil} from 'babylon.quarks';
-import type {BatchedRenderer, ParticleSystem} from 'babylon.quarks';
-import type {Scene} from '@babylonjs/core/scene';
 import {TransformNode} from '@babylonjs/core/Meshes/transformNode';
 import type {Node} from '@babylonjs/core/node';
+import type {Scene} from '@babylonjs/core/scene';
+import type {BatchedRenderer, ParticleSystem} from 'babylon.quarks';
+import {ParticleEmitter, QuarksLoader, QuarksUtil} from 'babylon.quarks';
 
 /** `ParticleEmitter`'s constructor default (see babylon.quarks/src/ParticleEmitter.ts) — the
  * name every emitter gets when the source JSON didn't give it one of its own. */

@@ -1,6 +1,6 @@
-import {Behavior} from './Behavior';
 import {Particle} from '../Particle';
 import {ColorGeneratorFromJSON, FunctionColorGenerator} from '../functions';
+import {Behavior} from './Behavior';
 
 /**
  * Color particles by their life.
@@ -15,14 +15,39 @@ export class ColorOverLife implements Behavior {
     }
 
     update(particle: Particle, delta: number): void {
-        this.color.genColor(particle.memory, particle.color, particle.age / particle.life);
-        particle.color.x *= particle.startColor.x;
-        particle.color.y *= particle.startColor.y;
-        particle.color.z *= particle.startColor.z;
-        particle.color.w *= particle.startColor.w;
+        const color = particle.color;
+        const startColor = particle.startColor;
+        this.color.genColor(particle.memory, color, particle.age / particle.life);
+        color.x *= startColor.x;
+        color.y *= startColor.y;
+        color.z *= startColor.z;
+        color.w *= startColor.w;
     }
 
-    frameUpdate(delta: number): void {}
+    updateAll(particles: Array<Particle>, count: number, delta: number): void {
+        // Hoisting the generator makes genColor a monomorphic call site here,
+        // unlike the shared per-particle dispatch in the system.
+        const generator = this.color;
+        for (let i = 0; i < count; i++) {
+            const particle = particles[i];
+            if (particle.age >= particle.life) {
+                continue;
+            }
+            const color = particle.color;
+            const startColor = particle.startColor;
+            generator.genColor(particle.memory, color, particle.age / particle.life);
+            color.x *= startColor.x;
+            color.y *= startColor.y;
+            color.z *= startColor.z;
+            color.w *= startColor.w;
+        }
+    }
+
+    frameUpdate(delta: number): void {
+        // Refresh once per frame, before either update path reads the generator,
+        // so both see the same values and an edited gradient is picked up.
+        this.color.refreshTable?.();
+    }
 
     toJSON(): any {
         return {

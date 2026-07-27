@@ -1,6 +1,6 @@
-import React, {useSyncExternalStore} from 'react';
-import type {TransformNode} from '@babylonjs/core/Meshes/transformNode';
 import {Quaternion} from '@babylonjs/core/Maths/math.vector';
+import type {TransformNode} from '@babylonjs/core/Meshes/transformNode';
+import {useSyncExternalStore} from 'react';
 import {getTransformRevision, notifyTransformChanged, subscribeTransform} from '../core/transformStore';
 import {ModuleSection} from './ModuleSection';
 import {NumberField, Row} from './fields';
@@ -23,7 +23,13 @@ function setEulerDegreeAxis(node: TransformNode, axis: 'x' | 'y' | 'z', degrees:
     }
 }
 
-function AxisRow(props: {label: string; hintKey?: string; values: {x: number; y: number; z: number}; step: number; onChange: (axis: 'x' | 'y' | 'z', value: number) => void}) {
+function AxisRow(props: {
+    label: string;
+    hintKey?: string;
+    values: {x: number; y: number; z: number};
+    step: number;
+    onChange: (axis: 'x' | 'y' | 'z', value: number) => void;
+}) {
     return (
         <Row label={props.label} hintKey={props.hintKey}>
             <div style={{display: 'flex', gap: 4}}>
@@ -41,18 +47,33 @@ export function ObjectModule(props: {node: TransformNode; label: string}) {
     const euler = getEulerDegrees(node);
     return (
         <ModuleSection title={`Object — ${props.label}`}>
-            <AxisRow label="Position" values={{x: node.position.x, y: node.position.y, z: node.position.z}} step={0.1} onChange={(axis, v) => {
-                node.position[axis] = v;
-                notifyTransformChanged();
-            }} />
-            <AxisRow label="Rotation" values={euler} step={1} onChange={(axis, v) => {
-                setEulerDegreeAxis(node, axis, v);
-                notifyTransformChanged();
-            }} />
-            <AxisRow label="Scale" values={{x: node.scaling.x, y: node.scaling.y, z: node.scaling.z}} step={0.1} onChange={(axis, v) => {
-                node.scaling[axis] = v;
-                notifyTransformChanged();
-            }} />
+            <AxisRow
+                label="Position"
+                values={{x: node.position.x, y: node.position.y, z: node.position.z}}
+                step={0.1}
+                onChange={(axis, v) => {
+                    node.position[axis] = v;
+                    notifyTransformChanged();
+                }}
+            />
+            <AxisRow
+                label="Rotation"
+                values={euler}
+                step={1}
+                onChange={(axis, v) => {
+                    setEulerDegreeAxis(node, axis, v);
+                    notifyTransformChanged();
+                }}
+            />
+            <AxisRow
+                label="Scale"
+                values={{x: node.scaling.x, y: node.scaling.y, z: node.scaling.z}}
+                step={0.1}
+                onChange={(axis, v) => {
+                    node.scaling[axis] = v;
+                    notifyTransformChanged();
+                }}
+            />
         </ModuleSection>
     );
 }

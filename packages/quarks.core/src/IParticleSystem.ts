@@ -1,6 +1,7 @@
+import {FunctionValueGenerator, ValueGenerator} from './functions';
 import {Matrix4, Vector3} from './math';
 import {IParticle} from './Particle';
-import {FunctionValueGenerator, ValueGenerator} from './functions';
+import {ParticleStore} from './ParticleStore';
 export interface EmissionState {
     burstIndex: number;
     burstWaveIndex: number;
@@ -13,9 +14,7 @@ export interface EmissionState {
     previousWorldPos?: Vector3;
 }
 
-export interface Resource {
-
-}
+export interface Resource {}
 
 export interface JsonMetaData {
     textures: {[uuid: string]: Resource};
@@ -90,7 +89,7 @@ export interface IEmitter {
     matrixWorld: any; //type is annoying
 }
 
-export type ParticleSystemEventType = "emitEnd" | "finished" | "destroy" | "particleDied";
+export type ParticleSystemEventType = 'emitEnd' | 'finished' | 'destroy' | 'particleDied';
 export interface ParticleSystemEvent {
     type: ParticleSystemEventType;
     particleSystem: IParticleSystem;
@@ -98,7 +97,37 @@ export interface ParticleSystemEvent {
 }
 
 export interface IParticleSystem {
-
+    /**
+     * Column storage backing the particles' vector attributes, when the
+     * implementation uses one. Rows `[0, particleNum)` hold the live particles
+     * in the same order as `particles`, so a renderer can read them as ranges.
+     * @type {ParticleStore}
+     */
+    store?: ParticleStore;
+    /**
+     * Wall-clock time that has passed since the last simulated step, in
+     * seconds, when the implementation simulates on a fixed timestep. Negative
+     * when that step ran a hair ahead of real time instead (rounded to the
+     * nearest step rather than floored, so this stays small either way). A
+     * renderer uses it to draw where the particles are now rather than where
+     * the last step left them.
+     * @type {number}
+     */
+    simulationResidual?: number;
+    /**
+     * Length of one simulation step, in seconds, when the implementation
+     * simulates on a fixed timestep. Turning is recorded per step rather than
+     * per second, so a renderer needs this to know what fraction of a step
+     * {@link simulationResidual} is.
+     * @type {number}
+     */
+    simulationStep?: number;
+    /**
+     * Whether this system only emits through another system, which is when its
+     * particles carry their own parent transform.
+     * @type {boolean}
+     */
+    onlyUsedByOther?: boolean;
     /**
      * Whether the ParticleSystem should be automatically disposed when it finishes emitting particles.
      * @type {string}
@@ -169,7 +198,7 @@ export interface IParticleSystem {
 
     emit(delta: number, subEmissionState: EmissionState, matrix: Matrix4): void;
 
-    addEventListener(event: ParticleSystemEventType, callback: (event: ParticleSystemEvent)=>void): void;
-    removeEventListener(event: ParticleSystemEventType, callback: (event: ParticleSystemEvent)=>void): void;
+    addEventListener(event: ParticleSystemEventType, callback: (event: ParticleSystemEvent) => void): void;
+    removeEventListener(event: ParticleSystemEventType, callback: (event: ParticleSystemEvent) => void): void;
     removeAllEventListeners(event: ParticleSystemEventType): void;
 }

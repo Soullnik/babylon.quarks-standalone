@@ -1,28 +1,28 @@
+import {IParticleSystem} from '../IParticleSystem';
 import {Particle} from '../Particle';
+import {Constructable, ParameterPair} from '../TypeUtil';
+import {ApplyCollision} from './ApplyCollision';
+import {ApplyForce} from './ApplyForce';
+import {ChangeEmitDirection} from './ChangeEmitDirection';
+import {ColorBySpeed} from './ColorBySpeed';
 import {ColorOverLife} from './ColorOverLife';
+import {EmitSubParticleSystem} from './EmitSubParticleSystem';
+import {ForceOverLife} from './ForceOverLife';
+import {FrameOverLife} from './FrameOverLife';
+import {GravityForce} from './GravityForce';
+import {InheritVelocity} from './InheritVelocity';
+import {LimitSpeedOverLife} from './LimitSpeedOverLife';
+import {Noise} from './Noise';
+import {OrbitOverLife} from './OrbitOverLife';
+import {Rotation3DOverLife} from './Rotation3DOverLife';
+import {RotationBySpeed} from './RotationBySpeed';
 import {RotationOverLife} from './RotationOverLife';
+import {SizeBySpeed} from './SizeBySpeed';
 import {SizeOverLife} from './SizeOverLife';
 import {SpeedOverLife} from './SpeedOverLife';
-import {RotationBySpeed} from './RotationBySpeed';
-import {SizeBySpeed} from './SizeBySpeed';
-import {ColorBySpeed} from './ColorBySpeed';
-import {FrameOverLife} from './FrameOverLife';
-import {OrbitOverLife} from './OrbitOverLife';
-import {ApplyForce} from './ApplyForce';
-import {Constructable, ParameterPair} from '../TypeUtil';
-import {GravityForce} from './GravityForce';
-import {WidthOverLength} from './WidthOverLength';
-import {ChangeEmitDirection} from './ChangeEmitDirection';
-import {EmitSubParticleSystem} from './EmitSubParticleSystem';
-import {IParticleSystem} from '../IParticleSystem';
 import {TurbulenceField} from './TurbulenceField';
-import {Rotation3DOverLife} from './Rotation3DOverLife';
-import {ForceOverLife} from './ForceOverLife';
 import {VelocityOverLife} from './VelocityOverLife';
-import {InheritVelocity} from './InheritVelocity';
-import {Noise} from './Noise';
-import {LimitSpeedOverLife} from './LimitSpeedOverLife';
-import { ApplyCollision } from './ApplyCollision';
+import {WidthOverLength} from './WidthOverLength';
 
 /**
  * Interface for particle behaviors.
@@ -32,6 +32,19 @@ export interface Behavior {
     type: string;
     initialize(particle: Particle, particleSystem: IParticleSystem): void;
     update(particle: Particle, delta: number): void;
+    /**
+     * Optional bulk form of {@link update}, applied to `particles[0..count)`.
+     *
+     * The per-particle `update` is reached through one call site shared by every
+     * behavior type, which leaves it megamorphic: V8 can neither inline it nor
+     * specialise the generator calls inside. A behavior that implements this
+     * instead gets one call per frame and a loop it owns, where those calls are
+     * monomorphic. Implementations must skip dead particles exactly as the
+     * per-particle path does, and must produce identical results.
+     *
+     * Behaviors that do not implement it keep working unchanged.
+     */
+    updateAll?(particles: Array<Particle>, count: number, delta: number): void;
     frameUpdate(delta: number): void;
     toJSON(): any;
     clone(): Behavior;
@@ -239,4 +252,3 @@ export function BehaviorFromJSON(json: any, particleSystem: IParticleSystem): Be
     }
     return null;
 }
-

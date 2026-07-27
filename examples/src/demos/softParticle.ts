@@ -1,20 +1,20 @@
-import type { DemoContext } from '../types';
-import '@babylonjs/core/Rendering/depthRendererSceneComponent';
-import {Vector3 as BVector3} from '@babylonjs/core/Maths/math.vector';
 import {Constants} from '@babylonjs/core/Engines/constants';
+import {Vector3 as BVector3} from '@babylonjs/core/Maths/math.vector';
+import '@babylonjs/core/Rendering/depthRendererSceneComponent';
 import {
-    ParticleSystem,
+    Bezier,
+    ConstantColor,
     ConstantValue,
+    ForceOverLife,
+    FrameOverLife,
+    ParticleSystem,
+    PiecewiseBezier,
     PointEmitter,
     RenderMode,
-    ConstantColor,
-    FrameOverLife,
-    ForceOverLife,
-    PiecewiseBezier,
-    Bezier,
     Vector4,
 } from 'babylon.quarks';
 import {createSharedTexture, SHARED_ASSETS} from '../shared/common';
+import type {DemoContext} from '../types';
 
 export function init({scene, camera, batchRenderer, systems}: DemoContext) {
     camera.setPosition(new BVector3(0, 7, 16));

@@ -1,10 +1,18 @@
-import type {Scene} from "@babylonjs/core/scene";
-import type {TransformNode} from "@babylonjs/core/Meshes/transformNode";
-import {QuarksLoader, QuarksUtil, ParticleEmitter, ParticleSystem, BatchedRenderer, getPhysicsResolver, setPhysicsResolver} from "babylon.quarks";
+import type {TransformNode} from '@babylonjs/core/Meshes/transformNode';
+import type {Scene} from '@babylonjs/core/scene';
+import {
+    BatchedRenderer,
+    getPhysicsResolver,
+    ParticleEmitter,
+    ParticleSystem,
+    QuarksLoader,
+    QuarksUtil,
+    setPhysicsResolver,
+} from 'babylon.quarks';
 
 /** Returns true when JSON looks like a Quarks / Three.js Object3D export. */
 export function isQuarksExportJson(json: unknown): json is Record<string, unknown> {
-    return typeof json === "object" && json !== null && "object" in json;
+    return typeof json === 'object' && json !== null && 'object' in json;
 }
 
 /**
@@ -42,10 +50,10 @@ export function loadQuarksFromJson(
     batchRenderer: BatchedRenderer,
     systems: ParticleSystem[],
     json: unknown,
-    baseUrl = ""
+    baseUrl = ''
 ): TransformNode {
     if (!isQuarksExportJson(json)) {
-        throw new Error("JSON must be a Quarks export with an \"object\" root (Object3D.toJSON format).");
+        throw new Error('JSON must be a Quarks export with an "object" root (Object3D.toJSON format).');
     }
     ensureGroundResolver();
     const loader = new QuarksLoader(scene, {baseUrl});

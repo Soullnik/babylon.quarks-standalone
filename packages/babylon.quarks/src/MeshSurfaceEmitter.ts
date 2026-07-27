@@ -1,13 +1,6 @@
-import {Mesh} from '@babylonjs/core/Meshes/mesh';
 import {VertexBuffer} from '@babylonjs/core/Buffers/buffer';
-import {
-    Particle,
-    EmitterShape,
-    ShapeJSON,
-    IParticleSystem,
-    Vector3,
-    Plugin,
-} from 'quarks.core';
+import {Mesh} from '@babylonjs/core/Meshes/mesh';
+import {EmitterShape, IParticleSystem, Particle, Plugin, ShapeJSON, Vector3} from 'quarks.core';
 
 export class MeshSurfaceEmitter implements EmitterShape {
     type = 'mesh_surface';
@@ -73,7 +66,8 @@ export class MeshSurfaceEmitter implements EmitterShape {
         }
 
         const triCount = this._triangleIndexToArea.length - 1;
-        let left = 0, right = triCount;
+        let left = 0,
+            right = triCount;
         const target = Math.random() * this._triangleIndexToArea[triCount];
 
         while (left + 1 < right) {
@@ -96,9 +90,15 @@ export class MeshSurfaceEmitter implements EmitterShape {
         const idx1 = this._indices[left * 3 + 1];
         const idx2 = this._indices[left * 3 + 2];
 
-        const ax = this._positions[idx0 * 3], ay = this._positions[idx0 * 3 + 1], az = this._positions[idx0 * 3 + 2];
-        const bx = this._positions[idx1 * 3] - ax, by = this._positions[idx1 * 3 + 1] - ay, bz = this._positions[idx1 * 3 + 2] - az;
-        const cx = this._positions[idx2 * 3] - ax, cy = this._positions[idx2 * 3 + 1] - ay, cz = this._positions[idx2 * 3 + 2] - az;
+        const ax = this._positions[idx0 * 3],
+            ay = this._positions[idx0 * 3 + 1],
+            az = this._positions[idx0 * 3 + 2];
+        const bx = this._positions[idx1 * 3] - ax,
+            by = this._positions[idx1 * 3 + 1] - ay,
+            bz = this._positions[idx1 * 3 + 2] - az;
+        const cx = this._positions[idx2 * 3] - ax,
+            cy = this._positions[idx2 * 3 + 1] - ay,
+            cz = this._positions[idx2 * 3 + 2] - az;
 
         p.position.set(ax + bx * u1 + cx * u2, ay + by * u1 + cy * u2, az + bz * u1 + cz * u2);
 
@@ -110,7 +110,10 @@ export class MeshSurfaceEmitter implements EmitterShape {
     }
 
     toJSON(): ShapeJSON {
-        return {type: 'mesh_surface', mesh: this._mesh ? (this._mesh as any).uniqueId?.toString() : this._meshReferenceId ?? ''};
+        return {
+            type: 'mesh_surface',
+            mesh: this._mesh ? (this._mesh as any).uniqueId?.toString() : (this._meshReferenceId ?? ''),
+        };
     }
 
     static fromJSON(json: any): MeshSurfaceEmitter {
@@ -127,11 +130,13 @@ export class MeshSurfaceEmitter implements EmitterShape {
 export const MeshSurfaceEmitterPlugin: Plugin = {
     id: 'babylon.quarks',
     initialize: () => {},
-    emitterShapes: [{
-        type: 'mesh_surface',
-        params: [['mesh', ['mesh']]],
-        constructor: MeshSurfaceEmitter,
-        loadJSON: (json: any) => MeshSurfaceEmitter.fromJSON(json),
-    }],
+    emitterShapes: [
+        {
+            type: 'mesh_surface',
+            params: [['mesh', ['mesh']]],
+            constructor: MeshSurfaceEmitter,
+            loadJSON: (json: any) => MeshSurfaceEmitter.fromJSON(json),
+        },
+    ],
     behaviors: [],
 };

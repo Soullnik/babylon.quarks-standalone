@@ -1,7 +1,7 @@
 import {NullEngine} from '@babylonjs/core/Engines/nullEngine';
-import {Scene} from '@babylonjs/core/scene';
 import {Mesh} from '@babylonjs/core/Meshes/mesh';
 import {MeshBuilder} from '@babylonjs/core/Meshes/meshBuilder';
+import {Scene} from '@babylonjs/core/scene';
 import {SpriteParticle} from 'quarks.core';
 import {MeshSurfaceEmitter} from '../src/MeshSurfaceEmitter';
 

@@ -1,22 +1,22 @@
-import type { DemoContext } from '../types';
-import {Vector3 as BVector3} from '@babylonjs/core/Maths/math.vector';
 import {Constants} from '@babylonjs/core/Engines/constants';
+import {Vector3 as BVector3} from '@babylonjs/core/Maths/math.vector';
 import {
-    ParticleSystem,
-    RenderMode,
-    ConstantValue,
-    IntervalValue,
-    ConstantColor,
-    PointEmitter,
-    SphereEmitter,
-    SizeOverLife,
-    FrameOverLife,
-    PiecewiseBezier,
     Bezier,
+    ConstantColor,
+    ConstantValue,
+    FrameOverLife,
+    IntervalValue,
+    ParticleSystem,
+    PiecewiseBezier,
+    PointEmitter,
     RandomColor,
+    RenderMode,
+    SizeOverLife,
+    SphereEmitter,
     Vector4,
 } from 'babylon.quarks';
 import {createColorOverLifeRange, createSharedTexture, SHARED_ASSETS} from '../shared/common';
+import type {DemoContext} from '../types';
 
 export function init({scene, camera, batchRenderer, systems, demoState}: DemoContext) {
     camera.setPosition(new BVector3(0, 8, 20));
@@ -30,9 +30,7 @@ export function init({scene, camera, batchRenderer, systems, demoState}: DemoCon
         startLife: new ConstantValue(1.0),
         startSpeed: new ConstantValue(0),
         startSize: new ConstantValue(15.0),
-        startColor: new ConstantColor(
-            new Vector4(0.5220588 * 0.772549, 0.6440161 * 0.772549, 1 * 0.772549, 0.772549)
-        ),
+        startColor: new ConstantColor(new Vector4(0.5220588 * 0.772549, 0.6440161 * 0.772549, 1 * 0.772549, 0.772549)),
         worldSpace: false,
         emissionOverTime: new ConstantValue(1),
         emissionBursts: [],
@@ -87,10 +85,7 @@ export function init({scene, camera, batchRenderer, systems, demoState}: DemoCon
         startSpeed: new ConstantValue(0),
         startSize: new IntervalValue(3, 6),
         startRotation: new IntervalValue(-Math.PI, Math.PI),
-        startColor: new RandomColor(
-            new Vector4(0.1397059, 0.3592291, 1, 1),
-            new Vector4(1, 0.9275356, 0.1029412, 1)
-        ),
+        startColor: new RandomColor(new Vector4(0.1397059, 0.3592291, 1, 1), new Vector4(1, 0.9275356, 0.1029412, 1)),
         worldSpace: true,
         emissionOverTime: new IntervalValue(5, 10),
         emissionBursts: [],
@@ -118,10 +113,7 @@ export function init({scene, camera, batchRenderer, systems, demoState}: DemoCon
         startSpeed: new ConstantValue(0),
         startSize: new IntervalValue(5, 10),
         startRotation: new IntervalValue(-Math.PI, Math.PI),
-        startColor: new RandomColor(
-            new Vector4(0.1397059, 0.3592291, 1, 1),
-            new Vector4(1, 0.9275356, 0.1029412, 1)
-        ),
+        startColor: new RandomColor(new Vector4(0.1397059, 0.3592291, 1, 1), new Vector4(1, 0.9275356, 0.1029412, 1)),
         worldSpace: false,
         emissionOverTime: new ConstantValue(3),
         emissionBursts: [],

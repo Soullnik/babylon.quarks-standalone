@@ -28,7 +28,11 @@ class GroundRingMarker {
 
     constructor(scene: Scene, name: string, color: Color3) {
         this.anchor = new TransformNode(`${name}-root`, scene);
-        this.ring = MeshBuilder.CreateLines(`${name}-ring`, {points: buildGroundRingPoints(GROUND_RING_RADIUS)}, scene) as LinesMesh;
+        this.ring = MeshBuilder.CreateLines(
+            `${name}-ring`,
+            {points: buildGroundRingPoints(GROUND_RING_RADIUS)},
+            scene
+        ) as LinesMesh;
         this.ring.color = color;
         this.ring.parent = this.anchor;
         this.ring.isPickable = false;

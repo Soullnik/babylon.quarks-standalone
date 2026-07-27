@@ -1,11 +1,11 @@
 import {Vector4} from '../math';
-import {FunctionJSON} from './FunctionJSON';
 import {ColorToJSON, JSONToColor} from '../util/JSONUtil';
-import {RandomColor} from './RandomColor';
 import {ColorRange} from './ColorRange';
-import {Gradient} from './Gradient';
-import {RandomColorBetweenGradient} from './RandomColorBetweenGradient';
+import {FunctionJSON} from './FunctionJSON';
 import {GeneratorMemory} from './GeneratorMemory';
+import {Gradient} from './Gradient';
+import {RandomColor} from './RandomColor';
+import {RandomColorBetweenGradient} from './RandomColorBetweenGradient';
 
 export interface ColorGenerator {
     type: 'value';
@@ -19,6 +19,8 @@ export interface FunctionColorGenerator {
     type: 'function';
     startGen(memory: GeneratorMemory): void;
     genColor(memory: GeneratorMemory, color: Vector4, t: number): Vector4;
+    /** See FunctionValueGenerator.refreshTable. */
+    refreshTable?(): void;
     toJSON(): FunctionJSON;
     clone(): FunctionColorGenerator;
 }

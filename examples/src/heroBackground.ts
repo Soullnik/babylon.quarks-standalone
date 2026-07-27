@@ -1,40 +1,41 @@
-import {Engine} from "@babylonjs/core/Engines/engine";
-import {Scene} from "@babylonjs/core/scene";
-import {ArcRotateCamera} from "@babylonjs/core/Cameras/arcRotateCamera";
-import {HemisphericLight} from "@babylonjs/core/Lights/hemisphericLight";
-import {Vector3 as BVector3} from "@babylonjs/core/Maths/math.vector";
-import {Color4} from "@babylonjs/core/Maths/math.color";
-import {Constants} from "@babylonjs/core/Engines/constants";
+import {ArcRotateCamera} from '@babylonjs/core/Cameras/arcRotateCamera';
+import {Constants} from '@babylonjs/core/Engines/constants';
+import {Engine} from '@babylonjs/core/Engines/engine';
+import {HemisphericLight} from '@babylonjs/core/Lights/hemisphericLight';
+import {Color4} from '@babylonjs/core/Maths/math.color';
+import {Vector3 as BVector3} from '@babylonjs/core/Maths/math.vector';
+import {Scene} from '@babylonjs/core/scene';
 // Side-effect import: registers Scene.createPickingRay, used to project the cursor into the world.
-import "@babylonjs/core/Culling/ray";
-import {BatchedRenderer, ParticleSystem} from "babylon.quarks";
+import '@babylonjs/core/Culling/ray';
 import {
-    RenderMode,
-    ConstantValue,
-    IntervalValue,
-    ConstantColor,
-    SphereEmitter,
-    PointEmitter,
-    DonutEmitter,
-    RandomColor,
-    Vector4,
-    Vector3 as QVector3,
-    Gradient,
+    ApplyForce,
+    BatchedRenderer,
+    Bezier,
     ColorOverLife,
-    SizeOverLife,
-    RotationOverLife,
-    WidthOverLength,
-    OrbitOverLife,
+    ConstantColor,
+    ConstantValue,
+    DonutEmitter,
+    Gradient,
     GravityForce,
     InheritVelocity,
+    IntervalValue,
     LimitSpeedOverLife,
-    TurbulenceField,
-    ApplyForce,
     Noise,
+    OrbitOverLife,
+    ParticleSystem,
     PiecewiseBezier,
-    Bezier,
-} from "babylon.quarks";
-import {SHARED_ASSETS, createSharedTexture} from "./shared/common";
+    PointEmitter,
+    Vector3 as QVector3,
+    RandomColor,
+    RenderMode,
+    RotationOverLife,
+    SizeOverLife,
+    SphereEmitter,
+    TurbulenceField,
+    Vector4,
+    WidthOverLength,
+} from 'babylon.quarks';
+import {SHARED_ASSETS, createSharedTexture} from './shared/common';
 
 /** 10×10 `texture1.png`: soft circle / glow / cloud live at 90 / 91 / 93; tile 0 is the default round particle. */
 const T1 = {
@@ -81,13 +82,13 @@ function constantCurve(value: number) {
 }
 
 function heroTextureUrl(relativePath: string) {
-    const path = relativePath.replace(/^\//, "");
+    const path = relativePath.replace(/^\//, '');
     const base = import.meta.env?.BASE_URL;
-    if (typeof window === "undefined" || base == null || base === "" || base === "/" || base === "./") {
+    if (typeof window === 'undefined' || base == null || base === '' || base === '/' || base === './') {
         return path;
     }
-    const prefix = base.endsWith("/") ? base : `${base}/`;
-    const rootRelative = `${prefix}${path}`.replace(/([^:]\/)\/+/g, "$1");
+    const prefix = base.endsWith('/') ? base : `${base}/`;
+    const rootRelative = `${prefix}${path}`.replace(/([^:]\/)\/+/g, '$1');
     try {
         return new URL(rootRelative, window.location.origin).href;
     } catch {
@@ -104,14 +105,14 @@ function heroTextureUrl(relativePath: string) {
  * BatchedRenderer. Reacts to the cursor (parallax + dust lean) and page scroll.
  */
 export function mountIndexHeroBackground() {
-    if (typeof window === "undefined") {
+    if (typeof window === 'undefined') {
         return () => {};
     }
-    if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) {
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
         return () => {};
     }
 
-    const canvas = document.getElementById("hero-bg");
+    const canvas = document.getElementById('hero-bg');
     if (!(canvas instanceof HTMLCanvasElement)) {
         return () => {};
     }
@@ -124,13 +125,13 @@ export function mountIndexHeroBackground() {
     scene.clearColor = new Color4(0.04, 0.045, 0.09, 1);
     scene.autoClear = true;
 
-    const camera = new ArcRotateCamera("heroCam", -Math.PI / 2, Math.PI / 3, 26, BVector3.Zero(), scene);
+    const camera = new ArcRotateCamera('heroCam', -Math.PI / 2, Math.PI / 3, 26, BVector3.Zero(), scene);
     camera.minZ = 0.1;
     camera.setPosition(new BVector3(0, 9.5, 26));
 
-    new HemisphericLight("heroLight", new BVector3(0.35, 1, -0.2), scene);
+    new HemisphericLight('heroLight', new BVector3(0.35, 1, -0.2), scene);
 
-    const batchRenderer = new BatchedRenderer("heroVfx", scene);
+    const batchRenderer = new BatchedRenderer('heroVfx', scene);
     const systems: ParticleSystem[] = [];
 
     const atlasPath = heroTextureUrl(SHARED_ASSETS.atlas);
@@ -320,7 +321,7 @@ export function mountIndexHeroBackground() {
     });
     cursorComets.addBehavior(new ColorOverLife(fadeEnvelope(0.1, 0.55)));
     // Fling ribbons along the cursor's motion, then let the vortex capture them.
-    cursorComets.addBehavior(new InheritVelocity(new ConstantValue(0.55), "initial"));
+    cursorComets.addBehavior(new InheritVelocity(new ConstantValue(0.55), 'initial'));
     cursorComets.addBehavior(new GravityForce(new QVector3(0, 0, 0), 45));
     cursorComets.addBehavior(new OrbitOverLife(new IntervalValue(0.3, 0.6), diskAxis));
     cursorComets.addBehavior(new LimitSpeedOverLife(constantCurve(7), 0.25));
@@ -360,14 +361,14 @@ export function mountIndexHeroBackground() {
     const onScroll = () => {
         targetScroll = Math.min((window.scrollY || 0) / Math.max(window.innerHeight, 1), 1.6);
     };
-    window.addEventListener("pointermove", onPointerMove, {passive: true});
-    window.addEventListener("scroll", onScroll, {passive: true});
+    window.addEventListener('pointermove', onPointerMove, {passive: true});
+    window.addEventListener('scroll', onScroll, {passive: true});
 
     const onResize = () => {
         updateComposition();
         engine.resize();
     };
-    window.addEventListener("resize", onResize);
+    window.addEventListener('resize', onResize);
 
     // Cursor-comet steering state: previous smoothed pointer (for speed) and reusable vectors.
     let prevPointerX = 0;
@@ -379,7 +380,7 @@ export function mountIndexHeroBackground() {
     const onFirstPointer = () => {
         pointerSeen = true;
     };
-    window.addEventListener("pointermove", onFirstPointer, {passive: true, once: true});
+    window.addEventListener('pointermove', onFirstPointer, {passive: true, once: true});
 
     engine.runRenderLoop(() => {
         const delta = Math.min(engine.getDeltaTime() / 1000, 0.05);
@@ -432,10 +433,10 @@ export function mountIndexHeroBackground() {
     });
 
     return () => {
-        window.removeEventListener("resize", onResize);
-        window.removeEventListener("pointermove", onPointerMove);
-        window.removeEventListener("pointermove", onFirstPointer);
-        window.removeEventListener("scroll", onScroll);
+        window.removeEventListener('resize', onResize);
+        window.removeEventListener('pointermove', onPointerMove);
+        window.removeEventListener('pointermove', onFirstPointer);
+        window.removeEventListener('scroll', onScroll);
         engine.stopRenderLoop();
         for (const system of systems) {
             system.dispose();

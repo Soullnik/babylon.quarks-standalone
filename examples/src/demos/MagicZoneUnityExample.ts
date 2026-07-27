@@ -1,9 +1,6 @@
-import type {DemoContext} from "../types";
-import {Vector3 as BVector3} from "@babylonjs/core/Maths/math.vector";
-import {CreateGround} from "@babylonjs/core/Meshes/Builders/groundBuilder";
-import {StandardMaterial} from "@babylonjs/core/Materials/standardMaterial";
-import {Color3} from "@babylonjs/core/Maths/math.color";
-import {QuarksLoader, QuarksUtil, ParticleEmitter, ParticleSystem} from "babylon.quarks";
+import {Vector3 as BVector3} from '@babylonjs/core/Maths/math.vector';
+import {ParticleEmitter, ParticleSystem, QuarksLoader, QuarksUtil} from 'babylon.quarks';
+import type {DemoContext} from '../types';
 
 /**
  * Unity euler-order investigation harness (MagicZone).
@@ -31,7 +28,7 @@ export async function init({scene, camera, batchRenderer, systems}: DemoContext)
     camera.setPosition(new BVector3(0, 9, 16));
     camera.setTarget(new BVector3(0, 0, 0));
 
-    const loader = new QuarksLoader(scene, {baseUrl: ""});
+    const loader = new QuarksLoader(scene, {baseUrl: ''});
 
     const mount = async (url: string, x: number) => {
         const root = await loader.load(url);
@@ -48,5 +45,5 @@ export async function init({scene, camera, batchRenderer, systems}: DemoContext)
         return root;
     };
 
-    await mount("magicZoneUnityExample.json", 0);
+    await mount('magicZoneUnityExample.json', 0);
 }

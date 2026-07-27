@@ -1,6 +1,6 @@
-import {Behavior} from './Behavior';
 import {Particle} from '../Particle';
 import {ColorGeneratorFromJSON, FunctionColorGenerator, IntervalValue} from '../functions';
+import {Behavior} from './Behavior';
 
 /**
  * Color particles by their speed.

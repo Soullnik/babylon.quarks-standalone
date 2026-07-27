@@ -1,12 +1,12 @@
-import {Behavior} from './Behavior';
 import {Particle} from '../Particle';
 import {
-    FunctionValueGenerator, GeneratorFromJSON,
+    FunctionValueGenerator,
+    GeneratorFromJSON,
     IntervalValue,
-    ValueGeneratorFromJSON,
     Vector3Function,
     Vector3Generator,
 } from '../functions';
+import {Behavior} from './Behavior';
 
 /**
  * Apply size to particles based on their speed.
@@ -28,7 +28,9 @@ export class SizeBySpeed implements Behavior {
         if (this.size instanceof Vector3Function) {
             this.size.genValue(particle.memory, particle.size, t).multiply(particle.startSize);
         } else {
-            particle.size.copy(particle.startSize).multiplyScalar((this.size as FunctionValueGenerator).genValue(particle.memory, t));
+            particle.size
+                .copy(particle.startSize)
+                .multiplyScalar((this.size as FunctionValueGenerator).genValue(particle.memory, t));
         }
     }
 

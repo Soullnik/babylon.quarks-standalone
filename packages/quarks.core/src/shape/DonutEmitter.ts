@@ -1,6 +1,3 @@
-import {EmitterMode, EmitterShape, getValueFromEmitterMode, ShapeJSON} from './EmitterUtil';
-import {Particle} from '../Particle';
-import {MathUtils, Matrix4, Quaternion} from '../math';
 import {
     ConstantValue,
     FunctionValueGenerator,
@@ -9,7 +6,10 @@ import {
     ValueGeneratorFromJSON,
 } from '../functions';
 import {EmissionState, IParticleSystem} from '../IParticleSystem';
-import { UP_VEC3, ZERO_VEC3 } from '../util/MathUtil';
+import {MathUtils, Matrix4, Quaternion} from '../math';
+import {Particle} from '../Particle';
+import {UP_VEC3, ZERO_VEC3} from '../util/MathUtil';
+import {EmitterMode, EmitterShape, getValueFromEmitterMode, ShapeJSON} from './EmitterUtil';
 
 /**
  * Interface representing the parameters for a donut emitter.
@@ -60,7 +60,7 @@ export class DonutEmitter implements EmitterShape {
     memory: GeneratorMemory;
 
     _m1: Matrix4;
-    
+
     constructor(parameters: DonutEmitterParameters = {}) {
         this.radius = parameters.radius ?? 10;
         this.arc = parameters.arc ?? 2.0 * Math.PI;

@@ -1,268 +1,329 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-    <meta charset="utf-8">
-    <title>Particle Demos — Babylon.quarks for Babylon.js</title>
-    <link rel="icon" type="image/png" href="./logo.png"/>
-    <link rel="icon" href="./favicon.ico" sizes="any"/>
-    <link rel="apple-touch-icon" href="./apple-touch-icon.png"/>
-    <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
-    <meta name="theme-color" content="#000000"/>
-    <meta name="description" content="Interactive Babylon.js particle demos powered by Babylon.quarks — emitter shapes, blending, trails, sub-emitters, GPU turbulence and more. Open any effect in the visual editor.">
-    <meta name="keywords" content="babylon.js particle demo, babylonjs particles, babylon vfx, gpu particles, particle effects">
-    <link rel="canonical" href="https://soullnik.github.io/babylon.quarks-standalone/babylonDemo.html">
-    <meta property="og:type" content="website">
-    <meta property="og:site_name" content="Babylon.quarks">
-    <meta property="og:title" content="Particle Demos — Babylon.quarks for Babylon.js">
-    <meta property="og:description" content="Interactive Babylon.js particle demos: emitter shapes, blending, trails, sub-emitters, GPU turbulence and more.">
-    <meta property="og:url" content="https://soullnik.github.io/babylon.quarks-standalone/babylonDemo.html">
-    <meta property="og:image" content="https://soullnik.github.io/babylon.quarks-standalone/og-image.png">
-    <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:title" content="Particle Demos — Babylon.quarks for Babylon.js">
-    <meta name="twitter:description" content="Interactive Babylon.js particle demos powered by Babylon.quarks.">
-    <meta name="twitter:image" content="https://soullnik.github.io/babylon.quarks-standalone/og-image.png">
-    <style>
-        :root {
-            color-scheme: dark;
-        }
+    <head>
+        <meta charset="utf-8" />
+        <title>Particle Demos — Babylon.quarks for Babylon.js</title>
+        <link rel="icon" type="image/png" href="./logo.png" />
+        <link rel="icon" href="./favicon.ico" sizes="any" />
+        <link rel="apple-touch-icon" href="./apple-touch-icon.png" />
+        <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0" />
+        <meta name="theme-color" content="#000000" />
+        <meta
+            name="description"
+            content="Interactive Babylon.js particle demos powered by Babylon.quarks — emitter shapes, blending, trails, sub-emitters, GPU turbulence and more. Open any effect in the visual editor."
+        />
+        <meta
+            name="keywords"
+            content="babylon.js particle demo, babylonjs particles, babylon vfx, gpu particles, particle effects"
+        />
+        <link rel="canonical" href="https://soullnik.github.io/babylon.quarks-standalone/babylonDemo.html" />
+        <meta property="og:type" content="website" />
+        <meta property="og:site_name" content="Babylon.quarks" />
+        <meta property="og:title" content="Particle Demos — Babylon.quarks for Babylon.js" />
+        <meta
+            property="og:description"
+            content="Interactive Babylon.js particle demos: emitter shapes, blending, trails, sub-emitters, GPU turbulence and more."
+        />
+        <meta property="og:url" content="https://soullnik.github.io/babylon.quarks-standalone/babylonDemo.html" />
+        <meta property="og:image" content="https://soullnik.github.io/babylon.quarks-standalone/og-image.png" />
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content="Particle Demos — Babylon.quarks for Babylon.js" />
+        <meta name="twitter:description" content="Interactive Babylon.js particle demos powered by Babylon.quarks." />
+        <meta name="twitter:image" content="https://soullnik.github.io/babylon.quarks-standalone/og-image.png" />
+        <style>
+            :root {
+                color-scheme: dark;
+            }
 
-        body {
-            margin: 0;
-            padding: 0;
-            font-family: Inter, Segoe UI, Roboto, sans-serif;
-            background: #070b16;
-            color: #eef2ff;
-        }
+            body {
+                margin: 0;
+                padding: 0;
+                font-family:
+                    Inter,
+                    Segoe UI,
+                    Roboto,
+                    sans-serif;
+                background: #070b16;
+                color: #eef2ff;
+            }
 
-        #renderer-canvas {
-            position: fixed;
-            inset: 0;
-            width: 100%;
-            height: 100%;
-            z-index: 0;
-            touch-action: none;
-            display: block;
-        }
+            #renderer-canvas {
+                position: fixed;
+                inset: 0;
+                width: 100%;
+                height: 100%;
+                z-index: 0;
+                touch-action: none;
+                display: block;
+            }
 
-        .hud {
-            position: fixed;
-            top: 14px;
-            left: 14px;
-            right: 14px;
-            z-index: 20;
-            border: 1px solid rgba(151, 172, 255, 0.25);
-            border-radius: 14px;
-            background: rgba(8, 12, 24, 0.72);
-            backdrop-filter: blur(10px);
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 12px;
-            padding: 10px 12px;
-            flex-wrap: wrap;
-        }
-
-        .hud-left,
-        .hud-center,
-        .hud-right {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            min-width: 0;
-        }
-
-        .hud-center {
-            flex: 1 1 auto;
-            justify-content: center;
-        }
-
-        .ui-btn,
-        .ui-link,
-        .ui-select {
-            border-radius: 10px;
-            border: 1px solid #3f5593;
-            background: rgba(27, 41, 79, 0.55);
-            color: #eef2ff;
-            height: 34px;
-            padding: 0 12px;
-            font-size: 13px;
-        }
-
-        .ui-select {
-            min-width: 0;
-            max-width: min(280px, 100%);
-        }
-
-        .ui-link {
-            text-decoration: none;
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-        }
-
-        .ui-btn {
-            cursor: pointer;
-        }
-
-        .ui-btn:hover,
-        .ui-link:hover,
-        .ui-select:hover {
-            border-color: #6f90e9;
-            background: rgba(46, 70, 133, 0.65);
-        }
-
-        .ui-btn:active {
-            transform: translateY(1px);
-        }
-
-        .ui-link svg {
-            flex-shrink: 0;
-        }
-
-        .ui-title {
-            font-size: 14px;
-            font-weight: 600;
-            letter-spacing: 0.01em;
-            min-width: 0;
-            text-align: center;
-        }
-
-        .pill {
-            border-radius: 999px;
-            border: 1px solid #3f5593;
-            padding: 6px 10px;
-            font-size: 12px;
-            color: #bbcaef;
-            background: rgba(16, 24, 46, 0.65);
-            white-space: nowrap;
-        }
-
-        .hint {
-            position: fixed;
-            left: 14px;
-            bottom: 14px;
-            z-index: 20;
-            border: 1px solid rgba(151, 172, 255, 0.2);
-            border-radius: 10px;
-            padding: 7px 10px;
-            font-size: 12px;
-            color: #aebfe8;
-            background: rgba(8, 12, 24, 0.6);
-            backdrop-filter: blur(8px);
-            line-height: 1.45;
-        }
-
-        #json-file-input {
-            display: none;
-        }
-
-        .drop-overlay {
-            position: fixed;
-            inset: 0;
-            z-index: 30;
-            display: none;
-            align-items: center;
-            justify-content: center;
-            padding: 24px;
-            background: rgba(6, 10, 22, 0.72);
-            border: 2px dashed rgba(120, 165, 255, 0.55);
-            pointer-events: none;
-        }
-
-        .drop-overlay.is-visible {
-            display: flex;
-        }
-
-        .drop-overlay-inner {
-            border-radius: 16px;
-            padding: 22px 28px;
-            text-align: center;
-            background: rgba(12, 18, 38, 0.92);
-            border: 1px solid rgba(151, 172, 255, 0.35);
-            box-shadow: 0 18px 48px rgba(0, 0, 0, 0.35);
-        }
-
-        .drop-overlay-inner strong {
-            display: block;
-            font-size: 18px;
-            margin-bottom: 8px;
-        }
-
-        .drop-overlay-inner span {
-            font-size: 13px;
-            color: #aebfe8;
-        }
-
-        @media (max-width: 720px) {
             .hud {
-                gap: 8px;
-                padding: 8px 10px;
-            }
-
-            .hud-center {
-                flex: 1 1 100%;
-                width: 100%;
-                order: 1;
-            }
-
-            .ui-title {
-                display: none;
-            }
-
-            .ui-select {
-                flex: 1;
-                width: 100%;
-                max-width: 100%;
-            }
-
-            .hud-right {
-                flex: 1 1 100%;
+                position: fixed;
+                top: 14px;
+                left: 14px;
+                right: 14px;
+                z-index: 20;
+                border: 1px solid rgba(151, 172, 255, 0.25);
+                border-radius: 14px;
+                background: rgba(8, 12, 24, 0.72);
+                backdrop-filter: blur(10px);
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: 12px;
+                padding: 10px 12px;
                 flex-wrap: wrap;
             }
 
-            .hint {
-                right: 14px;
-                max-width: calc(100% - 28px);
+            .hud-left,
+            .hud-center,
+            .hud-right {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                min-width: 0;
             }
-        }
-    </style>
-</head>
-<body id="home">
-    <canvas id="renderer-canvas"></canvas>
-    <header class="hud">
-        <div class="hud-left">
-            <a href="./" class="ui-link">Back</a>
-            <button id="previousBtn" class="ui-btn" type="button">Prev</button>
-            <button id="nextBtn" class="ui-btn" type="button">Next</button>
-            <button id="openJsonBtn" class="ui-btn" type="button">Open JSON</button>
-            <button id="openInEditorBtn" class="ui-btn" type="button" title="Open the current effect in the effect editor">Open in editor</button>
-            <input id="json-file-input" type="file" accept=".json,application/json" />
+
+            .hud-center {
+                flex: 1 1 auto;
+                justify-content: center;
+            }
+
+            .ui-btn,
+            .ui-link,
+            .ui-select {
+                border-radius: 10px;
+                border: 1px solid #3f5593;
+                background: rgba(27, 41, 79, 0.55);
+                color: #eef2ff;
+                height: 34px;
+                padding: 0 12px;
+                font-size: 13px;
+            }
+
+            .ui-select {
+                min-width: 0;
+                max-width: min(280px, 100%);
+            }
+
+            .ui-link {
+                text-decoration: none;
+                display: inline-flex;
+                align-items: center;
+                gap: 6px;
+            }
+
+            .ui-btn {
+                cursor: pointer;
+            }
+
+            .ui-btn:hover,
+            .ui-link:hover,
+            .ui-select:hover {
+                border-color: #6f90e9;
+                background: rgba(46, 70, 133, 0.65);
+            }
+
+            .ui-btn:active {
+                transform: translateY(1px);
+            }
+
+            .ui-link svg {
+                flex-shrink: 0;
+            }
+
+            .ui-title {
+                font-size: 14px;
+                font-weight: 600;
+                letter-spacing: 0.01em;
+                min-width: 0;
+                text-align: center;
+            }
+
+            .pill {
+                border-radius: 999px;
+                border: 1px solid #3f5593;
+                padding: 6px 10px;
+                font-size: 12px;
+                color: #bbcaef;
+                background: rgba(16, 24, 46, 0.65);
+                white-space: nowrap;
+            }
+
+            .hint {
+                position: fixed;
+                left: 14px;
+                bottom: 14px;
+                z-index: 20;
+                border: 1px solid rgba(151, 172, 255, 0.2);
+                border-radius: 10px;
+                padding: 7px 10px;
+                font-size: 12px;
+                color: #aebfe8;
+                background: rgba(8, 12, 24, 0.6);
+                backdrop-filter: blur(8px);
+                line-height: 1.45;
+            }
+
+            #json-file-input {
+                display: none;
+            }
+
+            .drop-overlay {
+                position: fixed;
+                inset: 0;
+                z-index: 30;
+                display: none;
+                align-items: center;
+                justify-content: center;
+                padding: 24px;
+                background: rgba(6, 10, 22, 0.72);
+                border: 2px dashed rgba(120, 165, 255, 0.55);
+                pointer-events: none;
+            }
+
+            .drop-overlay.is-visible {
+                display: flex;
+            }
+
+            .drop-overlay-inner {
+                border-radius: 16px;
+                padding: 22px 28px;
+                text-align: center;
+                background: rgba(12, 18, 38, 0.92);
+                border: 1px solid rgba(151, 172, 255, 0.35);
+                box-shadow: 0 18px 48px rgba(0, 0, 0, 0.35);
+            }
+
+            .drop-overlay-inner strong {
+                display: block;
+                font-size: 18px;
+                margin-bottom: 8px;
+            }
+
+            .drop-overlay-inner span {
+                font-size: 13px;
+                color: #aebfe8;
+            }
+
+            @media (max-width: 720px) {
+                .hud {
+                    gap: 8px;
+                    padding: 8px 10px;
+                }
+
+                .hud-center {
+                    flex: 1 1 100%;
+                    width: 100%;
+                    order: 1;
+                }
+
+                .ui-title {
+                    display: none;
+                }
+
+                .ui-select {
+                    flex: 1;
+                    width: 100%;
+                    max-width: 100%;
+                }
+
+                .hud-right {
+                    flex: 1 1 100%;
+                    flex-wrap: wrap;
+                }
+
+                .hint {
+                    right: 14px;
+                    max-width: calc(100% - 28px);
+                }
+            }
+        </style>
+    </head>
+    <body id="home">
+        <canvas id="renderer-canvas"></canvas>
+        <header class="hud">
+            <div class="hud-left">
+                <a href="./" class="ui-link">Back</a>
+                <button id="previousBtn" class="ui-btn" type="button">Prev</button>
+                <button id="nextBtn" class="ui-btn" type="button">Next</button>
+                <button id="openJsonBtn" class="ui-btn" type="button">Open JSON</button>
+                <button
+                    id="openInEditorBtn"
+                    class="ui-btn"
+                    type="button"
+                    title="Open the current effect in the effect editor"
+                >
+                    Open in editor
+                </button>
+                <input id="json-file-input" type="file" accept=".json,application/json" />
+            </div>
+            <div class="hud-center">
+                <span id="demo-name" class="ui-title">Loading...</span>
+                <select id="demo-select" class="ui-select" aria-label="Choose demo"></select>
+            </div>
+            <div class="hud-right">
+                <span class="pill">Particles: <span id="particleCount">0</span></span>
+                <span class="pill">FPS: <span id="fps">0</span></span>
+                <a
+                    class="ui-link"
+                    href="https://github.com/Soullnik/babylon.quarks-standalone"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label="Repository on GitHub"
+                >
+                    <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="16"
+                        height="16"
+                        viewBox="0 0 24 24"
+                        fill="currentColor"
+                        aria-hidden="true"
+                    >
+                        <path
+                            d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"
+                        />
+                    </svg>
+                    Repo
+                </a>
+                <a
+                    class="ui-link"
+                    href="https://www.npmjs.com/package/babylon.quarks"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label="babylon.quarks on npm"
+                >
+                    <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="16"
+                        height="16"
+                        viewBox="0 0 24 24"
+                        fill="currentColor"
+                        aria-hidden="true"
+                    >
+                        <path
+                            d="M1.763 0C.786 0 0 .786 0 1.763v20.474C0 23.214.786 24 1.763 24h20.474c.977 0 1.763-.786 1.763-1.763V1.763C24 .786 23.214 0 22.237 0H1.763zM5.13 5.323l13.837.019-.009 13.818h-3.464l.01-10.382h-3.46L12.04 19.17h-3.47L5.113 5.311z"
+                        />
+                    </svg>
+                    npm
+                </a>
+                <a
+                    id="source-link"
+                    href="https://github.com/Soullnik/babylon.quarks-standalone/blob/main/examples/src/viewer.ts"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="ui-link"
+                    >Source</a
+                >
+            </div>
+        </header>
+        <div id="drop-overlay" class="drop-overlay" aria-hidden="true">
+            <div class="drop-overlay-inner">
+                <strong>Drop Quarks JSON</strong>
+                <span>Object3D export with particle emitters (.json)</span>
+            </div>
         </div>
-        <div class="hud-center">
-            <span id="demo-name" class="ui-title">Loading...</span>
-            <select id="demo-select" class="ui-select" aria-label="Choose demo"></select>
-        </div>
-        <div class="hud-right">
-            <span class="pill">Particles: <span id="particleCount">0</span></span>
-            <span class="pill">FPS: <span id="fps">0</span></span>
-            <a class="ui-link" href="https://github.com/Soullnik/babylon.quarks-standalone" target="_blank" rel="noopener noreferrer" aria-label="Repository on GitHub">
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
-                Repo
-            </a>
-            <a class="ui-link" href="https://www.npmjs.com/package/babylon.quarks" target="_blank" rel="noopener noreferrer" aria-label="babylon.quarks on npm">
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M1.763 0C.786 0 0 .786 0 1.763v20.474C0 23.214.786 24 1.763 24h20.474c.977 0 1.763-.786 1.763-1.763V1.763C24 .786 23.214 0 22.237 0H1.763zM5.13 5.323l13.837.019-.009 13.818h-3.464l.01-10.382h-3.46L12.04 19.17h-3.47L5.113 5.311z"/></svg>
-                npm
-            </a>
-            <a id="source-link" href="https://github.com/Soullnik/babylon.quarks-standalone/blob/main/examples/src/viewer.ts" target="_blank" rel="noopener noreferrer" class="ui-link">Source</a>
-        </div>
-    </header>
-    <div id="drop-overlay" class="drop-overlay" aria-hidden="true">
-        <div class="drop-overlay-inner">
-            <strong>Drop Quarks JSON</strong>
-            <span>Object3D export with particle emitters (.json)</span>
-        </div>
-    </div>
-    <div class="hint">Left/Right: switch demo · Drop a .json file or use Open JSON</div>
-    <script type="module" src="./src/viewer.ts"></script>
-</body>
+        <div class="hint">Left/Right: switch demo · Drop a .json file or use Open JSON</div>
+        <script type="module" src="./src/viewer.ts"></script>
+    </body>
 </html>

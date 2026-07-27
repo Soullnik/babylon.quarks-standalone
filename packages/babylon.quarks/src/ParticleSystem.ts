@@ -1,47 +1,52 @@
-import {Scene} from '@babylonjs/core/scene';
-import {Texture} from '@babylonjs/core/Materials/Textures/texture';
 import {Constants} from '@babylonjs/core/Engines/constants';
+import {BaseTexture} from '@babylonjs/core/Materials/Textures/baseTexture';
+import {Texture} from '@babylonjs/core/Materials/Textures/texture';
+import {Scene} from '@babylonjs/core/scene';
 import {
     AxisAngleGenerator,
+    Behavior,
+    BehaviorFromJSON,
     ColorGenerator,
     ColorGeneratorFromJSON,
     ConstantColor,
     ConstantValue,
+    EmissionState,
+    EmitterFromJSON,
+    EmitterShape,
     FunctionColorGenerator,
     FunctionJSON,
     FunctionValueGenerator,
+    FusionStep,
     GeneratorFromJSON,
-    ValueGenerator,
-    ValueGeneratorFromJSON,
-    Behavior,
-    BehaviorFromJSON,
-    Particle,
-    SpriteParticle,
-    TrailParticle,
-    EmitterFromJSON,
-    EmitterShape,
-    SphereEmitter,
-    RendererEmitterSettings,
-    RotationGenerator,
-    IParticleSystem,
-    EmissionState,
     GeneratorMemory,
-    TrailSettings,
-    StretchedBillBoardSettings,
-    SerializationOptions,
-    Vector3,
-    Vector4,
+    IParticleSystem,
     Matrix3,
     Matrix4,
-    Quaternion,
-    Vector3Generator,
+    Particle,
+    ParticleStore,
     ParticleSystemEvent,
     ParticleSystemEventType,
+    planBehaviorFusion,
+    Quaternion,
+    RendererEmitterSettings,
+    RotationGenerator,
+    SerializationOptions,
+    SphereEmitter,
+    SpriteParticle,
+    StretchedBillBoardSettings,
+    TrailParticle,
+    TrailSettings,
+    ValueGenerator,
+    ValueGeneratorFromJSON,
+    Vector3,
+    Vector3Generator,
+    Vector4,
 } from 'quarks.core';
+import {BatchedRenderer, VFXBatchSettings} from './BatchedRenderer';
+import {ensureEnvAtlasFromCube, getCachedEnvAtlas} from './envAtlas';
+import {ensureTriangleIndices} from './geometryUtil';
 import {ParticleEmitter} from './ParticleEmitter';
 import {RenderMode} from './VFXBatch';
-import {BatchedRenderer, VFXBatchSettings} from './BatchedRenderer';
-import {ensureTriangleIndices} from './geometryUtil';
 
 export interface BurstParameters {
     time: number;
@@ -51,6 +56,9 @@ export interface BurstParameters {
     probability: number;
 }
 
+/** Particle backed by a {@link ParticleStore} row, as this system always creates. */
+type StoreBackedParticle = Particle & {storeIndex: number; setStoreIndex(index: number): void};
+
 const UP = new Vector3(0, 0, 1);
 const tempQ = new Quaternion();
 const tempV = new Vector3();
@@ -58,14 +66,21 @@ const tempV2 = new Vector3();
 const PREWARM_FPS = 60;
 const SIMULATION_STEP = 1 / PREWARM_FPS;
 const MAX_SIMULATION_STEPS_PER_FRAME = 8;
+// Math.round() breaks an exact tie (accumulator sitting at precisely half a
+// step) by rounding up. At exactly 120Hz that tie is not a corner case — it is
+// every single frame — and rounding it up would run a step on every one of
+// them instead of every other one. Nudging the tie down costs nothing on a
+// real display (real frame times essentially never land on the tie exactly)
+// and keeps the well-tested "half a step is no step yet" behavior.
+const ROUND_TIE_BIAS = 1e-9;
 
-const DEFAULT_POSITIONS = new Float32Array([
-    -0.5, -0.5, 0,
-     0.5, -0.5, 0,
-     0.5,  0.5, 0,
-    -0.5,  0.5, 0,
-]);
+const DEFAULT_POSITIONS = new Float32Array([-0.5, -0.5, 0, 0.5, -0.5, 0, 0.5, 0.5, 0, -0.5, 0.5, 0]);
 const DEFAULT_UVS = new Float32Array([0, 0, 1, 0, 1, 1, 0, 1]);
+
+/** Zero UVs sized to a position buffer — missing/mismatched uv attrs → GL_INVALID_OPERATION on iOS. */
+function fallbackUVsForPositions(positions: Float32Array): Float32Array {
+    return new Float32Array((positions.length / 3) * 2);
+}
 const DEFAULT_INDICES = new Uint32Array([0, 1, 2, 0, 2, 3]);
 
 export interface ParticleSystemParameters {
@@ -196,6 +211,8 @@ export class ParticleSystem implements IParticleSystem {
     particleNum: number;
     paused: boolean;
     particles: Array<Particle>;
+    /** Column storage shared by this system's particles. */
+    readonly store: ParticleStore = new ParticleStore(64);
     emitterShape: EmitterShape;
     emitter: ParticleEmitter;
     rendererSettings: VFXBatchSettings;
@@ -217,10 +234,13 @@ export class ParticleSystem implements IParticleSystem {
     private listeners: {[event: string]: Array<(event: ParticleSystemEvent) => void>} = {};
     private readonly layerMaskProxy: {mask: number};
     private materialRef: any = null;
+    private sceneRef: Scene | undefined;
     private qualityFactor = 1;
-    private useFastTrailHistory = true;
     private simulationAccumulator = 0;
     private destroyed = false;
+    /** Behaviors the cached plan was built from, compared by identity. */
+    private fusionPlan?: Array<Behavior>;
+    private fusionSteps: Array<FusionStep> = [];
     /** @internal **/
     _renderer?: BatchedRenderer;
 
@@ -424,7 +444,8 @@ export class ParticleSystem implements IParticleSystem {
     }
 
     constructor(parameters: ParticleSystemParameters) {
-        this.layerMaskProxy = {mask: parameters.layerMask ?? 0x0FFFFFFF};
+        this.sceneRef = parameters.scene;
+        this.layerMaskProxy = {mask: parameters.layerMask ?? 0x0fffffff};
         Object.defineProperty(this.layerMaskProxy, 'mask', {
             enumerable: true,
             get: () => this.rendererSettings.layerMask,
@@ -465,7 +486,9 @@ export class ParticleSystem implements IParticleSystem {
         this.rendererSettings = {
             instancingGeometry: parameters.instancingGeometry ?? DEFAULT_POSITIONS,
             instancingIndices: parameters.instancingIndices ?? DEFAULT_INDICES,
-            instancingUVs: parameters.instancingUVs ?? DEFAULT_UVS,
+            instancingUVs:
+                parameters.instancingUVs ??
+                (parameters.instancingGeometry ? fallbackUVsForPositions(parameters.instancingGeometry) : DEFAULT_UVS),
             instancingNormals: parameters.instancingNormals,
             renderMode: parameters.renderMode ?? RenderMode.BillBoard,
             renderOrder: parameters.renderOrder ?? 0,
@@ -481,10 +504,16 @@ export class ParticleSystem implements IParticleSystem {
             materialDepthWrite: parameters.depthWrite ?? false,
             materialAlphaTest: parameters.alphaTest ?? 0,
             texture: parameters.texture ?? null,
-            layerMask: parameters.layerMask ?? 0x0FFFFFFF,
+            reflectionTexture: null,
+            reflectionLevel: 1,
+            reflectionFaces: null,
+            reflectionAtlas: null,
+            layerMask: parameters.layerMask ?? 0x0fffffff,
         };
         if (this.rendererSettings.renderMode === RenderMode.Mesh && !this.rendererSettings.instancingNormals) {
-            this.rendererSettings.instancingNormals = ParticleSystem.createFallbackNormals(this.rendererSettings.instancingGeometry);
+            this.rendererSettings.instancingNormals = ParticleSystem.createFallbackNormals(
+                this.rendererSettings.instancingGeometry
+            );
         }
 
         this.materialRef = parameters.material ?? null;
@@ -520,7 +549,6 @@ export class ParticleSystem implements IParticleSystem {
         this.emissionOverDistance.startGen(this.memory);
         this.startDelay.startGen(this.memory);
         this.startDelayTimeLeft = this.startDelay.genValue(this.memory, 0);
-        this.refreshTrailHistoryMode();
 
         this.emitEnded = false;
         this.markForDestroy = false;
@@ -536,6 +564,7 @@ export class ParticleSystem implements IParticleSystem {
             depthWrite?: boolean;
             alphaTest?: number;
             texture?: Texture | null;
+            reflectionAtlas?: BaseTexture | null;
             layerMask?: number;
         } = {}
     ) {
@@ -548,12 +577,18 @@ export class ParticleSystem implements IParticleSystem {
             overrides.texture !== undefined
                 ? overrides.texture
                 : (material?.albedoTexture ??
-                    material?.diffuseTexture ??
-                    material?.emissiveTexture ??
-                    material?.opacityTexture ??
-                    material?.baseTexture ??
-                    this.rendererSettings.texture ??
-                    null);
+                  material?.diffuseTexture ??
+                  material?.emissiveTexture ??
+                  material?.opacityTexture ??
+                  material?.baseTexture ??
+                  this.rendererSettings.texture ??
+                  null);
+        const resolvedReflection =
+            material?.reflectionTexture ??
+            material?.environmentTexture ??
+            this.rendererSettings.reflectionTexture ??
+            null;
+        const resolvedReflectionLevel = typeof resolvedReflection?.level === 'number' ? resolvedReflection.level : 1;
         const resolvedBlendMode =
             overrides.blendMode ??
             (typeof material?.alphaMode === 'number' ? material.alphaMode : this.rendererSettings.materialBlendMode);
@@ -562,8 +597,8 @@ export class ParticleSystem implements IParticleSystem {
             (typeof material?.needAlphaBlending === 'function'
                 ? material.needAlphaBlending()
                 : typeof material?.alpha === 'number'
-                    ? material.alpha < 1
-                    : this.rendererSettings.materialTransparent);
+                  ? material.alpha < 1
+                  : this.rendererSettings.materialTransparent);
         const resolvedDepthTest =
             overrides.depthTest ??
             (typeof material?.disableDepthTest === 'boolean'
@@ -574,17 +609,57 @@ export class ParticleSystem implements IParticleSystem {
             (typeof material?.disableDepthWrite === 'boolean'
                 ? !material.disableDepthWrite
                 : typeof material?.forceDepthWrite === 'boolean'
-                    ? material.forceDepthWrite
-                    : this.rendererSettings.materialDepthWrite);
+                  ? material.forceDepthWrite
+                  : this.rendererSettings.materialDepthWrite);
         const resolvedAlphaTest =
             overrides.alphaTest ??
-            (typeof material?.alphaCutOff === 'number'
-                ? material.alphaCutOff
-                : typeof material?.alphaCutOffValue === 'number'
-                    ? material.alphaCutOffValue
-                    : this.rendererSettings.materialAlphaTest);
+            (() => {
+                // StandardMaterial always has alphaCutOff (default 0.4). Only treat it as
+                // particle alpha-test when the material is actually in an alpha-test mode —
+                // otherwise Mesh Material demos wrongly enable USE_ALPHATEST.
+                const mode = material?.transparencyMode;
+                const alphaTestMode = mode === 1 || mode === 3;
+                if (alphaTestMode && typeof material?.alphaCutOff === 'number') {
+                    return material.alphaCutOff;
+                }
+                if (alphaTestMode && typeof material?.alphaCutOffValue === 'number') {
+                    return material.alphaCutOffValue;
+                }
+                if (material) {
+                    return 0;
+                }
+                return this.rendererSettings.materialAlphaTest;
+            })();
 
         this.rendererSettings.texture = resolvedTexture;
+        this.rendererSettings.reflectionTexture = resolvedReflection;
+        this.rendererSettings.reflectionLevel =
+            typeof material?.reflectionLevel === 'number' ? material.reflectionLevel : resolvedReflectionLevel;
+        // Prefer an explicit atlas; otherwise build a 3×2 atlas from CubeTexture
+        // face URLs (iOS-safe single sampler2D — not samplerCube / six faces).
+        let resolvedAtlas =
+            material?.reflectionAtlas ?? overrides.reflectionAtlas ?? this.rendererSettings.reflectionAtlas ?? null;
+        if (!resolvedAtlas && resolvedReflection?.isCube) {
+            resolvedAtlas = getCachedEnvAtlas(resolvedReflection);
+            if (!resolvedAtlas && this.sceneRef) {
+                ensureEnvAtlasFromCube(resolvedReflection, this.sceneRef, (atlas) => {
+                    if (this.rendererSettings.reflectionAtlas === atlas) {
+                        return;
+                    }
+                    this.rendererSettings.reflectionAtlas = atlas;
+                    if (material && material.reflectionAtlas == null) {
+                        material.reflectionAtlas = atlas;
+                    }
+                    this.neededToUpdateRender = true;
+                });
+                resolvedAtlas = getCachedEnvAtlas(resolvedReflection);
+            }
+        }
+        this.rendererSettings.reflectionAtlas = resolvedAtlas;
+        // Do not expand cube files into six face textures anymore — that path
+        // still trips GL_INVALID_OPERATION on iOS. Prefer a single atlas.
+        this.rendererSettings.reflectionFaces =
+            material?.reflectionFaces?.length === 6 ? material.reflectionFaces : null;
         this.rendererSettings.materialBlendMode = resolvedBlendMode;
         this.rendererSettings.materialTransparent = resolvedTransparent;
         this.rendererSettings.materialDepthTest = resolvedDepthTest;
@@ -596,88 +671,56 @@ export class ParticleSystem implements IParticleSystem {
         this.neededToUpdateRender = true;
     }
 
-    pause() { this.paused = true; }
-    play() { this.paused = false; }
-    stop() { this.restart(); this.pause(); }
-
-    private refreshTrailHistoryMode() {
-        this.useFastTrailHistory = !this.behaviors.some((behavior) => (behavior as any).type === 'WidthOverLength');
+    pause() {
+        this.paused = true;
     }
-
-    private ensureTrailHistoryCapacity(particle: TrailParticle, capacity: number) {
-        const trailAny = particle as any;
-        if (trailAny._trailHistoryCapacity === capacity && trailAny._trailHistoryPositions) {
-            return;
-        }
-        trailAny._trailHistoryCapacity = capacity;
-        trailAny._trailHistoryPositions = new Float32Array(capacity * 3);
-        trailAny._trailHistorySizes = new Float32Array(capacity);
-        trailAny._trailHistoryColors = new Float32Array(capacity * 4);
-        trailAny._trailHistoryHead = 0;
-        trailAny._trailHistoryCount = 0;
+    play() {
+        this.paused = false;
     }
-
-    private resetTrailHistory(particle: TrailParticle) {
-        const trailAny = particle as any;
-        trailAny._trailHistoryHead = 0;
-        trailAny._trailHistoryCount = 0;
-    }
-
-    private getTrailHistoryCount(particle: TrailParticle): number {
-        const trailAny = particle as any;
-        const fastHistoryCount = trailAny._trailHistoryCount;
-        if (typeof fastHistoryCount === 'number') {
-            return fastHistoryCount;
-        }
-        return particle.previous.length;
-    }
-
-    private updateFastTrailHistory(particle: TrailParticle) {
-        const trailAny = particle as any;
-        const capacity = Math.max(1, Math.ceil(particle.length));
-        this.ensureTrailHistoryCapacity(particle, capacity);
-        let head = trailAny._trailHistoryHead as number;
-        let count = trailAny._trailHistoryCount as number;
-        const positions = trailAny._trailHistoryPositions as Float32Array;
-        const sizes = trailAny._trailHistorySizes as Float32Array;
-        const colors = trailAny._trailHistoryColors as Float32Array;
-
-        if (particle.age <= particle.life) {
-            const posIndex = head * 3;
-            positions[posIndex] = particle.position.x;
-            positions[posIndex + 1] = particle.position.y;
-            positions[posIndex + 2] = particle.position.z;
-            sizes[head] = particle.size.x;
-            const colorIndex = head * 4;
-            colors[colorIndex] = particle.color.x;
-            colors[colorIndex + 1] = particle.color.y;
-            colors[colorIndex + 2] = particle.color.z;
-            colors[colorIndex + 3] = particle.color.w;
-            head = (head + 1) % capacity;
-            if (count < capacity) {
-                count++;
-            }
-        } else if (count > 0) {
-            count--;
-        }
-
-        trailAny._trailHistoryHead = head;
-        trailAny._trailHistoryCount = count;
+    stop() {
+        this.restart();
+        this.pause();
     }
 
     setQualityFactor(qualityFactor: number) {
         this.qualityFactor = Math.max(0.1, Math.min(1, qualityFactor));
     }
 
+    /**
+     * Appends one particle to the pool, giving it the next row of the store.
+     *
+     * Growing the store replaces its arrays, so every particle already bound to
+     * it has to be re-pointed at the new ones.
+     */
+    /** Points every particle at the store's columns again, after any were replaced. */
+    private rebindParticles(): void {
+        const particles = this.particles;
+        for (let i = 0; i < particles.length; i++) {
+            (particles[i] as SpriteParticle | TrailParticle).rebind();
+        }
+    }
+
+    private growParticlePool(isTrailMode: boolean): void {
+        const index = this.particles.length;
+        if (this.store.ensureCapacity(index + 1)) {
+            this.rebindParticles();
+        }
+        this.particles.push(isTrailMode ? new TrailParticle(this.store, index) : new SpriteParticle(this.store, index));
+    }
+
     private spawn(count: number, emissionState: EmissionState, matrix: Matrix4) {
-        tempQ.setFromRotationMatrix(matrix);
         const translation = tempV;
         const scale = tempV2;
+        // decompose writes tempQ, so no separate setFromRotationMatrix is needed.
         matrix.decompose(translation, tempQ, scale);
         const behaviors = this.behaviors;
         const behaviorCount = behaviors.length;
         const renderMode = this.rendererSettings.renderMode;
         const isTrailMode = renderMode === RenderMode.Trail;
+        const isSpriteMode = !isTrailMode;
+        const isMeshMode = renderMode === RenderMode.Mesh;
+        const startRotationIsRotation = this.startRotation.type === 'rotation';
+        const startSizeIsVector3 = this.startSize.type === 'vec3function';
         const timeRatio = emissionState.time / this.duration;
         const trailSettings = isTrailMode ? (this.rendererEmitterSettings as TrailSettings) : undefined;
         const followLocalOrigin = Boolean(trailSettings?.followLocalOrigin);
@@ -686,15 +729,15 @@ export class ParticleSystem implements IParticleSystem {
             emissionState.burstParticleIndex = i;
             this.particleNum++;
             if (this.particles.length < this.particleNum) {
-                if (isTrailMode) {
-                    this.particles.push(new TrailParticle());
-                } else {
-                    this.particles.push(new SpriteParticle());
-                }
+                this.growParticlePool(isTrailMode);
             }
             const particle = this.particles[this.particleNum - 1];
             particle.reset();
             particle.speedModifier = 1;
+            // Parent EmitSub can refill an onlyUsedByOther system after it had
+            // already finished empty; clear the flag so update does not treat it
+            // as done while it has live particles again.
+            this.finishedEventFired = false;
             this.startColor.startGen(particle.memory);
             this.startColor.genColor(particle.memory, particle.startColor, this.emissionState.time);
             particle.color.copy(particle.startColor);
@@ -704,7 +747,7 @@ export class ParticleSystem implements IParticleSystem {
             particle.life = this.startLife.genValue(particle.memory, timeRatio);
             particle.age = 0;
             this.startSize.startGen(particle.memory);
-            if (this.startSize.type === 'vec3function') {
+            if (startSizeIsVector3) {
                 (this.startSize as Vector3Generator).genValue(particle.memory, particle.startSize, timeRatio);
             } else {
                 const size = (this.startSize as FunctionValueGenerator).genValue(particle.memory, timeRatio);
@@ -714,39 +757,51 @@ export class ParticleSystem implements IParticleSystem {
             particle.uvTile = this.startTileIndex.genValue(particle.memory);
             particle.size.copy(particle.startSize);
 
-            if (
-                this.rendererSettings.renderMode === RenderMode.Mesh ||
-                this.rendererSettings.renderMode === RenderMode.BillBoard ||
-                this.rendererSettings.renderMode === RenderMode.VerticalBillBoard ||
-                this.rendererSettings.renderMode === RenderMode.HorizontalBillBoard ||
-                this.rendererSettings.renderMode === RenderMode.StretchedBillBoard
-            ) {
+            if (isSpriteMode) {
                 const sprite = particle as SpriteParticle;
                 this.startRotation.startGen(particle.memory);
-                if (renderMode === RenderMode.Mesh) {
+                if (isMeshMode) {
                     if (!(sprite.rotation instanceof Quaternion)) {
                         sprite.rotation = new Quaternion();
                     }
-                    if (this.startRotation.type === 'rotation') {
-                        this.startRotation.genValue(particle.memory, sprite.rotation as Quaternion, 1, timeRatio);
+                    // A recycled particle can still carry the turn of whatever
+                    // it was last time; the renderer would draw a fraction of it
+                    // before any behavior has had a chance to say otherwise.
+                    if (sprite.angularVelocity instanceof Quaternion) {
+                        sprite.angularVelocity.set(0, 0, 0, 1);
+                    }
+                    if (startRotationIsRotation) {
+                        (this.startRotation as RotationGenerator).genValue(
+                            particle.memory,
+                            sprite.rotation as Quaternion,
+                            1,
+                            timeRatio
+                        );
                     } else {
-                        (sprite.rotation as Quaternion).setFromAxisAngle(UP, this.startRotation.genValue(sprite.memory, timeRatio));
+                        (sprite.rotation as Quaternion).setFromAxisAngle(
+                            UP,
+                            (this.startRotation as FunctionValueGenerator).genValue(sprite.memory, timeRatio)
+                        );
                     }
                 } else {
-                    if (this.startRotation.type === 'rotation') {
+                    if (startRotationIsRotation) {
                         sprite.rotation = 0;
                     } else {
-                        sprite.rotation = this.startRotation.genValue(sprite.memory, timeRatio);
+                        sprite.rotation = (this.startRotation as FunctionValueGenerator).genValue(
+                            sprite.memory,
+                            timeRatio
+                        );
                     }
+                    // Set until a turning behavior says otherwise, so the
+                    // renderer never carries a recycled particle's old spin.
+                    sprite.angularVelocity = 0;
                 }
-            } else if (isTrailMode && trailSettings) {
+            } else if (trailSettings) {
                 const trail = particle as TrailParticle;
                 trailSettings.startLength.startGen(trail.memory);
                 trail.length = trailSettings.startLength.genValue(trail.memory, timeRatio);
-                if (this.useFastTrailHistory) {
-                    this.ensureTrailHistoryCapacity(trail, Math.max(1, Math.ceil(trail.length)));
-                    this.resetTrailHistory(trail);
-                }
+                trail.ensureHistoryCapacity(Math.max(1, Math.ceil(trail.length)));
+                trail.resetHistory();
             }
 
             this.emitterShape.initialize(particle, emissionState);
@@ -833,6 +888,20 @@ export class ParticleSystem implements IParticleSystem {
         }
 
         if (!this.looping && this.finishedEventFired && this.particleNum === 0) {
+            // Still tick the fixed-step clock. A sub-emitter target
+            // (onlyUsedByOther) goes empty between parent bursts; skipping the
+            // accumulator here desyncs it from the parent, so the next particles
+            // the parent emits into it sit at age 0 / startColor until the phase
+            // catches up — white flashes scattered wherever the parent was.
+            if (delta > 0.1) {
+                delta = 0.1;
+            }
+            this.simulationAccumulator += delta;
+            const stepsToRun = Math.min(
+                MAX_SIMULATION_STEPS_PER_FRAME,
+                Math.max(0, Math.round(this.simulationAccumulator / SIMULATION_STEP - ROUND_TIE_BIAS))
+            );
+            this.simulationAccumulator -= stepsToRun * SIMULATION_STEP;
             return;
         }
 
@@ -855,10 +924,7 @@ export class ParticleSystem implements IParticleSystem {
         const emitterElements = this.emitter.matrixWorld.elements;
         this.tempEmitterPos.set(emitterElements[12], emitterElements[13], emitterElements[14]);
         if (this.previousEmitterPos !== undefined && delta > 0) {
-            this.emitterVelocity
-                .copy(this.tempEmitterPos)
-                .sub(this.previousEmitterPos)
-                .divideScalar(delta);
+            this.emitterVelocity.copy(this.tempEmitterPos).sub(this.previousEmitterPos).divideScalar(delta);
         }
         (this.previousEmitterPos ??= new Vector3()).copy(this.tempEmitterPos);
 
@@ -875,12 +941,83 @@ export class ParticleSystem implements IParticleSystem {
         this.simulationAccumulator += delta;
         const stepsToRun = Math.min(
             MAX_SIMULATION_STEPS_PER_FRAME,
-            Math.floor((this.simulationAccumulator + 1e-9) / SIMULATION_STEP)
+            Math.max(0, Math.round(this.simulationAccumulator / SIMULATION_STEP - ROUND_TIE_BIAS))
         );
         for (let i = 0; i < stepsToRun; i++) {
             this.simulateStep(SIMULATION_STEP);
         }
         this.simulationAccumulator -= stepsToRun * SIMULATION_STEP;
+    }
+
+    /**
+     * Time the display is ahead of (positive) or still ahead of the simulation
+     * (negative — the simulation ran a hair early), in seconds. Magnitude never
+     * exceeds one step.
+     *
+     * The simulation runs on a fixed 1/60 step so that emission and lifetimes
+     * stay in phase — without it a slow emitter flickers when the frame rate
+     * wobbles. But frames do not arrive on that grid: a display running at
+     * anything other than exactly 60Hz leaves some frames with no step at all
+     * (half of them at 120Hz, three in five at 144Hz) and others with two, so
+     * the particles are drawn stuttering even while the frame rate is perfect.
+     *
+     * The steps-per-frame count below is chosen by *rounding* the accumulated
+     * time to the nearest step, not flooring it. Flooring always leaves the
+     * accumulator positive, and when the real frame rate sits very close to
+     * 60Hz (as most displays do) that leftover creeps toward a full step for
+     * many consecutive frames before tipping over into a frame that runs two
+     * steps at once and resets it to near zero — a visible lurch, every particle
+     * in the system at once, with a perfectly steady frame rate the whole time.
+     * Rounding lets the leftover go negative instead, which keeps it centered
+     * near zero and stops it from ever building up toward that reset.
+     *
+     * Renderers close the gap by advancing what they draw along each particle's
+     * velocity by this much. That reproduces the straight-line part of the
+     * motion exactly — it is the same term the next step would integrate — so
+     * the simulation stays fixed-step while the picture moves continuously.
+     */
+    /** Length of one simulation step, in seconds. See {@link simulationResidual}. */
+    get simulationStep(): number {
+        return SIMULATION_STEP;
+    }
+
+    get simulationResidual(): number {
+        if (this.paused) {
+            return 0;
+        }
+        // Magnitude never more than a step, even if a frame long enough to hit
+        // the per-frame step cap left the accumulator with more than that.
+        if (this.simulationAccumulator > SIMULATION_STEP) return SIMULATION_STEP;
+        if (this.simulationAccumulator < -SIMULATION_STEP) return -SIMULATION_STEP;
+        return this.simulationAccumulator;
+    }
+
+    /**
+     * Execution plan for this system's behaviors, rebuilt when the list changes.
+     *
+     * Consecutive behaviors that can be compiled into one loop are merged, so
+     * the particles are walked once instead of once per behavior. The plan is
+     * keyed on the behavior instances, not their types: swapping one out has to
+     * change the generated code's indices.
+     */
+    private behaviorSteps(): Array<FusionStep> {
+        const behaviors = this.behaviors;
+        const cached = this.fusionPlan;
+        if (cached !== undefined && cached.length === behaviors.length) {
+            let same = true;
+            for (let i = 0; i < behaviors.length; i++) {
+                if (cached[i] !== behaviors[i]) {
+                    same = false;
+                    break;
+                }
+            }
+            if (same) {
+                return this.fusionSteps;
+            }
+        }
+        this.fusionPlan = behaviors.slice();
+        this.fusionSteps = planBehaviorFusion(behaviors);
+        return this.fusionSteps;
     }
 
     /** Advances emission, behaviors, motion and culling by one fixed timestep. */
@@ -890,62 +1027,125 @@ export class ParticleSystem implements IParticleSystem {
         }
 
         const particles = this.particles;
-        const behaviorCount = this.behaviors.length;
+        const behaviors = this.behaviors;
+        const behaviorCount = behaviors.length;
         const particleCount = this.particleNum;
+        const isTrailMode = this.rendererSettings.renderMode === RenderMode.Trail;
+        // Only stretched billboards draw from velocity, and only they pay for
+        // keeping the previous one.
+        const stretched = this.rendererSettings.renderMode === RenderMode.StretchedBillBoard;
+
+        // Remember where everything starts this step, so the renderer can carry
+        // the motion the step produces on into the part of the frame that comes
+        // after it. Taken after emission on purpose: a particle born this step
+        // then starts from where it was born rather than from whatever the row
+        // held before, and so is drawn at the emitter instead of jumping.
+        const columns = this.store;
+        const vector3Rows = particleCount * 3;
+        columns.previousPosition.set(columns.position.subarray(0, vector3Rows));
+        columns.previousSize.set(columns.size.subarray(0, vector3Rows));
+        if (stretched) {
+            if (columns.keepPreviousVelocity()) {
+                this.rebindParticles();
+            }
+            columns.previousVelocity.set(columns.velocity.subarray(0, vector3Rows));
+        }
+        columns.previousColor.set(columns.color.subarray(0, particleCount * 4));
+
         this.emitterShape.update(this, delta);
-        for (let j = 0; j < behaviorCount; j++) {
-            const behavior = this.behaviors[j];
-            behavior.frameUpdate(delta);
+        const steps = this.behaviorSteps();
+        for (let s = 0; s < steps.length; s++) {
+            const step = steps[s];
+            const stepBehaviors = step.behaviors;
+            for (let j = 0; j < stepBehaviors.length; j++) {
+                stepBehaviors[j].frameUpdate(delta);
+            }
+            // Nothing to update: skip, matching what the per-particle loop did.
+            // A behavior may set up state before its loop that is only valid
+            // once it has seen a particle.
+            if (particleCount === 0) {
+                continue;
+            }
+            if (step.run !== undefined) {
+                step.run(behaviors, particles, particleCount, delta);
+                continue;
+            }
+            const behavior = stepBehaviors[0];
+            if (behavior.updateAll !== undefined) {
+                behavior.updateAll(particles, particleCount, delta);
+                continue;
+            }
             for (let i = 0; i < particleCount; i++) {
                 const particle = particles[i];
-                if (!particle.died) {
+                // Inlined `died` — this runs once per behavior per particle.
+                if (particle.age < particle.life) {
                     behavior.update(particle, delta);
                 }
             }
         }
 
-        const followLocalOrigin =
-            this.rendererSettings.renderMode === RenderMode.Trail &&
-            (this.rendererEmitterSettings as TrailSettings).followLocalOrigin;
-        const emitterMatrix = this.emitter.matrixWorld;
-        for (let i = 0; i < particleCount; i++) {
-            const particle = particles[i];
-            if (followLocalOrigin && (particle as TrailParticle).localPosition) {
-                particle.position.copy((particle as TrailParticle).localPosition!);
-                if (particle.parentMatrix) {
-                    particle.position.applyMatrix4(particle.parentMatrix);
-                } else {
-                    particle.position.applyMatrix4(emitterMatrix);
-                }
-            } else {
-                particle.position.addScaledVector(particle.velocity, delta * particle.speedModifier);
-            }
-            particle.age += delta;
-        }
-
-        if (this.rendererSettings.renderMode === RenderMode.Trail) {
+        const followLocalOrigin = isTrailMode && (this.rendererEmitterSettings as TrailSettings).followLocalOrigin;
+        if (followLocalOrigin) {
+            const emitterMatrix = this.emitter.matrixWorld;
             for (let i = 0; i < particleCount; i++) {
-                const trailParticle = particles[i] as TrailParticle;
-                if (this.useFastTrailHistory) {
-                    this.updateFastTrailHistory(trailParticle);
+                const particle = particles[i];
+                if ((particle as TrailParticle).localPosition) {
+                    particle.position.copy((particle as TrailParticle).localPosition!);
+                    particle.position.applyMatrix4(particle.parentMatrix ?? emitterMatrix);
                 } else {
-                    trailParticle.update();
+                    particle.position.addScaledVector(particle.velocity, delta * particle.speedModifier);
                 }
+                particle.age += delta;
+            }
+        } else {
+            // Live particles own rows [0, particleNum), so integrate straight
+            // over the columns. Nothing in here touches a particle object.
+            const positions = this.store.position;
+            const velocities = this.store.velocity;
+            const scalars = this.store.scalars;
+            const stride = ParticleStore.SCALAR_STRIDE;
+            for (let i = 0, offset = 0, scalar = 0; i < particleCount; i++, offset += 3, scalar += stride) {
+                const step = delta * scalars[scalar + ParticleStore.SPEED_MODIFIER];
+                positions[offset] += velocities[offset] * step;
+                positions[offset + 1] += velocities[offset + 1] * step;
+                positions[offset + 2] += velocities[offset + 2] * step;
+                scalars[scalar + ParticleStore.AGE] += delta;
             }
         }
 
+        if (isTrailMode) {
+            for (let i = 0; i < particleCount; i++) {
+                (particles[i] as TrailParticle).update();
+            }
+        }
+
+        const notifyDeaths = this.hasListeners('particleDied');
+        const store = this.store;
+        const scalars = store.scalars;
+        const scalarStride = ParticleStore.SCALAR_STRIDE;
         let liveParticleCount = this.particleNum;
         for (let i = 0; i < liveParticleCount; i++) {
             const particle = particles[i];
-            if (
-                particle.died &&
-                (!(particle instanceof TrailParticle) || this.getTrailHistoryCount(particle as TrailParticle) === 0)
-            ) {
-                particles[i] = particles[liveParticleCount - 1];
-                particles[liveParticleCount - 1] = particle;
+            const scalar = i * scalarStride;
+            const dead = scalars[scalar + ParticleStore.AGE] >= scalars[scalar + ParticleStore.LIFE];
+            if (dead && (!isTrailMode || (particle as TrailParticle).historyCount === 0)) {
+                const last = liveParticleCount - 1;
+                const survivor = particles[last] as StoreBackedParticle;
+                particles[i] = survivor;
+                particles[last] = particle;
+                // Move the rows along with the particles so slot k always owns
+                // row k. Live particles then stay one contiguous range, which is
+                // what lets the renderer copy them without gathering.
+                if (i !== last) {
+                    store.swapRows(i, last);
+                    survivor.setStoreIndex(i);
+                    (particle as StoreBackedParticle).setStoreIndex(last);
+                }
                 liveParticleCount--;
                 i--;
-                this.fire({type: 'particleDied', particleSystem: this, particle: particle});
+                if (notifyDeaths) {
+                    this.fire({type: 'particleDied', particleSystem: this, particle: particle});
+                }
             }
         }
         this.particleNum = liveParticleCount;
@@ -971,7 +1171,9 @@ export class ParticleSystem implements IParticleSystem {
             if (this.looping) {
                 emissionState.time -= this.duration;
                 emissionState.burstIndex = 0;
-                this.behaviors.forEach((behavior) => behavior.reset());
+                for (let i = 0; i < this.behaviors.length; i++) {
+                    this.behaviors[i].reset();
+                }
             } else {
                 if (!this.emitEnded && !this.onlyUsedByOther) {
                     this.endEmit();
@@ -979,7 +1181,11 @@ export class ParticleSystem implements IParticleSystem {
             }
         }
 
-        this.normalMatrix.getNormalMatrix(emitterMatrix);
+        // Only spawns in world space consume the normal matrix, and computing it
+        // inverts a 4x4 — skip it for local-space systems.
+        if (this.worldSpace) {
+            this.normalMatrix.getNormalMatrix(emitterMatrix);
+        }
         const emissionBursts = this.emissionBursts;
         const emissionBurstCount = emissionBursts.length;
         const qualityFactor = this.qualityFactor;
@@ -1026,7 +1232,11 @@ export class ParticleSystem implements IParticleSystem {
         }
 
         if (emissionState.previousWorldPos === undefined) emissionState.previousWorldPos = new Vector3();
-        emissionState.previousWorldPos.set(emitterMatrix.elements[12], emitterMatrix.elements[13], emitterMatrix.elements[14]);
+        emissionState.previousWorldPos.set(
+            emitterMatrix.elements[12],
+            emitterMatrix.elements[13],
+            emitterMatrix.elements[14]
+        );
         emissionState.time += delta;
     }
 
@@ -1034,15 +1244,15 @@ export class ParticleSystem implements IParticleSystem {
         const isRootObject = metaData === undefined || typeof metaData === 'string';
         const meta: BabylonMetaData = isRootObject
             ? {
-                geometries: {},
-                materials: {},
-                textures: {},
-                images: {},
-                shapes: {},
-                skeletons: {},
-                animations: {},
-                nodes: {},
-            }
+                  geometries: {},
+                  materials: {},
+                  textures: {},
+                  images: {},
+                  shapes: {},
+                  skeletons: {},
+                  animations: {},
+                  nodes: {},
+              }
             : metaData;
 
         const geometryUUID = this.ensureGeometryMeta(meta);
@@ -1125,8 +1335,8 @@ export class ParticleSystem implements IParticleSystem {
         const materialTextureRef = materialMeta?.texture ?? json.texture;
         const texture =
             typeof materialTextureRef === 'string'
-                ? meta.textures?.[materialTextureRef] ?? null
-                : materialTextureRef ?? null;
+                ? (meta.textures?.[materialTextureRef] ?? null)
+                : (materialTextureRef ?? null);
         const resolvedGeometryEntry =
             typeof json.instancingGeometry === 'string'
                 ? meta.geometries?.[json.instancingGeometry]
@@ -1143,14 +1353,20 @@ export class ParticleSystem implements IParticleSystem {
             shape,
             startLife: ValueGeneratorFromJSON(json.startLife),
             startSpeed: ValueGeneratorFromJSON(json.startSpeed),
-            startRotation: GeneratorFromJSON(json.startRotation) as RotationGenerator | ValueGenerator | FunctionValueGenerator,
+            startRotation: GeneratorFromJSON(json.startRotation) as
+                | RotationGenerator
+                | ValueGenerator
+                | FunctionValueGenerator,
             startSize: GeneratorFromJSON(json.startSize) as Vector3Generator | ValueGenerator | FunctionValueGenerator,
             startColor: ColorGeneratorFromJSON(json.startColor) as ColorGenerator,
             emissionOverTime: ValueGeneratorFromJSON(json.emissionOverTime),
             emissionOverDistance: ValueGeneratorFromJSON(json.emissionOverDistance),
             emissionBursts: json.emissionBursts?.map((burst: any) => ({
                 time: burst.time,
-                count: typeof burst.count === 'number' ? new ConstantValue(burst.count) : ValueGeneratorFromJSON(burst.count),
+                count:
+                    typeof burst.count === 'number'
+                        ? new ConstantValue(burst.count)
+                        : ValueGeneratorFromJSON(burst.count),
                 probability: burst.probability ?? 1,
                 interval: burst.interval ?? 0.1,
                 cycle: burst.cycle ?? burst.cycleCount ?? 1,
@@ -1235,7 +1451,9 @@ export class ParticleSystem implements IParticleSystem {
             positions: Array.from(this.rendererSettings.instancingGeometry),
             indices: Array.from(this.rendererSettings.instancingIndices),
             uvs: this.rendererSettings.instancingUVs ? Array.from(this.rendererSettings.instancingUVs) : undefined,
-            normals: this.rendererSettings.instancingNormals ? Array.from(this.rendererSettings.instancingNormals) : undefined,
+            normals: this.rendererSettings.instancingNormals
+                ? Array.from(this.rendererSettings.instancingNormals)
+                : undefined,
         };
         return geometryUUID;
     }
@@ -1248,6 +1466,13 @@ export class ParticleSystem implements IParticleSystem {
             meta.textures[textureUUID] = texture;
         }
 
+        const reflectionAtlas = this.rendererSettings.reflectionAtlas;
+        let reflectionAtlasUUID: string | undefined;
+        if (reflectionAtlas instanceof Texture) {
+            reflectionAtlasUUID = ParticleSystem.nextSerializationId('quarks_texture');
+            meta.textures[reflectionAtlasUUID] = reflectionAtlas;
+        }
+
         const materialUUID = ParticleSystem.nextSerializationId('quarks_material');
         meta.materials[materialUUID] = {
             uuid: materialUUID,
@@ -1258,6 +1483,8 @@ export class ParticleSystem implements IParticleSystem {
             depthWrite: this.rendererSettings.materialDepthWrite,
             alphaTest: this.rendererSettings.materialAlphaTest,
             texture: textureUUID,
+            reflectionAtlas: reflectionAtlasUUID,
+            reflectionLevel: this.rendererSettings.reflectionLevel,
             sourceMaterial: this.materialRef ?? undefined,
         };
         return materialUUID;
@@ -1319,7 +1546,8 @@ export class ParticleSystem implements IParticleSystem {
 
     addBehavior(behavior: Behavior) {
         this.behaviors.push(behavior);
-        this.refreshTrailHistoryMode();
+        // A sub emitter added here changes which system has to update first.
+        this._renderer?._invalidateUpdateOrder();
     }
 
     getRendererSettings(): VFXBatchSettings {
@@ -1342,9 +1570,19 @@ export class ParticleSystem implements IParticleSystem {
         }
     }
 
+    /** True when at least one callback is registered for the event type. */
+    private hasListeners(event: ParticleSystemEventType): boolean {
+        const callbacks = this.listeners[event];
+        return callbacks !== undefined && callbacks.length > 0;
+    }
+
     private fire(event: ParticleSystemEvent) {
-        if (this.listeners[event.type]) {
-            this.listeners[event.type].forEach((callback) => callback(event));
+        const callbacks = this.listeners[event.type];
+        if (callbacks === undefined) {
+            return;
+        }
+        for (let i = 0; i < callbacks.length; i++) {
+            callbacks[i](event);
         }
     }
 

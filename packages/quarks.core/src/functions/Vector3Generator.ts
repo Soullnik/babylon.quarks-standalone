@@ -1,13 +1,15 @@
-import {GeneratorMemory} from './GeneratorMemory';
-import {FunctionJSON} from './FunctionJSON';
 import {Vector3} from '../math';
-import {Vector3Function} from './Vector3Function';
 import {ConstantValue} from './ConstantValue';
+import {FunctionJSON} from './FunctionJSON';
+import {GeneratorMemory} from './GeneratorMemory';
+import {Vector3Function} from './Vector3Function';
 
 export interface Vector3Generator {
     type: 'vec3function';
     startGen(memory: GeneratorMemory): void;
     genValue(memory: GeneratorMemory, vec: Vector3, t?: number): Vector3;
+    /** See FunctionValueGenerator.refreshTable. */
+    refreshTable?(): void;
     toJSON(): FunctionJSON;
     clone(): Vector3Generator;
 }

@@ -1,4 +1,4 @@
 {
-  "extends": ["../../typedoc.package.json"],
-  "entryPoints": ["src/index.ts"]
+    "extends": ["../../typedoc.package.json"],
+    "entryPoints": ["src/index.ts"]
 }

@@ -1,6 +1,6 @@
-import {Behavior} from './Behavior';
-import {Particle, RecordState, TrailParticle} from '../Particle';
+import {Particle, TrailParticle} from '../Particle';
 import {FunctionValueGenerator, ValueGeneratorFromJSON} from '../functions/ValueGenerator';
+import {Behavior} from './Behavior';
 
 /**
  * Apply width to particles based on their length.
@@ -15,14 +15,25 @@ export class WidthOverLength implements Behavior {
     constructor(public width: FunctionValueGenerator) {}
 
     update(particle: Particle): void {
-        if (particle instanceof TrailParticle) {
-            const iter = particle.previous.values();
-            for (let i = 0; i < particle.previous.length; i++) {
-                const cur = iter.next();
-                (cur.value as RecordState).size = this.width.genValue(
-                    particle.memory,
-                    (particle.previous.length - i) / particle.length
-                );
+        if (!(particle instanceof TrailParticle)) {
+            return;
+        }
+        const count = particle.historyCount;
+        if (count === 0) {
+            return;
+        }
+        const capacity = particle.historyCapacity;
+        const sizes = particle.historySizes;
+        const memory = particle.memory;
+        const invLength = 1 / particle.length;
+        // Walk the ring buffer oldest-first, wrapping by hand so the loop stays
+        // free of divisions.
+        let slot = particle.getHistoryIndex(0);
+        for (let i = 0; i < count; i++) {
+            sizes[slot] = this.width.genValue(memory, (count - i) * invLength);
+            slot++;
+            if (slot === capacity) {
+                slot = 0;
             }
         }
     }

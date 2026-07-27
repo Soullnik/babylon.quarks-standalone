@@ -1,80 +1,80 @@
 name: Publish npm package
 
 on:
-  workflow_dispatch:
-  release:
-    types:
-      - published
+    workflow_dispatch:
+    release:
+        types:
+            - published
 
 jobs:
-  publish:
-    runs-on: ubuntu-latest
-    permissions:
-      # write: uploading the .unitypackage to the GitHub Release below.
-      contents: write
-      # Required for npm trusted publishing (OIDC token exchange).
-      id-token: write
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+    publish:
+        runs-on: ubuntu-latest
+        permissions:
+            # write: uploading the .unitypackage to the GitHub Release below.
+            contents: write
+            # Required for npm trusted publishing (OIDC token exchange).
+            id-token: write
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          registry-url: https://registry.npmjs.org
-          cache: npm
+            - name: Setup Node.js
+              uses: actions/setup-node@v4
+              with:
+                  node-version: 20
+                  registry-url: https://registry.npmjs.org
+                  cache: npm
 
-      # Trusted publishing requires npm >= 11.5.1; Node 20 bundles npm 10.
-      - name: Update npm
-        run: npm install -g npm@11
+            # Trusted publishing requires npm >= 11.5.1; Node 20 bundles npm 10.
+            - name: Update npm
+              run: npm install -g npm@11
 
-      - name: Install dependencies
-        run: npm ci
+            - name: Install dependencies
+              run: npm ci
 
-      - name: Build package
-        run: npm run build
+            - name: Build package
+              run: npm run build
 
-      - name: Build effect editor
-        run: npm run build:editor
+            - name: Build effect editor
+              run: npm run build:editor
 
-      - name: Run package tests
-        run: npm run test
+            - name: Run package tests
+              run: npm run test
 
-      - name: Verify package tarball contents
-        run: npm run check:pack
+            - name: Verify package tarball contents
+              run: npm run check:pack
 
-      # Built and attached before the npm publish steps so the Unity package always reaches
-      # the release regardless of npm publish outcome (e.g. a version already published).
-      - name: Build Unity exporter .unitypackage
-        run: npm run build:unitypackage
+            # Built and attached before the npm publish steps so the Unity package always reaches
+            # the release regardless of npm publish outcome (e.g. a version already published).
+            - name: Build Unity exporter .unitypackage
+              run: npm run build:unitypackage
 
-      - name: Attach .unitypackage to the GitHub Release
-        if: github.event_name == 'release'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: gh release upload "${{ github.event.release.tag_name }}" tools/unity-quarks-exporter/dist/BabylonQuarksUnityExporter.unitypackage --clobber
+            - name: Attach .unitypackage to the GitHub Release
+              if: github.event_name == 'release'
+              env:
+                  GH_TOKEN: ${{ github.token }}
+              run: gh release upload "${{ github.event.release.tag_name }}" tools/unity-quarks-exporter/dist/BabylonQuarksUnityExporter.unitypackage --clobber
 
-      # Both packages are published from a single release even though a given release usually
-      # only bumps one of them — `npm publish` errors on a version that's already on the
-      # registry, which would otherwise fail the whole job over a package that has nothing new
-      # to publish. Skip instead of failing when the current version is already published.
-      - name: Publish babylon.quarks
-        run: |
-          name=$(node -p "require('./packages/babylon.quarks/package.json').name")
-          version=$(node -p "require('./packages/babylon.quarks/package.json').version")
-          if npm view "$name@$version" version >/dev/null 2>&1; then
-            echo "$name@$version is already published, skipping."
-          else
-            npm publish --workspace=babylon.quarks --access public
-          fi
+            # Both packages are published from a single release even though a given release usually
+            # only bumps one of them — `npm publish` errors on a version that's already on the
+            # registry, which would otherwise fail the whole job over a package that has nothing new
+            # to publish. Skip instead of failing when the current version is already published.
+            - name: Publish babylon.quarks
+              run: |
+                  name=$(node -p "require('./packages/babylon.quarks/package.json').name")
+                  version=$(node -p "require('./packages/babylon.quarks/package.json').version")
+                  if npm view "$name@$version" version >/dev/null 2>&1; then
+                    echo "$name@$version is already published, skipping."
+                  else
+                    npm publish --workspace=babylon.quarks --access public
+                  fi
 
-      - name: Publish babylon.quarks-editor
-        run: |
-          name=$(node -p "require('./packages/babylon.quarks-editor/package.json').name")
-          version=$(node -p "require('./packages/babylon.quarks-editor/package.json').version")
-          if npm view "$name@$version" version >/dev/null 2>&1; then
-            echo "$name@$version is already published, skipping."
-          else
-            npm publish --workspace=babylon.quarks-editor --access public
-          fi
+            - name: Publish babylon.quarks-editor
+              run: |
+                  name=$(node -p "require('./packages/babylon.quarks-editor/package.json').name")
+                  version=$(node -p "require('./packages/babylon.quarks-editor/package.json').version")
+                  if npm view "$name@$version" version >/dev/null 2>&1; then
+                    echo "$name@$version is already published, skipping."
+                  else
+                    npm publish --workspace=babylon.quarks-editor --access public
+                  fi

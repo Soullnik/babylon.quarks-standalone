@@ -1,19 +1,19 @@
-import type { DemoContext } from '../types';
-import {Vector3 as BVector3} from '@babylonjs/core/Maths/math.vector';
 import {Constants} from '@babylonjs/core/Engines/constants';
+import {Vector3 as BVector3} from '@babylonjs/core/Maths/math.vector';
 import {
-    ParticleSystem,
+    Bezier,
+    ConstantColor,
     ConstantValue,
     IntervalValue,
-    SphereEmitter,
-    RenderMode,
-    ConstantColor,
-    SpeedOverLife,
+    ParticleSystem,
     PiecewiseBezier,
-    Bezier,
+    RenderMode,
+    SpeedOverLife,
+    SphereEmitter,
     Vector4,
 } from 'babylon.quarks';
 import {createSharedTexture, SHARED_ASSETS} from '../shared/common';
+import type {DemoContext} from '../types';
 
 function addBlendSystem({scene, batchRenderer, systems, texture, blendMode, position, color}) {
     const system = new ParticleSystem({

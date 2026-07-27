@@ -29,30 +29,22 @@ const G3 = 1.0 / 6.0;
 const F4 = (Math.sqrt(5.0) - 1.0) / 4.0;
 const G4 = (5.0 - Math.sqrt(5.0)) / 20.0;
 
-const grad3 = new Float32Array([1, 1, 0,
-    -1, 1, 0,
-    1, -1, 0,
+const grad3 = new Float32Array([
+    1, 1, 0, -1, 1, 0, 1, -1, 0,
 
-    -1, -1, 0,
-    1, 0, 1,
-    -1, 0, 1,
+    -1, -1, 0, 1, 0, 1, -1, 0, 1,
 
-    1, 0, -1,
-    -1, 0, -1,
-    0, 1, 1,
+    1, 0, -1, -1, 0, -1, 0, 1, 1,
 
-    0, -1, 1,
-    0, 1, -1,
-    0, -1, -1]);
+    0, -1, 1, 0, 1, -1, 0, -1, -1,
+]);
 
-const grad4 = new Float32Array([0, 1, 1, 1, 0, 1, 1, -1, 0, 1, -1, 1, 0, 1, -1, -1,
-    0, -1, 1, 1, 0, -1, 1, -1, 0, -1, -1, 1, 0, -1, -1, -1,
-    1, 0, 1, 1, 1, 0, 1, -1, 1, 0, -1, 1, 1, 0, -1, -1,
-    -1, 0, 1, 1, -1, 0, 1, -1, -1, 0, -1, 1, -1, 0, -1, -1,
-    1, 1, 0, 1, 1, 1, 0, -1, 1, -1, 0, 1, 1, -1, 0, -1,
-    -1, 1, 0, 1, -1, 1, 0, -1, -1, -1, 0, 1, -1, -1, 0, -1,
-    1, 1, 1, 0, 1, 1, -1, 0, 1, -1, 1, 0, 1, -1, -1, 0,
-    -1, 1, 1, 0, -1, 1, -1, 0, -1, -1, 1, 0, -1, -1, -1, 0]);
+const grad4 = new Float32Array([
+    0, 1, 1, 1, 0, 1, 1, -1, 0, 1, -1, 1, 0, 1, -1, -1, 0, -1, 1, 1, 0, -1, 1, -1, 0, -1, -1, 1, 0, -1, -1, -1, 1, 0, 1,
+    1, 1, 0, 1, -1, 1, 0, -1, 1, 1, 0, -1, -1, -1, 0, 1, 1, -1, 0, 1, -1, -1, 0, -1, 1, -1, 0, -1, -1, 1, 1, 0, 1, 1, 1,
+    0, -1, 1, -1, 0, 1, 1, -1, 0, -1, -1, 1, 0, 1, -1, 1, 0, -1, -1, -1, 0, 1, -1, -1, 0, -1, 1, 1, 1, 0, 1, 1, -1, 0,
+    1, -1, 1, 0, 1, -1, -1, 0, -1, 1, 1, 0, -1, 1, -1, 0, -1, -1, 1, 0, -1, -1, -1, 0,
+]);
 
 /**
  * A random() function, must return a numer in the interval [0,1), just like Math.random().
@@ -70,7 +62,7 @@ export class SimplexNoise {
      * @param randomOrSeed A random number generator or a seed (string|number).
      * Defaults to Math.random (random irreproducible initialization).
      */
-    constructor(randomOrSeed: RandomFn|string|number = Math.random) {
+    constructor(randomOrSeed: RandomFn | string | number = Math.random) {
         const random = typeof randomOrSeed == 'function' ? randomOrSeed : alea(randomOrSeed);
         this.p = buildPermutationTable(random);
         this.perm = new Uint8Array(512);
@@ -154,7 +146,7 @@ export class SimplexNoise {
      * @param z
      * @returns a number in the interval [-1, 1]
      */
-    noise3D(x:number, y:number, z:number): number {
+    noise3D(x: number, y: number, z: number): number {
         const permMod12 = this.permMod12;
         const perm = this.perm;
         let n0, n1, n2, n3; // Noise contributions from the four corners
@@ -199,8 +191,8 @@ export class SimplexNoise {
                 j2 = 0;
                 k2 = 1;
             } // Z X Y order
-        }
-        else { // x0<y0
+        } else {
+            // x0<y0
             if (y0 < z0) {
                 i1 = 0;
                 j1 = 0;
@@ -284,7 +276,7 @@ export class SimplexNoise {
      * @param z
      * @returns a number in the interval [-1, 1]
      */
-    noise4D(x:number, y:number, z:number, w:number): number {
+    noise4D(x: number, y: number, z: number, w: number): number {
         const perm = this.perm;
 
         let n0, n1, n2, n3, n4; // Noise contributions from the five corners
@@ -437,7 +429,7 @@ The ALEA PRNG and masher code used by simplex-noise.js
 is based on code by Johannes Baagøe, modified by Jonas Wagner.
 See alea.md for the full license.
 */
-function alea(seed: string|number): RandomFn {
+function alea(seed: string | number): RandomFn {
     let s0 = 0;
     let s1 = 0;
     let s2 = 0;
@@ -461,17 +453,17 @@ function alea(seed: string|number): RandomFn {
         s2 += 1;
     }
 
-    return function() {
+    return function () {
         const t = 2091639 * s0 + c * 2.3283064365386963e-10; // 2^-32
         s0 = s1;
         s1 = s2;
-        return s2 = t - (c = t | 0);
+        return (s2 = t - (c = t | 0));
     };
 }
 
 function masher() {
     let n = 0xefc8249d;
-    return function(data: number|string) {
+    return function (data: number | string) {
         data = data.toString();
         for (let i = 0; i < data.length; i++) {
             n += data.charCodeAt(i);

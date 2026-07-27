@@ -1,7 +1,7 @@
-import {Behavior} from './Behavior';
 import {Particle} from '../Particle';
 import {ValueGenerator, ValueGeneratorFromJSON} from '../functions/ValueGenerator';
 import {Quaternion, Vector3} from '../math';
+import {Behavior} from './Behavior';
 /**
  * Change the emit direction of particles.
  */

@@ -1,4 +1,4 @@
-import React from 'react';
+import type {Behavior} from 'babylon.quarks';
 import {
     ApplyCollision,
     ApplyForce,
@@ -22,15 +22,15 @@ import {
     VelocityOverLife,
     WidthOverLength,
 } from 'babylon.quarks';
-import type {Behavior} from 'babylon.quarks';
+import React from 'react';
 import {EffectBinding} from '../core/binding';
 import {ensureGroundResolver} from '../core/collision';
 import {DEFAULT_GRADIENT_STOPS, buildGradient, findBehavior, readGradientStops} from '../core/colors';
 import {buildCurve, buildScalar, readPieces, readScalar} from '../core/values';
-import {GradientEditor} from './GradientEditor';
 import {CurveEditor} from './CurveEditor';
-import {ModuleSection} from './ModuleSection';
 import {NumberField, Row, SelectField} from './fields';
+import {GradientEditor} from './GradientEditor';
+import {ModuleSection} from './ModuleSection';
 import {ValueField} from './ValueField';
 
 interface ModuleProps {
@@ -79,7 +79,11 @@ export function SpeedOverLifeModule({binding}: ModuleProps) {
             binding={binding}
             title="Speed over Lifetime"
             type="SpeedOverLife"
-            create={() => new SpeedOverLife(buildScalar({mode: 'curve', value: 1, min: 0, max: 1, curve: [1, 0.75, 0.5, 0]}) as never)}
+            create={() =>
+                new SpeedOverLife(
+                    buildScalar({mode: 'curve', value: 1, min: 0, max: 1, curve: [1, 0.75, 0.5, 0]}) as never
+                )
+            }
         >
             {(behavior) => (
                 <div style={{marginTop: 6}}>
@@ -100,7 +104,12 @@ export function LimitSpeedOverLifeModule({binding}: ModuleProps) {
             binding={binding}
             title="Limit Speed over Lifetime"
             type="LimitSpeedOverLife"
-            create={() => new LimitSpeedOverLife(buildScalar({mode: 'curve', value: 1, min: 0, max: 1, curve: [4, 2, 1, 1]}) as never, 0.5)}
+            create={() =>
+                new LimitSpeedOverLife(
+                    buildScalar({mode: 'curve', value: 1, min: 0, max: 1, curve: [4, 2, 1, 1]}) as never,
+                    0.5
+                )
+            }
         >
             {(behavior) => (
                 <>
@@ -135,9 +144,27 @@ export function ForceOverLifeModule({binding}: ModuleProps) {
         >
             {(behavior) => (
                 <>
-                    <ValueField hintKey="force.x" label="X" generator={behavior.x} curveMax={10} onChange={(g) => binding.apply(() => (behavior.x = g))} />
-                    <ValueField hintKey="force.y" label="Y" generator={behavior.y} curveMax={10} onChange={(g) => binding.apply(() => (behavior.y = g))} />
-                    <ValueField hintKey="force.z" label="Z" generator={behavior.z} curveMax={10} onChange={(g) => binding.apply(() => (behavior.z = g))} />
+                    <ValueField
+                        hintKey="force.x"
+                        label="X"
+                        generator={behavior.x}
+                        curveMax={10}
+                        onChange={(g) => binding.apply(() => (behavior.x = g))}
+                    />
+                    <ValueField
+                        hintKey="force.y"
+                        label="Y"
+                        generator={behavior.y}
+                        curveMax={10}
+                        onChange={(g) => binding.apply(() => (behavior.y = g))}
+                    />
+                    <ValueField
+                        hintKey="force.z"
+                        label="Z"
+                        generator={behavior.z}
+                        curveMax={10}
+                        onChange={(g) => binding.apply(() => (behavior.z = g))}
+                    />
                 </>
             )}
         </BehaviorModule>
@@ -164,12 +191,42 @@ export function VelocityOverLifeModule({binding}: ModuleProps) {
                             onChange={(v) => binding.apply(() => (behavior.space = v))}
                         />
                     </Row>
-                    <ValueField label="Linear X" generator={behavior.linearX} curveMax={10} onChange={(g) => binding.apply(() => (behavior.linearX = g))} />
-                    <ValueField label="Linear Y" generator={behavior.linearY} curveMax={10} onChange={(g) => binding.apply(() => (behavior.linearY = g))} />
-                    <ValueField label="Linear Z" generator={behavior.linearZ} curveMax={10} onChange={(g) => binding.apply(() => (behavior.linearZ = g))} />
-                    <ValueField label="Orbital X" generator={behavior.orbitalX} curveMax={Math.PI * 4} onChange={(g) => binding.apply(() => (behavior.orbitalX = g))} />
-                    <ValueField label="Orbital Y" generator={behavior.orbitalY} curveMax={Math.PI * 4} onChange={(g) => binding.apply(() => (behavior.orbitalY = g))} />
-                    <ValueField label="Orbital Z" generator={behavior.orbitalZ} curveMax={Math.PI * 4} onChange={(g) => binding.apply(() => (behavior.orbitalZ = g))} />
+                    <ValueField
+                        label="Linear X"
+                        generator={behavior.linearX}
+                        curveMax={10}
+                        onChange={(g) => binding.apply(() => (behavior.linearX = g))}
+                    />
+                    <ValueField
+                        label="Linear Y"
+                        generator={behavior.linearY}
+                        curveMax={10}
+                        onChange={(g) => binding.apply(() => (behavior.linearY = g))}
+                    />
+                    <ValueField
+                        label="Linear Z"
+                        generator={behavior.linearZ}
+                        curveMax={10}
+                        onChange={(g) => binding.apply(() => (behavior.linearZ = g))}
+                    />
+                    <ValueField
+                        label="Orbital X"
+                        generator={behavior.orbitalX}
+                        curveMax={Math.PI * 4}
+                        onChange={(g) => binding.apply(() => (behavior.orbitalX = g))}
+                    />
+                    <ValueField
+                        label="Orbital Y"
+                        generator={behavior.orbitalY}
+                        curveMax={Math.PI * 4}
+                        onChange={(g) => binding.apply(() => (behavior.orbitalY = g))}
+                    />
+                    <ValueField
+                        label="Orbital Z"
+                        generator={behavior.orbitalZ}
+                        curveMax={Math.PI * 4}
+                        onChange={(g) => binding.apply(() => (behavior.orbitalZ = g))}
+                    />
                 </>
             )}
         </BehaviorModule>
@@ -256,7 +313,9 @@ export function NoiseModule({binding}: ModuleProps) {
             binding={binding}
             title="Noise"
             type="Noise"
-            create={() => new Noise(new ConstantValue(1), new ConstantValue(1), new ConstantValue(1), new ConstantValue(0))}
+            create={() =>
+                new Noise(new ConstantValue(1), new ConstantValue(1), new ConstantValue(1), new ConstantValue(0))
+            }
         >
             {(behavior) => (
                 <>
@@ -297,7 +356,14 @@ export function NoiseModule({binding}: ModuleProps) {
 }
 
 /** Three numeric inputs for a Vector3 field, replacing the whole vector on any edit. */
-function Vector3Row(props: {label: string; hintKey?: string; value: Vector3; min?: number; step?: number; onChange: (v: Vector3) => void}) {
+function Vector3Row(props: {
+    label: string;
+    hintKey?: string;
+    value: Vector3;
+    min?: number;
+    step?: number;
+    onChange: (v: Vector3) => void;
+}) {
     const set = (axis: 'x' | 'y' | 'z', n: number) => {
         const next = props.value.clone();
         next[axis] = n;
@@ -325,7 +391,14 @@ export function TurbulenceModule({binding}: ModuleProps) {
             {(behavior) => (
                 <>
                     {/* scale divides particle position, so keep each axis strictly positive. */}
-                    <Vector3Row hintKey="turbulence.scale" label="Scale" value={behavior.scale} min={0.01} step={0.1} onChange={(v) => binding.apply(() => (behavior.scale = v))} />
+                    <Vector3Row
+                        hintKey="turbulence.scale"
+                        label="Scale"
+                        value={behavior.scale}
+                        min={0.01}
+                        step={0.1}
+                        onChange={(v) => binding.apply(() => (behavior.scale = v))}
+                    />
                     <Row label="Octaves">
                         <NumberField
                             value={behavior.octaves}
@@ -403,8 +476,8 @@ export function CollisionModule({binding}: ModuleProps) {
                         />
                     </Row>
                     <div style={{fontSize: 11, opacity: 0.6, marginTop: 4}}>
-                        Collides against a ground plane. Bounce is saved with the effect; Floor Y is an
-                        editor preview aid (a host can register its own colliders).
+                        Collides against a ground plane. Bounce is saved with the effect; Floor Y is an editor preview
+                        aid (a host can register its own colliders).
                     </div>
                 </>
             )}
@@ -420,12 +493,16 @@ function SpeedRangeRows({binding, behavior}: {binding: EffectBinding; behavior: 
                 <NumberField
                     value={behavior.speedRange.a}
                     min={0}
-                    onChange={(v) => binding.apply(() => (behavior.speedRange = new IntervalValue(v, behavior.speedRange.b)))}
+                    onChange={(v) =>
+                        binding.apply(() => (behavior.speedRange = new IntervalValue(v, behavior.speedRange.b)))
+                    }
                 />
                 <NumberField
                     value={behavior.speedRange.b}
                     min={0}
-                    onChange={(v) => binding.apply(() => (behavior.speedRange = new IntervalValue(behavior.speedRange.a, v)))}
+                    onChange={(v) =>
+                        binding.apply(() => (behavior.speedRange = new IntervalValue(behavior.speedRange.a, v)))
+                    }
                 />
             </div>
         </Row>
@@ -444,7 +521,11 @@ export function ColorBySpeedModule({binding}: ModuleProps) {
                 <>
                     <div style={{marginTop: 6}}>
                         <GradientEditor
-                            stops={behavior.color instanceof Gradient ? readGradientStops(behavior.color) : DEFAULT_GRADIENT_STOPS}
+                            stops={
+                                behavior.color instanceof Gradient
+                                    ? readGradientStops(behavior.color)
+                                    : DEFAULT_GRADIENT_STOPS
+                            }
                             onChange={(stops) => binding.apply(() => (behavior.color = buildGradient(stops)))}
                         />
                     </div>
@@ -461,7 +542,12 @@ export function SizeBySpeedModule({binding}: ModuleProps) {
             binding={binding}
             title="Size by Speed"
             type="SizeBySpeed"
-            create={() => new SizeBySpeed(buildScalar({mode: 'curve', value: 1, min: 0, max: 1, curve: [0.5, 0.8, 1.2, 1.5]}) as never, new IntervalValue(0, 5))}
+            create={() =>
+                new SizeBySpeed(
+                    buildScalar({mode: 'curve', value: 1, min: 0, max: 1, curve: [0.5, 0.8, 1.2, 1.5]}) as never,
+                    new IntervalValue(0, 5)
+                )
+            }
         >
             {(behavior) => (
                 <>
@@ -529,7 +615,11 @@ export function WidthOverTrailModule({binding}: ModuleProps) {
             binding={binding}
             title="Width over Trail"
             type="WidthOverLength"
-            create={() => new WidthOverLength(buildScalar({mode: 'curve', value: 1, min: 0, max: 1, curve: [1, 0.75, 0.4, 0]}) as never)}
+            create={() =>
+                new WidthOverLength(
+                    buildScalar({mode: 'curve', value: 1, min: 0, max: 1, curve: [1, 0.75, 0.4, 0]}) as never
+                )
+            }
         >
             {(behavior) => (
                 <div style={{marginTop: 6}}>
@@ -559,7 +649,15 @@ export function TextureSheetModule({binding}: ModuleProps) {
         <ModuleSection title="Texture Sheet Animation" defaultOpen={false}>
             {textureUrl && (
                 <div style={{marginTop: 6}}>
-                    <div style={{position: 'relative', width: 218, border: '1px solid #2b3761', borderRadius: 6, overflow: 'hidden'}}>
+                    <div
+                        style={{
+                            position: 'relative',
+                            width: 218,
+                            border: '1px solid #2b3761',
+                            borderRadius: 6,
+                            overflow: 'hidden',
+                        }}
+                    >
                         <img src={textureUrl} alt="texture atlas" style={{width: '100%', display: 'block'}} />
                         <div
                             style={{
@@ -607,10 +705,20 @@ export function TextureSheetModule({binding}: ModuleProps) {
                 </div>
             )}
             <Row label="Tiles U">
-                <NumberField value={system.uTileCount} min={1} step={1} onChange={(v) => binding.apply((s) => (s.uTileCount = Math.round(v)))} />
+                <NumberField
+                    value={system.uTileCount}
+                    min={1}
+                    step={1}
+                    onChange={(v) => binding.apply((s) => (s.uTileCount = Math.round(v)))}
+                />
             </Row>
             <Row label="Tiles V">
-                <NumberField value={system.vTileCount} min={1} step={1} onChange={(v) => binding.apply((s) => (s.vTileCount = Math.round(v)))} />
+                <NumberField
+                    value={system.vTileCount}
+                    min={1}
+                    step={1}
+                    onChange={(v) => binding.apply((s) => (s.vTileCount = Math.round(v)))}
+                />
             </Row>
             <Row label="Blend tiles">
                 <input
@@ -641,7 +749,13 @@ export function TextureSheetModule({binding}: ModuleProps) {
                             if (e.target.checked) {
                                 s.addBehavior(
                                     new FrameOverLife(
-                                        buildScalar({mode: 'curve', value: 0, min: 0, max: tiles - 1, curve: [0, (tiles - 1) / 3, (2 * (tiles - 1)) / 3, tiles - 1]}) as never
+                                        buildScalar({
+                                            mode: 'curve',
+                                            value: 0,
+                                            min: 0,
+                                            max: tiles - 1,
+                                            curve: [0, (tiles - 1) / 3, (2 * (tiles - 1)) / 3, tiles - 1],
+                                        }) as never
                                     )
                                 );
                             }

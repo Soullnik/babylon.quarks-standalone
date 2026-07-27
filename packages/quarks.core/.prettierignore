@@ -1,9 +1,0 @@
-# Ignore artifacts:
-dist
-node_modules
-.husky
-.gitignore
-.github
-docs
-examples
-coverage

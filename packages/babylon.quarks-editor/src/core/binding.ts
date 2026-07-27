@@ -1,7 +1,7 @@
-import type {ParticleSystem} from 'babylon.quarks';
 import type {TransformNode} from '@babylonjs/core/Meshes/transformNode';
-import {buildEffectTree, serializeEffectTree} from './effectTree';
+import type {ParticleSystem} from 'babylon.quarks';
 import type {EffectTreeNode} from './effectTree';
+import {buildEffectTree, serializeEffectTree} from './effectTree';
 
 export type EditorListener = () => void;
 

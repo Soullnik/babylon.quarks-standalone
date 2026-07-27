@@ -8,10 +8,10 @@ High-performance particle system for [Babylon.js](https://www.babylonjs.com/). B
 
 [**Live demos**](https://soullnik.github.io/babylon.quarks-standalone/)
 
-| | | | |
-|---|---|---|---|
-| [![Muzzle Flash](https://raw.githubusercontent.com/Soullnik/babylon.quarks-standalone/main/examples/public/previews/muzzle-flash.png)](https://soullnik.github.io/babylon.quarks-standalone/babylonDemo.html#MuzzleFlashDemo) | [![Explosion](https://raw.githubusercontent.com/Soullnik/babylon.quarks-standalone/main/examples/public/previews/explosion.png)](https://soullnik.github.io/babylon.quarks-standalone/babylonDemo.html#ExplosionDemo) | [![Trail](https://raw.githubusercontent.com/Soullnik/babylon.quarks-standalone/main/examples/public/previews/trail.png)](https://soullnik.github.io/babylon.quarks-standalone/babylonDemo.html#TrailDemo) | [![Sub Emitter](https://raw.githubusercontent.com/Soullnik/babylon.quarks-standalone/main/examples/public/previews/sub-emitter.png)](https://soullnik.github.io/babylon.quarks-standalone/babylonDemo.html#SubEmitterDemo) |
-| [![Electric Ball](https://raw.githubusercontent.com/Soullnik/babylon.quarks-standalone/main/examples/public/previews/electric-ball.png)](https://soullnik.github.io/babylon.quarks-standalone/babylonDemo.html#ElectricBallDemo) | [![Black Hole](https://raw.githubusercontent.com/Soullnik/babylon.quarks-standalone/main/examples/public/previews/black-hole.png)](https://soullnik.github.io/babylon.quarks-standalone/babylonDemo.html#BlackHoleDemo) | [![Soft Particles](https://raw.githubusercontent.com/Soullnik/babylon.quarks-standalone/main/examples/public/previews/soft-particle.png)](https://soullnik.github.io/babylon.quarks-standalone/babylonDemo.html#SoftParticleDemo) | [![Level-Up](https://raw.githubusercontent.com/Soullnik/babylon.quarks-standalone/main/examples/public/previews/level-up.png)](https://soullnik.github.io/babylon.quarks-standalone/babylonDemo.html#LevelUpDemo) |
+|                                                                                                                                                                                                                                  |                                                                                                                                                                                                                         |                                                                                                                                                                                                                                   |                                                                                                                                                                                                                            |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [![Muzzle Flash](https://raw.githubusercontent.com/Soullnik/babylon.quarks-standalone/main/examples/public/previews/muzzle-flash.png)](https://soullnik.github.io/babylon.quarks-standalone/babylonDemo.html#MuzzleFlashDemo)    | [![Explosion](https://raw.githubusercontent.com/Soullnik/babylon.quarks-standalone/main/examples/public/previews/explosion.png)](https://soullnik.github.io/babylon.quarks-standalone/babylonDemo.html#ExplosionDemo)   | [![Trail](https://raw.githubusercontent.com/Soullnik/babylon.quarks-standalone/main/examples/public/previews/trail.png)](https://soullnik.github.io/babylon.quarks-standalone/babylonDemo.html#TrailDemo)                         | [![Sub Emitter](https://raw.githubusercontent.com/Soullnik/babylon.quarks-standalone/main/examples/public/previews/sub-emitter.png)](https://soullnik.github.io/babylon.quarks-standalone/babylonDemo.html#SubEmitterDemo) |
+| [![Electric Ball](https://raw.githubusercontent.com/Soullnik/babylon.quarks-standalone/main/examples/public/previews/electric-ball.png)](https://soullnik.github.io/babylon.quarks-standalone/babylonDemo.html#ElectricBallDemo) | [![Black Hole](https://raw.githubusercontent.com/Soullnik/babylon.quarks-standalone/main/examples/public/previews/black-hole.png)](https://soullnik.github.io/babylon.quarks-standalone/babylonDemo.html#BlackHoleDemo) | [![Soft Particles](https://raw.githubusercontent.com/Soullnik/babylon.quarks-standalone/main/examples/public/previews/soft-particle.png)](https://soullnik.github.io/babylon.quarks-standalone/babylonDemo.html#SoftParticleDemo) | [![Level-Up](https://raw.githubusercontent.com/Soullnik/babylon.quarks-standalone/main/examples/public/previews/level-up.png)](https://soullnik.github.io/babylon.quarks-standalone/babylonDemo.html#LevelUpDemo)          |
 
 ## Features
 
@@ -35,7 +35,7 @@ Peer dependency: `@babylonjs/core` >= 9.
 ## Quick start
 
 ```ts
-import {Constants} from "@babylonjs/core/Engines/constants";
+import {Constants} from '@babylonjs/core/Engines/constants';
 import {
     BatchedRenderer,
     ParticleSystem,
@@ -45,10 +45,10 @@ import {
     IntervalValue,
     ConstantColor,
     Vector4,
-} from "babylon.quarks";
+} from 'babylon.quarks';
 
 // One renderer per scene; it batches all systems added to it.
-const batchRenderer = new BatchedRenderer("particles", scene);
+const batchRenderer = new BatchedRenderer('particles', scene);
 
 const system = new ParticleSystem({
     scene,
@@ -80,13 +80,13 @@ The package ships a UMD bundle (`dist/babylon.quarks.umd.min.js`, exposed as the
 ```js
 var createScene = async function () {
     var scene = new BABYLON.Scene(engine);
-    var camera = new BABYLON.ArcRotateCamera("cam", -Math.PI / 2, 1.2, 10, BABYLON.Vector3.Zero(), scene);
+    var camera = new BABYLON.ArcRotateCamera('cam', -Math.PI / 2, 1.2, 10, BABYLON.Vector3.Zero(), scene);
     camera.attachControl(canvas, true);
 
-    await BABYLON.Tools.LoadScriptAsync("https://cdn.jsdelivr.net/npm/babylon.quarks/dist/babylon.quarks.umd.min.js");
+    await BABYLON.Tools.LoadScriptAsync('https://cdn.jsdelivr.net/npm/babylon.quarks/dist/babylon.quarks.umd.min.js');
     const Q = BabylonQuarks;
 
-    const batchRenderer = new Q.BatchedRenderer("particles", scene);
+    const batchRenderer = new Q.BatchedRenderer('particles', scene);
     const system = new Q.ParticleSystem({
         scene,
         duration: 5,
@@ -98,7 +98,7 @@ var createScene = async function () {
         emissionOverTime: new Q.ConstantValue(60),
         shape: new Q.ConeEmitter({radius: 0.3, angle: 0.4}),
         renderMode: Q.RenderMode.BillBoard,
-        texture: new BABYLON.Texture("textures/flare.png", scene),
+        texture: new BABYLON.Texture('textures/flare.png', scene),
         transparent: true,
         blendMode: BABYLON.Constants.ALPHA_ADD,
     });
@@ -124,8 +124,8 @@ The same bundle works in any plain `<script>` setup alongside the global `babylo
 The library runs on Babylon's `WebGPUEngine` — its GLSL shaders are transpiled to WGSL automatically by Babylon (glslang/twgsl are fetched by Babylon on engine init). Everything except engine creation stays the same:
 
 ```ts
-import {WebGPUEngine} from "@babylonjs/core/Engines/webgpuEngine";
-import "@babylonjs/core/Engines/WebGPU/Extensions/index";
+import {WebGPUEngine} from '@babylonjs/core/Engines/webgpuEngine';
+import '@babylonjs/core/Engines/WebGPU/Extensions/index';
 
 const engine = new WebGPUEngine(canvas, {antialias: true});
 await engine.initAsync();
@@ -143,11 +143,11 @@ Design an effect with one of these tools, then load the exported JSON with `Quar
 - **quarks.art** — effects exported from the [quarks.art](https://quarks.art/) editor also load fine, since it's the same JSON envelope.
 
 ```ts
-import {BatchedRenderer, QuarksLoader, QuarksUtil} from "babylon.quarks";
+import {BatchedRenderer, QuarksLoader, QuarksUtil} from 'babylon.quarks';
 
-const batchRenderer = new BatchedRenderer("particles", scene);
+const batchRenderer = new BatchedRenderer('particles', scene);
 const loader = new QuarksLoader(scene);
-const effect = await loader.load("effects/explosion.json");
+const effect = await loader.load('effects/explosion.json');
 QuarksUtil.addToBatchRenderer(effect, batchRenderer);
 QuarksUtil.play(effect);
 ```

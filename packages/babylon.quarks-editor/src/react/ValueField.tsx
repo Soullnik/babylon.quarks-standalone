@@ -1,4 +1,3 @@
-import React from 'react';
 import {ScalarGenerator, ScalarValueState, buildCurve, buildScalar, readPieces, readScalar} from '../core/values';
 import {CurveEditor} from './CurveEditor';
 import {NumberField, Row, SelectField} from './fields';

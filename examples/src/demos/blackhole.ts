@@ -1,20 +1,20 @@
-import type { DemoContext } from '../types';
-import {Vector3 as BVector3} from '@babylonjs/core/Maths/math.vector';
 import {Constants} from '@babylonjs/core/Engines/constants';
+import {Vector3 as BVector3} from '@babylonjs/core/Maths/math.vector';
 import {
-    ParticleSystem,
-    RenderMode,
-    ConstantValue,
-    ConstantColor,
-    PointEmitter,
-    SphereEmitter,
     ColorOverLife,
-    Vector4,
-    Vector3,
+    ConstantColor,
+    ConstantValue,
     Gradient,
     OrbitOverLife,
+    ParticleSystem,
+    PointEmitter,
+    RenderMode,
+    SphereEmitter,
+    Vector3,
+    Vector4,
 } from 'babylon.quarks';
 import {createSharedTexture} from '../shared/common';
+import type {DemoContext} from '../types';
 
 export function init({scene, camera, batchRenderer, systems}: DemoContext) {
     camera.setPosition(new BVector3(0, 6, 22));
@@ -24,7 +24,10 @@ export function init({scene, camera, batchRenderer, systems}: DemoContext) {
         scene,
         duration: 1,
         looping: true,
-        startLife: new ConstantValue(1),
+        // rate × life = 1 leaves one blank frame per period on the fixed-step
+        // clock (age and emission sit one step apart). One step of slack is the
+        // same workaround Unity documents as "life 1.01".
+        startLife: new ConstantValue(1 + 1 / 60),
         startSpeed: new ConstantValue(0),
         startSize: new ConstantValue(40),
         startColor: new ConstantColor(new Vector4(0, 0, 0, 1)),
@@ -89,7 +92,8 @@ export function init({scene, camera, batchRenderer, systems}: DemoContext) {
         scene,
         duration: 1,
         looping: true,
-        startLife: new ConstantValue(1),
+        // Same knife-edge as beam: one particle per second living one second.
+        startLife: new ConstantValue(1 + 1 / 60),
         startSpeed: new ConstantValue(0),
         startSize: new ConstantValue(30),
         startColor: new ConstantColor(new Vector4(0.9254901960784314, 0.788235294117647, 0.1607843137254902, 1)),

@@ -1,11 +1,4 @@
-import {
-    ConstantValue,
-    IParticleSystem,
-    InheritVelocity,
-    Matrix4,
-    SpriteParticle,
-    Vector3,
-} from '../../src';
+import {ConstantValue, IParticleSystem, InheritVelocity, Matrix4, SpriteParticle, Vector3} from '../../src';
 
 const makePS = (worldSpace = false, emitterVelocity?: Vector3, matrixWorld = new Matrix4()) =>
     ({

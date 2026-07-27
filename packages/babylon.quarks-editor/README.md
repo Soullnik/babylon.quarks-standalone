@@ -13,17 +13,17 @@ npm install babylon.quarks-editor babylon.quarks @babylonjs/core react @heroicon
 ## Usage
 
 ```tsx
-import {EffectBinding, EffectHistory} from "babylon.quarks-editor";
-import {EffectEditor} from "babylon.quarks-editor/react";
+import {EffectBinding, EffectHistory} from 'babylon.quarks-editor';
+import {EffectEditor} from 'babylon.quarks-editor/react';
 
-const binding = new EffectBinding(particleSystem);   // your babylon.quarks ParticleSystem
+const binding = new EffectBinding(particleSystem); // your babylon.quarks ParticleSystem
 const history = new EffectHistory();
 history.attach(binding);
 
 <EffectEditor binding={binding} />;
 
 // Serialize to Quarks JSON (round-trips through QuarksLoader):
-const json = binding.exportJSON("MyEffect");
+const json = binding.exportJSON('MyEffect');
 ```
 
 Modules: Main, Emission (bursts), Shape (7 emitter types), Speed/Limit Speed/Force/Rotation over Lifetime, Gravity, Color over Lifetime (gradient), Size over Lifetime (curve), Noise, Sub Emitters, Texture Sheet Animation, Renderer. Multi-system hierarchy with add/remove/rename, undo/redo via `EffectHistory`.
@@ -39,9 +39,9 @@ an opinion on your CDN, asset pipeline, or loader (`@babylonjs/loaders`, your ow
   "Load from file…" in the Renderer module) into whatever object you assign as `system.texture`.
 - `resolveGeometry(file) => Promise<GeometryData>` — turns a picked file (from "Load from file…"
   in the Mesh render mode's geometry dropdown) into vertex buffers: `{positions, indices?, uvs?,
-  normals?}` (typed arrays or plain number arrays).
+normals?}` (typed arrays or plain number arrays).
 - `textureOptions?: {label, url}[]` / `geometryOptions?: {label, positions, indices?, uvs?,
-  normals?}[]` — preset lists shown alongside "Custom URL…" / "Load from file…".
+normals?}[]` — preset lists shown alongside "Custom URL…" / "Load from file…".
 
 **Signature differs by entry point** — a common source of "works in the demo, throws in my
 host" bugs:

@@ -1,32 +1,33 @@
-import {
-    ConstantValue,
-    ConstantColor,
-    IntervalValue,
-    SphereEmitter,
-    PointEmitter,
-    ConeEmitter,
-    Vector4,
-    SizeOverLife,
-    PiecewiseBezier,
-    Bezier,
-    ColorOverLife,
-    Gradient,
-    AxisAngleGenerator,
-    Vector3 as QVector3,
-    Matrix4,
-    Vector3,
-    Quaternion as QRot,
-    VelocityOverLife,
-    InheritVelocity,
-} from 'quarks.core';
-import {NullEngine} from '@babylonjs/core/Engines/nullEngine';
-import {Scene} from '@babylonjs/core/scene';
 import {Constants} from '@babylonjs/core/Engines/constants';
+import {NullEngine} from '@babylonjs/core/Engines/nullEngine';
 import {StandardMaterial} from '@babylonjs/core/Materials/standardMaterial';
 import {RawTexture} from '@babylonjs/core/Materials/Textures/rawTexture';
+import {Scene} from '@babylonjs/core/scene';
+import {
+    AxisAngleGenerator,
+    Bezier,
+    ConeEmitter,
+    ConstantColor,
+    ConstantValue,
+    ForceOverLife,
+    InheritVelocity,
+    IntervalValue,
+    Matrix4,
+    PiecewiseBezier,
+    PointEmitter,
+    Quaternion as QRot,
+    Vector3 as QVector3,
+    SizeOverLife,
+    SphereEmitter,
+    TrailParticle,
+    Vector3,
+    Vector4,
+    VelocityOverLife,
+    WidthOverLength,
+} from 'quarks.core';
+import {BatchedRenderer} from '../src/BatchedRenderer';
 import {ParticleSystem} from '../src/ParticleSystem';
 import {RenderMode} from '../src/VFXBatch';
-import {BatchedRenderer} from '../src/BatchedRenderer';
 
 let engine: NullEngine;
 let scene: Scene;
@@ -125,15 +126,17 @@ describe('ParticleSystem', () => {
             startColor: new ConstantColor(new Vector4(1, 1, 1, 1)),
             emissionOverTime: new ConstantValue(10),
             shape: new SphereEmitter(),
-            behaviors: [
-                new SizeOverLife(new PiecewiseBezier([[new Bezier(1, 0.75, 0.5, 0), 0]])),
-            ],
+            behaviors: [new SizeOverLife(new PiecewiseBezier([[new Bezier(1, 0.75, 0.5, 0), 0]]))],
         });
         expect(ps.behaviors.length).toBe(1);
     });
 
     it('should pause and resume', () => {
-        const ps = new ParticleSystem({scene, startLife: new ConstantValue(1), emissionOverTime: new ConstantValue(10)});
+        const ps = new ParticleSystem({
+            scene,
+            startLife: new ConstantValue(1),
+            emissionOverTime: new ConstantValue(10),
+        });
         ps.pause();
         expect(ps.paused).toBe(true);
         ps.play();
@@ -677,7 +680,13 @@ describe('ParticleSystem', () => {
                     geo: {positions: new Float32Array(12), indices: new Uint32Array([0, 1, 2])},
                 },
                 materials: {
-                    mat: {transparent: true, alphaMode: Constants.ALPHA_ADD, depthTest: true, depthWrite: false, alphaTest: 0},
+                    mat: {
+                        transparent: true,
+                        alphaMode: Constants.ALPHA_ADD,
+                        depthTest: true,
+                        depthWrite: false,
+                        alphaTest: 0,
+                    },
                 },
             },
             {},
@@ -708,16 +717,7 @@ describe('ParticleSystem', () => {
         expect(rot.w).toBeDefined();
     });
 
-    it('disables fast trail history when WidthOverLength behavior is present', () => {
-        const widthBehavior = {
-            type: 'WidthOverLength',
-            clone: () => widthBehavior,
-            reset: () => {},
-            initialize: () => {},
-            frameUpdate: () => {},
-            update: () => {},
-            toJSON: () => ({type: 'WidthOverLength'}),
-        } as any;
+    it('WidthOverLength writes trail widths into the history ring buffer', () => {
         const ps = new ParticleSystem({
             scene,
             renderMode: RenderMode.Trail,
@@ -728,9 +728,19 @@ describe('ParticleSystem', () => {
             emissionOverTime: new ConstantValue(20),
             shape: new PointEmitter(),
             rendererEmitterSettings: {startLength: new ConstantValue(6), followLocalOrigin: false},
-            behaviors: [widthBehavior],
+            behaviors: [new WidthOverLength(new PiecewiseBezier([[new Bezier(0.5, 0.5, 0.5, 0.5), 0]]))],
         });
-        expect((ps as any).useFastTrailHistory).toBe(false);
+        for (let i = 0; i < 10; i++) {
+            ps.update(1 / 60);
+        }
+        expect(ps.particleNum).toBeGreaterThan(0);
+        const trail = ps.particles[0] as TrailParticle;
+        expect(trail.historyCount).toBeGreaterThan(1);
+        // The newest sample is recorded after the behavior pass, so it still
+        // carries the raw particle size until the next step.
+        for (let i = 0; i < trail.historyCount - 1; i++) {
+            expect(trail.historySizes[trail.getHistoryIndex(i)]).toBeCloseTo(0.5);
+        }
     });
 
     it('clones trail and stretched systems with renderer emitter settings', () => {
@@ -825,7 +835,13 @@ describe('ParticleSystem', () => {
             {
                 ...meta,
                 materials: {
-                    mat: {transparent: true, alphaMode: Constants.ALPHA_ADD, depthTest: true, depthWrite: false, alphaTest: 0},
+                    mat: {
+                        transparent: true,
+                        alphaMode: Constants.ALPHA_ADD,
+                        depthTest: true,
+                        depthWrite: false,
+                        alphaTest: 0,
+                    },
                 },
             },
             {},
@@ -839,7 +855,13 @@ describe('ParticleSystem', () => {
         const meta: any = {
             textures: {},
             materials: {
-                mat: {transparent: true, alphaMode: Constants.ALPHA_ADD, depthTest: true, depthWrite: false, alphaTest: 0},
+                mat: {
+                    transparent: true,
+                    alphaMode: Constants.ALPHA_ADD,
+                    depthTest: true,
+                    depthWrite: false,
+                    alphaTest: 0,
+                },
             },
             geometries: {
                 arc: {
@@ -1031,7 +1053,7 @@ describe('ParticleSystem', () => {
         expect((ps as any).emitEnded).toBe(false);
     });
 
-    it('fast trail history path stays active for short-lived trail particles', () => {
+    it('records trail history in the ring buffer for short-lived trail particles', () => {
         const ps = new ParticleSystem({
             scene,
             renderMode: RenderMode.Trail,
@@ -1050,7 +1072,12 @@ describe('ParticleSystem', () => {
         for (let i = 0; i < 20; i++) {
             ps.update(1 / 20);
         }
-        expect((ps as any).useFastTrailHistory).toBe(true);
+        expect(ps.particleNum).toBeGreaterThan(0);
+        const trail = ps.particles[0] as TrailParticle;
+        expect(trail.historyCapacity).toBe(8);
+        expect(trail.historyCount).toBeGreaterThan(0);
+        // The legacy linked list is no longer populated.
+        expect(trail.previous.length).toBe(0);
     });
 
     it('trail followLocalOrigin respects particle parentMatrix when updating positions', () => {
@@ -1078,34 +1105,72 @@ describe('ParticleSystem', () => {
         expect(ps.particleNum).toBeGreaterThan(0);
     });
 
-    it('slow trail path uses TrailParticle.update when WidthOverLength is present', () => {
-        const widthBehavior = {
-            type: 'WidthOverLength',
-            clone: () => widthBehavior,
-            reset: () => {},
-            initialize: () => {},
-            frameUpdate: () => {},
-            update: () => {},
-            toJSON: () => ({type: 'WidthOverLength'}),
-        } as any;
+    it('retires trail history samples once the particle outlives its life', () => {
         const ps = new ParticleSystem({
             scene,
             renderMode: RenderMode.Trail,
-            startLife: new ConstantValue(0.5),
+            looping: false,
+            startLife: new ConstantValue(0.1),
             startSpeed: new ConstantValue(0),
             startSize: new ConstantValue(1),
             startColor: new ConstantColor(new Vector4(1, 1, 1, 1)),
-            emissionOverTime: new ConstantValue(200),
+            emissionOverTime: new ConstantValue(0),
+            emissionBursts: [{time: 0, count: new ConstantValue(1), cycle: 1, interval: 0, probability: 1}],
             shape: new PointEmitter(),
             rendererEmitterSettings: {startLength: new ConstantValue(10), followLocalOrigin: false},
-            behaviors: [widthBehavior],
         });
         ps.emit(0.05, ps.emissionState, ps.emitter.matrixWorld);
-        ps.emit(0.05, ps.emissionState, ps.emitter.matrixWorld);
-        for (let i = 0; i < 15; i++) {
-            ps.update(1 / 30);
+        expect(ps.particleNum).toBe(1);
+        const trail = ps.particles[0] as TrailParticle;
+        for (let i = 0; i < 6; i++) {
+            ps.update(1 / 60);
         }
-        expect((ps as any).useFastTrailHistory).toBe(false);
+        const peakHistory = trail.historyCount;
+        expect(peakHistory).toBeGreaterThan(0);
+        for (let i = 0; i < 30; i++) {
+            ps.update(1 / 60);
+        }
+        // Dead particles shed one sample per step until the trail is gone.
+        expect(trail.historyCount).toBe(0);
+        expect(ps.particleNum).toBe(0);
+    });
+});
+
+describe('ParticleSystem behavior batching', () => {
+    it('updates a system whose behaviors have never seen a particle', () => {
+        // Sub emitter systems sit empty until triggered, so their behaviors never
+        // run initialize(). A batched behavior must not assume otherwise.
+        const ps = new ParticleSystem({
+            scene,
+            onlyUsedByOther: true,
+            startLife: new ConstantValue(1),
+            emissionOverTime: new ConstantValue(0),
+            shape: new PointEmitter(),
+            behaviors: [new ForceOverLife(new ConstantValue(1), new ConstantValue(-2), new ConstantValue(0))],
+        });
+        expect(ps.particleNum).toBe(0);
+        expect(() => {
+            for (let i = 0; i < 5; i++) {
+                ps.update(1 / 60);
+            }
+        }).not.toThrow();
+    });
+
+    it('applies a batched force once the system does emit', () => {
+        const ps = new ParticleSystem({
+            scene,
+            worldSpace: true,
+            startLife: new ConstantValue(5),
+            startSpeed: new ConstantValue(0),
+            emissionOverTime: new ConstantValue(30),
+            shape: new PointEmitter(),
+            behaviors: [new ForceOverLife(new ConstantValue(0), new ConstantValue(-10), new ConstantValue(0))],
+        });
+        for (let i = 0; i < 10; i++) {
+            ps.update(1 / 60);
+        }
+        expect(ps.particleNum).toBeGreaterThan(0);
+        expect(ps.particles[0].velocity.y).toBeLessThan(0);
     });
 });
 

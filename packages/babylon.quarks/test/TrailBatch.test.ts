@@ -1,12 +1,12 @@
-import {NullEngine} from '@babylonjs/core/Engines/nullEngine';
-import {Scene} from '@babylonjs/core/scene';
 import {Constants} from '@babylonjs/core/Engines/constants';
+import {NullEngine} from '@babylonjs/core/Engines/nullEngine';
 import {ShaderMaterial} from '@babylonjs/core/Materials/shaderMaterial';
 import {RawTexture} from '@babylonjs/core/Materials/Textures/rawTexture';
+import {Scene} from '@babylonjs/core/scene';
 import {ConstantColor, ConstantValue, PointEmitter, Vector4} from 'quarks.core';
 import {BatchedRenderer} from '../src/BatchedRenderer';
-import {TrailBatch} from '../src/TrailBatch';
 import {ParticleSystem} from '../src/ParticleSystem';
+import {TrailBatch} from '../src/TrailBatch';
 import {RenderMode} from '../src/VFXBatch';
 
 describe('TrailBatch', () => {
@@ -56,7 +56,11 @@ describe('TrailBatch', () => {
 
         const batch = getTrailBatch(renderer);
         expect(batch.mesh.isEnabled()).toBe(true);
-        expect(batch.mesh.subMeshes[0]?.indexCount ?? 0).toBe(0);
+        // Nothing reaches the screen, but the draw is not submitted with zero
+        // indices — WebGPU warns about that once per frame. The batch parks on a
+        // triangle whose corners are all the same vertex instead.
+        expect(batch.mesh.subMeshes[0].indexCount).toBeGreaterThan(0);
+        expect(Array.from(batch.mesh.getIndices()!.slice(0, 6))).toEqual([0, 0, 0, 0, 0, 0]);
 
         renderer.dispose();
         system.dispose();
@@ -97,14 +101,15 @@ describe('TrailBatch', () => {
         renderer.addSystem(system);
 
         const batch = getTrailBatch(renderer);
-        expect((batch as any).maxParticles).toBe(10000);
+        const initialCapacity = (batch as any).maxParticles as number;
 
         for (let i = 0; i < 90; i++) {
             renderer.update(1 / 60);
         }
 
-        expect((batch as any).maxParticles).toBeGreaterThan(10000);
+        expect((batch as any).maxParticles).toBeGreaterThan(initialCapacity);
         expect(batch.mesh.isEnabled()).toBe(true);
+        expect(batch.mesh.subMeshes[0].indexCount).toBeGreaterThan(0);
 
         renderer.dispose();
         system.dispose();

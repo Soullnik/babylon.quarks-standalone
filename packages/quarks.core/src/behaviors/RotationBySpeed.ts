@@ -1,8 +1,8 @@
-import {Behavior} from './Behavior';
 import {Particle} from '../Particle';
+import {IntervalValue} from '../functions';
 import {FunctionValueGenerator, ValueGenerator, ValueGeneratorFromJSON} from '../functions/ValueGenerator';
 import {Quaternion} from '../math';
-import {IntervalValue} from '../functions';
+import {Behavior} from './Behavior';
 
 /**
  * Apply rotation to particles based on their speed.
@@ -25,8 +25,10 @@ export class RotationBySpeed implements Behavior {
     update(particle: Particle, delta: number): void {
         if (typeof particle.rotation === 'number') {
             const t = (particle.startSpeed - this.speedRange.a) / (this.speedRange.b - this.speedRange.a);
-            (particle.rotation as number) +=
-                delta * (this.angularVelocity as FunctionValueGenerator).genValue(particle.memory, t);
+            const rate = (this.angularVelocity as FunctionValueGenerator).genValue(particle.memory, t);
+            (particle.rotation as number) += delta * rate;
+            // Kept for the renderer, which draws between steps.
+            particle.angularVelocity = rate;
         }
     }
 

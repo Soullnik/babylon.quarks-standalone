@@ -1,8 +1,8 @@
-import {Behavior} from './Behavior';
-import {Particle} from '../Particle';
-import {EmissionState, IParticleSystem, IEmitter} from '../IParticleSystem';
+import {EmissionState, IEmitter, IParticleSystem} from '../IParticleSystem';
 import {Matrix4, Quaternion, Vector3} from '../math';
-import { ONE_VEC3, Z_VEC3 } from '../util/MathUtil';
+import {Particle} from '../Particle';
+import {ONE_VEC3, Z_VEC3} from '../util/MathUtil';
+import {Behavior} from './Behavior';
 
 export enum SubParticleEmitMode {
     Death,

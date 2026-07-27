@@ -3,8 +3,8 @@ import {MeshBuilder} from '@babylonjs/core/Meshes/meshBuilder';
 import {TransformNode} from '@babylonjs/core/Meshes/transformNode';
 import type {Scene} from '@babylonjs/core/scene';
 import {EDITOR_SCENE_NODE_METADATA} from './editorScene';
-import type {GalleryEntry} from './loadEffectGallery';
 import {GROUND_RING_RADIUS, GalleryHoverMarker} from './gallerySelectionMarker';
+import type {GalleryEntry} from './loadEffectGallery';
 
 interface PickMetadata {
     quarksEditorPick: true;

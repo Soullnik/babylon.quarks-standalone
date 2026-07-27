@@ -1,7 +1,7 @@
-import {Behavior} from './Behavior';
 import {Particle} from '../Particle';
-import {FunctionValueGenerator, ValueGenerator, ValueGeneratorFromJSON} from '../functions';
+import {ValueGenerator, ValueGeneratorFromJSON} from '../functions';
 import {Vector3} from '../math';
+import {Behavior} from './Behavior';
 
 /**
  * Apply a global force to particles.
@@ -24,7 +24,31 @@ export class ApplyForce implements Behavior {
     initialize(particle: Particle): void {}
 
     update(particle: Particle, delta: number): void {
-        particle.velocity.addScaledVector(this.direction, this.magnitudeValue * delta);
+        const scale = this.magnitudeValue * delta;
+        const direction = this.direction;
+        const velocity = particle.velocity;
+        velocity.x += direction.x * scale;
+        velocity.y += direction.y * scale;
+        velocity.z += direction.z * scale;
+    }
+
+    updateAll(particles: Array<Particle>, count: number, delta: number): void {
+        // The force is identical for every particle, so the vector maths
+        // collapses to three constants computed once per frame.
+        const scale = this.magnitudeValue * delta;
+        const dx = this.direction.x * scale;
+        const dy = this.direction.y * scale;
+        const dz = this.direction.z * scale;
+        for (let i = 0; i < count; i++) {
+            const particle = particles[i];
+            if (particle.age >= particle.life) {
+                continue;
+            }
+            const velocity = particle.velocity;
+            velocity.x += dx;
+            velocity.y += dy;
+            velocity.z += dz;
+        }
     }
 
     frameUpdate(delta: number): void {

@@ -1,35 +1,34 @@
-import type { DemoContext } from '../types';
-import type {Scene} from '@babylonjs/core/scene';
-import type {Texture} from '@babylonjs/core/Materials/Textures/texture';
-import {Vector3 as BVector3} from '@babylonjs/core/Maths/math.vector';
 import {Constants} from '@babylonjs/core/Engines/constants';
-import {MeshBuilder} from '@babylonjs/core/Meshes/meshBuilder';
 import {StandardMaterial} from '@babylonjs/core/Materials/standardMaterial';
 import {DynamicTexture} from '@babylonjs/core/Materials/Textures/dynamicTexture';
+import type {Texture} from '@babylonjs/core/Materials/Textures/texture';
 import {Color3} from '@babylonjs/core/Maths/math.color';
+import {Vector3 as BVector3} from '@babylonjs/core/Maths/math.vector';
+import {MeshBuilder} from '@babylonjs/core/Meshes/meshBuilder';
+import type {Scene} from '@babylonjs/core/scene';
 import {
-    ParticleSystem,
-    RenderMode,
-    ConstantValue,
-    IntervalValue,
-    ConstantColor,
-    PointEmitter,
-    ConeEmitter,
-    SphereEmitter,
+    Bezier,
     CircleEmitter,
+    ConeEmitter,
+    ConstantValue,
     DonutEmitter,
+    EmitterMode,
     GridEmitter,
     HemisphereEmitter,
-    RectangleEmitter,
-    EmitterMode,
-    SizeOverLife,
+    IntervalValue,
+    ParticleSystem,
     PiecewiseBezier,
-    Bezier,
+    PointEmitter,
     RandomColor,
+    RectangleEmitter,
+    RenderMode,
+    SizeOverLife,
+    SphereEmitter,
     Vector4,
     type EmitterShape,
 } from 'babylon.quarks';
 import {createSharedTexture} from '../shared/common';
+import type {DemoContext} from '../types';
 
 function createLabel(scene: Scene, text: string, position: BVector3) {
     const plane = MeshBuilder.CreatePlane(`label-${text}`, {size: 1.6}, scene);

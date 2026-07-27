@@ -1,5 +1,5 @@
-import type {Scene} from '@babylonjs/core/scene';
 import {TransformNode} from '@babylonjs/core/Meshes/transformNode';
+import type {Scene} from '@babylonjs/core/scene';
 import {
     ColorOverLife,
     ConeEmitter,

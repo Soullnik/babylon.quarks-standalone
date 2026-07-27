@@ -1,7 +1,6 @@
-import type {ParticleSystem} from 'babylon.quarks';
-import {ConstantValue, IntervalValue} from 'babylon.quarks';
-import type {FunctionValueGenerator, ValueGenerator} from 'babylon.quarks';
 import type {TransformNode} from '@babylonjs/core/Meshes/transformNode';
+import type {FunctionValueGenerator, ParticleSystem, ValueGenerator} from 'babylon.quarks';
+import {ConstantValue, IntervalValue} from 'babylon.quarks';
 import type {EffectBinding} from './binding';
 import type {EffectTreeNode} from './effectTree';
 
@@ -29,7 +28,10 @@ export type TimelineRow =
  * stateful `genValue` (IntervalValue caches its sampled slot on first call and returns NaN
  * on a later call with a fresh memory array, so it can't be safely re-read on every render).
  */
-export function computeStartOffset(gen: ValueGenerator | FunctionValueGenerator): {value: number; startOffsetVariable: boolean} {
+export function computeStartOffset(gen: ValueGenerator | FunctionValueGenerator): {
+    value: number;
+    startOffsetVariable: boolean;
+} {
     if (gen instanceof ConstantValue) {
         return {value: gen.value, startOffsetVariable: false};
     }
@@ -97,10 +99,8 @@ function estimateMaxStartLife(system: ParticleSystem): number {
 
 /** When emission is burst-only, the effect window ends at the last burst time, not full duration. */
 function estimateEmissionEnd(system: ParticleSystem): number {
-    const rate =
-        system.emissionOverTime instanceof ConstantValue ? system.emissionOverTime.value : null;
-    const perMeter =
-        system.emissionOverDistance instanceof ConstantValue ? system.emissionOverDistance.value : null;
+    const rate = system.emissionOverTime instanceof ConstantValue ? system.emissionOverTime.value : null;
+    const perMeter = system.emissionOverDistance instanceof ConstantValue ? system.emissionOverDistance.value : null;
     if ((rate != null && rate > 0) || (perMeter != null && perMeter > 0)) {
         return system.duration;
     }

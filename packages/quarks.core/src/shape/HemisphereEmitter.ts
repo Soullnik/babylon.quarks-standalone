@@ -1,6 +1,3 @@
-import {EmitterMode, EmitterShape, getValueFromEmitterMode, ShapeJSON} from './EmitterUtil';
-import {Particle} from '../Particle';
-import {MathUtils, Matrix4, Quaternion} from '../math';
 import {
     ConstantValue,
     FunctionValueGenerator,
@@ -9,7 +6,10 @@ import {
     ValueGeneratorFromJSON,
 } from '../functions';
 import {EmissionState, IParticleSystem} from '../IParticleSystem';
-import { UP_VEC3, ZERO_VEC3 } from '../util/MathUtil';
+import {MathUtils, Matrix4, Quaternion} from '../math';
+import {Particle} from '../Particle';
+import {UP_VEC3, ZERO_VEC3} from '../util/MathUtil';
+import {EmitterMode, EmitterShape, getValueFromEmitterMode, ShapeJSON} from './EmitterUtil';
 /**
  * Interface representing the parameters for a hemisphere emitter.
  */
@@ -63,7 +63,7 @@ export class HemisphereEmitter implements EmitterShape {
         this.spread = parameters.spread ?? 0;
         this.speed = parameters.speed ?? new ConstantValue(1);
         this.memory = [];
-        
+
         this._m1 = new Matrix4();
     }
     private currentValue = 0;
@@ -91,7 +91,7 @@ export class HemisphereEmitter implements EmitterShape {
 
         p.velocity.copy(p.position).multiplyScalar(p.startSpeed);
         p.position.multiplyScalar(this.radius * rand);
-        
+
         // Default facing-outward orientation, but defer to startRotation if set.
         if (p.rotation instanceof Quaternion) {
             const r = p.rotation;

@@ -1,12 +1,21 @@
 import {Matrix4} from './Matrix4';
-import {Vector3} from './Vector3';
 import {Vector2} from './Vector2';
+import {Vector3} from './Vector3';
 
 class Matrix3 {
     elements: number[];
-    constructor(n11?: number, n12?: number, n13?: number, n21?: number, n22?: number, n23?: number, n31?: number, n32?: number, n33?: number) {
-        (Matrix3.prototype as any).isMatrix3 = true;
-
+    declare readonly isMatrix3: boolean;
+    constructor(
+        n11?: number,
+        n12?: number,
+        n13?: number,
+        n21?: number,
+        n22?: number,
+        n23?: number,
+        n31?: number,
+        n32?: number,
+        n33?: number
+    ) {
         this.elements = [1, 0, 0, 0, 1, 0, 0, 0, 1];
 
         if (n11 !== undefined) {
@@ -14,7 +23,17 @@ class Matrix3 {
         }
     }
 
-    set(n11: number, n12: number, n13: number, n21: number, n22: number, n23: number, n31: number, n32: number, n33: number) {
+    set(
+        n11: number,
+        n12: number,
+        n13: number,
+        n21: number,
+        n22: number,
+        n23: number,
+        n31: number,
+        n32: number,
+        n33: number
+    ) {
         const te = this.elements;
 
         te[0] = n11;
@@ -332,6 +351,8 @@ class Matrix3 {
         return new Matrix3().fromArray(this.elements);
     }
 }
+
+(Matrix3.prototype as any).isMatrix3 = true;
 
 const _m3 = /*@__PURE__*/ new Matrix3();
 

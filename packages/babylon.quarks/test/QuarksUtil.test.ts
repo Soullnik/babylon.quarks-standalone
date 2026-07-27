@@ -1,11 +1,11 @@
 import {NullEngine} from '@babylonjs/core/Engines/nullEngine';
-import {Scene} from '@babylonjs/core/scene';
 import {TransformNode} from '@babylonjs/core/Meshes/transformNode';
+import {Scene} from '@babylonjs/core/scene';
 import {ConstantValue} from 'quarks.core';
-import {ParticleSystem} from '../src/ParticleSystem';
-import {ParticleEmitter} from '../src/ParticleEmitter';
-import {QuarksUtil} from '../src/QuarksUtil';
 import {BatchedRenderer} from '../src/BatchedRenderer';
+import {ParticleEmitter} from '../src/ParticleEmitter';
+import {ParticleSystem} from '../src/ParticleSystem';
+import {QuarksUtil} from '../src/QuarksUtil';
 
 describe('QuarksUtil parity helpers', () => {
     let engine: NullEngine;
@@ -23,10 +23,16 @@ describe('QuarksUtil parity helpers', () => {
 
     it('runs callback on all particle emitters in subtree', () => {
         const root = new TransformNode('root', scene);
-        const emitterA = new ParticleSystem({scene, startLife: new ConstantValue(1), emissionOverTime: new ConstantValue(1)})
-            .emitter as ParticleEmitter;
-        const emitterB = new ParticleSystem({scene, startLife: new ConstantValue(1), emissionOverTime: new ConstantValue(1)})
-            .emitter as ParticleEmitter;
+        const emitterA = new ParticleSystem({
+            scene,
+            startLife: new ConstantValue(1),
+            emissionOverTime: new ConstantValue(1),
+        }).emitter as ParticleEmitter;
+        const emitterB = new ParticleSystem({
+            scene,
+            startLife: new ConstantValue(1),
+            emissionOverTime: new ConstantValue(1),
+        }).emitter as ParticleEmitter;
         const container = new TransformNode('container', scene);
         emitterA.parent = root;
         container.parent = root;
@@ -42,7 +48,11 @@ describe('QuarksUtil parity helpers', () => {
 
     it('calls endEmit on all emitters in subtree', () => {
         const root = new TransformNode('root-end-emit', scene);
-        const system = new ParticleSystem({scene, startLife: new ConstantValue(1), emissionOverTime: new ConstantValue(1)});
+        const system = new ParticleSystem({
+            scene,
+            startLife: new ConstantValue(1),
+            emissionOverTime: new ConstantValue(1),
+        });
         const emitter = system.emitter as ParticleEmitter;
         emitter.parent = root;
 
@@ -57,8 +67,16 @@ describe('QuarksUtil parity helpers', () => {
 
     it('forwards lifecycle helpers and autoDestroy changes to all emitters', () => {
         const root = new TransformNode('root-controls', scene);
-        const systemA = new ParticleSystem({scene, startLife: new ConstantValue(1), emissionOverTime: new ConstantValue(1)});
-        const systemB = new ParticleSystem({scene, startLife: new ConstantValue(1), emissionOverTime: new ConstantValue(1)});
+        const systemA = new ParticleSystem({
+            scene,
+            startLife: new ConstantValue(1),
+            emissionOverTime: new ConstantValue(1),
+        });
+        const systemB = new ParticleSystem({
+            scene,
+            startLife: new ConstantValue(1),
+            emissionOverTime: new ConstantValue(1),
+        });
         const emitterA = systemA.emitter as ParticleEmitter;
         const emitterB = systemB.emitter as ParticleEmitter;
         emitterA.parent = root;
@@ -94,8 +112,16 @@ describe('QuarksUtil parity helpers', () => {
     it('adds all emitter systems to the provided batch renderer', () => {
         const root = new TransformNode('root-batch', scene);
         const renderer = new BatchedRenderer('batch-util', scene);
-        const systemA = new ParticleSystem({scene, startLife: new ConstantValue(1), emissionOverTime: new ConstantValue(1)});
-        const systemB = new ParticleSystem({scene, startLife: new ConstantValue(1), emissionOverTime: new ConstantValue(1)});
+        const systemA = new ParticleSystem({
+            scene,
+            startLife: new ConstantValue(1),
+            emissionOverTime: new ConstantValue(1),
+        });
+        const systemB = new ParticleSystem({
+            scene,
+            startLife: new ConstantValue(1),
+            emissionOverTime: new ConstantValue(1),
+        });
         (systemA.emitter as ParticleEmitter).parent = root;
         (systemB.emitter as ParticleEmitter).parent = root;
 

@@ -1,70 +1,70 @@
 {
-  "name": "babylon.quarks",
-  "version": "0.18.1",
-  "description": "A High-Performance Particle System for Babylon.js",
-  "type": "module",
-  "types": "./dist/types/index.d.ts",
-  "main": "./dist/babylon.quarks.cjs",
-  "module": "./dist/babylon.quarks.esm.js",
-  "unpkg": "./dist/babylon.quarks.umd.min.js",
-  "jsdelivr": "./dist/babylon.quarks.umd.min.js",
-  "exports": {
-    ".": {
-      "import": "./dist/babylon.quarks.esm.js",
-      "require": "./dist/babylon.quarks.cjs",
-      "types": "./dist/types/index.d.ts"
+    "name": "babylon.quarks",
+    "version": "0.19.0",
+    "description": "A High-Performance Particle System for Babylon.js",
+    "type": "module",
+    "types": "./dist/types/index.d.ts",
+    "main": "./dist/babylon.quarks.cjs",
+    "module": "./dist/babylon.quarks.esm.js",
+    "unpkg": "./dist/babylon.quarks.umd.min.js",
+    "jsdelivr": "./dist/babylon.quarks.umd.min.js",
+    "exports": {
+        ".": {
+            "import": "./dist/babylon.quarks.esm.js",
+            "require": "./dist/babylon.quarks.cjs",
+            "types": "./dist/types/index.d.ts"
+        }
+    },
+    "files": [
+        "dist",
+        "src",
+        "LICENSE",
+        "README.md",
+        "CHANGELOG.md"
+    ],
+    "scripts": {
+        "clean": "rimraf dist dist-types tsconfig.tsbuildinfo",
+        "build:types": "tsc --emitDeclarationOnly",
+        "build:js": "cross-env NODE_ENV=production rollup -c",
+        "build": "npm run clean && npm run build:types && npm run build:js",
+        "test": "jest",
+        "docs": "typedoc",
+        "test:coverage": "jest --coverage",
+        "prettier": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\""
+    },
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/Soullnik/babylon.quarks-standalone.git"
+    },
+    "keywords": [
+        "babylonjs",
+        "babylon.js",
+        "particles",
+        "particle-system",
+        "particle",
+        "vfx",
+        "visual-effects",
+        "gpu-particles",
+        "webgl",
+        "webgpu",
+        "quarks",
+        "three.quarks",
+        "3d",
+        "game",
+        "performance"
+    ],
+    "author": "soullnik <soullnik96@gmail.com>",
+    "license": "MIT",
+    "bugs": {
+        "url": "https://github.com/Soullnik/babylon.quarks-standalone/issues"
+    },
+    "homepage": "https://github.com/Soullnik/babylon.quarks-standalone#readme",
+    "peerDependencies": {
+        "@babylonjs/core": ">=9.0.0"
+    },
+    "devDependencies": {
+        "@babylonjs/core": "^9.0.0",
+        "@types/jest": "^30.0.0",
+        "quarks.core": "*"
     }
-  },
-  "files": [
-    "dist",
-    "src",
-    "LICENSE",
-    "README.md",
-    "CHANGELOG.md"
-  ],
-  "scripts": {
-    "clean": "rimraf dist dist-types tsconfig.tsbuildinfo",
-    "build:types": "tsc --emitDeclarationOnly",
-    "build:js": "cross-env NODE_ENV=production rollup -c",
-    "build": "npm run clean && npm run build:types && npm run build:js",
-    "test": "jest",
-    "docs": "typedoc",
-    "test:coverage": "jest --coverage",
-    "prettier": "prettier --write --ignore-unknown **/*.ts"
-  },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/Soullnik/babylon.quarks-standalone.git"
-  },
-  "keywords": [
-    "babylonjs",
-    "babylon.js",
-    "particles",
-    "particle-system",
-    "particle",
-    "vfx",
-    "visual-effects",
-    "gpu-particles",
-    "webgl",
-    "webgpu",
-    "quarks",
-    "three.quarks",
-    "3d",
-    "game",
-    "performance"
-  ],
-  "author": "soullnik <soullnik96@gmail.com>",
-  "license": "MIT",
-  "bugs": {
-    "url": "https://github.com/Soullnik/babylon.quarks-standalone/issues"
-  },
-  "homepage": "https://github.com/Soullnik/babylon.quarks-standalone#readme",
-  "peerDependencies": {
-    "@babylonjs/core": ">=9.0.0"
-  },
-  "devDependencies": {
-    "@babylonjs/core": "^9.0.0",
-    "@types/jest": "^30.0.0",
-    "quarks.core": "*"
-  }
 }

@@ -1,13 +1,13 @@
-import {NullEngine} from '@babylonjs/core/Engines/nullEngine';
-import {Scene} from '@babylonjs/core/scene';
 import {Constants} from '@babylonjs/core/Engines/constants';
+import {NullEngine} from '@babylonjs/core/Engines/nullEngine';
 import {RawTexture} from '@babylonjs/core/Materials/Textures/rawTexture';
+import {Scene} from '@babylonjs/core/scene';
 import {ConstantColor, ConstantValue, PointEmitter, Vector4} from 'quarks.core';
 import {BatchedRenderer} from '../src/BatchedRenderer';
 import {ParticleSystem} from '../src/ParticleSystem';
-import {RenderMode} from '../src/VFXBatch';
-import {TrailBatch} from '../src/TrailBatch';
 import {SpriteBatch} from '../src/SpriteBatch';
+import {TrailBatch} from '../src/TrailBatch';
+import {RenderMode} from '../src/VFXBatch';
 
 describe('BatchedRenderer', () => {
     let engine: NullEngine;
@@ -266,9 +266,94 @@ describe('BatchedRenderer', () => {
 
     it('deleteSystem ignores systems that were never registered', () => {
         const renderer = new BatchedRenderer('del-unknown', scene);
-        const orphan = new ParticleSystem({scene, startLife: new ConstantValue(1), emissionOverTime: new ConstantValue(0)});
+        const orphan = new ParticleSystem({
+            scene,
+            startLife: new ConstantValue(1),
+            emissionOverTime: new ConstantValue(0),
+        });
         renderer.deleteSystem(orphan);
         renderer.dispose();
         orphan.dispose();
+    });
+
+    it('freezes systems whose emitter is disabled and resumes them on enable', () => {
+        const renderer = new BatchedRenderer('hidden-sim', scene);
+        const system = createSystem();
+        renderer.addSystem(system);
+        for (let i = 0; i < 30; i++) renderer.update(1 / 60);
+
+        const particlesWhenHidden = system.particleNum;
+        expect(particlesWhenHidden).toBeGreaterThan(0);
+        const frozenAge = system.particles[0].age;
+        const frozenTime = system.time;
+
+        system.emitter.visible = false;
+        for (let i = 0; i < 30; i++) renderer.update(1 / 60);
+        expect(system.particleNum).toBe(particlesWhenHidden);
+        expect(system.particles[0].age).toBe(frozenAge);
+        expect(system.time).toBe(frozenTime);
+        // Nothing of a hidden system reaches the GPU either.
+        expect(renderer.getBatchRenderStats()[0].instanceCount).toBe(0);
+
+        system.emitter.visible = true;
+        renderer.update(1 / 60);
+        expect(system.particles[0].age).toBeGreaterThan(frozenAge);
+        expect(renderer.getBatchRenderStats()[0].instanceCount).toBeGreaterThan(0);
+
+        renderer.dispose();
+        system.dispose();
+    });
+
+    it('keeps an orphaned batch warm briefly, then reclaims it', () => {
+        const renderer = new BatchedRenderer('batch-reclaim', scene);
+        const system = createSystem();
+        renderer.addSystem(system);
+        renderer.update(1 / 60);
+        expect(renderer.batches.length).toBe(1);
+
+        // Moves the system to a new batch and leaves the old one empty.
+        system.uTileCount = 4;
+        renderer.update(1 / 60);
+        expect(renderer.batches.length).toBe(2);
+
+        // Still kept around shortly after, so toggling back reuses it.
+        for (let i = 0; i < 5; i++) renderer.update(1 / 60);
+        expect(renderer.batches.length).toBe(2);
+
+        for (let i = 0; i < 200; i++) renderer.update(1 / 60);
+        expect(renderer.batches.length).toBe(1);
+        // The surviving batch is the one the system actually uses.
+        expect(renderer.batches[0].systems.has(system)).toBe(true);
+        expect(renderer.getBatchRenderStats()[0].particleCount).toBeGreaterThan(0);
+
+        renderer.dispose();
+        system.dispose();
+    });
+
+    it('remaps system batch indices when an earlier batch is reclaimed', () => {
+        const renderer = new BatchedRenderer('batch-remap', scene);
+        const dropped = createSystem();
+        renderer.addSystem(dropped);
+        renderer.update(1 / 60);
+
+        const kept = createSystem();
+        kept.uTileCount = 4;
+        renderer.addSystem(kept);
+        renderer.update(1 / 60);
+        expect(renderer.batches.length).toBe(2);
+
+        // Retire the first batch so the second one shifts down an index.
+        dropped.dispose();
+        for (let i = 0; i < 200; i++) renderer.update(1 / 60);
+        expect(renderer.batches.length).toBe(1);
+        expect(renderer.systemToBatchIndex.get(kept)).toBe(0);
+
+        // The remaining system must still be routed to a live batch.
+        kept.uTileCount = 8;
+        renderer.update(1 / 60);
+        expect(renderer.batches[renderer.systemToBatchIndex.get(kept)!].systems.has(kept)).toBe(true);
+
+        renderer.dispose();
+        kept.dispose();
     });
 });

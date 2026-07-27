@@ -75,7 +75,11 @@ export function PromptDialog(props: PromptDialogProps): React.ReactElement {
                     <button className="qe-hover" style={buttonStyle} onClick={onCancel}>
                         Cancel
                     </button>
-                    <button className="qe-hover" style={{...buttonStyle, background: theme.accent, color: '#0a1128', borderColor: theme.accent}} onClick={submit}>
+                    <button
+                        className="qe-hover"
+                        style={{...buttonStyle, background: theme.accent, color: '#0a1128', borderColor: theme.accent}}
+                        onClick={submit}
+                    >
                         {confirmLabel}
                     </button>
                 </div>

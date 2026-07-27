@@ -1,32 +1,44 @@
-import {Scene} from "@babylonjs/core/scene";
-import {ArcRotateCamera} from "@babylonjs/core/Cameras/arcRotateCamera";
-import {Vector3 as BVector3} from "@babylonjs/core/Maths/math.vector";
-import {Color4} from "@babylonjs/core/Maths/math.color";
-import {Constants} from "@babylonjs/core/Engines/constants";
-import {ParticleSystem as NativeParticleSystem} from "@babylonjs/core/Particles/particleSystem";
-import {GPUParticleSystem} from "@babylonjs/core/Particles/gpuParticleSystem";
-import "@babylonjs/core/Particles/webgl2ParticleSystem";
-import {SceneInstrumentation} from "@babylonjs/core/Instrumentation/sceneInstrumentation";
+import {ArcRotateCamera} from '@babylonjs/core/Cameras/arcRotateCamera';
+import {Constants} from '@babylonjs/core/Engines/constants';
+import {SceneInstrumentation} from '@babylonjs/core/Instrumentation/sceneInstrumentation';
+import {Color4} from '@babylonjs/core/Maths/math.color';
+import {Vector3 as BVector3} from '@babylonjs/core/Maths/math.vector';
+import {GPUParticleSystem} from '@babylonjs/core/Particles/gpuParticleSystem';
+import {ParticleSystem as NativeParticleSystem} from '@babylonjs/core/Particles/particleSystem';
+import '@babylonjs/core/Particles/webgl2ParticleSystem';
+import {Scene} from '@babylonjs/core/scene';
 import {
     BatchedRenderer,
-    ParticleSystem,
+    ConeEmitter,
+    ConstantColor,
     ConstantValue,
     IntervalValue,
-    ConstantColor,
-    ConeEmitter,
+    ParticleSystem,
     RenderMode,
     Vector4,
-} from "babylon.quarks";
-import {SHARED_ASSETS, createColorOverLifeRange, createSharedTexture} from "./shared/common";
-import {createEngineFromQuery} from "./shared/engineFactory";
+} from 'babylon.quarks';
+import {SHARED_ASSETS, createColorOverLifeRange, createSharedTexture} from './shared/common';
+import {createEngineFromQuery} from './shared/engineFactory';
 
 const LIFETIME = 2;
 const EMITTER_RING_RADIUS = 3;
 const CONE_RADIUS = 0.2;
 const CONE_ANGLE = 0.5;
-const WARMUP_FRAMES = 90;
-const MEASURE_FRAMES = 240;
-const SWEEP_COUNTS = [2000, 10000, 30000];
+const PARTICLE_COUNT_OPTIONS = [2000, 5000, 10000, 20000, 50000, 100000, 200000, 300000];
+const DEFAULT_SWEEP_COUNTS = [2000, 10000, 30000];
+
+const query = new URLSearchParams(window.location.search);
+const numberList = (raw: string | null, fallback: number[]): number[] => {
+    const parsed = (raw ?? '')
+        .split(',')
+        .map((part) => parseInt(part, 10))
+        .filter((value) => Number.isFinite(value) && value > 0);
+    return parsed.length > 0 ? parsed : fallback;
+};
+
+const WARMUP_FRAMES = numberList(query.get('warmup'), [90])[0];
+const MEASURE_FRAMES = numberList(query.get('frames'), [240])[0];
+const SWEEP_COUNTS = numberList(query.get('counts'), DEFAULT_SWEEP_COUNTS);
 
 const COLOR_START = {r: 1, g: 0.7, b: 0.3, a: 1};
 const COLOR_END = {r: 0.6, g: 0.2, b: 0.05, a: 0};
@@ -73,15 +85,15 @@ function perEmitterRate(config: BenchConfig): number {
     return config.totalParticles / config.emitterCount / LIFETIME;
 }
 
-const quarksBackend: (() => Backend) = () => {
+const quarksBackend: () => Backend = () => {
     let renderer: BatchedRenderer | null = null;
     let systems: ParticleSystem[] = [];
     return {
-        id: "quarks",
-        label: "babylon.quarks (batched)",
+        id: 'quarks',
+        label: 'babylon.quarks (batched)',
         isSupported: () => true,
         start(scene, config) {
-            renderer = new BatchedRenderer("bench-quarks", scene);
+            renderer = new BatchedRenderer('bench-quarks', scene);
             systems = [];
             const texture = createSharedTexture(scene, SHARED_ASSETS.defaultParticle);
             const rate = perEmitterRate(config);
@@ -148,11 +160,11 @@ function configureNativeSystem(
     system.start();
 }
 
-const nativeCpuBackend: (() => Backend) = () => {
+const nativeCpuBackend: () => Backend = () => {
     let systems: NativeParticleSystem[] = [];
     return {
-        id: "native-cpu",
-        label: "Babylon ParticleSystem (CPU)",
+        id: 'native-cpu',
+        label: 'Babylon ParticleSystem (CPU)',
         isSupported: () => true,
         start(scene, config) {
             systems = [];
@@ -172,12 +184,12 @@ const nativeCpuBackend: (() => Backend) = () => {
     };
 };
 
-const nativeGpuBackend: (() => Backend) = () => {
+const nativeGpuBackend: () => Backend = () => {
     let systems: GPUParticleSystem[] = [];
     let capacityPerSystem = 0;
     return {
-        id: "native-gpu",
-        label: "Babylon GPUParticleSystem",
+        id: 'native-gpu',
+        label: 'Babylon GPUParticleSystem',
         isSupported: () => GPUParticleSystem.IsSupported,
         start(scene, config) {
             systems = [];
@@ -203,26 +215,26 @@ const nativeGpuBackend: (() => Backend) = () => {
 };
 
 const backendFactories: {[id: string]: () => Backend} = {
-    "quarks": quarksBackend,
-    "native-cpu": nativeCpuBackend,
-    "native-gpu": nativeGpuBackend,
+    quarks: quarksBackend,
+    'native-cpu': nativeCpuBackend,
+    'native-gpu': nativeGpuBackend,
 };
 
 const backendLabels: {[id: string]: string} = {
-    "quarks": "babylon.quarks (batched)",
-    "native-cpu": "Babylon ParticleSystem (CPU)",
-    "native-gpu": "Babylon GPUParticleSystem",
+    quarks: 'babylon.quarks (batched)',
+    'native-cpu': 'Babylon ParticleSystem (CPU)',
+    'native-gpu': 'Babylon GPUParticleSystem',
 };
 
-const canvas = document.getElementById("renderer-canvas") as HTMLCanvasElement;
-const backendSelect = document.getElementById("backend-select") as HTMLSelectElement;
-const countSelect = document.getElementById("count-select") as HTMLSelectElement;
-const emittersSelect = document.getElementById("emitters-select") as HTMLSelectElement;
-const runSweepButton = document.getElementById("run-sweep") as HTMLButtonElement;
-const copyResultsButton = document.getElementById("copy-results") as HTMLButtonElement;
-const progressEl = document.getElementById("progress") as HTMLDivElement;
-const statsEl = document.getElementById("stats") as HTMLDivElement;
-const resultsEl = document.getElementById("results") as HTMLDivElement;
+const canvas = document.getElementById('renderer-canvas') as HTMLCanvasElement;
+const backendSelect = document.getElementById('backend-select') as HTMLSelectElement;
+const countSelect = document.getElementById('count-select') as HTMLSelectElement;
+const emittersSelect = document.getElementById('emitters-select') as HTMLSelectElement;
+const runSweepButton = document.getElementById('run-sweep') as HTMLButtonElement;
+const copyResultsButton = document.getElementById('copy-results') as HTMLButtonElement;
+const progressEl = document.getElementById('progress') as HTMLDivElement;
+const statsEl = document.getElementById('stats') as HTMLDivElement;
+const resultsEl = document.getElementById('results') as HTMLDivElement;
 
 const engine = await createEngineFromQuery(canvas);
 
@@ -244,9 +256,9 @@ let sweepRunning = false;
 let sweepResults: RunResult[] = [];
 
 function fillSelect(select: HTMLSelectElement, entries: Array<{value: string; label: string; disabled?: boolean}>) {
-    select.innerHTML = "";
+    select.innerHTML = '';
     for (const entry of entries) {
-        const option = document.createElement("option");
+        const option = document.createElement('option');
         option.value = entry.value;
         option.textContent = entry.label;
         option.disabled = Boolean(entry.disabled);
@@ -268,7 +280,7 @@ function startRun(backendId: string, config: BenchConfig) {
 
     scene = new Scene(engine);
     scene.clearColor = new Color4(0.03, 0.04, 0.09, 1);
-    const camera = new ArcRotateCamera("cam", -Math.PI / 2, 1.1, 16, new BVector3(0, 1.5, 0), scene);
+    const camera = new ArcRotateCamera('cam', -Math.PI / 2, 1.1, 16, new BVector3(0, 1.5, 0), scene);
     camera.attachControl(canvas, true);
     camera.wheelDeltaPercentage = 0.01;
     instrumentation = new SceneInstrumentation(scene);
@@ -289,12 +301,12 @@ function renderLiveStats() {
         return;
     }
     statsEl.innerHTML = [
-        `<b>Engine</b> ${engine.isWebGPU ? "WebGPU" : "WebGL"}`,
+        `<b>Engine</b> ${engine.isWebGPU ? 'WebGPU' : 'WebGL'}`,
         `<b>FPS</b> ${engine.getFps().toFixed(0)}`,
         `<b>CPU frame</b> ${averageCpuMs().toFixed(2)} ms`,
         `<b>Draw calls</b> ${instrumentation?.drawCallsCounter.current ?? 0}`,
         `<b>Active particles</b> ${backend.getActiveCount()}`,
-    ].join("<br>");
+    ].join('<br>');
 }
 
 engine.runRenderLoop(() => {
@@ -350,18 +362,18 @@ function measureCurrentRun(): Promise<{avgCpuMs: number; avgFps: number; drawCal
 }
 
 function resultsToMarkdown(results: RunResult[]): string {
-    const header = "| Backend | Particles | Emitters | CPU ms/frame | FPS | Draw calls |";
-    const divider = "|---|---:|---:|---:|---:|---:|";
+    const header = '| Backend | Particles | Emitters | CPU ms/frame | FPS | Draw calls |';
+    const divider = '|---|---:|---:|---:|---:|---:|';
     const rows = results.map(
         (r) =>
             `| ${r.backend} | ${r.totalParticles} | ${r.emitterCount} | ${r.avgCpuMs.toFixed(2)} | ${r.avgFps.toFixed(0)} | ${r.drawCalls} |`
     );
-    return [header, divider, ...rows].join("\n");
+    return [header, divider, ...rows].join('\n');
 }
 
 function renderResultsTable(results: RunResult[]) {
     if (results.length === 0) {
-        resultsEl.innerHTML = "";
+        resultsEl.innerHTML = '';
         return;
     }
     const rows = results
@@ -370,7 +382,7 @@ function renderResultsTable(results: RunResult[]) {
                 `<tr><td>${r.backend}</td><td>${r.totalParticles}</td><td>${r.emitterCount}</td>` +
                 `<td>${r.avgCpuMs.toFixed(2)}</td><td>${r.avgFps.toFixed(0)}</td><td>${r.drawCalls}</td></tr>`
         )
-        .join("");
+        .join('');
     resultsEl.innerHTML =
         `<table><thead><tr><th>Backend</th><th>Particles</th><th>Emitters</th>` +
         `<th>CPU ms</th><th>FPS</th><th>Draws</th></tr></thead><tbody>${rows}</tbody></table>`;
@@ -415,6 +427,13 @@ async function runSweep() {
     startRun(backendSelect.value, currentConfig());
 }
 
+declare global {
+    interface Window {
+        benchmarkResults?: RunResult[];
+        benchmarkDone?: boolean;
+    }
+}
+
 function applySelection() {
     if (sweepRunning) {
         return;
@@ -423,32 +442,49 @@ function applySelection() {
 }
 
 fillSelect(backendSelect, [
-    {value: "quarks", label: backendLabels["quarks"]},
-    {value: "native-cpu", label: backendLabels["native-cpu"]},
+    {value: 'quarks', label: backendLabels['quarks']},
+    {value: 'native-cpu', label: backendLabels['native-cpu']},
     {
-        value: "native-gpu",
-        label: backendLabels["native-gpu"] + (GPUParticleSystem.IsSupported ? "" : " (unsupported)"),
+        value: 'native-gpu',
+        label: backendLabels['native-gpu'] + (GPUParticleSystem.IsSupported ? '' : ' (unsupported)'),
         disabled: !GPUParticleSystem.IsSupported,
     },
 ]);
 fillSelect(
     countSelect,
-    [2000, 5000, 10000, 20000, 50000].map((count) => ({value: String(count), label: count.toLocaleString("en-US")}))
+    PARTICLE_COUNT_OPTIONS.map((count) => ({value: String(count), label: count.toLocaleString('en-US')}))
 );
-countSelect.value = "10000";
-fillSelect(emittersSelect, [1, 4, 16].map((count) => ({value: String(count), label: String(count)})));
-emittersSelect.value = "4";
+countSelect.value = '10000';
+fillSelect(
+    emittersSelect,
+    [1, 4, 16].map((count) => ({value: String(count), label: String(count)}))
+);
+emittersSelect.value = String(numberList(query.get('emitters'), [4])[0]);
 
-backendSelect.addEventListener("change", applySelection);
-countSelect.addEventListener("change", applySelection);
-emittersSelect.addEventListener("change", applySelection);
-runSweepButton.addEventListener("click", () => void runSweep());
-copyResultsButton.addEventListener("click", () => {
+backendSelect.addEventListener('change', applySelection);
+countSelect.addEventListener('change', applySelection);
+emittersSelect.addEventListener('change', applySelection);
+runSweepButton.addEventListener('click', () => void runSweep());
+copyResultsButton.addEventListener('click', () => {
     void navigator.clipboard.writeText(resultsToMarkdown(sweepResults));
-    copyResultsButton.textContent = "Copied!";
-    setTimeout(() => (copyResultsButton.textContent = "Copy as markdown"), 1200);
+    copyResultsButton.textContent = 'Copied!';
+    setTimeout(() => (copyResultsButton.textContent = 'Copy as markdown'), 1200);
 });
 
-window.addEventListener("resize", () => engine.resize());
+window.addEventListener('resize', () => engine.resize());
 
 applySelection();
+
+/**
+ * Headless hook: `?autorun=1` runs the sweep on load and publishes the results
+ * on `window`, so browser automation can read the same numbers the panel shows.
+ * `counts`, `emitters`, `warmup` and `frames` override the sweep parameters.
+ * Runs last so the controls it reads are already populated.
+ */
+if (query.get('autorun') !== null) {
+    window.benchmarkDone = false;
+    void runSweep().then(() => {
+        window.benchmarkResults = sweepResults;
+        window.benchmarkDone = true;
+    });
+}

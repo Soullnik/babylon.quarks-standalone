@@ -1,7 +1,7 @@
-import {ColorGenerator, FunctionColorGenerator} from './ColorGenerator';
-import {FunctionJSON} from './FunctionJSON';
-import {ColorToJSON, JSONToColor} from '../util/JSONUtil';
 import {Vector4} from '../math';
+import {ColorToJSON, JSONToColor} from '../util/JSONUtil';
+import {ColorGenerator} from './ColorGenerator';
+import {FunctionJSON} from './FunctionJSON';
 import {GeneratorMemory} from './GeneratorMemory';
 
 export class ColorRange implements ColorGenerator {

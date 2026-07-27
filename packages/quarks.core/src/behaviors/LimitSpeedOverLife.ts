@@ -1,6 +1,6 @@
-import {Behavior} from './Behavior';
 import {Particle} from '../Particle';
 import {FunctionValueGenerator, ValueGeneratorFromJSON} from '../functions';
+import {Behavior} from './Behavior';
 
 /**
  * Limit the speed of particles over their life.
@@ -25,6 +25,23 @@ export class LimitSpeedOverLife implements Behavior {
             particle.velocity.multiplyScalar(1 - percent * this.dampen * delta * 20);
         }
     }
+
+    updateAll(particles: Array<Particle>, count: number, delta: number): void {
+        const generator = this.speed;
+        const dampenStep = this.dampen * delta * 20;
+        for (let i = 0; i < count; i++) {
+            const particle = particles[i];
+            if (particle.age >= particle.life) {
+                continue;
+            }
+            const velocity = particle.velocity;
+            const speed = velocity.length();
+            const limit = generator.genValue(particle.memory, particle.age / particle.life);
+            if (speed > limit) {
+                velocity.multiplyScalar(1 - ((speed - limit) / speed) * dampenStep);
+            }
+        }
+    }
     toJSON(): any {
         return {
             type: this.type,
@@ -37,7 +54,9 @@ export class LimitSpeedOverLife implements Behavior {
         return new LimitSpeedOverLife(ValueGeneratorFromJSON(json.speed) as FunctionValueGenerator, json.dampen);
     }
 
-    frameUpdate(delta: number): void {}
+    frameUpdate(delta: number): void {
+        this.speed.refreshTable?.();
+    }
 
     clone(): Behavior {
         return new LimitSpeedOverLife(this.speed.clone(), this.dampen);

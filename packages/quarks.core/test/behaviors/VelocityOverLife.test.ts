@@ -5,8 +5,8 @@ import {
     Matrix4,
     PiecewiseBezier,
     SpriteParticle,
-    VelocityOverLife,
     Vector3,
+    VelocityOverLife,
 } from '../../src';
 
 const makePS = (worldSpace = false, matrixWorld = new Matrix4()) =>
@@ -133,6 +133,32 @@ describe('VelocityOverLife', () => {
 
         // 180° around the emitter at (10,0,0) takes (11,0,0) to (9,0,0)
         expect(particle.position.x).toBeCloseTo(9);
+        expect(particle.position.z).toBeCloseTo(0);
+    });
+
+    test('orbital rotation in world space turns around the emitter axes, not the world axes', () => {
+        const behavior = new VelocityOverLife(
+            new ConstantValue(0),
+            new ConstantValue(0),
+            new ConstantValue(0),
+            new ConstantValue(Math.PI / 2),
+            new ConstantValue(0),
+            new ConstantValue(0)
+        );
+        // Emitter turned 90° about +Z, so its own +X axis points along world +Y.
+        const matrix = new Matrix4().makeRotationZ(Math.PI / 2);
+        const ps = makePS(true, matrix);
+        const particle = makeParticle();
+        particle.position.set(0, 0, 1);
+
+        behavior.initialize(particle, ps);
+        behavior.frameUpdate(1);
+        behavior.update(particle, 1);
+
+        // Turning +Z by 90° around +Y gives +X. Around the world +X it would
+        // have gone to -Y instead.
+        expect(particle.position.x).toBeCloseTo(1);
+        expect(particle.position.y).toBeCloseTo(0);
         expect(particle.position.z).toBeCloseTo(0);
     });
 

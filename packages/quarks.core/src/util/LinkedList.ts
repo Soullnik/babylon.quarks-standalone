@@ -32,8 +32,7 @@ export class CircularLinkedList<T> {
     }
 
     start(): T | null {
-        if (this.head === null)
-            return null;
+        if (this.head === null) return null;
         return this.head.data;
     }
 
@@ -54,7 +53,7 @@ export class CircularLinkedList<T> {
         return node;
     }
 
-    insertAfter(prevNode: LinkedListNode<T>, data: T): LinkedListNode<T>{
+    insertAfter(prevNode: LinkedListNode<T>, data: T): LinkedListNode<T> {
         const node = new LinkedListNode(data);
         node.prev = prevNode;
         node.next = prevNode.next;
@@ -69,13 +68,12 @@ export class CircularLinkedList<T> {
         if (this.head) {
             // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
             return this.head.prev!;
-        } else
-            return undefined;
+        } else return undefined;
     }
     /**
      * Returns an iterator over the values
      */
-    * values() {
+    *values() {
         let current = this.head;
         if (current !== null) {
             yield current.data;
@@ -110,17 +108,14 @@ export class LinkedList<T> {
     }
 
     front(): T | null {
-        if (this.head === null)
-            return null;
+        if (this.head === null) return null;
         return this.head.data;
     }
 
     back(): T | null {
-        if (this.tail === null)
-            return null;
+        if (this.tail === null) return null;
         return this.tail.data;
     }
-
 
     /**
      * remove at head in O(1)
@@ -223,19 +218,16 @@ export class LinkedList<T> {
             tempNode = tempNode.next;
         }
         if (tempNode.data === data) {
-            if (tempNode.prev !== null)
-                tempNode.prev.next = tempNode.next;
-            if (tempNode.next !== null)
-                tempNode.next.prev = tempNode.prev;
+            if (tempNode.prev !== null) tempNode.prev.next = tempNode.next;
+            if (tempNode.next !== null) tempNode.next.prev = tempNode.prev;
             this.length--;
         }
     }
 
-
     /**
      * Returns an iterator over the values
      */
-    * values() {
+    *values() {
         let current = this.head;
         while (current !== null) {
             yield current.data;

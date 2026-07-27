@@ -1,5 +1,4 @@
-import {Gradient, Vector3, Vector4} from '../../src';
-import {RandomColorBetweenGradient} from '../../src';
+import {Gradient, RandomColorBetweenGradient, Vector3, Vector4} from '../../src';
 
 describe('RandomColorBetweenGradient', () => {
     test('.genColor', () => {

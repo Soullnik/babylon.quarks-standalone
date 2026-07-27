@@ -1,25 +1,57 @@
-import {Behavior} from './Behavior';
 import {Particle} from '../Particle';
 import {FunctionValueGenerator, PiecewiseBezier, ValueGeneratorFromJSON} from '../functions';
+import {Behavior} from './Behavior';
 
 /**
  * apply tile number of particle texture by particles' life.
  */
 export class FrameOverLife implements Behavior {
     type = 'FrameOverLife';
-    constructor(public frame: FunctionValueGenerator) {}
+
+    private _frame!: FunctionValueGenerator;
+    // Cached so the per-particle update does not repeat the instanceof test.
+    private _frameIsBezier = false;
+
+    constructor(frame: FunctionValueGenerator) {
+        this.frame = frame;
+    }
+
+    get frame(): FunctionValueGenerator {
+        return this._frame;
+    }
+
+    set frame(frame: FunctionValueGenerator) {
+        this._frame = frame;
+        this._frameIsBezier = frame instanceof PiecewiseBezier;
+    }
 
     initialize(particle: Particle): void {
-        this.frame.startGen(particle.memory);
+        this._frame.startGen(particle.memory);
     }
 
     update(particle: Particle, delta: number): void {
-        if (this.frame instanceof PiecewiseBezier) {
-            particle.uvTile = this.frame.genValue(particle.memory, particle.age / particle.life);
+        if (this._frameIsBezier) {
+            particle.uvTile = this._frame.genValue(particle.memory, particle.age / particle.life);
         }
     }
 
-    frameUpdate(delta: number): void {}
+    updateAll(particles: Array<Particle>, count: number, delta: number): void {
+        if (!this._frameIsBezier) {
+            return;
+        }
+        const generator = this._frame;
+        for (let i = 0; i < count; i++) {
+            const particle = particles[i];
+            if (particle.age >= particle.life) {
+                continue;
+            }
+            particle.uvTile = generator.genValue(particle.memory, particle.age / particle.life);
+        }
+    }
+
+    frameUpdate(delta: number): void {
+        this._frame.refreshTable?.();
+    }
 
     toJSON(): any {
         return {

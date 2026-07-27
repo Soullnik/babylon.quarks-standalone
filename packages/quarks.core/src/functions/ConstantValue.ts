@@ -1,6 +1,6 @@
-import {ValueGenerator} from './ValueGenerator';
 import {FunctionJSON} from './FunctionJSON';
 import {GeneratorMemory} from './GeneratorMemory';
+import {ValueGenerator} from './ValueGenerator';
 
 export class ConstantValue implements ValueGenerator {
     type: 'value';

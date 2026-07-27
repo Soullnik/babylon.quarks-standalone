@@ -1,7 +1,7 @@
-import {Mesh} from '@babylonjs/core/Meshes/mesh';
-import {Scene} from '@babylonjs/core/scene';
 import {BaseTexture} from '@babylonjs/core/Materials/Textures/baseTexture';
 import {ShaderMaterial} from '@babylonjs/core/Materials/shaderMaterial';
+import {Mesh} from '@babylonjs/core/Meshes/mesh';
+import {Scene} from '@babylonjs/core/scene';
 import {IParticleSystem} from 'quarks.core';
 import {VFXBatchSettings} from './BatchedRenderer';
 
@@ -33,6 +33,10 @@ export interface StoredBatchSettings {
     materialDepthWrite: boolean;
     materialAlphaTest: number;
     texture: any;
+    reflectionTexture: BaseTexture | null;
+    reflectionLevel: number;
+    reflectionFaces: BaseTexture[] | null;
+    reflectionAtlas: BaseTexture | null;
     layerMask: number;
 }
 
@@ -42,6 +46,7 @@ export abstract class VFXBatch {
     settings: StoredBatchSettings;
     protected maxParticles: number;
     protected scene: Scene;
+    private readonly visibleSystems: IParticleSystem[] = [];
 
     protected constructor(settings: VFXBatchSettings, scene: Scene) {
         this.scene = scene;
@@ -66,6 +71,10 @@ export abstract class VFXBatch {
             materialDepthWrite: settings.materialDepthWrite,
             materialAlphaTest: settings.materialAlphaTest,
             texture: settings.texture,
+            reflectionTexture: settings.reflectionTexture ?? null,
+            reflectionLevel: settings.reflectionLevel ?? 1,
+            reflectionFaces: settings.reflectionFaces ?? null,
+            reflectionAtlas: settings.reflectionAtlas ?? null,
             layerMask: settings.layerMask,
         };
         this.mesh = new Mesh('vfxBatch', scene);
@@ -80,13 +89,20 @@ export abstract class VFXBatch {
         this.systems.delete(system);
     }
 
+    /**
+     * Visible systems of this batch, written into a buffer owned by the batch.
+     * Called once per frame per batch, so the result is reused rather than
+     * reallocated; treat it as valid only until the next call.
+     */
     getVisibleSystems(): IParticleSystem[] {
-        const visibleSystems: IParticleSystem[] = [];
+        const visibleSystems = this.visibleSystems;
+        let count = 0;
         for (const system of this.systems) {
             if (system.emitter.visible) {
-                visibleSystems.push(system);
+                visibleSystems[count++] = system;
             }
         }
+        visibleSystems.length = count;
         return visibleSystems;
     }
 

@@ -1,7 +1,7 @@
-import {Behavior} from './Behavior';
 import {Particle} from '../Particle';
 import {Vector3} from '../math';
 import SimplexNoise from '../util/SimplexNoise';
+import {Behavior} from './Behavior';
 
 /**
  * Apply turbulence to particles.

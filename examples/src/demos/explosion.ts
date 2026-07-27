@@ -1,7 +1,7 @@
-import type { DemoContext } from '../types';
 import {Vector3 as BVector3} from '@babylonjs/core/Maths/math.vector';
 import type {TransformNode} from '@babylonjs/core/Meshes/transformNode';
-import {QuarksLoader, ParticleEmitter, ParticleSystem} from 'babylon.quarks';
+import {ParticleEmitter, ParticleSystem, QuarksLoader} from 'babylon.quarks';
+import type {DemoContext} from '../types';
 
 const EXPLOSION_REFRESH_TIME = 2;
 

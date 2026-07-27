@@ -1,6 +1,3 @@
-import {EmitterMode, EmitterShape, getValueFromEmitterMode, ShapeJSON} from './EmitterUtil';
-import {Particle} from '../Particle';
-import {MathUtils} from '../math';
 import {
     ConstantValue,
     FunctionValueGenerator,
@@ -9,6 +6,9 @@ import {
     ValueGeneratorFromJSON,
 } from '../functions';
 import {EmissionState, IParticleSystem} from '../IParticleSystem';
+import {MathUtils} from '../math';
+import {Particle} from '../Particle';
+import {EmitterMode, EmitterShape, getValueFromEmitterMode, ShapeJSON} from './EmitterUtil';
 
 /**
  * Interface representing the parameters for a cone emitter.

@@ -1,5 +1,5 @@
-import {Bezier, ConstantValue, IntervalValue, PiecewiseBezier} from 'babylon.quarks';
 import type {FunctionValueGenerator, ValueGenerator} from 'babylon.quarks';
+import {Bezier, ConstantValue, IntervalValue, PiecewiseBezier} from 'babylon.quarks';
 
 export type ScalarGenerator = ValueGenerator | FunctionValueGenerator;
 export type ScalarMode = 'constant' | 'random' | 'curve';

@@ -1,12 +1,12 @@
 import {NullEngine} from '@babylonjs/core/Engines/nullEngine';
-import {Scene} from '@babylonjs/core/scene';
 import {Mesh} from '@babylonjs/core/Meshes/mesh';
 import {TransformNode} from '@babylonjs/core/Meshes/transformNode';
+import {Scene} from '@babylonjs/core/scene';
 import {ConstantValue} from 'quarks.core';
-import {ParticleSystem} from '../src/ParticleSystem';
-import {ParticleEmitter} from '../src/ParticleEmitter';
-import {QuarksPrefab} from '../src/QuarksPrefab';
 import {BatchedRenderer} from '../src/BatchedRenderer';
+import {ParticleEmitter} from '../src/ParticleEmitter';
+import {ParticleSystem} from '../src/ParticleSystem';
+import {QuarksPrefab} from '../src/QuarksPrefab';
 
 describe('QuarksPrefab', () => {
     let engine: NullEngine;
@@ -24,15 +24,22 @@ describe('QuarksPrefab', () => {
 
     it('adds and resolves particle animation references', () => {
         const root = new TransformNode('root', scene);
-        const system = new ParticleSystem({scene, startLife: new ConstantValue(1), emissionOverTime: new ConstantValue(1)});
+        const system = new ParticleSystem({
+            scene,
+            startLife: new ConstantValue(1),
+            emissionOverTime: new ConstantValue(1),
+        });
         const emitter = system.emitter as ParticleEmitter;
         (emitter as any)._quarksUUID = 'emitter-1';
         emitter.parent = root;
 
-        const prefab = QuarksPrefab.fromJSON({
-            name: 'prefab',
-            animationData: [{startTime: 0, duration: 2, type: 'ps', targetUUID: 'emitter-1', loop: false}],
-        }, scene);
+        const prefab = QuarksPrefab.fromJSON(
+            {
+                name: 'prefab',
+                animationData: [{startTime: 0, duration: 2, type: 'ps', targetUUID: 'emitter-1', loop: false}],
+            },
+            scene
+        );
         prefab.parent = root;
         prefab.resolveReferences(root);
 
@@ -42,7 +49,11 @@ describe('QuarksPrefab', () => {
     });
 
     it('plays and stops particle system animations on timeline transitions', () => {
-        const system = new ParticleSystem({scene, startLife: new ConstantValue(1), emissionOverTime: new ConstantValue(5)});
+        const system = new ParticleSystem({
+            scene,
+            startLife: new ConstantValue(1),
+            emissionOverTime: new ConstantValue(5),
+        });
         const emitter = system.emitter as ParticleEmitter;
         const prefab = new QuarksPrefab('prefab-runtime', scene);
         prefab.addParticleSystemAnimation(emitter, 0, 0.5, false);
@@ -76,12 +87,22 @@ describe('QuarksPrefab', () => {
         };
         (animatedTarget as any).animations = [clip];
 
-        const prefab = QuarksPrefab.fromJSON({
-            name: 'prefab-three',
-            animationData: [
-                {startTime: 0.25, duration: 1.5, type: 'three', targetUUID: 'animated-uuid', clipUUID: 'clip-uuid', loop: false},
-            ],
-        }, scene);
+        const prefab = QuarksPrefab.fromJSON(
+            {
+                name: 'prefab-three',
+                animationData: [
+                    {
+                        startTime: 0.25,
+                        duration: 1.5,
+                        type: 'three',
+                        targetUUID: 'animated-uuid',
+                        clipUUID: 'clip-uuid',
+                        loop: false,
+                    },
+                ],
+            },
+            scene
+        );
         prefab.parent = root;
         prefab.resolveReferences(root);
 
@@ -113,7 +134,11 @@ describe('QuarksPrefab', () => {
     });
 
     it('loops particle and three animations on active window exits', () => {
-        const system = new ParticleSystem({scene, startLife: new ConstantValue(1), emissionOverTime: new ConstantValue(1)});
+        const system = new ParticleSystem({
+            scene,
+            startLife: new ConstantValue(1),
+            emissionOverTime: new ConstantValue(1),
+        });
         const emitter = system.emitter as ParticleEmitter;
         const clip = {duration: 0.4, play: jest.fn(), stop: jest.fn(), pause: jest.fn(), setTime: jest.fn()};
         const keepAliveClip = {duration: 1, play: jest.fn(), stop: jest.fn(), pause: jest.fn(), setTime: jest.fn()};
@@ -150,7 +175,11 @@ describe('QuarksPrefab', () => {
 
     it('adds particle systems to a registered batched renderer when particle animations activate', () => {
         const renderer = new BatchedRenderer('prefab-br', scene);
-        const system = new ParticleSystem({scene, startLife: new ConstantValue(1), emissionOverTime: new ConstantValue(5)});
+        const system = new ParticleSystem({
+            scene,
+            startLife: new ConstantValue(1),
+            emissionOverTime: new ConstantValue(5),
+        });
         const emitter = system.emitter as ParticleEmitter;
         const prefab = new QuarksPrefab('prefab-br-root', scene);
         prefab.registerBatchedRenderer(renderer);
@@ -176,7 +205,11 @@ describe('QuarksPrefab', () => {
 
     it('stops playback when timeline exceeds total duration', () => {
         const prefab = new QuarksPrefab('timeline-stop', scene);
-        const system = new ParticleSystem({scene, startLife: new ConstantValue(1), emissionOverTime: new ConstantValue(5)});
+        const system = new ParticleSystem({
+            scene,
+            startLife: new ConstantValue(1),
+            emissionOverTime: new ConstantValue(5),
+        });
         const emitter = system.emitter as ParticleEmitter;
         prefab.addParticleSystemAnimation(emitter, 0, 0.2, false);
         prefab.play();
@@ -204,7 +237,9 @@ describe('QuarksPrefab', () => {
         const target: any = new Mesh('meta-mesh', scene);
         const clip = {uuid: 'c1', duration: 1, play: jest.fn()};
         target.metadata = {animations: [clip]};
-        (prefab as any)._tempAnimationJSON = [{type: 'three', targetUUID: String(target.uniqueId), duration: 1, loop: false}];
+        (prefab as any)._tempAnimationJSON = [
+            {type: 'three', targetUUID: String(target.uniqueId), duration: 1, loop: false},
+        ];
         prefab.resolveReferences(target);
         expect(prefab.animationData.length).toBe(1);
     });

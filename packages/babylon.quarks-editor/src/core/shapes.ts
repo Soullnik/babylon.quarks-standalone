@@ -1,7 +1,10 @@
+import type {Mesh} from '@babylonjs/core/Meshes/mesh';
+import type {EmitterShape} from 'babylon.quarks';
 import {
     CircleEmitter,
     ConeEmitter,
     DonutEmitter,
+    EmitterMode,
     GridEmitter,
     HemisphereEmitter,
     MeshSurfaceEmitter,
@@ -9,11 +12,17 @@ import {
     RectangleEmitter,
     SphereEmitter,
 } from 'babylon.quarks';
-import type {EmitterShape} from 'babylon.quarks';
-import {EmitterMode} from 'babylon.quarks';
-import type {Mesh} from '@babylonjs/core/Meshes/mesh';
 
-export type ShapeType = 'point' | 'sphere' | 'hemisphere' | 'cone' | 'circle' | 'donut' | 'rectangle' | 'grid' | 'mesh_surface';
+export type ShapeType =
+    | 'point'
+    | 'sphere'
+    | 'hemisphere'
+    | 'cone'
+    | 'circle'
+    | 'donut'
+    | 'rectangle'
+    | 'grid'
+    | 'mesh_surface';
 
 export const SHAPE_TYPES: Array<{value: ShapeType; label: string}> = [
     {value: 'cone', label: 'Cone'},
@@ -64,7 +73,8 @@ export function getShapeType(shape: EmitterShape): ShapeType {
 
 export function readShapeParams(shape: EmitterShape): ShapeParams {
     const anyShape = shape as unknown as {[key: string]: unknown};
-    const num = (key: string, fallback: number) => (typeof anyShape[key] === 'number' ? (anyShape[key] as number) : fallback);
+    const num = (key: string, fallback: number) =>
+        typeof anyShape[key] === 'number' ? (anyShape[key] as number) : fallback;
     return {
         radius: num('radius', DEFAULT_SHAPE_PARAMS.radius),
         mode: num('mode', DEFAULT_SHAPE_PARAMS.mode) as EmitterMode,
@@ -100,9 +110,21 @@ export function createShape(type: ShapeType, params: ShapeParams): EmitterShape 
         case 'point':
             return new PointEmitter();
         case 'sphere':
-            return new SphereEmitter({radius: params.radius, arc: params.arc, thickness: params.thickness, mode: params.mode, spread: params.spread});
+            return new SphereEmitter({
+                radius: params.radius,
+                arc: params.arc,
+                thickness: params.thickness,
+                mode: params.mode,
+                spread: params.spread,
+            });
         case 'hemisphere':
-            return new HemisphereEmitter({radius: params.radius, arc: params.arc, thickness: params.thickness, mode: params.mode, spread: params.spread});
+            return new HemisphereEmitter({
+                radius: params.radius,
+                arc: params.arc,
+                thickness: params.thickness,
+                mode: params.mode,
+                spread: params.spread,
+            });
         case 'cone':
             return new ConeEmitter({
                 radius: params.radius,
@@ -113,7 +135,13 @@ export function createShape(type: ShapeType, params: ShapeParams): EmitterShape 
                 spread: params.spread,
             });
         case 'circle':
-            return new CircleEmitter({radius: params.radius, arc: params.arc, thickness: params.thickness, mode: params.mode, spread: params.spread});
+            return new CircleEmitter({
+                radius: params.radius,
+                arc: params.arc,
+                thickness: params.thickness,
+                mode: params.mode,
+                spread: params.spread,
+            });
         case 'donut':
             return new DonutEmitter({
                 radius: params.radius,
@@ -124,9 +152,19 @@ export function createShape(type: ShapeType, params: ShapeParams): EmitterShape 
                 spread: params.spread,
             });
         case 'rectangle':
-            return new RectangleEmitter({width: params.width, height: params.height, mode: params.mode, spread: params.spread});
+            return new RectangleEmitter({
+                width: params.width,
+                height: params.height,
+                mode: params.mode,
+                spread: params.spread,
+            });
         case 'grid':
-            return new GridEmitter({width: params.width, height: params.height, column: params.column, row: params.row});
+            return new GridEmitter({
+                width: params.width,
+                height: params.height,
+                column: params.column,
+                row: params.row,
+            });
         case 'mesh_surface':
             return new MeshSurfaceEmitter(params.mesh);
     }

@@ -1,23 +1,23 @@
 {
-  "compilerOptions": {
-    "target": "ES2020",
-    "module": "ESNext",
-    "moduleResolution": "bundler",
-    "lib": ["ES2020", "DOM"],
-    "types": ["vite/client"],
-    "strict": false,
-    "noImplicitAny": false,
-    "esModuleInterop": true,
-    "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true,
-    "resolveJsonModule": true,
-    "isolatedModules": true,
-    "jsx": "react-jsx",
-    "noEmit": true,
-    "paths": {
-      "babylon.quarks-editor": ["../packages/babylon.quarks-editor/src/index.ts"],
-      "babylon.quarks-editor/react": ["../packages/babylon.quarks-editor/src/react/index.ts"]
-    }
-  },
-  "include": ["src/**/*", "vite.config.ts"]
+    "compilerOptions": {
+        "target": "ES2020",
+        "module": "ESNext",
+        "moduleResolution": "bundler",
+        "lib": ["ES2020", "DOM"],
+        "types": ["vite/client"],
+        "strict": false,
+        "noImplicitAny": false,
+        "esModuleInterop": true,
+        "skipLibCheck": true,
+        "forceConsistentCasingInFileNames": true,
+        "resolveJsonModule": true,
+        "isolatedModules": true,
+        "jsx": "react-jsx",
+        "noEmit": true,
+        "paths": {
+            "babylon.quarks-editor": ["../packages/babylon.quarks-editor/src/index.ts"],
+            "babylon.quarks-editor/react": ["../packages/babylon.quarks-editor/src/react/index.ts"]
+        }
+    },
+    "include": ["src/**/*", "vite.config.ts"]
 }

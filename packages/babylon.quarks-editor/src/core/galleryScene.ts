@@ -1,9 +1,9 @@
 import {Vector3} from '@babylonjs/core/Maths/math.vector';
-import type {Scene} from '@babylonjs/core/scene';
 import type {TransformNode} from '@babylonjs/core/Meshes/transformNode';
+import type {Scene} from '@babylonjs/core/scene';
 import type {BatchedRenderer} from 'babylon.quarks';
-import type {GalleryEntry} from './loadEffectGallery';
 import {DEFAULT_GALLERY_SPACING, galleryGridPosition} from './galleryLayout';
+import type {GalleryEntry} from './loadEffectGallery';
 
 /** Clears live particles and freezes simulation for one placed catalog entry. */
 export function clearGalleryEntrySimulation(entry: GalleryEntry, renderer: BatchedRenderer): void {
@@ -15,11 +15,7 @@ export function clearGalleryEntrySimulation(entry: GalleryEntry, renderer: Batch
 }
 
 /** Parents a catalog entry into the live scene and registers its systems with the renderer. */
-export function placeGalleryEntryInScene(
-    entry: GalleryEntry,
-    renderer: BatchedRenderer,
-    worldPosition: Vector3
-): void {
+export function placeGalleryEntryInScene(entry: GalleryEntry, renderer: BatchedRenderer, worldPosition: Vector3): void {
     entry.root.setEnabled(true);
     entry.root.parent = null;
     entry.root.position.copyFrom(worldPosition);

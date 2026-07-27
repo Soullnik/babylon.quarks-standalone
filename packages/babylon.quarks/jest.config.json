@@ -5,11 +5,7 @@
     "moduleFileExtensions": ["ts", "tsx", "js"],
     "coveragePathIgnorePatterns": ["/node_modules/", "/test/"],
     "extensionsToTreatAsEsm": [".ts"],
-    "collectCoverageFrom": [
-        "src/**/*.{js,ts}",
-        "!src/index.ts",
-        "!src/shaders/index.ts"
-    ],
+    "collectCoverageFrom": ["src/**/*.{js,ts}", "!src/index.ts", "!src/shaders/index.ts"],
     "coverageThreshold": {
         "global": {
             "statements": 97,
@@ -18,11 +14,9 @@
             "lines": 97
         }
     },
-    "transformIgnorePatterns": [
-        "/node_modules/(?!@babylonjs)"
-    ],
+    "transformIgnorePatterns": ["/node_modules/(?!@babylonjs)"],
     "transform": {
         "^.+\\.(ts|tsx)$": "ts-jest",
-        "^.+\\.js$": ["babel-jest", { "plugins": ["@babel/plugin-transform-modules-commonjs"] }]
+        "^.+\\.js$": ["babel-jest", {"plugins": ["@babel/plugin-transform-modules-commonjs"]}]
     }
 }
