@@ -175,8 +175,13 @@ export class SpriteBatch extends VFXBatch {
             defines.push('USE_MAP');
         }
         const atlas = this.settings.reflectionAtlas;
+        // Env atlas sampling still raises GL_INVALID_OPERATION on iOS WebKit.
+        // Gated behind demoState / URL until that path is fixed; lit+map draws.
+        const envAllowed =
+            typeof window !== 'undefined' &&
+            (window as {__QUARKS_MESH_ENV__?: boolean}).__QUARKS_MESH_ENV__ === true;
         const atlasPending =
-            this.settings.renderMode === RenderMode.Mesh && !!atlas && !atlas.isReady();
+            envAllowed && this.settings.renderMode === RenderMode.Mesh && !!atlas && !atlas.isReady();
         if (atlasPending && atlas) {
             const onLoad = (atlas as {onLoadObservable?: {addOnce: (cb: () => void) => void}}).onLoadObservable;
             onLoad?.addOnce(() => {
@@ -184,7 +189,7 @@ export class SpriteBatch extends VFXBatch {
             });
         }
         const useEnvAtlas =
-            this.settings.renderMode === RenderMode.Mesh && !!atlas && atlas.isReady();
+            envAllowed && this.settings.renderMode === RenderMode.Mesh && !!atlas && atlas.isReady();
         if (useEnvAtlas) {
             defines.push('USE_ENVMAP_ATLAS');
         }

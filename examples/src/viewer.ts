@@ -103,7 +103,8 @@ function createBaseScene() {
 
     batchRenderer = new BatchedRenderer("batchRenderer", scene);
     systems = [];
-    demoState = {totalTime: 0, refreshIndex: 0};
+    const keepMeshEnv = demoState.meshEnvEnabled;
+    demoState = {totalTime: 0, refreshIndex: 0, meshEnvEnabled: keepMeshEnv};
 }
 
 function updateSourceLink() {
@@ -256,6 +257,8 @@ function dumpMeshDiagnostics(reason: string) {
                 !!settings.reflectionAtlas,
                 "atlasReady",
                 settings.reflectionAtlas ? settings.reflectionAtlas.isReady() : false,
+                "envFlag",
+                !!(window as {__QUARKS_MESH_ENV__?: boolean}).__QUARKS_MESH_ENV__,
                 "noMip",
                 (settings.reflectionTexture as any)?.noMipmap ?? (settings.reflectionTexture as any)?._noMipmap,
                 "samp",
@@ -501,6 +504,16 @@ if (window.location.hash) {
 setupJsonImportUi();
 mountPhoneDebugLogUi();
 window.addEventListener("phone-debug-dump", () => dumpMeshDiagnostics("manual"));
+window.addEventListener("phone-debug-try-env", () => {
+    demoState.meshEnvEnabled = true;
+    (window as {__QUARKS_MESH_ENV__?: boolean}).__QUARKS_MESH_ENV__ = true;
+    const meshIndex = demos.findIndex((demoItem) => demoItem.key === "MeshMaterialDemo");
+    if (meshIndex >= 0) {
+        demoIndex = meshIndex;
+        phoneLog("INF", "reloading MeshMaterialDemo with env atlas enabled");
+        loadDemo(demoIndex);
+    }
+});
 
 const originalLoggerError = Logger.Error.bind(Logger);
 Logger.Error = (message: string | any[], limit?: number) => {

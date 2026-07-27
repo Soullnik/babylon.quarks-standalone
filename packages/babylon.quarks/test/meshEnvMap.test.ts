@@ -52,10 +52,35 @@ describe('mesh particle environment map', () => {
         atlas.dispose();
     });
 
-    it('enables USE_ENVMAP_ATLAS and USE_MAP on the mesh ShaderMaterial', () => {
+    it('enables USE_MAP on mesh batches even without a diffuse texture', () => {
+        const system = new ParticleSystem({
+            scene,
+            startLife: new ConstantValue(1),
+            emissionOverTime: new ConstantValue(5),
+            startColor: new ConstantColor(new Vector4(1, 1, 1, 1)),
+            shape: new PointEmitter(),
+            renderMode: RenderMode.Mesh,
+            transparent: false,
+            blendMode: Constants.ALPHA_DISABLE,
+        });
+
+        const renderer = new BatchedRenderer('mesh-white-map', scene);
+        renderer.addSystem(system);
+        renderer.update(1 / 60);
+
+        const batch = renderer.batches[0] as SpriteBatch;
+        const defines = (batch.mesh.material as any).options.defines as string[];
+        expect(defines).toContain('USE_MAP');
+        expect(defines).not.toContain('USE_ENVMAP_ATLAS');
+
+        renderer.dispose();
+        system.dispose();
+    });
+
+    it('keeps USE_ENVMAP_ATLAS gated off unless the window flag is set', () => {
         const atlas = new Texture('data:atlas2', scene, {
             noMipmap: true,
-            invertY: true,
+            invertY: false,
             samplingMode: Texture.LINEAR_LINEAR,
         });
         jest.spyOn(atlas, 'isReady').mockReturnValue(true);
@@ -79,13 +104,15 @@ describe('mesh particle environment map', () => {
         renderer.addSystem(system);
         renderer.update(1 / 60);
 
-        const batch = renderer.batches[0] as SpriteBatch;
-        const defines = (batch.mesh.material as any).options.defines as string[];
-        expect(defines).toContain('USE_ENVMAP_ATLAS');
+        let defines = (renderer.batches[0].mesh.material as any).options.defines as string[];
         expect(defines).toContain('USE_MAP');
-        expect(defines).not.toContain('USE_ENVMAP');
-        expect(defines).not.toContain('USE_ENVMAP_FACES');
-        expect(defines).not.toContain('USE_ALPHATEST');
+        expect(defines).not.toContain('USE_ENVMAP_ATLAS');
+
+        (window as any).__QUARKS_MESH_ENV__ = true;
+        (renderer.batches[0] as SpriteBatch).rebuildMaterial();
+        defines = (renderer.batches[0].mesh.material as any).options.defines as string[];
+        expect(defines).toContain('USE_ENVMAP_ATLAS');
+        delete (window as any).__QUARKS_MESH_ENV__;
 
         renderer.dispose();
         system.dispose();

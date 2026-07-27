@@ -82,6 +82,7 @@ export function mountPhoneDebugLogUi() {
     const copyBtn = document.getElementById("phone-log-copy");
     const closeBtn = document.getElementById("phone-log-close");
     const dumpBtn = document.getElementById("phone-log-dump");
+    const tryEnvBtn = document.getElementById("phone-log-try-env");
 
     btn?.addEventListener("click", () => {
         panel?.classList.toggle("is-open");
@@ -126,6 +127,12 @@ export function mountPhoneDebugLogUi() {
 
     dumpBtn?.addEventListener("click", () => {
         window.dispatchEvent(new CustomEvent("phone-debug-dump"));
+    });
+
+    tryEnvBtn?.addEventListener("click", () => {
+        (window as {__QUARKS_MESH_ENV__?: boolean}).__QUARKS_MESH_ENV__ = true;
+        push("INF", "Try env: __QUARKS_MESH_ENV__=true — reloading MeshMaterialDemo");
+        window.dispatchEvent(new CustomEvent("phone-debug-try-env"));
     });
 }
 

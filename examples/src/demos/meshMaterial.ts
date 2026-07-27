@@ -39,9 +39,9 @@ function loadImage(url: string): Promise<HTMLImageElement> {
 }
 
 /**
- * Packs the six cube faces into one 3×2 atlas. Mesh particles sample this with a
- * single sampler2D — six separate face samplers (and samplerCube) both raise
- * GL_INVALID_OPERATION on iOS WebKit and drop the draw.
+ * Packs the six cube faces into one 3×2 atlas. Kept ready for the temporary
+ * "Try env" phone debug toggle — iOS WebKit still rejects atlas sampling with
+ * GL_INVALID_OPERATION, so the demo stays lit-only until that is resolved.
  */
 async function createEnvAtlas(scene: DemoContext['scene']): Promise<Texture> {
     const images = await Promise.all(ENV_FACE_URLS.map((url) => loadImage(url)));
@@ -66,19 +66,28 @@ async function createEnvAtlas(scene: DemoContext['scene']): Promise<Texture> {
     return atlas;
 }
 
-export async function init({scene, camera, batchRenderer, systems}: DemoContext) {
+export async function init({scene, camera, batchRenderer, systems, demoState}: DemoContext) {
     camera.setPosition(new BVector3(0, 6, 16));
 
-    const envAtlas = await createEnvAtlas(scene);
+    // Prebuild the atlas for the debug "Try env" path, but do not attach it
+    // unless explicitly requested — sampling it on iOS currently yields 1282.
+    const wantEnv =
+        !!(demoState as {meshEnvEnabled?: boolean}).meshEnvEnabled ||
+        (typeof window !== 'undefined' &&
+            (window as {__QUARKS_MESH_ENV__?: boolean}).__QUARKS_MESH_ENV__ === true);
+    const envAtlas = wantEnv ? await createEnvAtlas(scene) : null;
 
-    // StandardMaterial stays the public API; reflectionAtlas is read by
-    // applyMaterialSettings for the mesh batch (2D atlas, not samplerCube).
     const meshMaterial = new StandardMaterial('meshParticleMaterial', scene);
     meshMaterial.backFaceCulling = false;
-    meshMaterial.alpha = 0.95;
+    meshMaterial.alpha = 1;
     meshMaterial.transparencyMode = null;
-    (meshMaterial as any).reflectionAtlas = envAtlas;
-    (meshMaterial as any).reflectionLevel = 1;
+    if (envAtlas) {
+        (meshMaterial as any).reflectionAtlas = envAtlas;
+        (meshMaterial as any).reflectionLevel = 1;
+    }
+
+    // Same class of texture AlphaTest / SubEmitter use successfully on iPhone.
+    const diffuse = new Texture('textures/particle_default.png', scene);
 
     const particleMesh = MeshBuilder.CreateCapsule(
         'meshParticleGeo',
@@ -111,9 +120,11 @@ export async function init({scene, camera, batchRenderer, systems}: DemoContext)
         emissionOverTime: new ConstantValue(60),
         shape: new ConeEmitter({radius: 0.1, angle: 1}),
         material: meshMaterial,
+        texture: diffuse,
         renderMode: RenderMode.Mesh,
-        transparent: true,
-        blendMode: Constants.ALPHA_COMBINE,
+        transparent: false,
+        blendMode: Constants.ALPHA_DISABLE,
+        depthWrite: true,
         alphaTest: 0,
         startTileIndex: new ConstantValue(0),
         uTileCount: 1,
