@@ -2,6 +2,7 @@ import {NullEngine} from '@babylonjs/core/Engines/nullEngine';
 import {Scene} from '@babylonjs/core/scene';
 import {StandardMaterial} from '@babylonjs/core/Materials/standardMaterial';
 import {CubeTexture} from '@babylonjs/core/Materials/Textures/cubeTexture';
+import {Texture} from '@babylonjs/core/Materials/Textures/texture';
 import {Constants} from '@babylonjs/core/Engines/constants';
 import {ConstantColor, ConstantValue, PointEmitter, Vector4} from 'quarks.core';
 import {BatchedRenderer} from '../src/BatchedRenderer';
@@ -27,13 +28,14 @@ describe('mesh particle environment map', () => {
     function makeEnv(tag: string, level = 1): CubeTexture {
         const env = CubeTexture.CreateFromImages(
             [0, 1, 2, 3, 4, 5].map((i) => `data:${tag}/${i}`),
-            scene
+            scene,
+            true
         );
         env.level = level;
         return env;
     }
 
-    it('harvests reflectionTexture from a StandardMaterial into renderer settings', () => {
+    it('harvests reflectionTexture and expands cube files into six face textures', () => {
         const env = makeEnv('harvest', 0.75);
         const material = new StandardMaterial('env-mat', scene);
         material.reflectionTexture = env;
@@ -50,6 +52,7 @@ describe('mesh particle environment map', () => {
 
         expect(system.getRendererSettings().reflectionTexture).toBe(env);
         expect(system.getRendererSettings().reflectionLevel).toBeCloseTo(0.75, 5);
+        expect(system.getRendererSettings().reflectionFaces?.length).toBe(6);
 
         system.dispose();
         material.dispose();
@@ -99,11 +102,21 @@ describe('mesh particle environment map', () => {
         envB.dispose();
     });
 
-    it('enables USE_ENVMAP on the mesh ShaderMaterial when a cube map is present', () => {
-        const env = makeEnv('shader');
-        jest.spyOn(env, 'isReady').mockReturnValue(true);
+    it('enables USE_ENVMAP_FACES when six face textures are ready', () => {
+        const faces = [0, 1, 2, 3, 4, 5].map(
+            (i) =>
+                new Texture(`data:face/${i}`, scene, {
+                    noMipmap: true,
+                    invertY: false,
+                    samplingMode: Texture.LINEAR_LINEAR,
+                })
+        );
+        for (const face of faces) {
+            jest.spyOn(face, 'isReady').mockReturnValue(true);
+        }
+
         const material = new StandardMaterial('env-shader', scene);
-        material.reflectionTexture = env;
+        (material as any).reflectionFaces = faces;
 
         const system = new ParticleSystem({
             scene,
@@ -123,13 +136,16 @@ describe('mesh particle environment map', () => {
 
         const batch = renderer.batches[0] as SpriteBatch;
         const defines = (batch.mesh.material as any).options.defines as string[];
-        expect(defines).toContain('USE_ENVMAP');
+        expect(defines).toContain('USE_ENVMAP_FACES');
+        expect(defines).not.toContain('USE_ENVMAP');
         expect(defines).not.toContain('USE_ALPHATEST');
 
         renderer.dispose();
         system.dispose();
         material.dispose();
-        env.dispose();
+        for (const face of faces) {
+            face.dispose();
+        }
     });
 
     it('does not enable alpha-test from StandardMaterial default alphaCutOff', () => {

@@ -35,6 +35,12 @@ export interface VFXBatchSettings {
     reflectionTexture: BaseTexture | null;
     /** Multiplier for the reflection sample — mirrors `texture.level`. */
     reflectionLevel: number;
+    /**
+     * Optional six cube-face 2D textures (px,py,pz,nx,ny,nz). Preferred over
+     * `reflectionTexture` for sampling: samplerCube on ShaderMaterial hits
+     * GL_INVALID_OPERATION on iOS WebKit, so mesh env uses face samplers.
+     */
+    reflectionFaces: BaseTexture[] | null;
     layerMask: number;
 }
 
@@ -44,6 +50,25 @@ export interface AdaptivePerformanceOptions {
     maxQuality: number;
     decreaseStep: number;
     increaseStep: number;
+}
+
+/** True when both face lists are the same six texture references (or both empty). */
+function reflectionFacesEqual(
+    a: BaseTexture[] | null | undefined,
+    b: BaseTexture[] | null | undefined
+): boolean {
+    if (a === b) {
+        return true;
+    }
+    if (!a || !b || a.length !== b.length) {
+        return false;
+    }
+    for (let i = 0; i < a.length; i++) {
+        if (a[i] !== b[i]) {
+            return false;
+        }
+    }
+    return true;
 }
 
 export interface AdaptivePerformanceState extends AdaptivePerformanceOptions {
@@ -109,6 +134,7 @@ export class BatchedRenderer extends TransformNode {
             a.texture === b.texture &&
             a.reflectionTexture === b.reflectionTexture &&
             a.reflectionLevel === b.reflectionLevel &&
+            reflectionFacesEqual(a.reflectionFaces, b.reflectionFaces) &&
             a.renderMode === b.renderMode &&
             a.blendTiles === b.blendTiles &&
             a.softParticles === b.softParticles &&

@@ -18,11 +18,48 @@ var mapSampler: sampler;
 var map: texture_2d<f32>;
 #endif
 
-#ifdef USE_ENVMAP
-var reflectionCubeSampler: sampler;
-var reflectionCube: texture_cube<f32>;
+#ifdef USE_ENVMAP_FACES
+var envPosXSampler: sampler;
+var envPosX: texture_2d<f32>;
+var envPosYSampler: sampler;
+var envPosY: texture_2d<f32>;
+var envPosZSampler: sampler;
+var envPosZ: texture_2d<f32>;
+var envNegXSampler: sampler;
+var envNegX: texture_2d<f32>;
+var envNegYSampler: sampler;
+var envNegY: texture_2d<f32>;
+var envNegZSampler: sampler;
+var envNegZ: texture_2d<f32>;
 uniform eyePosition: vec3f;
 uniform reflectionLevel: f32;
+
+fn sampleEnvFaces(r: vec3f) -> vec3f {
+    let a = abs(r);
+    var uv: vec2f;
+    if (a.x >= a.y && a.x >= a.z) {
+        if (r.x >= 0.0) {
+            uv = vec2f(-r.z, -r.y) / a.x * 0.5 + 0.5;
+            return textureSample(envPosX, envPosXSampler, uv).rgb;
+        }
+        uv = vec2f(r.z, -r.y) / a.x * 0.5 + 0.5;
+        return textureSample(envNegX, envNegXSampler, uv).rgb;
+    }
+    if (a.y >= a.z) {
+        if (r.y >= 0.0) {
+            uv = vec2f(r.x, r.z) / a.y * 0.5 + 0.5;
+            return textureSample(envPosY, envPosYSampler, uv).rgb;
+        }
+        uv = vec2f(r.x, -r.z) / a.y * 0.5 + 0.5;
+        return textureSample(envNegY, envNegYSampler, uv).rgb;
+    }
+    if (r.z >= 0.0) {
+        uv = vec2f(r.x, -r.y) / a.z * 0.5 + 0.5;
+        return textureSample(envPosZ, envPosZSampler, uv).rgb;
+    }
+    uv = vec2f(-r.x, -r.y) / a.z * 0.5 + 0.5;
+    return textureSample(envNegZ, envNegZSampler, uv).rgb;
+}
 #endif
 
 #ifdef SOFT_PARTICLES
@@ -62,15 +99,12 @@ fn main(input: FragmentInputs) -> FragmentOutputs {
     let NdotL = max(dot(N, L), 0.0);
     let litColor = uniforms.ambientColor + uniforms.lightColor * NdotL;
 
-    // Same composition as the GLSL mesh fragment — Standard-like diffuse lighting
-    // plus cubic reflection sampled with Babylon's computeCubicCoords formula.
     var color = baseColor.rgb * litColor;
 
-#ifdef USE_ENVMAP
+#ifdef USE_ENVMAP_FACES
     let viewDir = normalize(fragmentInputs.vWorldPos - uniforms.eyePosition);
     let reflectionCoords = reflect(viewDir, N);
-    let reflectionColor = textureSample(reflectionCube, reflectionCubeSampler, reflectionCoords).rgb * uniforms.reflectionLevel;
-    color += reflectionColor;
+    color += sampleEnvFaces(reflectionCoords) * uniforms.reflectionLevel;
 #endif
 
     var finalColor = vec4f(color, baseColor.a);

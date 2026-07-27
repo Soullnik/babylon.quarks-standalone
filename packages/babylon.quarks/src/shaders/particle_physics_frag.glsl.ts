@@ -17,10 +17,44 @@ varying float vTileBlend;
 uniform sampler2D map;
 #endif
 
-#ifdef USE_ENVMAP
-uniform samplerCube reflectionCube;
+// Six cube faces as 2D samplers — samplerCube on ShaderMaterial raises
+// GL_INVALID_OPERATION (1282) on iOS WebKit and the draw is dropped.
+#ifdef USE_ENVMAP_FACES
+uniform sampler2D envPosX;
+uniform sampler2D envPosY;
+uniform sampler2D envPosZ;
+uniform sampler2D envNegX;
+uniform sampler2D envNegY;
+uniform sampler2D envNegZ;
 uniform vec3 eyePosition;
 uniform float reflectionLevel;
+
+vec3 sampleEnvFaces(vec3 r) {
+    vec3 a = abs(r);
+    vec2 uv;
+    if (a.x >= a.y && a.x >= a.z) {
+        if (r.x >= 0.0) {
+            uv = vec2(-r.z, -r.y) / a.x * 0.5 + 0.5;
+            return texture2D(envPosX, uv).rgb;
+        }
+        uv = vec2(r.z, -r.y) / a.x * 0.5 + 0.5;
+        return texture2D(envNegX, uv).rgb;
+    }
+    if (a.y >= a.z) {
+        if (r.y >= 0.0) {
+            uv = vec2(r.x, r.z) / a.y * 0.5 + 0.5;
+            return texture2D(envPosY, uv).rgb;
+        }
+        uv = vec2(r.x, -r.z) / a.y * 0.5 + 0.5;
+        return texture2D(envNegY, uv).rgb;
+    }
+    if (r.z >= 0.0) {
+        uv = vec2(r.x, -r.y) / a.z * 0.5 + 0.5;
+        return texture2D(envPosZ, uv).rgb;
+    }
+    uv = vec2(-r.x, -r.y) / a.z * 0.5 + 0.5;
+    return texture2D(envNegZ, uv).rgb;
+}
 #endif
 
 #ifdef SOFT_PARTICLES
@@ -58,16 +92,12 @@ void main() {
     float NdotL = max(dot(N, L), 0.0);
     vec3 litColor = ambientColor + lightColor * NdotL;
 
-    // Matches Babylon StandardMaterial's default lit diffuse term, then adds
-    // cubic reflection the same way default.fragment does for REFLECTIONMAP_CUBIC:
-    // reflect(normalize(worldPos - eye), N), sample cube, scale by level.
     vec3 color = baseColor.rgb * litColor;
 
-#ifdef USE_ENVMAP
+#ifdef USE_ENVMAP_FACES
     vec3 viewDir = normalize(vWorldPos - eyePosition);
     vec3 reflectionCoords = reflect(viewDir, N);
-    vec3 reflectionColor = textureCube(reflectionCube, reflectionCoords).rgb * reflectionLevel;
-    color += reflectionColor;
+    color += sampleEnvFaces(reflectionCoords) * reflectionLevel;
 #endif
 
     gl_FragColor = vec4(color, baseColor.a);

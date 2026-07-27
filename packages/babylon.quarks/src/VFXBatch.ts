@@ -35,6 +35,7 @@ export interface StoredBatchSettings {
     texture: any;
     reflectionTexture: BaseTexture | null;
     reflectionLevel: number;
+    reflectionFaces: BaseTexture[] | null;
     layerMask: number;
 }
 
@@ -71,6 +72,7 @@ export abstract class VFXBatch {
             texture: settings.texture,
             reflectionTexture: settings.reflectionTexture ?? null,
             reflectionLevel: settings.reflectionLevel ?? 1,
+            reflectionFaces: settings.reflectionFaces ?? null,
             layerMask: settings.layerMask,
         };
         this.mesh = new Mesh('vfxBatch', scene);

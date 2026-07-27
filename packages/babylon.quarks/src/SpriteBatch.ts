@@ -156,29 +156,35 @@ export class SpriteBatch extends VFXBatch {
         if (this.settings.texture) {
             defines.push('USE_MAP');
         }
-        // Only sample the cubemap once it is GPU-complete. Binding/sampling an
-        // incomplete cube (or one whose mip chain never finished) raises
-        // GL_INVALID_OPERATION (1282) on iOS WebKit and the draw is dropped —
-        // particles keep ticking but nothing appears.
-        const reflectionTexture = this.settings.reflectionTexture;
-        const envPending =
+        // Prefer six 2D cube faces over samplerCube. Cube sampling through
+        // ShaderMaterial raises GL_INVALID_OPERATION on iOS WebKit (draw dropped
+        // while the particle count still moves).
+        const faces = this.settings.reflectionFaces;
+        const facesPending =
             this.settings.renderMode === RenderMode.Mesh &&
-            !!reflectionTexture &&
-            reflectionTexture.isCube &&
-            !reflectionTexture.isReady();
-        if (envPending && reflectionTexture) {
-            const onLoad = (reflectionTexture as {onLoadObservable?: {addOnce: (cb: () => void) => void}}).onLoadObservable;
-            onLoad?.addOnce(() => {
-                this.rebuildMaterial();
-            });
+            !!faces &&
+            faces.length === 6 &&
+            faces.some((face) => !face.isReady());
+        if (facesPending && faces) {
+            for (const face of faces) {
+                if (face.isReady()) {
+                    continue;
+                }
+                const onLoad = (face as {onLoadObservable?: {addOnce: (cb: () => void) => void}}).onLoadObservable;
+                onLoad?.addOnce(() => {
+                    if (faces.every((entry) => entry.isReady())) {
+                        this.rebuildMaterial();
+                    }
+                });
+            }
         }
-        const useEnvMap =
+        const useEnvFaces =
             this.settings.renderMode === RenderMode.Mesh &&
-            !!reflectionTexture &&
-            reflectionTexture.isCube &&
-            reflectionTexture.isReady();
-        if (useEnvMap) {
-            defines.push('USE_ENVMAP');
+            !!faces &&
+            faces.length === 6 &&
+            faces.every((face) => face.isReady());
+        if (useEnvFaces) {
+            defines.push('USE_ENVMAP_FACES');
         }
         if (this.settings.uTileCount > 1 || this.settings.vTileCount > 1) {
             defines.push('UV_TILE');
@@ -220,8 +226,8 @@ export class SpriteBatch extends VFXBatch {
         if (this.settings.texture) {
             samplers.push('map');
         }
-        if (useEnvMap) {
-            samplers.push('reflectionCube');
+        if (useEnvFaces) {
+            samplers.push('envPosX', 'envPosY', 'envPosZ', 'envNegX', 'envNegY', 'envNegZ');
             uniforms.push('eyePosition');
             uniforms.push('reflectionLevel');
         }
@@ -257,8 +263,11 @@ export class SpriteBatch extends VFXBatch {
         if (this.settings.texture) {
             mat.setTexture('map', this.settings.texture);
         }
-        if (useEnvMap && this.settings.reflectionTexture) {
-            mat.setTexture('reflectionCube', this.settings.reflectionTexture);
+        if (useEnvFaces && faces) {
+            const faceNames = ['envPosX', 'envPosY', 'envPosZ', 'envNegX', 'envNegY', 'envNegZ'] as const;
+            for (let i = 0; i < 6; i++) {
+                mat.setTexture(faceNames[i], faces[i]);
+            }
             mat.setFloat('reflectionLevel', this.settings.reflectionLevel);
             const eyePosition = new BVector3();
             mat.onBindObservable.add(() => {
