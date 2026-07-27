@@ -299,7 +299,14 @@ export class QuarksLoader {
         for (const texDef of textures) {
             const imageUrl = images[texDef.image];
             if (imageUrl) {
-                const texture = new Texture(imageUrl, this.scene);
+                const invertY = texDef.invertY !== undefined ? !!texDef.invertY : true;
+                const noMipmap = !!texDef.noMipmap;
+                const texture = new Texture(imageUrl, this.scene, {
+                    noMipmap,
+                    invertY,
+                    samplingMode:
+                        typeof texDef.samplingMode === 'number' ? texDef.samplingMode : undefined,
+                });
                 if (Array.isArray(texDef.wrap)) {
                     texture.wrapU = this.mapWrapMode(texDef.wrap[0]);
                     texture.wrapV = this.mapWrapMode(texDef.wrap[1] ?? texDef.wrap[0]);
@@ -352,6 +359,14 @@ export class QuarksLoader {
             const textureRef = matDef.map ?? matDef.texture;
             if (textureRef) {
                 matInfo.texture = meta.textures[textureRef] || null;
+            }
+
+            const reflectionAtlasRef = matDef.reflectionAtlas;
+            if (reflectionAtlasRef) {
+                matInfo.reflectionAtlas = meta.textures[reflectionAtlasRef] || null;
+            }
+            if (typeof matDef.reflectionLevel === 'number') {
+                matInfo.reflectionLevel = matDef.reflectionLevel;
             }
 
             // QuarksMaterial (what ParticleSystem.ensureMaterialMeta emits) writes `alphaMode`

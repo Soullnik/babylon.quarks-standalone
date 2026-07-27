@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using UnityEditor;
 using UnityEngine;
+using UnityEngine.Rendering;
 
 namespace BabylonQuarks.UnityExporter
 {
@@ -63,6 +64,15 @@ namespace BabylonQuarks.UnityExporter
             string textureUuid = tex != null ? AddTexture(tex) : null;
             LastBlendMode = DetectBlend(mat);
 
+            string reflectionAtlasUuid = null;
+            float reflectionLevel = 1f;
+            Cubemap cube = FindReflectionCubemap(mat);
+            if (cube != null)
+            {
+                reflectionAtlasUuid = AddCubemapAtlas(cube);
+                reflectionLevel = ReadReflectionLevel(mat);
+            }
+
             string uuid = NewId("quarks_material");
             var m = new JObject()
                 .Set("uuid", uuid)
@@ -79,11 +89,16 @@ namespace BabylonQuarks.UnityExporter
                 m.Set("texture", textureUuid);
                 m.Set("map", textureUuid);
             }
+            if (reflectionAtlasUuid != null)
+            {
+                m.Set("reflectionAtlas", reflectionAtlasUuid);
+                m.Set("reflectionLevel", reflectionLevel);
+            }
             Materials.Add(m);
             return uuid;
         }
 
-        private string AddTexture(Texture tex)
+        private string AddTexture(Texture tex, bool envAtlas = false)
         {
             string url = ResolveTextureUrl(tex);
             if (!_imageByUrl.TryGetValue(url, out var imageUuid))
@@ -93,12 +108,207 @@ namespace BabylonQuarks.UnityExporter
                 Images.Add(new JObject().Set("uuid", imageUuid).Set("url", url));
             }
             string texUuid = NewId("quarks_texture");
-            Textures.Add(new JObject()
+            var t = new JObject()
                 .Set("uuid", texUuid)
                 .Set("name", tex.name)
                 .Set("image", imageUuid)
-                .Set("wrap", new JArray().Add(1001).Add(1001)));
+                .Set("wrap", new JArray().Add(1001).Add(1001));
+            if (envAtlas)
+            {
+                // Match babylon.quarks env-atlas sampling (invertY:false, no mips).
+                t.Set("invertY", false);
+                t.Set("noMipmap", true);
+            }
+            Textures.Add(t);
             return texUuid;
+        }
+
+        /// <summary>
+        /// Finds a cubemap on the particle material (common shader property names).
+        /// </summary>
+        private static Cubemap FindReflectionCubemap(Material mat)
+        {
+            if (mat == null) return null;
+            string[] names = {
+                "_Cube", "_Cubemap", "_ReflectionCubemap", "_EnvMap",
+                "_EnvironmentMap", "_SpecCube0", "_ReflectionTex"
+            };
+            foreach (string name in names)
+            {
+                if (!mat.HasProperty(name)) continue;
+                Texture t = mat.GetTexture(name);
+                if (t is Cubemap cube) return cube;
+            }
+            // Any cubemap-typed texture property (custom shaders).
+            foreach (string name in mat.GetTexturePropertyNames())
+            {
+                Texture t = mat.GetTexture(name);
+                if (t is Cubemap cube) return cube;
+            }
+            return null;
+        }
+
+        private static float ReadReflectionLevel(Material mat)
+        {
+            if (mat == null) return 1f;
+            string[] names = { "_ReflectionIntensity", "_ReflectionStrength", "_EnvIntensity" };
+            foreach (string name in names)
+            {
+                if (!mat.HasProperty(name)) continue;
+                return mat.GetFloat(name);
+            }
+            return 1f;
+        }
+
+        /// <summary>
+        /// Bakes a Cubemap into a 3×2 atlas (px py pz / nx ny nz) and embeds it.
+        /// </summary>
+        private string AddCubemapAtlas(Cubemap cube)
+        {
+            Texture2D atlas = BakeCubemapToAtlas(cube);
+            if (atlas == null) return null;
+            try
+            {
+                atlas.name = cube.name + "_envAtlas";
+                return AddTexture(atlas, envAtlas: true);
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(atlas);
+            }
+        }
+
+        /// <summary>
+        /// Packs cubemap faces into one Texture2D matching babylon.quarks USE_ENVMAP_ATLAS layout.
+        /// </summary>
+        private static Texture2D BakeCubemapToAtlas(Cubemap cube)
+        {
+            if (cube == null || cube.width <= 0) return null;
+
+            // Cap face size so embedded JSON stays reasonable.
+            int srcSize = cube.width;
+            int size = Math.Min(srcSize, 256);
+            var atlas = new Texture2D(size * 3, size * 2, TextureFormat.RGBA32, false, false);
+            CubemapFace[] faces = {
+                CubemapFace.PositiveX, CubemapFace.PositiveY, CubemapFace.PositiveZ,
+                CubemapFace.NegativeX, CubemapFace.NegativeY, CubemapFace.NegativeZ
+            };
+
+            for (int i = 0; i < 6; i++)
+            {
+                Texture2D faceTex = ReadCubemapFace(cube, faces[i], size);
+                if (faceTex == null)
+                {
+                    Debug.LogWarning($"[Quarks Exporter] Could not read cubemap face {faces[i]} from '{cube.name}'");
+                    UnityEngine.Object.DestroyImmediate(atlas);
+                    return null;
+                }
+                try
+                {
+                    // Texture2D y=0 is bottom; canvas-style atlas has +faces on the top row.
+                    // Place +faces (i=0..2) at top → high y, -faces at bottom → y=0.
+                    int x = (i % 3) * size;
+                    int y = (i < 3) ? size : 0;
+                    atlas.SetPixels(x, y, size, size, faceTex.GetPixels());
+                }
+                finally
+                {
+                    UnityEngine.Object.DestroyImmediate(faceTex);
+                }
+            }
+            atlas.Apply(false, false);
+            return atlas;
+        }
+
+        /// <summary>
+        /// Reads one cubemap face into a readable Texture2D, via GetPixels or GPU blit.
+        /// </summary>
+        private static Texture2D ReadCubemapFace(Cubemap cube, CubemapFace face, int size)
+        {
+            // Prefer CPU read when the cubemap is readable.
+            try
+            {
+                Color[] pixels = cube.GetPixels(face);
+                if (pixels != null && pixels.Length > 0)
+                {
+                    int faceSize = cube.width;
+                    var full = new Texture2D(faceSize, faceSize, TextureFormat.RGBA32, false, false);
+                    full.SetPixels(pixels);
+                    full.Apply(false, false);
+                    if (faceSize == size) return full;
+                    Texture2D scaled = ScaleTexture(full, size);
+                    UnityEngine.Object.DestroyImmediate(full);
+                    return scaled;
+                }
+            }
+            catch
+            {
+                // Non-readable cubemap — fall through to GPU blit.
+            }
+
+            RenderTexture previous = RenderTexture.active;
+            int faceSize = cube.width;
+            RenderTexture rt = RenderTexture.GetTemporary(
+                faceSize, faceSize, 0, RenderTextureFormat.ARGB32, RenderTextureReadWrite.sRGB);
+            Texture2D readable = null;
+            try
+            {
+                int faceIndex = (int)face;
+                if (SystemInfo.copyTextureSupport == CopyTextureSupport.None)
+                {
+                    Debug.LogWarning($"[Quarks Exporter] CopyTexture unsupported; cannot bake cubemap '{cube.name}'");
+                    return null;
+                }
+                var faceTex = new Texture2D(faceSize, faceSize, TextureFormat.RGBA32, false, false);
+                try
+                {
+                    Graphics.CopyTexture(cube, faceIndex, 0, faceTex, 0, 0);
+                }
+                catch (Exception e)
+                {
+                    UnityEngine.Object.DestroyImmediate(faceTex);
+                    Debug.LogWarning($"[Quarks Exporter] Could not CopyTexture cubemap face {face}: {e.Message}");
+                    return null;
+                }
+                if (faceSize == size)
+                {
+                    return faceTex;
+                }
+                Texture2D scaled = ScaleTexture(faceTex, size);
+                UnityEngine.Object.DestroyImmediate(faceTex);
+                return scaled;
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning($"[Quarks Exporter] Could not blit cubemap face {face}: {e.Message}");
+                if (readable != null) UnityEngine.Object.DestroyImmediate(readable);
+                return null;
+            }
+            finally
+            {
+                RenderTexture.active = previous;
+                RenderTexture.ReleaseTemporary(rt);
+            }
+        }
+
+        private static Texture2D ScaleTexture(Texture2D source, int size)
+        {
+            RenderTexture previous = RenderTexture.active;
+            RenderTexture rt = RenderTexture.GetTemporary(size, size, 0, RenderTextureFormat.ARGB32, RenderTextureReadWrite.sRGB);
+            try
+            {
+                Graphics.Blit(source, rt);
+                RenderTexture.active = rt;
+                var scaled = new Texture2D(size, size, TextureFormat.RGBA32, false, false);
+                scaled.ReadPixels(new Rect(0, 0, size, size), 0, 0);
+                scaled.Apply(false, false);
+                return scaled;
+            }
+            finally
+            {
+                RenderTexture.active = previous;
+                RenderTexture.ReleaseTemporary(rt);
+            }
         }
 
         private string ResolveTextureUrl(Texture tex)
@@ -211,6 +421,19 @@ namespace BabylonQuarks.UnityExporter
                 var uvs = new JArray();
                 foreach (var t in uv) { uvs.Add(t.x); uvs.Add(t.y); }
                 g.Set("uvs", uvs);
+            }
+
+            Vector3[] normals = mesh.normals;
+            if (normals == null || normals.Length == 0)
+            {
+                mesh.RecalculateNormals();
+                normals = mesh.normals;
+            }
+            if (normals != null && normals.Length > 0)
+            {
+                var n = new JArray();
+                foreach (var v in normals) { n.Add(v.x); n.Add(v.y); n.Add(v.z); }
+                g.Set("normals", n);
             }
             Geometries.Add(g);
             return uuid;

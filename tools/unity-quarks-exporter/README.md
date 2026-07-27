@@ -77,7 +77,7 @@ death-triggered spark sub-emitter).
 | **Collision** | `ApplyCollision` (bounce; collider is host-provided) |
 | **Texture Sheet Animation** | tiles U/V, start tile, `FrameOverLife` sweep |
 | **Sub Emitters** | child systems wired via `EmitSubParticleSystem` (birth/death → quarks modes) |
-| **Renderer** | render mode (billboard ×4 / stretched / mesh), sort order, mesh geometry, material blend mode + main texture (embedded) |
+| **Renderer** | render mode (billboard ×4 / stretched / mesh), sort order, mesh geometry (positions / indices / uvs / **normals**), material blend mode + main texture (embedded), optional **reflectionAtlas** (3×2 cubemap bake) + reflectionLevel when the material has a Cubemap |
 
 Curves convert per-segment with a Hermite→Bézier transform so tangents are preserved; Unity
 gradients sample both color and alpha keys.
@@ -99,6 +99,10 @@ gradients sample both color and alpha keys.
   sheet; Unity's `frameOverTime` curve / cycle semantics aren't mapped 1:1.
 - **Blend mode** is inferred from the material's shader name / `_DstBlend`; unusual custom shaders
   default to alpha blend.
+- **Mesh env map:** if the particle material exposes a Cubemap (`_Cube`, `_Cubemap`,
+  `_ReflectionCubemap`, …, or any Cubemap-typed texture property), it is baked into a 3×2
+  `reflectionAtlas` (px py pz / nx ny nz) so babylon.quarks can sample reflections on iOS.
+  Materials without a cubemap export lit/diffuse only. Skybox is not used as a fallback.
 - Modules with no quarks counterpart (Lights, Trails ribbon, Custom Data, Collision triggers) are
   skipped.
 

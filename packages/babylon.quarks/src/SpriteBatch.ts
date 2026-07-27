@@ -6,6 +6,7 @@ import {ShaderMaterial} from '@babylonjs/core/Materials/shaderMaterial';
 import {Scene} from '@babylonjs/core/scene';
 import {Constants} from '@babylonjs/core/Engines/constants';
 import {Vector2 as BVector2, Vector3 as BVector3, Vector4 as BVector4} from '@babylonjs/core/Maths/math.vector';
+import {RawTexture} from '@babylonjs/core/Materials/Textures/rawTexture';
 import {
     Vector3,
     Vector4,
@@ -31,6 +32,18 @@ import local_particle_physics_vert_wgsl from './shaders/local_particle_physics_v
 import {registerShaders, shaderLanguageFor, ShaderSources} from './shaders/shaderLanguageSupport';
 
 export class SpriteBatch extends VFXBatch {
+    private static whiteTextureByScene = new WeakMap<Scene, RawTexture>();
+
+    /** 1×1 white map so mesh batches always have a sampler2D (iOS WebKit). */
+    private static whiteTexture(scene: Scene): RawTexture {
+        let texture = SpriteBatch.whiteTextureByScene.get(scene);
+        if (!texture) {
+            texture = RawTexture.CreateRGBATexture(new Uint8Array([255, 255, 255, 255]), 1, 1, scene);
+            texture.name = 'quarksMeshWhite';
+            SpriteBatch.whiteTextureByScene.set(scene, texture);
+        }
+        return texture;
+    }
     private offsetBuffer!: Float32Array;
     private rotationBuffer!: Float32Array;
     private sizeBuffer!: Float32Array;
@@ -63,8 +76,14 @@ export class SpriteBatch extends VFXBatch {
         const vertexData = new VertexData();
         vertexData.positions = this.settings.instancingGeometry;
         vertexData.indices = this.settings.instancingIndices;
-        if (this.settings.instancingUVs) {
-            vertexData.uvs = this.settings.instancingUVs;
+        const vertexCount = this.settings.instancingGeometry.length / 3;
+        const uvs = this.settings.instancingUVs;
+        // WebGL (especially iOS) raises INVALID_OPERATION if the shader reads
+        // `attribute vec2 uv` but the buffer is missing or shorter than vertices.
+        if (uvs && uvs.length >= vertexCount * 2) {
+            vertexData.uvs = uvs;
+        } else {
+            vertexData.uvs = new Float32Array(vertexCount * 2);
         }
         if (this.settings.instancingNormals) {
             vertexData.normals = this.settings.instancingNormals;
@@ -153,8 +172,25 @@ export class SpriteBatch extends VFXBatch {
             fragmentShader = {glsl: particle_frag, wgsl: particle_frag_wgsl};
         }
 
-        if (this.settings.texture) {
+        // Mesh batches without a diffuse map still need a sampler2D on iOS WebKit —
+        // a zero-sampler particle mesh effect often never becomes drawable there.
+        const mapTexture =
+            this.settings.texture ??
+            (this.settings.renderMode === RenderMode.Mesh ? SpriteBatch.whiteTexture(this.scene) : null);
+        if (mapTexture) {
             defines.push('USE_MAP');
+        }
+        const atlas = this.settings.reflectionAtlas;
+        const atlasPending = this.settings.renderMode === RenderMode.Mesh && !!atlas && !atlas.isReady();
+        if (atlasPending && atlas) {
+            const onLoad = (atlas as {onLoadObservable?: {addOnce: (cb: () => void) => void}}).onLoadObservable;
+            onLoad?.addOnce(() => {
+                this.rebuildMaterial();
+            });
+        }
+        const useEnvAtlas = this.settings.renderMode === RenderMode.Mesh && !!atlas && atlas.isReady();
+        if (useEnvAtlas) {
+            defines.push('USE_ENVMAP_ATLAS');
         }
         if (this.settings.uTileCount > 1 || this.settings.vTileCount > 1) {
             defines.push('UV_TILE');
@@ -193,8 +229,13 @@ export class SpriteBatch extends VFXBatch {
             uniforms.push('tileCountX');
             uniforms.push('tileCountY');
         }
-        if (this.settings.texture) {
+        if (mapTexture) {
             samplers.push('map');
+        }
+        if (useEnvAtlas) {
+            samplers.push('envAtlas');
+            uniforms.push('eyePosition');
+            uniforms.push('reflectionLevel');
         }
         if (this.settings.renderMode === RenderMode.StretchedBillBoard) {
             uniforms.push('speedFactor');
@@ -225,8 +266,21 @@ export class SpriteBatch extends VFXBatch {
             }
         );
 
-        if (this.settings.texture) {
-            mat.setTexture('map', this.settings.texture);
+        if (mapTexture) {
+            mat.setTexture('map', mapTexture);
+        }
+        if (useEnvAtlas && atlas) {
+            mat.setTexture('envAtlas', atlas);
+            mat.setFloat('reflectionLevel', this.settings.reflectionLevel);
+            const eyePosition = new BVector3();
+            mat.onBindObservable.add(() => {
+                const camera = this.scene.activeCamera;
+                if (!camera) {
+                    return;
+                }
+                eyePosition.copyFrom(camera.globalPosition);
+                mat.setVector3('eyePosition', eyePosition);
+            });
         }
         if (this.settings.uTileCount > 1 || this.settings.vTileCount > 1) {
             mat.setFloat('tileCountX', this.settings.uTileCount);

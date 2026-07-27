@@ -375,6 +375,7 @@ if (window.location.hash) {
 }
 
 setupJsonImportUi();
+
 loadDemo(demoIndex);
 
 engine.runRenderLoop(() => {

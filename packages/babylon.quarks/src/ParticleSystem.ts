@@ -1,5 +1,6 @@
 import {Scene} from '@babylonjs/core/scene';
 import {Texture} from '@babylonjs/core/Materials/Textures/texture';
+import {BaseTexture} from '@babylonjs/core/Materials/Textures/baseTexture';
 import {Constants} from '@babylonjs/core/Engines/constants';
 import {
     AxisAngleGenerator,
@@ -45,6 +46,7 @@ import {ParticleEmitter} from './ParticleEmitter';
 import {RenderMode} from './VFXBatch';
 import {BatchedRenderer, VFXBatchSettings} from './BatchedRenderer';
 import {ensureTriangleIndices} from './geometryUtil';
+import {ensureEnvAtlasFromCube, getCachedEnvAtlas} from './envAtlas';
 
 export interface BurstParameters {
     time: number;
@@ -72,6 +74,11 @@ const DEFAULT_POSITIONS = new Float32Array([
     -0.5,  0.5, 0,
 ]);
 const DEFAULT_UVS = new Float32Array([0, 0, 1, 0, 1, 1, 0, 1]);
+
+/** Zero UVs sized to a position buffer — missing/mismatched uv attrs → GL_INVALID_OPERATION on iOS. */
+function fallbackUVsForPositions(positions: Float32Array): Float32Array {
+    return new Float32Array((positions.length / 3) * 2);
+}
 const DEFAULT_INDICES = new Uint32Array([0, 1, 2, 0, 2, 3]);
 
 export interface ParticleSystemParameters {
@@ -225,6 +232,7 @@ export class ParticleSystem implements IParticleSystem {
     private listeners: {[event: string]: Array<(event: ParticleSystemEvent) => void>} = {};
     private readonly layerMaskProxy: {mask: number};
     private materialRef: any = null;
+    private sceneRef: Scene | undefined;
     private qualityFactor = 1;
     private simulationAccumulator = 0;
     private destroyed = false;
@@ -434,6 +442,7 @@ export class ParticleSystem implements IParticleSystem {
     }
 
     constructor(parameters: ParticleSystemParameters) {
+        this.sceneRef = parameters.scene;
         this.layerMaskProxy = {mask: parameters.layerMask ?? 0x0FFFFFFF};
         Object.defineProperty(this.layerMaskProxy, 'mask', {
             enumerable: true,
@@ -475,7 +484,11 @@ export class ParticleSystem implements IParticleSystem {
         this.rendererSettings = {
             instancingGeometry: parameters.instancingGeometry ?? DEFAULT_POSITIONS,
             instancingIndices: parameters.instancingIndices ?? DEFAULT_INDICES,
-            instancingUVs: parameters.instancingUVs ?? DEFAULT_UVS,
+            instancingUVs:
+                parameters.instancingUVs ??
+                (parameters.instancingGeometry
+                    ? fallbackUVsForPositions(parameters.instancingGeometry)
+                    : DEFAULT_UVS),
             instancingNormals: parameters.instancingNormals,
             renderMode: parameters.renderMode ?? RenderMode.BillBoard,
             renderOrder: parameters.renderOrder ?? 0,
@@ -491,6 +504,10 @@ export class ParticleSystem implements IParticleSystem {
             materialDepthWrite: parameters.depthWrite ?? false,
             materialAlphaTest: parameters.alphaTest ?? 0,
             texture: parameters.texture ?? null,
+            reflectionTexture: null,
+            reflectionLevel: 1,
+            reflectionFaces: null,
+            reflectionAtlas: null,
             layerMask: parameters.layerMask ?? 0x0FFFFFFF,
         };
         if (this.rendererSettings.renderMode === RenderMode.Mesh && !this.rendererSettings.instancingNormals) {
@@ -545,6 +562,7 @@ export class ParticleSystem implements IParticleSystem {
             depthWrite?: boolean;
             alphaTest?: number;
             texture?: Texture | null;
+            reflectionAtlas?: BaseTexture | null;
             layerMask?: number;
         } = {}
     ) {
@@ -563,6 +581,13 @@ export class ParticleSystem implements IParticleSystem {
                     material?.baseTexture ??
                     this.rendererSettings.texture ??
                     null);
+        const resolvedReflection =
+            material?.reflectionTexture ??
+            material?.environmentTexture ??
+            this.rendererSettings.reflectionTexture ??
+            null;
+        const resolvedReflectionLevel =
+            typeof resolvedReflection?.level === 'number' ? resolvedReflection.level : 1;
         const resolvedBlendMode =
             overrides.blendMode ??
             (typeof material?.alphaMode === 'number' ? material.alphaMode : this.rendererSettings.materialBlendMode);
@@ -587,13 +612,58 @@ export class ParticleSystem implements IParticleSystem {
                     : this.rendererSettings.materialDepthWrite);
         const resolvedAlphaTest =
             overrides.alphaTest ??
-            (typeof material?.alphaCutOff === 'number'
-                ? material.alphaCutOff
-                : typeof material?.alphaCutOffValue === 'number'
-                    ? material.alphaCutOffValue
-                    : this.rendererSettings.materialAlphaTest);
+            (() => {
+                // StandardMaterial always has alphaCutOff (default 0.4). Only treat it as
+                // particle alpha-test when the material is actually in an alpha-test mode —
+                // otherwise Mesh Material demos wrongly enable USE_ALPHATEST.
+                const mode = material?.transparencyMode;
+                const alphaTestMode = mode === 1 || mode === 3;
+                if (alphaTestMode && typeof material?.alphaCutOff === 'number') {
+                    return material.alphaCutOff;
+                }
+                if (alphaTestMode && typeof material?.alphaCutOffValue === 'number') {
+                    return material.alphaCutOffValue;
+                }
+                if (material) {
+                    return 0;
+                }
+                return this.rendererSettings.materialAlphaTest;
+            })();
 
         this.rendererSettings.texture = resolvedTexture;
+        this.rendererSettings.reflectionTexture = resolvedReflection;
+        this.rendererSettings.reflectionLevel =
+            typeof material?.reflectionLevel === 'number'
+                ? material.reflectionLevel
+                : resolvedReflectionLevel;
+        // Prefer an explicit atlas; otherwise build a 3×2 atlas from CubeTexture
+        // face URLs (iOS-safe single sampler2D — not samplerCube / six faces).
+        let resolvedAtlas =
+            material?.reflectionAtlas ??
+            overrides.reflectionAtlas ??
+            this.rendererSettings.reflectionAtlas ??
+            null;
+        if (!resolvedAtlas && resolvedReflection?.isCube) {
+            resolvedAtlas = getCachedEnvAtlas(resolvedReflection);
+            if (!resolvedAtlas && this.sceneRef) {
+                ensureEnvAtlasFromCube(resolvedReflection, this.sceneRef, (atlas) => {
+                    if (this.rendererSettings.reflectionAtlas === atlas) {
+                        return;
+                    }
+                    this.rendererSettings.reflectionAtlas = atlas;
+                    if (material && material.reflectionAtlas == null) {
+                        material.reflectionAtlas = atlas;
+                    }
+                    this.neededToUpdateRender = true;
+                });
+                resolvedAtlas = getCachedEnvAtlas(resolvedReflection);
+            }
+        }
+        this.rendererSettings.reflectionAtlas = resolvedAtlas;
+        // Do not expand cube files into six face textures anymore — that path
+        // still trips GL_INVALID_OPERATION on iOS. Prefer a single atlas.
+        this.rendererSettings.reflectionFaces =
+            material?.reflectionFaces?.length === 6 ? material.reflectionFaces : null;
         this.rendererSettings.materialBlendMode = resolvedBlendMode;
         this.rendererSettings.materialTransparent = resolvedTransparent;
         this.rendererSettings.materialDepthTest = resolvedDepthTest;
@@ -1374,6 +1444,13 @@ export class ParticleSystem implements IParticleSystem {
             meta.textures[textureUUID] = texture;
         }
 
+        const reflectionAtlas = this.rendererSettings.reflectionAtlas;
+        let reflectionAtlasUUID: string | undefined;
+        if (reflectionAtlas instanceof Texture) {
+            reflectionAtlasUUID = ParticleSystem.nextSerializationId('quarks_texture');
+            meta.textures[reflectionAtlasUUID] = reflectionAtlas;
+        }
+
         const materialUUID = ParticleSystem.nextSerializationId('quarks_material');
         meta.materials[materialUUID] = {
             uuid: materialUUID,
@@ -1384,6 +1461,8 @@ export class ParticleSystem implements IParticleSystem {
             depthWrite: this.rendererSettings.materialDepthWrite,
             alphaTest: this.rendererSettings.materialAlphaTest,
             texture: textureUUID,
+            reflectionAtlas: reflectionAtlasUUID,
+            reflectionLevel: this.rendererSettings.reflectionLevel,
             sourceMaterial: this.materialRef ?? undefined,
         };
         return materialUUID;
