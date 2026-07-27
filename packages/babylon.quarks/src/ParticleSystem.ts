@@ -66,6 +66,13 @@ const tempV2 = new Vector3();
 const PREWARM_FPS = 60;
 const SIMULATION_STEP = 1 / PREWARM_FPS;
 const MAX_SIMULATION_STEPS_PER_FRAME = 8;
+// Math.round() breaks an exact tie (accumulator sitting at precisely half a
+// step) by rounding up. At exactly 120Hz that tie is not a corner case — it is
+// every single frame — and rounding it up would run a step on every one of
+// them instead of every other one. Nudging the tie down costs nothing on a
+// real display (real frame times essentially never land on the tie exactly)
+// and keeps the well-tested "half a step is no step yet" behavior.
+const ROUND_TIE_BIAS = 1e-9;
 
 const DEFAULT_POSITIONS = new Float32Array([
     -0.5, -0.5, 0,
@@ -898,7 +905,7 @@ export class ParticleSystem implements IParticleSystem {
             this.simulationAccumulator += delta;
             const stepsToRun = Math.min(
                 MAX_SIMULATION_STEPS_PER_FRAME,
-                Math.floor((this.simulationAccumulator + 1e-9) / SIMULATION_STEP)
+                Math.max(0, Math.round(this.simulationAccumulator / SIMULATION_STEP - ROUND_TIE_BIAS))
             );
             this.simulationAccumulator -= stepsToRun * SIMULATION_STEP;
             return;
@@ -943,7 +950,7 @@ export class ParticleSystem implements IParticleSystem {
         this.simulationAccumulator += delta;
         const stepsToRun = Math.min(
             MAX_SIMULATION_STEPS_PER_FRAME,
-            Math.floor((this.simulationAccumulator + 1e-9) / SIMULATION_STEP)
+            Math.max(0, Math.round(this.simulationAccumulator / SIMULATION_STEP - ROUND_TIE_BIAS))
         );
         for (let i = 0; i < stepsToRun; i++) {
             this.simulateStep(SIMULATION_STEP);
@@ -952,8 +959,9 @@ export class ParticleSystem implements IParticleSystem {
     }
 
     /**
-     * Time the display is ahead of the simulation, in seconds, always less than
-     * one step.
+     * Time the display is ahead of (positive) or still ahead of the simulation
+     * (negative — the simulation ran a hair early), in seconds. Magnitude never
+     * exceeds one step.
      *
      * The simulation runs on a fixed 1/60 step so that emission and lifetimes
      * stay in phase — without it a slow emitter flickers when the frame rate
@@ -961,6 +969,16 @@ export class ParticleSystem implements IParticleSystem {
      * anything other than exactly 60Hz leaves some frames with no step at all
      * (half of them at 120Hz, three in five at 144Hz) and others with two, so
      * the particles are drawn stuttering even while the frame rate is perfect.
+     *
+     * The steps-per-frame count below is chosen by *rounding* the accumulated
+     * time to the nearest step, not flooring it. Flooring always leaves the
+     * accumulator positive, and when the real frame rate sits very close to
+     * 60Hz (as most displays do) that leftover creeps toward a full step for
+     * many consecutive frames before tipping over into a frame that runs two
+     * steps at once and resets it to near zero — a visible lurch, every particle
+     * in the system at once, with a perfectly steady frame rate the whole time.
+     * Rounding lets the leftover go negative instead, which keeps it centered
+     * near zero and stops it from ever building up toward that reset.
      *
      * Renderers close the gap by advancing what they draw along each particle's
      * velocity by this much. That reproduces the straight-line part of the
@@ -976,9 +994,11 @@ export class ParticleSystem implements IParticleSystem {
         if (this.paused) {
             return 0;
         }
-        // Never more than a step, even if a frame long enough to hit the
-        // per-frame step cap left the accumulator with time it could not spend.
-        return this.simulationAccumulator < SIMULATION_STEP ? this.simulationAccumulator : SIMULATION_STEP;
+        // Magnitude never more than a step, even if a frame long enough to hit
+        // the per-frame step cap left the accumulator with more than that.
+        if (this.simulationAccumulator > SIMULATION_STEP) return SIMULATION_STEP;
+        if (this.simulationAccumulator < -SIMULATION_STEP) return -SIMULATION_STEP;
+        return this.simulationAccumulator;
     }
 
     /**

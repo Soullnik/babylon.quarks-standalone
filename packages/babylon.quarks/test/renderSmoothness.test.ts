@@ -111,7 +111,7 @@ describe('render-time smoothness', () => {
         renderer.dispose();
     });
 
-    it('draws where wall-clock time says, while the simulation lags behind', () => {
+    it('draws where wall-clock time says, while the simulation stays within a step of it', () => {
         const {system, renderer} = setup();
         const startZ = drawnZ(renderer);
         let elapsed = 0;
@@ -119,10 +119,12 @@ describe('render-time smoothness', () => {
             const delta = 1 / 90;
             renderer.update(delta);
             elapsed += delta;
-            // The drawn position tracks wall-clock time, while the simulated one
-            // lags by up to a step.
+            // The drawn position tracks wall-clock time. The simulated one is
+            // rounded to the nearest step rather than floored (see
+            // simulationResidual), so it can sit slightly ahead of wall-clock
+            // time as well as behind — but never by more than one step either way.
             expect(drawnZ(renderer) - startZ).toBeCloseTo(elapsed * SPEED, 5);
-            expect(system.particles[0].position.z).toBeLessThanOrEqual(drawnZ(renderer) + 1e-6);
+            expect(Math.abs(system.particles[0].position.z - drawnZ(renderer))).toBeLessThanOrEqual(SPEED / 60 + 1e-6);
         }
         renderer.dispose();
     });

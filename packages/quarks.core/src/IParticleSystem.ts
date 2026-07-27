@@ -109,7 +109,9 @@ export interface IParticleSystem {
     store?: ParticleStore;
     /**
      * Wall-clock time that has passed since the last simulated step, in
-     * seconds, when the implementation simulates on a fixed timestep. A
+     * seconds, when the implementation simulates on a fixed timestep. Negative
+     * when that step ran a hair ahead of real time instead (rounded to the
+     * nearest step rather than floored, so this stays small either way). A
      * renderer uses it to draw where the particles are now rather than where
      * the last step left them.
      * @type {number}

@@ -399,7 +399,7 @@ export class SpriteBatch extends VFXBatch {
             const residual = system.simulationResidual ?? 0;
             const stepFraction = residual === 0 ? 0 : residual / (system.simulationStep ?? residual);
             if (copiedColor) {
-                if (stepFraction > 0 && particleNum > 0) {
+                if (stepFraction !== 0 && particleNum > 0) {
                     SpriteBatch.continueColor(this.colorBuffer, index * 4, store!, particleNum, stepFraction);
                 } else {
                     this.colorBuffer.set(store!.color.subarray(0, particleNum * 4), index * 4);
@@ -407,12 +407,12 @@ export class SpriteBatch extends VFXBatch {
             }
             let copiedPositionAndSize = false;
             if (store !== undefined && systemWorldSpace) {
-                if (stepFraction > 0 && particleNum > 0) {
+                if (stepFraction !== 0 && particleNum > 0) {
                     SpriteBatch.extrapolate(this.offsetBuffer, index * 3, store, particleNum, stepFraction);
                 } else {
                     this.offsetBuffer.set(store.position.subarray(0, particleNum * 3), index * 3);
                 }
-                if (stepFraction > 0 && particleNum > 0) {
+                if (stepFraction !== 0 && particleNum > 0) {
                     SpriteBatch.continueVector3(this.sizeBuffer, index * 3, store.size, store.previousSize, particleNum, stepFraction);
                 } else {
                     this.sizeBuffer.set(store.size.subarray(0, particleNum * 3), index * 3);
@@ -422,7 +422,7 @@ export class SpriteBatch extends VFXBatch {
                 const base = index * 3;
                 const end = base + particleNum * 3;
                 const offsets = this.offsetBuffer;
-                if (stepFraction > 0) {
+                if (stepFraction !== 0) {
                     SpriteBatch.extrapolate(offsets, base, store!, particleNum, stepFraction);
                 } else {
                     offsets.set(store!.position.subarray(0, particleNum * 3), base);
@@ -442,7 +442,7 @@ export class SpriteBatch extends VFXBatch {
                     offsets[o + 2] = (m02 * px + m12 * py + m22 * pz + m32) * w;
                 }
                 const sizes = this.sizeBuffer;
-                if (stepFraction > 0) {
+                if (stepFraction !== 0) {
                     SpriteBatch.continueVector3(sizes, base, store!.size, store!.previousSize, particleNum, stepFraction);
                 } else {
                     sizes.set(store!.size.subarray(0, particleNum * 3), base);
