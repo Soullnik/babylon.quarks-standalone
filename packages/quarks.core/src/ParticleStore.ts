@@ -13,10 +13,42 @@
  * here would add an indirection rather than remove one.
  */
 export class ParticleStore {
+    private static readonly EMPTY = new Float32Array(0);
+
     /** Number of particle rows the arrays can hold. */
     capacity: number;
 
     position: Float32Array;
+    /**
+     * Where each particle was when the current simulation step began.
+     *
+     * The step is fixed while frames are not, so a frame is usually drawn some
+     * way past the last step. The renderer closes that gap by continuing the
+     * motion the last step produced — and the only way to know that motion for
+     * every kind of behavior, not just the ones that move a particle by its
+     * velocity, is to have kept where it started.
+     */
+    previousPosition: Float32Array;
+    /**
+     * Size and colour at the start of the current step, for the same reason as
+     * {@link previousPosition}. These are read off a curve at `age / life`
+     * rather than integrated, and at the lifetimes an explosion uses — a fifth
+     * of a second, a dozen steps in total — a whole step of fade lands on one
+     * frame and none on the next.
+     */
+    previousSize: Float32Array;
+    previousColor: Float32Array;
+    /**
+     * Velocity at the start of the current step. A stretched billboard's shape
+     * is its velocity — the streak points along it and is as long as it — so a
+     * velocity that only changes on steps makes the sprite's outline pop at the
+     * step rate even while its position moves smoothly.
+     *
+     * Empty until {@link keepPreviousVelocity} asks for it, because only that
+     * one render mode reads it and an unused column is not free: it sits
+     * between the columns that are hot and costs them their locality.
+     */
+    previousVelocity: Float32Array = ParticleStore.EMPTY;
     velocity: Float32Array;
     size: Float32Array;
     startSize: Float32Array;
@@ -42,6 +74,9 @@ export class ParticleStore {
     constructor(capacity = 64) {
         this.capacity = Math.max(1, capacity);
         this.position = new Float32Array(this.capacity * 3);
+        this.previousPosition = new Float32Array(this.capacity * 3);
+        this.previousSize = new Float32Array(this.capacity * 3);
+        this.previousColor = new Float32Array(this.capacity * 4);
         this.velocity = new Float32Array(this.capacity * 3);
         this.size = new Float32Array(this.capacity * 3);
         this.startSize = new Float32Array(this.capacity * 3);
@@ -66,6 +101,12 @@ export class ParticleStore {
             capacity *= 2;
         }
         this.position = ParticleStore.grow(this.position, capacity * 3);
+        this.previousPosition = ParticleStore.grow(this.previousPosition, capacity * 3);
+        this.previousSize = ParticleStore.grow(this.previousSize, capacity * 3);
+        if (this.previousVelocity.length > 0) {
+            this.previousVelocity = ParticleStore.grow(this.previousVelocity, capacity * 3);
+        }
+        this.previousColor = ParticleStore.grow(this.previousColor, capacity * 4);
         this.velocity = ParticleStore.grow(this.velocity, capacity * 3);
         this.size = ParticleStore.grow(this.size, capacity * 3);
         this.startSize = ParticleStore.grow(this.startSize, capacity * 3);
@@ -83,6 +124,19 @@ export class ParticleStore {
      * the live particles stay a contiguous range that a renderer can copy in one
      * go rather than gathering particle by particle.
      */
+    /**
+     * Starts keeping {@link previousVelocity}. Harmless to call every step;
+     * returns true on the call that allocated, which replaces the array and so
+     * leaves every particle's view of it pointing at the old one.
+     */
+    keepPreviousVelocity(): boolean {
+        if (this.previousVelocity.length >= this.capacity * 3) {
+            return false;
+        }
+        this.previousVelocity = new Float32Array(this.capacity * 3);
+        return true;
+    }
+
     swapRows(a: number, b: number): void {
         if (a === b) {
             return;
@@ -90,12 +144,18 @@ export class ParticleStore {
         const a3 = a * 3;
         const b3 = b * 3;
         ParticleStore.swap3(this.position, a3, b3);
+        ParticleStore.swap3(this.previousPosition, a3, b3);
+        ParticleStore.swap3(this.previousSize, a3, b3);
+        if (this.previousVelocity.length > 0) {
+            ParticleStore.swap3(this.previousVelocity, a3, b3);
+        }
         ParticleStore.swap3(this.velocity, a3, b3);
         ParticleStore.swap3(this.size, a3, b3);
         ParticleStore.swap3(this.startSize, a3, b3);
         const a4 = a * 4;
         const b4 = b * 4;
         ParticleStore.swap4(this.color, a4, b4);
+        ParticleStore.swap4(this.previousColor, a4, b4);
         ParticleStore.swap4(this.startColor, a4, b4);
         ParticleStore.swap3(this.scalars, a * ParticleStore.SCALAR_STRIDE, b * ParticleStore.SCALAR_STRIDE);
     }

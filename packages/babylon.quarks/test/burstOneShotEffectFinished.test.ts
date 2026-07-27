@@ -115,7 +115,9 @@ describe('burst one-shot effect finished', () => {
             renderer.addSystem(system);
         }
 
-        simulate(systems, 0.6);
+        // A little past the longest life in the effect, rather than exactly on
+        // it, so the assertion does not sit on the rounding.
+        simulate(systems, 0.7);
 
         expect(QuarksUtil.isEffectFinished(root)).toBe(true);
         for (const system of systems) {
@@ -129,7 +131,9 @@ describe('burst one-shot effect finished', () => {
 
     it('marks a single-burst splat finished before duration elapses', () => {
         const {root, systems} = createSingleBurstSplat();
-        simulate(systems, 0.6);
+        // A little past the longest life in the effect, rather than exactly on
+        // it, so the assertion does not sit on the rounding.
+        simulate(systems, 0.7);
 
         expect(QuarksUtil.isEffectFinished(root)).toBe(true);
         expect(systems[0].isFinished()).toBe(true);

@@ -2,7 +2,7 @@ import {TransformNode} from '@babylonjs/core/Meshes/transformNode';
 import {Scene} from '@babylonjs/core/scene';
 import {Texture} from '@babylonjs/core/Materials/Textures/texture';
 import {BaseTexture} from '@babylonjs/core/Materials/Textures/baseTexture';
-import {IParticleSystem} from 'quarks.core';
+import {EmitSubParticleSystem, IParticleSystem} from 'quarks.core';
 import {VFXBatch, RenderMode, StoredBatchSettings} from './VFXBatch';
 import {SpriteBatch} from './SpriteBatch';
 import {TrailBatch} from './TrailBatch';
@@ -50,6 +50,19 @@ export class BatchedRenderer extends TransformNode {
     depthTexture: BaseTexture | null = null;
     /** Systems in insertion order — iterated every frame, unlike the map. */
     private systems: Array<IParticleSystem> = [];
+    /**
+     * The same systems, ordered so that one emitting into another comes first.
+     *
+     * A sub emitter's particles are created by its parent's behaviors, part way
+     * through the parent's step. A sub system updated before its parent has
+     * already fixed the list of particles it will run behaviors over, so those
+     * new particles are drawn that frame with nothing but their start values —
+     * white where a colour curve would have coloured them, at their start size,
+     * sitting at the point they were born. Rebuilt only when the set of systems
+     * or their behaviors changes, not per frame.
+     */
+    private orderedSystems: Array<IParticleSystem> = [];
+    private orderedSystemsStale = true;
     /** Consecutive frames each batch has held no system, parallel to `batches`. */
     private batchEmptyFrames: Array<number> = [];
     /**
@@ -104,6 +117,7 @@ export class BatchedRenderer extends TransformNode {
         particleSystem._renderer = this;
         if (!this.systemToBatchIndex.has(system) && this.systems.indexOf(system) === -1) {
             this.systems.push(system);
+            this.orderedSystemsStale = true;
         }
         if (this.adaptivePerformanceState.enabled) {
             particleSystem.setQualityFactor(this.adaptivePerformanceState.currentQuality);
@@ -153,6 +167,14 @@ export class BatchedRenderer extends TransformNode {
         const index = this.systems.indexOf(system);
         if (index !== -1) {
             this.systems.splice(index, 1);
+            this.orderedSystemsStale = true;
+        }
+        // Also out of the ordered copy, which update() may be iterating right
+        // now: a system that disposes itself from inside its own update leaves
+        // the loop expecting the slot it vacated to hold the next one.
+        const ordered = this.orderedSystems.indexOf(system);
+        if (ordered !== -1) {
+            this.orderedSystems.splice(ordered, 1);
         }
         return removed;
     }
@@ -221,13 +243,71 @@ export class BatchedRenderer extends TransformNode {
         this.lastAppliedQuality = quality;
     }
 
+    /** @internal Called when a system's behaviors change, which can add a sub emitter. */
+    _invalidateUpdateOrder(): void {
+        this.orderedSystemsStale = true;
+    }
+
+    /**
+     * Orders the systems so a system emitting into another runs first.
+     *
+     * Depth first over "emits into" edges, recording each system once all the
+     * systems it feeds have been recorded, then reversed — a system therefore
+     * lands ahead of everything it emits into, however deep the chain. A cycle
+     * cannot be satisfied by any order; it is left as found rather than dropped.
+     */
+    private orderSystems(): Array<IParticleSystem> {
+        if (!this.orderedSystemsStale) {
+            return this.orderedSystems;
+        }
+        const ordered: Array<IParticleSystem> = [];
+        const visiting = new Set<IParticleSystem>();
+        const done = new Set<IParticleSystem>();
+        const known = new Set<IParticleSystem>(this.systems);
+
+        const subTargetsOf = (system: IParticleSystem): Array<IParticleSystem> => {
+            const targets: Array<IParticleSystem> = [];
+            for (const behavior of (system as ParticleSystem).behaviors ?? []) {
+                if (behavior.type !== 'EmitSubParticleSystem') {
+                    continue;
+                }
+                const target = (behavior as EmitSubParticleSystem).subParticleSystem?.system;
+                if (target !== undefined && known.has(target)) {
+                    targets.push(target);
+                }
+            }
+            return targets;
+        };
+
+        const visit = (system: IParticleSystem): void => {
+            if (done.has(system) || visiting.has(system)) {
+                return;
+            }
+            visiting.add(system);
+            for (const target of subTargetsOf(system)) {
+                visit(target);
+            }
+            visiting.delete(system);
+            done.add(system);
+            ordered.push(system);
+        };
+
+        for (const system of this.systems) {
+            visit(system);
+        }
+        ordered.reverse();
+        this.orderedSystems = ordered;
+        this.orderedSystemsStale = false;
+        return ordered;
+    }
+
     update(delta: number) {
         const adaptiveState = this.adaptivePerformanceState;
         const frameStart = adaptiveState.enabled ? performance.now() : 0;
         if (adaptiveState.enabled) {
             this.applyAdaptiveQuality();
         }
-        const systems = this.systems;
+        const systems = this.orderSystems();
         for (let i = 0; i < systems.length; i++) {
             const system = systems[i];
             // A disabled emitter holds its particles frozen instead of simulating

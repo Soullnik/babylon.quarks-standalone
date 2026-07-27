@@ -16,9 +16,11 @@
     "capture:previews": "tsx ./scripts/capture-demo-previews.mts",
     "check:pack": "node ./scripts/check-pack-contents.mjs",
     "build:unitypackage": "node ./scripts/build-unitypackage.mjs",
-    "check": "npm run build && npm run build:editor && npm run test && npm run build:examples && npm run check:pack",
+    "check": "npm run build && npm run build:editor && npm run test && npm run check:smoothness && npm run build:examples && npm run check:pack",
     "examples": "npm run dev --workspace=examples",
-    "dev": "npm run examples"
+    "dev": "npm run examples",
+    "validate:wgsl": "node ./scripts/validate-wgsl.mjs",
+    "check:smoothness": "tsx ./scripts/smoothness-sweep.mts"
   },
   "engines": {
     "node": ">=20.11.0",

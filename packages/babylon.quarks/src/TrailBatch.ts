@@ -12,6 +12,9 @@ import {VFXBatch, RenderMode} from './VFXBatch';
 import {VFXBatchSettings} from './BatchedRenderer';
 import trail_vert from './shaders/trail_vert.glsl';
 import trail_frag from './shaders/trail_frag.glsl';
+import trail_vert_wgsl from './shaders/trail_vert.wgsl';
+import trail_frag_wgsl from './shaders/trail_frag.wgsl';
+import {registerShaders, shaderLanguageFor} from './shaders/shaderLanguageSupport';
 
 export class TrailBatch extends VFXBatch {
     private positionBuffer!: Float32Array;
@@ -22,6 +25,8 @@ export class TrailBatch extends VFXBatch {
     private widthBuffer!: Float32Array;
     private colorBuffer!: Float32Array;
     private indexBuffer!: Uint32Array;
+    /** True while the batch is parked on the degenerate draw, see uploadGeometry. */
+    private drawsNothing = false;
     private previousVB!: VertexBuffer;
     private nextVB!: VertexBuffer;
     private sideVB!: VertexBuffer;
@@ -66,7 +71,19 @@ export class TrailBatch extends VFXBatch {
         this.mesh.setVerticesData(VertexBuffer.PositionKind, this.positionBuffer, true);
         this.mesh.setVerticesData(VertexBuffer.UVKind, this.uvBuffer, true);
         this.mesh.setVerticesData(VertexBuffer.ColorKind, this.colorBuffer, true, 4);
-        this.mesh.setIndices(this.indexBuffer.subarray(0, 6), null, true);
+        // The whole array, not just the dummy triangle: this call is what sizes
+        // the GPU index buffer, and updateIndices later writes into it without
+        // resizing it. Handing it six indices here left a 24 byte buffer that
+        // every later frame overran — WebGL tolerated it, WebGPU rejects the
+        // draw outright ("index range does not fit in index buffer size").
+        // The vertex buffers above are already created at full capacity; this
+        // was the one that was not.
+        this.mesh.setIndices(this.indexBuffer, null, true);
+        this.drawsNothing = false;
+        if (this.mesh.subMeshes && this.mesh.subMeshes.length > 0) {
+            // Until the first update, only the dummy triangle is real.
+            this.mesh.subMeshes[0].indexCount = 6;
+        }
         const engine = this.scene.getEngine();
         this.previousVB = new VertexBuffer(engine, this.previousBuffer, 'previous', true, false, 3, false);
         this.nextVB = new VertexBuffer(engine, this.nextBuffer, 'next', true, false, 3, false);
@@ -112,8 +129,13 @@ export class TrailBatch extends VFXBatch {
             defines.push('USE_MAP');
         }
 
-        Effect.ShadersStore[shaderName + 'VertexShader'] = trail_vert;
-        Effect.ShadersStore[shaderName + 'FragmentShader'] = trail_frag;
+        const shaderLanguage = shaderLanguageFor(this.scene.getEngine());
+        registerShaders(
+            shaderName,
+            {glsl: trail_vert, wgsl: trail_vert_wgsl},
+            {glsl: trail_frag, wgsl: trail_frag_wgsl},
+            shaderLanguage
+        );
 
         const attributes = ['position', 'previous', 'next', 'side', 'width', 'uv', 'color'];
         const uniforms = ['world', 'view', 'projection', 'worldViewProjection', 'lineWidth', 'resolution', 'sizeAttenuation'];
@@ -131,6 +153,7 @@ export class TrailBatch extends VFXBatch {
                 samplers,
                 defines,
                 needAlphaBlending: this.settings.materialTransparent,
+                shaderLanguage,
             }
         );
 
@@ -191,7 +214,13 @@ export class TrailBatch extends VFXBatch {
             const system = visibleSystems[s];
             const particles = system.particles;
             for (let j = 0; j < system.particleNum; j++) {
-                particleCount += (particles[j] as TrailParticle).historyCount * 2;
+                const historyCount = (particles[j] as TrailParticle).historyCount;
+                if (historyCount === 0) {
+                    continue;
+                }
+                // +2 reserves the live tip vertex pair that frames between
+                // simulation steps append ahead of the recorded head.
+                particleCount += historyCount * 2 + 2;
             }
         }
         if (particleCount > this.maxParticles) {
@@ -216,14 +245,24 @@ export class TrailBatch extends VFXBatch {
             const systemWorldSpace = system.worldSpace;
             const objectScale = (Math.abs(scale.x) + Math.abs(scale.y) + Math.abs(scale.z)) / 3;
             // A ribbon's samples were recorded at past steps and stay where they
-            // were; only its newest sample is the particle, and that one has
-            // moved on since the step that recorded it. Leaving it behind makes
-            // the whole trail stutter on frames that ran no step. A trail pinned
+            // were. The particle itself has moved on since the step that wrote
+            // the newest sample, so frames that run no step would freeze the
+            // whole trail if that head were left behind. Moving the recorded
+            // head forward to catch up stretches the last segment from one
+            // step of travel to almost two, then snaps it back when the next
+            // step lands — a rubber-band the eye reads as lost smoothness,
+            // especially at 120Hz where every other frame is between steps.
+            // Appending a live tip ahead of the recorded samples keeps the
+            // body still and the tip moving without that pulse. A trail pinned
             // to the emitter's origin is driven by the emitter's transform
             // rather than by the particle's velocity, so it is left alone.
             const residual = (system.rendererEmitterSettings as TrailSettings).followLocalOrigin
                 ? 0
                 : (system.simulationResidual ?? 0);
+            // Measured from the step the particle just took, not from its
+            // velocity: a trail pulled along by an orbit or by a plugin's own
+            // behavior has motion no velocity term describes.
+            const stepFraction = residual === 0 ? 0 : residual / (system.simulationStep ?? residual);
 
             for (let j = 0; j < particleNum; j++) {
                 const particle = particles[j] as TrailParticle;
@@ -231,11 +270,6 @@ export class TrailBatch extends VFXBatch {
                 if (particleHistoryLength === 0) {
                     continue;
                 }
-                const newest = particleHistoryLength - 1;
-                const advance = residual * particle.speedModifier;
-                const headX = particle.velocity.x * advance;
-                const headY = particle.velocity.y * advance;
-                const headZ = particle.velocity.z * advance;
                 const historyCapacity = particle.historyCapacity;
                 const historyPositions = particle.historyPositions;
                 const historySizes = particle.historySizes;
@@ -276,30 +310,6 @@ export class TrailBatch extends VFXBatch {
                     let nextX = historyPositions[nextPosIndex];
                     let nextY = historyPositions[nextPosIndex + 1];
                     let nextZ = historyPositions[nextPosIndex + 2];
-
-                    // The head shows up as `current` on the last sample and as
-                    // `next` on the one before it, and is its own `previous`
-                    // when the ribbon is a single sample long. It has to be
-                    // carried forward in every one of those, or the shader
-                    // builds this segment's direction from two different
-                    // versions of the same point.
-                    if (advance !== 0) {
-                        if (i === newest) {
-                            currentX += headX;
-                            currentY += headY;
-                            currentZ += headZ;
-                            if (newest === 0) {
-                                previousX += headX;
-                                previousY += headY;
-                                previousZ += headZ;
-                            }
-                        }
-                        if (i >= newest - 1) {
-                            nextX += headX;
-                            nextY += headY;
-                            nextZ += headZ;
-                        }
-                    }
 
                     const currentSize = historySizes[currentSlot];
                     const currentColorIndex = currentSlot * 4;
@@ -396,6 +406,103 @@ export class TrailBatch extends VFXBatch {
                         triangles++;
                     }
                 }
+
+                // Live tip: same place a sprite would be drawn this frame, past
+                // the last recorded sample. The recorded ribbon stays put.
+                if (stepFraction !== 0) {
+                    const previousHead = particle.previousPosition;
+                    const position = particle.position;
+                    let tipX = position.x + (position.x - previousHead.x) * stepFraction;
+                    let tipY = position.y + (position.y - previousHead.y) * stepFraction;
+                    let tipZ = position.z + (position.z - previousHead.z) * stepFraction;
+                    const headIndex = index - 2;
+                    const headX = this.positionBuffer[headIndex * 3];
+                    const headY = this.positionBuffer[headIndex * 3 + 1];
+                    const headZ = this.positionBuffer[headIndex * 3 + 2];
+
+                    if (!systemWorldSpace) {
+                        const w = 1 / (m03 * tipX + m13 * tipY + m23 * tipZ + m33);
+                        const tx = (m00 * tipX + m10 * tipY + m20 * tipZ + m30) * w;
+                        const ty = (m01 * tipX + m11 * tipY + m21 * tipZ + m31) * w;
+                        tipZ = (m02 * tipX + m12 * tipY + m22 * tipZ + m32) * w;
+                        tipX = tx;
+                        tipY = ty;
+                    }
+
+                    const tipPi = index * 3;
+                    this.positionBuffer[tipPi] = tipX;
+                    this.positionBuffer[tipPi + 1] = tipY;
+                    this.positionBuffer[tipPi + 2] = tipZ;
+                    this.positionBuffer[tipPi + 3] = tipX;
+                    this.positionBuffer[tipPi + 4] = tipY;
+                    this.positionBuffer[tipPi + 5] = tipZ;
+
+                    this.previousBuffer[tipPi] = headX;
+                    this.previousBuffer[tipPi + 1] = headY;
+                    this.previousBuffer[tipPi + 2] = headZ;
+                    this.previousBuffer[tipPi + 3] = headX;
+                    this.previousBuffer[tipPi + 4] = headY;
+                    this.previousBuffer[tipPi + 5] = headZ;
+
+                    this.nextBuffer[tipPi] = tipX;
+                    this.nextBuffer[tipPi + 1] = tipY;
+                    this.nextBuffer[tipPi + 2] = tipZ;
+                    this.nextBuffer[tipPi + 3] = tipX;
+                    this.nextBuffer[tipPi + 4] = tipY;
+                    this.nextBuffer[tipPi + 5] = tipZ;
+
+                    // The recorded head's `next` was itself; point it at the tip
+                    // so the shader builds the live segment from one version of
+                    // each endpoint.
+                    const headPi = headIndex * 3;
+                    this.nextBuffer[headPi] = tipX;
+                    this.nextBuffer[headPi + 1] = tipY;
+                    this.nextBuffer[headPi + 2] = tipZ;
+                    this.nextBuffer[headPi + 3] = tipX;
+                    this.nextBuffer[headPi + 4] = tipY;
+                    this.nextBuffer[headPi + 5] = tipZ;
+
+                    this.sideBuffer[index] = 1;
+                    this.sideBuffer[index + 1] = -1;
+
+                    const tipSize = particle.size.x;
+                    if (systemWorldSpace || particle.parentMatrix) {
+                        this.widthBuffer[index] = tipSize;
+                        this.widthBuffer[index + 1] = tipSize;
+                    } else {
+                        this.widthBuffer[index] = tipSize * objectScale;
+                        this.widthBuffer[index + 1] = tipSize * objectScale;
+                    }
+
+                    const tipUi = index * 2;
+                    const tipU = (1 + col) * tileWidth;
+                    this.uvBuffer[tipUi] = tipU;
+                    this.uvBuffer[tipUi + 1] = (vTileCount - row - 1) * tileHeight;
+                    this.uvBuffer[tipUi + 2] = tipU;
+                    this.uvBuffer[tipUi + 3] = (vTileCount - row) * tileHeight;
+
+                    const tipColor = particle.color;
+                    const tipCi = index * 4;
+                    this.colorBuffer[tipCi] = tipColor.x;
+                    this.colorBuffer[tipCi + 1] = tipColor.y;
+                    this.colorBuffer[tipCi + 2] = tipColor.z;
+                    this.colorBuffer[tipCi + 3] = tipColor.w;
+                    this.colorBuffer[tipCi + 4] = tipColor.x;
+                    this.colorBuffer[tipCi + 5] = tipColor.y;
+                    this.colorBuffer[tipCi + 6] = tipColor.z;
+                    this.colorBuffer[tipCi + 7] = tipColor.w;
+
+                    this.indexBuffer[triangles * 3] = headIndex;
+                    this.indexBuffer[triangles * 3 + 1] = headIndex + 1;
+                    this.indexBuffer[triangles * 3 + 2] = index;
+                    triangles++;
+                    this.indexBuffer[triangles * 3] = index;
+                    this.indexBuffer[triangles * 3 + 1] = headIndex + 1;
+                    this.indexBuffer[triangles * 3 + 2] = index + 1;
+                    triangles++;
+
+                    index += 2;
+                }
             }
         }
 
@@ -425,16 +532,46 @@ export class TrailBatch extends VFXBatch {
             if (colorVB) colorVB.update(this.colorBuffer.subarray(0, index * 4));
 
             if (this.mesh.subMeshes && this.mesh.subMeshes.length > 0) {
-                const meshBoundingInfo = this.mesh.getBoundingInfo();
-                for (const subMesh of this.mesh.subMeshes) {
-                    (subMesh as any)._boundingInfo = meshBoundingInfo;
-                }
+                this.adoptMeshBounds();
                 this.mesh.subMeshes[0].indexCount = triangles * 3;
                 this.mesh.subMeshes[0].verticesCount = index;
             }
+            this.drawsNothing = false;
         } else if (this.mesh.subMeshes && this.mesh.subMeshes.length > 0) {
-            this.mesh.subMeshes[0].indexCount = 0;
-            this.mesh.subMeshes[0].verticesCount = 0;
+            // Nothing to draw. Leaving the count at zero still submits the draw,
+            // and WebGPU complains about it once per frame for as long as the
+            // batch stays empty — which, for a looping effect, is every gap
+            // between passes. Disabling the mesh instead costs a frame coming
+            // back, the flicker the sprite batch already works around.
+            //
+            // So draw a triangle whose corners are all the same vertex: it is a
+            // legal draw that rasterises nothing, whatever stale geometry is
+            // still in the buffers. Only written on the way into empty, not on
+            // every empty frame.
+            if (!this.drawsNothing) {
+                this.indexBuffer.fill(0, 0, 6);
+                this.mesh.updateIndices(this.indexBuffer.subarray(0, 6));
+                this.adoptMeshBounds();
+                this.drawsNothing = true;
+            }
+            this.mesh.subMeshes[0].indexCount = 6;
+            this.mesh.subMeshes[0].verticesCount = 1;
+        }
+    }
+
+    /**
+     * Points every sub mesh at the mesh's own bounds.
+     *
+     * Updating indices rebuilds the sub meshes, and a fresh one computes its
+     * bounds from the vertex data — which this batch keeps deliberately stale
+     * beyond the range it draws. Transparent sorting reads those bounds every
+     * frame, so they have to be replaced again after every index update, not
+     * only when the geometry is built.
+     */
+    private adoptMeshBounds(): void {
+        const meshBoundingInfo = this.mesh.getBoundingInfo();
+        for (const subMesh of this.mesh.subMeshes) {
+            (subMesh as any)._boundingInfo = meshBoundingInfo;
         }
     }
 

@@ -619,13 +619,18 @@ export class ParticleSystem implements IParticleSystem {
      * Growing the store replaces its arrays, so every particle already bound to
      * it has to be re-pointed at the new ones.
      */
+    /** Points every particle at the store's columns again, after any were replaced. */
+    private rebindParticles(): void {
+        const particles = this.particles;
+        for (let i = 0; i < particles.length; i++) {
+            (particles[i] as SpriteParticle | TrailParticle).rebind();
+        }
+    }
+
     private growParticlePool(isTrailMode: boolean): void {
         const index = this.particles.length;
         if (this.store.ensureCapacity(index + 1)) {
-            const particles = this.particles;
-            for (let i = 0; i < particles.length; i++) {
-                (particles[i] as SpriteParticle | TrailParticle).rebind();
-            }
+            this.rebindParticles();
         }
         this.particles.push(
             isTrailMode ? new TrailParticle(this.store, index) : new SpriteParticle(this.store, index)
@@ -658,6 +663,10 @@ export class ParticleSystem implements IParticleSystem {
             const particle = this.particles[this.particleNum - 1];
             particle.reset();
             particle.speedModifier = 1;
+            // Parent EmitSub can refill an onlyUsedByOther system after it had
+            // already finished empty; clear the flag so update does not treat it
+            // as done while it has live particles again.
+            this.finishedEventFired = false;
             this.startColor.startGen(particle.memory);
             this.startColor.genColor(particle.memory, particle.startColor, this.emissionState.time);
             particle.color.copy(particle.startColor);
@@ -808,6 +817,20 @@ export class ParticleSystem implements IParticleSystem {
         }
 
         if (!this.looping && this.finishedEventFired && this.particleNum === 0) {
+            // Still tick the fixed-step clock. A sub-emitter target
+            // (onlyUsedByOther) goes empty between parent bursts; skipping the
+            // accumulator here desyncs it from the parent, so the next particles
+            // the parent emits into it sit at age 0 / startColor until the phase
+            // catches up — white flashes scattered wherever the parent was.
+            if (delta > 0.1) {
+                delta = 0.1;
+            }
+            this.simulationAccumulator += delta;
+            const stepsToRun = Math.min(
+                MAX_SIMULATION_STEPS_PER_FRAME,
+                Math.floor((this.simulationAccumulator + 1e-9) / SIMULATION_STEP)
+            );
+            this.simulationAccumulator -= stepsToRun * SIMULATION_STEP;
             return;
         }
 
@@ -927,6 +950,27 @@ export class ParticleSystem implements IParticleSystem {
         const behaviorCount = behaviors.length;
         const particleCount = this.particleNum;
         const isTrailMode = this.rendererSettings.renderMode === RenderMode.Trail;
+        // Only stretched billboards draw from velocity, and only they pay for
+        // keeping the previous one.
+        const stretched = this.rendererSettings.renderMode === RenderMode.StretchedBillBoard;
+
+        // Remember where everything starts this step, so the renderer can carry
+        // the motion the step produces on into the part of the frame that comes
+        // after it. Taken after emission on purpose: a particle born this step
+        // then starts from where it was born rather than from whatever the row
+        // held before, and so is drawn at the emitter instead of jumping.
+        const columns = this.store;
+        const vector3Rows = particleCount * 3;
+        columns.previousPosition.set(columns.position.subarray(0, vector3Rows));
+        columns.previousSize.set(columns.size.subarray(0, vector3Rows));
+        if (stretched) {
+            if (columns.keepPreviousVelocity()) {
+                this.rebindParticles();
+            }
+            columns.previousVelocity.set(columns.velocity.subarray(0, vector3Rows));
+        }
+        columns.previousColor.set(columns.color.subarray(0, particleCount * 4));
+
         this.emitterShape.update(this, delta);
         const steps = this.behaviorSteps();
         for (let s = 0; s < steps.length; s++) {
@@ -1401,6 +1445,8 @@ export class ParticleSystem implements IParticleSystem {
 
     addBehavior(behavior: Behavior) {
         this.behaviors.push(behavior);
+        // A sub emitter added here changes which system has to update first.
+        this._renderer?._invalidateUpdateOrder();
     }
 
     getRendererSettings(): VFXBatchSettings {

@@ -14,6 +14,10 @@ All notable changes to the Unity Quarks Exporter are documented here.
 
 ### Fixed
 
+- Constant `rate × life` that lands on a whole number gets one simulation step
+  of lifetime slack on export. Quarks' fixed 1/60 clock otherwise leaves one
+  blank frame per period on that knife edge (BlackHole's beam/ring); Unity's
+  own tip is "life 1.01". Curves and random ranges are left alone.
 - Gravity is exported as a world-space force. It was written as an `ApplyForce`,
   whose direction is added straight to the velocity and so gets turned by the
   emitter's own rotation: a particle system carrying Unity's usual -90° about X

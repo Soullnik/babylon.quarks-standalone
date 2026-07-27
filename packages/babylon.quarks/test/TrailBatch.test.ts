@@ -56,7 +56,11 @@ describe('TrailBatch', () => {
 
         const batch = getTrailBatch(renderer);
         expect(batch.mesh.isEnabled()).toBe(true);
-        expect(batch.mesh.subMeshes[0]?.indexCount ?? 0).toBe(0);
+        // Nothing reaches the screen, but the draw is not submitted with zero
+        // indices — WebGPU warns about that once per frame. The batch parks on a
+        // triangle whose corners are all the same vertex instead.
+        expect(batch.mesh.subMeshes[0].indexCount).toBeGreaterThan(0);
+        expect(Array.from(batch.mesh.getIndices()!.slice(0, 6))).toEqual([0, 0, 0, 0, 0, 0]);
 
         renderer.dispose();
         system.dispose();

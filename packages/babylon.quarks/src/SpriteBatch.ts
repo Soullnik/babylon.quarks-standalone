@@ -23,6 +23,12 @@ import particle_frag from './shaders/particle_frag.glsl';
 import particle_physics_frag from './shaders/particle_physics_frag.glsl';
 import stretched_bb_particle_vert from './shaders/stretched_bb_particle_vert.glsl';
 import local_particle_physics_vert from './shaders/local_particle_physics_vert.glsl';
+import particle_vert_wgsl from './shaders/particle_vert.wgsl';
+import particle_frag_wgsl from './shaders/particle_frag.wgsl';
+import particle_physics_frag_wgsl from './shaders/particle_physics_frag.wgsl';
+import stretched_bb_particle_vert_wgsl from './shaders/stretched_bb_particle_vert.wgsl';
+import local_particle_physics_vert_wgsl from './shaders/local_particle_physics_vert.wgsl';
+import {registerShaders, shaderLanguageFor, ShaderSources} from './shaders/shaderLanguageSupport';
 
 export class SpriteBatch extends VFXBatch {
     private offsetBuffer!: Float32Array;
@@ -132,19 +138,19 @@ export class SpriteBatch extends VFXBatch {
         // Effect.ShadersStore and defeat Babylon's compiled-effect cache.
         const shaderName = `quarksParticle_${this.settings.renderMode}`;
         this.lastStretchedSpeedFactor = Number.NaN;
-        let vertexShader: string;
-        let fragmentShader: string;
         const defines: string[] = [];
 
+        let vertexShader: ShaderSources;
+        let fragmentShader: ShaderSources;
         if (this.settings.renderMode === RenderMode.Mesh) {
-            vertexShader = local_particle_physics_vert;
-            fragmentShader = particle_physics_frag;
+            vertexShader = {glsl: local_particle_physics_vert, wgsl: local_particle_physics_vert_wgsl};
+            fragmentShader = {glsl: particle_physics_frag, wgsl: particle_physics_frag_wgsl};
         } else if (this.settings.renderMode === RenderMode.StretchedBillBoard) {
-            vertexShader = stretched_bb_particle_vert;
-            fragmentShader = particle_frag;
+            vertexShader = {glsl: stretched_bb_particle_vert, wgsl: stretched_bb_particle_vert_wgsl};
+            fragmentShader = {glsl: particle_frag, wgsl: particle_frag_wgsl};
         } else {
-            vertexShader = particle_vert;
-            fragmentShader = particle_frag;
+            vertexShader = {glsl: particle_vert, wgsl: particle_vert_wgsl};
+            fragmentShader = {glsl: particle_frag, wgsl: particle_frag_wgsl};
         }
 
         if (this.settings.texture) {
@@ -169,8 +175,8 @@ export class SpriteBatch extends VFXBatch {
             defines.push('HORIZONTAL');
         }
 
-        Effect.ShadersStore[shaderName + 'VertexShader'] = vertexShader;
-        Effect.ShadersStore[shaderName + 'FragmentShader'] = fragmentShader;
+        const shaderLanguage = shaderLanguageFor(this.scene.getEngine());
+        registerShaders(shaderName, vertexShader, fragmentShader, shaderLanguage);
 
         const attributes = ['position', 'uv', 'offset', 'color', 'size', 'rotation', 'uvTile'];
         if (this.settings.renderMode === RenderMode.Mesh) {
@@ -215,6 +221,7 @@ export class SpriteBatch extends VFXBatch {
                 samplers,
                 defines,
                 needAlphaBlending: this.settings.materialTransparent,
+                shaderLanguage,
             }
         );
 
@@ -321,37 +328,48 @@ export class SpriteBatch extends VFXBatch {
             // transform can be copied as one range instead of gathered.
             const store = system.store;
             const copiedColor = store !== undefined;
-            if (copiedColor) {
-                this.colorBuffer.set(store!.color.subarray(0, particleNum * 4), index * 4);
-            }
             // Particles only carry their own parent transform when the system
             // emits through another one; otherwise the whole range shares the
             // emitter's matrix and can be transformed in place after the copy.
             const sharedTransform = store !== undefined && system.onlyUsedByOther !== true;
             // The simulation runs on a fixed step that the display does not
             // share, so the last step is usually in the past by the time the
-            // frame is drawn. Carrying each particle along its own velocity for
-            // the leftover time puts it where it belongs now; without it the
-            // particles visibly stutter on any display that is not exactly 60Hz.
+            // frame is drawn. Continuing the motion that step produced puts each
+            // particle where it belongs now; without it they visibly stutter on
+            // any display that is not exactly 60Hz and in phase.
+            //
+            // The motion is measured, not predicted from velocity: plenty of
+            // behaviors move a particle by writing its position — orbits, noise,
+            // turbulence, anything a plugin does — and a velocity based guess
+            // leaves every one of those stuttering exactly as before.
             const residual = system.simulationResidual ?? 0;
-            // Turning is recorded per step rather than per second, so it is
-            // carried by the fraction of a step the frame is past, not by time.
             const stepFraction = residual === 0 ? 0 : residual / (system.simulationStep ?? residual);
+            if (copiedColor) {
+                if (stepFraction > 0 && particleNum > 0) {
+                    SpriteBatch.continueColor(this.colorBuffer, index * 4, store!, particleNum, stepFraction);
+                } else {
+                    this.colorBuffer.set(store!.color.subarray(0, particleNum * 4), index * 4);
+                }
+            }
             let copiedPositionAndSize = false;
             if (store !== undefined && systemWorldSpace) {
-                if (residual > 0 && particleNum > 0) {
-                    SpriteBatch.extrapolate(this.offsetBuffer, index * 3, store, particleNum, residual);
+                if (stepFraction > 0 && particleNum > 0) {
+                    SpriteBatch.extrapolate(this.offsetBuffer, index * 3, store, particleNum, stepFraction);
                 } else {
                     this.offsetBuffer.set(store.position.subarray(0, particleNum * 3), index * 3);
                 }
-                this.sizeBuffer.set(store.size.subarray(0, particleNum * 3), index * 3);
+                if (stepFraction > 0 && particleNum > 0) {
+                    SpriteBatch.continueVector3(this.sizeBuffer, index * 3, store.size, store.previousSize, particleNum, stepFraction);
+                } else {
+                    this.sizeBuffer.set(store.size.subarray(0, particleNum * 3), index * 3);
+                }
                 copiedPositionAndSize = true;
             } else if (sharedTransform && particleNum > 0) {
                 const base = index * 3;
                 const end = base + particleNum * 3;
                 const offsets = this.offsetBuffer;
-                if (residual > 0) {
-                    SpriteBatch.extrapolate(offsets, base, store!, particleNum, residual);
+                if (stepFraction > 0) {
+                    SpriteBatch.extrapolate(offsets, base, store!, particleNum, stepFraction);
                 } else {
                     offsets.set(store!.position.subarray(0, particleNum * 3), base);
                 }
@@ -370,7 +388,11 @@ export class SpriteBatch extends VFXBatch {
                     offsets[o + 2] = (m02 * px + m12 * py + m22 * pz + m32) * w;
                 }
                 const sizes = this.sizeBuffer;
-                sizes.set(store!.size.subarray(0, particleNum * 3), base);
+                if (stepFraction > 0) {
+                    SpriteBatch.continueVector3(sizes, base, store!.size, store!.previousSize, particleNum, stepFraction);
+                } else {
+                    sizes.set(store!.size.subarray(0, particleNum * 3), base);
+                }
                 for (let o = base; o < end; o += 3) {
                     sizes[o] *= absScaleX;
                     sizes[o + 1] *= absScaleY;
@@ -419,11 +441,10 @@ export class SpriteBatch extends VFXBatch {
 
                 if (!copiedPositionAndSize) {
                     const position = particle.position;
-                    const velocity = particle.velocity;
-                    const advance = residual * particle.speedModifier;
-                    let px = position.x + velocity.x * advance;
-                    let py = position.y + velocity.y * advance;
-                    let pz = position.z + velocity.z * advance;
+                    const previous = particle.previousPosition;
+                    let px = position.x + (position.x - previous.x) * stepFraction;
+                    let py = position.y + (position.y - previous.y) * stepFraction;
+                    let pz = position.z + (position.z - previous.z) * stepFraction;
                     if (!systemWorldSpace) {
                         // Inlined point transform: this is the default (local space)
                         // path and runs for every particle every frame.
@@ -468,16 +489,22 @@ export class SpriteBatch extends VFXBatch {
                 this.uvTileBuffer[index] = particle.uvTile;
 
                 if (isStretchedRender && this.velocityBuffer) {
-                    let vel: Vector3;
-                    if (systemWorldSpace) {
-                        vel = particle.velocity;
-                    } else {
-                        vel = this.vector_;
+                    // The streak points along the velocity and is as long as it,
+                    // so a velocity frozen between steps makes the sprite's
+                    // outline pop at the step rate while its position glides.
+                    const velocity = particle.velocity;
+                    const previousVelocity = particle.previousVelocity;
+                    const vx = velocity.x + (velocity.x - previousVelocity.x) * stepFraction;
+                    const vy = velocity.y + (velocity.y - previousVelocity.y) * stepFraction;
+                    const vz = velocity.z + (velocity.z - previousVelocity.z) * stepFraction;
+                    let vel: Vector3 = this.vector_;
+                    vel.set(vx, vy, vz);
+                    if (!systemWorldSpace) {
                         if (particle.parentMatrix) {
                             this.rotationMat2_.setFromMatrix4(particle.parentMatrix);
-                            vel.copy(particle.velocity).applyMatrix3(this.rotationMat2_);
+                            vel.applyMatrix3(this.rotationMat2_);
                         } else {
-                            vel.copy(particle.velocity).applyMatrix3(this.rotationMat_);
+                            vel.applyMatrix3(this.rotationMat_);
                         }
                     }
                     const vi = index * 4;
@@ -557,31 +584,82 @@ export class SpriteBatch extends VFXBatch {
     }
 
     /**
-     * Writes rows `[0, count)` of the store's positions into `target` at
-     * `base`, each carried along its own velocity for `residual` seconds.
+     * Continues a three-component column by `fraction` of the step it just took,
+     * never below zero.
      *
-     * This is the same integration the next simulation step performs, so for a
-     * particle under constant velocity the drawn path is exactly the continuous
-     * one. A particle whose motion comes from somewhere else — a force about to
-     * change its velocity, a behavior that displaces it directly — is off by
-     * whatever that adds over less than one step.
+     * Size fades to nothing at the end of a life, so the last step before death
+     * can point past zero; a negative size turns a sprite inside out.
+     */
+    private static continueVector3(
+        target: Float32Array,
+        base: number,
+        current: Float32Array,
+        previous: Float32Array,
+        count: number,
+        fraction: number
+    ): void {
+        for (let i = 0, o = 0; i < count; i++, o += 3) {
+            const x = current[o] + (current[o] - previous[o]) * fraction;
+            const y = current[o + 1] + (current[o + 1] - previous[o + 1]) * fraction;
+            const z = current[o + 2] + (current[o + 2] - previous[o + 2]) * fraction;
+            target[base + o] = x > 0 ? x : 0;
+            target[base + o + 1] = y > 0 ? y : 0;
+            target[base + o + 2] = z > 0 ? z : 0;
+        }
+    }
+
+    /** The same for colour, whose alpha runs out at the end of a life too. */
+    private static continueColor(
+        target: Float32Array,
+        base: number,
+        store: ParticleStore,
+        count: number,
+        fraction: number
+    ): void {
+        const current = store.color;
+        const previous = store.previousColor;
+        for (let i = 0, o = 0; i < count; i++, o += 4) {
+            const r = current[o] + (current[o] - previous[o]) * fraction;
+            const g = current[o + 1] + (current[o + 1] - previous[o + 1]) * fraction;
+            const b = current[o + 2] + (current[o + 2] - previous[o + 2]) * fraction;
+            const a = current[o + 3] + (current[o + 3] - previous[o + 3]) * fraction;
+            target[base + o] = r > 0 ? r : 0;
+            target[base + o + 1] = g > 0 ? g : 0;
+            target[base + o + 2] = b > 0 ? b : 0;
+            target[base + o + 3] = a > 0 ? a : 0;
+        }
+    }
+
+    /**
+     * Writes rows `[0, count)` of the store's positions into `target` at `base`,
+     * each carried on by `fraction` of the step it just took.
+     *
+     * Continuing the measured last step covers every way a particle can move —
+     * velocity integration, an orbit, noise, a plugin's own behavior — because
+     * it reads what happened rather than predicting from one term of it. Over
+     * less than a step it is a straight line through a path that may curve,
+     * which for a sixtieth of a second is well under a pixel.
+     *
+     * A particle born during the step has the same position on both sides and
+     * so does not move at all, which is what puts it at the emitter rather than
+     * a step's travel away from it.
      */
     private static extrapolate(
         target: Float32Array,
         base: number,
         store: ParticleStore,
         count: number,
-        residual: number
+        fraction: number
     ): void {
         const positions = store.position;
-        const velocities = store.velocity;
-        const scalars = store.scalars;
-        const stride = ParticleStore.SCALAR_STRIDE;
-        for (let i = 0, o = 0, s = ParticleStore.SPEED_MODIFIER; i < count; i++, o += 3, s += stride) {
-            const advance = residual * scalars[s];
-            target[base + o] = positions[o] + velocities[o] * advance;
-            target[base + o + 1] = positions[o + 1] + velocities[o + 1] * advance;
-            target[base + o + 2] = positions[o + 2] + velocities[o + 2] * advance;
+        const previous = store.previousPosition;
+        for (let i = 0, o = 0; i < count; i++, o += 3) {
+            const x = positions[o];
+            const y = positions[o + 1];
+            const z = positions[o + 2];
+            target[base + o] = x + (x - previous[o]) * fraction;
+            target[base + o + 1] = y + (y - previous[o + 1]) * fraction;
+            target[base + o + 2] = z + (z - previous[o + 2]) * fraction;
         }
     }
 

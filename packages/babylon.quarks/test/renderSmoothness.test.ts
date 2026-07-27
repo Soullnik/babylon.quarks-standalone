@@ -1,10 +1,15 @@
 import {
+    ApplyForce,
     AxisAngleGenerator,
     ConstantColor,
     ConstantValue,
     PointEmitter,
+    Bezier,
+    OrbitOverLife,
+    PiecewiseBezier,
     Rotation3DOverLife,
     RotationOverLife,
+    SizeOverLife,
     TrailParticle,
     Vector3 as QVector3,
     Vector4,
@@ -76,7 +81,11 @@ function setup(worldSpace = true) {
     particle.position.set(0, 0, 0);
     particle.velocity.set(0, 0, SPEED);
     particle.speedModifier = 1;
-    renderer.refreshBatches(); // so the drawn state reflects the pinned particle
+    // One whole step after pinning: the renderer continues the motion the last
+    // step actually produced, so the last step has to be a real one. Pinning a
+    // particle and reading straight away describes a step that never ran.
+    renderer.update(1 / 60);
+    renderer.refreshBatches();
     return {system, renderer, particle};
 }
 
@@ -104,6 +113,7 @@ describe('render-time smoothness', () => {
 
     it('draws where wall-clock time says, while the simulation lags behind', () => {
         const {system, renderer} = setup();
+        const startZ = drawnZ(renderer);
         let elapsed = 0;
         for (let i = 0; i < 60; i++) {
             const delta = 1 / 90;
@@ -111,7 +121,7 @@ describe('render-time smoothness', () => {
             elapsed += delta;
             // The drawn position tracks wall-clock time, while the simulated one
             // lags by up to a step.
-            expect(drawnZ(renderer)).toBeCloseTo(elapsed * SPEED, 5);
+            expect(drawnZ(renderer) - startZ).toBeCloseTo(elapsed * SPEED, 5);
             expect(system.particles[0].position.z).toBeLessThanOrEqual(drawnZ(renderer) + 1e-6);
         }
         renderer.dispose();
@@ -146,6 +156,150 @@ describe('render-time smoothness', () => {
             expect(now - previous).toBeCloseTo(delta * SPEED, 5);
             previous = now;
         }
+        renderer.dispose();
+    });
+
+    it('carries motion that no velocity describes, like an orbit', () => {
+        // The gap this closes: plenty of behaviors move a particle by writing
+        // its position — orbits, noise, turbulence, anything a plugin does.
+        // Continuing along the velocity leaves every one of them stuttering,
+        // because their velocity is zero the whole time.
+        const system = makeSystem();
+        system.behaviors.push(new OrbitOverLife(new ConstantValue(2), new QVector3(0, 1, 0)));
+        const renderer = new BatchedRenderer('smoothness-orbit', scene);
+        renderer.addSystem(system);
+        system.play();
+        renderer.update(1 / 60);
+        const particle = system.particles[0];
+        particle.position.set(5, 0, 0);
+        particle.velocity.set(0, 0, 0);
+        particle.speedModifier = 1;
+        for (const behavior of system.behaviors) behavior.initialize(particle, system);
+        renderer.update(1 / 60);
+        renderer.refreshBatches();
+
+        const drawnX = () => (renderer.batches[0] as unknown as {offsetBuffer: Float32Array}).offsetBuffer[0];
+        const drawn = () => {
+            const b = (renderer.batches[0] as unknown as {offsetBuffer: Float32Array}).offsetBuffer;
+            return [b[0], b[1], b[2]];
+        };
+        expect(particle.velocity.length()).toBe(0);
+
+        let previous = drawn();
+        const moves: number[] = [];
+        for (let i = 0; i < 16; i++) {
+            renderer.update(1 / 120);
+            const now = drawn();
+            moves.push(Math.hypot(now[0] - previous[0], now[1] - previous[1], now[2] - previous[2]));
+            previous = now;
+        }
+        void drawnX;
+
+        // Every frame moves, and by about the same amount: a frame that ran no
+        // step must still show half a step's worth of orbit.
+        const smallest = Math.min(...moves);
+        const largest = Math.max(...moves);
+        expect(smallest).toBeGreaterThan(0);
+        expect(largest / smallest).toBeLessThan(1.1);
+        renderer.dispose();
+    });
+
+    it('keeps a short-lived particle fading and shrinking every frame', () => {
+        // Explosion layers live a fifth of a second — a dozen steps in total —
+        // so a whole step of fade lands on one frame and none on the next.
+        // Size and colour are read off a curve rather than integrated, so the
+        // only way to continue them is to have kept what the step produced.
+        const LIFE = 0.2;
+        const system = new ParticleSystem({
+            scene,
+            duration: 100,
+            looping: true,
+            worldSpace: true,
+            startLife: new ConstantValue(LIFE),
+            startSpeed: new ConstantValue(0),
+            startSize: new ConstantValue(2),
+            startColor: new ConstantColor(new Vector4(1, 1, 1, 1)),
+            emissionOverTime: new ConstantValue(300),
+            shape: new PointEmitter(),
+            renderMode: RenderMode.BillBoard,
+            behaviors: [new SizeOverLife(new PiecewiseBezier([[new Bezier(1, 0.7, 0.35, 0), 0]]))],
+        });
+        const renderer = new BatchedRenderer('smoothness-fade', scene);
+        renderer.addSystem(system);
+        system.play();
+        for (let i = 0; i < 30; i++) renderer.update(1 / 60);
+
+        const sizes = () => (renderer.batches[0] as unknown as {sizeBuffer: Float32Array}).sizeBuffer;
+        let previous = {size: sizes()[0], who: system.particles[0]};
+        const changes: number[] = [];
+        for (let i = 0; i < 40; i++) {
+            renderer.update(1 / 120);
+            const who = system.particles[0];
+            const size = sizes()[0];
+            // Rows are recycled constantly at this lifetime; only compare a row
+            // that still holds the same particle, and only once that particle
+            // has a whole step behind it — one born this frame has nothing to
+            // continue yet, correctly.
+            if (who === previous.who && who.age > 1 / 60) changes.push(Math.abs(size - previous.size));
+            previous = {size, who};
+        }
+
+        expect(changes.length).toBeGreaterThan(10);
+        // Every frame moves the size along. Before this, half of them did not.
+        const frozen = changes.filter((c) => c < 1e-6).length;
+        expect(frozen).toBe(0);
+        renderer.dispose();
+    });
+
+    it('keeps a stretched billboard the right length between steps', () => {
+        // A stretched billboard's shape is its velocity: the streak points along
+        // it and is as long as it. A velocity frozen between steps makes the
+        // outline pop at the step rate while the position glides.
+        const system = new ParticleSystem({
+            scene,
+            duration: 100,
+            looping: true,
+            worldSpace: true,
+            startLife: new ConstantValue(50),
+            startSpeed: new ConstantValue(30),
+            startSize: new ConstantValue(1),
+            startColor: new ConstantColor(new Vector4(1, 1, 1, 1)),
+            emissionOverTime: new ConstantValue(0),
+            emissionBursts: [{time: 0, count: new ConstantValue(1), cycle: 1, interval: 0, probability: 1}],
+            shape: new PointEmitter(),
+            renderMode: RenderMode.StretchedBillBoard,
+            rendererEmitterSettings: {speedFactor: 1, lengthFactor: 0},
+            behaviors: [new ApplyForce(new QVector3(0, 0, -1), new ConstantValue(20))],
+        });
+        const renderer = new BatchedRenderer('smoothness-stretch', scene);
+        renderer.addSystem(system);
+        system.play();
+        renderer.update(1 / 60);
+        const particle = system.particles[0];
+        particle.position.set(0, 0, 0);
+        particle.velocity.set(0, 0, 30);
+        particle.speedModifier = 1;
+        renderer.update(1 / 60);
+
+        const streak = () => {
+            const v = (renderer.batches[0] as unknown as {velocityBuffer: Float32Array}).velocityBuffer;
+            return Math.hypot(v[0], v[1], v[2]);
+        };
+        let previous = streak();
+        const changes: number[] = [];
+        for (let i = 0; i < 20; i++) {
+            renderer.update(1 / 120);
+            const now = streak();
+            changes.push(Math.abs(now - previous));
+            previous = now;
+        }
+
+        // A constant force shortens the streak at a constant rate, so no frame
+        // may leave it unchanged and none may move it twice as far.
+        const smallest = Math.min(...changes);
+        const largest = Math.max(...changes);
+        expect(smallest).toBeGreaterThan(0);
+        expect(largest / smallest).toBeLessThan(1.1);
         renderer.dispose();
     });
 
@@ -267,58 +421,88 @@ describe('render-time smoothness', () => {
         const positions = (renderer: BatchedRenderer) =>
             (renderer.batches[0] as unknown as {positionBuffer: Float32Array}).positionBuffer;
 
-        /** Z of the newest ribbon sample, which is written last. */
-        const headZ = (renderer: BatchedRenderer, particle: TrailParticle) =>
-            positions(renderer)[(particle.historyCount - 1) * 2 * 3 + 2];
+        /**
+         * Z of the newest ribbon sample written this frame. Between steps that
+         * is the live tip past the recorded head; on a step boundary it is the
+         * recorded head itself.
+         */
+        const headZ = (renderer: BatchedRenderer, particle: TrailParticle, residual: number) => {
+            const sample = particle.historyCount - 1 + (residual > 0 ? 1 : 0);
+            return positions(renderer)[sample * 2 * 3 + 2];
+        };
+
+        /** Length of the last recorded segment (second-newest → newest). */
+        const recordedTailLength = (renderer: BatchedRenderer, particle: TrailParticle) => {
+            const newest = particle.historyCount - 1;
+            const a = newest * 2 * 3 + 2;
+            const b = (newest - 1) * 2 * 3 + 2;
+            return Math.abs(positions(renderer)[a] - positions(renderer)[b]);
+        };
 
         it('keeps the ribbon head moving on frames that run no simulation step', () => {
-            const {renderer, particle} = setupTrail();
+            const {system, renderer, particle} = setupTrail();
             const delta = 1 / 120;
-            let previous = headZ(renderer, particle);
+            let previous = headZ(renderer, particle, system.simulationResidual ?? 0);
             for (let i = 0; i < 12; i++) {
                 renderer.update(delta);
-                const now = headZ(renderer, particle);
+                const now = headZ(renderer, particle, system.simulationResidual ?? 0);
                 expect(now - previous).toBeCloseTo(delta * SPEED, 5);
                 previous = now;
             }
             renderer.dispose();
         });
 
-        it('leaves the samples behind the head where they were recorded', () => {
+        it('leaves every recorded sample where it was, including the head', () => {
+            // The live tip is appended past the recorded ribbon; stretching the
+            // recorded head instead pulses the last segment once per step.
             const {renderer, particle} = setupTrail();
-            const before = positions(renderer).slice(0, (particle.historyCount - 1) * 2 * 3);
-            renderer.update(1 / 120); // no simulation step, so only the head may move
-            const after = positions(renderer).slice(0, (particle.historyCount - 1) * 2 * 3);
+            const before = positions(renderer).slice(0, particle.historyCount * 2 * 3);
+            renderer.update(1 / 120); // no simulation step
+            const after = positions(renderer).slice(0, particle.historyCount * 2 * 3);
             expect(Array.from(after)).toEqual(Array.from(before));
             renderer.dispose();
         });
 
-        it('feeds the head to the shader consistently as current, previous and next', () => {
-            // The ribbon direction comes from neighbouring samples, so a head
-            // carried forward in one buffer but not the others would twist it.
+        it('does not stretch the last recorded segment between steps', () => {
             const {renderer, particle} = setupTrail();
+            const before = recordedTailLength(renderer, particle);
+            for (let i = 0; i < 8; i++) {
+                renderer.update(1 / 120);
+                expect(recordedTailLength(renderer, particle)).toBeCloseTo(before, 5);
+            }
+            renderer.dispose();
+        });
+
+        it('feeds the live tip to the shader consistently as current, previous and next', () => {
+            // The ribbon direction comes from neighbouring samples, so a tip
+            // carried in one buffer but not the others would twist it.
+            const {system, renderer, particle} = setupTrail();
             renderer.update(1 / 120);
+            expect(system.simulationResidual ?? 0).toBeGreaterThan(0);
             const buffers = renderer.batches[0] as unknown as {
                 positionBuffer: Float32Array;
                 previousBuffer: Float32Array;
                 nextBuffer: Float32Array;
             };
-            const last = particle.historyCount - 1;
-            const headOffset = last * 2 * 3;
-            const beforeHeadOffset = (last - 1) * 2 * 3;
-            // The head is its own `next` on the final sample...
-            expect(buffers.nextBuffer[headOffset + 2]).toBeCloseTo(buffers.positionBuffer[headOffset + 2], 6);
-            // ...and the `next` of the sample before it.
-            expect(buffers.nextBuffer[beforeHeadOffset + 2]).toBeCloseTo(buffers.positionBuffer[headOffset + 2], 6);
+            const tip = particle.historyCount; // appended past the recorded head
+            const recordedHead = particle.historyCount - 1;
+            const tipOffset = tip * 2 * 3;
+            const headOffset = recordedHead * 2 * 3;
+            // The tip is its own `next`...
+            expect(buffers.nextBuffer[tipOffset + 2]).toBeCloseTo(buffers.positionBuffer[tipOffset + 2], 6);
+            // ...and the `next` of the recorded head behind it.
+            expect(buffers.nextBuffer[headOffset + 2]).toBeCloseTo(buffers.positionBuffer[tipOffset + 2], 6);
+            // ...and its `previous` is that recorded head.
+            expect(buffers.previousBuffer[tipOffset + 2]).toBeCloseTo(buffers.positionBuffer[headOffset + 2], 6);
             renderer.dispose();
         });
 
         it('leaves a ribbon pinned to the emitter origin alone', () => {
             // Those follow the emitter transform, not the particle's velocity.
-            const {renderer, particle} = setupTrail(true);
-            const before = headZ(renderer, particle);
+            const {system, renderer, particle} = setupTrail(true);
+            const before = headZ(renderer, particle, system.simulationResidual ?? 0);
             renderer.update(1 / 120);
-            expect(headZ(renderer, particle)).toBeCloseTo(before, 6);
+            expect(headZ(renderer, particle, system.simulationResidual ?? 0)).toBeCloseTo(before, 6);
             renderer.dispose();
         });
     });
@@ -343,7 +527,8 @@ describe('render-time smoothness', () => {
         // has to be exactly N steps of motion.
         const {system, renderer} = setup();
         for (let i = 0; i < 30; i++) renderer.update(1 / 60);
-        expect(system.particles[0].position.z).toBeCloseTo((30 / 60) * SPEED, 4);
+        // 30 steps here, plus the one setup ran to give the renderer real motion.
+        expect(system.particles[0].position.z).toBeCloseTo((31 / 60) * SPEED, 4);
         expect(system.simulationResidual).toBeLessThan(1 / 60);
         renderer.dispose();
     });
