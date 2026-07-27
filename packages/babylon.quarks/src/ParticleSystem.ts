@@ -73,6 +73,11 @@ const DEFAULT_POSITIONS = new Float32Array([
     -0.5,  0.5, 0,
 ]);
 const DEFAULT_UVS = new Float32Array([0, 0, 1, 0, 1, 1, 0, 1]);
+
+/** Zero UVs sized to a position buffer — missing/mismatched uv attrs → GL_INVALID_OPERATION on iOS. */
+function fallbackUVsForPositions(positions: Float32Array): Float32Array {
+    return new Float32Array((positions.length / 3) * 2);
+}
 const DEFAULT_INDICES = new Uint32Array([0, 1, 2, 0, 2, 3]);
 
 export interface ParticleSystemParameters {
@@ -478,7 +483,11 @@ export class ParticleSystem implements IParticleSystem {
         this.rendererSettings = {
             instancingGeometry: parameters.instancingGeometry ?? DEFAULT_POSITIONS,
             instancingIndices: parameters.instancingIndices ?? DEFAULT_INDICES,
-            instancingUVs: parameters.instancingUVs ?? DEFAULT_UVS,
+            instancingUVs:
+                parameters.instancingUVs ??
+                (parameters.instancingGeometry
+                    ? fallbackUVsForPositions(parameters.instancingGeometry)
+                    : DEFAULT_UVS),
             instancingNormals: parameters.instancingNormals,
             renderMode: parameters.renderMode ?? RenderMode.BillBoard,
             renderOrder: parameters.renderOrder ?? 0,

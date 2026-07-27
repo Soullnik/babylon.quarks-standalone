@@ -95,6 +95,7 @@ export async function init({scene, camera, batchRenderer, systems, demoState}: D
     particleMesh.setEnabled(false);
     const positions = particleMesh.getVerticesData(VertexBuffer.PositionKind);
     const normals = particleMesh.getVerticesData(VertexBuffer.NormalKind);
+    const uvs = particleMesh.getVerticesData(VertexBuffer.UVKind);
     const indices = particleMesh.getIndices();
     if (!positions || !indices) {
         return;
@@ -107,6 +108,7 @@ export async function init({scene, camera, batchRenderer, systems, demoState}: D
         prewarm: true,
         instancingGeometry: new Float32Array(positions),
         instancingNormals: normals ? new Float32Array(normals) : undefined,
+        instancingUVs: uvs ? new Float32Array(uvs) : undefined,
         instancingIndices: new Uint32Array(indices),
         startLife: new IntervalValue(2.0, 3.0),
         startSpeed: new ConstantValue(1),

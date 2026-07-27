@@ -83,8 +83,14 @@ export class SpriteBatch extends VFXBatch {
         const vertexData = new VertexData();
         vertexData.positions = this.settings.instancingGeometry;
         vertexData.indices = this.settings.instancingIndices;
-        if (this.settings.instancingUVs) {
-            vertexData.uvs = this.settings.instancingUVs;
+        const vertexCount = this.settings.instancingGeometry.length / 3;
+        const uvs = this.settings.instancingUVs;
+        // WebGL (especially iOS) raises INVALID_OPERATION if the shader reads
+        // `attribute vec2 uv` but the buffer is missing or shorter than vertices.
+        if (uvs && uvs.length >= vertexCount * 2) {
+            vertexData.uvs = uvs;
+        } else {
+            vertexData.uvs = new Float32Array(vertexCount * 2);
         }
         if (this.settings.instancingNormals) {
             vertexData.normals = this.settings.instancingNormals;

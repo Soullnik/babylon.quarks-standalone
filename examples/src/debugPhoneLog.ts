@@ -130,7 +130,7 @@ export function mountPhoneDebugLogUi() {
     });
 
     tryEnvBtn?.addEventListener("click", () => {
-        push("INF", "Try env: enabling SpriteBatch.meshEnvEnabled and reloading MeshMaterialDemo");
+        push("INF", ["Try env: enabling SpriteBatch.meshEnvEnabled and reloading MeshMaterialDemo"]);
         window.dispatchEvent(new CustomEvent("phone-debug-try-env"));
     });
 }

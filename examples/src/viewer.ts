@@ -305,7 +305,12 @@ function dumpMeshDiagnostics(reason: string) {
                         "geom",
                         ps.rendererSettings.instancingGeometry?.length,
                         "normals",
-                        ps.rendererSettings.instancingNormals?.length
+                        ps.rendererSettings.instancingNormals?.length,
+                        "uvs",
+                        ps.rendererSettings.instancingUVs?.length,
+                        "uvOk",
+                        (ps.rendererSettings.instancingUVs?.length ?? 0) >=
+                            ((ps.rendererSettings.instancingGeometry?.length ?? 0) / 3) * 2
                     );
                 }
             }

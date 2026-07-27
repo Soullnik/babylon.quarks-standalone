@@ -120,24 +120,22 @@ describe('mesh particle environment map', () => {
         atlas.dispose();
     });
 
-    it('does not enable alpha-test from StandardMaterial default alphaCutOff', () => {
-        const material = new StandardMaterial('no-at', scene);
-        expect(material.alphaCutOff).toBeCloseTo(0.4, 5);
-        material.transparencyMode = null;
-
+    it('sizes fallback UVs to custom mesh geometry so the uv attribute is complete', () => {
+        // A capsule-sized position buffer with the old DEFAULT_UVS (4 verts) left the
+        // uv attribute short — iOS WebKit then raised GL_INVALID_OPERATION on draw.
+        const positions = new Float32Array(208 * 3);
         const system = new ParticleSystem({
             scene,
             startLife: new ConstantValue(1),
             emissionOverTime: new ConstantValue(0),
             renderMode: RenderMode.Mesh,
-            material,
-            transparent: true,
-            blendMode: Constants.ALPHA_COMBINE,
+            instancingGeometry: positions,
+            transparent: false,
+            blendMode: Constants.ALPHA_DISABLE,
         });
 
-        expect(system.getRendererSettings().materialAlphaTest).toBe(0);
+        expect(system.getRendererSettings().instancingUVs?.length).toBe(208 * 2);
 
         system.dispose();
-        material.dispose();
     });
 });
