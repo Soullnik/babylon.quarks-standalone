@@ -32,6 +32,13 @@ import local_particle_physics_vert_wgsl from './shaders/local_particle_physics_v
 import {registerShaders, shaderLanguageFor, ShaderSources} from './shaders/shaderLanguageSupport';
 
 export class SpriteBatch extends VFXBatch {
+    /**
+     * Temporary gate for mesh env-atlas sampling. iOS WebKit still raises
+     * GL_INVALID_OPERATION when USE_ENVMAP_ATLAS is active; leave false until
+     * that path is fixed. Toggled from the phone Logs → Try env button.
+     */
+    static meshEnvEnabled = false;
+
     private static whiteTextureByScene = new WeakMap<Scene, RawTexture>();
 
     /** 1×1 white map so mesh batches always have a sampler2D (iOS WebKit). */
@@ -176,10 +183,7 @@ export class SpriteBatch extends VFXBatch {
         }
         const atlas = this.settings.reflectionAtlas;
         // Env atlas sampling still raises GL_INVALID_OPERATION on iOS WebKit.
-        // Gated behind demoState / URL until that path is fixed; lit+map draws.
-        const envAllowed =
-            typeof window !== 'undefined' &&
-            (window as {__QUARKS_MESH_ENV__?: boolean}).__QUARKS_MESH_ENV__ === true;
+        const envAllowed = SpriteBatch.meshEnvEnabled;
         const atlasPending =
             envAllowed && this.settings.renderMode === RenderMode.Mesh && !!atlas && !atlas.isReady();
         if (atlasPending && atlas) {

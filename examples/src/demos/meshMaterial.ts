@@ -71,10 +71,7 @@ export async function init({scene, camera, batchRenderer, systems, demoState}: D
 
     // Prebuild the atlas for the debug "Try env" path, but do not attach it
     // unless explicitly requested — sampling it on iOS currently yields 1282.
-    const wantEnv =
-        !!(demoState as {meshEnvEnabled?: boolean}).meshEnvEnabled ||
-        (typeof window !== 'undefined' &&
-            (window as {__QUARKS_MESH_ENV__?: boolean}).__QUARKS_MESH_ENV__ === true);
+    const wantEnv = !!(demoState as {meshEnvEnabled?: boolean}).meshEnvEnabled;
     const envAtlas = wantEnv ? await createEnvAtlas(scene) : null;
 
     const meshMaterial = new StandardMaterial('meshParticleMaterial', scene);

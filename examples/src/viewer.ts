@@ -5,7 +5,7 @@ import {Vector3 as BVector3} from "@babylonjs/core/Maths/math.vector";
 import {Color4} from "@babylonjs/core/Maths/math.color";
 import {ShaderMaterial} from "@babylonjs/core/Materials/shaderMaterial";
 import {Logger} from "@babylonjs/core/Misc/logger";
-import {BatchedRenderer, ParticleSystem, RenderMode} from "babylon.quarks";
+import {BatchedRenderer, ParticleSystem, RenderMode, SpriteBatch} from "babylon.quarks";
 import {loadQuarksFromJson} from "./loadQuarksJson";
 import {createEngineFromQuery} from "./shared/engineFactory";
 import {ensurePortableTextureUrl, serializeEffectForest} from "babylon.quarks-editor";
@@ -258,7 +258,7 @@ function dumpMeshDiagnostics(reason: string) {
                 "atlasReady",
                 settings.reflectionAtlas ? settings.reflectionAtlas.isReady() : false,
                 "envFlag",
-                !!(window as {__QUARKS_MESH_ENV__?: boolean}).__QUARKS_MESH_ENV__,
+                SpriteBatch.meshEnvEnabled,
                 "noMip",
                 (settings.reflectionTexture as any)?.noMipmap ?? (settings.reflectionTexture as any)?._noMipmap,
                 "samp",
@@ -506,7 +506,7 @@ mountPhoneDebugLogUi();
 window.addEventListener("phone-debug-dump", () => dumpMeshDiagnostics("manual"));
 window.addEventListener("phone-debug-try-env", () => {
     demoState.meshEnvEnabled = true;
-    (window as {__QUARKS_MESH_ENV__?: boolean}).__QUARKS_MESH_ENV__ = true;
+    SpriteBatch.meshEnvEnabled = true;
     const meshIndex = demos.findIndex((demoItem) => demoItem.key === "MeshMaterialDemo");
     if (meshIndex >= 0) {
         demoIndex = meshIndex;

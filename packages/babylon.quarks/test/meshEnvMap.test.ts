@@ -77,7 +77,7 @@ describe('mesh particle environment map', () => {
         system.dispose();
     });
 
-    it('keeps USE_ENVMAP_ATLAS gated off unless the window flag is set', () => {
+    it('keeps USE_ENVMAP_ATLAS gated off unless SpriteBatch.meshEnvEnabled', () => {
         const atlas = new Texture('data:atlas2', scene, {
             noMipmap: true,
             invertY: false,
@@ -108,13 +108,11 @@ describe('mesh particle environment map', () => {
         expect(defines).toContain('USE_MAP');
         expect(defines).not.toContain('USE_ENVMAP_ATLAS');
 
-        const root = globalThis as {__QUARKS_MESH_ENV__?: boolean; window?: unknown};
-        root.window = root;
-        root.__QUARKS_MESH_ENV__ = true;
+        SpriteBatch.meshEnvEnabled = true;
         (renderer.batches[0] as SpriteBatch).rebuildMaterial();
         defines = (renderer.batches[0].mesh.material as any).options.defines as string[];
         expect(defines).toContain('USE_ENVMAP_ATLAS');
-        delete root.__QUARKS_MESH_ENV__;
+        SpriteBatch.meshEnvEnabled = false;
 
         renderer.dispose();
         system.dispose();

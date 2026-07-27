@@ -130,8 +130,7 @@ export function mountPhoneDebugLogUi() {
     });
 
     tryEnvBtn?.addEventListener("click", () => {
-        (window as {__QUARKS_MESH_ENV__?: boolean}).__QUARKS_MESH_ENV__ = true;
-        push("INF", "Try env: __QUARKS_MESH_ENV__=true — reloading MeshMaterialDemo");
+        push("INF", "Try env: enabling SpriteBatch.meshEnvEnabled and reloading MeshMaterialDemo");
         window.dispatchEvent(new CustomEvent("phone-debug-try-env"));
     });
 }
