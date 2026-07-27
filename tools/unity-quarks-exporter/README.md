@@ -97,8 +97,9 @@ gradients sample both color and alpha keys.
   the Z axis only.
 - **Texture Sheet Animation:** the frame animation is exported as a full linear sweep over the
   sheet; Unity's `frameOverTime` curve / cycle semantics aren't mapped 1:1.
-- **Blend mode** is inferred from the material's shader name / `_DstBlend`; unusual custom shaders
-  default to alpha blend.
+- **Blend mode** is inferred from the material's shader name / `_SrcBlend`/`_DstBlend`.
+  Alpha Blended / Premultiply map to alpha blend; Additive → additive; Multiply/Modulate →
+  multiply. Unusual custom shaders default to alpha blend.
 - **Mesh env map:** if the particle material exposes a Cubemap (`_Cube`, `_Cubemap`,
   `_ReflectionCubemap`, …, or any Cubemap-typed texture property), it is baked into a 3×2
   `reflectionAtlas` (px py pz / nx ny nz) so babylon.quarks can sample reflections on iOS.

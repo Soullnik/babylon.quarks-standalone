@@ -225,13 +225,14 @@ namespace BabylonQuarks.UnityExporter
         /// </summary>
         private static Texture2D ReadCubemapFace(Cubemap cube, CubemapFace face, int size)
         {
+            int faceSize = cube.width;
+
             // Prefer CPU read when the cubemap is readable.
             try
             {
                 Color[] pixels = cube.GetPixels(face);
                 if (pixels != null && pixels.Length > 0)
                 {
-                    int faceSize = cube.width;
                     var full = new Texture2D(faceSize, faceSize, TextureFormat.RGBA32, false, false);
                     full.SetPixels(pixels);
                     full.Apply(false, false);
@@ -247,7 +248,6 @@ namespace BabylonQuarks.UnityExporter
             }
 
             RenderTexture previous = RenderTexture.active;
-            int faceSize = cube.width;
             RenderTexture rt = RenderTexture.GetTemporary(
                 faceSize, faceSize, 0, RenderTextureFormat.ARGB32, RenderTextureReadWrite.sRGB);
             Texture2D readable = null;
@@ -463,11 +463,23 @@ namespace BabylonQuarks.UnityExporter
             // quarks/Babylon blend ints: 1 = additive, 2 = alpha blend, 3 = subtract, 4 = multiply.
             if (mat == null) return 2;
             string sn = mat.shader != null ? mat.shader.name.ToLowerInvariant() : "";
+
+            // Name checks — order matters: "Alpha Blended Premultiply" contains "multiply"
+            // as a substring and must NOT be treated as multiply.
             if (sn.Contains("additive")) return 1;
-            if (sn.Contains("multiply")) return 4;
-            if (mat.HasProperty("_DstBlend") && (int)mat.GetFloat("_DstBlend") == 1)
+            if (sn.Contains("premultiply") || sn.Contains("alpha blend") || sn.Contains("alphablend"))
+                return 2;
+            if (sn.Contains("multiply") || sn.Contains("modulate")) return 4;
+
+            // Fall back to GPU blend factors when the shader name is uninformative
+            // (e.g. Particles/Standard Unlit).
+            if (mat.HasProperty("_DstBlend"))
             {
-                return 1; // DstBlend == One → additive
+                int dst = (int)mat.GetFloat("_DstBlend");
+                int src = mat.HasProperty("_SrcBlend") ? (int)mat.GetFloat("_SrcBlend") : -1;
+                // UnityEngine.Rendering.BlendMode: One=1, DstColor=2, Zero=0
+                if (dst == 1) return 1; // DstBlend == One → additive
+                if (src == 2) return 4; // Src = DstColor → multiply/modulate
             }
             return 2;
         }
