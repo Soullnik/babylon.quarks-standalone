@@ -18,47 +18,47 @@ var mapSampler: sampler;
 var map: texture_2d<f32>;
 #endif
 
-#ifdef USE_ENVMAP_FACES
-var envPosXSampler: sampler;
-var envPosX: texture_2d<f32>;
-var envPosYSampler: sampler;
-var envPosY: texture_2d<f32>;
-var envPosZSampler: sampler;
-var envPosZ: texture_2d<f32>;
-var envNegXSampler: sampler;
-var envNegX: texture_2d<f32>;
-var envNegYSampler: sampler;
-var envNegY: texture_2d<f32>;
-var envNegZSampler: sampler;
-var envNegZ: texture_2d<f32>;
+#ifdef USE_ENVMAP_ATLAS
+var envAtlasSampler: sampler;
+var envAtlas: texture_2d<f32>;
 uniform eyePosition: vec3f;
 uniform reflectionLevel: f32;
 
-fn sampleEnvFaces(r: vec3f) -> vec3f {
+fn sampleEnvAtlas(r: vec3f) -> vec3f {
     let a = abs(r);
-    var uv: vec2f;
+    var localUV: vec2f;
+    var cellX: f32;
+    var cellY: f32;
     if (a.x >= a.y && a.x >= a.z) {
+        cellX = 0.0;
         if (r.x >= 0.0) {
-            uv = vec2f(-r.z, -r.y) / a.x * 0.5 + 0.5;
-            return textureSample(envPosX, envPosXSampler, uv).rgb;
+            cellY = 0.0;
+            localUV = vec2f(-r.z, -r.y) / a.x * 0.5 + 0.5;
+        } else {
+            cellY = 1.0;
+            localUV = vec2f(r.z, -r.y) / a.x * 0.5 + 0.5;
         }
-        uv = vec2f(r.z, -r.y) / a.x * 0.5 + 0.5;
-        return textureSample(envNegX, envNegXSampler, uv).rgb;
-    }
-    if (a.y >= a.z) {
+    } else if (a.y >= a.z) {
+        cellX = 1.0;
         if (r.y >= 0.0) {
-            uv = vec2f(r.x, r.z) / a.y * 0.5 + 0.5;
-            return textureSample(envPosY, envPosYSampler, uv).rgb;
+            cellY = 0.0;
+            localUV = vec2f(r.x, r.z) / a.y * 0.5 + 0.5;
+        } else {
+            cellY = 1.0;
+            localUV = vec2f(r.x, -r.z) / a.y * 0.5 + 0.5;
         }
-        uv = vec2f(r.x, -r.z) / a.y * 0.5 + 0.5;
-        return textureSample(envNegY, envNegYSampler, uv).rgb;
+    } else {
+        cellX = 2.0;
+        if (r.z >= 0.0) {
+            cellY = 0.0;
+            localUV = vec2f(r.x, -r.y) / a.z * 0.5 + 0.5;
+        } else {
+            cellY = 1.0;
+            localUV = vec2f(-r.x, -r.y) / a.z * 0.5 + 0.5;
+        }
     }
-    if (r.z >= 0.0) {
-        uv = vec2f(r.x, -r.y) / a.z * 0.5 + 0.5;
-        return textureSample(envPosZ, envPosZSampler, uv).rgb;
-    }
-    uv = vec2f(-r.x, -r.y) / a.z * 0.5 + 0.5;
-    return textureSample(envNegZ, envNegZSampler, uv).rgb;
+    let uv = (vec2f(cellX, cellY) + clamp(localUV, vec2f(0.0), vec2f(1.0))) / vec2f(3.0, 2.0);
+    return textureSample(envAtlas, envAtlasSampler, uv).rgb;
 }
 #endif
 
@@ -101,10 +101,10 @@ fn main(input: FragmentInputs) -> FragmentOutputs {
 
     var color = baseColor.rgb * litColor;
 
-#ifdef USE_ENVMAP_FACES
+#ifdef USE_ENVMAP_ATLAS
     let viewDir = normalize(fragmentInputs.vWorldPos - uniforms.eyePosition);
     let reflectionCoords = reflect(viewDir, N);
-    color += sampleEnvFaces(reflectionCoords) * uniforms.reflectionLevel;
+    color += sampleEnvAtlas(reflectionCoords) * uniforms.reflectionLevel;
 #endif
 
     var finalColor = vec4f(color, baseColor.a);

@@ -1,7 +1,6 @@
 import type { DemoContext } from '../types';
 import {Vector3 as BVector3} from '@babylonjs/core/Maths/math.vector';
 import {StandardMaterial} from '@babylonjs/core/Materials/standardMaterial';
-import {CubeTexture} from '@babylonjs/core/Materials/Textures/cubeTexture';
 import {Texture} from '@babylonjs/core/Materials/Textures/texture';
 import {MeshBuilder} from '@babylonjs/core/Meshes/meshBuilder';
 import {VertexBuffer} from '@babylonjs/core/Buffers/buffer';
@@ -19,36 +18,67 @@ import {
     Vector4,
 } from 'babylon.quarks';
 
-export function init({scene, camera, batchRenderer, systems}: DemoContext) {
+const ENV_FACE_URLS = [
+    'textures/cube/posx.jpg',
+    'textures/cube/posy.jpg',
+    'textures/cube/posz.jpg',
+    'textures/cube/negx.jpg',
+    'textures/cube/negy.jpg',
+    'textures/cube/negz.jpg',
+] as const;
+
+/** Loads one image URL as an HTMLImageElement. */
+function loadImage(url: string): Promise<HTMLImageElement> {
+    return new Promise((resolve, reject) => {
+        const image = new Image();
+        image.crossOrigin = 'anonymous';
+        image.onload = () => resolve(image);
+        image.onerror = () => reject(new Error(`Failed to load ${url}`));
+        image.src = url;
+    });
+}
+
+/**
+ * Packs the six cube faces into one 3×2 atlas. Mesh particles sample this with a
+ * single sampler2D — six separate face samplers (and samplerCube) both raise
+ * GL_INVALID_OPERATION on iOS WebKit and drop the draw.
+ */
+async function createEnvAtlas(scene: DemoContext['scene']): Promise<Texture> {
+    const images = await Promise.all(ENV_FACE_URLS.map((url) => loadImage(url)));
+    const size = images[0].width;
+    const canvas = document.createElement('canvas');
+    canvas.width = size * 3;
+    canvas.height = size * 2;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) {
+        throw new Error('Could not create env atlas canvas');
+    }
+    for (let i = 0; i < 6; i++) {
+        ctx.drawImage(images[i], (i % 3) * size, Math.floor(i / 3) * size, size, size);
+    }
+    const atlas = new Texture(canvas.toDataURL('image/jpeg', 0.92), scene, {
+        noMipmap: true,
+        invertY: false,
+        samplingMode: Texture.LINEAR_LINEAR,
+    });
+    atlas.name = 'meshEnvAtlas';
+    atlas.level = 1;
+    return atlas;
+}
+
+export async function init({scene, camera, batchRenderer, systems}: DemoContext) {
     camera.setPosition(new BVector3(0, 6, 16));
 
-    // noMipmap: true — on iOS WebKit, a cube that expects mipmaps but never gets a
-    // complete chain throws GL_INVALID_OPERATION (1282) on every draw, so the
-    // particle batch is culled while the CPU count keeps moving.
-    const envMap = CubeTexture.CreateFromImages(
-        [
-            'textures/cube/posx.jpg',
-            'textures/cube/posy.jpg',
-            'textures/cube/posz.jpg',
-            'textures/cube/negx.jpg',
-            'textures/cube/negy.jpg',
-            'textures/cube/negz.jpg',
-        ],
-        scene,
-        true
-    );
-    envMap.coordinatesMode = Texture.CUBIC_MODE;
-    envMap.updateSamplingMode(Texture.LINEAR_LINEAR);
+    const envAtlas = await createEnvAtlas(scene);
 
-    // StandardMaterial is the public API surface: applyMaterialSettings reads
-    // reflectionTexture into the mesh batch. Do not assign it to a scene mesh —
-    // compiling Standard + cubemap on a dummy mesh has broken draws on iOS WebKit
-    // while the particle count still ticks.
+    // StandardMaterial stays the public API; reflectionAtlas is read by
+    // applyMaterialSettings for the mesh batch (2D atlas, not samplerCube).
     const meshMaterial = new StandardMaterial('meshParticleMaterial', scene);
     meshMaterial.backFaceCulling = false;
     meshMaterial.alpha = 0.95;
     meshMaterial.transparencyMode = null;
-    meshMaterial.reflectionTexture = envMap;
+    (meshMaterial as any).reflectionAtlas = envAtlas;
+    (meshMaterial as any).reflectionLevel = 1;
 
     const particleMesh = MeshBuilder.CreateCapsule(
         'meshParticleGeo',

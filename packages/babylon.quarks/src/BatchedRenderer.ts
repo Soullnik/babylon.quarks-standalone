@@ -36,11 +36,16 @@ export interface VFXBatchSettings {
     /** Multiplier for the reflection sample — mirrors `texture.level`. */
     reflectionLevel: number;
     /**
-     * Optional six cube-face 2D textures (px,py,pz,nx,ny,nz). Preferred over
-     * `reflectionTexture` for sampling: samplerCube on ShaderMaterial hits
-     * GL_INVALID_OPERATION on iOS WebKit, so mesh env uses face samplers.
+     * Optional six cube-face 2D textures (px,py,pz,nx,ny,nz). Prefer
+     * `reflectionAtlas` on iOS — many simultaneous face samplers still trip
+     * GL_INVALID_OPERATION on WebKit.
      */
     reflectionFaces: BaseTexture[] | null;
+    /**
+     * Single 3×2 atlas of cube faces (px py pz / nx ny nz). One sampler2D —
+     * the path that stays valid on iOS WebKit ShaderMaterial draws.
+     */
+    reflectionAtlas: BaseTexture | null;
     layerMask: number;
 }
 
@@ -135,6 +140,7 @@ export class BatchedRenderer extends TransformNode {
             a.reflectionTexture === b.reflectionTexture &&
             a.reflectionLevel === b.reflectionLevel &&
             reflectionFacesEqual(a.reflectionFaces, b.reflectionFaces) &&
+            a.reflectionAtlas === b.reflectionAtlas &&
             a.renderMode === b.renderMode &&
             a.blendTiles === b.blendTiles &&
             a.softParticles === b.softParticles &&

@@ -1,7 +1,6 @@
 import {NullEngine} from '@babylonjs/core/Engines/nullEngine';
 import {Scene} from '@babylonjs/core/scene';
 import {StandardMaterial} from '@babylonjs/core/Materials/standardMaterial';
-import {CubeTexture} from '@babylonjs/core/Materials/Textures/cubeTexture';
 import {Texture} from '@babylonjs/core/Materials/Textures/texture';
 import {Constants} from '@babylonjs/core/Engines/constants';
 import {ConstantColor, ConstantValue, PointEmitter, Vector4} from 'quarks.core';
@@ -24,21 +23,16 @@ describe('mesh particle environment map', () => {
         engine.dispose();
     });
 
-    /** Placeholder cube texture — NullEngine never samples it; settings only need isCube + level. */
-    function makeEnv(tag: string, level = 1): CubeTexture {
-        const env = CubeTexture.CreateFromImages(
-            [0, 1, 2, 3, 4, 5].map((i) => `data:${tag}/${i}`),
-            scene,
-            true
-        );
-        env.level = level;
-        return env;
-    }
-
-    it('harvests reflectionTexture and expands cube files into six face textures', () => {
-        const env = makeEnv('harvest', 0.75);
+    it('harvests reflectionAtlas from the material into renderer settings', () => {
+        const atlas = new Texture('data:atlas', scene, {
+            noMipmap: true,
+            invertY: true,
+            samplingMode: Texture.LINEAR_LINEAR,
+        });
+        atlas.level = 0.8;
         const material = new StandardMaterial('env-mat', scene);
-        material.reflectionTexture = env;
+        (material as any).reflectionAtlas = atlas;
+        (material as any).reflectionLevel = 0.8;
 
         const system = new ParticleSystem({
             scene,
@@ -50,73 +44,24 @@ describe('mesh particle environment map', () => {
             blendMode: Constants.ALPHA_COMBINE,
         });
 
-        expect(system.getRendererSettings().reflectionTexture).toBe(env);
-        expect(system.getRendererSettings().reflectionLevel).toBeCloseTo(0.75, 5);
-        expect(system.getRendererSettings().reflectionFaces?.length).toBe(6);
+        expect(system.getRendererSettings().reflectionAtlas).toBe(atlas);
+        expect(system.getRendererSettings().reflectionLevel).toBeCloseTo(0.8, 5);
 
         system.dispose();
         material.dispose();
-        env.dispose();
+        atlas.dispose();
     });
 
-    it('batches mesh systems with different env maps separately', () => {
-        const envA = makeEnv('a');
-        const envB = makeEnv('b');
-        const matA = new StandardMaterial('env-a', scene);
-        matA.reflectionTexture = envA;
-        const matB = new StandardMaterial('env-b', scene);
-        matB.reflectionTexture = envB;
-
-        const make = (material: StandardMaterial) =>
-            new ParticleSystem({
-                scene,
-                startLife: new ConstantValue(1),
-                emissionOverTime: new ConstantValue(10),
-                startColor: new ConstantColor(new Vector4(1, 1, 1, 1)),
-                startSize: new ConstantValue(0.1),
-                startSpeed: new ConstantValue(0),
-                shape: new PointEmitter(),
-                renderMode: RenderMode.Mesh,
-                material,
-                transparent: true,
-                blendMode: Constants.ALPHA_COMBINE,
-            });
-
-        const renderer = new BatchedRenderer('env-batch', scene);
-        const systemA = make(matA);
-        const systemB = make(matB);
-        renderer.addSystem(systemA);
-        renderer.addSystem(systemB);
-
-        expect(renderer.batches.length).toBe(2);
-        expect(renderer.batches[0]).toBeInstanceOf(SpriteBatch);
-        expect(renderer.batches[0].settings.reflectionTexture).toBe(envA);
-        expect(renderer.batches[1].settings.reflectionTexture).toBe(envB);
-
-        renderer.dispose();
-        systemA.dispose();
-        systemB.dispose();
-        matA.dispose();
-        matB.dispose();
-        envA.dispose();
-        envB.dispose();
-    });
-
-    it('enables USE_ENVMAP_FACES when six face textures are ready', () => {
-        const faces = [0, 1, 2, 3, 4, 5].map(
-            (i) =>
-                new Texture(`data:face/${i}`, scene, {
-                    noMipmap: true,
-                    invertY: false,
-                    samplingMode: Texture.LINEAR_LINEAR,
-                })
-        );
-        for (const face of faces) {
-            jest.spyOn(face, 'isReady').mockReturnValue(true);
-        }
+    it('enables USE_ENVMAP_ATLAS and USE_MAP on the mesh ShaderMaterial', () => {
+        const atlas = new Texture('data:atlas2', scene, {
+            noMipmap: true,
+            invertY: true,
+            samplingMode: Texture.LINEAR_LINEAR,
+        });
+        jest.spyOn(atlas, 'isReady').mockReturnValue(true);
 
         const material = new StandardMaterial('env-shader', scene);
-        (material as any).reflectionFaces = faces;
+        (material as any).reflectionAtlas = atlas;
 
         const system = new ParticleSystem({
             scene,
@@ -136,16 +81,16 @@ describe('mesh particle environment map', () => {
 
         const batch = renderer.batches[0] as SpriteBatch;
         const defines = (batch.mesh.material as any).options.defines as string[];
-        expect(defines).toContain('USE_ENVMAP_FACES');
+        expect(defines).toContain('USE_ENVMAP_ATLAS');
+        expect(defines).toContain('USE_MAP');
         expect(defines).not.toContain('USE_ENVMAP');
+        expect(defines).not.toContain('USE_ENVMAP_FACES');
         expect(defines).not.toContain('USE_ALPHATEST');
 
         renderer.dispose();
         system.dispose();
         material.dispose();
-        for (const face of faces) {
-            face.dispose();
-        }
+        atlas.dispose();
     });
 
     it('does not enable alpha-test from StandardMaterial default alphaCutOff', () => {

@@ -497,6 +497,7 @@ export class ParticleSystem implements IParticleSystem {
             reflectionTexture: null,
             reflectionLevel: 1,
             reflectionFaces: null,
+            reflectionAtlas: null,
             layerMask: parameters.layerMask ?? 0x0FFFFFFF,
         };
         if (this.rendererSettings.renderMode === RenderMode.Mesh && !this.rendererSettings.instancingNormals) {
@@ -551,6 +552,7 @@ export class ParticleSystem implements IParticleSystem {
             depthWrite?: boolean;
             alphaTest?: number;
             texture?: Texture | null;
+            reflectionAtlas?: BaseTexture | null;
             layerMask?: number;
         } = {}
     ) {
@@ -620,12 +622,19 @@ export class ParticleSystem implements IParticleSystem {
 
         this.rendererSettings.texture = resolvedTexture;
         this.rendererSettings.reflectionTexture = resolvedReflection;
-        this.rendererSettings.reflectionLevel = resolvedReflectionLevel;
-        this.rendererSettings.reflectionFaces = this.resolveReflectionFaces(
-            material,
-            resolvedReflection,
-            overrides as {reflectionFaces?: BaseTexture[] | null}
-        );
+        this.rendererSettings.reflectionLevel =
+            typeof material?.reflectionLevel === 'number'
+                ? material.reflectionLevel
+                : resolvedReflectionLevel;
+        this.rendererSettings.reflectionAtlas =
+            material?.reflectionAtlas ??
+            overrides.reflectionAtlas ??
+            this.rendererSettings.reflectionAtlas ??
+            null;
+        // Do not expand cube files into six face textures anymore — that path
+        // still trips GL_INVALID_OPERATION on iOS. Prefer a single atlas.
+        this.rendererSettings.reflectionFaces =
+            material?.reflectionFaces?.length === 6 ? material.reflectionFaces : null;
         this.rendererSettings.materialBlendMode = resolvedBlendMode;
         this.rendererSettings.materialTransparent = resolvedTransparent;
         this.rendererSettings.materialDepthTest = resolvedDepthTest;
@@ -635,47 +644,6 @@ export class ParticleSystem implements IParticleSystem {
             this.rendererSettings.layerMask = overrides.layerMask;
         }
         this.neededToUpdateRender = true;
-    }
-
-    /**
-     * Builds six 2D face textures for mesh env sampling. samplerCube on a
-     * ShaderMaterial triggers GL_INVALID_OPERATION on iOS WebKit; face
-     * samplers do not.
-     */
-    private resolveReflectionFaces(
-        material: any,
-        reflection: any,
-        overrides: {reflectionFaces?: BaseTexture[] | null}
-    ): BaseTexture[] | null {
-        if (overrides.reflectionFaces !== undefined) {
-            return overrides.reflectionFaces;
-        }
-        if (material?.reflectionFaces?.length === 6) {
-            return material.reflectionFaces;
-        }
-        const files = reflection?.isCube ? (reflection as {_files?: string[]})._files : null;
-        if (!files || files.length !== 6) {
-            return this.rendererSettings.reflectionFaces;
-        }
-        const previous = this.rendererSettings.reflectionFaces;
-        if (
-            previous?.length === 6 &&
-            previous.every((face, i) => (face as Texture).url === files[i] || face?.name === files[i])
-        ) {
-            return previous;
-        }
-        const scene = this.sceneRef ?? this.emitter?.getScene?.();
-        if (!scene) {
-            return null;
-        }
-        return files.map(
-            (url) =>
-                new Texture(url, scene, {
-                    noMipmap: true,
-                    invertY: false,
-                    samplingMode: Texture.LINEAR_LINEAR,
-                })
-        );
     }
 
     pause() { this.paused = true; }
