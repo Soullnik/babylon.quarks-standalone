@@ -116,10 +116,22 @@ function finishEnvelope(object: Record<string, unknown>, meta: SerializeMeta): s
     const textures: Array<{uuid: string; image?: string}> = [];
     for (const [uuid, tex] of Object.entries(meta.textures)) {
         const url = tex?.url ?? tex?.name;
+        const invertY = typeof tex?.invertY === 'boolean' ? tex.invertY : undefined;
+        const isEnvAtlas =
+            tex?.name === 'quarksEnvAtlas' ||
+            (typeof tex?.name === 'string' && tex.name.endsWith('_envAtlas'));
         if (url) {
             const imageUuid = `${uuid}-image`;
             images.push({uuid: imageUuid, url});
-            textures.push({uuid, image: imageUuid});
+            const entry: {uuid: string; image?: string; invertY?: boolean; noMipmap?: boolean} = {
+                uuid,
+                image: imageUuid,
+            };
+            if (invertY === false || isEnvAtlas) {
+                entry.invertY = false;
+                entry.noMipmap = true;
+            }
+            textures.push(entry);
         } else {
             textures.push({uuid});
         }

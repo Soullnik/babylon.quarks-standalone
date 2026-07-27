@@ -2,6 +2,7 @@ import type { DemoContext } from '../types';
 import {Vector3 as BVector3} from '@babylonjs/core/Maths/math.vector';
 import {StandardMaterial} from '@babylonjs/core/Materials/standardMaterial';
 import {Texture} from '@babylonjs/core/Materials/Textures/texture';
+import {CubeTexture} from '@babylonjs/core/Materials/Textures/cubeTexture';
 import {MeshBuilder} from '@babylonjs/core/Meshes/meshBuilder';
 import {VertexBuffer} from '@babylonjs/core/Buffers/buffer';
 import {Constants} from '@babylonjs/core/Engines/constants';
@@ -25,54 +26,21 @@ const ENV_FACE_URLS = [
     'textures/cube/negx.jpg',
     'textures/cube/negy.jpg',
     'textures/cube/negz.jpg',
-] as const;
-
-/** Loads one image URL as an HTMLImageElement. */
-function loadImage(url: string): Promise<HTMLImageElement> {
-    return new Promise((resolve, reject) => {
-        const image = new Image();
-        image.crossOrigin = 'anonymous';
-        image.onload = () => resolve(image);
-        image.onerror = () => reject(new Error(`Failed to load ${url}`));
-        image.src = url;
-    });
-}
-
-/** Packs the six cube faces into one 3×2 atlas (px py pz / nx ny nz). */
-async function createEnvAtlas(scene: DemoContext['scene']): Promise<Texture> {
-    const images = await Promise.all(ENV_FACE_URLS.map((url) => loadImage(url)));
-    const size = images[0].width;
-    const canvas = document.createElement('canvas');
-    canvas.width = size * 3;
-    canvas.height = size * 2;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) {
-        throw new Error('Could not create env atlas canvas');
-    }
-    for (let i = 0; i < 6; i++) {
-        ctx.drawImage(images[i], (i % 3) * size, Math.floor(i / 3) * size, size, size);
-    }
-    const atlas = new Texture(canvas.toDataURL('image/jpeg', 0.92), scene, {
-        noMipmap: true,
-        invertY: false,
-        samplingMode: Texture.LINEAR_LINEAR,
-    });
-    atlas.name = 'meshEnvAtlas';
-    atlas.level = 1;
-    return atlas;
-}
+];
 
 export async function init({scene, camera, batchRenderer, systems}: DemoContext) {
     camera.setPosition(new BVector3(0, 6, 16));
 
-    const envAtlas = await createEnvAtlas(scene);
+    // Native Babylon cubemap — ParticleSystem harvest builds the iOS-safe 3×2 atlas.
+    const envMap = CubeTexture.CreateFromImages(ENV_FACE_URLS, scene, true);
+    envMap.coordinatesMode = Texture.CUBIC_MODE;
+    envMap.level = 1;
 
     const meshMaterial = new StandardMaterial('meshParticleMaterial', scene);
     meshMaterial.backFaceCulling = false;
     meshMaterial.alpha = 1;
     meshMaterial.transparencyMode = null;
-    (meshMaterial as any).reflectionAtlas = envAtlas;
-    (meshMaterial as any).reflectionLevel = 1;
+    meshMaterial.reflectionTexture = envMap;
 
     // Same class of texture AlphaTest / SubEmitter use successfully on iPhone.
     const diffuse = new Texture('textures/particle_default.png', scene);

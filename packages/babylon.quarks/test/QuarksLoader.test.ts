@@ -515,6 +515,84 @@ describe('QuarksLoader matrix decomposition', () => {
         engine.dispose();
     });
 
+    it('loads mesh normals and reflectionAtlas from QuarksMaterial JSON', () => {
+        const engine = new NullEngine();
+        const scene = new Scene(engine);
+
+        const root = new QuarksLoader(scene).parse(
+            {
+                images: [
+                    {uuid: 'img-diff', url: 'textures/particle_default.png'},
+                    {uuid: 'img-atlas', url: 'textures/cube/posx.jpg'},
+                ],
+                textures: [
+                    {uuid: 'tex-diff', image: 'img-diff'},
+                    {uuid: 'tex-atlas', image: 'img-atlas', invertY: false, noMipmap: true},
+                ],
+                materials: [
+                    {
+                        uuid: 'mat-1',
+                        type: 'QuarksMaterial',
+                        transparent: false,
+                        alphaMode: Constants.ALPHA_DISABLE,
+                        texture: 'tex-diff',
+                        reflectionAtlas: 'tex-atlas',
+                        reflectionLevel: 0.85,
+                    },
+                ],
+                geometries: [
+                    {
+                        uuid: 'geo-1',
+                        type: 'QuarksGeometry',
+                        positions: [0, 0, 0, 1, 0, 0, 0, 1, 0],
+                        indices: [0, 1, 2],
+                        uvs: [0, 0, 1, 0, 0, 1],
+                        normals: [0, 1, 0, 0, 1, 0, 0, 1, 0],
+                    },
+                ],
+                object: {
+                    uuid: 'emitter-mesh',
+                    type: 'ParticleEmitter',
+                    ps: {
+                        version: '2.0',
+                        looping: true,
+                        duration: 1,
+                        startLife: {type: 'ConstantValue', value: 1},
+                        startSpeed: {type: 'ConstantValue', value: 0},
+                        startSize: {type: 'ConstantValue', value: 1},
+                        startColor: {type: 'ConstantColor', color: {r: 1, g: 1, b: 1, a: 1}},
+                        startRotation: {type: 'ConstantValue', value: 0},
+                        emissionOverTime: {type: 'ConstantValue', value: 0},
+                        emissionOverDistance: {type: 'ConstantValue', value: 0},
+                        shape: {type: 'point'},
+                        renderMode: 2,
+                        instancingGeometry: 'geo-1',
+                        material: 'mat-1',
+                        worldSpace: true,
+                        uTileCount: 1,
+                        vTileCount: 1,
+                        startTileIndex: {type: 'ConstantValue', value: 0},
+                        behaviors: [],
+                    },
+                },
+            },
+            ''
+        );
+
+        const emitter =
+            root instanceof ParticleEmitter
+                ? root
+                : (root.getChildren().find((n) => n instanceof ParticleEmitter) as ParticleEmitter);
+        const system = emitter.system as ParticleSystem;
+        const settings = system.getRendererSettings();
+        expect(settings.instancingNormals).toEqual(new Float32Array([0, 1, 0, 0, 1, 0, 0, 1, 0]));
+        expect(settings.reflectionAtlas).toBeTruthy();
+        expect(settings.reflectionLevel).toBeCloseTo(0.85, 5);
+
+        scene.dispose();
+        engine.dispose();
+    });
+
     it('parses sphere and plain buffer geometry variants', () => {
         const engine = new NullEngine();
         const scene = new Scene(engine);

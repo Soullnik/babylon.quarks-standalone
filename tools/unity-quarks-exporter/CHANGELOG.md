@@ -4,6 +4,13 @@ All notable changes to the Unity Quarks Exporter are documented here.
 
 ## [0.19.0] — 2026-07-25
 
+### Added
+
+- Mesh particle geometry now exports **normals** (recalculated when missing) so mesh shading and
+  environment reflections work after load.
+- When the particle material has a **Cubemap** (`_Cube` / `_Cubemap` / …), it is baked into an
+  embedded 3×2 `reflectionAtlas` plus `reflectionLevel` for babylon.quarks mesh env sampling.
+
 ### Changed
 
 - The exporter now carries the same version as the babylon.quarks packages it

@@ -46,6 +46,7 @@ import {ParticleEmitter} from './ParticleEmitter';
 import {RenderMode} from './VFXBatch';
 import {BatchedRenderer, VFXBatchSettings} from './BatchedRenderer';
 import {ensureTriangleIndices} from './geometryUtil';
+import {ensureEnvAtlasFromCube, getCachedEnvAtlas} from './envAtlas';
 
 export interface BurstParameters {
     time: number;
@@ -635,11 +636,30 @@ export class ParticleSystem implements IParticleSystem {
             typeof material?.reflectionLevel === 'number'
                 ? material.reflectionLevel
                 : resolvedReflectionLevel;
-        this.rendererSettings.reflectionAtlas =
+        // Prefer an explicit atlas; otherwise build a 3×2 atlas from CubeTexture
+        // face URLs (iOS-safe single sampler2D — not samplerCube / six faces).
+        let resolvedAtlas =
             material?.reflectionAtlas ??
             overrides.reflectionAtlas ??
             this.rendererSettings.reflectionAtlas ??
             null;
+        if (!resolvedAtlas && resolvedReflection?.isCube) {
+            resolvedAtlas = getCachedEnvAtlas(resolvedReflection);
+            if (!resolvedAtlas && this.sceneRef) {
+                ensureEnvAtlasFromCube(resolvedReflection, this.sceneRef, (atlas) => {
+                    if (this.rendererSettings.reflectionAtlas === atlas) {
+                        return;
+                    }
+                    this.rendererSettings.reflectionAtlas = atlas;
+                    if (material && material.reflectionAtlas == null) {
+                        material.reflectionAtlas = atlas;
+                    }
+                    this.neededToUpdateRender = true;
+                });
+                resolvedAtlas = getCachedEnvAtlas(resolvedReflection);
+            }
+        }
+        this.rendererSettings.reflectionAtlas = resolvedAtlas;
         // Do not expand cube files into six face textures anymore — that path
         // still trips GL_INVALID_OPERATION on iOS. Prefer a single atlas.
         this.rendererSettings.reflectionFaces =
@@ -1424,6 +1444,13 @@ export class ParticleSystem implements IParticleSystem {
             meta.textures[textureUUID] = texture;
         }
 
+        const reflectionAtlas = this.rendererSettings.reflectionAtlas;
+        let reflectionAtlasUUID: string | undefined;
+        if (reflectionAtlas instanceof Texture) {
+            reflectionAtlasUUID = ParticleSystem.nextSerializationId('quarks_texture');
+            meta.textures[reflectionAtlasUUID] = reflectionAtlas;
+        }
+
         const materialUUID = ParticleSystem.nextSerializationId('quarks_material');
         meta.materials[materialUUID] = {
             uuid: materialUUID,
@@ -1434,6 +1461,8 @@ export class ParticleSystem implements IParticleSystem {
             depthWrite: this.rendererSettings.materialDepthWrite,
             alphaTest: this.rendererSettings.materialAlphaTest,
             texture: textureUUID,
+            reflectionAtlas: reflectionAtlasUUID,
+            reflectionLevel: this.rendererSettings.reflectionLevel,
             sourceMaterial: this.materialRef ?? undefined,
         };
         return materialUUID;

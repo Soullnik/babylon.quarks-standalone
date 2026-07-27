@@ -8,6 +8,8 @@ import {BatchedRenderer} from '../src/BatchedRenderer';
 import {ParticleSystem} from '../src/ParticleSystem';
 import {SpriteBatch} from '../src/SpriteBatch';
 import {RenderMode} from '../src/VFXBatch';
+import * as envAtlas from '../src/envAtlas';
+import {cacheEnvAtlas, cubeFaceUrls, getCachedEnvAtlas} from '../src/envAtlas';
 
 describe('mesh particle environment map', () => {
     let engine: NullEngine;
@@ -112,6 +114,76 @@ describe('mesh particle environment map', () => {
         system.dispose();
         material.dispose();
         atlas.dispose();
+    });
+
+    it('auto-uses a cached env atlas built from CubeTexture face URLs', () => {
+        const atlas = new Texture('data:auto-atlas', scene, {
+            noMipmap: true,
+            invertY: false,
+            samplingMode: Texture.LINEAR_LINEAR,
+        });
+        jest.spyOn(atlas, 'isReady').mockReturnValue(true);
+
+        const faceUrls = ['px', 'py', 'pz', 'nx', 'ny', 'nz'];
+        const cube = {
+            isCube: true,
+            isReady: () => true,
+            level: 0.7,
+            files: faceUrls,
+            _files: faceUrls,
+        } as any;
+        cacheEnvAtlas(cube, atlas);
+
+        const material = new StandardMaterial('cube-env', scene);
+        material.reflectionTexture = cube;
+
+        const system = new ParticleSystem({
+            scene,
+            startLife: new ConstantValue(1),
+            emissionOverTime: new ConstantValue(0),
+            renderMode: RenderMode.Mesh,
+            material,
+            transparent: true,
+            blendMode: Constants.ALPHA_COMBINE,
+        });
+
+        expect(system.getRendererSettings().reflectionAtlas).toBe(atlas);
+        expect(system.getRendererSettings().reflectionLevel).toBeCloseTo(0.7, 5);
+        expect(cubeFaceUrls(cube)).toEqual(faceUrls);
+
+        system.dispose();
+        material.dispose();
+        atlas.dispose();
+    });
+
+    it('kicks async atlas build when a CubeTexture has face URLs', async () => {
+        const atlas = new Texture('data:async-atlas', scene, {
+            noMipmap: true,
+            invertY: false,
+            samplingMode: Texture.LINEAR_LINEAR,
+        });
+        const faceUrls = ['px', 'py', 'pz', 'nx', 'ny', 'nz'];
+        const cube = {
+            isCube: true,
+            isReady: () => true,
+            files: faceUrls,
+            _files: faceUrls,
+        } as any;
+
+        const originalBuilder = envAtlas.envAtlasBuilder.createFromFaceUrls;
+        envAtlas.envAtlasBuilder.createFromFaceUrls = jest.fn().mockResolvedValue(atlas);
+
+        try {
+            const ready = await new Promise<Texture>((resolve) => {
+                envAtlas.ensureEnvAtlasFromCube(cube, scene, resolve);
+            });
+            expect(envAtlas.envAtlasBuilder.createFromFaceUrls).toHaveBeenCalledWith(faceUrls, scene);
+            expect(ready).toBe(atlas);
+            expect(getCachedEnvAtlas(cube)).toBe(atlas);
+        } finally {
+            envAtlas.envAtlasBuilder.createFromFaceUrls = originalBuilder;
+            atlas.dispose();
+        }
     });
 
     it('sizes fallback UVs to custom mesh geometry so the uv attribute is complete', () => {

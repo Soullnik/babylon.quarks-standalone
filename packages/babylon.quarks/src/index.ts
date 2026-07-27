@@ -21,6 +21,13 @@ export {ParticleEmitter} from './ParticleEmitter';
 export {QuarksUtil} from './QuarksUtil';
 export {QuarksLoader} from './QuarksLoader';
 export type {QuarksLoaderOptions} from './QuarksLoader';
+export {
+    cacheEnvAtlas,
+    createEnvAtlasFromFaceUrls,
+    cubeFaceUrls,
+    ensureEnvAtlasFromCube,
+    getCachedEnvAtlas,
+} from './envAtlas';
 export {QuarksPrefab} from './QuarksPrefab';
 export type {AnimationData, QuarksTimelineClip} from './QuarksPrefab';
 export {MeshSurfaceEmitter, MeshSurfaceEmitterPlugin} from './MeshSurfaceEmitter';
