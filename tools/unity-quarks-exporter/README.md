@@ -35,15 +35,44 @@ Requires Unity **2020.3+**.
 3. Choose where to save the `.json`. Textures are embedded as data URIs, so the file is
    self-contained.
 
+The Console logs a **validity tier** (`full` / `good` / `partial` / `poor`) and any coverage
+warnings for that hierarchy.
+
 ### Folder of prefabs
 
 1. In the **Project** window, select a folder under `Assets` that contains effect prefabs
    (each prefab root or children must include at least one `ParticleSystem`).
-2. Menu **Tools → Quarks → Export Folder of Effects to JSON**.
+2. Menu **Tools → Quarks → Export Folder of Effects to JSON** (everything) or
+   **Export Folder (Good+ Validity Only)** (skips `partial` / `poor`).
 3. Pick an output folder on disk. Every matching prefab is exported as `{name}.json`; subfolders
    under the selected Assets folder are mirrored in the output.
 
-Load the result in Babylon.js:
+The Good+ export also writes `export-validity-report.json` next to the batch so you can see
+what was kept vs skipped and why.
+
+### Analyze a VFX pack (metadata)
+
+For a large pack (hundreds/thousands of prefabs, many duplicates):
+
+1. Select the pack root folder under `Assets`.
+2. Menu **Tools → Quarks → Analyze Effect Pack Metadata**.
+3. Save the report JSON.
+
+The report includes:
+
+| Field | Meaning |
+| ----- | ------- |
+| `summary.prefabCount` / `uniqueFingerprints` | Total prefabs vs deduped feature fingerprints |
+| `summary.tiers` | `full` / `good` / `partial` / `poor` counts |
+| `summary.estimatedExportablePct` | Weighted estimate toward a ~90% validity target |
+| `featureHistogram` | How often each shape / module / curve mode appears |
+| `gapImpact` | Which exporter gaps hit the most **unique** effects (fix this) |
+| `effects[]` | Per-prefab score, tier, issues, and a compact system feature dump |
+
+**Workflow toward ~90% validity:** analyze pack → sort `gapImpact` → close the highest-impact
+mappings in `ParticleConverter` / quarks.core → re-analyze → batch-export with Good+ filter.
+
+Load an exported effect in Babylon.js:
 
 ```ts
 import {QuarksLoader} from 'babylon.quarks';
@@ -55,16 +84,16 @@ root.parent = batchedRenderer; // your BatchedRenderer
 
 …or open it in the effect editor via **Open from JSON**.
 
-See [`sample-output.json`](./sample-output.json) for a representative export (an emitter with a
-death-triggered spark sub-emitter).
+Example Unity exports live under [`examples/public/`](../../examples/public/)
+(e.g. `SimplePortalRed.json`, `magicZoneUnityExample.json`).
 
 ## What gets exported
 
 | Unity module                         | Quarks mapping                                                                                                                                                                                                                                                       |
 | ------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Main**                             | duration, loop, prewarm, start delay/lifetime/speed/size (incl. 3D size), start rotation, start color (constant / two colors / gradient / two gradients), simulation space → `worldSpace`, gravity → `ApplyForce`                                                    |
+| **Main**                             | duration, loop, prewarm, start delay/lifetime/speed/size (incl. 3D size), start rotation, start color (constant / two colors / gradient / two gradients), simulation space → `worldSpace`, gravity → `ForceOverLife`                                                  |
 | **Emission**                         | rate over time, rate over distance, bursts (time / count / cycles / interval / probability)                                                                                                                                                                          |
-| **Shape**                            | Cone, Sphere, Hemisphere, Circle, Donut (radius, angle, arc, thickness), **Mesh** → `mesh_surface`, randomize direction → `ChangeEmitDirection`                                                                                                                      |
+| **Shape**                            | Cone, Sphere, Hemisphere, Circle, Donut (radius, angle, arc, thickness), **Box / BoxShell / BoxEdge** → `rectangle` (XY; Z flattened), **Mesh** → `mesh_surface`, randomize direction → `ChangeEmitDirection`                                                      |
 | **Color over Lifetime**              | `ColorOverLife` (gradient)                                                                                                                                                                                                                                           |
 | **Size over Lifetime**               | `SizeOverLife` (curve → piecewise Bézier)                                                                                                                                                                                                                            |
 | **Rotation over Lifetime**           | `RotationOverLife` (deg→rad)                                                                                                                                                                                                                                         |
@@ -73,7 +102,7 @@ death-triggered spark sub-emitter).
 | **Limit Velocity over Lifetime**     | `LimitSpeedOverLife` (limit + dampen)                                                                                                                                                                                                                                |
 | **Force over Lifetime**              | `ForceOverLife` (XYZ)                                                                                                                                                                                                                                                |
 | **Color / Size / Rotation by Speed** | `ColorBySpeed` / `SizeBySpeed` / `RotationBySpeed` (+ speed range)                                                                                                                                                                                                   |
-| **Noise**                            | `Noise` (frequency + strength)                                                                                                                                                                                                                                       |
+| **Noise**                            | `Noise` (frequency + strength + position/rotation amount)                                                                                                                                                                                                            |
 | **Collision**                        | `ApplyCollision` (bounce; collider is host-provided)                                                                                                                                                                                                                 |
 | **Texture Sheet Animation**          | tiles U/V, start tile, `FrameOverLife` sweep                                                                                                                                                                                                                         |
 | **Sub Emitters**                     | child systems wired via `EmitSubParticleSystem` (birth/death → quarks modes)                                                                                                                                                                                         |
@@ -89,7 +118,8 @@ gradients sample both color and alpha keys.
   tweak; effects authored at the origin are unaffected.
 - **Mesh shape:** exported as a `mesh_surface` emitter plus a `Mesh` source node holding the
   geometry. That node is a real (visible) mesh in the loaded scene — hide/disable it if you only
-  want it as an emission source. Box / Edge shapes still fall back to a point emitter.
+  want it as an emission source. Edge shapes still fall back to a point emitter.
+- **Box shape:** mapped to quarks `rectangle` on the XY plane; box depth (Z) is not preserved.
 - **Collision:** only `bounce` is exported. quarks resolves collisions against a host-provided
   collider (e.g. the editor's ground plane), so Unity's collision planes/world aren't carried over.
 - **3D rotation:** 3D _start_ rotation is exported as an Euler generator for **Mesh** render mode
@@ -105,7 +135,7 @@ gradients sample both color and alpha keys.
   `reflectionAtlas` (px py pz / nx ny nz) so babylon.quarks can sample reflections on iOS.
   Materials without a cubemap export lit/diffuse only. Skybox is not used as a fallback.
 - Modules with no quarks counterpart (Lights, Trails ribbon, Custom Data, Collision triggers) are
-  skipped.
+  skipped — the pack analyzer flags them so you can see how often they block validity.
 
 ## Layout
 
@@ -114,7 +144,8 @@ Editor/
   Json.cs                 minimal JSON writer (no dependencies)
   ValueConverter.cs       MinMaxCurve / Gradient / AnimationCurve → quarks value JSON
   ExportContext.cs        meta accumulation, texture embedding, node-uuid maps
+  ExportCoverage.cs       feature sniff + validity scoring (shared by analyze / export)
+  EffectPackAnalyzer.cs   pack metadata scan → histogram / gapImpact / per-effect report
   ParticleConverter.cs    Shuriken modules → the per-system "ps" object
   QuarksExporter.cs       menu entry + hierarchy walk + envelope assembly
-sample-output.json        example export (also used to validate the output format)
 ```

@@ -60,19 +60,73 @@ namespace BabylonQuarks.UnityExporter
         [MenuItem("Tools/Quarks/Export Folder of Effects to JSON", true)]
         private static bool ValidateExportSelectedFolder() => !string.IsNullOrEmpty(GetSelectedAssetFolder());
 
+        [MenuItem("Tools/Quarks/Export Folder (Good+ Validity Only)", false, 3)]
+        public static void ExportSelectedFolderValidOnly()
+        {
+            string assetFolder = GetSelectedAssetFolder();
+            if (string.IsNullOrEmpty(assetFolder))
+            {
+                EditorUtility.DisplayDialog("Quarks Exporter",
+                    "Select a folder under Assets in the Project window.", "OK");
+                return;
+            }
+
+            string outputFolder = EditorUtility.OpenFolderPanel(
+                "Export valid Quarks effects to", "", "");
+            if (string.IsNullOrEmpty(outputFolder)) return;
+
+            // Full + Good only — skip Partial/Poor so the batch is what we can stand behind.
+            ExportFolder(assetFolder, outputFolder, ExportCoverage.Tier.Good, writeReport: true);
+        }
+
+        [MenuItem("Tools/Quarks/Export Folder (Good+ Validity Only)", true)]
+        private static bool ValidateExportSelectedFolderValidOnly() =>
+            !string.IsNullOrEmpty(GetSelectedAssetFolder());
+
         /// <summary>Writes one effect hierarchy to a JSON file on disk.</summary>
         public static void ExportToFile(GameObject root, string path)
         {
+            var assessment = ExportCoverage.Assess(root);
             string json = Export(root);
             File.WriteAllText(path, json);
-            Debug.Log($"[Quarks Exporter] Exported '{root.name}' → {path}");
+
+            string tier = ExportCoverage.TierName(assessment.Tier);
+            if (assessment.Issues.Count == 0)
+            {
+                Debug.Log($"[Quarks Exporter] Exported '{root.name}' → {path} (validity: {tier}, score {assessment.Score:0.00})");
+            }
+            else
+            {
+                Debug.LogWarning(
+                    $"[Quarks Exporter] Exported '{root.name}' → {path} (validity: {tier}, score {assessment.Score:0.00}, " +
+                    $"{assessment.Issues.Count} coverage issue(s) — run Analyze Effect Pack Metadata for details)");
+                foreach (var issue in assessment.Issues)
+                {
+                    Debug.LogWarning(
+                        $"[Quarks Exporter]   [{ExportCoverage.SeverityName(issue.Severity)}] " +
+                        $"{issue.SystemName}: {issue.Message}");
+                }
+            }
         }
 
         /// <summary>
         /// Exports every prefab with a ParticleSystem under <paramref name="assetFolder"/>.
         /// Output mirrors the subfolder layout relative to the selected Assets folder.
         /// </summary>
-        public static void ExportFolder(string assetFolder, string outputFolder)
+        public static void ExportFolder(string assetFolder, string outputFolder) =>
+            ExportFolder(assetFolder, outputFolder, minTier: null, writeReport: false);
+
+        /// <summary>
+        /// Exports particle prefabs under <paramref name="assetFolder"/>, optionally keeping only
+        /// effects whose coverage tier is at least <paramref name="minTier"/> (Full ≤ Good ≤ Partial ≤ Poor).
+        /// When <paramref name="writeReport"/> is true, writes <c>export-validity-report.json</c>
+        /// next to the output with per-effect scores and skip reasons.
+        /// </summary>
+        public static void ExportFolder(
+            string assetFolder,
+            string outputFolder,
+            ExportCoverage.Tier? minTier,
+            bool writeReport)
         {
             string[] guids = AssetDatabase.FindAssets("t:Prefab", new[] { assetFolder });
             var prefabPaths = new List<string>();
@@ -97,8 +151,10 @@ namespace BabylonQuarks.UnityExporter
             string folderPrefix = assetFolder.EndsWith("/") ? assetFolder : assetFolder + "/";
 
             int exported = 0;
-            int skipped = 0;
+            int skippedInstantiate = 0;
+            int skippedValidity = 0;
             bool cancelled = false;
+            var reportEffects = new JArray();
 
             try
             {
@@ -119,12 +175,33 @@ namespace BabylonQuarks.UnityExporter
                     GameObject instance = PrefabUtility.InstantiatePrefab(prefab) as GameObject;
                     if (instance == null)
                     {
-                        skipped++;
+                        skippedInstantiate++;
                         continue;
                     }
 
                     try
                     {
+                        var assessment = ExportCoverage.Assess(instance, assetPath);
+                        bool export = !minTier.HasValue
+                            || ExportCoverage.MeetsMinTier(assessment, minTier.Value);
+
+                        if (writeReport)
+                        {
+                            reportEffects.Add(new JObject()
+                                .Set("path", assessment.AssetPath)
+                                .Set("name", assessment.Name)
+                                .Set("fingerprint", assessment.Fingerprint)
+                                .Set("score", System.Math.Round(assessment.Score, 4))
+                                .Set("tier", ExportCoverage.TierName(assessment.Tier))
+                                .Set("exported", export));
+                        }
+
+                        if (!export)
+                        {
+                            skippedValidity++;
+                            continue;
+                        }
+
                         string relative = assetPath.StartsWith(folderPrefix)
                             ? assetPath.Substring(folderPrefix.Length)
                             : Path.GetFileName(assetPath);
@@ -152,16 +229,41 @@ namespace BabylonQuarks.UnityExporter
                 EditorUtility.ClearProgressBar();
             }
 
+            if (writeReport)
+            {
+                Directory.CreateDirectory(outputFolder);
+                var report = new JObject()
+                    .Set("metadata", new JObject()
+                        .Set("generator", "unity-quark-exporter")
+                        .Set("sourceFolder", assetFolder)
+                        .Set("minTier", minTier.HasValue
+                            ? ExportCoverage.TierName(minTier.Value)
+                            : "none"))
+                    .Set("summary", new JObject()
+                        .Set("exported", exported)
+                        .Set("skippedValidity", skippedValidity)
+                        .Set("skippedInstantiate", skippedInstantiate)
+                        .Set("cancelled", cancelled))
+                    .Set("effects", reportEffects);
+                File.WriteAllText(
+                    Path.Combine(outputFolder, "export-validity-report.json"),
+                    report.ToString());
+            }
+
             string message = cancelled
                 ? $"Cancelled after exporting {exported} of {prefabPaths.Count} effect(s)."
                 : $"Exported {exported} effect(s) to:\n{outputFolder}";
-            if (skipped > 0)
+            if (skippedValidity > 0)
             {
-                message += $"\n\nSkipped {skipped} prefab(s) that could not be instantiated.";
+                message += $"\n\nSkipped {skippedValidity} prefab(s) below validity tier '{ExportCoverage.TierName(minTier ?? ExportCoverage.Tier.Good)}'.";
+            }
+            if (skippedInstantiate > 0)
+            {
+                message += $"\n\nSkipped {skippedInstantiate} prefab(s) that could not be instantiated.";
             }
 
             EditorUtility.DisplayDialog("Quarks Exporter", message, "OK");
-            if (exported > 0)
+            if (exported > 0 || writeReport)
             {
                 EditorUtility.RevealInFinder(outputFolder);
             }

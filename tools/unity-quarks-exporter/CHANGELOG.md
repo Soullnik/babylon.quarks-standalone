@@ -2,6 +2,24 @@
 
 All notable changes to the Unity Quarks Exporter are documented here.
 
+## [0.19.1] — 2026-07-28
+
+### Added
+
+- **Tools → Quarks → Analyze Effect Pack Metadata** — scan a folder of particle prefabs, dedupe by
+  feature fingerprint, and write a JSON report (`featureHistogram`, `gapImpact`, per-effect
+  scores/tiers). Use this on large VFX packs to drive exporter work toward ~90% validity.
+- **Tools → Quarks → Export Folder (Good+ Validity Only)** — batch-export only effects scored
+  `full` or `good`; writes `export-validity-report.json` beside the output.
+- Shared `ExportCoverage` scoring (`full` / `good` / `partial` / `poor`) used by analyze, filtered
+  export, and single-effect Console warnings.
+
+### Changed
+
+- **Box / BoxShell / BoxEdge** shapes map to quarks `rectangle` (XY plane) instead of falling back
+  to a point emitter. Z depth is still flattened (reported as a minor coverage issue).
+- **Noise** now exports Unity `positionAmount` and `rotationAmount` instead of hard-coding 1 / 0.
+
 ## [0.19.0] — 2026-07-25
 
 ### Added

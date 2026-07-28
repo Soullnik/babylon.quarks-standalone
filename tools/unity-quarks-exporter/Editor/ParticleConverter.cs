@@ -220,8 +220,28 @@ namespace BabylonQuarks.UnityExporter
                         return new JObject().Set("type", "mesh_surface").Set("mesh", meshNodeUuid);
                     }
                     return new JObject().Set("type", "point");
+                case ParticleSystemShapeType.Box:
+                case ParticleSystemShapeType.BoxShell:
+                case ParticleSystemShapeType.BoxEdge:
+                    // quarks has rectangle (XY plane), not a 3D box. Map scale.x/y and use
+                    // thickness to approximate shell (0) vs volume (1); Z depth is dropped.
+                    {
+                        Vector3 scale = shape.scale;
+                        float thickness = shape.shapeType == ParticleSystemShapeType.BoxShell
+                            || shape.shapeType == ParticleSystemShapeType.BoxEdge
+                            ? 0f
+                            : Mathf.Clamp01(shape.radiusThickness > 0f ? shape.radiusThickness : 1f);
+                        return new JObject()
+                            .Set("type", "rectangle")
+                            .Set("width", Mathf.Abs(scale.x))
+                            .Set("height", Mathf.Abs(scale.y))
+                            .Set("thickness", thickness)
+                            .Set("mode", 0)
+                            .Set("spread", 0)
+                            .Set("speed", ValueConverter.Constant(0));
+                    }
                 default:
-                    // Box/Edge and other volumes have no direct quarks equivalent yet.
+                    // Edge and other volumes have no direct quarks equivalent yet.
                     return new JObject().Set("type", "point");
             }
         }
@@ -370,8 +390,8 @@ namespace BabylonQuarks.UnityExporter
                 .Set("type", "Noise")
                 .Set("frequency", ValueConverter.Constant(m.frequency))
                 .Set("power", ValueConverter.Curve(m.strength))
-                .Set("positionAmount", ValueConverter.Constant(1))
-                .Set("rotationAmount", ValueConverter.Constant(0)));
+                .Set("positionAmount", ValueConverter.Curve(m.positionAmount))
+                .Set("rotationAmount", ValueConverter.Curve(m.rotationAmount)));
         }
 
         private static void AddInheritVelocity(ParticleSystem ps, JArray behaviors)
