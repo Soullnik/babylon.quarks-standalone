@@ -45,6 +45,61 @@ namespace BabylonQuarks.UnityExporter
         [MenuItem("Tools/Quarks/Analyze Effect Pack Metadata", true)]
         private static bool ValidateAnalyzeSelectedFolder() => !string.IsNullOrEmpty(GetSelectedAssetFolder());
 
+        [MenuItem("Tools/Quarks/Dump Conversion for Selected Effect", false, 21)]
+        public static void DumpSelectedConversion()
+        {
+            GameObject root = Selection.activeGameObject;
+            if (root == null || root.GetComponentsInChildren<ParticleSystem>(true).Length == 0)
+            {
+                EditorUtility.DisplayDialog("Quarks Analyzer",
+                    "Select a GameObject with a ParticleSystem (or a parent of several).", "OK");
+                return;
+            }
+
+            string path = EditorUtility.SaveFilePanel(
+                "Save conversion dump",
+                "",
+                root.name + ".conversion.json",
+                "json");
+            if (string.IsNullOrEmpty(path)) return;
+
+            JObject dump = ConversionDump.ForRoot(root);
+            File.WriteAllText(path, dump.ToString());
+            EditorUtility.RevealInFinder(path);
+
+            int suspicions = 0;
+            foreach (var kv in dump.Members)
+            {
+                if (kv.Key == "suspicionCount" && kv.Value is JNumber n) suspicions = (int)n.Value;
+            }
+            EditorUtility.DisplayDialog(
+                "Quarks Analyzer",
+                suspicions == 0
+                    ? $"Wrote conversion dump for '{root.name}' with no suspicions."
+                    : $"Wrote conversion dump for '{root.name}' with {suspicions} suspicion(s).\nCheck Console / JSON suspicions[].",
+                "OK");
+
+            if (suspicions > 0)
+            {
+                foreach (var kv in dump.Members)
+                {
+                    if (kv.Key != "suspicions" || !(kv.Value is JArray arr)) continue;
+                    foreach (var item in arr.Items)
+                    {
+                        if (item is JObject obj)
+                        {
+                            Debug.LogWarning("[Quarks Conversion] " + obj.ToString());
+                        }
+                    }
+                }
+            }
+        }
+
+        [MenuItem("Tools/Quarks/Dump Conversion for Selected Effect", true)]
+        private static bool ValidateDumpSelectedConversion() =>
+            Selection.activeGameObject != null
+            && Selection.activeGameObject.GetComponentsInChildren<ParticleSystem>(true).Length > 0;
+
         /// <summary>Scans every ParticleSystem prefab under <paramref name="assetFolder"/>.</summary>
         public static PackReport AnalyzeFolder(string assetFolder)
         {
@@ -70,6 +125,9 @@ namespace BabylonQuarks.UnityExporter
             var uniqueFingerprints = new HashSet<string>();
             var gapUnique = new Dictionary<string, HashSet<string>>();
             var featureCounts = new Dictionary<string, int>();
+            var suspicionUnique = new Dictionary<string, HashSet<string>>();
+            int effectsWithSuspicions = 0;
+            int totalSuspicions = 0;
 
             try
             {
@@ -97,6 +155,11 @@ namespace BabylonQuarks.UnityExporter
                     try
                     {
                         var assessment = ExportCoverage.Assess(instance, assetPath);
+                        JObject conversion = ConversionDump.ForRoot(instance);
+                        int suspicionCount = ReadIntMember(conversion, "suspicionCount");
+                        assessment.Conversion = conversion;
+                        assessment.SuspicionCount = suspicionCount;
+
                         report.Effects.Add(assessment);
                         report.PrefabCount++;
                         report.SystemCount += assessment.SystemCount;
@@ -104,9 +167,16 @@ namespace BabylonQuarks.UnityExporter
                         bool isUnique = uniqueFingerprints.Add(assessment.Fingerprint);
                         if (isUnique) report.UniqueCount++;
 
-                        TallyTier(report, assessment.Tier);
+                        TallyTiers(report, assessment.Tier);
                         TallyFeatures(featureCounts, assessment);
                         TallyGaps(gapUnique, assessment, isUnique);
+
+                        if (suspicionCount > 0)
+                        {
+                            effectsWithSuspicions++;
+                            totalSuspicions += suspicionCount;
+                            TallySuspicions(suspicionUnique, conversion, assessment.Fingerprint, isUnique);
+                        }
                     }
                     finally
                     {
@@ -121,8 +191,65 @@ namespace BabylonQuarks.UnityExporter
 
             report.FeatureHistogram = ToSortedCounts(featureCounts);
             report.GapImpact = BuildGapImpact(gapUnique, report.UniqueCount);
+            report.SuspicionImpact = BuildGapImpact(suspicionUnique, report.UniqueCount);
+            report.EffectsWithSuspicions = effectsWithSuspicions;
+            report.TotalSuspicions = totalSuspicions;
             report.EstimatedExportablePct = ComputeExportablePct(report);
             return report;
+        }
+
+        private static void TallySuspicions(
+            Dictionary<string, HashSet<string>> suspicionUnique,
+            JObject conversion,
+            string fingerprint,
+            bool isUnique)
+        {
+            if (!isUnique) return;
+            JArray arr = FindArrayMember(conversion, "suspicions");
+            if (arr == null) return;
+            var seen = new HashSet<string>();
+            foreach (var item in arr.Items)
+            {
+                if (!(item is JObject obj)) continue;
+                string code = ReadStringMember(obj, "code");
+                if (string.IsNullOrEmpty(code) || !seen.Add(code)) continue;
+                if (!suspicionUnique.TryGetValue(code, out var set))
+                {
+                    set = new HashSet<string>();
+                    suspicionUnique[code] = set;
+                }
+                set.Add(fingerprint);
+            }
+        }
+
+        private static JArray FindArrayMember(JObject obj, string key)
+        {
+            foreach (var kv in obj.Members)
+            {
+                if (kv.Key == key && kv.Value is JArray arr) return arr;
+            }
+            return null;
+        }
+
+        private static int ReadIntMember(JObject obj, string key)
+        {
+            foreach (var kv in obj.Members)
+            {
+                if (kv.Key == key && kv.Value is JNumber n) return (int)n.Value;
+            }
+            return 0;
+        }
+
+        private static string ReadStringMember(JObject obj, string key)
+        {
+            foreach (var kv in obj.Members)
+            {
+                if (kv.Key != key) continue;
+                if (kv.Value is JString s) return s.Value;
+                if (kv.Value is JNull || kv.Value == null) return null;
+                return kv.Value.ToString();
+            }
+            return null;
         }
 
         private static void TallyTier(PackReport report, ExportCoverage.Tier tier)
@@ -258,20 +385,35 @@ namespace BabylonQuarks.UnityExporter
                 $"  good     {report.GoodCount}\n" +
                 $"  partial  {report.PartialCount}\n" +
                 $"  poor     {report.PoorCount}\n\n" +
+                $"Conversion suspicions: {report.TotalSuspicions} across {report.EffectsWithSuspicions} effect(s)\n" +
                 $"Estimated exportable: {report.EstimatedExportablePct:0.0}%\n" +
                 $"(full+good + ½·partial)\n\n" +
-                TopGapsText(report, 8) +
+                TopGapsText(report, 6) + "\n\n" +
+                TopSuspicionsText(report, 6) +
                 (report.Cancelled ? "\n\n(Scan was cancelled early.)" : "");
         }
 
         private static string TopGapsText(PackReport report, int max)
         {
             if (report.GapImpact.Count == 0) return "No coverage gaps found.";
-            var lines = new List<string> { "Top gaps by unique effects:" };
+            var lines = new List<string> { "Top coverage gaps by unique effects:" };
             int n = Mathf.Min(max, report.GapImpact.Count);
             for (int i = 0; i < n; i++)
             {
                 var g = report.GapImpact[i];
+                lines.Add($"  {g.Code}: {g.AffectedUnique} ({g.PctOfUnique:0.0}%)");
+            }
+            return string.Join("\n", lines);
+        }
+
+        private static string TopSuspicionsText(PackReport report, int max)
+        {
+            if (report.SuspicionImpact.Count == 0) return "No conversion suspicions found.";
+            var lines = new List<string> { "Top conversion suspicions by unique effects:" };
+            int n = Mathf.Min(max, report.SuspicionImpact.Count);
+            for (int i = 0; i < n; i++)
+            {
+                var g = report.SuspicionImpact[i];
                 lines.Add($"  {g.Code}: {g.AffectedUnique} ({g.PctOfUnique:0.0}%)");
             }
             return string.Join("\n", lines);
@@ -299,9 +441,12 @@ namespace BabylonQuarks.UnityExporter
             public int GoodCount;
             public int PartialCount;
             public int PoorCount;
+            public int EffectsWithSuspicions;
+            public int TotalSuspicions;
             public float EstimatedExportablePct;
             public List<KeyValuePair<string, int>> FeatureHistogram = new List<KeyValuePair<string, int>>();
             public List<GapImpactRow> GapImpact = new List<GapImpactRow>();
+            public List<GapImpactRow> SuspicionImpact = new List<GapImpactRow>();
             public List<ExportCoverage.EffectAssessment> Effects = new List<ExportCoverage.EffectAssessment>();
 
             /// <summary>Builds the JSON report object written to disk.</summary>
@@ -314,6 +459,15 @@ namespace BabylonQuarks.UnityExporter
                 foreach (var g in GapImpact)
                 {
                     gaps.Add(new JObject()
+                        .Set("code", g.Code)
+                        .Set("affectedUnique", g.AffectedUnique)
+                        .Set("pctOfUnique", Math.Round(g.PctOfUnique, 2)));
+                }
+
+                var suspicions = new JArray();
+                foreach (var g in SuspicionImpact)
+                {
+                    suspicions.Add(new JObject()
                         .Set("code", g.Code)
                         .Set("affectedUnique", g.AffectedUnique)
                         .Set("pctOfUnique", Math.Round(g.PctOfUnique, 2)));
@@ -346,21 +500,29 @@ namespace BabylonQuarks.UnityExporter
                             .Set("twoCurves", s.TwoCurvesAnywhere));
                     }
 
-                    effects.Add(new JObject()
+                    // Full unity↔exported dump only when something looks wrong — keeps pack
+                    // reports readable. Clean effects still get suspicionCount=0.
+                    var effectObj = new JObject()
                         .Set("path", e.AssetPath)
                         .Set("name", e.Name)
                         .Set("fingerprint", e.Fingerprint)
                         .Set("systemCount", e.SystemCount)
                         .Set("score", Math.Round(e.Score, 4))
                         .Set("tier", ExportCoverage.TierName(e.Tier))
+                        .Set("suspicionCount", e.SuspicionCount)
                         .Set("issues", issues)
-                        .Set("systems", systems));
+                        .Set("systems", systems);
+                    if (e.SuspicionCount > 0 && e.Conversion != null)
+                    {
+                        effectObj.Set("conversion", e.Conversion);
+                    }
+                    effects.Add(effectObj);
                 }
 
                 return new JObject()
                     .Set("metadata", new JObject()
                         .Set("generator", "unity-quark-exporter-analyzer")
-                        .Set("version", 1)
+                        .Set("version", 2)
                         .Set("generatedAt", GeneratedAt)
                         .Set("sourceFolder", SourceFolder)
                         .Set("cancelled", Cancelled))
@@ -370,6 +532,8 @@ namespace BabylonQuarks.UnityExporter
                         .Set("particleSystemCount", SystemCount)
                         .Set("skipped", Skipped)
                         .Set("estimatedExportablePct", Math.Round(EstimatedExportablePct, 2))
+                        .Set("effectsWithSuspicions", EffectsWithSuspicions)
+                        .Set("totalSuspicions", TotalSuspicions)
                         .Set("tiers", new JObject()
                             .Set("full", FullCount)
                             .Set("good", GoodCount)
@@ -377,6 +541,7 @@ namespace BabylonQuarks.UnityExporter
                             .Set("poor", PoorCount)))
                     .Set("featureHistogram", histogram)
                     .Set("gapImpact", gaps)
+                    .Set("suspicionImpact", suspicions)
                     .Set("effects", effects);
             }
         }

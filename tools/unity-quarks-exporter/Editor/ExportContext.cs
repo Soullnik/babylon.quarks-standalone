@@ -458,9 +458,13 @@ namespace BabylonQuarks.UnityExporter
             return nodeUuid;
         }
 
-        private static int DetectBlend(Material mat)
+        /// <summary>
+        /// Maps a Unity particle material to a quarks/Babylon blend int
+        /// (1 = additive, 2 = alpha blend, 3 = subtract, 4 = multiply).
+        /// Public so the conversion dump can show the same inference the exporter uses.
+        /// </summary>
+        public static int DetectBlend(Material mat)
         {
-            // quarks/Babylon blend ints: 1 = additive, 2 = alpha blend, 3 = subtract, 4 = multiply.
             if (mat == null) return 2;
             string sn = mat.shader != null ? mat.shader.name.ToLowerInvariant() : "";
 
@@ -471,8 +475,7 @@ namespace BabylonQuarks.UnityExporter
                 return 2;
             if (sn.Contains("multiply") || sn.Contains("modulate")) return 4;
 
-            // Fall back to GPU blend factors when the shader name is uninformative
-            // (e.g. Particles/Standard Unlit).
+            // GPU blend factors — reliable for Particles/Standard Unlit and custom shaders.
             if (mat.HasProperty("_DstBlend"))
             {
                 int dst = (int)mat.GetFloat("_DstBlend");
@@ -481,7 +484,64 @@ namespace BabylonQuarks.UnityExporter
                 if (dst == 1) return 1; // DstBlend == One → additive
                 if (src == 2) return 4; // Src = DstColor → multiply/modulate
             }
+
+            // Particles/Standard Unlit Color Mode:
+            // Multiply=0, Additive=1, Subtractive=2, Overlay=3, Color=4, Difference=5
+            if (mat.HasProperty("_ColorMode"))
+            {
+                switch (Mathf.RoundToInt(mat.GetFloat("_ColorMode")))
+                {
+                    case 0: return 4; // Multiply
+                    case 1: return 1; // Additive
+                    case 2: return 3; // Subtractive
+                    default: return 2; // Overlay/Color/Difference → alpha as best effort
+                }
+            }
+
             return 2;
+        }
+
+        /// <summary>Reads Unity particle shader color-mode enum when present.</summary>
+        public static bool TryParticleColorMode(Material mat, out int mode)
+        {
+            mode = -1;
+            if (mat == null) return false;
+            // Prefer _ColorMode (Particles/Standard Unlit). Avoid generic _Mode — it means
+            // different things on surface shaders (Opaque/Cutout/Fade/…) and would mis-map.
+            if (mat.HasProperty("_ColorMode"))
+            {
+                mode = Mathf.RoundToInt(mat.GetFloat("_ColorMode"));
+                return true;
+            }
+            return false;
+        }
+
+        /// <summary>Human-readable name for a quarks blend int.</summary>
+        public static string BlendName(int blend)
+        {
+            switch (blend)
+            {
+                case 1: return "additive";
+                case 2: return "alpha";
+                case 3: return "subtract";
+                case 4: return "multiply";
+                default: return "unknown(" + blend + ")";
+            }
+        }
+
+        /// <summary>Particles/Standard Unlit _ColorMode label.</summary>
+        public static string ColorModeName(int mode)
+        {
+            switch (mode)
+            {
+                case 0: return "Multiply";
+                case 1: return "Additive";
+                case 2: return "Subtractive";
+                case 3: return "Overlay";
+                case 4: return "Color";
+                case 5: return "Difference";
+                default: return "Unknown";
+            }
         }
     }
 }

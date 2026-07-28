@@ -89,6 +89,8 @@ namespace BabylonQuarks.UnityExporter
             public int SystemCount;
             public float Score;
             public Tier Tier;
+            public int SuspicionCount;
+            public JObject Conversion;
             public readonly List<SystemFeatures> Systems = new List<SystemFeatures>();
             public readonly List<Issue> Issues = new List<Issue>();
         }

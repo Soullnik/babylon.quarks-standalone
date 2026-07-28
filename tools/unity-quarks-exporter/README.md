@@ -66,11 +66,21 @@ The report includes:
 | `summary.tiers` | `full` / `good` / `partial` / `poor` counts |
 | `summary.estimatedExportablePct` | Weighted estimate toward a ~90% validity target |
 | `featureHistogram` | How often each shape / module / curve mode appears |
-| `gapImpact` | Which exporter gaps hit the most **unique** effects (fix this) |
-| `effects[]` | Per-prefab score, tier, issues, and a compact system feature dump |
+| `gapImpact` | Which **missing** exporter mappings hit the most unique effects |
+| `suspicionImpact` | Which **lossy/wrong conversion** heuristics fire most often |
+| `effects[]` | Per-prefab score, tier, coverage issues; when suspicious, full `conversion` dump |
 
-**Workflow toward ~90% validity:** analyze pack → sort `gapImpact` → close the highest-impact
-mappings in `ParticleConverter` / quarks.core → re-analyze → batch-export with Good+ filter.
+**Two layers of diagnosis:**
+
+1. **Coverage gaps** — module/mode not implemented (Trails, Edge shape, …).
+2. **Conversion dump** — feature *is* mapped, but Unity source values vs exported values look wrong
+   (e.g. child with no material → default alpha while siblings are additive).
+
+For a single hierarchy: **Tools → Quarks → Dump Conversion for Selected Effect** writes
+`{name}.conversion.json` with per-system `unity` / `exported` side-by-side plus `suspicions[]`.
+
+**Workflow toward ~90% validity:** analyze pack → sort `gapImpact` + `suspicionImpact` → close
+mappings / fix value translation → re-analyze → batch-export with Good+ filter.
 
 Load an exported effect in Babylon.js:
 
@@ -145,6 +155,7 @@ Editor/
   ValueConverter.cs       MinMaxCurve / Gradient / AnimationCurve → quarks value JSON
   ExportContext.cs        meta accumulation, texture embedding, node-uuid maps
   ExportCoverage.cs       feature sniff + validity scoring (shared by analyze / export)
+  ConversionDump.cs       Unity source ↔ exported values + conversion suspicions
   EffectPackAnalyzer.cs   pack metadata scan → histogram / gapImpact / per-effect report
   ParticleConverter.cs    Shuriken modules → the per-system "ps" object
   QuarksExporter.cs       menu entry + hierarchy walk + envelope assembly
