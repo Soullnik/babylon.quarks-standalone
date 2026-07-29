@@ -79,8 +79,37 @@ The report includes:
 For a single hierarchy: **Tools → Quarks → Dump Conversion for Selected Effect** writes
 `{name}.conversion.json` with per-system `unity` / `exported` side-by-side plus `suspicions[]`.
 
+### Audit effect parity (Unity vs actual export)
+
+When an effect scores `full` but still looks wrong in Babylon (e.g. FlamethrowerToonyBlue), use the
+parity audit — it compares three layers per field:
+
+| Column | Source |
+| ------ | ------ |
+| `unity` | Raw Shuriken snapshot (`UnityEffectProbe`) |
+| `expected` | Re-built `ParticleConverter.BuildPs` (independent of the envelope walk) |
+| `exported` | The `ps` block inside `ExportEnvelope` (what actually lands in the JSON file) |
+
+1. Select the effect root in the Hierarchy.
+2. Menu **Tools → Quarks → Audit Effect Parity (Selected)**.
+3. Save `{name}.parity.json`.
+
+The report includes:
+
+| Field | Meaning |
+| ----- | ------- |
+| `summary.differences` | Rows where `expected` ≠ `exported` (exporter bug) or Unity-only gaps |
+| `notableDifferences` | Flat list of non-`match` rows across all systems |
+| `systems[].parity[]` | Per-field `status`: `match` / `transformed` / `mismatch` / `unity_only` |
+| `systems[].unity` | Full module dump (curves sampled, TSA, material blend inference, renderer stretch, …) |
+| `exportEnvelope` | Full JSON envelope for side-by-side diff in your editor |
+
+**How to debug visually wrong effects:** open `notableDifferences`, sort by `mismatch`, read `unity` vs
+`exported` for that field. `transformed` rows are intentional mappings (deg→rad, TwoCurves, box→rectangle).
+`unity_only` means Unity has a feature we do not export (e.g. `tsa.cycleCount > 1`).
+
 **Workflow toward ~90% validity:** analyze pack → sort `gapImpact` + `suspicionImpact` → close
-mappings / fix value translation → re-analyze → batch-export with Good+ filter.
+mappings / fix value translation → **parity-audit** flagged effects → re-analyze → batch-export with Good+ filter.
 
 Load an exported effect in Babylon.js:
 
@@ -136,11 +165,12 @@ gradients sample both color and alpha keys. **TwoCurves** → `RandomBetweenCurv
 - **3D rotation:** 3D _start_ rotation is exported as an Euler generator for **Mesh** render mode
   (billboards can't tilt, so they use the Z angle only). Rotation **over lifetime** still exports
   the Z axis only.
-- **Texture Sheet Animation:** the frame animation is exported as a full linear sweep over the
-  sheet; Unity's `frameOverTime` curve / cycle semantics aren't mapped 1:1.
-- **Blend mode** is inferred from the material's shader name / `_SrcBlend`/`_DstBlend`.
+- **Texture Sheet Animation:** `frameOverTime` is exported as `FrameOverLife` (scaled to tile
+  count). `cycleCount > 1` is not repeated; Sprites mode is not mapped.
+- **Blend mode** is inferred from the material's shader name / `_SrcBlend`/`_DstBlend` /
+  `_ColorMode`. Missing materials default to **additive** (Unity's default particle material).
   Alpha Blended / Premultiply map to alpha blend; Additive → additive; Multiply/Modulate →
-  multiply. Unusual custom shaders default to alpha blend.
+  multiply.
 - **Mesh env map:** if the particle material exposes a Cubemap (`_Cube`, `_Cubemap`,
   `_ReflectionCubemap`, …, or any Cubemap-typed texture property), it is baked into a 3×2
   `reflectionAtlas` (px py pz / nx ny nz) so babylon.quarks can sample reflections on iOS.
@@ -157,6 +187,8 @@ Editor/
   ExportContext.cs        meta accumulation, texture embedding, node-uuid maps
   ExportCoverage.cs       feature sniff + validity scoring (shared by analyze / export)
   ConversionDump.cs       Unity source ↔ exported values + conversion suspicions
+  UnityEffectProbe.cs     forensic Unity ParticleSystem dump (all modules/curves)
+  EffectParityAudit.cs    Unity vs expected vs actual export — field-level parity rows
   EffectPackAnalyzer.cs   pack metadata scan → histogram / gapImpact / per-effect report
   ParticleConverter.cs    Shuriken modules → the per-system "ps" object
   QuarksExporter.cs       menu entry + hierarchy walk + envelope assembly

@@ -305,7 +305,7 @@ namespace BabylonQuarks.UnityExporter
                 // TwoCurves / Curve / constants all go through ValueConverter (incl. RandomBetweenCurves).
                 behaviors.Add(new JObject()
                     .Set("type", "FrameOverLife")
-                    .Set("frame", ScaleCurve(tsa.frameOverTime, tiles - 1)));
+                    .Set("frame", ValueConverter.ScaleCurve(tsa.frameOverTime, tiles - 1)));
             }
             else
             {
@@ -350,7 +350,7 @@ namespace BabylonQuarks.UnityExporter
             // Unity rotation-over-lifetime is in degrees/sec; quarks angularVelocity is radians/sec.
             behaviors.Add(new JObject()
                 .Set("type", "RotationOverLife")
-                .Set("angularVelocity", ScaleCurve(m.z, Mathf.Deg2Rad)));
+                .Set("angularVelocity", ValueConverter.ScaleCurve(m.z, Mathf.Deg2Rad)));
         }
 
         private static void AddVelocityOverLife(ParticleSystem ps, JArray behaviors)
@@ -456,7 +456,7 @@ namespace BabylonQuarks.UnityExporter
             if (!m.enabled) return;
             behaviors.Add(new JObject()
                 .Set("type", "RotationBySpeed")
-                .Set("angularVelocity", ScaleCurve(m.z, Mathf.Deg2Rad))
+                .Set("angularVelocity", ValueConverter.ScaleCurve(m.z, Mathf.Deg2Rad))
                 .Set("speedRange", SpeedRange(m.range)));
         }
 
@@ -514,19 +514,5 @@ namespace BabylonQuarks.UnityExporter
             }
         }
 
-        private static JToken ScaleCurve(ParticleSystem.MinMaxCurve c, float scale)
-        {
-            switch (c.mode)
-            {
-                case ParticleSystemCurveMode.Constant: return ValueConverter.Constant(c.constant * scale);
-                case ParticleSystemCurveMode.TwoConstants: return ValueConverter.Interval(c.constantMin * scale, c.constantMax * scale);
-                case ParticleSystemCurveMode.Curve: return ValueConverter.Bezier(c.curve, c.curveMultiplier * scale);
-                case ParticleSystemCurveMode.TwoCurves:
-                    return ValueConverter.RandomBetweenCurves(
-                        ValueConverter.Bezier(c.curveMin, c.curveMultiplier * scale),
-                        ValueConverter.Bezier(c.curveMax, c.curveMultiplier * scale));
-                default: return ValueConverter.Constant(c.constant * scale);
-            }
-        }
     }
 }

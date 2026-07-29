@@ -2,6 +2,19 @@
 
 All notable changes to the Unity Quarks Exporter are documented here.
 
+## [Unreleased]
+
+### Added
+
+- **Tools → Quarks → Audit Effect Parity (Selected)** — three-way field audit per particle system:
+  `unity` (full `UnityEffectProbe` dump) vs `expected` (re-built `BuildPs`) vs `exported` (actual
+  envelope). Writes `{name}.parity.json` with `notableDifferences` for debugging effects that score
+  `full` but look wrong visually.
+- `UnityEffectProbe` — forensic dump of every Shuriken module, curve mode, TSA, renderer stretch,
+  material blend inference.
+- `QuarksExporter.ExportEnvelope` — returns the envelope `JObject` for audits without writing a file.
+- `ValueConverter.ScaleCurve` — shared curve scaling (TSA frame indices, rotation deg→rad).
+
 ## [0.19.1] — 2026-07-28
 
 ### Added

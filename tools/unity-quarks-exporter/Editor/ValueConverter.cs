@@ -91,6 +91,26 @@ namespace BabylonQuarks.UnityExporter
 
         private static float Finite(float v) => (float.IsNaN(v) || float.IsInfinity(v)) ? 0f : v;
 
+        /// <summary>Scales every sample of a MinMaxCurve (TSA frame indices, deg→rad, …).</summary>
+        public static JToken ScaleCurve(ParticleSystem.MinMaxCurve c, float scale)
+        {
+            switch (c.mode)
+            {
+                case ParticleSystemCurveMode.Constant:
+                    return Constant(c.constant * scale);
+                case ParticleSystemCurveMode.TwoConstants:
+                    return Interval(c.constantMin * scale, c.constantMax * scale);
+                case ParticleSystemCurveMode.Curve:
+                    return Bezier(c.curve, c.curveMultiplier * scale);
+                case ParticleSystemCurveMode.TwoCurves:
+                    return RandomBetweenCurves(
+                        Bezier(c.curveMin, c.curveMultiplier * scale),
+                        Bezier(c.curveMax, c.curveMultiplier * scale));
+                default:
+                    return Constant(c.constant * scale);
+            }
+        }
+
         // ---- colors ------------------------------------------------------------------------
 
         public static JToken Color(Color c) =>

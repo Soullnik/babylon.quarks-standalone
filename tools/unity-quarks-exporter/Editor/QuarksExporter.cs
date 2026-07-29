@@ -277,13 +277,13 @@ namespace BabylonQuarks.UnityExporter
         }
 
         /// <summary>Serializes a GameObject hierarchy into the Quarks JSON envelope string.</summary>
-        public static string Export(GameObject root)
+        public static string Export(GameObject root) => ExportEnvelope(root).ToString();
+
+        /// <summary>Same as <see cref="Export"/> but returns the envelope object (for parity audits).</summary>
+        public static JObject ExportEnvelope(GameObject root)
         {
             var ctx = new ExportContext();
 
-            // Pass 1: assign a stable node uuid to every transform (emitters too), then flag which
-            // systems are sub-emitter targets — so their nodes serialize with onlyUsedByOther=true
-            // and their parents' EmitSubParticleSystem behaviors can reference them by uuid.
             AssignUuids(root.transform, ctx);
             foreach (var ps in root.GetComponentsInChildren<ParticleSystem>(true))
             {
@@ -295,11 +295,8 @@ namespace BabylonQuarks.UnityExporter
                 }
             }
 
-            // Pass 2: serialize the hierarchy into the object tree.
             JObject obj = SerializeNode(root.transform, ctx);
 
-            // Mesh-shape emitters emit a source Mesh node each; attach them under the root so
-            // linkReferences can resolve every mesh_surface.mesh reference.
             if (ctx.MeshSourceNodes.Count > 0)
             {
                 JArray children = obj.GetOrCreateArray("children");
@@ -309,7 +306,7 @@ namespace BabylonQuarks.UnityExporter
                 }
             }
 
-            var envelope = new JObject()
+            return new JObject()
                 .Set("metadata", new JObject()
                     .Set("version", 4.5)
                     .Set("type", "Object3D")
@@ -319,7 +316,6 @@ namespace BabylonQuarks.UnityExporter
                 .Set("textures", ctx.Textures)
                 .Set("images", ctx.Images)
                 .Set("object", obj);
-            return envelope.ToString();
         }
 
         private static void AssignUuids(Transform t, ExportContext ctx)
