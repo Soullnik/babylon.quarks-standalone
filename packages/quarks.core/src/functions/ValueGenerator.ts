@@ -42,6 +42,13 @@ export function ValueGeneratorFromJSON(json: FunctionJSON): FunctionValueGenerat
             return IntervalValue.fromJSON(json);
         case 'PiecewiseBezier':
             return PiecewiseBezier.fromJSON(json);
+        case 'RandomBetweenCurves': {
+            // Lazy require avoids a circular import with RandomBetweenCurves.ts
+            // (its fromJSON calls back into ValueGeneratorFromJSON for children).
+            // eslint-disable-next-line @typescript-eslint/no-require-imports
+            const {RandomBetweenCurves} = require('./RandomBetweenCurves') as typeof import('./RandomBetweenCurves');
+            return RandomBetweenCurves.fromJSON(json);
+        }
         default:
             return new ConstantValue(0);
     }

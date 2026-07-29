@@ -27,7 +27,7 @@
  *   `Gradient`, `RandomColor`) — `startGen` is a no-op; `genValue` derives
  *   output from inputs (`t`, params) alone.
  * - **Sample-once stochastic** (`IntervalValue`, `ColorRange`,
- *   `RandomColorBetweenGradient`, `RandomQuatGenerator`) — `startGen` pushes
+ *   `RandomColorBetweenGradient`, `RandomBetweenCurves`, `RandomQuatGenerator`) — `startGen` pushes
  *   one random sample into memory; `genValue` reads it. This is what keeps a
  *   given particle's "random" startSize/color/rotation fixed for its life.
  * - **Composite** (`AxisAngleGenerator`, `Vector3Function`, `EulerGenerator`)

@@ -301,11 +301,11 @@ namespace BabylonQuarks.UnityExporter
                     .Set("uTileCount", u)
                     .Set("vTileCount", v)
                     .Set("blendTiles", false);
-                // Animate across the sheet over lifetime (0 → last frame). Unity's frameOverTime
-                // curve semantics don't map 1:1, so a full linear sweep is used as the common case.
+                // Unity frameOverTime is typically 0..1 progress over life; scale to frame indices.
+                // TwoCurves / Curve / constants all go through ValueConverter (incl. RandomBetweenCurves).
                 behaviors.Add(new JObject()
                     .Set("type", "FrameOverLife")
-                    .Set("frame", LinearBezier(0, tiles - 1)));
+                    .Set("frame", ScaleCurve(tsa.frameOverTime, tiles - 1)));
             }
             else
             {
@@ -329,9 +329,18 @@ namespace BabylonQuarks.UnityExporter
         {
             var m = ps.sizeOverLifetime;
             if (!m.enabled) return;
-            // quarks SizeOverLife is uniform; with separate axes Unity throws on `.size`, so use X.
-            var curve = m.separateAxes ? m.x : m.size;
-            behaviors.Add(new JObject().Set("type", "SizeOverLife").Set("size", ValueConverter.Curve(curve)));
+            if (m.separateAxes)
+            {
+                behaviors.Add(new JObject()
+                    .Set("type", "SizeOverLife")
+                    .Set("size", new JObject()
+                        .Set("type", "Vector3Function")
+                        .Set("x", ValueConverter.Curve(m.x))
+                        .Set("y", ValueConverter.Curve(m.y))
+                        .Set("z", ValueConverter.Curve(m.z))));
+                return;
+            }
+            behaviors.Add(new JObject().Set("type", "SizeOverLife").Set("size", ValueConverter.Curve(m.size)));
         }
 
         private static void AddRotationOverLife(ParticleSystem ps, JArray behaviors)
@@ -428,10 +437,16 @@ namespace BabylonQuarks.UnityExporter
         {
             var m = ps.sizeBySpeed;
             if (!m.enabled) return;
-            var curve = m.separateAxes ? m.x : m.size;
+            JToken size = m.separateAxes
+                ? new JObject()
+                    .Set("type", "Vector3Function")
+                    .Set("x", ValueConverter.Curve(m.x))
+                    .Set("y", ValueConverter.Curve(m.y))
+                    .Set("z", ValueConverter.Curve(m.z))
+                : ValueConverter.Curve(m.size);
             behaviors.Add(new JObject()
                 .Set("type", "SizeBySpeed")
-                .Set("size", ValueConverter.Curve(curve))
+                .Set("size", size)
                 .Set("speedRange", SpeedRange(m.range)));
         }
 
@@ -506,18 +521,12 @@ namespace BabylonQuarks.UnityExporter
                 case ParticleSystemCurveMode.Constant: return ValueConverter.Constant(c.constant * scale);
                 case ParticleSystemCurveMode.TwoConstants: return ValueConverter.Interval(c.constantMin * scale, c.constantMax * scale);
                 case ParticleSystemCurveMode.Curve: return ValueConverter.Bezier(c.curve, c.curveMultiplier * scale);
-                case ParticleSystemCurveMode.TwoCurves: return ValueConverter.Bezier(c.curveMax, c.curveMultiplier * scale);
+                case ParticleSystemCurveMode.TwoCurves:
+                    return ValueConverter.RandomBetweenCurves(
+                        ValueConverter.Bezier(c.curveMin, c.curveMultiplier * scale),
+                        ValueConverter.Bezier(c.curveMax, c.curveMultiplier * scale));
                 default: return ValueConverter.Constant(c.constant * scale);
             }
         }
-
-        private static JToken LinearBezier(float from, float to)
-        {
-            var fn = new JObject().Set("p0", from).Set("p1", from + (to - from) / 3f).Set("p2", from + 2f * (to - from) / 3f).Set("p3", to);
-            var functions = new JArray().Add(new JObject().Set("function", fn).Set("start", 0));
-            return new JObject().Set("type", "PiecewiseBezier").Set("functions", functions);
-        }
-
-        private static JToken Vec3(float x, float y, float z) => new JArray().Add(x).Add(y).Add(z);
     }
 }

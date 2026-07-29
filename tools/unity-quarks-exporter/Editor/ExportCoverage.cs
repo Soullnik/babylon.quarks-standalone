@@ -282,34 +282,17 @@ namespace BabylonQuarks.UnityExporter
             else if (features.TextureSheetSingleRow)
             {
                 Add(issues, "tsa.singleRow", Severity.Minor, sys,
-                    "TSA Single Row is exported as a full-sheet FrameOverLife sweep.");
+                    "TSA Single Row is exported as Whole Sheet frameOverTime mapping.");
             }
-            else if (features.TextureSheet)
+            else if (features.TextureSheet && ps.textureSheetAnimation.cycleCount > 1)
             {
-                Add(issues, "tsa.frameOverTime", Severity.Minor, sys,
-                    "TSA frameOverTime / cycles are approximated as a linear full-sheet sweep.");
+                Add(issues, "tsa.cycles", Severity.Minor, sys,
+                    "TSA cycleCount > 1 is not repeated on export (single lifetime sweep).");
             }
 
-            if (features.TwoCurvesAnywhere)
-            {
-                Add(issues, "curve.twoCurves", Severity.Major, sys,
-                    "TwoCurves modes export the upper curve only (random-between-curves lost).");
-            }
-            if (features.TwoGradientsColorOverLife)
-            {
-                Add(issues, "color.twoGradients", Severity.Minor, sys,
-                    "Color over Lifetime TwoGradients exports the max gradient only.");
-            }
-            if (features.SizeOverLifetimeSeparateAxes)
-            {
-                Add(issues, "size.separateAxes", Severity.Minor, sys,
-                    "Size over Lifetime separate axes: only X is exported.");
-            }
-            if (features.SizeBySpeedSeparateAxes)
-            {
-                Add(issues, "sizeBySpeed.separateAxes", Severity.Minor, sys,
-                    "Size by Speed separate axes: only X is exported.");
-            }
+            // TwoCurves / TwoGradients / separate size axes are mapped (RandomBetweenCurves,
+            // RandomColorBetweenGradient, Vector3Function) — no coverage issue.
+
             if (features.LimitVelocitySeparateAxes)
             {
                 Add(issues, "limitVelocity.separateAxes", Severity.Minor, sys,

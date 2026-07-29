@@ -29,12 +29,17 @@ namespace BabylonQuarks.UnityExporter
                 case ParticleSystemCurveMode.Curve:
                     return Bezier(c.curve, c.curveMultiplier);
                 case ParticleSystemCurveMode.TwoCurves:
-                    // quarks value generators have no two-curve range; use the upper curve.
-                    return Bezier(c.curveMax, c.curveMultiplier);
+                    return RandomBetweenCurves(
+                        Bezier(c.curveMin, c.curveMultiplier),
+                        Bezier(c.curveMax, c.curveMultiplier));
                 default:
                     return Constant(c.constant);
             }
         }
+
+        /// <summary>Unity TwoCurves → quarks RandomBetweenCurves (stable per-particle lerp).</summary>
+        public static JToken RandomBetweenCurves(JToken a, JToken b) =>
+            new JObject().Set("type", "RandomBetweenCurves").Set("a", a).Set("b", b);
 
         /// <summary>AnimationCurve (0..1 time domain) → PiecewiseBezier via Hermite→Bézier per segment.</summary>
         public static JToken Bezier(AnimationCurve curve, float multiplier)
@@ -130,7 +135,10 @@ namespace BabylonQuarks.UnityExporter
                 case ParticleSystemGradientMode.RandomColor:
                     return Gradient(g.gradient);
                 case ParticleSystemGradientMode.TwoGradients:
-                    return Gradient(g.gradientMax);
+                    return new JObject()
+                        .Set("type", "RandomColorBetweenGradient")
+                        .Set("gradient1", Gradient(g.gradientMin))
+                        .Set("gradient2", Gradient(g.gradientMax));
                 case ParticleSystemGradientMode.TwoColors:
                     return GradientFromColors(g.colorMin, g.colorMax);
                 default:

@@ -465,7 +465,9 @@ namespace BabylonQuarks.UnityExporter
         /// </summary>
         public static int DetectBlend(Material mat)
         {
-            if (mat == null) return 2;
+            // Unity's default particle material is additive; a missing material on a child
+            // renderer used to fall through to alpha and break VFX packs (Soul* / explosions).
+            if (mat == null) return 1;
             string sn = mat.shader != null ? mat.shader.name.ToLowerInvariant() : "";
 
             // Name checks — order matters: "Alpha Blended Premultiply" contains "multiply"

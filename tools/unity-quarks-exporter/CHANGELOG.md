@@ -10,22 +10,29 @@ All notable changes to the Unity Quarks Exporter are documented here.
   feature fingerprint, and write a JSON report (`featureHistogram`, `gapImpact`, per-effect
   scores/tiers). Use this on large VFX packs to drive exporter work toward ~90% validity.
 - **Tools → Quarks → Dump Conversion for Selected Effect** — side-by-side Unity source vs exported
-  values plus heuristic `suspicions` (null-material child defaulting to alpha among additive
-  siblings, TwoCurves loss, shape collapsed to point, blend mismatch, …).
+  values plus heuristic `suspicions`.
 - Pack analyze report v2 also includes `suspicionImpact` and embeds full `conversion` dumps on
   effects that have suspicions.
 - **Tools → Quarks → Export Folder (Good+ Validity Only)** — batch-export only effects scored
   `full` or `good`; writes `export-validity-report.json` beside the output.
 - Shared `ExportCoverage` scoring (`full` / `good` / `partial` / `poor`) used by analyze, filtered
   export, and single-effect Console warnings.
+- quarks.core **`RandomBetweenCurves`** — Unity MinMaxCurve TwoCurves mode (stable per-particle
+  lerp between two curves over `t`).
 
 ### Changed
 
-- **Box / BoxShell / BoxEdge** shapes map to quarks `rectangle` (XY plane) instead of falling back
-  to a point emitter. Z depth is still flattened (reported as a minor coverage issue).
-- **Noise** now exports Unity `positionAmount` and `rotationAmount` instead of hard-coding 1 / 0.
-- Blend inference also reads Particles/Standard Unlit `_ColorMode` (Multiply/Additive/…) after
-  shader-name and `_DstBlend` checks.
+- **TwoCurves** export uses `RandomBetweenCurves` (was upper curve only) — the dominant gap on the
+  ~1200-prefab skill pack (~61% of unique fingerprints).
+- **Size over Lifetime / by Speed** separate axes export as `Vector3Function`.
+- **Color over Lifetime TwoGradients** → `RandomColorBetweenGradient`.
+- **TSA `frameOverTime`** maps through `ScaleCurve` to frame indices (incl. TwoCurves).
+- **Null material** defaults to **additive** blend (Unity default particle), fixing child alpha
+  among additive siblings.
+- **Box / BoxShell / BoxEdge** shapes map to quarks `rectangle` (XY plane).
+- **Noise** exports Unity `positionAmount` and `rotationAmount`.
+- Blend inference also reads Particles/Standard Unlit `_ColorMode` after name + `_DstBlend`.
+- `FrameOverLife` accepts any `FunctionValueGenerator` (not only `PiecewiseBezier`).
 
 ## [0.19.0] — 2026-07-25
 

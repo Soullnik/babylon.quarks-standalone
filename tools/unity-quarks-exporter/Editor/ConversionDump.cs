@@ -24,18 +24,12 @@ namespace BabylonQuarks.UnityExporter
             var systems = root.GetComponentsInChildren<ParticleSystem>(true);
             var systemDumps = new JArray();
             var suspicions = new List<Suspicion>();
-            var blendBySystem = new List<int>();
 
             foreach (var ps in systems)
             {
                 var renderer = ps.GetComponent<ParticleSystemRenderer>();
-                JObject dump = ForSystem(ps, renderer, suspicions);
-                systemDumps.Add(dump);
-                blendBySystem.Add(ReadExportedBlend(dump));
+                systemDumps.Add(ForSystem(ps, renderer, suspicions));
             }
-
-            // Cross-system: parent additive + child default alpha (null material) is a classic miss.
-            FlagSiblingBlendMismatch(systems, blendBySystem, suspicions);
 
             var suspicionArr = new JArray();
             foreach (var s in suspicions)
@@ -72,7 +66,6 @@ namespace BabylonQuarks.UnityExporter
 
             FlagBlendSuspicions(ps.name, mat, exportedBlend, suspicions);
             FlagShapeSuspicions(ps.name, shape, exportedShape, suspicions);
-            FlagCurveSuspicions(ps, suspicions);
 
             return new JObject()
                 .Set("name", ps.name)
@@ -371,11 +364,11 @@ namespace BabylonQuarks.UnityExporter
                 suspicions.Add(new Suspicion
                 {
                     Code = "blend.nullMaterial",
-                    Severity = "major",
+                    Severity = "minor",
                     SystemName = systemName,
                     Message =
-                        "No material on renderer — exporter defaults blending to alpha (2). " +
-                        "If siblings are additive, this child will look wrong (classic child alpha-blend bug).",
+                        "No material on renderer — exporter defaults blending to additive (Unity default particle) " +
+                        "and embeds no texture. Assign a material if the look depends on a specific atlas/blend.",
                 });
                 return;
             }
@@ -449,68 +442,6 @@ namespace BabylonQuarks.UnityExporter
             }
         }
 
-        private static void FlagCurveSuspicions(ParticleSystem ps, List<Suspicion> suspicions)
-        {
-            void Check(string label, ParticleSystem.MinMaxCurve c)
-            {
-                if (c.mode != ParticleSystemCurveMode.TwoCurves) return;
-                suspicions.Add(new Suspicion
-                {
-                    Code = "curve.twoCurvesLossy",
-                    Severity = "major",
-                    SystemName = ps.name,
-                    Message =
-                        $"{label} is TwoCurves — exporter keeps the upper curve only (random-between lost).",
-                });
-            }
-
-            var main = ps.main;
-            Check("startLifetime", main.startLifetime);
-            Check("startSpeed", main.startSpeed);
-            Check("startSize", main.startSize);
-            if (ps.emission.enabled)
-            {
-                Check("rateOverTime", ps.emission.rateOverTime);
-                Check("rateOverDistance", ps.emission.rateOverDistance);
-            }
-            if (ps.noise.enabled) Check("noise.strength", ps.noise.strength);
-            if (ps.sizeOverLifetime.enabled)
-            {
-                Check("sizeOverLifetime",
-                    ps.sizeOverLifetime.separateAxes ? ps.sizeOverLifetime.x : ps.sizeOverLifetime.size);
-            }
-        }
-
-        private static void FlagSiblingBlendMismatch(
-            ParticleSystem[] systems,
-            List<int> blends,
-            List<Suspicion> suspicions)
-        {
-            bool anyAdditive = false;
-            for (int i = 0; i < blends.Count; i++)
-            {
-                if (blends[i] == 1) anyAdditive = true;
-            }
-            if (!anyAdditive) return;
-
-            for (int i = 0; i < systems.Length; i++)
-            {
-                var renderer = systems[i].GetComponent<ParticleSystemRenderer>();
-                if (renderer != null && renderer.sharedMaterial == null && blends[i] == 2)
-                {
-                    suspicions.Add(new Suspicion
-                    {
-                        Code = "blend.childDefaultAlphaAmongAdditive",
-                        Severity = "major",
-                        SystemName = systems[i].name,
-                        Message =
-                            "This system has no material (defaults to alpha) while another system in the " +
-                            "effect exports as additive — likely the child alpha-blend bug.",
-                    });
-                }
-            }
-        }
-
         // ---- helpers --------------------------------------------------------------------
 
         private static int MapRenderMode(ParticleSystemRenderer renderer)
@@ -525,19 +456,6 @@ namespace BabylonQuarks.UnityExporter
                 case ParticleSystemRenderMode.VerticalBillboard: return 5;
                 default: return 0;
             }
-        }
-
-        private static int ReadExportedBlend(JObject systemDump)
-        {
-            foreach (var kv in systemDump.Members)
-            {
-                if (kv.Key != "exported" || !(kv.Value is JObject exported)) continue;
-                foreach (var e in exported.Members)
-                {
-                    if (e.Key == "blending" && e.Value is JNumber n) return (int)n.Value;
-                }
-            }
-            return 2;
         }
 
         private static string ReadStringMember(JObject obj, string key)

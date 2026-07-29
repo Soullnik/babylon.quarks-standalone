@@ -1,5 +1,5 @@
 import {Particle} from '../Particle';
-import {PiecewiseBezier, Vector3Function} from '../functions';
+import {Vector3Function} from '../functions';
 import {Quaternion} from '../math';
 import {Behavior} from './Behavior';
 
@@ -28,7 +28,7 @@ export interface FusionStep {
 }
 
 /** Constructors the generated code needs to test a generator's or a particle's kind. */
-const DEPS = {PiecewiseBezier, Vector3Function, Quaternion};
+const DEPS = {Vector3Function, Quaternion};
 
 interface Fragment {
     /** Hoisted out of the loop; runs once per pass. */
@@ -87,9 +87,8 @@ function fragmentFor(behavior: Behavior, k: number): Fragment | null {
             };
         case 'FrameOverLife':
             return {
-                setup: `const g${k} = behaviors[${k}].frame;
-                    const bezier_${k} = g${k} instanceof deps.PiecewiseBezier;`,
-                body: `if (bezier_${k}) { p.uvTile = g${k}.genValue(p.memory, t); }`,
+                setup: `const g${k} = behaviors[${k}].frame;`,
+                body: `p.uvTile = g${k}.genValue(p.memory, t);`,
             };
         case 'SpeedOverLife':
             return {
