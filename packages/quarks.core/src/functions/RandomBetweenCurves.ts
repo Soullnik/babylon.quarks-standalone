@@ -1,8 +1,10 @@
 import {MathUtils} from '../math';
+import {ConstantValue} from './ConstantValue';
 import {FunctionJSON} from './FunctionJSON';
 import {GeneratorMemory} from './GeneratorMemory';
+import {IntervalValue} from './IntervalValue';
 import {PiecewiseBezier} from './PiecewiseBezier';
-import {FunctionValueGenerator, ValueGenerator, ValueGeneratorFromJSON} from './ValueGenerator';
+import type {FunctionValueGenerator, ValueGenerator} from './ValueGenerator';
 
 /**
  * Unity MinMaxCurve "Two Curves" mode: pick a random lerp factor once at spawn,
@@ -48,11 +50,27 @@ export class RandomBetweenCurves implements FunctionValueGenerator {
     }
 
     static fromJSON(json: FunctionJSON): RandomBetweenCurves {
-        return new RandomBetweenCurves(ValueGeneratorFromJSON(json.a), ValueGeneratorFromJSON(json.b));
+        return new RandomBetweenCurves(childFromJSON(json.a), childFromJSON(json.b));
     }
 
     clone(): FunctionValueGenerator {
         return new RandomBetweenCurves(this.a.clone(), this.b.clone());
+    }
+}
+
+/** Parses scalar generator JSON without importing ValueGeneratorFromJSON (avoids a cycle). */
+function childFromJSON(json: FunctionJSON): FunctionValueGenerator | ValueGenerator {
+    switch (json.type) {
+        case 'ConstantValue':
+            return ConstantValue.fromJSON(json);
+        case 'IntervalValue':
+            return IntervalValue.fromJSON(json);
+        case 'PiecewiseBezier':
+            return PiecewiseBezier.fromJSON(json);
+        case 'RandomBetweenCurves':
+            return RandomBetweenCurves.fromJSON(json);
+        default:
+            return new ConstantValue(0);
     }
 }
 

@@ -3,6 +3,7 @@ import {FunctionJSON} from './FunctionJSON';
 import {GeneratorMemory} from './GeneratorMemory';
 import {IntervalValue} from './IntervalValue';
 import {PiecewiseBezier} from './PiecewiseBezier';
+import {RandomBetweenCurves} from './RandomBetweenCurves';
 
 /**
  * `startGen`/`genValue` follow the per-particle slot pattern documented in
@@ -42,13 +43,8 @@ export function ValueGeneratorFromJSON(json: FunctionJSON): FunctionValueGenerat
             return IntervalValue.fromJSON(json);
         case 'PiecewiseBezier':
             return PiecewiseBezier.fromJSON(json);
-        case 'RandomBetweenCurves': {
-            // Lazy require avoids a circular import with RandomBetweenCurves.ts
-            // (its fromJSON calls back into ValueGeneratorFromJSON for children).
-            // eslint-disable-next-line @typescript-eslint/no-require-imports
-            const {RandomBetweenCurves} = require('./RandomBetweenCurves') as typeof import('./RandomBetweenCurves');
+        case 'RandomBetweenCurves':
             return RandomBetweenCurves.fromJSON(json);
-        }
         default:
             return new ConstantValue(0);
     }
