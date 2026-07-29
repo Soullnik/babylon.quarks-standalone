@@ -167,7 +167,7 @@ namespace BabylonQuarks.UnityExporter
                         bool isUnique = uniqueFingerprints.Add(assessment.Fingerprint);
                         if (isUnique) report.UniqueCount++;
 
-                        TallyTiers(report, assessment.Tier);
+                        TallyTier(report, assessment.Tier);
                         TallyFeatures(featureCounts, assessment);
                         TallyGaps(gapUnique, assessment, isUnique);
 

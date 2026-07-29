@@ -227,7 +227,7 @@ namespace BabylonQuarks.UnityExporter
                     // thickness to approximate shell (0) vs volume (1); Z depth is dropped.
                     {
                         Vector3 scale = shape.scale;
-                        float thickness = shape.shapeType == ParticleSystemShapeType.BoxShell
+                        float boxThickness = shape.shapeType == ParticleSystemShapeType.BoxShell
                             || shape.shapeType == ParticleSystemShapeType.BoxEdge
                             ? 0f
                             : Mathf.Clamp01(shape.radiusThickness > 0f ? shape.radiusThickness : 1f);
@@ -235,7 +235,7 @@ namespace BabylonQuarks.UnityExporter
                             .Set("type", "rectangle")
                             .Set("width", Mathf.Abs(scale.x))
                             .Set("height", Mathf.Abs(scale.y))
-                            .Set("thickness", thickness)
+                            .Set("thickness", boxThickness)
                             .Set("mode", 0)
                             .Set("spread", 0)
                             .Set("speed", ValueConverter.Constant(0));
