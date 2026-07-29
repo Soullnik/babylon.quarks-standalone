@@ -13,6 +13,7 @@ export * from './PiecewiseBezier';
 export * from './PiecewiseFunction';
 export * from './RandomColor';
 export * from './RandomColorBetweenGradient';
+export * from './RandomBetweenCurves';
 export * from './RandomQuatGenerator';
 export * from './RotationGenerator';
 export * from './ValueGenerator';

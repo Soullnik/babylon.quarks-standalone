@@ -50,6 +50,7 @@ namespace BabylonQuarks.UnityExporter
     {
         private readonly double _v;
         public JNumber(double v) { _v = v; }
+        public double Value => _v;
 
         internal override void Write(StringBuilder sb, int indent)
         {
@@ -74,6 +75,7 @@ namespace BabylonQuarks.UnityExporter
     {
         private readonly string _v;
         public JString(string v) { _v = v; }
+        public string Value => _v;
 
         internal override void Write(StringBuilder sb, int indent)
         {
@@ -174,6 +176,32 @@ namespace BabylonQuarks.UnityExporter
             }
             Newline(sb, indent);
             sb.Append('}');
+        }
+    }
+
+    /// <summary>Read-only navigation helpers for audit / analyzer code.</summary>
+    public static class JObjectNav
+    {
+        public static JToken Get(this JObject o, string key)
+        {
+            if (o == null) return null;
+            foreach (var kv in o.Members)
+            {
+                if (kv.Key == key) return kv.Value;
+            }
+            return null;
+        }
+
+        public static JObject GetObject(this JObject o, string key)
+        {
+            JToken t = o.Get(key);
+            return t as JObject;
+        }
+
+        public static JArray GetArray(this JObject o, string key)
+        {
+            JToken t = o.Get(key);
+            return t as JArray;
         }
     }
 }

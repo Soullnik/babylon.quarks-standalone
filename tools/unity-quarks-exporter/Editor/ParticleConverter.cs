@@ -220,8 +220,28 @@ namespace BabylonQuarks.UnityExporter
                         return new JObject().Set("type", "mesh_surface").Set("mesh", meshNodeUuid);
                     }
                     return new JObject().Set("type", "point");
+                case ParticleSystemShapeType.Box:
+                case ParticleSystemShapeType.BoxShell:
+                case ParticleSystemShapeType.BoxEdge:
+                    // quarks has rectangle (XY plane), not a 3D box. Map scale.x/y and use
+                    // thickness to approximate shell (0) vs volume (1); Z depth is dropped.
+                    {
+                        Vector3 scale = shape.scale;
+                        float boxThickness = shape.shapeType == ParticleSystemShapeType.BoxShell
+                            || shape.shapeType == ParticleSystemShapeType.BoxEdge
+                            ? 0f
+                            : Mathf.Clamp01(shape.radiusThickness > 0f ? shape.radiusThickness : 1f);
+                        return new JObject()
+                            .Set("type", "rectangle")
+                            .Set("width", Mathf.Abs(scale.x))
+                            .Set("height", Mathf.Abs(scale.y))
+                            .Set("thickness", boxThickness)
+                            .Set("mode", 0)
+                            .Set("spread", 0)
+                            .Set("speed", ValueConverter.Constant(0));
+                    }
                 default:
-                    // Box/Edge and other volumes have no direct quarks equivalent yet.
+                    // Edge and other volumes have no direct quarks equivalent yet.
                     return new JObject().Set("type", "point");
             }
         }
@@ -281,11 +301,11 @@ namespace BabylonQuarks.UnityExporter
                     .Set("uTileCount", u)
                     .Set("vTileCount", v)
                     .Set("blendTiles", false);
-                // Animate across the sheet over lifetime (0 → last frame). Unity's frameOverTime
-                // curve semantics don't map 1:1, so a full linear sweep is used as the common case.
+                // Unity frameOverTime is typically 0..1 progress over life; scale to frame indices.
+                // TwoCurves / Curve / constants all go through ValueConverter (incl. RandomBetweenCurves).
                 behaviors.Add(new JObject()
                     .Set("type", "FrameOverLife")
-                    .Set("frame", LinearBezier(0, tiles - 1)));
+                    .Set("frame", ValueConverter.ScaleCurve(tsa.frameOverTime, tiles - 1)));
             }
             else
             {
@@ -309,9 +329,18 @@ namespace BabylonQuarks.UnityExporter
         {
             var m = ps.sizeOverLifetime;
             if (!m.enabled) return;
-            // quarks SizeOverLife is uniform; with separate axes Unity throws on `.size`, so use X.
-            var curve = m.separateAxes ? m.x : m.size;
-            behaviors.Add(new JObject().Set("type", "SizeOverLife").Set("size", ValueConverter.Curve(curve)));
+            if (m.separateAxes)
+            {
+                behaviors.Add(new JObject()
+                    .Set("type", "SizeOverLife")
+                    .Set("size", new JObject()
+                        .Set("type", "Vector3Function")
+                        .Set("x", ValueConverter.Curve(m.x))
+                        .Set("y", ValueConverter.Curve(m.y))
+                        .Set("z", ValueConverter.Curve(m.z))));
+                return;
+            }
+            behaviors.Add(new JObject().Set("type", "SizeOverLife").Set("size", ValueConverter.Curve(m.size)));
         }
 
         private static void AddRotationOverLife(ParticleSystem ps, JArray behaviors)
@@ -321,7 +350,7 @@ namespace BabylonQuarks.UnityExporter
             // Unity rotation-over-lifetime is in degrees/sec; quarks angularVelocity is radians/sec.
             behaviors.Add(new JObject()
                 .Set("type", "RotationOverLife")
-                .Set("angularVelocity", ScaleCurve(m.z, Mathf.Deg2Rad)));
+                .Set("angularVelocity", ValueConverter.ScaleCurve(m.z, Mathf.Deg2Rad)));
         }
 
         private static void AddVelocityOverLife(ParticleSystem ps, JArray behaviors)
@@ -370,8 +399,8 @@ namespace BabylonQuarks.UnityExporter
                 .Set("type", "Noise")
                 .Set("frequency", ValueConverter.Constant(m.frequency))
                 .Set("power", ValueConverter.Curve(m.strength))
-                .Set("positionAmount", ValueConverter.Constant(1))
-                .Set("rotationAmount", ValueConverter.Constant(0)));
+                .Set("positionAmount", ValueConverter.Curve(m.positionAmount))
+                .Set("rotationAmount", ValueConverter.Curve(m.rotationAmount)));
         }
 
         private static void AddInheritVelocity(ParticleSystem ps, JArray behaviors)
@@ -408,10 +437,16 @@ namespace BabylonQuarks.UnityExporter
         {
             var m = ps.sizeBySpeed;
             if (!m.enabled) return;
-            var curve = m.separateAxes ? m.x : m.size;
+            JToken size = m.separateAxes
+                ? new JObject()
+                    .Set("type", "Vector3Function")
+                    .Set("x", ValueConverter.Curve(m.x))
+                    .Set("y", ValueConverter.Curve(m.y))
+                    .Set("z", ValueConverter.Curve(m.z))
+                : ValueConverter.Curve(m.size);
             behaviors.Add(new JObject()
                 .Set("type", "SizeBySpeed")
-                .Set("size", ValueConverter.Curve(curve))
+                .Set("size", size)
                 .Set("speedRange", SpeedRange(m.range)));
         }
 
@@ -421,7 +456,7 @@ namespace BabylonQuarks.UnityExporter
             if (!m.enabled) return;
             behaviors.Add(new JObject()
                 .Set("type", "RotationBySpeed")
-                .Set("angularVelocity", ScaleCurve(m.z, Mathf.Deg2Rad))
+                .Set("angularVelocity", ValueConverter.ScaleCurve(m.z, Mathf.Deg2Rad))
                 .Set("speedRange", SpeedRange(m.range)));
         }
 
@@ -479,25 +514,5 @@ namespace BabylonQuarks.UnityExporter
             }
         }
 
-        private static JToken ScaleCurve(ParticleSystem.MinMaxCurve c, float scale)
-        {
-            switch (c.mode)
-            {
-                case ParticleSystemCurveMode.Constant: return ValueConverter.Constant(c.constant * scale);
-                case ParticleSystemCurveMode.TwoConstants: return ValueConverter.Interval(c.constantMin * scale, c.constantMax * scale);
-                case ParticleSystemCurveMode.Curve: return ValueConverter.Bezier(c.curve, c.curveMultiplier * scale);
-                case ParticleSystemCurveMode.TwoCurves: return ValueConverter.Bezier(c.curveMax, c.curveMultiplier * scale);
-                default: return ValueConverter.Constant(c.constant * scale);
-            }
-        }
-
-        private static JToken LinearBezier(float from, float to)
-        {
-            var fn = new JObject().Set("p0", from).Set("p1", from + (to - from) / 3f).Set("p2", from + 2f * (to - from) / 3f).Set("p3", to);
-            var functions = new JArray().Add(new JObject().Set("function", fn).Set("start", 0));
-            return new JObject().Set("type", "PiecewiseBezier").Set("functions", functions);
-        }
-
-        private static JToken Vec3(float x, float y, float z) => new JArray().Add(x).Add(y).Add(z);
     }
 }

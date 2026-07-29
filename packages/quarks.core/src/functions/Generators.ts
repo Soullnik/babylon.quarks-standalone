@@ -11,6 +11,7 @@ export function GeneratorFromJSON(
         case 'ConstantValue':
         case 'IntervalValue':
         case 'PiecewiseBezier':
+        case 'RandomBetweenCurves':
             return ValueGeneratorFromJSON(json);
         case 'AxisAngle':
         case 'RandomQuat':

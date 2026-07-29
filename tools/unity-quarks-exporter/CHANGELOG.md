@@ -2,6 +2,51 @@
 
 All notable changes to the Unity Quarks Exporter are documented here.
 
+## [Unreleased]
+
+### Added
+
+- **Tools → Quarks → Audit Effect Parity (Selected)** — three-way field audit per particle system:
+  `unity` (full `UnityEffectProbe` dump) vs `expected` (re-built `BuildPs`) vs `exported` (actual
+  envelope). Writes `{name}.parity.json` with `notableDifferences` for debugging effects that score
+  `full` but look wrong visually.
+- `UnityEffectProbe` — forensic dump of every Shuriken module, curve mode, TSA, renderer stretch,
+  material blend inference.
+- `QuarksExporter.ExportEnvelope` — returns the envelope `JObject` for audits without writing a file.
+- `ValueConverter.ScaleCurve` — shared curve scaling (TSA frame indices, rotation deg→rad).
+
+## [0.19.1] — 2026-07-28
+
+### Added
+
+- **Tools → Quarks → Analyze Effect Pack Metadata** — scan a folder of particle prefabs, dedupe by
+  feature fingerprint, and write a JSON report (`featureHistogram`, `gapImpact`, per-effect
+  scores/tiers). Use this on large VFX packs to drive exporter work toward ~90% validity.
+- **Tools → Quarks → Dump Conversion for Selected Effect** — side-by-side Unity source vs exported
+  values plus heuristic `suspicions`.
+- Pack analyze report v2 also includes `suspicionImpact` and embeds full `conversion` dumps on
+  effects that have suspicions.
+- **Tools → Quarks → Export Folder (Good+ Validity Only)** — batch-export only effects scored
+  `full` or `good`; writes `export-validity-report.json` beside the output.
+- Shared `ExportCoverage` scoring (`full` / `good` / `partial` / `poor`) used by analyze, filtered
+  export, and single-effect Console warnings.
+- quarks.core **`RandomBetweenCurves`** — Unity MinMaxCurve TwoCurves mode (stable per-particle
+  lerp between two curves over `t`).
+
+### Changed
+
+- **TwoCurves** export uses `RandomBetweenCurves` (was upper curve only) — the dominant gap on the
+  ~1200-prefab skill pack (~61% of unique fingerprints).
+- **Size over Lifetime / by Speed** separate axes export as `Vector3Function`.
+- **Color over Lifetime TwoGradients** → `RandomColorBetweenGradient`.
+- **TSA `frameOverTime`** maps through `ScaleCurve` to frame indices (incl. TwoCurves).
+- **Null material** defaults to **additive** blend (Unity default particle), fixing child alpha
+  among additive siblings.
+- **Box / BoxShell / BoxEdge** shapes map to quarks `rectangle` (XY plane).
+- **Noise** exports Unity `positionAmount` and `rotationAmount`.
+- Blend inference also reads Particles/Standard Unlit `_ColorMode` after name + `_DstBlend`.
+- `FrameOverLife` accepts any `FunctionValueGenerator` (not only `PiecewiseBezier`).
+
 ## [0.19.0] — 2026-07-25
 
 ### Added
