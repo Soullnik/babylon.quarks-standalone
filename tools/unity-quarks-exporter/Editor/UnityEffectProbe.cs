@@ -276,7 +276,7 @@ namespace BabylonQuarks.UnityExporter
                 .Set("cycleCount", tsa.cycleCount)
                 .Set("rowMode", tsa.rowMode.ToString())
                 .Set("rowIndex", tsa.rowIndex)
-                .Set("uvChannelMask", tsa.uvChannelMask)
+                .Set("uvChannelMask", (int)tsa.uvChannelMask)
                 .Set("timeMode", tsa.timeMode.ToString())
                 .Set("fps", tsa.fps)
                 .Set("startFrame", ProbeCurve(tsa.startFrame))

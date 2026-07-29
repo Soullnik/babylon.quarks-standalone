@@ -233,8 +233,10 @@ namespace BabylonQuarks.UnityExporter
             // renderer / material
             CmpScalar(rows, prefix + "renderMode", null, null, expectedPs, exportedPs, "renderMode",
                 "Unity ParticleSystemRenderMode → quarks renderMode int");
-            CmpScalar(rows, prefix + "blending", unity.GetObject("material")?.Get("inferredBlend"),
-                null, expectedPs, exportedPs, "blending", "Material → quarks blending int");
+            AddCompareRow(rows, prefix + "blending",
+                unity.GetObject("material")?.Get("inferredBlend"),
+                expectedPs.Get("blending"), exportedPs.Get("blending"),
+                "Material → quarks blending int");
             CmpStretchRenderer(rows, prefix, unity.GetObject("renderer"), expectedPs, exportedPs);
 
             // TSA tiles
