@@ -1084,6 +1084,33 @@ export class ParticleSystem implements IParticleSystem {
             }
         }
 
+        // Newborns were snapshotted above with spawn size/color (startSize /
+        // startColor) before SizeOverLife / ColorOverLife ran. That false jump
+        // is then extrapolated by the renderer when simulationResidual is
+        // negative (common with rounded fixed-step) and flashes the start
+        // appearance at the emitter. Collapse it so birth matches t=0 on the
+        // curves. Age is still 0 here — integration below ages them.
+        if (particleCount > 0) {
+            const prevSize = columns.previousSize;
+            const curSize = columns.size;
+            const prevColor = columns.previousColor;
+            const curColor = columns.color;
+            const scalars = columns.scalars;
+            const stride = ParticleStore.SCALAR_STRIDE;
+            for (let i = 0, o3 = 0, o4 = 0, s = 0; i < particleCount; i++, o3 += 3, o4 += 4, s += stride) {
+                if (scalars[s + ParticleStore.AGE] !== 0) {
+                    continue;
+                }
+                prevSize[o3] = curSize[o3];
+                prevSize[o3 + 1] = curSize[o3 + 1];
+                prevSize[o3 + 2] = curSize[o3 + 2];
+                prevColor[o4] = curColor[o4];
+                prevColor[o4 + 1] = curColor[o4 + 1];
+                prevColor[o4 + 2] = curColor[o4 + 2];
+                prevColor[o4 + 3] = curColor[o4 + 3];
+            }
+        }
+
         const followLocalOrigin = isTrailMode && (this.rendererEmitterSettings as TrailSettings).followLocalOrigin;
         if (followLocalOrigin) {
             const emitterMatrix = this.emitter.matrixWorld;

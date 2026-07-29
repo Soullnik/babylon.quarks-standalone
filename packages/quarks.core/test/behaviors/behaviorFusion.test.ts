@@ -247,6 +247,23 @@ describe('behavior fusion', () => {
         runPlan(behaviors, particles, DELTA);
         expect(particles[0].size.x).toBeCloseTo(particles[0].startSize.x, 6);
     });
+    it('keeps FrameOverLife with non-bezier generators fused and updating uvTile', () => {
+        const build = (): Behavior[] => [new ColorOverLife(new Gradient()), new FrameOverLife(new ConstantValue(2))];
+        const fusedBehaviors = build();
+        const separateBehaviors = build();
+        const fused = makePool(COUNT);
+        const separate = makePool(COUNT);
+        for (const p of fused) for (const b of fusedBehaviors) b.initialize(p, system);
+        for (const p of separate) for (const b of separateBehaviors) b.initialize(p, system);
+
+        expect(planBehaviorFusion(fusedBehaviors)).toHaveLength(1);
+
+        runPlan(fusedBehaviors, fused, DELTA);
+        runSeparately(separateBehaviors, separate, DELTA);
+
+        expect(snapshot(fused)).toEqual(snapshot(separate));
+        expect(fused.some((particle) => particle.uvTile !== 0)).toBe(true);
+    });
     it('matches the separate path for the quaternion behaviors', () => {
         // A rotated, scaled, off-origin emitter, so the world/local conversions
         // and the orbit pivot are all doing something.

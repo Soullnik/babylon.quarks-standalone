@@ -253,6 +253,45 @@ describe('render-time smoothness', () => {
         renderer.dispose();
     });
 
+    it('does not flash startSize for newborns when residual is negative', () => {
+        // SizeOverLife at t=0 is 0 (Smoke-style). Spawn still writes startSize,
+        // and previousSize used to snapshot that before behaviors — so a negative
+        // residual extrapolated back toward startSize and flickered a full-size
+        // particle at the emitter.
+        const START = 2.5;
+        const system = new ParticleSystem({
+            scene,
+            duration: 1,
+            looping: true,
+            worldSpace: true,
+            startLife: new ConstantValue(1),
+            startSpeed: new ConstantValue(0),
+            startSize: new ConstantValue(START),
+            startColor: new ConstantColor(new Vector4(1, 1, 1, 1)),
+            emissionOverTime: new ConstantValue(120),
+            shape: new PointEmitter(),
+            renderMode: RenderMode.BillBoard,
+            behaviors: [new SizeOverLife(new PiecewiseBezier([[new Bezier(0, 0, 0.73, 0.84), 0]]))],
+        });
+        const renderer = new BatchedRenderer('newborn-size-flash', scene);
+        renderer.addSystem(system);
+        system.play();
+
+        let worstYoungSize = 0;
+        for (let i = 0; i < 360; i++) {
+            renderer.update(i % 2 === 0 ? 1 / 60 : 1 / 90);
+            const sizes = (renderer.batches[0] as unknown as {sizeBuffer: Float32Array}).sizeBuffer;
+            for (let p = 0; p < system.particleNum; p++) {
+                if (system.particles[p].age < 2 / 60) {
+                    worstYoungSize = Math.max(worstYoungSize, sizes[p * 3]);
+                }
+            }
+        }
+
+        expect(worstYoungSize).toBeLessThan(0.2);
+        renderer.dispose();
+    });
+
     it('keeps a stretched billboard the right length between steps', () => {
         // A stretched billboard's shape is its velocity: the streak points along
         // it and is as long as it. A velocity frozen between steps makes the

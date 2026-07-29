@@ -7,6 +7,7 @@ import {
     ConstantValue,
     ForceOverLife,
     FrameOverLife,
+    getPhysicsResolver,
     Gradient,
     InheritVelocity,
     IntervalValue,
@@ -24,7 +25,6 @@ import {
 } from 'babylon.quarks';
 import React from 'react';
 import {EffectBinding} from '../core/binding';
-import {ensureGroundResolver} from '../core/collision';
 import {DEFAULT_GRADIENT_STOPS, buildGradient, findBehavior, readGradientStops} from '../core/colors';
 import {buildCurve, buildScalar, readPieces, readScalar} from '../core/values';
 import {CurveEditor} from './CurveEditor';
@@ -448,15 +448,14 @@ export function EmitDirectionModule({binding}: ModuleProps) {
 }
 
 export function CollisionModule({binding}: ModuleProps) {
-    // Ensure the shared ground-plane resolver exists before any ApplyCollision is created,
-    // otherwise its update() would dereference an undefined resolver.
-    const resolver = ensureGroundResolver();
+    // Like Unity: Collision stores bounce only. Colliders are host-provided via
+    // setPhysicsResolver — the editor never invents a ground plane.
     return (
         <BehaviorModule<ApplyCollision>
             binding={binding}
             title="Collision"
             type="ApplyCollision"
-            create={() => new ApplyCollision(ensureGroundResolver(), 0.5)}
+            create={() => new ApplyCollision(getPhysicsResolver(), 0.5)}
         >
             {(behavior) => (
                 <>
@@ -468,16 +467,9 @@ export function CollisionModule({binding}: ModuleProps) {
                             onChange={(v) => binding.apply(() => (behavior.bounce = v))}
                         />
                     </Row>
-                    <Row label="Floor Y">
-                        <NumberField
-                            value={resolver.y}
-                            step={0.1}
-                            onChange={(v) => binding.apply(() => (resolver.y = v))}
-                        />
-                    </Row>
                     <div style={{fontSize: 11, opacity: 0.6, marginTop: 4}}>
-                        Collides against a ground plane. Bounce is saved with the effect; Floor Y is an editor preview
-                        aid (a host can register its own colliders).
+                        Bounce is saved with the effect. Colliders come from the host
+                        (setPhysicsResolver) — without one, Collision is inert.
                     </div>
                 </>
             )}

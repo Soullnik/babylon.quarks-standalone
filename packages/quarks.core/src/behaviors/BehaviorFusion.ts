@@ -87,9 +87,8 @@ function fragmentFor(behavior: Behavior, k: number): Fragment | null {
             };
         case 'FrameOverLife':
             return {
-                setup: `const g${k} = behaviors[${k}].frame;
-                    const bezier_${k} = g${k} instanceof deps.PiecewiseBezier;`,
-                body: `if (bezier_${k}) { p.uvTile = g${k}.genValue(p.memory, t); }`,
+                setup: `const g${k} = behaviors[${k}].frame;`,
+                body: `p.uvTile = g${k}.type === 'function' ? g${k}.genValue(p.memory, t) : g${k}.genValue(p.memory);`,
             };
         case 'SpeedOverLife':
             return {

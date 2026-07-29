@@ -281,11 +281,12 @@ namespace BabylonQuarks.UnityExporter
                     .Set("uTileCount", u)
                     .Set("vTileCount", v)
                     .Set("blendTiles", false);
-                // Animate across the sheet over lifetime (0 → last frame). Unity's frameOverTime
-                // curve semantics don't map 1:1, so a full linear sweep is used as the common case.
+                // Unity frameOverTime is authored in normalized tile space (0..1), so scale it to
+                // the concrete tile indices used by quarks. This preserves constants, random
+                // ranges and curves instead of flattening everything into a linear sweep.
                 behaviors.Add(new JObject()
                     .Set("type", "FrameOverLife")
-                    .Set("frame", LinearBezier(0, tiles - 1)));
+                    .Set("frame", ScaleCurve(tsa.frameOverTime, tiles - 1)));
             }
             else
             {
@@ -489,13 +490,6 @@ namespace BabylonQuarks.UnityExporter
                 case ParticleSystemCurveMode.TwoCurves: return ValueConverter.Bezier(c.curveMax, c.curveMultiplier * scale);
                 default: return ValueConverter.Constant(c.constant * scale);
             }
-        }
-
-        private static JToken LinearBezier(float from, float to)
-        {
-            var fn = new JObject().Set("p0", from).Set("p1", from + (to - from) / 3f).Set("p2", from + 2f * (to - from) / 3f).Set("p3", to);
-            var functions = new JArray().Add(new JObject().Set("function", fn).Set("start", 0));
-            return new JObject().Set("type", "PiecewiseBezier").Set("functions", functions);
         }
 
         private static JToken Vec3(float x, float y, float z) => new JArray().Add(x).Add(y).Add(z);

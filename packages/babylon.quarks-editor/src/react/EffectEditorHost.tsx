@@ -25,7 +25,6 @@ import {BatchedRenderer, ParticleSystem, QuarksUtil} from 'babylon.quarks';
 import React, {useCallback, useEffect, useMemo, useReducer, useRef, useState} from 'react';
 import {createRoot} from 'react-dom/client';
 import {EffectBinding} from '../core/binding';
-import {ensureGroundResolver} from '../core/collision';
 import {createGalleryDefaultEntry} from '../core/defaultEffect';
 import {EmitterShapeWireframes} from '../core/emitterShapeWireframe';
 import {getGalleryDragSession, setGalleryDragSession} from '../core/galleryDragSession';
@@ -252,9 +251,6 @@ export function EffectEditorHost(props: EffectEditorHostProps) {
     };
 
     useEffect(() => {
-        // Register the shared ground-plane collider before any effect (default or imported)
-        // is built, so ApplyCollision behaviors deserialized by QuarksLoader resolve against it.
-        ensureGroundResolver();
         const engine = new Engine(canvasRef.current!, true);
         const scene = new Scene(engine);
         scene.clearColor = new Color4(0.03, 0.04, 0.09, 1);
@@ -262,8 +258,8 @@ export function EffectEditorHost(props: EffectEditorHostProps) {
         camera.attachControl(canvasRef.current!, true);
         camera.wheelDeltaPercentage = 0.01;
 
-        // Mesh render mode particles are lit (billboard modes ignore these), and the grid gives
-        // a visual floor at the same y=0 plane the Collision module's ground resolver uses.
+        // Mesh render mode particles are lit (billboard modes ignore these); the grid is visual
+        // reference only and is not a physics collider.
         scene.ambientColor = new Color3(1, 1, 1);
         const sunLight = new DirectionalLight('sun', new BVector3(-1, -1, -1), scene);
         sunLight.intensity = 1.0;

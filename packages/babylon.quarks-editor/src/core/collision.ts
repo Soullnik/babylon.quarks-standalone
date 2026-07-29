@@ -1,9 +1,8 @@
 import {Vector3, getPhysicsResolver, setPhysicsResolver} from 'babylon.quarks';
 
 /**
- * A horizontal ground plane collider. quarks.core's ApplyCollision behavior delegates to a
- * host-provided `PhysicsResolver` (a global singleton) and ships no collider primitive of its
- * own, so the editor supplies this — the common "particles bounce off the floor" case.
+ * A horizontal ground plane collider for hosts/demos that opt in via ensureGroundResolver /
+ * setPhysicsResolver. The editor never registers this automatically.
  *
  * `resolve` returns true and fills the surface normal when the point is at or below the plane,
  * which is exactly what ApplyCollision.update reflects the velocity against.
@@ -21,8 +20,8 @@ export class GroundPlaneResolver {
 }
 
 /**
- * Registers (once) a shared ground-plane resolver so ApplyCollision behaviors — whether added
- * in the inspector or deserialized from imported JSON — have something to collide against.
+ * Opt-in helper for hosts/demos that want a simple floor collider.
+ * The editor does not call this — like Unity, collision needs an explicit host-provided resolver.
  * Idempotent: an already-registered resolver is left untouched and returned.
  */
 export function ensureGroundResolver(): GroundPlaneResolver {

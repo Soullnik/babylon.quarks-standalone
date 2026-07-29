@@ -1,5 +1,5 @@
 import {Particle} from '../Particle';
-import {FunctionValueGenerator, PiecewiseBezier, ValueGeneratorFromJSON} from '../functions';
+import {FunctionValueGenerator, ValueGenerator, ValueGeneratorFromJSON} from '../functions';
 import {Behavior} from './Behavior';
 
 /**
@@ -8,21 +8,18 @@ import {Behavior} from './Behavior';
 export class FrameOverLife implements Behavior {
     type = 'FrameOverLife';
 
-    private _frame!: FunctionValueGenerator;
-    // Cached so the per-particle update does not repeat the instanceof test.
-    private _frameIsBezier = false;
+    private _frame!: FunctionValueGenerator | ValueGenerator;
 
-    constructor(frame: FunctionValueGenerator) {
+    constructor(frame: FunctionValueGenerator | ValueGenerator) {
         this.frame = frame;
     }
 
-    get frame(): FunctionValueGenerator {
+    get frame(): FunctionValueGenerator | ValueGenerator {
         return this._frame;
     }
 
-    set frame(frame: FunctionValueGenerator) {
+    set frame(frame: FunctionValueGenerator | ValueGenerator) {
         this._frame = frame;
-        this._frameIsBezier = frame instanceof PiecewiseBezier;
     }
 
     initialize(particle: Particle): void {
@@ -30,23 +27,23 @@ export class FrameOverLife implements Behavior {
     }
 
     update(particle: Particle, delta: number): void {
-        if (this._frameIsBezier) {
-            particle.uvTile = this._frame.genValue(particle.memory, particle.age / particle.life);
-        }
+        particle.uvTile = this.sampleFrame(particle, particle.age / particle.life);
     }
 
     updateAll(particles: Array<Particle>, count: number, delta: number): void {
-        if (!this._frameIsBezier) {
-            return;
-        }
-        const generator = this._frame;
         for (let i = 0; i < count; i++) {
             const particle = particles[i];
             if (particle.age >= particle.life) {
                 continue;
             }
-            particle.uvTile = generator.genValue(particle.memory, particle.age / particle.life);
+            particle.uvTile = this.sampleFrame(particle, particle.age / particle.life);
         }
+    }
+
+    private sampleFrame(particle: Particle, t: number): number {
+        return this._frame.type === 'function'
+            ? this._frame.genValue(particle.memory, t)
+            : this._frame.genValue(particle.memory);
     }
 
     frameUpdate(delta: number): void {
@@ -61,7 +58,7 @@ export class FrameOverLife implements Behavior {
     }
 
     static fromJSON(json: any): Behavior {
-        return new FrameOverLife(ValueGeneratorFromJSON(json.frame) as FunctionValueGenerator);
+        return new FrameOverLife(ValueGeneratorFromJSON(json.frame) as FunctionValueGenerator | ValueGenerator);
     }
 
     clone(): Behavior {

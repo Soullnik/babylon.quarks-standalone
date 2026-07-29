@@ -90,6 +90,7 @@ const cases: Array<[string, () => Behavior]> = [
     ['ApplyForce', () => new ApplyForce(new Vector3(0, -1, 0), new ConstantValue(9.8))],
     ['RotationOverLife', () => new RotationOverLife(new ConstantValue(1.5))],
     ['FrameOverLife', () => new FrameOverLife(new PiecewiseBezier([[new Bezier(0, 1, 2, 3), 0]]))],
+    ['FrameOverLife ConstantValue', () => new FrameOverLife(new ConstantValue(2))],
     ['SpeedOverLife', () => new SpeedOverLife(new PiecewiseBezier([[new Bezier(1, 0.7, 0.4, 0.2), 0]]))],
     ['GravityForce', () => new GravityForce(new Vector3(0, 5, 0), 4)],
     ['LimitSpeedOverLife', () => new LimitSpeedOverLife(new PiecewiseBezier([[new Bezier(2, 2, 2, 2), 0]]), 0.5)],
