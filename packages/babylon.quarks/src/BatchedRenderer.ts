@@ -22,6 +22,8 @@ export interface VFXBatchSettings {
     softParticles: boolean;
     softNearFade: number;
     softFarFade: number;
+    /** View-space nudge towards the camera, see `ParticleSystem.cameraOffset`. */
+    cameraOffset: number;
     materialBlendMode: number;
     materialTransparent: boolean;
     materialDepthTest: boolean;
@@ -146,6 +148,7 @@ export class BatchedRenderer extends TransformNode {
             a.softParticles === b.softParticles &&
             a.softFarFade === b.softFarFade &&
             a.softNearFade === b.softNearFade &&
+            a.cameraOffset === b.cameraOffset &&
             a.uTileCount === b.uTileCount &&
             a.vTileCount === b.vTileCount &&
             a.instancingGeometry === b.instancingGeometry &&

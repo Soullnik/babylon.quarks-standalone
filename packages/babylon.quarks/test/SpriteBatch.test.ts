@@ -266,6 +266,27 @@ describe('SpriteBatch', () => {
         systemOn.dispose();
     });
 
+    it('compiles the camera offset into the shader only when it is set', () => {
+        const renderer = new BatchedRenderer('sprite-camera-offset', scene);
+        const system = createSpriteSystem({cameraOffset: 0.25});
+        renderer.addSystem(system);
+        renderer.update(1 / 60);
+        const mat = getSpriteBatch(renderer).mesh.material as ShaderMaterial;
+        expectShaderDefines(mat, ['CAMERA_OFFSET']);
+        expect((mat as any)._floats.cameraOffset).toBeCloseTo(0.25, 5);
+        renderer.dispose();
+        system.dispose();
+
+        const plainRenderer = new BatchedRenderer('sprite-no-camera-offset', scene);
+        const plainSystem = createSpriteSystem();
+        plainRenderer.addSystem(plainSystem);
+        plainRenderer.update(1 / 60);
+        const plainMat = getSpriteBatch(plainRenderer).mesh.material as ShaderMaterial;
+        expect(plainMat.options.defines as string[]).not.toContain('CAMERA_OFFSET');
+        plainRenderer.dispose();
+        plainSystem.dispose();
+    });
+
     it('uses VERTICAL and HORIZONTAL billboard defines', () => {
         const rendererV = new BatchedRenderer('sprite-vert', scene);
         const sysV = createSpriteSystem({renderMode: RenderMode.VerticalBillBoard});

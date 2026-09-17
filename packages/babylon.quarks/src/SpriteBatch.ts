@@ -200,6 +200,9 @@ export class SpriteBatch extends VFXBatch {
         if (this.settings.softParticles) {
             defines.push('SOFT_PARTICLES');
         }
+        if (this.settings.cameraOffset !== 0) {
+            defines.push('CAMERA_OFFSET');
+        }
         if (this.settings.materialAlphaTest > 0) {
             defines.push('USE_ALPHATEST');
         }
@@ -243,6 +246,9 @@ export class SpriteBatch extends VFXBatch {
             uniforms.push('softParams');
             uniforms.push('depthParams');
             samplers.push('depthTexture');
+        }
+        if (this.settings.cameraOffset !== 0) {
+            uniforms.push('cameraOffset');
         }
         if (this.settings.materialAlphaTest > 0) {
             uniforms.push('alphaTest');
@@ -309,6 +315,9 @@ export class SpriteBatch extends VFXBatch {
         }
         if (this.settings.materialAlphaTest > 0) {
             mat.setFloat('alphaTest', this.settings.materialAlphaTest);
+        }
+        if (this.settings.cameraOffset !== 0) {
+            mat.setFloat('cameraOffset', this.settings.cameraOffset);
         }
         if (this.settings.renderMode === RenderMode.Mesh) {
             mat.setVector3('lightDirection', new BVector3(0.4, -1, 0.6));

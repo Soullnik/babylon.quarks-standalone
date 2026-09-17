@@ -117,6 +117,7 @@ export interface ParticleSystemParameters {
     softParticles?: boolean;
     softFarFade?: number;
     softNearFade?: number;
+    cameraOffset?: number;
     renderOrder?: number;
     worldSpace?: boolean;
     blendMode?: number;
@@ -168,6 +169,7 @@ export interface ParticleSystemJSONParameters {
     softParticles?: boolean;
     softFarFade?: number;
     softNearFade?: number;
+    cameraOffset?: number;
     blending?: number;
     transparent?: boolean;
     depthTest?: boolean;
@@ -374,6 +376,23 @@ export class ParticleSystem implements IParticleSystem {
         this.neededToUpdateRender = true;
     }
 
+    /**
+     * Slides every sprite this far along the eye ray, towards the camera.
+     *
+     * The sprite keeps its position and size on screen and only moves in depth,
+     * so an effect sitting flush with a surface stops being cut by it from every
+     * angle — unlike moving the emitter, which only works from one. Billboard,
+     * stretched billboard and mesh render modes; trails ignore it.
+     */
+    get cameraOffset() {
+        return this.rendererSettings.cameraOffset;
+    }
+
+    set cameraOffset(v: number) {
+        this.rendererSettings.cameraOffset = v;
+        this.neededToUpdateRender = true;
+    }
+
     get instancingGeometry(): Float32Array {
         return this.rendererSettings.instancingGeometry;
     }
@@ -498,6 +517,7 @@ export class ParticleSystem implements IParticleSystem {
             softParticles: parameters.softParticles ?? false,
             softNearFade: parameters.softNearFade ?? 0,
             softFarFade: parameters.softFarFade ?? 0,
+            cameraOffset: parameters.cameraOffset ?? 0,
             materialBlendMode: parameters.blendMode ?? Constants.ALPHA_ADD,
             materialTransparent: parameters.transparent ?? true,
             materialDepthTest: parameters.depthTest ?? true,
@@ -1322,6 +1342,7 @@ export class ParticleSystem implements IParticleSystem {
             softParticles: this.rendererSettings.softParticles,
             softFarFade: this.rendererSettings.softFarFade,
             softNearFade: this.rendererSettings.softNearFade,
+            cameraOffset: this.rendererSettings.cameraOffset,
             blending: this.rendererSettings.materialBlendMode,
             transparent: this.rendererSettings.materialTransparent,
             depthTest: this.rendererSettings.materialDepthTest,
@@ -1423,6 +1444,7 @@ export class ParticleSystem implements IParticleSystem {
             softParticles: json.softParticles,
             softFarFade: json.softFarFade,
             softNearFade: json.softNearFade,
+            cameraOffset: json.cameraOffset,
             behaviors: [],
             worldSpace: json.worldSpace,
             layerMask: json.layers,
@@ -1663,6 +1685,7 @@ export class ParticleSystem implements IParticleSystem {
             softParticles: this.rendererSettings.softParticles,
             softFarFade: this.rendererSettings.softFarFade,
             softNearFade: this.rendererSettings.softNearFade,
+            cameraOffset: this.rendererSettings.cameraOffset,
             behaviors: newBehaviors,
             worldSpace: this.worldSpace,
             blendMode: this.rendererSettings.materialBlendMode,

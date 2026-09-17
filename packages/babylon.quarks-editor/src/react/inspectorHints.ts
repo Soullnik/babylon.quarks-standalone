@@ -83,6 +83,7 @@ const INSPECTOR_HINTS: Record<string, string> = {
     'Render order': 'Sort priority within the batch — higher draws on top.',
     'Soft particles': 'Fades particles near intersecting geometry to reduce hard cutouts.',
     'Fade near/far': 'Distance range (near, far) for soft-particle depth fading.',
+    'Camera offset': 'Slides sprites towards the camera in view space, so they stop intersecting nearby geometry.',
 
     // Texture sheet
     'Tiles U': 'Number of horizontal cells in the texture atlas.',

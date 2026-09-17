@@ -22,6 +22,10 @@ uniform float tileCountX;
 uniform float tileCountY;
 #endif
 
+#ifdef CAMERA_OFFSET
+uniform float cameraOffset;
+#endif
+
 // Varyings
 varying vec2 vUV;
 varying vec4 vColor;
@@ -48,6 +52,16 @@ void main() {
     // Equivalent to viewVelocity * (1.0 + lengthFactor / vlength) for moving particles, but the
     // size-based term (vdir * lengthFactor) survives when the velocity contribution vanishes.
     mvPosition.xyz -= (position.x + 0.5) * (viewVelocity + vdir * lengthFactor) * avgSize;
+
+#ifdef CAMERA_OFFSET
+    // Slide each vertex along its own eye ray. The sprite keeps its exact place
+    // and size on screen and only moves in depth, so an effect flush with a
+    // surface stops being cut by it from every angle.
+    float eyeDistance = length(mvPosition.xyz);
+    if (eyeDistance > 0.0001) {
+        mvPosition.xyz -= mvPosition.xyz * (cameraOffset / eyeDistance);
+    }
+#endif
     gl_Position = projection * mvPosition;
 #ifdef SOFT_PARTICLES
     projPosition = gl_Position;

@@ -23,6 +23,11 @@ and the project follows the `quarks.core` 0.x version line.
 
 ### Added
 
+- `ParticleSystem.cameraOffset` slides each sprite along its own eye ray, towards the
+  camera. The sprite keeps its place and size on screen and only moves in depth, so an
+  effect flush with a surface stops being cut by it from every angle — the equivalent of
+  Cascade's and Niagara's Camera Offset module. Billboard, stretched billboard and mesh
+  render modes; trails ignore it.
 - `BatchedRenderer.setDepthTexture(texture, mode)` takes a `DepthTextureMode` saying how
   the texture stores depth — `LinearDepthMetric` (the default, matching
   `scene.enableDepthRenderer()`), `CameraSpaceZ` or `NonLinearDepth`.

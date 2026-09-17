@@ -157,6 +157,25 @@ plane, since that map clears to 0) or `NonLinearDepth` (`storeNonLinearDepth: tr
 Fade distances are in world units, so scale them to the effect: a 0.3 fade swallows an
 effect that is only half a unit across.
 
+### When the sprite sits flush with the surface
+
+Soft particles fade by distance to what is behind, so they have nothing to work with when
+a sprite lies in the same plane as the object. Two things help, and they compose:
+
+```ts
+system.cameraOffset = 0.15; // slide sprites along the eye ray, towards the camera
+system.depthTest = false; // or let the effect draw over the object entirely
+```
+
+`cameraOffset` is Cascade's / Niagara's Camera Offset: the sprite does not move on screen,
+only in depth, so unlike moving the emitter it holds from every camera angle. It separates
+along the view direction, so it does nothing for a surface seen edge-on.
+
+For an effect that should wrap an object rather than sit next to it, emit from the object:
+`MeshSurfaceEmitter` puts particles on a mesh's surface with their velocity along the face
+normal. It samples the mesh's vertices when assigned, so it follows a moving object but not
+a skinned pose.
+
 ## Author & load effects
 
 Design an effect with one of these tools, then load the exported JSON with `QuarksLoader`:

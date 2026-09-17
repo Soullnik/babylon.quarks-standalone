@@ -20,6 +20,10 @@ uniform tileCountX: f32;
 uniform tileCountY: f32;
 #endif
 
+#ifdef CAMERA_OFFSET
+uniform cameraOffset: f32;
+#endif
+
 // Varyings
 varying vUV: vec2f;
 varying vColor: vec4f;
@@ -58,6 +62,16 @@ fn main(input: VertexInputs) -> FragmentInputs {
     mvPosition.y += rotatedPosition.y;
 #endif
 
+
+#ifdef CAMERA_OFFSET
+    // Slide each vertex along its own eye ray. The sprite keeps its exact place
+    // and size on screen and only moves in depth, so an effect flush with a
+    // surface stops being cut by it from every angle.
+    let eyeDistance = length(mvPosition.xyz);
+    if (eyeDistance > 0.0001) {
+        mvPosition = vec4f(mvPosition.xyz - mvPosition.xyz * (uniforms.cameraOffset / eyeDistance), mvPosition.w);
+    }
+#endif
     let clipPosition = uniforms.projection * mvPosition;
     vertexOutputs.position = clipPosition;
 #ifdef SOFT_PARTICLES

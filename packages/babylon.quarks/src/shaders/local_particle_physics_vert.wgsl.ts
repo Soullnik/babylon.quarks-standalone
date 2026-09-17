@@ -17,6 +17,10 @@ uniform tileCountX: f32;
 uniform tileCountY: f32;
 #endif
 
+#ifdef CAMERA_OFFSET
+uniform cameraOffset: f32;
+#endif
+
 varying vUV: vec2f;
 varying vColor: vec4f;
 varying vNormal: vec3f;
@@ -47,7 +51,17 @@ fn main(input: VertexInputs) -> FragmentInputs {
     let localPos = rotatedPosition + vertexInputs.offset;
 
     let worldPos = uniforms.world * vec4f(localPos, 1.0);
-    let viewPos = uniforms.view * worldPos;
+    var viewPos = uniforms.view * worldPos;
+
+#ifdef CAMERA_OFFSET
+    // Slide each vertex along its own eye ray. The particle keeps its exact
+    // place and size on screen and only moves in depth, so an effect flush with
+    // a surface stops being cut by it from every angle.
+    let eyeDistance = length(viewPos.xyz);
+    if (eyeDistance > 0.0001) {
+        viewPos = vec4f(viewPos.xyz - viewPos.xyz * (uniforms.cameraOffset / eyeDistance), viewPos.w);
+    }
+#endif
     let clipPosition = uniforms.projection * viewPos;
     vertexOutputs.position = clipPosition;
 

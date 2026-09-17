@@ -28,6 +28,7 @@ export interface StoredBatchSettings {
     softParticles: boolean;
     softNearFade: number;
     softFarFade: number;
+    cameraOffset: number;
     materialBlendMode: number;
     materialTransparent: boolean;
     materialDepthTest: boolean;
@@ -68,6 +69,7 @@ export abstract class VFXBatch {
             softParticles: settings.softParticles,
             softNearFade: settings.softNearFade,
             softFarFade: settings.softFarFade,
+            cameraOffset: settings.cameraOffset ?? 0,
             materialBlendMode: settings.materialBlendMode,
             materialTransparent: settings.materialTransparent,
             materialDepthTest: settings.materialDepthTest,

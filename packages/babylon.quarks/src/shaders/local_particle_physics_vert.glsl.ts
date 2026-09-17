@@ -17,6 +17,10 @@ uniform float tileCountX;
 uniform float tileCountY;
 #endif
 
+#ifdef CAMERA_OFFSET
+uniform float cameraOffset;
+#endif
+
 varying vec2 vUV;
 varying vec4 vColor;
 varying vec3 vNormal;
@@ -47,6 +51,16 @@ void main() {
 
     vec4 worldPos = world * vec4(localPos, 1.0);
     vec4 viewPos = view * worldPos;
+
+#ifdef CAMERA_OFFSET
+    // Slide each vertex along its own eye ray. The particle keeps its exact
+    // place and size on screen and only moves in depth, so an effect flush with
+    // a surface stops being cut by it from every angle.
+    float eyeDistance = length(viewPos.xyz);
+    if (eyeDistance > 0.0001) {
+        viewPos.xyz -= viewPos.xyz * (cameraOffset / eyeDistance);
+    }
+#endif
     gl_Position = projection * viewPos;
 
     vWorldPos = worldPos.xyz;

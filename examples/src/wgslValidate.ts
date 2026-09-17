@@ -45,6 +45,7 @@ function cases(): Case[] {
     const mapOptions = [[], ['USE_MAP']];
     const softOptions = [[], ['SOFT_PARTICLES']];
     const alphaOptions = [[], ['USE_ALPHATEST']];
+    const cameraOptions = [[], ['CAMERA_OFFSET']];
 
     const push = (
         name: string,
@@ -57,27 +58,29 @@ function cases(): Case[] {
         for (const tile of tileOptions)
             for (const map of mapOptions)
                 for (const soft of softOptions)
-                    for (const alpha of alphaOptions) {
-                        const defines = [...extra, ...tile, ...map, ...soft, ...alpha];
-                        const uniforms = [...baseUniforms];
-                        const samplers: string[] = [];
-                        if (tile.length) uniforms.push('tileCountX', 'tileCountY');
-                        if (map.length) samplers.push('map');
-                        if (soft.length) {
-                            uniforms.push('softParams', 'depthParams');
-                            samplers.push('depthTexture');
+                    for (const alpha of alphaOptions)
+                        for (const camera of cameraOptions) {
+                            const defines = [...extra, ...tile, ...map, ...soft, ...alpha, ...camera];
+                            const uniforms = [...baseUniforms];
+                            const samplers: string[] = [];
+                            if (tile.length) uniforms.push('tileCountX', 'tileCountY');
+                            if (map.length) samplers.push('map');
+                            if (soft.length) {
+                                uniforms.push('softParams', 'depthParams');
+                                samplers.push('depthTexture');
+                            }
+                            if (alpha.length) uniforms.push('alphaTest');
+                            if (camera.length) uniforms.push('cameraOffset');
+                            out.push({
+                                name: `${name}${defines.length ? ' [' + defines.join(',') + ']' : ' [none]'}`,
+                                vertex,
+                                fragment,
+                                attributes,
+                                uniforms,
+                                samplers,
+                                defines,
+                            });
                         }
-                        if (alpha.length) uniforms.push('alphaTest');
-                        out.push({
-                            name: `${name}${defines.length ? ' [' + defines.join(',') + ']' : ' [none]'}`,
-                            vertex,
-                            fragment,
-                            attributes,
-                            uniforms,
-                            samplers,
-                            defines,
-                        });
-                    }
     };
 
     push('billboard', particleVert, particleFrag, SPRITE_ATTRS, SPRITE_UNIFORMS, []);

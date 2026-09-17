@@ -1151,6 +1151,13 @@ export function RendererModule({
                     </div>
                 </Row>
             )}
+            <Row label="Camera offset">
+                <NumberField
+                    value={system.cameraOffset}
+                    step={0.01}
+                    onChange={(v) => binding.apply((s) => (s.cameraOffset = v))}
+                />
+            </Row>
         </ModuleSection>
     );
 }
