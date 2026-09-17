@@ -207,6 +207,10 @@ export class TrailBatch extends VFXBatch {
         mat.needDepthPrePass = this.settings.materialDepthWrite;
         mat.forceDepthWrite = this.settings.materialDepthWrite;
         mat.disableDepthWrite = !this.settings.materialDepthWrite;
+        // Babylon has no "disable depth test" flag: comparing ALWAYS is how a
+        // material draws over whatever is already in the depth buffer. 0 hands
+        // the choice back to the engine default.
+        mat.depthFunction = this.settings.materialDepthTest ? 0 : Constants.ALWAYS;
 
         this.mesh.material = mat;
     }

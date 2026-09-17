@@ -246,6 +246,26 @@ describe('SpriteBatch', () => {
         depthTex.dispose();
     });
 
+    it('draws over the scene when the depth test is off, and defers to the engine when on', () => {
+        const rendererOff = new BatchedRenderer('sprite-no-depth-test', scene);
+        const systemOff = createSpriteSystem({depthTest: false});
+        rendererOff.addSystem(systemOff);
+        rendererOff.update(1 / 60);
+        const matOff = getSpriteBatch(rendererOff).mesh.material as ShaderMaterial;
+        expect(matOff.depthFunction).toBe(Constants.ALWAYS);
+        rendererOff.dispose();
+        systemOff.dispose();
+
+        const rendererOn = new BatchedRenderer('sprite-depth-test', scene);
+        const systemOn = createSpriteSystem();
+        rendererOn.addSystem(systemOn);
+        rendererOn.update(1 / 60);
+        const matOn = getSpriteBatch(rendererOn).mesh.material as ShaderMaterial;
+        expect(matOn.depthFunction).toBe(0);
+        rendererOn.dispose();
+        systemOn.dispose();
+    });
+
     it('uses VERTICAL and HORIZONTAL billboard defines', () => {
         const rendererV = new BatchedRenderer('sprite-vert', scene);
         const sysV = createSpriteSystem({renderMode: RenderMode.VerticalBillBoard});

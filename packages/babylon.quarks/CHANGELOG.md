@@ -16,6 +16,10 @@ and the project follows the `quarks.core` 0.x version line.
   decoded from the camera's own projection matrix, which holds for perspective and
   orthographic cameras, left- and right-handed scenes, WebGL and WebGPU clip space, and
   reverse depth buffers.
+- `depthTest: false` did nothing. The flag round-tripped through JSON, the editor toggle
+  and batch bucketing, but no one ever applied it to the material, so particles were
+  always depth-tested. Batch materials now compare `ALWAYS` when it is off, which is how
+  an effect draws over geometry it would otherwise be cut by.
 
 ### Added
 

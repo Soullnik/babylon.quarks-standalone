@@ -133,6 +133,18 @@ describe('TrailBatch', () => {
         system.dispose();
     });
 
+    it('drops the depth test on the trail material when the system asks for it', () => {
+        const renderer = new BatchedRenderer('trail-no-depth-test', scene);
+        const system = createTrailSystem({depthTest: false});
+        renderer.addSystem(system);
+
+        const material = getTrailBatch(renderer).mesh.material as ShaderMaterial;
+        expect(material.depthFunction).toBe(Constants.ALWAYS);
+
+        renderer.dispose();
+        system.dispose();
+    });
+
     it('includes USE_MAP define when trail uses a texture', () => {
         const tex = RawTexture.CreateRGBTexture(new Uint8Array([255, 0, 0, 255]), 1, 1, scene);
         const renderer = new BatchedRenderer('trail-texture', scene);
