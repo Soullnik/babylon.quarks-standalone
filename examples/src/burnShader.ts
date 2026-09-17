@@ -39,6 +39,9 @@ precision highp float;
 
 uniform float time;
 uniform float burn;
+/** 0 — the soft, photographic fire; 1 — flat bands and hard edges, drawn look. */
+uniform float stylize;
+uniform vec3 outlineColor;
 uniform float noiseScale;
 uniform float scrollSpeed;
 uniform vec3 emberColor;
@@ -81,24 +84,51 @@ float fbm(vec2 p) {
 void main() {
     // Tongues are stretched along the surface's up axis and scroll upwards; a
     // second, faster layer makes their edges flicker.
-    vec2 uv = vec2(vUV.x * noiseScale, vUV.y * noiseScale * 0.35);
-    float slow = fbm(uv + vec2(0.0, -time * scrollSpeed));
-    float fast = fbm(uv * 2.4 + vec2(time * 0.17, -time * scrollSpeed * 2.4));
-    float noise = mix(slow, fast, 0.4);
+    // Painted fire wants fewer, larger shapes — a brush stroke, not a wisp.
+    float shapeScale = mix(1.0, 0.55, step(0.5, stylize));
+    vec2 uv = vec2(vUV.x * noiseScale, vUV.y * noiseScale * 0.35) * shapeScale;
+    // A drawn effect animates on twos: snapping the clock to 10 frames a second
+    // gives the flames that flipbook cadence instead of a smooth crawl.
+    float t = mix(time, floor(time * 10.0) / 10.0, step(0.5, stylize));
+    float slow = fbm(uv + vec2(0.0, -t * scrollSpeed));
+    float fast = fbm(uv * 2.4 + vec2(t * 0.17, -t * scrollSpeed * 2.4));
+    float noise = mix(slow, fast, mix(0.4, 0.18, step(0.5, stylize)));
 
     // Fire clings to the bottom of the object and dies out towards the top.
     float up = clamp((vLocalPos.y + height * 0.5) / height, 0.0, 1.0);
-    float gradient = 1.0 - smoothstep(0.0, 0.8, up);
+    float gradient = 1.0 - smoothstep(0.0, mix(0.8, 1.05, step(0.5, stylize)), up);
 
     // Erosion: the noise field is cut at a threshold, so what survives is a set
     // of torn tongues rather than a wash of light. The burn uniform opens the
     // cut, letting the fire eat further up the surface, and a slow wobble keeps
     // the cut from looking stamped on.
     float mask = noise * (0.58 + 0.42 * gradient);
-    float flicker = 0.02 * sin(time * 6.0 + vUV.x * 14.0) + 0.015 * sin(time * 9.3 + vUV.y * 7.0);
-    float threshold = mix(0.47, 0.33, clamp(burn, 0.0, 1.0)) + flicker;
+    float flicker = 0.02 * sin(t * 6.0 + vUV.x * 14.0) + 0.015 * sin(t * 9.3 + vUV.y * 7.0);
+    float threshold = mix(0.47, 0.33, clamp(burn, 0.0, 1.0)) + flicker - 0.05 * step(0.5, stylize);
     float body = smoothstep(threshold, threshold + 0.035, mask);
     float edge = smoothstep(threshold - 0.05, threshold + 0.005, mask) - body;
+
+    // Rim light: only where there is fire, so the object does not glow all over.
+    float fresnel = pow(1.0 - clamp(dot(normalize(vNormalW), normalize(vViewDirW)), 0.0, 1.0), 3.0);
+
+    if (stylize > 0.5) {
+        // Hand-drawn look: the same mask, but quantised into a few flat bands
+        // and cut with hard steps, so every tongue reads as a painted shape with
+        // an inked edge instead of a gradient.
+        float quantised = floor(mask / 0.045) * 0.045;
+        float shape = step(threshold, quantised);
+        float mid = step(threshold + 0.05, quantised);
+        float core = step(threshold + 0.11, quantised);
+        float ink = shape - step(threshold + 0.038, quantised);
+
+        vec3 color = mix(emberColor, flameColor, mid);
+        color = mix(color, coreColor, core);
+        color = mix(color, outlineColor, ink);
+
+        float alpha = clamp(shape + ink * 0.4, 0.0, 1.0);
+        gl_FragColor = vec4(color * alpha, alpha);
+        return;
+    }
 
     // Hotter at the root of each tongue, cooling towards the tip.
     float heat = clamp(body * (0.25 + 0.75 * gradient), 0.0, 1.0);
@@ -106,8 +136,6 @@ void main() {
     color = mix(color, coreColor, smoothstep(0.7, 1.0, heat) * 0.8);
     color = mix(color, emberColor * 0.85, edge);
 
-    // Rim light: only where there is fire, so the object does not glow all over.
-    float fresnel = pow(1.0 - clamp(dot(normalize(vNormalW), normalize(vViewDirW)), 0.0, 1.0), 3.0);
     float alpha = clamp(body + edge * 0.7, 0.0, 1.0);
     alpha = clamp(alpha + fresnel * gradient * 0.25 * alpha, 0.0, 1.0);
 
