@@ -4,6 +4,7 @@ import {TransformNode} from '@babylonjs/core/Meshes/transformNode';
 import {Scene} from '@babylonjs/core/scene';
 import {EmitSubParticleSystem, IParticleSystem} from 'quarks.core';
 import {ParticleSystem} from './ParticleSystem';
+import {DepthTextureMode} from './SoftParticleDepth';
 import {SpriteBatch} from './SpriteBatch';
 import {TrailBatch} from './TrailBatch';
 import {RenderMode, StoredBatchSettings, VFXBatch} from './VFXBatch';
@@ -83,6 +84,8 @@ export class BatchedRenderer extends TransformNode {
     batches: Array<VFXBatch> = [];
     systemToBatchIndex: Map<IParticleSystem, number> = new Map<IParticleSystem, number>();
     depthTexture: BaseTexture | null = null;
+    /** How `depthTexture` encodes depth — see {@link setDepthTexture}. */
+    depthTextureMode: DepthTextureMode = DepthTextureMode.LinearDepthMetric;
     /** Systems in insertion order — iterated every frame, unlike the map. */
     private systems: Array<IParticleSystem> = [];
     /**
@@ -193,7 +196,7 @@ export class BatchedRenderer extends TransformNode {
         }
         batch.mesh.parent = this;
         if (this.depthTexture) {
-            batch.applyDepthTexture(this.depthTexture);
+            batch.applyDepthTexture(this.depthTexture, this.depthTextureMode);
         }
         batch.addSystem(system);
         this.batches.push(batch);
@@ -238,10 +241,20 @@ export class BatchedRenderer extends TransformNode {
         this.addSystem(system);
     }
 
-    setDepthTexture(depthTexture: BaseTexture | null) {
+    /**
+     * Depth buffer the soft-particle fade reads, usually
+     * `scene.enableDepthRenderer().getDepthMap()`.
+     *
+     * `mode` must match how that texture stores depth — the default matches
+     * `scene.enableDepthRenderer()` called without arguments. A mismatch does not
+     * merely change the fade distance: it decodes to the wrong distance
+     * entirely, which fades particles out where nothing is in front of them.
+     */
+    setDepthTexture(depthTexture: BaseTexture | null, mode: DepthTextureMode = DepthTextureMode.LinearDepthMetric) {
         this.depthTexture = depthTexture;
+        this.depthTextureMode = mode;
         for (const batch of this.batches) {
-            batch.applyDepthTexture(depthTexture);
+            batch.applyDepthTexture(depthTexture, mode);
         }
     }
 

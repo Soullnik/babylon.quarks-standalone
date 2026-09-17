@@ -30,6 +30,7 @@ export {QuarksPrefab} from './QuarksPrefab';
 export type {AnimationData, QuarksTimelineClip} from './QuarksPrefab';
 export {QuarksUtil} from './QuarksUtil';
 export * from './shaders/';
+export {computeDepthDecodeParams, DepthTextureMode} from './SoftParticleDepth';
 export {SpriteBatch} from './SpriteBatch';
 export {TrailBatch} from './TrailBatch';
 export {RenderMode, VFXBatch} from './VFXBatch';

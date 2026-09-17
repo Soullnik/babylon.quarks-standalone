@@ -8,6 +8,7 @@ import {Vector3 as BVector3} from '@babylonjs/core/Maths/math.vector';
 import type {Mesh} from '@babylonjs/core/Meshes/mesh';
 import {MeshBuilder} from '@babylonjs/core/Meshes/meshBuilder';
 import {TransformNode} from '@babylonjs/core/Meshes/transformNode';
+import '@babylonjs/core/Rendering/depthRendererSceneComponent';
 import {UtilityLayerRenderer} from '@babylonjs/core/Rendering/utilityLayerRenderer';
 import {Scene} from '@babylonjs/core/scene';
 import {GridMaterial} from '@babylonjs/materials/grid/gridMaterial';
@@ -283,6 +284,11 @@ export function EffectEditorHost(props: EffectEditorHostProps) {
         gizmoManagerRef.current = gizmoManager;
 
         const renderer = new BatchedRenderer('quarks-editor', scene);
+        // Soft particles need somewhere to read scene depth from, otherwise the
+        // inspector's "Soft particles" toggle changes nothing in the viewport.
+        if (typeof scene.enableDepthRenderer === 'function') {
+            renderer.setDepthTexture(scene.enableDepthRenderer(camera).getDepthMap());
+        }
         const history = new EffectHistory();
         const galleryRoot = new TransformNode('GalleryCatalog', scene);
         galleryRoot.setEnabled(false);

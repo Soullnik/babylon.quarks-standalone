@@ -16,7 +16,9 @@ var map: texture_2d<f32>;
 var depthTextureSampler: sampler;
 var depthTexture: texture_2d<f32>;
 uniform softParams: vec2f;
-uniform projParams: vec4f;
+// (x, y) decode a depth sample into a distance from the camera plane, z selects
+// the reciprocal form used by raw depth-buffer samples. See SoftParticleDepth.ts.
+uniform depthParams: vec4f;
 varying projPosition: vec4f;
 varying linearDepth: f32;
 #endif
@@ -52,9 +54,8 @@ fn main(input: FragmentInputs) -> FragmentOutputs {
     var p2 = fragmentInputs.projPosition.xy / fragmentInputs.projPosition.w;
     p2 = 0.5 * p2 + 0.5;
     let readDepth = textureSample(depthTexture, depthTextureSampler, p2).r;
-    let zNear = uniforms.projParams.x;
-    let zFar = uniforms.projParams.y;
-    let viewDepth = (zFar * zNear) / (zFar - readDepth * (zFar - zNear));
+    let decoded = uniforms.depthParams.x * readDepth + uniforms.depthParams.y;
+    let viewDepth = select(decoded, 1.0 / decoded, uniforms.depthParams.z > 0.5);
     let fade = clamp(uniforms.softParams.y * ((viewDepth - uniforms.softParams.x) - fragmentInputs.linearDepth), 0.0, 1.0);
     baseColor *= fade;
 #endif

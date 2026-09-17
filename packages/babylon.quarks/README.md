@@ -134,6 +134,29 @@ await engine.initAsync();
 
 All render modes (billboard, stretched billboard, mesh, trail) are validated to create WebGPU pipelines with zero validation errors. The [live demos](https://soullnik.github.io/babylon.quarks-standalone/) and the [benchmark page](https://soullnik.github.io/babylon.quarks-standalone/benchmark.html) accept `?engine=webgpu` in the URL to switch engines.
 
+## Soft particles
+
+Billboards intersecting geometry are cut along a hard line by the depth test — most
+visible against thin walls and floors. Soft particles fade a particle out as it
+approaches whatever is behind it, which needs a depth buffer to compare against:
+
+```ts
+import '@babylonjs/core/Rendering/depthRendererSceneComponent';
+
+batchRenderer.setDepthTexture(scene.enableDepthRenderer().getDepthMap());
+system.softParticles = true;
+system.softNearFade = 0; // where the fade starts, in world units
+system.softFarFade = 0.3; // where the particle is back to full opacity
+```
+
+`setDepthTexture` takes an optional `DepthTextureMode` for depth maps written some other
+way — `LinearDepthMetric` (the default, and what `enableDepthRenderer()` writes),
+`CameraSpaceZ` (`storeCameraSpaceZ: true`; also set `depthRenderer.clearColor` to your far
+plane, since that map clears to 0) or `NonLinearDepth` (`storeNonLinearDepth: true`).
+
+Fade distances are in world units, so scale them to the effect: a 0.3 fade swallows an
+effect that is only half a unit across.
+
 ## Author & load effects
 
 Design an effect with one of these tools, then load the exported JSON with `QuarksLoader`:

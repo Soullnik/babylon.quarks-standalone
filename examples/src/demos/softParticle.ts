@@ -1,10 +1,14 @@
 import {Constants} from '@babylonjs/core/Engines/constants';
+import {StandardMaterial} from '@babylonjs/core/Materials/standardMaterial';
+import {Color3} from '@babylonjs/core/Maths/math.color';
 import {Vector3 as BVector3} from '@babylonjs/core/Maths/math.vector';
+import {MeshBuilder} from '@babylonjs/core/Meshes/meshBuilder';
 import '@babylonjs/core/Rendering/depthRendererSceneComponent';
 import {
     Bezier,
     ConstantColor,
     ConstantValue,
+    DepthTextureMode,
     ForceOverLife,
     FrameOverLife,
     ParticleSystem,
@@ -21,8 +25,25 @@ export function init({scene, camera, batchRenderer, systems}: DemoContext) {
     const texture = createSharedTexture(scene, SHARED_ASSETS.smoke);
     if (typeof scene.enableDepthRenderer === 'function') {
         const depthRenderer = scene.enableDepthRenderer();
-        batchRenderer.setDepthTexture(depthRenderer.getDepthMap());
+        // The default depth renderer writes a linear depth metric, which is what
+        // DepthTextureMode.LinearDepthMetric decodes.
+        batchRenderer.setDepthTexture(depthRenderer.getDepthMap(), DepthTextureMode.LinearDepthMetric);
     }
+
+    // Geometry for the particles to intersect. The slab is 5 cm thick on
+    // purpose: a thin wall is where a hard billboard cut is most obvious.
+    const ground = MeshBuilder.CreateGround('softGround', {width: 40, height: 40}, scene);
+    const groundMaterial = new StandardMaterial('softGroundMat', scene);
+    groundMaterial.diffuseColor = new Color3(0.22, 0.24, 0.3);
+    groundMaterial.specularColor = new Color3(0.05, 0.05, 0.05);
+    ground.material = groundMaterial;
+
+    const slab = MeshBuilder.CreateBox('softSlab', {width: 10, height: 7, depth: 0.05}, scene);
+    slab.position = new BVector3(0, 3.5, 0);
+    const slabMaterial = new StandardMaterial('softSlabMat', scene);
+    slabMaterial.diffuseColor = new Color3(0.35, 0.37, 0.45);
+    slabMaterial.specularColor = new Color3(0.05, 0.05, 0.05);
+    slab.material = slabMaterial;
 
     const softParticles = new ParticleSystem({
         scene,

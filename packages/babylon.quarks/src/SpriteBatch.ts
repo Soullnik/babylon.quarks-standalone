@@ -27,6 +27,7 @@ import particle_vert_wgsl from './shaders/particle_vert.wgsl';
 import {registerShaders, shaderLanguageFor, ShaderSources} from './shaders/shaderLanguageSupport';
 import stretched_bb_particle_vert from './shaders/stretched_bb_particle_vert.glsl';
 import stretched_bb_particle_vert_wgsl from './shaders/stretched_bb_particle_vert.wgsl';
+import {computeDepthDecodeParams} from './SoftParticleDepth';
 import {RenderMode, VFXBatch} from './VFXBatch';
 
 export class SpriteBatch extends VFXBatch {
@@ -240,7 +241,7 @@ export class SpriteBatch extends VFXBatch {
         }
         if (this.settings.softParticles) {
             uniforms.push('softParams');
-            uniforms.push('projParams');
+            uniforms.push('depthParams');
             samplers.push('depthTexture');
         }
         if (this.settings.materialAlphaTest > 0) {
@@ -297,15 +298,13 @@ export class SpriteBatch extends VFXBatch {
                     1.0 / Math.max(this.settings.softFarFade - this.settings.softNearFade, 0.0001)
                 )
             );
-            // Reused across binds: this runs on every draw call.
-            const projParams = new BVector4(0, 0, 0, 0);
+            // Reused across binds: this runs on every draw call. The camera and
+            // its projection can change between frames, so the decode
+            // coefficients are recomputed rather than cached.
+            const depthParams = new BVector4(0, 0, 0, 0);
             mat.onBindObservable.add(() => {
-                const camera = this.scene.activeCamera;
-                if (camera) {
-                    projParams.x = camera.minZ;
-                    projParams.y = camera.maxZ;
-                    mat.setVector4('projParams', projParams);
-                }
+                computeDepthDecodeParams(this.scene, this.depthTextureMode, depthParams);
+                mat.setVector4('depthParams', depthParams);
             });
         }
         if (this.settings.materialAlphaTest > 0) {

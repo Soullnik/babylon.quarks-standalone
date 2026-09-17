@@ -240,7 +240,7 @@ describe('SpriteBatch', () => {
         expectShaderDefines(mat, ['SOFT_PARTICLES', 'USE_ALPHATEST']);
         expect((mat as any)._floats.alphaTest).toBeCloseTo(0.35, 5);
         mat.onBindObservable.notifyObservers(undefined as any);
-        expect((mat as any)._vectors4.projParams).toBeDefined();
+        expect((mat as any)._vectors4.depthParams).toBeDefined();
         renderer.dispose();
         system.dispose();
         depthTex.dispose();

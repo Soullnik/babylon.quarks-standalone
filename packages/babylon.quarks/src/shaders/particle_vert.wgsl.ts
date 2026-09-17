@@ -62,7 +62,10 @@ fn main(input: VertexInputs) -> FragmentInputs {
     vertexOutputs.position = clipPosition;
 #ifdef SOFT_PARTICLES
     vertexOutputs.projPosition = clipPosition;
-    vertexOutputs.linearDepth = -mvPosition.z;
+    // Distance from the camera plane: view-space Z is positive in front of a
+    // left-handed camera and negative in front of a right-handed one, and the
+    // decoded depth sample it is compared against is positive either way.
+    vertexOutputs.linearDepth = abs(mvPosition.z);
 #endif
 
     #ifdef UV_TILE

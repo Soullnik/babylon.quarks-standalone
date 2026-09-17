@@ -4,6 +4,27 @@ All notable changes to the `babylon.quarks` package are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project follows the `quarks.core` 0.x version line.
 
+## [Unreleased]
+
+### Fixed
+
+- Soft particles never faded anything. Two bugs cancelled out, so the feature looked
+  harmless while doing nothing: the vertex shaders wrote `linearDepth = -viewPosition.z`,
+  a three.js idiom that is negative in a Babylon left-handed scene, and the fragment
+  shaders decoded the depth sample as a raw depth-buffer value while
+  `scene.enableDepthRenderer()` writes a linear depth metric by default. Depth is now
+  decoded from the camera's own projection matrix, which holds for perspective and
+  orthographic cameras, left- and right-handed scenes, WebGL and WebGPU clip space, and
+  reverse depth buffers.
+
+### Added
+
+- `BatchedRenderer.setDepthTexture(texture, mode)` takes a `DepthTextureMode` saying how
+  the texture stores depth — `LinearDepthMetric` (the default, matching
+  `scene.enableDepthRenderer()`), `CameraSpaceZ` or `NonLinearDepth`.
+- The effect editor enables a depth renderer, so its "Soft particles" toggle now does
+  something in the viewport.
+
 ## [0.17.9] — 2026-07-14
 
 ### Fixed

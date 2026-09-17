@@ -4,6 +4,7 @@ import {Mesh} from '@babylonjs/core/Meshes/mesh';
 import {Scene} from '@babylonjs/core/scene';
 import {IParticleSystem} from 'quarks.core';
 import {VFXBatchSettings} from './BatchedRenderer';
+import {DepthTextureMode} from './SoftParticleDepth';
 
 export enum RenderMode {
     BillBoard = 0,
@@ -46,6 +47,8 @@ export abstract class VFXBatch {
     settings: StoredBatchSettings;
     protected maxParticles: number;
     protected scene: Scene;
+    /** How the renderer's depth texture encodes depth, for soft particles. */
+    protected depthTextureMode: DepthTextureMode = DepthTextureMode.LinearDepthMetric;
     private readonly visibleSystems: IParticleSystem[] = [];
 
     protected constructor(settings: VFXBatchSettings, scene: Scene) {
@@ -106,7 +109,11 @@ export abstract class VFXBatch {
         return visibleSystems;
     }
 
-    applyDepthTexture(depthTexture: BaseTexture | null): void {
+    applyDepthTexture(
+        depthTexture: BaseTexture | null,
+        mode: DepthTextureMode = DepthTextureMode.LinearDepthMetric
+    ): void {
+        this.depthTextureMode = mode;
         const material = this.mesh.material;
         if (material && material instanceof ShaderMaterial) {
             material.setTexture('depthTexture', depthTexture);

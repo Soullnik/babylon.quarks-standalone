@@ -5,6 +5,7 @@ import {Scene} from '@babylonjs/core/scene';
 import {ConstantColor, ConstantValue, PointEmitter, Vector4} from 'quarks.core';
 import {BatchedRenderer} from '../src/BatchedRenderer';
 import {ParticleSystem} from '../src/ParticleSystem';
+import {DepthTextureMode} from '../src/SoftParticleDepth';
 import {SpriteBatch} from '../src/SpriteBatch';
 import {TrailBatch} from '../src/TrailBatch';
 import {RenderMode} from '../src/VFXBatch';
@@ -138,12 +139,12 @@ describe('BatchedRenderer', () => {
         const onCreateSpy = jest.spyOn(SpriteBatch.prototype, 'applyDepthTexture');
         renderer.depthTexture = depthTex;
         renderer.addSystem(system);
-        expect(onCreateSpy).toHaveBeenCalledWith(depthTex);
+        expect(onCreateSpy).toHaveBeenCalledWith(depthTex, DepthTextureMode.LinearDepthMetric);
 
         const batch = renderer.batches[0];
         const spy = jest.spyOn(batch, 'applyDepthTexture');
         renderer.setDepthTexture(depthTex);
-        expect(spy).toHaveBeenCalledWith(depthTex);
+        expect(spy).toHaveBeenCalledWith(depthTex, DepthTextureMode.LinearDepthMetric);
         spy.mockRestore();
         onCreateSpy.mockRestore();
 
@@ -154,7 +155,7 @@ describe('BatchedRenderer', () => {
         expect(secondBatch).toBeDefined();
         const spy2 = jest.spyOn(secondBatch!, 'applyDepthTexture');
         renderer.setDepthTexture(depthTex);
-        expect(spy2).toHaveBeenCalledWith(depthTex);
+        expect(spy2).toHaveBeenCalledWith(depthTex, DepthTextureMode.LinearDepthMetric);
 
         renderer.dispose();
         system.dispose();
@@ -182,7 +183,7 @@ describe('BatchedRenderer', () => {
             rendererEmitterSettings: {startLength: new ConstantValue(4), followLocalOrigin: false},
         });
         renderer.addSystem(trail);
-        expect(batchSpy).toHaveBeenCalledWith(depthTex);
+        expect(batchSpy).toHaveBeenCalledWith(depthTex, DepthTextureMode.LinearDepthMetric);
         batchSpy.mockRestore();
         renderer.dispose();
         trail.dispose();

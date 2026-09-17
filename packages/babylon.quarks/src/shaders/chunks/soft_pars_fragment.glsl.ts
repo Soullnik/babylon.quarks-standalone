@@ -1,7 +1,10 @@
 export default /* glsl */ `
 #ifdef SOFT_PARTICLES
     uniform sampler2D depthTexture;
-    uniform vec4 projParams;
+    // (x, y) decode a depth sample into a distance from the camera plane, z
+    // selects the reciprocal form used by raw depth-buffer samples.
+    // See SoftParticleDepth.ts.
+    uniform vec4 depthParams;
     uniform vec2 softParams;
 
     varying vec4 projPosition;
@@ -10,11 +13,9 @@ export default /* glsl */ `
     #define SOFT_NEAR_FADE softParams.x
     #define SOFT_INV_FADE_DISTANCE softParams.y
 
-    #define zNear projParams.x
-    #define zFar projParams.y
-
-    float linearize_depth(float d) {
-        return (zFar * zNear) / (zFar - d * (zFar - zNear));
+    float decode_depth(float d) {
+        float decoded = depthParams.x * d + depthParams.y;
+        return depthParams.z > 0.5 ? 1.0 / decoded : decoded;
     }
 #endif
 `;

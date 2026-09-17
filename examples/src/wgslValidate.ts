@@ -64,7 +64,7 @@ function cases(): Case[] {
                         if (tile.length) uniforms.push('tileCountX', 'tileCountY');
                         if (map.length) samplers.push('map');
                         if (soft.length) {
-                            uniforms.push('softParams', 'projParams');
+                            uniforms.push('softParams', 'depthParams');
                             samplers.push('depthTexture');
                         }
                         if (alpha.length) uniforms.push('alphaTest');

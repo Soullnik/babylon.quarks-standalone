@@ -60,7 +60,10 @@ void main() {
     gl_Position = projection * mvPosition;
 #ifdef SOFT_PARTICLES
     projPosition = gl_Position;
-    linearDepth = -mvPosition.z;
+    // Distance from the camera plane: view-space Z is positive in front of a
+    // left-handed camera and negative in front of a right-handed one, and the
+    // decoded depth sample it is compared against is positive either way.
+    linearDepth = abs(mvPosition.z);
 #endif
 
     #ifdef UV_TILE

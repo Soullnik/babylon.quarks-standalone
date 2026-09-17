@@ -66,7 +66,9 @@ vec3 sampleEnvAtlas(vec3 r) {
 #ifdef SOFT_PARTICLES
 uniform sampler2D depthTexture;
 uniform vec2 softParams;
-uniform vec4 projParams;
+// (x, y) decode a depth sample into a distance from the camera plane, z selects
+// the reciprocal form used by raw depth-buffer samples. See SoftParticleDepth.ts.
+uniform vec4 depthParams;
 varying vec4 projPosition;
 varying float linearDepth;
 #endif
@@ -112,9 +114,8 @@ void main() {
     vec2 p2 = projPosition.xy / projPosition.w;
     p2 = 0.5 * p2 + 0.5;
     float readDepth = texture2D(depthTexture, p2.xy).r;
-    float zNear = projParams.x;
-    float zFar = projParams.y;
-    float viewDepth = (zFar * zNear) / (zFar - readDepth * (zFar - zNear));
+    float decoded = depthParams.x * readDepth + depthParams.y;
+    float viewDepth = depthParams.z > 0.5 ? 1.0 / decoded : decoded;
     float fade = clamp(softParams.y * ((viewDepth - softParams.x) - linearDepth), 0.0, 1.0);
     gl_FragColor *= fade;
 #endif
