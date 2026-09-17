@@ -19,6 +19,10 @@ import {loadQuarksFromJson} from './loadQuarksJson';
  *   soft=1   turn softParticles on for every system in the effect
  *   depth=1  hand the renderer a depth texture (needed for soft to do anything)
  *   near=…, far=…  softNearFade / softFarFade
+ *   test=0   drop the depth test, so the effect draws over the cube instead of
+ *            being cut by it — what a lot of shipped games do for small effects
+ *   offset=… push the whole effect this far towards the camera, so the sprites
+ *            stop crossing the surface in the first place
  *   t=…      seconds of effect time to simulate before the screenshot
  */
 const params = new URLSearchParams(location.search);
@@ -26,6 +30,8 @@ const useSoft = params.get('soft') === '1';
 const useDepth = params.get('depth') !== '0';
 const nearFade = Number(params.get('near') ?? 0);
 const farFade = Number(params.get('far') ?? 1);
+const depthTest = params.get('test') !== '0';
+const effectOffset = Number(params.get('offset') ?? 0);
 const settleTime = Number(params.get('t') ?? 1.2);
 
 const canvas = document.getElementById('renderCanvas') as HTMLCanvasElement;
@@ -57,7 +63,15 @@ const systems: ParticleSystem[] = [];
 async function main() {
     const json = await (await fetch('./RoundFireRed.json')).json();
     const root = loadQuarksFromJson(scene, batchRenderer, systems, json, './');
-    root.position = new BVector3(0, 0, 0);
+    // Towards the camera, which sits on -Z looking at the cube.
+    root.position = new BVector3(0, 0, -effectOffset);
+
+    if (!depthTest) {
+        for (const system of systems) {
+            system.getRendererSettings().materialDepthTest = false;
+            batchRenderer.updateSystem(system);
+        }
+    }
 
     if (useSoft) {
         for (const system of systems) {
