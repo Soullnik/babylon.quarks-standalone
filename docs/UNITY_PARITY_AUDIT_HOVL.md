@@ -56,10 +56,12 @@ and two of them live outside the particle system entirely:
 Worth recording, because three of the ranked guesses in `UNITY_VISUAL_PARITY.md` turned out not to
 apply to this pack at all. Measuring first saved the work.
 
-- **Blend-mode inference is fine here.** `DetectBlend`'s prediction matches the material's real
-  `_SrcBlend`/`_DstBlend` on all 41 systems that have an authored material — 23 additive, 18 alpha.
-  It gets there through the `_DstBlend == One` fallback, since the Shader Graph's name contains
-  none of the keywords it looks for. Fragile by construction, correct in practice.
+- **Blend-mode detection lands correctly here** — 23 additive, 18 alpha across the 41 systems with
+  an authored material. It used to get there by luck: `DetectBlend` matched the shader *name*
+  first and only fell through to `_SrcBlend`/`_DstBlend` because "Shader Graphs/HS_Blend_CG"
+  happens to contain none of its keywords. That order is now reversed — real blend state first,
+  name as a logged last resort — so the same 41 systems resolve from data, and the report shows
+  zero guesses.
 - **There is no HDR in the particle system.** Every `startColor` and every Color-over-Lifetime
   gradient peaks at exactly 1.0. The planned "grep the exported JSON for channels > 1" check would
   have found nothing and concluded, wrongly, that bloom did not matter. All of the HDR lives in the

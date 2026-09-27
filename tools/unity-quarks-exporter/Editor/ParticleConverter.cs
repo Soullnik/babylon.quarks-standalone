@@ -50,6 +50,10 @@ namespace BabylonQuarks.UnityExporter
 
             BuildTextureSheet(ps, obj, behaviors);
 
+            // On the *ps* object `blending` is Babylon's numbering — ParticleSystem.toJSON writes
+            // materialBlendMode here and fromJSON reads it back as an alpha mode. That is the
+            // opposite convention to the *material* object's `blending`, which is three.js's;
+            // ExportContext converts there. Keep the two apart.
             obj.Set("blending", ctx.LastBlendMode)
                 .Set("transparent", true)
                 .Set("worldSpace", main.simulationSpace != ParticleSystemSimulationSpace.Local);

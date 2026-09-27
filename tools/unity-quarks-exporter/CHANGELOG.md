@@ -2,6 +2,24 @@
 
 All notable changes to the Unity Quarks Exporter are documented here.
 
+## Unreleased
+
+### Fixed
+
+- **Blend mode is read from the material's real blend state instead of its shader name.** The old
+  `DetectBlend` matched keywords in `mat.shader.name` *first* and only consulted
+  `_SrcBlend`/`_DstBlend` when the name said nothing — so a shader called "MyAdditiveGlow" that
+  alpha-blends exported as additive, and renaming a shader changed the export. The order is now
+  blend factors + `_BlendOp` (accepting the `_BUILTIN_` spellings Shader Graph generates), then
+  the `Blend` surface option, then the name as a last resort, which now logs a warning naming the
+  material. Premultiplied alpha and subtractive blending are recognised rather than collapsed into
+  plain alpha blend, and the exported material carries `blendModeSource` saying where the mode
+  came from.
+- The material's `blending` field is written in three.js's numbering, which is what it means for a
+  three.js material; `alphaMode` keeps Babylon's. The two were previously given the same integer,
+  so a material read by three.quarks / quarks.art — which the JSON claims compatibility with —
+  got the wrong mode. babylon.quarks was unaffected because `QuarksLoader` prefers `alphaMode`.
+
 ## [0.19.0] — 2026-07-25
 
 ### Added

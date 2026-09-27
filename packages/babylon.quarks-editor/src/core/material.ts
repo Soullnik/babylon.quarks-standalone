@@ -13,6 +13,26 @@ function isEditableMaterialRecord(material: unknown): material is Record<string,
     return !!material && typeof material === 'object' && !('getClassName' in material);
 }
 
+/**
+ * Babylon alpha mode → three.js `blending`. A QuarksMaterial carries both: `alphaMode` in
+ * Babylon's numbering, which `QuarksLoader` prefers, and `blending` in three.js's, so the same
+ * file still reads correctly in three.quarks / quarks.art. They are different numbers for the
+ * same mode. three.js has no premultiplied constant — there it is normal blending plus a material
+ * flag — so ALPHA_PREMULTIPLIED maps to NormalBlending.
+ */
+function toThreeBlending(alphaMode: number): number {
+    switch (alphaMode) {
+        case 1: // Constants.ALPHA_ADD
+            return 2; // THREE.AdditiveBlending
+        case 3: // Constants.ALPHA_SUBTRACT
+            return 3; // THREE.SubtractiveBlending
+        case 4: // Constants.ALPHA_MULTIPLY
+            return 4; // THREE.MultiplyBlending
+        default:
+            return 1; // THREE.NormalBlending
+    }
+}
+
 /** Applies renderer material settings and keeps imported QuarksMaterial JSON in sync for export. */
 export function applyRendererMaterial(system: ParticleSystem, patch: RendererMaterialPatch): void {
     const settings = system.getRendererSettings();
@@ -40,7 +60,7 @@ export function applyRendererMaterial(system: ParticleSystem, patch: RendererMat
     if (isEditableMaterialRecord(material)) {
         if (patch.blendMode !== undefined) {
             material.alphaMode = patch.blendMode;
-            material.blending = patch.blendMode;
+            material.blending = toThreeBlending(patch.blendMode);
         }
         if (patch.transparent !== undefined) {
             material.transparent = patch.transparent;

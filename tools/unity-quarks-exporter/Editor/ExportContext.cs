@@ -19,7 +19,10 @@ namespace BabylonQuarks.UnityExporter
         public readonly JArray Textures = new JArray();
         public readonly JArray Images = new JArray();
 
-        /// <summary>Blend mode of the most recently built material — read straight after AddMaterialForRenderer.</summary>
+        /// <summary>
+        /// Babylon alpha mode of the most recently built material — read straight after
+        /// AddMaterialForRenderer. Babylon's numbering, not three.js's.
+        /// </summary>
         public int LastBlendMode = 2;
 
         public bool EmbedTextures = true;
@@ -62,7 +65,7 @@ namespace BabylonQuarks.UnityExporter
             Material mat = renderer != null ? renderer.sharedMaterial : null;
             Texture tex = mat != null ? mat.mainTexture : null;
             string textureUuid = tex != null ? AddTexture(tex) : null;
-            LastBlendMode = DetectBlend(mat);
+            LastBlendMode = DetectBlend(mat, out string blendSource);
 
             string reflectionAtlasUuid = null;
             float reflectionLevel = 1f;
@@ -78,8 +81,12 @@ namespace BabylonQuarks.UnityExporter
                 .Set("uuid", uuid)
                 .Set("type", "QuarksMaterial")
                 .Set("transparent", true)
+                // `alphaMode` is Babylon's numbering and is what QuarksLoader prefers; `blending`
+                // is three.js's, for quarks.art / three.quarks reading the same file. They are
+                // different numbers for the same mode — do not collapse them.
                 .Set("alphaMode", LastBlendMode)
-                .Set("blending", LastBlendMode)
+                .Set("blending", ToThreeBlending(LastBlendMode))
+                .Set("blendModeSource", blendSource)
                 .Set("depthTest", true)
                 .Set("depthWrite", false)
                 .Set("alphaTest", 0);
@@ -458,30 +465,158 @@ namespace BabylonQuarks.UnityExporter
             return nodeUuid;
         }
 
-        private static int DetectBlend(Material mat)
+        /// <summary>
+        /// Babylon alpha-mode constants (Constants.ALPHA_*), the numbering `alphaMode` carries.
+        /// </summary>
+        private const int AlphaAdd = 1;
+        private const int AlphaCombine = 2;
+        private const int AlphaSubtract = 3;
+        private const int AlphaMultiply = 4;
+        private const int AlphaPremultiplied = 7;
+        private const int AlphaUnknown = -1;
+
+        /// <summary>
+        /// Resolve a material's blend mode, preferring what the GPU is actually told to do over
+        /// what the shader happens to be called.
+        ///
+        /// The order matters. The blend factors are the ground truth: they are what Unity submits
+        /// and they mean the same thing in every pipeline. The surface-option enum is the same
+        /// state one level up. The shader's name is free text the author can change without
+        /// touching the rendering at all — a "MyAdditiveGlow" that alpha-blends is perfectly legal
+        /// — so it is consulted only when nothing real is readable, and it says so in the console.
+        /// </summary>
+        private static int DetectBlend(Material mat, out string source)
         {
-            // quarks/Babylon blend ints: 1 = additive, 2 = alpha blend, 3 = subtract, 4 = multiply.
-            if (mat == null) return 2;
-            string sn = mat.shader != null ? mat.shader.name.ToLowerInvariant() : "";
+            source = "default";
+            if (mat == null) return AlphaCombine;
 
-            // Name checks — order matters: "Alpha Blended Premultiply" contains "multiply"
-            // as a substring and must NOT be treated as multiply.
-            if (sn.Contains("additive")) return 1;
-            if (sn.Contains("premultiply") || sn.Contains("alpha blend") || sn.Contains("alphablend"))
-                return 2;
-            if (sn.Contains("multiply") || sn.Contains("modulate")) return 4;
-
-            // Fall back to GPU blend factors when the shader name is uninformative
-            // (e.g. Particles/Standard Unlit).
-            if (mat.HasProperty("_DstBlend"))
+            // 1. The real blend state. Shader Graph's Built-In target prefixes the properties it
+            //    generates, so accept either spelling.
+            if (TryReadBlendState(mat, out int src, out int dst, out int op, out string via))
             {
-                int dst = (int)mat.GetFloat("_DstBlend");
-                int src = mat.HasProperty("_SrcBlend") ? (int)mat.GetFloat("_SrcBlend") : -1;
-                // UnityEngine.Rendering.BlendMode: One=1, DstColor=2, Zero=0
-                if (dst == 1) return 1; // DstBlend == One → additive
-                if (src == 2) return 4; // Src = DstColor → multiply/modulate
+                int fromState = ClassifyBlendFactors(src, dst, op);
+                if (fromState != AlphaUnknown)
+                {
+                    source = via;
+                    return fromState;
+                }
             }
-            return 2;
+
+            // 2. The serialized surface option. URP and the Built-In Shader Graph target both use
+            //    `Blend`: Alpha=0, Premultiply=1, Additive=2, Multiply=3. HDRP's `_BlendMode`
+            //    numbers the same names differently, so it is deliberately not read here.
+            if (TryReadFloat(mat, out float surface, "_Blend", "_BUILTIN_Blend"))
+            {
+                switch ((int)surface)
+                {
+                    case 0: source = "surface option"; return AlphaCombine;
+                    case 1: source = "surface option"; return AlphaPremultiplied;
+                    case 2: source = "surface option"; return AlphaAdd;
+                    case 3: source = "surface option"; return AlphaMultiply;
+                }
+            }
+
+            // 3. Last resort: the shader's name. Order matters here too — "Alpha Blended
+            //    Premultiply" contains "multiply" as a substring and is not a multiply blend.
+            string sn = mat.shader != null ? mat.shader.name.ToLowerInvariant() : "";
+            int fromName = AlphaUnknown;
+            if (sn.Contains("additive")) fromName = AlphaAdd;
+            else if (sn.Contains("premultiply")) fromName = AlphaPremultiplied;
+            else if (sn.Contains("alpha blend") || sn.Contains("alphablend")) fromName = AlphaCombine;
+            else if (sn.Contains("multiply") || sn.Contains("modulate")) fromName = AlphaMultiply;
+
+            if (fromName != AlphaUnknown)
+            {
+                source = "shader name";
+                Debug.LogWarning(
+                    $"[Quarks Exporter] Material '{mat.name}' exposes no blend state; its blend mode was " +
+                    $"guessed from the shader name '{mat.shader?.name}'. Verify it in the exported effect.");
+                return fromName;
+            }
+
+            Debug.LogWarning(
+                $"[Quarks Exporter] Material '{mat.name}' (shader '{mat.shader?.name}') exposes no readable " +
+                "blend state and its name says nothing; defaulting to alpha blend.");
+            return AlphaCombine;
+        }
+
+        /// <summary>Reads src/dst factors and the blend op, under either property spelling.</summary>
+        private static bool TryReadBlendState(Material mat, out int src, out int dst, out int op, out string via)
+        {
+            src = dst = 0;
+            op = (int)BlendOp.Add;
+            via = null;
+            if (!TryReadFloat(mat, out float dstF, "_DstBlend", "_BUILTIN_DstBlend")) return false;
+            if (!TryReadFloat(mat, out float srcF, "_SrcBlend", "_BUILTIN_SrcBlend")) return false;
+            if (TryReadFloat(mat, out float opF, "_BlendOp", "_BUILTIN_BlendOp")) op = (int)opF;
+            src = (int)srcF;
+            dst = (int)dstF;
+            via = "blend factors";
+            return true;
+        }
+
+        private static bool TryReadFloat(Material mat, out float value, params string[] names)
+        {
+            foreach (string name in names)
+            {
+                if (mat.HasProperty(name))
+                {
+                    value = mat.GetFloat(name);
+                    return true;
+                }
+            }
+            value = 0f;
+            return false;
+        }
+
+        /// <summary>
+        /// Classify a src/dst/op triple, or AlphaUnknown when it is not one of the modes quarks
+        /// can express — better to fall through to another signal than to guess wrong here.
+        /// </summary>
+        private static int ClassifyBlendFactors(int src, int dst, int op)
+        {
+            bool subtractive = op == (int)BlendOp.Subtract || op == (int)BlendOp.ReverseSubtract;
+            if (subtractive && dst == (int)BlendMode.One) return AlphaSubtract;
+            if (op != (int)BlendOp.Add) return AlphaUnknown;
+
+            if (dst == (int)BlendMode.One)
+            {
+                // SrcAlpha/One and One/One are both additive; the alpha term differs but the
+                // colour contribution quarks reproduces is the same.
+                if (src == (int)BlendMode.One || src == (int)BlendMode.SrcAlpha ||
+                    src == (int)BlendMode.SrcAlphaSaturate) return AlphaAdd;
+                return AlphaUnknown;
+            }
+
+            if (dst == (int)BlendMode.OneMinusSrcAlpha)
+            {
+                if (src == (int)BlendMode.One) return AlphaPremultiplied;
+                if (src == (int)BlendMode.SrcAlpha) return AlphaCombine;
+                return AlphaUnknown;
+            }
+
+            // Particles/Multiply is DstColor/Zero; the "double" variant is DstColor/SrcColor.
+            if (src == (int)BlendMode.DstColor &&
+                (dst == (int)BlendMode.Zero || dst == (int)BlendMode.SrcColor)) return AlphaMultiply;
+            if (src == (int)BlendMode.Zero && dst == (int)BlendMode.SrcColor) return AlphaMultiply;
+
+            return AlphaUnknown;
+        }
+
+        /// <summary>
+        /// Babylon alpha mode → three.js `blending`, which numbers the same modes differently
+        /// (three: Normal=1, Additive=2, Subtractive=3, Multiply=4). three.js has no premultiplied
+        /// blending constant — it is normal blending plus a material flag — so it maps to Normal.
+        /// </summary>
+        private static int ToThreeBlending(int alphaMode)
+        {
+            switch (alphaMode)
+            {
+                case AlphaAdd: return 2;
+                case AlphaSubtract: return 3;
+                case AlphaMultiply: return 4;
+                default: return 1;
+            }
         }
     }
 }

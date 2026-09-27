@@ -165,25 +165,62 @@ class Assets:
                 'mipmaps': grab('enableMipMap'), 'alphaUsage': grab('alphaUsage')}
 
 
+# UnityEngine.Rendering.BlendMode / BlendOp values used by classify_blend_factors.
+BM_ZERO, BM_ONE, BM_DST_COLOR, BM_SRC_COLOR = 0, 1, 2, 3
+BM_SRC_ALPHA, BM_SRC_ALPHA_SATURATE, BM_ONE_MINUS_SRC_ALPHA = 5, 9, 10
+OP_ADD, OP_SUB, OP_REV_SUB = 0, 1, 2
+
+
+def classify_blend_factors(src, dst, op):
+    """Mirror of ExportContext.ClassifyBlendFactors; None when not expressible in quarks."""
+    if op in (OP_SUB, OP_REV_SUB) and dst == BM_ONE:
+        return 'subtract'
+    if op != OP_ADD:
+        return None
+    if dst == BM_ONE:
+        return 'additive' if src in (BM_ONE, BM_SRC_ALPHA, BM_SRC_ALPHA_SATURATE) else None
+    if dst == BM_ONE_MINUS_SRC_ALPHA:
+        if src == BM_ONE:
+            return 'premultiplied'
+        return 'alpha' if src == BM_SRC_ALPHA else None
+    if src == BM_DST_COLOR and dst in (BM_ZERO, BM_SRC_COLOR):
+        return 'multiply'
+    if src == BM_ZERO and dst == BM_SRC_COLOR:
+        return 'multiply'
+    return None
+
+
+def first_float(floats, *names):
+    for n in names:
+        if n in floats:
+            return floats[n]
+    return None
+
+
 def predict_blend(mat):
-    """Replicate ExportContext.DetectBlend so the report shows what it will guess."""
+    """Mirror of ExportContext.DetectBlend: real blend state first, the shader name last."""
     if mat is None:
-        return 'alpha', 'no material — DetectBlend returns 2'
-    sn = (mat['shader'] or '').lower()
-    if 'additive' in sn:
-        return 'additive', 'shader name'
-    if 'premultiply' in sn or 'alpha blend' in sn or 'alphablend' in sn:
-        return 'alpha', 'shader name'
-    if 'multiply' in sn or 'modulate' in sn:
-        return 'multiply', 'shader name'
+        return 'alpha', 'no material'
     f = mat['floats']
-    if '_DstBlend' in f:
-        dst, src = int(f['_DstBlend']), int(f.get('_SrcBlend', -1))
-        if dst == 1:
-            return 'additive', '_DstBlend == One'
-        if src == 2:
-            return 'multiply', '_SrcBlend == DstColor'
-    return 'alpha', 'fallback'
+    dst = first_float(f, '_DstBlend', '_BUILTIN_DstBlend')
+    src = first_float(f, '_SrcBlend', '_BUILTIN_SrcBlend')
+    if dst is not None and src is not None:
+        op = first_float(f, '_BlendOp', '_BUILTIN_BlendOp') or 0
+        mode = classify_blend_factors(int(src), int(dst), int(op))
+        if mode:
+            return mode, 'blend factors'
+    surface = first_float(f, '_Blend', '_BUILTIN_Blend')
+    if surface is not None:
+        mode = {0: 'alpha', 1: 'premultiplied', 2: 'additive', 3: 'multiply'}.get(int(surface))
+        if mode:
+            return mode, 'surface option'
+    sn = (mat['shader'] or '').lower()
+    for needle, mode in (('additive', 'additive'), ('premultiply', 'premultiplied'),
+                         ('alpha blend', 'alpha'), ('alphablend', 'alpha'),
+                         ('multiply', 'multiply'), ('modulate', 'multiply')):
+        if needle in sn:
+            return mode, 'shader name (guess)'
+    return 'alpha', 'default (guess)'
 
 
 def audit_system(ps, go, rend, assets):
@@ -288,6 +325,9 @@ def audit_system(ps, go, rend, assets):
         for slot in CUSTOM_TEX_SLOTS:
             if mat['texs'].get(slot):
                 add(('shader', f"Material {mat['name']}: texture slot {slot} bound — the quarks shader samples only `map`"))
+        if 'guess' in blend_from:
+            add(('blend', f"Blend mode could not be read from the material and was guessed "
+                          f"({blend}, from {blend_from})"))
         if '_SrcBlend' in f:
             entry['unityBlend'] = (f"{BLEND_FACTOR.get(int(f['_SrcBlend']), f['_SrcBlend'])} / "
                                    f"{BLEND_FACTOR.get(int(f.get('_DstBlend', -1)), f.get('_DstBlend'))}")

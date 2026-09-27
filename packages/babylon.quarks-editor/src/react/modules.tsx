@@ -929,6 +929,9 @@ export function RendererModule({
                         {value: 2, label: 'Alpha blend'},
                         {value: 3, label: 'Subtract'},
                         {value: 4, label: 'Multiply'},
+                        // Unity's "Alpha Blended Premultiply" imports as this; without it the
+                        // select has no matching option and the mode is lost on the next edit.
+                        {value: 7, label: 'Premultiplied'},
                     ]}
                     onChange={(blend) => patchMaterial({blendMode: blend})}
                 />
