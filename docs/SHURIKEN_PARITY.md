@@ -3,6 +3,10 @@
 Gap analysis of the effect editor + runtime against Unity's Particle System (Shuriken).
 Three tiers: ✅ shipped · 🟡 runtime supports it, editor UI missing · 🔴 needs quarks.core work.
 
+For why a Unity-authored effect can look different once exported even where this checklist says
+✅, see [UNITY_VISUAL_PARITY.md](./UNITY_VISUAL_PARITY.md) — the research plan for colour space,
+blending, sorting and export-fidelity gaps.
+
 ## Main
 - ✅ duration, looping, start lifetime/speed/size (constant/random/curve), start color, world space
 - ✅ prewarm, start rotation (constant/random angle, 3D random), start color random-between-two
