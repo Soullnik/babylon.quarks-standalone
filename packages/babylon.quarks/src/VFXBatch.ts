@@ -1,5 +1,6 @@
 import {BaseTexture} from '@babylonjs/core/Materials/Textures/baseTexture';
 import {ShaderMaterial} from '@babylonjs/core/Materials/shaderMaterial';
+import type {AbstractMesh} from '@babylonjs/core/Meshes/abstractMesh';
 import {Mesh} from '@babylonjs/core/Meshes/mesh';
 import {Scene} from '@babylonjs/core/scene';
 import {IParticleSystem} from 'quarks.core';
@@ -41,6 +42,17 @@ export interface StoredBatchSettings {
 }
 
 export abstract class VFXBatch {
+    /** Every mesh a batch has rendered through, so hosts can tell them from scene meshes. */
+    private static readonly batchMeshes = new WeakSet<AbstractMesh>();
+
+    /**
+     * Whether `mesh` is one of the renderer's own batch meshes rather than a mesh in the scene —
+     * known by identity, whatever the mesh happens to be called.
+     */
+    static isBatchMesh(mesh: AbstractMesh): boolean {
+        return VFXBatch.batchMeshes.has(mesh);
+    }
+
     mesh: Mesh;
     systems: Set<IParticleSystem>;
     settings: StoredBatchSettings;
@@ -77,8 +89,15 @@ export abstract class VFXBatch {
             reflectionAtlas: settings.reflectionAtlas ?? null,
             layerMask: settings.layerMask,
         };
-        this.mesh = new Mesh('vfxBatch', scene);
-        this.mesh.alwaysSelectAsActiveMesh = true;
+        this.mesh = this.createBatchMesh('vfxBatch');
+    }
+
+    /** Creates a mesh for this batch to render through and records it as a batch mesh. */
+    protected createBatchMesh(name: string): Mesh {
+        const mesh = new Mesh(name, this.scene);
+        mesh.alwaysSelectAsActiveMesh = true;
+        VFXBatch.batchMeshes.add(mesh);
+        return mesh;
     }
 
     addSystem(system: IParticleSystem) {

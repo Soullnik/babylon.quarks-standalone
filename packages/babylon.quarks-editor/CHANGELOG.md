@@ -4,6 +4,31 @@ All notable changes to the `babylon.quarks-editor` package are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project follows the `quarks.core` 0.x version line.
 
+## Unreleased
+
+### Fixed
+
+- The Shape module's mesh list no longer offers the renderer's own batch meshes as emission
+  sources. It excluded them by the name `'vfxBatch'`, but sprite and trail batches name their
+  meshes `'spriteBatch'` / `'trailBatch'`, so every one of them got through; they are now
+  recognised by identity (`VFXBatch.isBatchMesh`).
+
+### Changed
+
+- Nothing in the editor identifies anything by its name any more:
+    - A loaded effect's root takes the file's name only when the effect file left it unnamed
+      (`QuarksLoader.hasAuthoredName`), instead of when it happened to be called `'Effect'` or
+      `'Object3D'`. An effect saved with the default name `'Effect'` now keeps it on the root node;
+      its gallery entry is still labelled with the file name.
+    - Collapsing single-child groups on load moves a group's name onto its child only when the
+      file named the group and not the child, instead of comparing against `'particleEmitter'`.
+    - Gallery import picks effect files by content (a JSON object) rather than by a `.json`
+      extension, so effects saved without one load and mislabelled non-JSON files are skipped.
+    - Viewport drops raycast the editor's ground mesh by identity, not by the name `'ground'`.
+    - The Object module's tooltip comes from an explicit hint key, not a title prefix.
+    - Serialized textures carry their own `invertY` / `noMipmap`, instead of the reflection atlas
+      being recognised by name and every `invertY: false` texture also losing its mipmaps.
+
 ## [0.17.9] — 2026-07-14
 
 ### Added

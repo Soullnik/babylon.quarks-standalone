@@ -1,4 +1,5 @@
 import {Vector3} from '@babylonjs/core/Maths/math.vector';
+import type {AbstractMesh} from '@babylonjs/core/Meshes/abstractMesh';
 import type {TransformNode} from '@babylonjs/core/Meshes/transformNode';
 import type {Scene} from '@babylonjs/core/scene';
 import type {BatchedRenderer} from 'babylon.quarks';
@@ -68,13 +69,13 @@ export function removeGalleryEntryFromScene(
 }
 
 /** Raycasts the editor ground plane from canvas/client coordinates. */
-export function pickGroundPosition(scene: Scene, clientX: number, clientY: number): Vector3 {
+export function pickGroundPosition(scene: Scene, ground: AbstractMesh, clientX: number, clientY: number): Vector3 {
     const canvas = scene.getEngine().getRenderingCanvas();
     if (!canvas) {
         return Vector3.Zero();
     }
     const rect = canvas.getBoundingClientRect();
-    const pick = scene.pick(clientX - rect.left, clientY - rect.top, (mesh) => mesh.name === 'ground');
+    const pick = scene.pick(clientX - rect.left, clientY - rect.top, (mesh) => mesh === ground);
     return pick?.pickedPoint?.clone() ?? Vector3.Zero();
 }
 

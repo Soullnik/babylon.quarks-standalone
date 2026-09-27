@@ -59,9 +59,9 @@ apply to this pack at all. Measuring first saved the work.
 - **Blend-mode detection lands correctly here** — 23 additive, 18 alpha across the 41 systems with
   an authored material. It used to get there by luck: `DetectBlend` matched the shader *name*
   first and only fell through to `_SrcBlend`/`_DstBlend` because "Shader Graphs/HS_Blend_CG"
-  happens to contain none of its keywords. That order is now reversed — real blend state first,
-  name as a logged last resort — so the same 41 systems resolve from data, and the report shows
-  zero guesses.
+  happens to contain none of its keywords. The exporter no longer consults names at all — blend
+  comes from the shader source, the blend properties or the surface option — and the same 41
+  systems resolve from data.
 - **There is no HDR in the particle system.** Every `startColor` and every Color-over-Lifetime
   gradient peaks at exactly 1.0. The planned "grep the exported JSON for channels > 1" check would
   have found nothing and concluded, wrongly, that bloom did not matter. All of the HDR lives in the

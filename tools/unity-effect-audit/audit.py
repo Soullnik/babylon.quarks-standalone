@@ -17,6 +17,7 @@ import sys, re, json, pathlib, collections
 
 sys.path.insert(0, str(pathlib.Path(__file__).parent))
 import uyaml
+import shaderlab
 
 # ---- Unity enums ---------------------------------------------------------------------
 SHAPE = {0: 'Sphere', 1: 'SphereShell', 2: 'Hemisphere', 3: 'HemisphereShell', 4: 'Cone',
@@ -61,8 +62,6 @@ MODULES = {
     'CustomDataModule':             (None, 'not exported'),
 }
 SHAPE_OK = {'Cone', 'ConeVolume', 'Sphere', 'Hemisphere', 'Circle', 'Donut', 'Mesh'}
-# Texture slots the quarks fragment shader has no sampler for.
-CUSTOM_TEX_SLOTS = ('_Mask', '_Noise', '_Flow', '_Distortion')
 UNITY_DEFAULT_MAX_PARTICLE_SIZE = 0.5
 
 
@@ -135,10 +134,25 @@ class Assets:
                 if isinstance(item, dict):
                     colors.update(item)
             sg = (b.get('m_Shader') or {}).get('guid')
+            # Unity 2021.2+ lists enabled keywords in m_ValidKeywords; older versions keep one
+            # space-separated m_ShaderKeywords string.
+            keywords = set(b.get('m_ValidKeywords') or [])
+            keywords |= set(str(b.get('m_ShaderKeywords') or '').split())
             return {'name': b.get('m_Name'), 'shader_guid': sg, 'floats': floats,
-                    'texs': texs, 'colors': colors,
-                    'shader': pathlib.Path(self.guids[sg]).name if sg in self.guids else f'<builtin {sg}>'}
+                    'texs': texs, 'colors': colors, 'keywords': keywords,
+                    'shader': pathlib.Path(self.guids[sg]).name if sg in self.guids else f'<builtin {sg}>',
+                    'shader_source': self._shader_source(sg)}
         return None
+
+    def _shader_source(self, guid):
+        """The shader asset's text when it is a file in the folder; None for Unity built-ins."""
+        path = self.guids.get(guid)
+        if not path or not pathlib.Path(path).is_file():
+            return None
+        try:
+            return pathlib.Path(path).read_text(encoding='utf-8', errors='replace')
+        except OSError:
+            return None
 
     def by_guid(self, guid):
         path = self.guids.get(guid)
@@ -197,30 +211,73 @@ def first_float(floats, *names):
     return None
 
 
+PREMULTIPLY_KEYWORDS = ('_ALPHAPREMULTIPLY_ON', '_BUILTIN_ALPHAPREMULTIPLY_ON')
+
+
+def refine_premultiplied(mat, mode):
+    """Mirror of ExportContext.RefinePremultiplied: the keyword says the shader premultiplies itself."""
+    if mode == 'premultiplied' and mat['keywords'] & set(PREMULTIPLY_KEYWORDS):
+        return 'alpha'
+    return mode
+
+
 def predict_blend(mat):
-    """Mirror of ExportContext.DetectBlend: real blend state first, the shader name last."""
+    """
+    Mirror of ExportContext.DetectBlend. Data only: the shader's ShaderLab source, then the
+    blend-factor properties, then the surface option — never the shader's name. What none of
+    them resolves is reported as a default, not guessed.
+    """
     if mat is None:
         return 'alpha', 'no material'
     f = mat['floats']
+
+    def read_float(name):
+        return f.get(name)
+
+    source = mat.get('shader_source')
+    statement = shaderlab.blend_statement(source) if source else None
+    if statement and statement[0] == 'factors':
+        resolved = shaderlab.resolve(statement, read_float)
+        mode = classify_blend_factors(*resolved) if resolved else None
+        if mode:
+            return refine_premultiplied(mat, mode), 'shader source'
+
     dst = first_float(f, '_DstBlend', '_BUILTIN_DstBlend')
     src = first_float(f, '_SrcBlend', '_BUILTIN_SrcBlend')
     if dst is not None and src is not None:
         op = first_float(f, '_BlendOp', '_BUILTIN_BlendOp') or 0
         mode = classify_blend_factors(int(src), int(dst), int(op))
         if mode:
-            return mode, 'blend factors'
+            return refine_premultiplied(mat, mode), 'blend factors'
     surface = first_float(f, '_Blend', '_BUILTIN_Blend')
     if surface is not None:
-        mode = {0: 'alpha', 1: 'premultiplied', 2: 'additive', 3: 'multiply'}.get(int(surface))
+        # URP / Built-In Shader Graph Premultiply multiplies by alpha in the shader: straight alpha for quarks.
+        mode = {0: 'alpha', 1: 'alpha', 2: 'additive', 3: 'multiply'}.get(int(surface))
         if mode:
             return mode, 'surface option'
-    sn = (mat['shader'] or '').lower()
-    for needle, mode in (('additive', 'additive'), ('premultiply', 'premultiplied'),
-                         ('alpha blend', 'alpha'), ('alphablend', 'alpha'),
-                         ('multiply', 'multiply'), ('modulate', 'multiply')):
-        if needle in sn:
-            return mode, 'shader name (guess)'
-    return 'alpha', 'default (guess)'
+    return 'alpha', 'default (unreadable)'
+
+
+def declared_properties(mat):
+    """The properties the material's shader declares, or None for a shader with no source here."""
+    source = mat.get('shader_source')
+    if not source:
+        return None
+    props = shaderlab.properties(source)
+    if props is not None:
+        return {k: {'texture': v['type'] in shaderlab.TEXTURE_TYPES, 'main': v['main']} for k, v in props.items()}
+    graph = shaderlab.graph_properties(source)
+    if graph is not None:
+        return {k: {'texture': v['type'] == 'texture', 'main': v['main']} for k, v in graph.items()}
+    return None
+
+
+def main_texture_property(declared):
+    """Unity's Material.mainTexture: the [MainTexture]-marked property, else `_MainTex`."""
+    for name, info in declared.items():
+        if info['texture'] and info['main']:
+            return name
+    return '_MainTex'
 
 
 def audit_system(ps, go, rend, assets):
@@ -322,12 +379,15 @@ def audit_system(ps, go, rend, assets):
             add(('dropped', f"Material {mat['name']}: _Depthpower = {f['_Depthpower']} (soft particles) not exported"))
         if f.get('_Opacity') not in (None, 1):
             add(('dropped', f"Material {mat['name']}: _Opacity = {f['_Opacity']} not exported"))
-        for slot in CUSTOM_TEX_SLOTS:
-            if mat['texs'].get(slot):
-                add(('shader', f"Material {mat['name']}: texture slot {slot} bound — the quarks shader samples only `map`"))
-        if 'guess' in blend_from:
-            add(('blend', f"Blend mode could not be read from the material and was guessed "
-                          f"({blend}, from {blend_from})"))
+        declared = declared_properties(mat)
+        if declared is not None:
+            main = main_texture_property(declared)
+            for prop, info in declared.items():
+                if info['texture'] and prop != main and mat['texs'].get(prop):
+                    add(('shader', f"Material {mat['name']}: shader samples a second texture ({prop}) — "
+                                   "the quarks shader samples only `map`"))
+        if blend_from.startswith('default'):
+            add(('blend', f"Blend mode not readable from the shader source or material — exported as {blend}"))
         if '_SrcBlend' in f:
             entry['unityBlend'] = (f"{BLEND_FACTOR.get(int(f['_SrcBlend']), f['_SrcBlend'])} / "
                                    f"{BLEND_FACTOR.get(int(f.get('_DstBlend', -1)), f.get('_DstBlend'))}")

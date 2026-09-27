@@ -27,16 +27,39 @@ function yieldToBrowser(): Promise<void> {
     return new Promise((resolve) => requestAnimationFrame(() => resolve()));
 }
 
-/** Collects `.json` files from a folder picker result, sorted by relative path. */
-export function collectJsonFiles(files: FileList | File[]): File[] {
+/** How much of a file is read to decide whether it could be a JSON effect. */
+const SNIFF_BYTES = 512;
+
+/**
+ * Whether a file's content could be a JSON effect: its first character, past a byte-order mark
+ * and whitespace, opens an object. Decided from the bytes, not the file name — a folder can hold
+ * effects saved without a `.json` extension and textures that happen to have one. The full parse
+ * that follows is what actually accepts or rejects it.
+ */
+async function looksLikeJsonObject(file: File): Promise<boolean> {
+    const head = await file.slice(0, SNIFF_BYTES).text();
+    return head
+        .replace(/^\uFEFF/, '')
+        .trimStart()
+        .startsWith('{');
+}
+
+/** Collects the files that could be JSON effects from a picker result, sorted by relative path. */
+export async function collectEffectFiles(files: FileList | File[]): Promise<File[]> {
     const list = Array.from(files);
+    const candidates = await Promise.all(list.map(looksLikeJsonObject));
     return list
-        .filter((file) => file.name.toLowerCase().endsWith('.json'))
+        .filter((_, i) => candidates[i])
         .sort((a, b) => {
             const pathA = (a as File & {webkitRelativePath?: string}).webkitRelativePath || a.name;
             const pathB = (b as File & {webkitRelativePath?: string}).webkitRelativePath || b.name;
             return pathA.localeCompare(pathB);
         });
+}
+
+/** Display label for a file: its name without the last extension (a leading dot is not one). */
+export function fileLabel(file: File): string {
+    return file.name.replace(/(?<=.)\.[^./\\]+$/, '');
 }
 
 /**
@@ -49,7 +72,7 @@ export async function loadEffectGallery(
     catalogRoot: TransformNode,
     onProgress: (progress: GalleryLoadProgress) => void
 ): Promise<GalleryEntry[]> {
-    const jsonFiles = collectJsonFiles(files);
+    const jsonFiles = await collectEffectFiles(files);
     const entries: GalleryEntry[] = [];
 
     onProgress({done: 0, total: jsonFiles.length, loaded: 0, failed: 0});
@@ -58,7 +81,7 @@ export async function loadEffectGallery(
         const file = jsonFiles[i];
         try {
             const json = JSON.parse(await file.text());
-            const {root, systems} = parseEffectFromJson(scene, null, json, {
+            const {root, systems, rootNameAuthored} = parseEffectFromJson(scene, null, json, {
                 registerRenderer: false,
                 autoplay: false,
             });
@@ -68,8 +91,8 @@ export async function loadEffectGallery(
             }
 
             const relPath = (file as File & {webkitRelativePath?: string}).webkitRelativePath || file.name;
-            const label = file.name.replace(/\.json$/i, '');
-            if (!root.name || root.name === 'Effect' || root.name === 'Object3D') {
+            const label = fileLabel(file);
+            if (!rootNameAuthored) {
                 root.name = label;
             }
 

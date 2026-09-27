@@ -3,7 +3,6 @@ import {Constants} from '@babylonjs/core/Engines/constants';
 import {ShaderMaterial} from '@babylonjs/core/Materials/shaderMaterial';
 import {RawTexture} from '@babylonjs/core/Materials/Textures/rawTexture';
 import {Vector2 as BVector2, Vector3 as BVector3, Vector4 as BVector4} from '@babylonjs/core/Maths/math.vector';
-import {Mesh} from '@babylonjs/core/Meshes/mesh';
 import {VertexData} from '@babylonjs/core/Meshes/mesh.vertexData';
 import {Scene} from '@babylonjs/core/scene';
 import {
@@ -68,8 +67,7 @@ export class SpriteBatch extends VFXBatch {
 
     setupBuffers(): void {
         this.mesh.dispose();
-        this.mesh = new Mesh('spriteBatch', this.scene);
-        this.mesh.alwaysSelectAsActiveMesh = true;
+        this.mesh = this.createBatchMesh('spriteBatch');
 
         const vertexData = new VertexData();
         vertexData.positions = this.settings.instancingGeometry;

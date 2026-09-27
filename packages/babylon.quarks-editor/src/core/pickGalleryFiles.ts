@@ -1,4 +1,4 @@
-import {collectJsonFiles} from './loadEffectGallery';
+import {collectEffectFiles} from './loadEffectGallery';
 
 interface DirectoryPickerWindow {
     showDirectoryPicker?: (options?: {mode?: 'read' | 'readwrite'}) => Promise<FileSystemDirectoryHandle>;
@@ -13,12 +13,14 @@ interface DirectoryHandleWithEntries {
     entries(): AsyncIterableIterator<[string, FileSystemDirectoryHandle | FileSystemFileHandle]>;
 }
 
-/** Recursively collects `.json` files from a directory handle (File System Access API). */
-async function readJsonFilesFromDirectory(dir: DirectoryHandleWithEntries, prefix = ''): Promise<File[]> {
+/**
+ * Recursively collects every file under a directory handle (File System Access API). Which of
+ * them are effects is decided from their content by collectEffectFiles, not from their names.
+ */
+async function readFilesFromDirectory(dir: DirectoryHandleWithEntries, prefix = ''): Promise<File[]> {
     const files: File[] = [];
     for await (const [name, entry] of dir.entries()) {
         if (entry.kind === 'file') {
-            if (!name.toLowerCase().endsWith('.json')) continue;
             const file = await entry.getFile();
             Object.defineProperty(file, 'webkitRelativePath', {
                 value: prefix + name,
@@ -29,10 +31,7 @@ async function readJsonFilesFromDirectory(dir: DirectoryHandleWithEntries, prefi
         }
         if (entry.kind === 'directory') {
             files.push(
-                ...(await readJsonFilesFromDirectory(
-                    entry as unknown as DirectoryHandleWithEntries,
-                    `${prefix}${name}/`
-                ))
+                ...(await readFilesFromDirectory(entry as unknown as DirectoryHandleWithEntries, `${prefix}${name}/`))
             );
         }
     }
@@ -51,7 +50,7 @@ export async function pickGalleryJsonFiles(): Promise<File[] | null | undefined>
 
     try {
         const dir = (await picker.call(window, {mode: 'read'})) as DirectoryHandleWithEntries;
-        return collectJsonFiles(await readJsonFilesFromDirectory(dir));
+        return await collectEffectFiles(await readFilesFromDirectory(dir));
     } catch (err) {
         if (err instanceof DOMException && err.name === 'AbortError') {
             return null;

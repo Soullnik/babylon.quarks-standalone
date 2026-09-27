@@ -14,6 +14,7 @@ import {
     RandomQuatGenerator,
     RenderMode,
     SizeOverLife,
+    VFXBatch,
     Vector3Function,
     Vector4,
 } from 'babylon.quarks';
@@ -549,9 +550,11 @@ export function ShapeModule({binding}: ModuleProps) {
     const params = {...DEFAULT_SHAPE_PARAMS, ...readShapeParams(system.emitterShape)};
     const keys = SHAPE_PARAM_KEYS[type];
     const scene = system.emitter.getScene();
-    // 'vfxBatch' is the renderer's own internal instancing mesh — never a valid emission source.
+    // The renderer's own batch meshes are never a valid emission source. They are told apart by
+    // identity: sprite and trail batches are named 'spriteBatch' / 'trailBatch', so the name check
+    // this replaced ('vfxBatch') let every one of them into the list.
     const meshOptions = scene.meshes.filter(
-        (m): m is Mesh => m instanceof Mesh && m.name !== 'vfxBatch' && m.getTotalVertices() > 0
+        (m): m is Mesh => m instanceof Mesh && !VFXBatch.isBatchMesh(m) && m.getTotalVertices() > 0
     );
     return (
         <ModuleSection title="Shape">

@@ -3,7 +3,6 @@ import {BoundingInfo} from '@babylonjs/core/Culling/boundingInfo';
 import {Constants} from '@babylonjs/core/Engines/constants';
 import {ShaderMaterial} from '@babylonjs/core/Materials/shaderMaterial';
 import {Vector2 as BVector2, Vector3 as BVector3} from '@babylonjs/core/Maths/math.vector';
-import {Mesh} from '@babylonjs/core/Meshes/mesh';
 import {Scene} from '@babylonjs/core/scene';
 import {IParticleSystem, Matrix4, Quaternion, TrailParticle, TrailSettings, Vector3} from 'quarks.core';
 import {VFXBatchSettings} from './BatchedRenderer';
@@ -42,8 +41,7 @@ export class TrailBatch extends VFXBatch {
 
     setupBuffers(): void {
         this.mesh.dispose();
-        this.mesh = new Mesh('trailBatch', this.scene);
-        this.mesh.alwaysSelectAsActiveMesh = true;
+        this.mesh = this.createBatchMesh('trailBatch');
         this.buildGeometryBuffers();
     }
 

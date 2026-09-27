@@ -18,9 +18,7 @@ export function ModuleSection(props: {
     const [open, setOpen] = useState(props.defaultOpen ?? true);
     const toggleable = props.onToggle !== undefined;
     const dimmed = toggleable && props.enabled === false;
-    const titleHint = props.hint ?? getInspectorHint(props.hintKey ?? props.title);
-    const objectHint = props.title.startsWith('Object — ') ? getInspectorHint('Object') : undefined;
-    const tooltip = titleHint ?? objectHint;
+    const tooltip = props.hint ?? getInspectorHint(props.hintKey ?? props.title);
 
     return (
         <section

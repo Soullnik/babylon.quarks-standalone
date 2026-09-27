@@ -137,6 +137,37 @@ describe('QuarksLoader matrix decomposition', () => {
         engine.dispose();
     });
 
+    it('records which node names came from the file', () => {
+        const engine = new NullEngine();
+        const scene = new Scene(engine);
+
+        const root = new QuarksLoader(scene).parse({
+            images: [],
+            textures: [],
+            materials: [],
+            geometries: [],
+            object: {
+                uuid: 'root',
+                type: 'Object3D',
+                children: [
+                    {uuid: 'named', type: 'Group', name: 'Fire'},
+                    // Named like the stand-in an unnamed node gets, but written in the file.
+                    {uuid: 'looks-default', type: 'Group', name: 'Object3D'},
+                ],
+            },
+        });
+
+        const [named, looksDefault] = root.getChildren();
+        // The unnamed root is still called something — its JSON type — but that is not authored.
+        expect(root.name).toBe('Object3D');
+        expect(QuarksLoader.hasAuthoredName(root)).toBe(false);
+        expect(QuarksLoader.hasAuthoredName(named)).toBe(true);
+        expect(QuarksLoader.hasAuthoredName(looksDefault)).toBe(true);
+
+        scene.dispose();
+        engine.dispose();
+    });
+
     it('round-trips a material blend mode through toJSON/parse', () => {
         const engine = new NullEngine();
         const scene = new Scene(engine);
@@ -966,30 +997,48 @@ describe('QuarksLoader matrix decomposition', () => {
         scene.dispose();
         engine.dispose();
     });
-    it('warns about an image entry that is not an image', () => {
-        // A Unity built-in texture exports as its virtual asset path, which
-        // otherwise just fails to load with no hint as to why.
+    it('warns about a texture only when its image actually fails to load', () => {
+        // Decided by the load, not by what the url looks like. A Unity built-in texture exports as
+        // its virtual asset path and fails; a .png can 404 just as well; an extensionless CDN url
+        // and a data URI are fine images.
         const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
         try {
             const engine = new NullEngine();
             const scene = new Scene(engine);
-            const loader = new QuarksLoader(scene);
-            loader.parse({
+            // Delayed loading keeps Babylon's own load/error handlers reachable without a network.
+            scene.useDelayedTextureLoading = true;
+            const urls = {
+                builtin: 'Resources/unity_builtin_extra',
+                missing: 'textures/missing.png',
+                cdn: 'https://cdn.example.com/texture?id=5',
+                inline: 'data:image/png;base64,AAAA',
+            };
+            new QuarksLoader(scene).parse({
                 metadata: {version: 4.5, type: 'Object'},
-                images: [
-                    {uuid: 'img-broken', url: 'Resources/unity_builtin_extra'},
-                    {uuid: 'img-ok', url: 'textures/spark.png'},
-                    {uuid: 'img-inline', url: 'data:image/png;base64,AAAA'},
-                ],
-                textures: [],
+                images: Object.entries(urls).map(([uuid, url]) => ({uuid, url})),
+                textures: Object.keys(urls).map((uuid) => ({uuid: `tex-${uuid}`, image: uuid})),
                 materials: [],
                 geometries: [],
                 object: {uuid: 'n0', type: 'Group', name: 'root'},
             } as any);
+
+            // Parsing alone judges nothing.
+            expect(warn).not.toHaveBeenCalled();
+
+            const texture = (url: string) => scene.textures.find((tex) => (tex as Texture).url === url) as any;
+            texture(urls.cdn)._delayedOnLoad?.();
+            texture(urls.inline)._delayedOnLoad?.();
+            texture(urls.builtin)._delayedOnError('Unable to load');
+            texture(urls.missing)._delayedOnError('404 Not Found');
+
             const messages = warn.mock.calls.map((c) => String(c[0]));
+            expect(messages).toHaveLength(2);
             expect(messages.filter((m) => m.includes('unity_builtin_extra'))).toHaveLength(1);
-            expect(messages.filter((m) => m.includes('spark.png'))).toHaveLength(0);
-            expect(messages.filter((m) => m.includes('data:image'))).toHaveLength(0);
+            expect(messages.filter((m) => m.includes('missing.png') && m.includes('404 Not Found'))).toHaveLength(1);
+            expect(messages.filter((m) => m.includes('cdn.example.com') || m.includes('data:image'))).toHaveLength(0);
+
+            scene.dispose();
+            engine.dispose();
         } finally {
             warn.mockRestore();
         }

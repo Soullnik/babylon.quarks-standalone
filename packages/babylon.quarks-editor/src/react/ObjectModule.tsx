@@ -46,7 +46,7 @@ export function ObjectModule(props: {node: TransformNode; label: string}) {
     const {node} = props;
     const euler = getEulerDegrees(node);
     return (
-        <ModuleSection title={`Object — ${props.label}`}>
+        <ModuleSection title={`Object — ${props.label}`} hintKey="Object">
             <AxisRow
                 label="Position"
                 values={{x: node.position.x, y: node.position.y, z: node.position.z}}

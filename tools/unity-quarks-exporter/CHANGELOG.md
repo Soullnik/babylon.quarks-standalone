@@ -4,21 +4,48 @@ All notable changes to the Unity Quarks Exporter are documented here.
 
 ## Unreleased
 
+### Changed
+
+- **Nothing is decided by a name any more.** Every place the exporter inferred what something _is_
+  from what it is _called_ now reads the data instead. Properties are still looked up by their own
+  names — that is how a property is addressed — but no shader, material, texture or file name
+  steers the export.
+    - **Blend mode.** `DetectBlend` used to match "additive" / "multiply" / … in the shader's name
+      _first_ and only then look at the blend state, so a shader named "MyAdditiveGlow" that
+      alpha-blends exported as additive, and renaming a shader changed the export. It now reads,
+      in order: the shader's own ShaderLab source when it is a file in the project (the `Blend` /
+      `BlendOp` statements it renders with, parsed as ShaderLab, with `[_Property]` references
+      resolved through the material — which also covers shaders that hard-code their blend or
+      name their blend properties something else); the `_SrcBlend` / `_DstBlend` / `_BlendOp`
+      properties (and the `_BUILTIN_` spellings Shader Graph generates); the `Blend` surface
+      option. What none of those resolves exports as alpha blend with a console warning naming
+      the material and saying why. The exported material records `blendModeSource`.
+    - **Reflection cubemap.** Found by the texture dimension of the properties the material's
+      shader declares, instead of a list of guessed names (`_Cube`, `_EnvMap`, …) and the
+      material's saved-property list, which keeps textures from shaders the material used before.
+    - **Texture embedding.** Whether a texture file can be embedded as-is, and its MIME type, come
+      from the file's signature bytes (PNG / JPEG / WebP), not its extension.
+- Unity's built-in shaders that hard-code their blend (Legacy Shaders/Particles/\*,
+  Mobile/Particles/\*) have no source in the project and no blend properties, so they now export
+  as alpha blend with that warning, where the old name matching guessed right for the common
+  ones. Switching such materials to Particles/Standard Unlit or URP Particles/Unlit — both expose
+  their blend — exports them correctly.
+
 ### Fixed
 
-- **Blend mode is read from the material's real blend state instead of its shader name.** The old
-  `DetectBlend` matched keywords in `mat.shader.name` *first* and only consulted
-  `_SrcBlend`/`_DstBlend` when the name said nothing — so a shader called "MyAdditiveGlow" that
-  alpha-blends exported as additive, and renaming a shader changed the export. The order is now
-  blend factors + `_BlendOp` (accepting the `_BUILTIN_` spellings Shader Graph generates), then
-  the `Blend` surface option, then the name as a last resort, which now logs a warning naming the
-  material. Premultiplied alpha and subtractive blending are recognised rather than collapsed into
-  plain alpha blend, and the exported material carries `blendModeSource` saying where the mode
-  came from.
+- **Premultiplied alpha.** `One / OneMinusSrcAlpha` means two different things. Built-in Standard
+  Particles, URP and Shader Graph enable `_ALPHAPREMULTIPLY_ON` and multiply colour by alpha in the
+  shader, so the texture is straight alpha and quarks must alpha-blend it; without that keyword the
+  premultiplication is in the texture and quarks must blend premultiplied. The exporter now reads
+  the keyword. It previously collapsed every premultiplied material into alpha blend (too dark for
+  premultiplied textures), and the first rework of `DetectBlend` flipped that the other way (too
+  bright for URP's premultiply mode).
+- Subtractive blending (`BlendOp Sub` / `RevSub` with `DstBlend One`) is recognised rather than
+  exported as alpha blend.
 - The material's `blending` field is written in three.js's numbering, which is what it means for a
   three.js material; `alphaMode` keeps Babylon's. The two were previously given the same integer,
-  so a material read by three.quarks / quarks.art — which the JSON claims compatibility with —
-  got the wrong mode. babylon.quarks was unaffected because `QuarksLoader` prefers `alphaMode`.
+  so a material read by three.quarks / quarks.art — which the JSON claims compatibility with — got
+  the wrong mode. babylon.quarks was unaffected because `QuarksLoader` prefers `alphaMode`.
 
 ## [0.19.0] — 2026-07-25
 

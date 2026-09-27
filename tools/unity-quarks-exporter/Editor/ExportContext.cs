@@ -131,37 +131,54 @@ namespace BabylonQuarks.UnityExporter
         }
 
         /// <summary>
-        /// Finds a cubemap on the particle material (common shader property names).
+        /// Finds the cubemap the material's shader samples, by what its texture properties *are*:
+        /// the shader's own declared properties whose texture dimension is Cube. Neither the
+        /// property's name nor the material's saved-property list is consulted — the latter keeps
+        /// textures from shaders the material used before, which the current shader never reads.
         /// </summary>
         private static Cubemap FindReflectionCubemap(Material mat)
         {
-            if (mat == null) return null;
-            string[] names = {
-                "_Cube", "_Cubemap", "_ReflectionCubemap", "_EnvMap",
-                "_EnvironmentMap", "_SpecCube0", "_ReflectionTex"
-            };
-            foreach (string name in names)
+            if (mat == null || mat.shader == null) return null;
+            Shader shader = mat.shader;
+            Cubemap found = null;
+            var bound = new List<string>();
+            for (int i = 0; i < shader.GetPropertyCount(); i++)
             {
-                if (!mat.HasProperty(name)) continue;
-                Texture t = mat.GetTexture(name);
-                if (t is Cubemap cube) return cube;
+                if (shader.GetPropertyType(i) != ShaderPropertyType.Texture) continue;
+                if (shader.GetPropertyTextureDimension(i) != TextureDimension.Cube) continue;
+                string property = shader.GetPropertyName(i);
+                if (mat.GetTexture(property) is Cubemap cube)
+                {
+                    bound.Add(property);
+                    if (found == null) found = cube;
+                }
             }
-            // Any cubemap-typed texture property (custom shaders).
-            foreach (string name in mat.GetTexturePropertyNames())
+            if (bound.Count > 1)
             {
-                Texture t = mat.GetTexture(name);
-                if (t is Cubemap cube) return cube;
+                Debug.LogWarning(
+                    $"[Quarks Exporter] Material '{mat.name}' binds {bound.Count} cubemaps " +
+                    $"({string.Join(", ", bound)}); quarks samples one reflection map, so the first " +
+                    $"declared ({bound[0]}) is exported.");
             }
-            return null;
+            return found;
         }
 
+        /// <summary>
+        /// Reflection strength. There is no Unity-defined property for it and the value's meaning
+        /// is not recoverable from data, so this is the one place the exporter reads properties by
+        /// a list of names: each name states what the property holds, which is the only evidence
+        /// there is. Only properties the current shader declares as numbers are read.
+        /// </summary>
         private static float ReadReflectionLevel(Material mat)
         {
-            if (mat == null) return 1f;
+            if (mat == null || mat.shader == null) return 1f;
             string[] names = { "_ReflectionIntensity", "_ReflectionStrength", "_EnvIntensity" };
             foreach (string name in names)
             {
-                if (!mat.HasProperty(name)) continue;
+                int index = mat.shader.FindPropertyIndex(name);
+                if (index < 0) continue;
+                ShaderPropertyType type = mat.shader.GetPropertyType(index);
+                if (type != ShaderPropertyType.Float && type != ShaderPropertyType.Range) continue;
                 return mat.GetFloat(name);
             }
             return 1f;
@@ -323,14 +340,18 @@ namespace BabylonQuarks.UnityExporter
             string path = AssetDatabase.GetAssetPath(tex);
             if (EmbedTextures)
             {
-                // Only the source file of a format a browser can decode is worth
-                // embedding as-is.
-                if (!string.IsNullOrEmpty(path) && File.Exists(path) && IsWebImageFile(path))
+                // Only the source file of a format a browser can decode is worth embedding
+                // as-is. The format is read from the file's own header, not its extension.
+                if (!string.IsNullOrEmpty(path) && File.Exists(path))
                 {
                     try
                     {
                         byte[] bytes = File.ReadAllBytes(path);
-                        return "data:" + MimeTypeOf(path) + ";base64," + Convert.ToBase64String(bytes);
+                        string mime = WebImageMimeType(bytes);
+                        if (mime != null)
+                        {
+                            return "data:" + mime + ";base64," + Convert.ToBase64String(bytes);
+                        }
                     }
                     catch (Exception e)
                     {
@@ -355,18 +376,21 @@ namespace BabylonQuarks.UnityExporter
             return !string.IsNullOrEmpty(path) ? path : tex.name;
         }
 
-        private static bool IsWebImageFile(string path)
+        /// <summary>
+        /// The MIME type of a browser-decodable image, identified by its signature bytes, or null
+        /// for anything else (TGA, PSD, EXR…), which then goes through the GPU re-encode.
+        /// </summary>
+        private static string WebImageMimeType(byte[] b)
         {
-            string ext = Path.GetExtension(path).ToLowerInvariant();
-            return ext == ".png" || ext == ".jpg" || ext == ".jpeg" || ext == ".webp";
-        }
-
-        private static string MimeTypeOf(string path)
-        {
-            string ext = Path.GetExtension(path).ToLowerInvariant();
-            return ext == ".jpg" || ext == ".jpeg" ? "image/jpeg"
-                : ext == ".webp" ? "image/webp"
-                : "image/png";
+            if (b.Length >= 8 && b[0] == 0x89 && b[1] == 0x50 && b[2] == 0x4E && b[3] == 0x47 &&
+                b[4] == 0x0D && b[5] == 0x0A && b[6] == 0x1A && b[7] == 0x0A)
+                return "image/png";
+            if (b.Length >= 3 && b[0] == 0xFF && b[1] == 0xD8 && b[2] == 0xFF)
+                return "image/jpeg";
+            if (b.Length >= 12 && b[0] == 0x52 && b[1] == 0x49 && b[2] == 0x46 && b[3] == 0x46 &&
+                b[8] == 0x57 && b[9] == 0x45 && b[10] == 0x42 && b[11] == 0x50)
+                return "image/webp"; // "RIFF" .... "WEBP"
+            return null;
         }
 
         /// <summary>
@@ -476,68 +500,452 @@ namespace BabylonQuarks.UnityExporter
         private const int AlphaUnknown = -1;
 
         /// <summary>
-        /// Resolve a material's blend mode, preferring what the GPU is actually told to do over
-        /// what the shader happens to be called.
+        /// Resolve a material's blend mode from data only — never from the name of the shader,
+        /// the material or anything else an author can rename without changing what renders.
         ///
-        /// The order matters. The blend factors are the ground truth: they are what Unity submits
-        /// and they mean the same thing in every pipeline. The surface-option enum is the same
-        /// state one level up. The shader's name is free text the author can change without
-        /// touching the rendering at all — a "MyAdditiveGlow" that alpha-blends is perfectly legal
-        /// — so it is consulted only when nothing real is readable, and it says so in the console.
+        /// 1. The shader's ShaderLab source, when it is a file in the project: the Blend and
+        ///    BlendOp statements it actually renders with, with any [_Property] references read
+        ///    through the material. This is the most direct source there is, and it also covers
+        ///    shaders that hard-code their blend or route it through properties with their own names.
+        /// 2. The blend-factor properties Unity's own shaders and Shader Graph expose.
+        /// 3. The `Blend` surface option those shaders serialize one level up.
+        ///
+        /// When none of that is readable — a Unity built-in shader with a hard-coded blend has no
+        /// source on disk and no properties — the export falls back to alpha blend and says so
+        /// in the console, naming the material. It does not guess.
         /// </summary>
         private static int DetectBlend(Material mat, out string source)
         {
             source = "default";
             if (mat == null) return AlphaCombine;
 
-            // 1. The real blend state. Shader Graph's Built-In target prefixes the properties it
-            //    generates, so accept either spelling.
-            if (TryReadBlendState(mat, out int src, out int dst, out int op, out string via))
+            ShaderSourceBlend fromSource = TryReadShaderSourceBlend(mat, out int src, out int dst, out int op);
+            int sourceSrc = src, sourceDst = dst, sourceOp = op;
+            if (fromSource == ShaderSourceBlend.Factors)
             {
-                int fromState = ClassifyBlendFactors(src, dst, op);
-                if (fromState != AlphaUnknown)
+                int mode = ClassifyBlendFactors(src, dst, op);
+                if (mode != AlphaUnknown)
                 {
-                    source = via;
-                    return fromState;
+                    source = "shader source";
+                    return RefinePremultiplied(mat, mode);
                 }
             }
 
-            // 2. The serialized surface option. URP and the Built-In Shader Graph target both use
-            //    `Blend`: Alpha=0, Premultiply=1, Additive=2, Multiply=3. HDRP's `_BlendMode`
-            //    numbers the same names differently, so it is deliberately not read here.
+            if (TryReadBlendState(mat, out src, out dst, out op, out string via))
+            {
+                int mode = ClassifyBlendFactors(src, dst, op);
+                if (mode != AlphaUnknown)
+                {
+                    source = via;
+                    return RefinePremultiplied(mat, mode);
+                }
+            }
+
+            // URP and the Built-In Shader Graph target both serialize `Blend` as Alpha=0,
+            // Premultiply=1, Additive=2, Multiply=3. HDRP's `_BlendMode` numbers the same names
+            // differently, so it is deliberately not read. Their Premultiply mode multiplies
+            // colour by alpha inside the shader, so what reaches the blender is straight alpha.
             if (TryReadFloat(mat, out float surface, "_Blend", "_BUILTIN_Blend"))
             {
                 switch ((int)surface)
                 {
                     case 0: source = "surface option"; return AlphaCombine;
-                    case 1: source = "surface option"; return AlphaPremultiplied;
+                    case 1: source = "surface option"; return AlphaCombine;
                     case 2: source = "surface option"; return AlphaAdd;
                     case 3: source = "surface option"; return AlphaMultiply;
                 }
             }
 
-            // 3. Last resort: the shader's name. Order matters here too — "Alpha Blended
-            //    Premultiply" contains "multiply" as a substring and is not a multiply blend.
-            string sn = mat.shader != null ? mat.shader.name.ToLowerInvariant() : "";
-            int fromName = AlphaUnknown;
-            if (sn.Contains("additive")) fromName = AlphaAdd;
-            else if (sn.Contains("premultiply")) fromName = AlphaPremultiplied;
-            else if (sn.Contains("alpha blend") || sn.Contains("alphablend")) fromName = AlphaCombine;
-            else if (sn.Contains("multiply") || sn.Contains("modulate")) fromName = AlphaMultiply;
+            string why = fromSource == ShaderSourceBlend.Opaque
+                ? "its shader source declares no blending (opaque), which quarks particles cannot express"
+                : fromSource == ShaderSourceBlend.Factors
+                    ? $"its shader's blend (src {(BlendMode)sourceSrc}, dst {(BlendMode)sourceDst}, op {sourceOp}) has no quarks equivalent"
+                    : "its shader exposes no blend properties and has no ShaderLab source in the project";
+            Debug.LogWarning(
+                $"[Quarks Exporter] Material '{mat.name}': blend mode not readable — {why}. " +
+                "Exported as alpha blend; check it in the effect, or switch the material to a shader " +
+                "that exposes its blend (e.g. Particles/Standard Unlit, URP Particles/Unlit).");
+            return AlphaCombine;
+        }
 
-            if (fromName != AlphaUnknown)
+        /// <summary>
+        /// One/OneMinusSrcAlpha means two different things. Unity's modern particle shaders
+        /// (Built-in Standard Particles, URP, Shader Graph) switch on _ALPHAPREMULTIPLY_ON and
+        /// multiply colour by alpha *in the shader*, so the texture is straight alpha and quarks —
+        /// whose shader outputs straight colour — must alpha-blend it. Without that keyword the
+        /// premultiplication is baked into the texture itself, and quarks must blend premultiplied.
+        /// </summary>
+        private static int RefinePremultiplied(Material mat, int mode)
+        {
+            if (mode != AlphaPremultiplied) return mode;
+            bool premultipliesInShader =
+                mat.IsKeywordEnabled("_ALPHAPREMULTIPLY_ON") || mat.IsKeywordEnabled("_BUILTIN_ALPHAPREMULTIPLY_ON");
+            return premultipliesInShader ? AlphaCombine : AlphaPremultiplied;
+        }
+
+        private enum ShaderSourceBlend { Unreadable, Opaque, Factors }
+
+        /// <summary>
+        /// Reads the blend state out of the shader's ShaderLab source. A parser for the language,
+        /// not a keyword search: Blend / BlendOp are read as statements from the first SubShader,
+        /// inheriting Category and SubShader state, from the first pass that blends (so a leading
+        /// depth-only pass is not mistaken for the colour pass). Program blocks, comments and
+        /// strings are skipped, so shader code that mentions the word never matches.
+        ///
+        /// Mirrored by tools/unity-effect-audit/shaderlab.py, where the cases it handles are
+        /// tested — keep the two in step.
+        /// </summary>
+        private static ShaderSourceBlend TryReadShaderSourceBlend(Material mat, out int src, out int dst, out int op)
+        {
+            src = dst = 0;
+            op = (int)BlendOp.Add;
+            if (mat.shader == null) return ShaderSourceBlend.Unreadable;
+            string path = AssetDatabase.GetAssetPath(mat.shader);
+            if (string.IsNullOrEmpty(path) || !File.Exists(path)) return ShaderSourceBlend.Unreadable;
+
+            string text;
+            try
             {
-                source = "shader name";
-                Debug.LogWarning(
-                    $"[Quarks Exporter] Material '{mat.name}' exposes no blend state; its blend mode was " +
-                    $"guessed from the shader name '{mat.shader?.name}'. Verify it in the exported effect.");
-                return fromName;
+                text = File.ReadAllText(path);
+            }
+            catch (Exception)
+            {
+                return ShaderSourceBlend.Unreadable;
             }
 
-            Debug.LogWarning(
-                $"[Quarks Exporter] Material '{mat.name}' (shader '{mat.shader?.name}') exposes no readable " +
-                "blend state and its name says nothing; defaulting to alpha blend.");
-            return AlphaCombine;
+            // Content, not the file extension, decides whether this is ShaderLab: a Shader Graph
+            // asset is JSON and starts with `{`.
+            List<ShaderLabToken> tokens = ShaderLabLex(text);
+            if (tokens.Count == 0 || !tokens[0].IsWord("Shader")) return ShaderSourceBlend.Unreadable;
+
+            int pos = 0;
+            ShaderLabBlock root = ShaderLabParseBlock(tokens, ref pos, "");
+            if (!ShaderLabFirstSubShader(root, null, null, out ShaderLabBlock sub,
+                    out ShaderLabBlend inheritedBlend, out ShaderLabFactor inheritedOp))
+            {
+                return ShaderSourceBlend.Unreadable;
+            }
+
+            ShaderLabBlend blend = sub.Blend ?? inheritedBlend;
+            ShaderLabFactor blendOp = sub.Op ?? inheritedOp;
+            var candidates = new List<KeyValuePair<ShaderLabBlend, ShaderLabFactor>>();
+            foreach (ShaderLabBlock child in sub.Children)
+            {
+                if (child.Kind == "pass")
+                {
+                    candidates.Add(new KeyValuePair<ShaderLabBlend, ShaderLabFactor>(
+                        child.Blend ?? blend, child.Op ?? blendOp));
+                }
+            }
+            if (candidates.Count == 0)
+            {
+                candidates.Add(new KeyValuePair<ShaderLabBlend, ShaderLabFactor>(blend, blendOp));
+            }
+
+            foreach (var candidate in candidates)
+            {
+                ShaderLabBlend b = candidate.Key;
+                if (b == null || b.Off) continue;
+                if (!ShaderLabResolveFactor(mat, b.Src, out src) || !ShaderLabResolveFactor(mat, b.Dst, out dst))
+                {
+                    return ShaderSourceBlend.Unreadable;
+                }
+                if (!ShaderLabResolveOp(mat, candidate.Value, out op)) return ShaderSourceBlend.Unreadable;
+                return ShaderSourceBlend.Factors;
+            }
+            return ShaderSourceBlend.Opaque;
+        }
+
+        private struct ShaderLabToken
+        {
+            public char Kind; // 'w' word, 's' string, 'p' punctuation
+            public string Value;
+
+            public bool IsWord(string word) =>
+                Kind == 'w' && string.Equals(Value, word, StringComparison.OrdinalIgnoreCase);
+
+            public bool IsPunct(char c) => Kind == 'p' && Value.Length == 1 && Value[0] == c;
+        }
+
+        private sealed class ShaderLabFactor
+        {
+            public bool IsProperty; // [_Name] reference rather than a literal keyword
+            public string Value;
+        }
+
+        private sealed class ShaderLabBlend
+        {
+            public bool Off;
+            public ShaderLabFactor Src, Dst;
+        }
+
+        private sealed class ShaderLabBlock
+        {
+            public string Kind;
+            public ShaderLabBlend Blend;
+            public ShaderLabFactor Op;
+            public readonly List<ShaderLabBlock> Children = new List<ShaderLabBlock>();
+        }
+
+        private static readonly Dictionary<string, string> ShaderLabProgramBlocks =
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                { "CGPROGRAM", "ENDCG" }, { "CGINCLUDE", "ENDCG" },
+                { "HLSLPROGRAM", "ENDHLSL" }, { "HLSLINCLUDE", "ENDHLSL" },
+                { "GLSLPROGRAM", "ENDGLSL" }, { "GLSLINCLUDE", "ENDGLSL" },
+            };
+
+        private static bool ShaderLabWordChar(char c) =>
+            char.IsLetterOrDigit(c) || c == '_' || c == '.' || c == '-' || c == '+';
+
+        private static List<ShaderLabToken> ShaderLabLex(string text)
+        {
+            var tokens = new List<ShaderLabToken>();
+            int i = 0, n = text.Length;
+            while (i < n)
+            {
+                char c = text[i];
+                if (char.IsWhiteSpace(c))
+                {
+                    i++;
+                }
+                else if (c == '/' && i + 1 < n && text[i + 1] == '/')
+                {
+                    int j = text.IndexOf('\n', i);
+                    i = j < 0 ? n : j;
+                }
+                else if (c == '/' && i + 1 < n && text[i + 1] == '*')
+                {
+                    int j = text.IndexOf("*/", i + 2, StringComparison.Ordinal);
+                    i = j < 0 ? n : j + 2;
+                }
+                else if (c == '"')
+                {
+                    int j = text.IndexOf('"', i + 1);
+                    if (j < 0) j = n;
+                    tokens.Add(new ShaderLabToken { Kind = 's', Value = text.Substring(i + 1, j - i - 1) });
+                    i = j + 1;
+                }
+                else if ("{}[](),=".IndexOf(c) >= 0)
+                {
+                    tokens.Add(new ShaderLabToken { Kind = 'p', Value = c.ToString() });
+                    i++;
+                }
+                else
+                {
+                    int j = i;
+                    while (j < n && ShaderLabWordChar(text[j])) j++;
+                    if (j == i)
+                    {
+                        i++;
+                        continue;
+                    }
+                    string word = text.Substring(i, j - i);
+                    i = j;
+                    if (ShaderLabProgramBlocks.TryGetValue(word, out string end))
+                    {
+                        i = ShaderLabFindWord(text, end, i);
+                        continue;
+                    }
+                    tokens.Add(new ShaderLabToken { Kind = 'w', Value = word });
+                }
+            }
+            return tokens;
+        }
+
+        /// <summary>Index just past the next whole-word occurrence of `word`, or the end.</summary>
+        private static int ShaderLabFindWord(string text, string word, int from)
+        {
+            int i = from;
+            while (true)
+            {
+                int j = text.IndexOf(word, i, StringComparison.Ordinal);
+                if (j < 0) return text.Length;
+                bool startOk = j == 0 || !ShaderLabWordChar(text[j - 1]);
+                int after = j + word.Length;
+                bool endOk = after >= text.Length || !ShaderLabWordChar(text[after]);
+                if (startOk && endOk) return after;
+                i = j + 1;
+            }
+        }
+
+        private static ShaderLabFactor ShaderLabParseFactor(List<ShaderLabToken> t, ref int pos)
+        {
+            if (pos < t.Count && t[pos].IsPunct('['))
+            {
+                if (pos + 2 < t.Count && t[pos + 1].Kind == 'w' && t[pos + 2].IsPunct(']'))
+                {
+                    var f = new ShaderLabFactor { IsProperty = true, Value = t[pos + 1].Value };
+                    pos += 3;
+                    return f;
+                }
+                pos++;
+                return null;
+            }
+            if (pos < t.Count && t[pos].Kind == 'w')
+            {
+                return new ShaderLabFactor { IsProperty = false, Value = t[pos++].Value };
+            }
+            return null;
+        }
+
+        /// <summary>Optional render-target index (`Blend 1 One One`); only target 0 counts.</summary>
+        private static int ShaderLabRenderTarget(List<ShaderLabToken> t, ref int pos)
+        {
+            if (pos < t.Count && t[pos].Kind == 'w' && int.TryParse(t[pos].Value, out int rt))
+            {
+                pos++;
+                return rt;
+            }
+            return 0;
+        }
+
+        /// <summary>Blend Off | Blend [rt] src dst [, srcA dstA].</summary>
+        private static ShaderLabBlend ShaderLabParseBlend(List<ShaderLabToken> t, ref int pos)
+        {
+            int rt = ShaderLabRenderTarget(t, ref pos);
+            if (pos < t.Count && t[pos].IsWord("Off"))
+            {
+                pos++;
+                return rt == 0 ? new ShaderLabBlend { Off = true } : null;
+            }
+            ShaderLabFactor src = ShaderLabParseFactor(t, ref pos);
+            ShaderLabFactor dst = ShaderLabParseFactor(t, ref pos);
+            if (pos < t.Count && t[pos].IsPunct(','))
+            {
+                pos++;
+                ShaderLabParseFactor(t, ref pos);
+                ShaderLabParseFactor(t, ref pos);
+            }
+            if (src == null || dst == null || rt != 0) return null;
+            return new ShaderLabBlend { Src = src, Dst = dst };
+        }
+
+        /// <summary>BlendOp [rt] op [, opA].</summary>
+        private static ShaderLabFactor ShaderLabParseBlendOp(List<ShaderLabToken> t, ref int pos)
+        {
+            int rt = ShaderLabRenderTarget(t, ref pos);
+            ShaderLabFactor op = ShaderLabParseFactor(t, ref pos);
+            if (pos < t.Count && t[pos].IsPunct(','))
+            {
+                pos++;
+                ShaderLabParseFactor(t, ref pos);
+            }
+            return rt == 0 ? op : null;
+        }
+
+        private static ShaderLabBlock ShaderLabParseBlock(List<ShaderLabToken> t, ref int pos, string kind)
+        {
+            var block = new ShaderLabBlock { Kind = kind };
+            string lastWord = null;
+            while (pos < t.Count)
+            {
+                ShaderLabToken token = t[pos];
+                if (token.IsPunct('}'))
+                {
+                    pos++;
+                    return block;
+                }
+                if (token.IsPunct('{'))
+                {
+                    pos++;
+                    block.Children.Add(ShaderLabParseBlock(t, ref pos, (lastWord ?? "").ToLowerInvariant()));
+                    lastWord = null;
+                    continue;
+                }
+                if (token.IsWord("Blend"))
+                {
+                    pos++;
+                    ShaderLabBlend blend = ShaderLabParseBlend(t, ref pos);
+                    if (blend != null && block.Blend == null) block.Blend = blend;
+                    lastWord = null;
+                    continue;
+                }
+                if (token.IsWord("BlendOp"))
+                {
+                    pos++;
+                    ShaderLabFactor op = ShaderLabParseBlendOp(t, ref pos);
+                    if (op != null && block.Op == null) block.Op = op;
+                    lastWord = null;
+                    continue;
+                }
+                if (token.Kind == 'w') lastWord = token.Value;
+                pos++;
+            }
+            return block;
+        }
+
+        private static bool ShaderLabFirstSubShader(ShaderLabBlock node, ShaderLabBlend blend, ShaderLabFactor op,
+            out ShaderLabBlock sub, out ShaderLabBlend inheritedBlend, out ShaderLabFactor inheritedOp)
+        {
+            foreach (ShaderLabBlock child in node.Children)
+            {
+                if (child.Kind == "subshader")
+                {
+                    sub = child;
+                    inheritedBlend = blend;
+                    inheritedOp = op;
+                    return true;
+                }
+                if (child.Kind == "shader" || child.Kind == "category")
+                {
+                    if (ShaderLabFirstSubShader(child, child.Blend ?? blend, child.Op ?? op,
+                            out sub, out inheritedBlend, out inheritedOp))
+                    {
+                        return true;
+                    }
+                }
+            }
+            sub = null;
+            inheritedBlend = null;
+            inheritedOp = null;
+            return false;
+        }
+
+        /// <summary>
+        /// A ShaderLab factor keyword or [_Property] → UnityEngine.Rendering.BlendMode. The
+        /// keywords are the enum's own member names, so this parses the language rather than
+        /// matching anything.
+        /// </summary>
+        private static bool ShaderLabResolveFactor(Material mat, ShaderLabFactor factor, out int value)
+        {
+            value = 0;
+            if (factor.IsProperty)
+            {
+                if (!TryReadFloat(mat, out float v, factor.Value)) return false;
+                value = (int)v;
+                return true;
+            }
+            if (int.TryParse(factor.Value, out _)) return false;
+            if (!Enum.TryParse(factor.Value, true, out BlendMode mode)) return false;
+            value = (int)mode;
+            return true;
+        }
+
+        /// <summary>
+        /// A ShaderLab BlendOp keyword or [_Property] → UnityEngine.Rendering.BlendOp. ShaderLab
+        /// spells subtract "Sub" / "RevSub" where the enum says Subtract / ReverseSubtract; any op
+        /// quarks cannot express comes back as an unsupported value rather than as Add.
+        /// </summary>
+        private static bool ShaderLabResolveOp(Material mat, ShaderLabFactor factor, out int value)
+        {
+            value = (int)BlendOp.Add;
+            if (factor == null) return true;
+            if (factor.IsProperty)
+            {
+                if (!TryReadFloat(mat, out float v, factor.Value)) return false;
+                value = (int)v;
+                return true;
+            }
+            switch (factor.Value.ToLowerInvariant())
+            {
+                case "add": value = (int)BlendOp.Add; return true;
+                case "sub": value = (int)BlendOp.Subtract; return true;
+                case "revsub": value = (int)BlendOp.ReverseSubtract; return true;
+                case "min": value = (int)BlendOp.Min; return true;
+                case "max": value = (int)BlendOp.Max; return true;
+                default: value = -2; return true;
+            }
         }
 
         /// <summary>Reads src/dst factors and the blend op, under either property spelling.</summary>

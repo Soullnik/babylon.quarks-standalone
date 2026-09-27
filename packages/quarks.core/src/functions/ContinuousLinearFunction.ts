@@ -85,7 +85,6 @@ export class ContinuousLinearFunction<T extends ObjectValueType<T> | number> {
     }
 
     toJSON(): FunctionJSON {
-        const subType = this.keys[0][0].constructor.name;
         return {
             type: 'CLinearFunction',
             subType: this.subType,

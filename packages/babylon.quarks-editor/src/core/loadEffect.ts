@@ -4,9 +4,12 @@ import type {Scene} from '@babylonjs/core/scene';
 import type {BatchedRenderer, ParticleSystem} from 'babylon.quarks';
 import {ParticleEmitter, QuarksLoader, QuarksUtil} from 'babylon.quarks';
 
-/** `ParticleEmitter`'s constructor default (see babylon.quarks/src/ParticleEmitter.ts) — the
- * name every emitter gets when the source JSON didn't give it one of its own. */
-const DEFAULT_EMITTER_NAME = 'particleEmitter';
+export interface LoadedEffect {
+    root: TransformNode;
+    systems: ParticleSystem[];
+    /** Whether the effect file named the root node; when false its name is a stand-in the host may replace. */
+    rootNameAuthored: boolean;
+}
 
 export interface LoadEffectOptions {
     /** Registers systems with the batched renderer (default true). */
@@ -15,29 +18,45 @@ export interface LoadEffectOptions {
     autoplay?: boolean;
 }
 
-function hasMeaningfulName(node: TransformNode): boolean {
-    return !!node.name && node.name !== DEFAULT_EMITTER_NAME;
+/**
+ * Which nodes carry a name the effect file gave them. Starts from what the loader recorded
+ * (QuarksLoader.hasAuthoredName) and follows names moved onto a collapsed child, so that name
+ * keeps counting as authored. An unnamed node still has *a* name — its JSON type or a
+ * constructor default — and this is what tells the two apart, rather than comparing against
+ * those stand-ins.
+ */
+class AuthoredNames {
+    private readonly moved = new WeakSet<TransformNode>();
+
+    has(node: TransformNode): boolean {
+        return this.moved.has(node) || QuarksLoader.hasAuthoredName(node);
+    }
+
+    add(node: TransformNode): void {
+        this.moved.add(node);
+    }
 }
 
 function groupChildren(node: TransformNode): TransformNode[] {
     return node.getChildren().filter((c): c is TransformNode => c instanceof TransformNode);
 }
 
-/** Reparents `only` onto `parent`, transferring the outgoing node's name if `only` doesn't
- * already have a meaningful one of its own, then disposes the now-empty wrapper. World
- * transform is preserved via `setParent`. */
-function collapseInto(wrapper: TransformNode, only: TransformNode, parent: Node | null): void {
-    if (!hasMeaningfulName(only) && hasMeaningfulName(wrapper)) {
+/** Reparents `only` onto `parent`, transferring the outgoing node's name if the file named the
+ * wrapper but not `only`, then disposes the now-empty wrapper. World transform is preserved via
+ * `setParent`. */
+function collapseInto(wrapper: TransformNode, only: TransformNode, parent: Node | null, authored: AuthoredNames): void {
+    if (!authored.has(only) && authored.has(wrapper)) {
         only.name = wrapper.name;
+        authored.add(only);
     }
     only.setParent(parent);
     wrapper.dispose(true, false);
 }
 
-function flattenRedundantGroups(node: TransformNode): void {
+function flattenRedundantGroups(node: TransformNode, authored: AuthoredNames): void {
     for (const child of node.getChildren()) {
         if (child instanceof TransformNode) {
-            flattenRedundantGroups(child);
+            flattenRedundantGroups(child, authored);
         }
     }
     if (node instanceof ParticleEmitter || !node.parent) {
@@ -55,10 +74,10 @@ function flattenRedundantGroups(node: TransformNode): void {
     if (only instanceof ParticleEmitter && only.getChildren().length > 0) {
         return;
     }
-    collapseInto(node, only, node.parent);
+    collapseInto(node, only, node.parent, authored);
 }
 
-function promoteIfSingleChildRoot(root: TransformNode): TransformNode {
+function promoteIfSingleChildRoot(root: TransformNode, authored: AuthoredNames): TransformNode {
     let current = root;
     while (!(current instanceof ParticleEmitter)) {
         const children = groupChildren(current);
@@ -67,7 +86,7 @@ function promoteIfSingleChildRoot(root: TransformNode): TransformNode {
         }
         const only = children[0];
         const parent = current.parent;
-        collapseInto(current, only, parent);
+        collapseInto(current, only, parent, authored);
         current = only;
     }
     return current;
@@ -98,14 +117,15 @@ export function parseEffectFromJson(
     json: unknown,
     options: LoadEffectOptions = {},
     baseUrl = ''
-): {root: TransformNode; systems: ParticleSystem[]} {
+): LoadedEffect {
     const registerRenderer = options.registerRenderer ?? true;
     const autoplay = options.autoplay ?? registerRenderer;
 
     const loader = new QuarksLoader(scene, {baseUrl});
+    const authored = new AuthoredNames();
     let root = loader.parse(json as never, baseUrl);
-    flattenRedundantGroups(root);
-    root = promoteIfSingleChildRoot(root);
+    flattenRedundantGroups(root, authored);
+    root = promoteIfSingleChildRoot(root, authored);
 
     const systems: ParticleSystem[] = [];
     QuarksUtil.runOnAllParticleEmitters(root, (emitter: ParticleEmitter) => {
@@ -125,15 +145,10 @@ export function parseEffectFromJson(
         }
     }
 
-    return {root, systems};
+    return {root, systems, rootNameAuthored: authored.has(root)};
 }
 
 /** Parses a Quarks JSON export, registers all systems with the renderer and starts playback. */
-export function loadEffectFromJson(
-    scene: Scene,
-    renderer: BatchedRenderer,
-    json: unknown,
-    baseUrl = ''
-): {root: TransformNode; systems: ParticleSystem[]} {
+export function loadEffectFromJson(scene: Scene, renderer: BatchedRenderer, json: unknown, baseUrl = ''): LoadedEffect {
     return parseEffectFromJson(scene, renderer, json, {registerRenderer: true, autoplay: true}, baseUrl);
 }

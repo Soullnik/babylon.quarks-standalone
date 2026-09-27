@@ -50,7 +50,7 @@ import {EffectHistory} from '../core/history';
 import {disposeLoadedEffect, loadEffectFromJson, parseEffectFromJson} from '../core/loadEffect';
 import {
     bindingFromGalleryEntry,
-    collectJsonFiles,
+    collectEffectFiles,
     loadEffectGallery,
     mergeGalleryEntries,
     type GalleryEntry,
@@ -206,13 +206,13 @@ export function EffectEditorHost(props: EffectEditorHostProps) {
 
     /** Appends JSON effects to the catalog without replacing the open effect. */
     const runGalleryImport = async (files: FileList | File[]) => {
-        const jsonFiles = collectJsonFiles(files);
+        const jsonFiles = await collectEffectFiles(files);
         if (jsonFiles.length === 0) {
             showMessage(
                 'Import to gallery',
                 files.length === 0
                     ? 'Import was cancelled or the browser returned no files.\n\nTry Chrome or Edge and pick .json files or a folder that contains them.'
-                    : `No .json files found among ${files.length} file(s) in the selection.`
+                    : `No JSON effect files found among ${files.length} file(s) in the selection.`
             );
             return;
         }
@@ -460,7 +460,7 @@ export function EffectEditorHost(props: EffectEditorHostProps) {
                 return;
             }
 
-            const position = pickGroundPosition(scene, clientX, clientY);
+            const position = pickGroundPosition(scene, ground, clientX, clientY);
             if (toPlace.length === 1) {
                 placeGalleryEntryInScene(toPlace[0], renderer, position);
             } else {
@@ -889,10 +889,15 @@ export function EffectEditorHost(props: EffectEditorHostProps) {
 
             if (inGallery && entryIndex >= 0 && prev) {
                 disposeEffect(current.root, [current.system, ...current.subSystems], state.renderer, wasInScene);
-                const {root, systems} = parseEffectFromJson(state.scene, wasInScene ? state.renderer : null, json, {
-                    registerRenderer: wasInScene,
-                    autoplay: false,
-                });
+                const {root, systems, rootNameAuthored} = parseEffectFromJson(
+                    state.scene,
+                    wasInScene ? state.renderer : null,
+                    json,
+                    {
+                        registerRenderer: wasInScene,
+                        autoplay: false,
+                    }
+                );
                 if (systems.length === 0) {
                     disposeLoadedEffect(root, systems, state.renderer, wasInScene);
                     return;
@@ -905,7 +910,7 @@ export function EffectEditorHost(props: EffectEditorHostProps) {
                     root.parent = state.galleryRoot;
                     root.setEnabled(false);
                 }
-                if (!root.name || root.name === 'Effect' || root.name === 'Object3D') {
+                if (!rootNameAuthored) {
                     root.name = prev.name;
                 }
                 const main = systems.find((s) => !s.onlyUsedByOther) ?? systems[0];
@@ -1082,7 +1087,7 @@ export function EffectEditorHost(props: EffectEditorHostProps) {
                         const described = describeGalleryDrag(snap.galleryEntries, payload);
                         if (described.entries.length === 0) return;
 
-                        const position = pickGroundPosition(snap.scene, e.clientX, e.clientY);
+                        const position = pickGroundPosition(snap.scene, snap.ground, e.clientX, e.clientY);
                         dropMarkerRef.current?.show(position, described.entries.length);
                         setGalleryDragHover({label: described.label, count: described.entries.length});
                     }}

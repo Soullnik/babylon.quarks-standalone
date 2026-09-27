@@ -4,6 +4,27 @@ All notable changes to the `babylon.quarks` package are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project follows the `quarks.core` 0.x version line.
 
+## Unreleased
+
+### Added
+
+- `VFXBatch.isBatchMesh(mesh)` — whether a mesh is one of the renderer's own batch meshes, known by
+  identity. Hosts listing scene meshes (e.g. as emission sources) can exclude them without relying
+  on their names.
+- `QuarksLoader.hasAuthoredName(node)` — whether a loaded node's name was written in the effect
+  file. Unnamed nodes still get a stand-in (their JSON type or a constructor default); this tells
+  the two apart from the data.
+
+### Changed
+
+- `QuarksLoader` warns about a texture when its image actually fails to load, instead of when its
+  url lacks an image-looking extension. A `.png` that 404s now warns; an extensionless CDN url that
+  loads fine no longer does.
+
+### Removed
+
+- A dead `constructor.name` read in `quarks.core`'s `ContinuousLinearFunction.toJSON`.
+
 ## [0.17.9] — 2026-07-14
 
 ### Fixed

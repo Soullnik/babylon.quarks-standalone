@@ -5,6 +5,7 @@ import {Matrix, Quaternion, Vector3} from '@babylonjs/core/Maths/math.vector';
 import {Mesh} from '@babylonjs/core/Meshes/mesh';
 import {VertexData} from '@babylonjs/core/Meshes/mesh.vertexData';
 import {TransformNode} from '@babylonjs/core/Meshes/transformNode';
+import type {Node} from '@babylonjs/core/node';
 import {Scene} from '@babylonjs/core/scene';
 import {Behavior, EmitSubParticleSystem} from 'quarks.core';
 import {ParticleEmitter} from './ParticleEmitter';
@@ -30,6 +31,18 @@ interface LoadedMeta {
 }
 
 export class QuarksLoader {
+    /** Nodes whose name was written in the effect file, as opposed to a stand-in the loader chose. */
+    private static readonly authoredNames = new WeakSet<Node>();
+
+    /**
+     * Whether `node`'s name was written in the effect file it was loaded from. A node the file
+     * leaves unnamed still gets a name — its JSON type, or a constructor default — and this tells
+     * the two apart from the data instead of by comparing against those stand-ins.
+     */
+    static hasAuthoredName(node: Node): boolean {
+        return QuarksLoader.authoredNames.has(node);
+    }
+
     private scene: Scene;
     private options: QuarksLoaderOptions;
 
@@ -254,29 +267,24 @@ export class QuarksLoader {
     private parseImages(images: any[], baseUrl: string, _meta: LoadedMeta): void {
         (this as any)._images = {};
         for (const img of images) {
-            if (img.url) {
-                QuarksLoader.warnIfNotAnImageUrl(img.url);
-            }
             (this as any)._images[img.uuid] = img.url ? this.resolveImageUrl(baseUrl, img.url) : null;
         }
     }
 
     /**
-     * Flags an image entry that is plainly not an image, which otherwise only
-     * shows up as a texture that silently fails to load.
+     * Reports a texture whose image actually failed to load, which otherwise only shows up as
+     * particles drawn without it. Decided by the load itself, not by what the url looks like: a
+     * `.png` url can 404 and an extensionless CDN url can be a perfectly good image.
      *
-     * The case worth naming: an exporter that could not embed a texture falls
-     * back to writing the source asset's path, and a Unity built-in texture
-     * reports a virtual path such as `Resources/unity_builtin_extra` that no
-     * file backs.
+     * The case worth naming: an exporter that could not embed a texture falls back to writing
+     * the source asset's path, and a Unity built-in texture reports a virtual path such as
+     * `Resources/unity_builtin_extra` that no file backs.
      */
-    private static warnIfNotAnImageUrl(url: string): void {
-        if (/^(data|blob):/i.test(url) || /\.(png|jpe?g|webp|gif|bmp|ktx2?|dds|env|basis)(\?|#|$)/i.test(url)) {
-            return;
-        }
+    private static warnTextureLoadFailed(url: string, message?: string): void {
+        const shown = url.startsWith('data:') ? `${url.slice(0, 40)}…` : url;
         console.warn(
-            `[QuarksLoader] Image "${url}" does not look like an image; its texture will fail to load. ` +
-                'This usually means the effect was exported without embedding that texture.'
+            `[QuarksLoader] Image "${shown}" failed to load${message ? ` (${message})` : ''}; its particles ` +
+                'render without a texture. If the effect came from an exporter, that texture was likely not embedded.'
         );
     }
 
@@ -304,6 +312,7 @@ export class QuarksLoader {
                     noMipmap,
                     invertY,
                     samplingMode: typeof texDef.samplingMode === 'number' ? texDef.samplingMode : undefined,
+                    onError: (message) => QuarksLoader.warnTextureLoadFailed(imageUrl, message),
                 });
                 if (Array.isArray(texDef.wrap)) {
                     texture.wrapU = this.mapWrapMode(texDef.wrap[0]);
@@ -484,7 +493,10 @@ export class QuarksLoader {
         }
 
         if (data.uuid) (node as any)._quarksUUID = data.uuid;
-        if (data.name) node.name = data.name;
+        if (typeof data.name === 'string' && data.name.length > 0) {
+            node.name = data.name;
+            QuarksLoader.authoredNames.add(node);
+        }
 
         if (data.matrix) {
             const matrix = Matrix.FromArray(data.matrix);

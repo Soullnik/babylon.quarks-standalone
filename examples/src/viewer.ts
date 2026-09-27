@@ -132,17 +132,19 @@ function setDropOverlayVisible(visible: boolean) {
     }
 }
 
-/** Loads a Quarks JSON file from disk into the viewer. */
+/** Loads a Quarks JSON file from disk into the viewer. Its content decides, not its file name. */
 async function loadDroppedJsonFile(file: File) {
-    if (!file.name.toLowerCase().endsWith('.json')) {
-        throw new Error('Please choose a .json file exported from Quarks.');
+    let json: unknown;
+    try {
+        json = JSON.parse(await file.text());
+    } catch {
+        throw new Error(`"${file.name}" is not a JSON effect exported from Quarks.`);
     }
 
     const token = ++loadToken;
     createBaseScene();
     camera.setPosition(new BVector3(0, 8, 18));
 
-    const json = JSON.parse(await file.text());
     const trackedSystems: ParticleSystem[] = [];
     loadQuarksFromJson(scene, batchRenderer, trackedSystems, json);
 
@@ -160,14 +162,22 @@ async function loadDroppedJsonFile(file: File) {
     updateSourceLink();
 }
 
-/** Picks the first JSON file from a drag-and-drop or file-input event. */
-function getJsonFileFromDataTransfer(dataTransfer: DataTransfer | null): File | null {
-    if (!dataTransfer?.files?.length) {
-        return null;
-    }
-    for (let i = 0; i < dataTransfer.files.length; i++) {
-        const file = dataTransfer.files[i];
-        if (file.name.toLowerCase().endsWith('.json')) {
+/** Whether a file's first character, past a byte-order mark and whitespace, opens a JSON object. */
+async function looksLikeJsonObject(file: File): Promise<boolean> {
+    const head = await file.slice(0, 512).text();
+    return head
+        .replace(/^\uFEFF/, '')
+        .trimStart()
+        .startsWith('{');
+}
+
+/**
+ * Picks the first dropped file whose content is a JSON object. Takes the files as an array:
+ * the browser may clear the DataTransfer once the drop handler awaits, so it is copied first.
+ */
+async function pickJsonObjectFile(files: File[]): Promise<File | null> {
+    for (const file of files) {
+        if (await looksLikeJsonObject(file)) {
             return file;
         }
     }
@@ -268,7 +278,7 @@ function setupJsonImportUi() {
         dragDepth = 0;
         setDropOverlayVisible(false);
 
-        const file = getJsonFileFromDataTransfer(event.dataTransfer);
+        const file = await pickJsonObjectFile(Array.from(event.dataTransfer.files));
         if (!file) {
             return;
         }

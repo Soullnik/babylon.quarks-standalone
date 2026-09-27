@@ -46,7 +46,7 @@ export function collectSystems(tree: EffectTreeNode): ParticleSystem[] {
 }
 
 interface SerializeMeta {
-    textures: {[k: string]: {url?: string; name?: string; invertY?: boolean}};
+    textures: {[k: string]: {url?: string; name?: string; invertY?: boolean; noMipmap?: boolean}};
     materials: {[k: string]: {[key: string]: unknown}};
     geometries: {[k: string]: unknown};
 }
@@ -120,9 +120,11 @@ function finishEnvelope(object: Record<string, unknown>, meta: SerializeMeta): s
     const textures: Array<{uuid: string; image?: string; invertY?: boolean; noMipmap?: boolean}> = [];
     for (const [uuid, tex] of Object.entries(meta.textures)) {
         const url = tex?.url ?? tex?.name;
+        // Sampling flags come from the texture itself. The reflection atlas is built with
+        // invertY:false and no mips (see envAtlas.ts / the Unity exporter), so it carries them
+        // like any other texture — no need to recognise it by name.
         const invertY = typeof tex?.invertY === 'boolean' ? tex.invertY : undefined;
-        const isEnvAtlas =
-            tex?.name === 'quarksEnvAtlas' || (typeof tex?.name === 'string' && tex.name.endsWith('_envAtlas'));
+        const noMipmap = typeof tex?.noMipmap === 'boolean' ? tex.noMipmap : undefined;
         if (url) {
             const imageUuid = `${uuid}-image`;
             images.push({uuid: imageUuid, url});
@@ -130,8 +132,10 @@ function finishEnvelope(object: Record<string, unknown>, meta: SerializeMeta): s
                 uuid,
                 image: imageUuid,
             };
-            if (invertY === false || isEnvAtlas) {
+            if (invertY === false) {
                 entry.invertY = false;
+            }
+            if (noMipmap === true) {
                 entry.noMipmap = true;
             }
             textures.push(entry);

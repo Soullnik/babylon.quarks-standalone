@@ -97,15 +97,19 @@ gradients sample both color and alpha keys.
   the Z axis only.
 - **Texture Sheet Animation:** the frame animation is exported as a full linear sweep over the
   sheet; Unity's `frameOverTime` curve / cycle semantics aren't mapped 1:1.
-- **Blend mode** is read from the material's actual blend state — `_SrcBlend`/`_DstBlend` and
-  `_BlendOp` (or the `_BUILTIN_` spellings Shader Graph's Built-In target generates), then the
-  `Blend` surface option. Additive, alpha, premultiplied, multiply and subtract are all
-  recognised. Only a material that exposes none of that falls back to matching keywords in the
-  shader's *name*, and that fallback logs a warning naming the material, because a shader's name
-  is free text and can disagree with what it actually draws. The exported material records which
-  source was used in `blendModeSource`.
-- **Mesh env map:** if the particle material exposes a Cubemap (`_Cube`, `_Cubemap`,
-  `_ReflectionCubemap`, …, or any Cubemap-typed texture property), it is baked into a 3×2
+- **Blend mode** is read from data only, never from the shader's name: first the shader's ShaderLab
+  source when it is a file in the project (its `Blend` / `BlendOp` statements, with `[_Property]`
+  references resolved through the material), then the `_SrcBlend` / `_DstBlend` / `_BlendOp`
+  properties (or the `_BUILTIN_` spellings Shader Graph generates), then the `Blend` surface
+  option. Additive, alpha, premultiplied, multiply and subtract are recognised; for
+  `One / OneMinusSrcAlpha` the `_ALPHAPREMULTIPLY_ON` keyword decides whether the shader
+  premultiplies itself (→ alpha blend) or the texture is premultiplied (→ premultiplied). The
+  exported material records the source in `blendModeSource`. Unity's built-in shaders that
+  hard-code their blend (Legacy Shaders/Particles/\*, Mobile/Particles/\*) have neither source
+  nor properties to read, so they export as alpha blend with a console warning naming the
+  material — switch them to Particles/Standard Unlit or URP Particles/Unlit, which expose it.
+- **Mesh env map:** if the material's shader declares a Cube-dimension texture property with a
+  cubemap bound (whatever the property is called), it is baked into a 3×2
   `reflectionAtlas` (px py pz / nx ny nz) so babylon.quarks can sample reflections on iOS.
   Materials without a cubemap export lit/diffuse only. Skybox is not used as a fallback.
 - Modules with no quarks counterpart (Lights, Trails ribbon, Custom Data, Collision triggers) are

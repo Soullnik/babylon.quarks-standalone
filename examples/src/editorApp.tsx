@@ -18,10 +18,20 @@ function resolveInitialEffect(): unknown {
     return undefined;
 }
 
+/**
+ * Which glTF container a file is, from its bytes: binary glTF opens with the ASCII magic "glTF";
+ * anything else is handed to the JSON .gltf loader. The file name is not consulted.
+ */
+async function gltfContainer(file: File): Promise<'.glb' | '.gltf'> {
+    const magic = new Uint8Array(await file.slice(0, 4).arrayBuffer());
+    const isBinary =
+        magic.length === 4 && magic[0] === 0x67 && magic[1] === 0x6c && magic[2] === 0x54 && magic[3] === 0x46;
+    return isBinary ? '.glb' : '.gltf';
+}
+
 /** Loads a user GLB/glTF and returns its first mesh's vertex buffers for the Mesh render mode. */
 async function loadGeometryFromFile(file: File, scene: Scene): Promise<GeometryData> {
-    const ext = file.name.toLowerCase().endsWith('.gltf') ? '.gltf' : '.glb';
-    const result = await SceneLoader.ImportMeshAsync('', '', file, scene, null, ext);
+    const result = await SceneLoader.ImportMeshAsync('', '', file, scene, null, await gltfContainer(file));
     try {
         const mesh = result.meshes.find(
             (m) => m.getTotalVertices() > 0 && m.getVerticesData(VertexBuffer.PositionKind)
