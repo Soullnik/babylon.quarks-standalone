@@ -31,6 +31,12 @@ Working hypothesis from the code read below: most of the visible loss is in **C*
 
 ## 2. Phase 0 — build the reference corpus
 
+> **Now automated.** [`tools/unity-parity-capture`](../tools/unity-parity-capture) does all of
+> §2.2 and most of §3 inside Unity in one run — exports, colour space and pipeline settings, a
+> measured blend per material, deterministic simulation data and rendered frames — and writes a
+> single archive to hand over. The manual procedure below is kept as the reference for what that
+> archive has to contain.
+
 Nothing here is automatable from this side: Claude cannot open Unity. This is the manual part, and
 everything downstream depends on it being captured *once*, properly.
 
