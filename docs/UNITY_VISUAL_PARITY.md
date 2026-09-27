@@ -132,7 +132,12 @@ Reading the result:
 - curves disagree → **stage A or B**, go to §4.8–§4.11, and the metric that diverges tells you
   which module (alive count → emission/lifetime; bbox → shape/velocity; size → size-over-life)
 
-### 3.3 Export audit (`scripts/unity-export-audit`, C# side)
+### 3.3 Export audit — shipped as `tools/unity-effect-audit`
+
+**Built, and it needs no Unity at all.** Unity serializes prefabs, materials, shader graphs and
+texture importers as YAML, so the audit reads the effect description straight off disk and applies
+the exporter's decision table to it. See the [tool](../tools/unity-effect-audit) and the
+[first results](./UNITY_PARITY_AUDIT_HOVL.md). The original plan, for reference:
 
 Walk the Unity `ParticleSystem` and the JSON it produced, and print **every module Unity had
 enabled that produced nothing in the output**. Today the exporter drops things silently
@@ -151,6 +156,13 @@ from "looks preserved" into a number.
 
 Each is stated as a claim about this codebase, with the experiment that settles it. Ordered by
 expected visual impact × number of effects affected.
+
+> **Since measured.** [`UNITY_PARITY_AUDIT_HOVL.md`](./UNITY_PARITY_AUDIT_HOVL.md) ran the
+> [export audit](../tools/unity-effect-audit) (§3.3) over a real 51-system pack and settled
+> several of these. §4.2 is confirmed and is the top cause, but through the *material's* HDR
+> multiplier rather than gradient colours; §4.4 and §4.8 did not apply at all; and the audit found
+> a cause not listed here — emitter shape transforms, which neither the exporter nor `quarks.core`
+> supports. Read that document before spending time on the ranking below.
 
 ### 4.1 No colour-space management anywhere — *top suspect*
 

@@ -7,3 +7,7 @@
 .DS_Store
 npm-debug.log*
 **/*.tsbuildinfo
+
+# python bytecode (tools/unity-effect-audit)
+__pycache__/
+*.pyc
