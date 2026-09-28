@@ -3,7 +3,7 @@ using System.Reflection;
 using UnityEngine;
 using UnityEngine.Rendering;
 
-namespace BabylonQuarks.ParityCapture
+namespace BabylonQuarks.UnityExporter
 {
     /// <summary>
     /// Renders a camera into its target texture, checking once that it actually works.
@@ -13,7 +13,7 @@ namespace BabylonQuarks.ParityCapture
     /// honours, the first render clears to a probe colour and reads it back: the path that puts
     /// that colour into the texture is the one used from then on.
     /// </summary>
-    internal static class ParityCameraRender
+    public static class OffscreenRender
     {
         private enum Path { Unknown, CameraRender, SubmitRenderRequest, None }
 
@@ -21,13 +21,18 @@ namespace BabylonQuarks.ParityCapture
         private static MethodInfo _submit;
         private static Type _requestType;
 
+        /// <summary>The path in use, for logs: Unknown until the first render.</summary>
         public static string PathName => _path.ToString();
 
+        /// <summary>Whether the last detection found a path that renders at all.</summary>
+        public static bool Works => _path == Path.CameraRender || _path == Path.SubmitRenderRequest;
+
+        /// <summary>Forgets the path, so the next render detects it again (a new kind of target).</summary>
         public static void Reset() => _path = Path.Unknown;
 
-        public static void Render(Camera camera, RenderTexture target, ParityLog log)
+        public static void Render(Camera camera, RenderTexture target)
         {
-            if (_path == Path.Unknown) Detect(camera, target, log);
+            if (_path == Path.Unknown) Detect(camera, target);
             switch (_path)
             {
                 case Path.SubmitRenderRequest:
@@ -41,7 +46,7 @@ namespace BabylonQuarks.ParityCapture
             }
         }
 
-        private static void Detect(Camera camera, RenderTexture target, ParityLog log)
+        private static void Detect(Camera camera, RenderTexture target)
         {
             Color saved = camera.backgroundColor;
             CameraClearFlags savedFlags = camera.clearFlags;
@@ -56,7 +61,7 @@ namespace BabylonQuarks.ParityCapture
                 {
                     _path = Path.CameraRender;
                 }
-                else if (PrepareSubmit(camera))
+                else if (PrepareSubmit())
                 {
                     Clear(target);
                     Submit(camera, target);
@@ -69,7 +74,7 @@ namespace BabylonQuarks.ParityCapture
             }
             catch (Exception e)
             {
-                log.Note("render path detection threw: " + e.GetBaseException().Message);
+                Debug.Log("[Quarks] Render path detection threw: " + e.GetBaseException().Message);
                 _path = Path.None;
             }
             finally
@@ -79,12 +84,15 @@ namespace BabylonQuarks.ParityCapture
             }
             if (_path == Path.None)
             {
-                Debug.LogError("[Quarks Parity] Neither Camera.Render nor SubmitRenderRequest rendered into a texture — frames and blend probes will be empty.");
+                Debug.LogWarning("[Quarks] Neither Camera.Render nor SubmitRenderRequest rendered into a texture.");
             }
-            log.Note("camera render path: " + _path);
+            else
+            {
+                Debug.Log("[Quarks] Camera render path: " + _path);
+            }
         }
 
-        private static bool PrepareSubmit(Camera camera)
+        private static bool PrepareSubmit()
         {
             if (_submit != null) return true;
             _requestType = typeof(RenderPipeline).GetNestedType("StandardRequest", BindingFlags.Public);

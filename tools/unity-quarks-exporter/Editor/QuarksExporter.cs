@@ -177,7 +177,14 @@ namespace BabylonQuarks.UnityExporter
         /// <summary>Serializes a GameObject hierarchy into the Quarks JSON envelope string.</summary>
         public static string Export(GameObject root)
         {
-            var ctx = new ExportContext();
+            using (var ctx = new ExportContext())
+            {
+                return Export(root, ctx);
+            }
+        }
+
+        private static string Export(GameObject root, ExportContext ctx)
+        {
 
             // Pass 1: assign a stable node uuid to every transform (emitters too), then flag which
             // systems are sub-emitter targets — so their nodes serialize with onlyUsedByOther=true

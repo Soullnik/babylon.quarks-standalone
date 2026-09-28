@@ -12,7 +12,7 @@ namespace BabylonQuarks.UnityExporter
     /// Quarks envelope while the hierarchy is serialized, and holds the node-uuid maps used to
     /// wire sub-emitters. Textures are embedded as data URIs so the exported JSON is self-contained.
     /// </summary>
-    public class ExportContext
+    public class ExportContext : IDisposable
     {
         public readonly JArray Geometries = new JArray();
         public readonly JArray Materials = new JArray();
@@ -26,6 +26,20 @@ namespace BabylonQuarks.UnityExporter
         public int LastBlendMode = 2;
 
         public bool EmbedTextures = true;
+
+        /// <summary>
+        /// Render each material once to measure its colour gain and, when its blend cannot be
+        /// read, its blend (see <see cref="MaterialProbe"/>). Off, materials export untinted.
+        /// </summary>
+        public bool MeasureMaterials = true;
+
+        private MaterialProbe _probe;
+
+        public void Dispose()
+        {
+            _probe?.Dispose();
+            _probe = null;
+        }
 
         /// <summary>Mesh nodes emitted for mesh-shape emitters; appended to the root object's children.</summary>
         public readonly System.Collections.Generic.List<JObject> MeshSourceNodes = new System.Collections.Generic.List<JObject>();
@@ -66,6 +80,40 @@ namespace BabylonQuarks.UnityExporter
             Texture tex = mat != null ? mat.mainTexture : null;
             string textureUuid = tex != null ? AddTexture(tex) : null;
             LastBlendMode = DetectBlend(mat, out string blendSource);
+            MaterialProbe.Result measured = default(MaterialProbe.Result);
+            if (mat != null && MeasureMaterials)
+            {
+                if (_probe == null) _probe = new MaterialProbe();
+                measured = _probe.Measure(mat);
+            }
+            if (LastBlendMode == AlphaUnknown)
+            {
+                if (measured.Measured && measured.BlendMode != AlphaUnknown)
+                {
+                    LastBlendMode = measured.BlendMode;
+                    blendSource = "measured";
+                }
+                else
+                {
+                    Debug.LogWarning(
+                        $"[Quarks Exporter] Material '{mat.name}': blend mode not readable — {blendSource}, " +
+                        $"and rendering it did not settle it either ({measured.Summary ?? "not measured"}). " +
+                        "Exported as alpha blend; check it in the effect, or switch the material to a shader " +
+                        "that exposes its blend (e.g. Particles/Standard Unlit, URP Particles/Unlit).");
+                    LastBlendMode = AlphaCombine;
+                    blendSource = "default";
+                }
+            }
+            else if (measured.Measured && measured.BlendMode != AlphaUnknown && measured.BlendMode != LastBlendMode)
+            {
+                // What the material renders beats what its declarations say — a shader can do
+                // its own premultiplying, say, which no Blend statement shows.
+                Debug.LogWarning(
+                    $"[Quarks Exporter] Material '{mat.name}': its {blendSource} read as alpha mode {LastBlendMode}, " +
+                    $"but rendered it blends as {measured.BlendMode} ({measured.Summary}). Exporting what it renders.");
+                LastBlendMode = measured.BlendMode;
+                blendSource = "measured";
+            }
 
             string reflectionAtlasUuid = null;
             float reflectionLevel = 1f;
@@ -101,9 +149,27 @@ namespace BabylonQuarks.UnityExporter
                 m.Set("reflectionAtlas", reflectionAtlasUuid);
                 m.Set("reflectionLevel", reflectionLevel);
             }
+            if (PlayerSettings.colorSpace == ColorSpace.Linear)
+            {
+                // A Linear project hands its particle shaders the particle colour as it is, as a
+                // linear value; only textures are decoded. Tell the runtime to do the same.
+                m.Set("vertexColorSpace", "linear");
+            }
+            if (measured.Measured && !IsUntinted(measured.Tint))
+            {
+                // The linear-space gain the material puts on the particle colour — an HDR colour
+                // or intensity, whatever its shader calls it — measured, not read off a property.
+                Vector4 t = measured.Tint;
+                m.Set("tint", new JArray().Add(Round4(t.x)).Add(Round4(t.y)).Add(Round4(t.z)).Add(Round4(t.w)));
+            }
             Materials.Add(m);
             return uuid;
         }
+
+        private static bool IsUntinted(Vector4 t) =>
+            Mathf.Abs(t.x - 1f) < 0.01f && Mathf.Abs(t.y - 1f) < 0.01f && Mathf.Abs(t.z - 1f) < 0.01f && Mathf.Abs(t.w - 1f) < 0.01f;
+
+        private static double Round4(float v) => Math.Round(v, 4);
 
         private string AddTexture(Texture tex, bool envAtlas = false)
         {
@@ -350,7 +416,10 @@ namespace BabylonQuarks.UnityExporter
                         string mime = WebImageMimeType(bytes);
                         if (mime != null)
                         {
-                            return "data:" + mime + ";base64," + Convert.ToBase64String(bytes);
+                            byte[] imported = WithImportedAlpha(path, bytes);
+                            return imported != null
+                                ? "data:image/png;base64," + Convert.ToBase64String(imported)
+                                : "data:" + mime + ";base64," + Convert.ToBase64String(bytes);
                         }
                     }
                     catch (Exception e)
@@ -374,6 +443,48 @@ namespace BabylonQuarks.UnityExporter
                     $"[Quarks Exporter] Texture '{tex.name}' could not be embedded; the effect will reference '{path}' and will not load outside Unity.");
             }
             return !string.IsNullOrEmpty(path) ? path : tex.name;
+        }
+
+        /// <summary>
+        /// The file's pixels with the alpha Unity's importer gives them, as a PNG — or null when
+        /// that is the file's own alpha and the file can go out unchanged. The importer's Alpha
+        /// Source can take alpha from the colour's grayscale or drop it, and particle textures are
+        /// very often imported that way from files with no alpha of their own: embedded as they
+        /// are, those draw as opaque squares.
+        /// </summary>
+        private static byte[] WithImportedAlpha(string path, byte[] fileBytes)
+        {
+            var importer = AssetImporter.GetAtPath(path) as TextureImporter;
+            if (importer == null || importer.alphaSource == TextureImporterAlphaSource.FromInput) return null;
+            bool fromGray = importer.alphaSource == TextureImporterAlphaSource.FromGrayScale;
+            var decoded = new Texture2D(2, 2, TextureFormat.RGBA32, false);
+            Texture2D output = null;
+            try
+            {
+                if (!decoded.LoadImage(fileBytes)) return null;
+                Color32[] pixels = decoded.GetPixels32();
+                for (int i = 0; i < pixels.Length; i++)
+                {
+                    Color32 c = pixels[i];
+                    // Color.grayscale's weights, on the stored (gamma) values, as the importer does.
+                    pixels[i].a = fromGray ? (byte)Mathf.RoundToInt(0.299f * c.r + 0.587f * c.g + 0.114f * c.b) : (byte)255;
+                }
+                // A file without alpha decodes to a format without it; write into one that has it.
+                output = new Texture2D(decoded.width, decoded.height, TextureFormat.RGBA32, false);
+                output.SetPixels32(pixels);
+                output.Apply(false);
+                return output.EncodeToPNG();
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning($"[Quarks Exporter] Could not apply the imported alpha of '{path}', embedding the file as it is: {e.Message}");
+                return null;
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(decoded);
+                if (output != null) UnityEngine.Object.DestroyImmediate(output);
+            }
         }
 
         /// <summary>
@@ -492,12 +603,12 @@ namespace BabylonQuarks.UnityExporter
         /// <summary>
         /// Babylon alpha-mode constants (Constants.ALPHA_*), the numbering `alphaMode` carries.
         /// </summary>
-        private const int AlphaAdd = 1;
-        private const int AlphaCombine = 2;
-        private const int AlphaSubtract = 3;
-        private const int AlphaMultiply = 4;
-        private const int AlphaPremultiplied = 7;
-        private const int AlphaUnknown = -1;
+        internal const int AlphaAdd = 1;
+        internal const int AlphaCombine = 2;
+        internal const int AlphaSubtract = 3;
+        internal const int AlphaMultiply = 4;
+        internal const int AlphaPremultiplied = 7;
+        internal const int AlphaUnknown = -1;
 
         /// <summary>
         /// Resolve a material's blend mode from data only — never from the name of the shader,
@@ -511,8 +622,9 @@ namespace BabylonQuarks.UnityExporter
         /// 3. The `Blend` surface option those shaders serialize one level up.
         ///
         /// When none of that is readable — a Unity built-in shader with a hard-coded blend has no
-        /// source on disk and no properties — the export falls back to alpha blend and says so
-        /// in the console, naming the material. It does not guess.
+        /// source on disk and no properties — this returns AlphaUnknown with the reason in
+        /// <paramref name="source"/>, and the caller measures the material by rendering it
+        /// (<see cref="MaterialProbe"/>). It does not guess.
         /// </summary>
         private static int DetectBlend(Material mat, out string source)
         {
@@ -556,16 +668,12 @@ namespace BabylonQuarks.UnityExporter
                 }
             }
 
-            string why = fromSource == ShaderSourceBlend.Opaque
+            source = fromSource == ShaderSourceBlend.Opaque
                 ? "its shader source declares no blending (opaque), which quarks particles cannot express"
                 : fromSource == ShaderSourceBlend.Factors
                     ? $"its shader's blend (src {(BlendMode)sourceSrc}, dst {(BlendMode)sourceDst}, op {sourceOp}) has no quarks equivalent"
                     : "its shader exposes no blend properties and has no ShaderLab source in the project";
-            Debug.LogWarning(
-                $"[Quarks Exporter] Material '{mat.name}': blend mode not readable — {why}. " +
-                "Exported as alpha blend; check it in the effect, or switch the material to a shader " +
-                "that exposes its blend (e.g. Particles/Standard Unlit, URP Particles/Unlit).");
-            return AlphaCombine;
+            return AlphaUnknown;
         }
 
         /// <summary>

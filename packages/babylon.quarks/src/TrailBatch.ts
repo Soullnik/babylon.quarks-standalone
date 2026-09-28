@@ -160,6 +160,7 @@ export class TrailBatch extends VFXBatch {
         if (this.settings.texture) {
             samplers.push('map');
         }
+        this.addColorDefines(defines, uniforms);
 
         const mat = new ShaderMaterial(
             shaderName,
@@ -184,6 +185,7 @@ export class TrailBatch extends VFXBatch {
         const resolution = new BVector2(engine.getRenderWidth(), engine.getRenderHeight());
         mat.setVector2('resolution', resolution);
         mat.setFloat('sizeAttenuation', 1);
+        this.bindColorUniforms(mat);
         mat.onBindObservable.add(() => {
             const renderEngine = this.scene.getEngine();
             const width = renderEngine.getRenderWidth();

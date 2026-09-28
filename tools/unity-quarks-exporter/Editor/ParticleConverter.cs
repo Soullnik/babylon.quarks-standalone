@@ -1,3 +1,4 @@
+using UnityEditor;
 using UnityEngine;
 
 namespace BabylonQuarks.UnityExporter
@@ -46,6 +47,12 @@ namespace BabylonQuarks.UnityExporter
             if (geometryUuid != null)
             {
                 obj.Set("instancingGeometry", geometryUuid);
+            }
+
+            JObject shapeTransform = BuildShapeTransform(ps.shape);
+            if (shapeTransform != null)
+            {
+                obj.Set("shapeTransform", shapeTransform);
             }
 
             BuildTextureSheet(ps, obj, behaviors);
@@ -184,14 +191,20 @@ namespace BabylonQuarks.UnityExporter
             if (!e.enabled || e.burstCount == 0) return arr;
             var bursts = new ParticleSystem.Burst[e.burstCount];
             e.GetBursts(bursts);
+            float duration = ps.main.duration;
             foreach (var b in bursts)
             {
+                float interval = Mathf.Max(0.001f, b.repeatInterval);
+                // Unity's 0 cycles means "repeat until the loop ends": that many waves fit.
+                int cycles = b.cycleCount > 0
+                    ? b.cycleCount
+                    : Mathf.Max(1, Mathf.CeilToInt((duration - b.time) / interval - 1e-4f));
                 arr.Add(new JObject()
                     .Set("time", b.time)
                     .Set("count", ValueConverter.Curve(b.count))
                     .Set("probability", b.probability)
-                    .Set("interval", Mathf.Max(0.001f, b.repeatInterval))
-                    .Set("cycle", Mathf.Max(1, b.cycleCount)));
+                    .Set("interval", interval)
+                    .Set("cycle", cycles));
             }
             return arr;
         }
@@ -200,7 +213,9 @@ namespace BabylonQuarks.UnityExporter
 
         private static JToken BuildShape(ParticleSystem.ShapeModule shape, ExportContext ctx)
         {
-            if (!shape.enabled) return new JObject().Set("type", "point");
+            // With the module off Unity emits from the system's origin straight along +Z — a cone
+            // of no radius and no angle, not quarks' point, which sprays in every direction.
+            if (!shape.enabled) return ShapeBase("cone", 0f, 2f * Mathf.PI, 1f).Set("angle", 0f);
 
             float arc = shape.arc * Mathf.Deg2Rad;
             float thickness = shape.radiusThickness;
@@ -228,6 +243,24 @@ namespace BabylonQuarks.UnityExporter
                     // Box/Edge and other volumes have no direct quarks equivalent yet.
                     return new JObject().Set("type", "point");
             }
+        }
+
+        /// <summary>
+        /// The Shape module's Position / Rotation / Scale, which move the shape inside its system
+        /// (a cone turned to point up, a sphere stretched into a column). Null when they leave the
+        /// shape where it is, and when the module is off — Unity ignores them then.
+        /// </summary>
+        private static JObject BuildShapeTransform(ParticleSystem.ShapeModule shape)
+        {
+            if (!shape.enabled) return null;
+            Vector3 p = shape.position;
+            Quaternion q = Quaternion.Euler(shape.rotation);
+            Vector3 s = shape.scale;
+            if (p == Vector3.zero && s == Vector3.one && Quaternion.Angle(q, Quaternion.identity) < 1e-3f) return null;
+            return new JObject()
+                .Set("position", new JArray().Add(p.x).Add(p.y).Add(p.z))
+                .Set("rotation", new JArray().Add(q.x).Add(q.y).Add(q.z).Add(q.w))
+                .Set("scale", new JArray().Add(s.x).Add(s.y).Add(s.z));
         }
 
         private static JObject ShapeBase(string type, float radius, float arc, float thickness)
@@ -264,9 +297,18 @@ namespace BabylonQuarks.UnityExporter
             {
                 // Unity Velocity Scale → speedFactor, Length Scale → lengthFactor, both faithfully
                 // (the runtime keeps the stretch aligned to velocity even when speedFactor is 0).
-                return new JObject()
+                var settings = new JObject()
                     .Set("speedFactor", renderer.velocityScale)
                     .Set("lengthFactor", renderer.lengthScale);
+                // Freeform Stretching (Unity 2022.2+) centres the particle and scales it along its
+                // travel instead of trailing it back from the particle. Read from the serialized
+                // renderer, so older editors, which have no such setting, simply leave it out.
+                SerializedProperty freeform = new SerializedObject(renderer).FindProperty("m_FreeformStretching");
+                if (freeform != null && freeform.propertyType == SerializedPropertyType.Boolean && freeform.boolValue)
+                {
+                    settings.Set("freeform", true);
+                }
+                return settings;
             }
             return new JObject();
         }

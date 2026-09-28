@@ -83,6 +83,30 @@ function fallbackUVsForPositions(positions: Float32Array): Float32Array {
 }
 const DEFAULT_INDICES = new Uint32Array([0, 1, 2, 0, 2, 3]);
 
+function isTinted(tint: readonly number[] | undefined): boolean {
+    return tint !== undefined && (tint[0] !== 1 || tint[1] !== 1 || tint[2] !== 1 || tint[3] !== 1);
+}
+
+function copyShapeTransform(t: ShapeTransform): ShapeTransform {
+    return {
+        position: [t.position[0], t.position[1], t.position[2]],
+        rotation: [t.rotation[0], t.rotation[1], t.rotation[2], t.rotation[3]],
+        scale: [t.scale[0], t.scale[1], t.scale[2]],
+    };
+}
+
+/**
+ * Where the emitter shape sits inside its system — an offset, turn and stretch applied to each
+ * particle's spawn position and direction, the way Unity's Shape module Position / Rotation /
+ * Scale work. The system's own transform (and so its simulation space) is not affected.
+ */
+export interface ShapeTransform {
+    position: [number, number, number];
+    /** Quaternion x, y, z, w. */
+    rotation: [number, number, number, number];
+    scale: [number, number, number];
+}
+
 export interface ParticleSystemParameters {
     autoDestroy?: boolean;
     looping?: boolean;
@@ -99,6 +123,7 @@ export interface ParticleSystemParameters {
     emissionOverTime?: ValueGenerator | FunctionValueGenerator;
     emissionOverDistance?: ValueGenerator | FunctionValueGenerator;
     emissionBursts?: Array<BurstParameters>;
+    shapeTransform?: ShapeTransform | null;
     onlyUsedByOther?: boolean;
     behaviors?: Array<Behavior>;
     instancingGeometry?: Float32Array;
@@ -152,6 +177,7 @@ export interface ParticleSystemJSONParameters {
     emissionOverTime: FunctionJSON;
     emissionOverDistance: FunctionJSON;
     emissionBursts?: Array<BurstParametersJSON>;
+    shapeTransform?: ShapeTransform;
     onlyUsedByOther: boolean;
     rendererEmitterSettings: RendererEmitterSettings;
     instancingGeometry?: any;
@@ -214,6 +240,10 @@ export class ParticleSystem implements IParticleSystem {
     /** Column storage shared by this system's particles. */
     readonly store: ParticleStore = new ParticleStore(64);
     emitterShape: EmitterShape;
+    private shapeTransformValue: ShapeTransform | null = null;
+    /** shapeTransform as a matrix for positions, and its linear part for directions. */
+    private shapeMatrix: Matrix4 | null = null;
+    private shapeLinear: Matrix3 | null = null;
     emitter: ParticleEmitter;
     rendererSettings: VFXBatchSettings;
     neededToUpdateRender: boolean;
@@ -271,8 +301,11 @@ export class ParticleSystem implements IParticleSystem {
         if (state.waitEmiting > 0) {
             return true;
         }
-        if (state.burstIndex < this.emissionBursts.length) {
-            return true;
+        for (const burst of this.emissionBursts) {
+            const last = burst.time + (this.burstWaveCount(burst) - 1) * burst.interval;
+            if (last >= state.time) {
+                return true;
+            }
         }
         if (state.time >= this.duration) {
             return false;
@@ -282,6 +315,40 @@ export class ParticleSystem implements IParticleSystem {
             return true;
         }
         return this.emissionOverDistance.genValue(this.memory, timeRatio) > 0;
+    }
+
+    /** See {@link ShapeTransform}; null when the shape sits at the system's origin, unturned. */
+    get shapeTransform(): ShapeTransform | null {
+        return this.shapeTransformValue;
+    }
+
+    set shapeTransform(value: ShapeTransform | null) {
+        this.shapeTransformValue = value;
+        if (!value) {
+            this.shapeMatrix = null;
+            this.shapeLinear = null;
+            return;
+        }
+        this.shapeMatrix = new Matrix4().compose(
+            new Vector3(...value.position),
+            new Quaternion(...value.rotation),
+            new Vector3(...value.scale)
+        );
+        this.shapeLinear = new Matrix3().setFromMatrix4(this.shapeMatrix);
+    }
+
+    /**
+     * How many times a burst fires in one loop: its cycle count, `interval` apart, cut at the
+     * end of the duration as Unity does — a wave past it never comes round before the loop
+     * restarts. The first wave always counts, wherever it falls; without a positive interval
+     * there is nothing to space the others by, and the burst fires once.
+     */
+    private burstWaveCount(burst: BurstParameters): number {
+        const cycles = Math.max(1, Math.floor(burst.cycle || 1));
+        if (cycles === 1 || !(burst.interval > 0)) {
+            return 1;
+        }
+        return Math.min(cycles, Math.max(1, Math.ceil((this.duration - burst.time) / burst.interval - 1e-9)));
     }
 
     /** Non-looping system with no particles left and nothing left to emit. */
@@ -470,6 +537,7 @@ export class ParticleSystem implements IParticleSystem {
         this.emissionBursts = parameters.emissionBursts ?? [];
         this.onlyUsedByOther = parameters.onlyUsedByOther ?? false;
         this.emitterShape = parameters.shape ?? new SphereEmitter();
+        this.shapeTransform = parameters.shapeTransform ?? null;
         this.behaviors = parameters.behaviors ?? [];
         this.worldSpace = parameters.worldSpace ?? false;
         this.rendererEmitterSettings = parameters.rendererEmitterSettings ?? {};
@@ -509,6 +577,8 @@ export class ParticleSystem implements IParticleSystem {
             reflectionFaces: null,
             reflectionAtlas: null,
             layerMask: parameters.layerMask ?? 0x0fffffff,
+            materialTint: [1, 1, 1, 1],
+            vertexColorLinear: false,
         };
         if (this.rendererSettings.renderMode === RenderMode.Mesh && !this.rendererSettings.instancingNormals) {
             this.rendererSettings.instancingNormals = ParticleSystem.createFallbackNormals(
@@ -660,6 +730,12 @@ export class ParticleSystem implements IParticleSystem {
         // still trips GL_INVALID_OPERATION on iOS. Prefer a single atlas.
         this.rendererSettings.reflectionFaces =
             material?.reflectionFaces?.length === 6 ? material.reflectionFaces : null;
+        const tint = material?.tint;
+        this.rendererSettings.materialTint =
+            Array.isArray(tint) && tint.length >= 3
+                ? [Number(tint[0]), Number(tint[1]), Number(tint[2]), tint.length > 3 ? Number(tint[3]) : 1]
+                : [1, 1, 1, 1];
+        this.rendererSettings.vertexColorLinear = material?.vertexColorSpace === 'linear';
         this.rendererSettings.materialBlendMode = resolvedBlendMode;
         this.rendererSettings.materialTransparent = resolvedTransparent;
         this.rendererSettings.materialDepthTest = resolvedDepthTest;
@@ -805,6 +881,14 @@ export class ParticleSystem implements IParticleSystem {
             }
 
             this.emitterShape.initialize(particle, emissionState);
+            if (this.shapeMatrix) {
+                particle.position.applyMatrix4(this.shapeMatrix);
+                // Turned and stretched like the shape, at the speed the shape gave it.
+                const speed = particle.velocity.length();
+                if (speed > 0) {
+                    particle.velocity.applyMatrix3(this.shapeLinear!).setLength(speed);
+                }
+            }
 
             if (isTrailMode && followLocalOrigin) {
                 const trail = particle as TrailParticle;
@@ -1194,9 +1278,13 @@ export class ParticleSystem implements IParticleSystem {
     }
 
     emit(delta: number, emissionState: EmissionState, emitterMatrix: Matrix4) {
+        // Bursts fire for the waves due in [burstFrom, time + delta); a wrap starts
+        // the window at 0 so a wave at the very start of the loop is not skipped.
+        let burstFrom = emissionState.time;
         if (emissionState.time > this.duration) {
             if (this.looping) {
                 emissionState.time -= this.duration;
+                burstFrom = 0;
                 emissionState.burstIndex = 0;
                 for (let i = 0; i < this.behaviors.length; i++) {
                     this.behaviors[i].reset();
@@ -1217,20 +1305,31 @@ export class ParticleSystem implements IParticleSystem {
         const emissionBurstCount = emissionBursts.length;
         const qualityFactor = this.qualityFactor;
 
-        while (
-            emissionState.burstIndex < emissionBurstCount &&
-            emissionBursts[emissionState.burstIndex].time <= emissionState.time
-        ) {
-            const burst = emissionBursts[emissionState.burstIndex];
-            if (Math.random() < burst.probability) {
-                const rawCount = burst.count.genValue(this.memory, this.time);
-                const count = qualityFactor >= 0.999 ? rawCount : Math.floor(rawCount * qualityFactor);
-                emissionState.isBursting = true;
-                emissionState.burstParticleCount = count;
-                this.spawn(count, emissionState, emitterMatrix);
-                emissionState.isBursting = false;
+        const burstTo = emissionState.time + delta;
+        for (let b = 0; b < emissionBurstCount; b++) {
+            const burst = emissionBursts[b];
+            const waves = this.burstWaveCount(burst);
+            // First wave due at or after burstFrom; the ones before fired in an earlier step.
+            // At most one fires per step, as in Unity: a burst repeating faster than the
+            // simulation steps comes out once a step, and the waves in between never do.
+            let wave =
+                burst.time >= burstFrom || waves === 1
+                    ? 0
+                    : Math.ceil((burstFrom - burst.time) / burst.interval - 1e-9);
+            for (; wave < waves; wave++) {
+                const at = burst.time + wave * burst.interval;
+                if (at >= burstTo) break;
+                if (at < burstFrom) continue;
+                if (Math.random() < burst.probability) {
+                    const rawCount = burst.count.genValue(this.memory, this.time);
+                    const count = qualityFactor >= 0.999 ? rawCount : Math.floor(rawCount * qualityFactor);
+                    emissionState.isBursting = true;
+                    emissionState.burstParticleCount = count;
+                    this.spawn(count, emissionState, emitterMatrix);
+                    emissionState.isBursting = false;
+                }
+                break;
             }
-            emissionState.burstIndex++;
         }
 
         if (!this.emitEnded) {
@@ -1308,6 +1407,7 @@ export class ParticleSystem implements IParticleSystem {
                 interval: burst.interval,
                 cycle: burst.cycle,
             })),
+            ...(this.shapeTransformValue ? {shapeTransform: copyShapeTransform(this.shapeTransformValue)} : {}),
             onlyUsedByOther: this.onlyUsedByOther,
             instancingGeometry: geometryUUID,
             renderMode: this.renderMode,
@@ -1398,6 +1498,7 @@ export class ParticleSystem implements IParticleSystem {
                 interval: burst.interval ?? 0.1,
                 cycle: burst.cycle ?? burst.cycleCount ?? 1,
             })),
+            shapeTransform: json.shapeTransform ? copyShapeTransform(json.shapeTransform) : null,
             onlyUsedByOther: json.onlyUsedByOther,
             instancingGeometry: resolvedGeometry.positions,
             instancingIndices: resolvedGeometry.indices,
@@ -1462,9 +1563,11 @@ export class ParticleSystem implements IParticleSystem {
             };
         }
         if (this.renderMode === RenderMode.StretchedBillBoard) {
+            const settings = this.rendererEmitterSettings as StretchedBillBoardSettings;
             return {
-                speedFactor: (this.rendererEmitterSettings as StretchedBillBoardSettings).speedFactor,
-                lengthFactor: (this.rendererEmitterSettings as StretchedBillBoardSettings).lengthFactor,
+                speedFactor: settings.speedFactor,
+                lengthFactor: settings.lengthFactor,
+                ...(settings.freeform ? {freeform: true} : {}),
             };
         }
         return {};
@@ -1512,6 +1615,8 @@ export class ParticleSystem implements IParticleSystem {
             texture: textureUUID,
             reflectionAtlas: reflectionAtlasUUID,
             reflectionLevel: this.rendererSettings.reflectionLevel,
+            ...(isTinted(this.rendererSettings.materialTint) ? {tint: [...this.rendererSettings.materialTint!]} : {}),
+            ...(this.rendererSettings.vertexColorLinear ? {vertexColorSpace: 'linear'} : {}),
             sourceMaterial: this.materialRef ?? undefined,
         };
         return materialUUID;
@@ -1578,6 +1683,10 @@ export class ParticleSystem implements IParticleSystem {
     }
 
     getRendererSettings(): VFXBatchSettings {
+        // Freeform is a stretched-billboard setting, but it picks the shader, so batches split on it.
+        this.rendererSettings.stretchFreeform =
+            this.rendererSettings.renderMode === RenderMode.StretchedBillBoard &&
+            (this.rendererEmitterSettings as StretchedBillBoardSettings).freeform === true;
         return this.rendererSettings;
     }
 
@@ -1626,6 +1735,7 @@ export class ParticleSystem implements IParticleSystem {
             rendererEmitterSettings = {
                 lengthFactor: (this.rendererEmitterSettings as StretchedBillBoardSettings).lengthFactor,
                 speedFactor: (this.rendererEmitterSettings as StretchedBillBoardSettings).speedFactor,
+                freeform: (this.rendererEmitterSettings as StretchedBillBoardSettings).freeform,
             };
         } else {
             rendererEmitterSettings = {};
@@ -1646,6 +1756,7 @@ export class ParticleSystem implements IParticleSystem {
             emissionOverTime: this.emissionOverTime.clone(),
             emissionOverDistance: this.emissionOverDistance.clone(),
             emissionBursts: this.emissionBursts.map((b) => ({...b})),
+            shapeTransform: this.shapeTransformValue && copyShapeTransform(this.shapeTransformValue),
             onlyUsedByOther: this.onlyUsedByOther,
             instancingGeometry: this.rendererSettings.instancingGeometry,
             instancingIndices: this.rendererSettings.instancingIndices,

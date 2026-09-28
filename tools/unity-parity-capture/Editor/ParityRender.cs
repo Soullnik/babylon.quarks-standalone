@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using BabylonQuarks.UnityExporter;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.Rendering;
@@ -30,11 +31,8 @@ namespace BabylonQuarks.ParityCapture
         private readonly Texture2D _readback;
         public readonly int Resolution;
 
-        private readonly ParityLog _log;
-
-        public ParityRender(int resolution, ParityLog log)
+        public ParityRender(int resolution)
         {
-            _log = log;
             Resolution = resolution;
             _rt = new RenderTexture(resolution, resolution, 24, RenderTextureFormat.ARGB32, RenderTextureReadWrite.sRGB)
             {
@@ -161,7 +159,7 @@ namespace BabylonQuarks.ParityCapture
         /// <summary>Renders the current view and returns its pixels.</summary>
         public Color32[] Render()
         {
-            ParityCameraRender.Render(Camera, _rt, _log);
+            OffscreenRender.Render(Camera, _rt);
             RenderTexture previous = RenderTexture.active;
             RenderTexture.active = _rt;
             _readback.ReadPixels(new Rect(0, 0, Resolution, Resolution), 0, 0, false);

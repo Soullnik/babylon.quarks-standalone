@@ -43,11 +43,23 @@ void main() {
     // Stretch direction is the velocity direction; only a genuinely motionless particle has none.
     // Deriving it via normalize keeps the stretch aligned even when the speed contribution is ~0
     // (e.g. speedFactor 0), instead of collapsing the whole burst onto a fixed screen axis.
-    vec3 vdir = vlength > 0.000001 ? viewVelocity / vlength : vec3(0.0, 0.0, 1.0);
+    // Any speed at all counts: effects give a stretched glow a speed of 0.001 only to point it,
+    // and with speedFactor 0 that arrives here another thousand times smaller.
+    vec3 vdir = vlength > 1e-20 ? viewVelocity / vlength : vec3(0.0, 0.0, 1.0);
+#ifdef FREEFORM_STRETCH
+    // A billboard turned to the direction of travel, then scaled about its centre along that
+    // direction in 3D: centred on the particle, and at full width rather than a sliver when the
+    // direction points at the camera. +x runs back along the travel, as it does in a streak.
+    vec2 screenDir = length(vdir.xy) > 1e-6 ? normalize(vdir.xy) : vec2(0.0, 1.0);
+    vec3 corner = (position.x * vec3(-screenDir, 0.0) + position.y * vec3(-screenDir.y, screenDir.x, 0.0)) * avgSize;
+    corner += vdir * dot(corner, vdir) * (vlength + lengthFactor - 1.0);
+    mvPosition.xyz += corner;
+#else
     mvPosition.xyz += position.y * normalize(cross(mvPosition.xyz, vdir)) * avgSize;
     // Equivalent to viewVelocity * (1.0 + lengthFactor / vlength) for moving particles, but the
     // size-based term (vdir * lengthFactor) survives when the velocity contribution vanishes.
     mvPosition.xyz -= (position.x + 0.5) * (viewVelocity + vdir * lengthFactor) * avgSize;
+#endif
     gl_Position = projection * mvPosition;
 #ifdef SOFT_PARTICLES
     projPosition = gl_Position;

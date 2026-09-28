@@ -206,6 +206,9 @@ export class SpriteBatch extends VFXBatch {
         if (this.settings.renderMode === RenderMode.HorizontalBillBoard) {
             defines.push('HORIZONTAL');
         }
+        if (this.settings.renderMode === RenderMode.StretchedBillBoard && this.settings.stretchFreeform) {
+            defines.push('FREEFORM_STRETCH');
+        }
 
         const shaderLanguage = shaderLanguageFor(this.scene.getEngine());
         registerShaders(shaderName, vertexShader, fragmentShader, shaderLanguage);
@@ -244,6 +247,7 @@ export class SpriteBatch extends VFXBatch {
         if (this.settings.materialAlphaTest > 0) {
             uniforms.push('alphaTest');
         }
+        this.addColorDefines(defines, uniforms);
         if (this.settings.renderMode === RenderMode.Mesh) {
             uniforms.push('lightDirection');
             uniforms.push('lightColor');
@@ -309,6 +313,7 @@ export class SpriteBatch extends VFXBatch {
         if (this.settings.materialAlphaTest > 0) {
             mat.setFloat('alphaTest', this.settings.materialAlphaTest);
         }
+        this.bindColorUniforms(mat);
         if (this.settings.renderMode === RenderMode.Mesh) {
             mat.setVector3('lightDirection', new BVector3(0.4, -1, 0.6));
             mat.setVector3('lightColor', new BVector3(1, 1, 1));
@@ -583,6 +588,20 @@ export class SpriteBatch extends VFXBatch {
                     const vz = velocity.z + (velocity.z - previousVelocity.z) * stepFraction;
                     let vel: Vector3 = this.vector_;
                     vel.set(vx, vy, vz);
+                    // Plus whatever moved it beyond its own velocity over the last step, so
+                    // the streak follows its total motion as Unity's does: VelocityOverLife,
+                    // orbits and the like move the position without touching `velocity`, and
+                    // a streak drawn from `velocity` alone points the wrong way — or, for a
+                    // particle with no speed of its own, nowhere.
+                    const step = system.simulationStep ?? 0;
+                    if (step > 0) {
+                        const position = particle.position;
+                        const previous = particle.previousPosition;
+                        const own = particle.speedModifier ?? 1;
+                        vel.x += (position.x - previous.x) / step - velocity.x * own;
+                        vel.y += (position.y - previous.y) / step - velocity.y * own;
+                        vel.z += (position.z - previous.z) / step - velocity.z * own;
+                    }
                     if (!systemWorldSpace) {
                         if (particle.parentMatrix) {
                             this.rotationMat2_.setFromMatrix4(particle.parentMatrix);

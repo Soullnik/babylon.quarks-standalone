@@ -45,6 +45,12 @@ function cases(): Case[] {
     const mapOptions = [[], ['USE_MAP']];
     const softOptions = [[], ['SOFT_PARTICLES']];
     const alphaOptions = [[], ['USE_ALPHATEST']];
+    // Colour handling: none, a tint alone, and every colour-space path together.
+    const colorOptions = [
+        [],
+        ['USE_TINT'],
+        ['USE_TINT', 'LINEAR_OUTPUT', 'LINEAR_VERTEX_COLOR', 'PREMULTIPLY_VERTEX_ALPHA'],
+    ];
 
     const push = (
         name: string,
@@ -57,27 +63,29 @@ function cases(): Case[] {
         for (const tile of tileOptions)
             for (const map of mapOptions)
                 for (const soft of softOptions)
-                    for (const alpha of alphaOptions) {
-                        const defines = [...extra, ...tile, ...map, ...soft, ...alpha];
-                        const uniforms = [...baseUniforms];
-                        const samplers: string[] = [];
-                        if (tile.length) uniforms.push('tileCountX', 'tileCountY');
-                        if (map.length) samplers.push('map');
-                        if (soft.length) {
-                            uniforms.push('softParams', 'projParams');
-                            samplers.push('depthTexture');
+                    for (const alpha of alphaOptions)
+                        for (const color of colorOptions) {
+                            const defines = [...extra, ...tile, ...map, ...soft, ...alpha, ...color];
+                            const uniforms = [...baseUniforms];
+                            if (color.includes('USE_TINT')) uniforms.push('tint');
+                            const samplers: string[] = [];
+                            if (tile.length) uniforms.push('tileCountX', 'tileCountY');
+                            if (map.length) samplers.push('map');
+                            if (soft.length) {
+                                uniforms.push('softParams', 'projParams');
+                                samplers.push('depthTexture');
+                            }
+                            if (alpha.length) uniforms.push('alphaTest');
+                            out.push({
+                                name: `${name}${defines.length ? ' [' + defines.join(',') + ']' : ' [none]'}`,
+                                vertex,
+                                fragment,
+                                attributes,
+                                uniforms,
+                                samplers,
+                                defines,
+                            });
                         }
-                        if (alpha.length) uniforms.push('alphaTest');
-                        out.push({
-                            name: `${name}${defines.length ? ' [' + defines.join(',') + ']' : ' [none]'}`,
-                            vertex,
-                            fragment,
-                            attributes,
-                            uniforms,
-                            samplers,
-                            defines,
-                        });
-                    }
     };
 
     push('billboard', particleVert, particleFrag, SPRITE_ATTRS, SPRITE_UNIFORMS, []);
@@ -92,6 +100,14 @@ function cases(): Case[] {
         []
     );
     push(
+        'stretched freeform',
+        stretchedVert,
+        particleFrag,
+        [...SPRITE_ATTRS, 'velocity'],
+        [...SPRITE_UNIFORMS, 'speedFactor'],
+        ['FREEFORM_STRETCH']
+    );
+    push(
         'mesh',
         meshVert,
         physicsFrag,
@@ -101,15 +117,26 @@ function cases(): Case[] {
     );
 
     for (const map of mapOptions) {
-        out.push({
-            name: `trail ${map.length ? '[USE_MAP]' : '[none]'}`,
-            vertex: trailVert,
-            fragment: trailFrag,
-            attributes: ['position', 'previous', 'next', 'side', 'width', 'uv', 'color'],
-            uniforms: ['world', 'view', 'projection', 'lineWidth', 'resolution', 'sizeAttenuation'],
-            samplers: map.length ? ['map'] : [],
-            defines: map,
-        });
+        for (const color of [[], ['USE_TINT', 'LINEAR_OUTPUT', 'LINEAR_VERTEX_COLOR', 'PREMULTIPLY_VERTEX_ALPHA']]) {
+            const defines = [...map, ...color];
+            out.push({
+                name: `trail ${defines.length ? '[' + defines.join(',') + ']' : '[none]'}`,
+                vertex: trailVert,
+                fragment: trailFrag,
+                attributes: ['position', 'previous', 'next', 'side', 'width', 'uv', 'color'],
+                uniforms: [
+                    'world',
+                    'view',
+                    'projection',
+                    'lineWidth',
+                    'resolution',
+                    'sizeAttenuation',
+                    ...(color.length ? ['tint'] : []),
+                ],
+                samplers: map.length ? ['map'] : [],
+                defines,
+            });
+        }
     }
     return out;
 }

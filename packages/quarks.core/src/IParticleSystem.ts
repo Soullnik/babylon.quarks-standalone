@@ -42,6 +42,13 @@ export interface StretchedBillBoardSettings {
      * @type {number}
      */
     lengthFactor: number;
+    /**
+     * Unity's Freeform Stretching: the particle is a billboard turned to its direction of travel
+     * and scaled about its centre along that direction in 3D, rather than a streak trailing back
+     * from it — so it stays centred on the particle and keeps its full width when the direction
+     * points at the camera.
+     */
+    freeform?: boolean;
 }
 
 export interface BillBoardSettings {}

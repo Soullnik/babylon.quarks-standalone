@@ -154,6 +154,25 @@ QuarksUtil.play(effect);
 
 See the [examples app](https://github.com/Soullnik/babylon.quarks-standalone/tree/main/examples) in the monorepo for 18 interactive demos and usage patterns.
 
+### Effects exported from Unity
+
+A Unity project in **Linear** colour space blends particles in linear space. Babylon does the same
+once the scene's image processing runs as a post-process, and the particle shaders follow it:
+
+```ts
+import {DefaultRenderingPipeline} from '@babylonjs/core/PostProcesses/RenderPipeline/Pipelines/defaultRenderingPipeline';
+
+const pipeline = new DefaultRenderingPipeline('pipeline', true, scene, [camera]); // HDR target
+pipeline.imageProcessingEnabled = true; // linear blending, converted to gamma at the end
+pipeline.imageProcessing.toneMappingEnabled = false; // as a URP camera without tonemapping
+pipeline.bloomEnabled = true; // for the glow a URP Bloom volume adds
+```
+
+Without it everything blends in gamma space: colours still match, but soft, semi-transparent glows
+come out dimmer and smaller than in Unity. The exporter writes Unity's coordinates unchanged, and
+Babylon's default handedness is Unity's — keep `scene.useRightHandedSystem` off to see an effect
+the way it was authored.
+
 ## Links
 
 - [API documentation](https://soullnik.github.io/babylon.quarks-standalone/docs/)

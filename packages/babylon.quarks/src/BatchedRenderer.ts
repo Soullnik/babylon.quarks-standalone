@@ -2,6 +2,7 @@ import {BaseTexture} from '@babylonjs/core/Materials/Textures/baseTexture';
 import {Texture} from '@babylonjs/core/Materials/Textures/texture';
 import {TransformNode} from '@babylonjs/core/Meshes/transformNode';
 import {Scene} from '@babylonjs/core/scene';
+import type {StretchedBillBoardSettings} from 'quarks.core';
 import {EmitSubParticleSystem, IParticleSystem} from 'quarks.core';
 import {ParticleSystem} from './ParticleSystem';
 import {SpriteBatch} from './SpriteBatch';
@@ -47,6 +48,18 @@ export interface VFXBatchSettings {
      */
     reflectionAtlas: BaseTexture | null;
     layerMask: number;
+    /** Stretched billboards drawn with {@link StretchedBillBoardSettings.freeform}. */
+    stretchFreeform?: boolean;
+    /**
+     * Linear-space RGBA gain on the particle colour — a material's HDR tint. RGB may go past 1.
+     * Absent or all ones is no tint.
+     */
+    materialTint?: [number, number, number, number];
+    /**
+     * The particle colour is a linear value rather than a gamma-space one — what a Unity project
+     * in Linear colour space hands its particle shaders. Only the texture is then decoded.
+     */
+    vertexColorLinear?: boolean;
 }
 
 export interface AdaptivePerformanceOptions {
@@ -55,6 +68,13 @@ export interface AdaptivePerformanceOptions {
     maxQuality: number;
     decreaseStep: number;
     increaseStep: number;
+}
+
+const NO_TINT: [number, number, number, number] = [1, 1, 1, 1];
+
+function tintEqual(a: readonly number[], b: readonly number[] | undefined): boolean {
+    const other = b ?? NO_TINT;
+    return a[0] === other[0] && a[1] === other[1] && a[2] === other[2] && a[3] === other[3];
 }
 
 /** True when both face lists are the same six texture references (or both empty). */
@@ -147,7 +167,10 @@ export class BatchedRenderer extends TransformNode {
             a.vTileCount === b.vTileCount &&
             a.instancingGeometry === b.instancingGeometry &&
             a.renderOrder === b.renderOrder &&
-            a.layerMask === b.layerMask
+            a.layerMask === b.layerMask &&
+            a.stretchFreeform === (b.stretchFreeform ?? false) &&
+            tintEqual(a.materialTint, b.materialTint) &&
+            a.vertexColorLinear === (b.vertexColorLinear ?? false)
         );
     }
 

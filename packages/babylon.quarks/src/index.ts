@@ -23,6 +23,7 @@ export type {
     BurstParametersJSON,
     ParticleSystemJSONParameters,
     ParticleSystemParameters,
+    ShapeTransform,
 } from './ParticleSystem';
 export {QuarksLoader} from './QuarksLoader';
 export type {QuarksLoaderOptions} from './QuarksLoader';

@@ -1,8 +1,13 @@
-import {BaseTexture} from '@babylonjs/core/Materials/Textures/baseTexture';
+import {Constants} from '@babylonjs/core/Engines/constants';
+import type {ImageProcessingConfiguration} from '@babylonjs/core/Materials/imageProcessingConfiguration';
 import {ShaderMaterial} from '@babylonjs/core/Materials/shaderMaterial';
+import {BaseTexture} from '@babylonjs/core/Materials/Textures/baseTexture';
+import {Vector4} from '@babylonjs/core/Maths/math.vector';
 import type {AbstractMesh} from '@babylonjs/core/Meshes/abstractMesh';
 import {Mesh} from '@babylonjs/core/Meshes/mesh';
+import type {Observer} from '@babylonjs/core/Misc/observable';
 import {Scene} from '@babylonjs/core/scene';
+import type {Nullable} from '@babylonjs/core/types';
 import {IParticleSystem} from 'quarks.core';
 import {VFXBatchSettings} from './BatchedRenderer';
 
@@ -39,6 +44,9 @@ export interface StoredBatchSettings {
     reflectionFaces: BaseTexture[] | null;
     reflectionAtlas: BaseTexture | null;
     layerMask: number;
+    stretchFreeform: boolean;
+    materialTint: [number, number, number, number];
+    vertexColorLinear: boolean;
 }
 
 export abstract class VFXBatch {
@@ -88,8 +96,66 @@ export abstract class VFXBatch {
             reflectionFaces: settings.reflectionFaces ?? null,
             reflectionAtlas: settings.reflectionAtlas ?? null,
             layerMask: settings.layerMask,
+            stretchFreeform: settings.stretchFreeform ?? false,
+            materialTint: settings.materialTint ? [...settings.materialTint] : [1, 1, 1, 1],
+            vertexColorLinear: settings.vertexColorLinear ?? false,
         };
         this.mesh = this.createBatchMesh('vfxBatch');
+        this.imageProcessingObserver = scene.imageProcessingConfiguration.onUpdateParameters.add(() => {
+            if (VFXBatch.outputsLinear(this.scene) !== this.linearOutput) {
+                const previous = this.mesh.material;
+                this.rebuildMaterial();
+                if (previous && previous !== this.mesh.material) {
+                    previous.dispose();
+                }
+            }
+        });
+    }
+
+    /**
+     * Whether particle colour should leave the shader in linear space: when the scene's image
+     * processing runs as a post-process, which expects linear input and converts to gamma itself
+     * (a DefaultRenderingPipeline with image processing on, say). Otherwise colours go out in
+     * gamma space, as the canvas expects.
+     */
+    static outputsLinear(scene: Scene): boolean {
+        const config = scene.imageProcessingConfiguration;
+        return config.applyByPostProcess && config.isEnabled;
+    }
+
+    /** The colour-space state the current material was built for. */
+    protected linearOutput = false;
+    private imageProcessingObserver: Nullable<Observer<ImageProcessingConfiguration>>;
+
+    /** Adds the tint and output colour-space defines and uniforms the fragment shaders share. */
+    protected addColorDefines(defines: string[], uniforms: string[]): void {
+        this.linearOutput = VFXBatch.outputsLinear(this.scene);
+        if (this.linearOutput) {
+            defines.push('LINEAR_OUTPUT');
+        }
+        if (this.hasTint()) {
+            defines.push('USE_TINT');
+            uniforms.push('tint');
+        }
+        if (this.settings.vertexColorLinear) {
+            defines.push('LINEAR_VERTEX_COLOR');
+        }
+        if (this.settings.materialTransparent && this.settings.materialBlendMode === Constants.ALPHA_PREMULTIPLIED) {
+            defines.push('PREMULTIPLY_VERTEX_ALPHA');
+        }
+    }
+
+    /** Sets the uniforms {@link addColorDefines} declared. */
+    protected bindColorUniforms(material: ShaderMaterial): void {
+        if (this.hasTint()) {
+            const [r, g, b, a] = this.settings.materialTint;
+            material.setVector4('tint', new Vector4(r, g, b, a));
+        }
+    }
+
+    private hasTint(): boolean {
+        const t = this.settings.materialTint;
+        return t[0] !== 1 || t[1] !== 1 || t[2] !== 1 || t[3] !== 1;
     }
 
     /** Creates a mesh for this batch to render through and records it as a batch mesh. */
@@ -138,6 +204,7 @@ export abstract class VFXBatch {
     abstract update(): void;
 
     dispose(): void {
+        this.scene.imageProcessingConfiguration.onUpdateParameters.remove(this.imageProcessingObserver);
         this.mesh.dispose();
     }
 }

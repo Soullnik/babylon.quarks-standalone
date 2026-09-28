@@ -6,14 +6,55 @@ and the project follows the `quarks.core` 0.x version line.
 
 ## Unreleased
 
+Measured against Unity itself: the Unity exporter's parity capture renders a folder of effects in
+Unity, and `tools/unity-parity-compare` renders the same exports here through the same camera and
+compares the two. On the 15 effects of the first capture, image energy went from 3–40 % of Unity's
+to within about ±15 % for most, with matching particle counts, positions, sizes and colours.
+
 ### Added
 
+- **Shape transform.** `ParticleSystem.shapeTransform` (JSON `shapeTransform: {position, rotation,
+scale}`, rotation a quaternion) offsets, turns and stretches the emitter shape inside its system,
+  as Unity's Shape module Position / Rotation / Scale do — a cone turned to point up, a sphere
+  stretched into a column. It applies to each particle's spawn position and direction; the
+  system's own transform and simulation space are untouched.
+- **Freeform stretching.** `rendererEmitterSettings.freeform` on a stretched billboard draws it as
+  Unity's Freeform Stretching does: a billboard turned to the direction of travel and scaled about
+  its centre along it, so it stays centred on the particle and keeps its width when the direction
+  faces the camera.
+- **Material tint.** A material's `tint` (RGBA) is a linear-space gain on the particle colour — what
+  a Unity HDR colour or intensity does. RGB may go past 1.
+- **Linear vertex colour.** A material with `vertexColorSpace: 'linear'` takes the particle colour
+  as a linear value and decodes only the texture — what a Unity project in Linear colour space
+  hands its particle shaders.
+- **Linear output.** When the scene's image processing runs as a post-process (a
+  `DefaultRenderingPipeline` with image processing on, say), particle colour leaves the shaders in
+  linear space and blends there, as Babylon's own particles and a Unity Linear project do; the
+  post-process converts to gamma. Materials rebuild when that setting changes.
 - `VFXBatch.isBatchMesh(mesh)` — whether a mesh is one of the renderer's own batch meshes, known by
   identity. Hosts listing scene meshes (e.g. as emission sources) can exclude them without relying
   on their names.
 - `QuarksLoader.hasAuthoredName(node)` — whether a loaded node's name was written in the effect
   file. Unnamed nodes still get a stand-in (their JSON type or a constructor default); this tells
   the two apart from the data.
+
+### Fixed
+
+- **Repeating bursts.** A burst's `cycle` and `interval` were ignored: every burst fired once per
+  loop, so a Unity burst of 1 × 20 cycles made one particle instead of twenty. Waves now fire
+  `interval` apart, are cut at the end of the loop, and come out at most once per simulation step
+  (as Unity's do, so a burst repeating faster than the step does not flood).
+- **Stretched billboards with almost no speed.** The stretch direction came from the velocity only
+  above 1e-6, but Unity effects routinely give a stretched glow a speed of 0.001 just to point it,
+  which with a speed factor of 0 arrives far below that — the streak then lay along the view
+  direction and drew as a line. Any non-zero speed now gives the direction.
+- **Stretched billboards moved by behaviors.** The streak followed `velocity` alone, which
+  VelocityOverLife, orbits and the like do not touch: particles rising by velocity-over-life drew as
+  short dashes pointing at the camera. The streak now follows the particle's total motion, as
+  Unity's does.
+- **Premultiplied blending with a fading particle.** In premultiplied mode the particle colour is
+  premultiplied by its own alpha in the shader, so fading alpha fades the colour too instead of
+  leaving an additive-looking glow.
 
 ### Changed
 

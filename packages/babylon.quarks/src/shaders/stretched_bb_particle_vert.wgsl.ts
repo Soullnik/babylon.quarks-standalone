@@ -46,15 +46,30 @@ fn main(input: VertexInputs) -> FragmentInputs {
     // Stretch direction is the velocity direction; only a genuinely motionless particle has none.
     // Deriving it via normalize keeps the stretch aligned even when the speed contribution is ~0
     // (e.g. speedFactor 0), instead of collapsing the whole burst onto a fixed screen axis.
+    // Any speed at all counts: effects give a stretched glow a speed of 0.001 only to point it,
+    // and with speedFactor 0 that arrives here another thousand times smaller.
     var vdir = vec3f(0.0, 0.0, 1.0);
-    if (vlength > 0.000001) {
+    if (vlength > 1e-20) {
         vdir = viewVelocity / vlength;
     }
+#ifdef FREEFORM_STRETCH
+    // A billboard turned to the direction of travel, then scaled about its centre along that
+    // direction in 3D: centred on the particle, and at full width rather than a sliver when the
+    // direction points at the camera. +x runs back along the travel, as it does in a streak.
+    var screenDir = vec2f(0.0, 1.0);
+    if (length(vdir.xy) > 1e-6) {
+        screenDir = normalize(vdir.xy);
+    }
+    var corner = (vertexInputs.position.x * vec3f(-screenDir, 0.0) + vertexInputs.position.y * vec3f(-screenDir.y, screenDir.x, 0.0)) * avgSize;
+    corner += vdir * dot(corner, vdir) * (vlength + lengthFactor - 1.0);
+    let stretched = mvPosition.xyz + corner;
+#else
     let widthOffset = vertexInputs.position.y * normalize(cross(mvPosition.xyz, vdir)) * avgSize;
     // Equivalent to viewVelocity * (1.0 + lengthFactor / vlength) for moving particles, but the
     // size-based term (vdir * lengthFactor) survives when the velocity contribution vanishes.
     let lengthOffset = (vertexInputs.position.x + 0.5) * (viewVelocity + vdir * lengthFactor) * avgSize;
     let stretched = mvPosition.xyz + widthOffset - lengthOffset;
+#endif
     mvPosition.x = stretched.x;
     mvPosition.y = stretched.y;
     mvPosition.z = stretched.z;

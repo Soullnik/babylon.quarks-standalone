@@ -221,11 +221,8 @@ namespace BabylonQuarks.ParityCapture
         private readonly Texture2D _readback;
         public readonly Texture2D Ramp;
 
-        private readonly ParityLog _log;
-
-        public ParityProbeRig(ParityLog log)
+        public ParityProbeRig()
         {
-            _log = log;
             int size = ParityMaterials.ProbeSize;
             _rt = new RenderTexture(size, size, 24, RenderTextureFormat.ARGBHalf, RenderTextureReadWrite.Linear)
             {
@@ -269,7 +266,7 @@ namespace BabylonQuarks.ParityCapture
             _camera.targetTexture = _rt;
             ParityRender.ConfigurePipelineCamera(_camera, postProcessing: false);
             // The float target may take a different render path than the 8-bit frames.
-            ParityCameraRender.Reset();
+            OffscreenRender.Reset();
         }
 
         public List<object> MeasureBackgrounds()
@@ -308,7 +305,7 @@ namespace BabylonQuarks.ParityCapture
         private Color[] RenderAt(float background)
         {
             _camera.backgroundColor = new Color(background, background, background, 0f);
-            ParityCameraRender.Render(_camera, _rt, _log);
+            OffscreenRender.Render(_camera, _rt);
             RenderTexture previous = RenderTexture.active;
             RenderTexture.active = _rt;
             _readback.ReadPixels(new Rect(0, 0, _rt.width, _rt.height), 0, 0, false);

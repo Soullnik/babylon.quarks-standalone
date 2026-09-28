@@ -4,6 +4,32 @@ All notable changes to the Unity Quarks Exporter are documented here.
 
 ## Unreleased
 
+Checked against Unity itself with `tools/unity-parity-capture` and `tools/unity-parity-compare`
+(see `docs/UNITY_PARITY_AUDIT_HOVL.md`): most of what made exported effects look wrong turned out
+to be data the exporter did not carry.
+
+### Added
+
+- **Shape transform.** The Shape module's Position / Rotation / Scale are exported as the system's
+  `shapeTransform`. 49 of the 51 systems in the Hovl auras carry one — cones turned to point up,
+  spheres stretched into columns — and without it cones fired at the camera and every stretched
+  glow drew as a line.
+- **Measured material colour.** Each material is rendered once, in a preview scene of its own, on
+  a quad with a plain white texture over black and over white (`MaterialProbe`). That gives the
+  linear-space gain it puts on the particle colour — an HDR colour times an intensity slider,
+  whatever the shader calls them — exported as the material's `tint`. Hovl's materials multiply by
+  2–18; without it every effect exported several times too dark.
+- **Blend measured when it cannot be read.** The same render shows how the material blends
+  (additive, straight alpha, premultiplied). A built-in shader with a hard-coded blend — the
+  `Default-Particle` material, say — exported as alpha blend before; it now exports as what it
+  renders. When the measurement disagrees with the declared blend, the measurement wins and the
+  console says so.
+- **Freeform stretching** (Unity 2022.2+) is exported as `freeform` on the stretched-billboard
+  settings, read from the serialized renderer so older editors are unaffected.
+- **Linear colour space.** In a Linear project, materials are exported with
+  `vertexColorSpace: "linear"`: Unity hands particle shaders the particle colour unconverted, and
+  the runtime then does the same.
+
 ### Changed
 
 - **Nothing is decided by a name any more.** Every place the exporter inferred what something _is_
@@ -33,6 +59,15 @@ All notable changes to the Unity Quarks Exporter are documented here.
 
 ### Fixed
 
+- **Texture alpha as Unity imports it.** Textures were embedded as their source files, but the
+  importer's Alpha Source often takes alpha from the colour's grayscale (or drops it), and particle
+  textures are usually opaque files imported that way. They drew as opaque squares. The exported
+  image now carries the alpha Unity uses.
+- **Shape module off.** Unity then emits from the system's origin straight along +Z; the exporter
+  wrote a point emitter, which sprays in every direction. It now writes a cone of no radius and
+  no angle.
+- **Infinite burst cycles.** A burst set to repeat until the loop ends (cycle count 0) exported as
+  a single burst; it now exports as the number of cycles that fit.
 - **Premultiplied alpha.** `One / OneMinusSrcAlpha` means two different things. Built-in Standard
   Particles, URP and Shader Graph enable `_ALPHAPREMULTIPLY_ON` and multiply colour by alpha in the
   shader, so the texture is straight alpha and quarks must alpha-blend it; without that keyword the

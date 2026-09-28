@@ -168,7 +168,7 @@ namespace BabylonQuarks.ParityCapture
                 }
                 finally
                 {
-                    manifest.Set("cameraRenderPath", ParityCameraRender.PathName);
+                    manifest.Set("cameraRenderPath", OffscreenRender.PathName);
                     manifest.Set("finished", DateTime.Now.ToString("o", CultureInfo.InvariantCulture))
                         .Set("errors", log.Errors).Set("warnings", log.Warnings);
                     PJson.Write(Path.Combine(outDir, "manifest.json"), manifest);
@@ -239,7 +239,7 @@ namespace BabylonQuarks.ParityCapture
             log.Step("materials", steps, () =>
             {
                 EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
-                using (var rig = new ParityProbeRig(log))
+                using (var rig = new ParityProbeRig())
                 {
                     int i = 0;
                     foreach (var kv in materials)
@@ -261,8 +261,8 @@ namespace BabylonQuarks.ParityCapture
             log.Step("effects", steps, () =>
             {
                 EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
-                ParityCameraRender.Reset();
-                using (var render = new ParityRender(settings.Resolution, log))
+                OffscreenRender.Reset();
+                using (var render = new ParityRender(settings.Resolution))
                 {
                     List<RenderVariant> variants = Variants(render, settings, manifest, log);
                     var usedNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);

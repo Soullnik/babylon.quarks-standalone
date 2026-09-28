@@ -8,7 +8,68 @@ The asset itself is third-party paid content and is **not** committed here. Ever
 derived analysis of our own exporter's behaviour; re-run the tool against your own copy to
 reproduce it.
 
-## Headline
+## Measured against Unity
+
+The static audit below was written from the files alone. A later run of
+[`tools/unity-parity-capture`](../tools/unity-parity-capture) in the pack's own project (Unity 6,
+URP, Linear colour space) gave Unity's frames, simulation and a measured blend per material, and
+[`tools/unity-parity-compare`](../tools/unity-parity-compare) rendered the same exports through
+babylon.quarks with the same camera. That settled which causes matter and turned up several the
+static audit could not see.
+
+**Energy** is the summed brightness over the frame (babylon.quarks ÷ Unity, mean over 24 frames);
+1.00 is a match. "Before": the exporter and runtime as they were. "After": every fix below, the
+scene blending in linear space.
+
+| effect | before | after | | effect | before | after |
+| --- | ---: | ---: | --- | --- | ---: | ---: |
+| Fire | 0.28 | 1.09 | | Meteor | 0.12 | 0.98 |
+| Gold | 0.03 | 1.03 | | Soap | 0.15 | 1.02 |
+| Healing | 0.21 | 1.01 | | Smoke | 0.25 | 0.83 |
+| Darkness | 0.02 | 1.13 | | Lightning | 0.32 | 1.10 |
+| Blood | 0.45 | 1.42 | | White | 0.29 | 1.33 |
+| Acid | 0.90 | 1.51 | | Freeze | 0.62 | 1.49 |
+| Shine | 0.09 | 1.17 | | Sleep | 0.75 | 1.29 |
+| Water | 0.06 | 4.49 | | | | |
+
+Particle counts now match Unity's within a few percent (they were 13–60 % short on seven
+effects), as do per-system positions, sizes and colours, and the centre of each effect sits within
+a few pixels of Unity's (up to 130 px off before). Water, Shine, White and Freeze bind the Shader
+Graph's `_Noise` / `_Flow` / `_Mask` textures — a mask on Water's wave layer, noise distortion —
+which quarks does not have. Acid, Blood and Sleep (1.3–1.5) bind none of them; what still lifts
+them is not identified yet.
+
+What the measurement showed, in order of how much it moved:
+
+1. **Texture alpha comes from the importer, not the file.** 25 of the 31 textures are imported with
+   Alpha Source = From Gray Scale from files with no alpha. Embedded as files, they drew as opaque
+   squares. _Exporter: embed the alpha Unity uses._
+2. **Shape transforms** — as the static audit said: 49 of 51 systems. Without them cones fired at
+   the camera, and every stretched glow (whose speed of 0.001 exists only to point it up) drew as
+   a line. _Exporter + runtime: `shapeTransform`._
+3. **Material gain** — the `_Emission` × HDR `_Color` the static audit found, confirmed by the
+   measured blend probe (source = gain × alpha exactly) and ranging 2–18×. _Exporter: measured by
+   rendering the material, exported as `tint`; runtime: applied in linear space._
+4. **Unity does not linearise particle colours.** In a Linear project the particle colour reaches
+   the shader unconverted; only the texture is decoded. Treating it as gamma made reds too deep
+   and yellows orange. _Exporter: `vertexColorSpace: "linear"`; runtime: honours it._
+5. **Blending happens in linear space.** In a gamma-space Babylon scene soft glows come out at
+   0.4–0.9 of Unity's energy even with everything else fixed. _Runtime: particle colour leaves the
+   shaders linear when the scene's image processing runs as a post-process._
+6. **Burst cycles were ignored by the runtime** — 16 of 51 systems emit through repeating bursts
+   (20 × 0.05 s, say) and emitted once per loop.
+7. **Stretched billboards**: the direction ignored speeds under 1e-6 (the 0.001-speed glows), and
+   ignored motion from VelocityOverLife; and Unity 6's **Freeform Stretching** — used by every
+   Water glow — centres the quad instead of trailing it. All fixed in the runtime.
+8. **Default-Particle** (a Legacy premultiply shader) cannot be read statically and exported as
+   alpha blend; the measured blend is premultiplied. _Exporter: measured blend when unreadable;
+   runtime: premultiplied mode premultiplies the particle colour._
+
+And what it ruled out: **bloom and grading barely matter at this distance.** The pack's volume
+(Bloom threshold 1, intensity 5) changes Unity's frames by a few percent — little of any effect
+goes over 1 once it is drawn at a normal size. The dullness was data, not post-processing.
+
+## Static audit: headline
 
 Most of the gap is **not** in the particle simulation, and not where
 [`UNITY_VISUAL_PARITY.md`](./UNITY_VISUAL_PARITY.md) guessed it would be. Three causes dominate,

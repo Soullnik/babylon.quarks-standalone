@@ -375,6 +375,14 @@ export class QuarksLoader {
             if (typeof matDef.reflectionLevel === 'number') {
                 matInfo.reflectionLevel = matDef.reflectionLevel;
             }
+            // Linear-space RGBA gain on the particle colour (a Unity HDR material colour).
+            if (Array.isArray(matDef.tint) && matDef.tint.length >= 3) {
+                matInfo.tint = matDef.tint.slice(0, 4);
+            }
+            // 'linear' when the particle colour is already a linear value (a Unity Linear project).
+            if (matDef.vertexColorSpace === 'linear') {
+                matInfo.vertexColorSpace = 'linear';
+            }
 
             // QuarksMaterial (what ParticleSystem.ensureMaterialMeta emits) writes `alphaMode`
             // directly as a Babylon alpha-mode constant; three.js materials (MeshBasicMaterial
