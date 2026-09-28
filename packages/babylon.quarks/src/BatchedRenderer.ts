@@ -4,6 +4,7 @@ import {TransformNode} from '@babylonjs/core/Meshes/transformNode';
 import {Scene} from '@babylonjs/core/scene';
 import type {StretchedBillBoardSettings} from 'quarks.core';
 import {EmitSubParticleSystem, IParticleSystem} from 'quarks.core';
+import type {MaterialGraph} from './materialGraph';
 import {ParticleSystem} from './ParticleSystem';
 import {SpriteBatch} from './SpriteBatch';
 import {TrailBatch} from './TrailBatch';
@@ -60,6 +61,8 @@ export interface VFXBatchSettings {
      * in Linear colour space hands its particle shaders. Only the texture is then decoded.
      */
     vertexColorLinear?: boolean;
+    /** The material's own shading, drawn instead of texture × colour (see {@link MaterialGraph}). */
+    materialGraph?: MaterialGraph | null;
 }
 
 export interface AdaptivePerformanceOptions {
@@ -170,7 +173,8 @@ export class BatchedRenderer extends TransformNode {
             a.layerMask === b.layerMask &&
             a.stretchFreeform === (b.stretchFreeform ?? false) &&
             tintEqual(a.materialTint, b.materialTint) &&
-            a.vertexColorLinear === (b.vertexColorLinear ?? false)
+            a.vertexColorLinear === (b.vertexColorLinear ?? false) &&
+            a.materialGraph === (b.materialGraph ?? null)
         );
     }
 

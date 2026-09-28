@@ -1,3 +1,5 @@
+import {srgbWgsl} from './srgb';
+
 export default /* wgsl */ `
 varying vUV: vec2f;
 varying vColor: vec4f;
@@ -29,6 +31,7 @@ uniform alphaTest: f32;
 uniform tint: vec4f;
 #endif
 
+${srgbWgsl}
 @fragment
 fn main(input: FragmentInputs) -> FragmentOutputs {
     var baseColor = fragmentInputs.vColor;
@@ -50,9 +53,9 @@ fn main(input: FragmentInputs) -> FragmentOutputs {
     #ifdef LINEAR_VERTEX_COLOR
     // The particle colour is already a linear value — what a Unity project in Linear colour
     // space hands its shaders, unconverted. Only the texture needs decoding.
-    var linearColor = pow(max(texColor.rgb, vec3f(0.0)), vec3f(2.2)) * fragmentInputs.vColor.rgb;
+    var linearColor = quarksToLinear(texColor.rgb) * fragmentInputs.vColor.rgb;
     #else
-    var linearColor = pow(max(baseColor.rgb, vec3f(0.0)), vec3f(2.2));
+    var linearColor = quarksToLinear(baseColor.rgb);
     #endif
     #ifdef PREMULTIPLY_VERTEX_ALPHA
     linearColor *= fragmentInputs.vColor.a;
@@ -64,7 +67,7 @@ fn main(input: FragmentInputs) -> FragmentOutputs {
     #ifdef LINEAR_OUTPUT
     baseColor = vec4f(linearColor, baseColor.a);
     #else
-    baseColor = vec4f(pow(linearColor, vec3f(1.0 / 2.2)), baseColor.a);
+    baseColor = vec4f(quarksToGamma(linearColor), baseColor.a);
     #endif
 #endif
 #if defined(PREMULTIPLY_VERTEX_ALPHA) && !defined(USE_TINT) && !defined(LINEAR_OUTPUT) && !defined(LINEAR_VERTEX_COLOR)

@@ -383,6 +383,17 @@ export class QuarksLoader {
             if (matDef.vertexColorSpace === 'linear') {
                 matInfo.vertexColorSpace = 'linear';
             }
+            // The material's own shading (a compiled Shader Graph), its textures resolved.
+            if (matDef.graph && Array.isArray(matDef.graph.nodes) && Array.isArray(matDef.graph.textures)) {
+                matInfo.graph = {
+                    ...matDef.graph,
+                    textures: matDef.graph.textures.map((entry: any) =>
+                        entry?.texture !== undefined
+                            ? {texture: meta.textures[entry.texture] ?? null, srgb: entry.srgb !== false}
+                            : {color: Array.isArray(entry?.color) ? entry.color : [1, 1, 1, 1]}
+                    ),
+                };
+            }
 
             // QuarksMaterial (what ParticleSystem.ensureMaterialMeta emits) writes `alphaMode`
             // directly as a Babylon alpha-mode constant; three.js materials (MeshBasicMaterial

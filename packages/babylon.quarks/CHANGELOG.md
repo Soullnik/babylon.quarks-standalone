@@ -9,7 +9,9 @@ and the project follows the `quarks.core` 0.x version line.
 Measured against Unity itself: the Unity exporter's parity capture renders a folder of effects in
 Unity, and `tools/unity-parity-compare` renders the same exports here through the same camera and
 compares the two. On the 15 effects of the first capture, image energy went from 3–40 % of Unity's
-to within about ±15 % for most, with matching particle counts, positions, sizes and colours.
+to within 5 % on nine and 15 % on twelve, with matching particle counts, positions, sizes and
+colours; the rest are made of a few large particles whose random draw moves them, or not yet
+explained (see `docs/UNITY_PARITY_AUDIT_HOVL.md`).
 
 ### Added
 
@@ -31,6 +33,20 @@ scale}`, rotation a quaternion) offsets, turns and stretches the emitter shape i
   `DefaultRenderingPipeline` with image processing on, say), particle colour leaves the shaders in
   linear space and blends there, as Babylon's own particles and a Unity Linear project do; the
   post-process converts to gamma. Materials rebuild when that setting changes.
+- **Material graphs.** A material may carry `graph`: what its shader computes for colour and alpha,
+  as a list of operations over its textures, the particle colour, UVs, time, the camera, the
+  screen position and the scene depth — what the Unity exporter compiles a Shader Graph into.
+  Billboards, stretched billboards and mesh particles draw with a fragment shader generated from
+  it (GLSL and WGSL, one shared shader per graph and render mode), so masks, noise, UV scrolling,
+  flow distortion and depth fade survive the export; a mesh drawn with a graph is unlit, the graph
+  alone deciding its colour, as in Unity. The loader resolves its textures and `toJSON` writes it
+  back. A graph that does not hold together is refused with a console warning and the material
+  draws as texture × colour, as trails always do. `buildGraphFragment(graph)` and the
+  `MaterialGraph` types are exported.
+- **Exact sRGB curves.** The particle shaders decode textures and encode colour with the exact sRGB
+  curves when the engine was created with `useExactSrgbConversions`, as Babylon's own materials
+  do, and with the 2.2 power otherwise. Unity uses the exact curves; the difference shows in dark,
+  faint parts of an effect.
 - `VFXBatch.isBatchMesh(mesh)` — whether a mesh is one of the renderer's own batch meshes, known by
   identity. Hosts listing scene meshes (e.g. as emission sources) can exclude them without relying
   on their names.

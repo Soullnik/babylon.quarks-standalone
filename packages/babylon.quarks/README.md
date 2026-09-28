@@ -173,6 +173,22 @@ come out dimmer and smaller than in Unity. The exporter writes Unity's coordinat
 Babylon's default handedness is Unity's — keep `scene.useRightHandedSystem` off to see an effect
 the way it was authored.
 
+Two more settings decide how close it gets:
+
+- **HDR or not.** In an HDR pipeline (as above) a particle brighter than 1 stays brighter than 1
+  through blending, as in a Unity camera with HDR on. An 8-bit target clamps each particle to 1
+  before it blends, as a Unity camera without HDR — or one rendering into an 8-bit render texture —
+  does. Heavily boosted alpha-blended smoke is where the two differ most.
+- **Exact sRGB.** Create the engine with `useExactSrgbConversions: true` and the particle shaders
+  decode textures and encode colour with the exact sRGB curves, as Unity's hardware does, instead
+  of Babylon's 2.2 power. The two differ mostly in dark, faint parts of an effect.
+
+A material exported from a **Shader Graph** carries what its graph computes (`graph` in the
+material JSON): masks, noise, UV scrolling, flow distortion, depth fade. Billboards, stretched
+billboards and mesh particles draw with a fragment shader generated from it, in GLSL and WGSL
+alike — a mesh then unlit, as the graph alone decides its colour; trails draw texture × colour. Its depth fade reads the batch's depth texture — the one soft
+particles use — and without one it does not fade.
+
 ## Links
 
 - [API documentation](https://soullnik.github.io/babylon.quarks-standalone/docs/)

@@ -157,6 +157,13 @@ namespace BabylonQuarks.UnityExporter
                 // linear value; only textures are decoded. Tell the runtime to do the same.
                 m.Set("vertexColorSpace", "linear");
             }
+            JObject graph = mat != null ? CompileShaderGraph(mat) : null;
+            if (graph != null)
+            {
+                // What the material's own shader computes; `texture` and `tint` stay as the
+                // approximation for renderers and render modes that draw without it.
+                m.Set("graph", graph);
+            }
             if (measured.Measured && !IsUntinted(measured.Tint))
             {
                 // The linear-space gain the material puts on the particle colour — an HDR colour
@@ -168,12 +175,106 @@ namespace BabylonQuarks.UnityExporter
             return uuid;
         }
 
+        /// <summary>
+        /// The material's Shader Graph, compiled with this material's values — or null when its
+        /// shader is not a Shader Graph in the project, or uses something the compiler does not
+        /// know (then the console says what, and the material draws as texture × colour).
+        /// </summary>
+        private JObject CompileShaderGraph(Material mat)
+        {
+            string path = mat.shader != null ? AssetDatabase.GetAssetPath(mat.shader) : null;
+            if (string.IsNullOrEmpty(path) || !File.Exists(path)) return null;
+            string text;
+            try
+            {
+                text = File.ReadAllText(path);
+            }
+            catch (IOException)
+            {
+                return null;
+            }
+            // A Shader Graph file is JSON; a ShaderLab file is not. Read by its content.
+            string start = text.TrimStart();
+            if (start.Length == 0 || start[0] != '{') return null;
+            var compiler = new ShaderGraphCompiler();
+            JObject graph = compiler.Compile(text, new GraphMaterialValues(this, mat));
+            if (graph == null)
+            {
+                Debug.LogWarning($"[Quarks Exporter] Material '{mat.name}': its Shader Graph is not exported ({compiler.Error}); it draws as texture × colour.");
+                return null;
+            }
+            if (PlayerSettings.colorSpace != ColorSpace.Linear) graph.Set("space", "gamma");
+            return graph;
+        }
+
+        /// <summary>A material's values as its Shader Graph reads them.</summary>
+        private sealed class GraphMaterialValues : IGraphMaterial
+        {
+            private readonly ExportContext _ctx;
+            private readonly Material _mat;
+
+            public GraphMaterialValues(ExportContext ctx, Material mat)
+            {
+                _ctx = ctx;
+                _mat = mat;
+            }
+
+            public float[] Value(string reference, GraphPropertyKind kind)
+            {
+                if (!_mat.HasProperty(reference)) return new float[4];
+                switch (kind)
+                {
+                    case GraphPropertyKind.Float:
+                    case GraphPropertyKind.Boolean:
+                        return new[] { _mat.GetFloat(reference), 0f, 0f, 0f };
+                    case GraphPropertyKind.Vector:
+                    {
+                        Vector4 v = _mat.GetVector(reference);
+                        return new[] { v.x, v.y, v.z, v.w };
+                    }
+                    default:
+                    {
+                        // In a Linear project a colour reaches the shader converted to linear —
+                        // an HDR one is used as it is.
+                        Color c = _mat.GetColor(reference);
+                        if (kind == GraphPropertyKind.Color && PlayerSettings.colorSpace == ColorSpace.Linear) c = new Color(c.linear.r, c.linear.g, c.linear.b, c.a);
+                        return new[] { c.r, c.g, c.b, c.a };
+                    }
+                }
+            }
+
+            public bool HasTexture(string reference) =>
+                reference != null && _mat.HasProperty(reference) && _mat.GetTexture(reference) != null;
+
+            public JToken Texture(string reference, float[] fallback)
+            {
+                Texture tex = HasTexture(reference) ? _mat.GetTexture(reference) : null;
+                if (tex == null)
+                {
+                    var color = new JArray();
+                    foreach (float f in fallback) color.Add(f);
+                    return new JObject().Set("color", color);
+                }
+                // Colour textures are decoded to linear when sampled; data textures are not.
+                bool srgb = !(AssetImporter.GetAtPath(AssetDatabase.GetAssetPath(tex)) is TextureImporter importer) || importer.sRGBTexture;
+                return new JObject().Set("texture", _ctx.AddTexture(tex)).Set("srgb", srgb && PlayerSettings.colorSpace == ColorSpace.Linear);
+            }
+
+            public float[] TextureTransform(string reference)
+            {
+                if (!_mat.HasProperty(reference)) return new[] { 1f, 1f, 0f, 0f };
+                Vector2 scale = _mat.GetTextureScale(reference);
+                Vector2 offset = _mat.GetTextureOffset(reference);
+                return new[] { scale.x, scale.y, offset.x, offset.y };
+            }
+        }
+
         private static bool IsUntinted(Vector4 t) =>
             Mathf.Abs(t.x - 1f) < 0.01f && Mathf.Abs(t.y - 1f) < 0.01f && Mathf.Abs(t.z - 1f) < 0.01f && Mathf.Abs(t.w - 1f) < 0.01f;
 
         private static double Round4(float v) => Math.Round(v, 4);
 
-        private string AddTexture(Texture tex, bool envAtlas = false)
+        internal string AddTexture(Texture tex, bool envAtlas = false)
         {
             string url = ResolveTextureUrl(tex);
             if (!_imageByUrl.TryGetValue(url, out var imageUuid))

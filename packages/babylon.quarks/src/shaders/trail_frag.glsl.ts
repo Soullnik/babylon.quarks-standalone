@@ -1,3 +1,5 @@
+import {srgbGlsl} from './srgb';
+
 export default /* glsl */ `
 varying vec2 vUV;
 varying vec4 vColor;
@@ -10,6 +12,7 @@ uniform sampler2D map;
 uniform vec4 tint;
 #endif
 
+${srgbGlsl}
 void main() {
     vec4 baseColor = vColor;
     vec4 texColor = vec4(1.0);
@@ -26,9 +29,9 @@ void main() {
     #ifdef LINEAR_VERTEX_COLOR
     // The particle colour is already a linear value — what a Unity project in Linear colour
     // space hands its shaders, unconverted. Only the texture needs decoding.
-    vec3 linearColor = pow(max(texColor.rgb, vec3(0.0)), vec3(2.2)) * vColor.rgb;
+    vec3 linearColor = quarksToLinear(texColor.rgb) * vColor.rgb;
     #else
-    vec3 linearColor = pow(max(baseColor.rgb, vec3(0.0)), vec3(2.2));
+    vec3 linearColor = quarksToLinear(baseColor.rgb);
     #endif
     #ifdef PREMULTIPLY_VERTEX_ALPHA
     linearColor *= vColor.a;
@@ -40,7 +43,7 @@ void main() {
     #ifdef LINEAR_OUTPUT
     baseColor.rgb = linearColor;
     #else
-    baseColor.rgb = pow(linearColor, vec3(1.0 / 2.2));
+    baseColor.rgb = quarksToGamma(linearColor);
     #endif
 #endif
 #if defined(PREMULTIPLY_VERTEX_ALPHA) && !defined(USE_TINT) && !defined(LINEAR_OUTPUT) && !defined(LINEAR_VERTEX_COLOR)

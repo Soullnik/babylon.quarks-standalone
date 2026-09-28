@@ -1,6 +1,8 @@
 import {VertexBuffer} from '@babylonjs/core/Buffers/buffer';
+import {Camera} from '@babylonjs/core/Cameras/camera';
 import {Constants} from '@babylonjs/core/Engines/constants';
 import {ShaderMaterial} from '@babylonjs/core/Materials/shaderMaterial';
+import type {BaseTexture} from '@babylonjs/core/Materials/Textures/baseTexture';
 import {RawTexture} from '@babylonjs/core/Materials/Textures/rawTexture';
 import {Vector2 as BVector2, Vector3 as BVector3, Vector4 as BVector4} from '@babylonjs/core/Maths/math.vector';
 import {VertexData} from '@babylonjs/core/Meshes/mesh.vertexData';
@@ -15,6 +17,7 @@ import {
     Vector3,
 } from 'quarks.core';
 import {VFXBatchSettings} from './BatchedRenderer';
+import {buildGraphFragment, GraphFragment, MaterialGraph, sourceHash} from './materialGraph';
 import local_particle_physics_vert from './shaders/local_particle_physics_vert.glsl';
 import local_particle_physics_vert_wgsl from './shaders/local_particle_physics_vert.wgsl';
 import particle_frag from './shaders/particle_frag.glsl';
@@ -147,11 +150,36 @@ export class SpriteBatch extends VFXBatch {
         this.buildExpandableBuffers();
     }
 
+    /** Fragment shaders built from material graphs, once per graph. */
+    private static graphFragments = new WeakMap<MaterialGraph, GraphFragment | null>();
+
+    /** The shader a material graph draws with, or null when it has none or it does not build. */
+    private graphFragment(): GraphFragment | null {
+        const graph = this.settings.materialGraph;
+        // Trails draw on their own path and keep texture × colour.
+        if (!graph) {
+            return null;
+        }
+        let fragment = SpriteBatch.graphFragments.get(graph);
+        if (fragment === undefined) {
+            try {
+                fragment = buildGraphFragment(graph);
+            } catch (e) {
+                console.warn(`babylon.quarks: ${(e as Error).message}; drawing the material as texture × colour.`);
+                fragment = null;
+            }
+            SpriteBatch.graphFragments.set(graph, fragment);
+        }
+        return fragment;
+    }
+
     rebuildMaterial(): void {
-        // The shader sources only depend on the render mode, so the store entry is
-        // registered once per mode. A unique name per rebuild would leak entries in
-        // Effect.ShadersStore and defeat Babylon's compiled-effect cache.
-        const shaderName = `quarksParticle_${this.settings.renderMode}`;
+        // The shader sources only depend on the render mode — or, for a material graph, on
+        // the graph — so the store entry is registered once for each. A unique name per rebuild
+        // would leak entries in Effect.ShadersStore and defeat Babylon's compiled-effect cache.
+        const graph = this.graphFragment();
+        const shaderName =
+            `quarksParticle_${this.settings.renderMode}` + (graph ? `_g${sourceHash(graph.glsl + graph.wgsl)}` : '');
         this.lastStretchedSpeedFactor = Number.NaN;
         const defines: string[] = [];
 
@@ -167,16 +195,23 @@ export class SpriteBatch extends VFXBatch {
             vertexShader = {glsl: particle_vert, wgsl: particle_vert_wgsl};
             fragmentShader = {glsl: particle_frag, wgsl: particle_frag_wgsl};
         }
+        if (graph) {
+            fragmentShader = {glsl: graph.glsl, wgsl: graph.wgsl};
+        }
 
         // Mesh batches without a diffuse map still need a sampler2D on iOS WebKit —
         // a zero-sampler particle mesh effect often never becomes drawable there.
-        const mapTexture =
-            this.settings.texture ??
-            (this.settings.renderMode === RenderMode.Mesh ? SpriteBatch.whiteTexture(this.scene) : null);
+        // A graph samples its own textures.
+        const mapTexture = graph
+            ? null
+            : (this.settings.texture ??
+              (this.settings.renderMode === RenderMode.Mesh ? SpriteBatch.whiteTexture(this.scene) : null));
         if (mapTexture) {
             defines.push('USE_MAP');
         }
-        const atlas = this.settings.reflectionAtlas;
+        // A graph is the material's whole shading: a mesh drawn with one is neither lit nor
+        // reflective, as a Shader Graph drawn by Unity has only what the graph computes.
+        const atlas = graph ? null : this.settings.reflectionAtlas;
         const atlasPending = this.settings.renderMode === RenderMode.Mesh && !!atlas && !atlas.isReady();
         if (atlasPending && atlas) {
             const onLoad = (atlas as {onLoadObservable?: {addOnce: (cb: () => void) => void}}).onLoadObservable;
@@ -194,10 +229,12 @@ export class SpriteBatch extends VFXBatch {
         if (this.settings.blendTiles) {
             defines.push('TILE_BLEND');
         }
-        if (this.settings.softParticles) {
+        // With a graph the define only makes the vertex stage hand over the clip position.
+        const softParticles = this.settings.softParticles && !graph;
+        if (softParticles || graph?.usesScreen) {
             defines.push('SOFT_PARTICLES');
         }
-        if (this.settings.materialAlphaTest > 0) {
+        if (this.settings.materialAlphaTest > 0 && !graph) {
             defines.push('USE_ALPHATEST');
         }
         if (this.settings.renderMode === RenderMode.VerticalBillBoard) {
@@ -239,16 +276,20 @@ export class SpriteBatch extends VFXBatch {
         if (this.settings.renderMode === RenderMode.StretchedBillBoard) {
             uniforms.push('speedFactor');
         }
-        if (this.settings.softParticles) {
+        if (softParticles) {
             uniforms.push('softParams');
             uniforms.push('projParams');
             samplers.push('depthTexture');
         }
-        if (this.settings.materialAlphaTest > 0) {
+        if (this.settings.materialAlphaTest > 0 && !graph) {
             uniforms.push('alphaTest');
         }
         this.addColorDefines(defines, uniforms);
-        if (this.settings.renderMode === RenderMode.Mesh) {
+        if (graph) {
+            uniforms.push(...graph.uniforms);
+            samplers.push(...graph.samplers);
+        }
+        if (this.settings.renderMode === RenderMode.Mesh && !graph) {
             uniforms.push('lightDirection');
             uniforms.push('lightColor');
             uniforms.push('ambientColor');
@@ -291,7 +332,10 @@ export class SpriteBatch extends VFXBatch {
         if (this.settings.renderMode === RenderMode.StretchedBillBoard) {
             mat.setFloat('speedFactor', this.settings.softNearFade > 0 ? this.settings.softNearFade : 1.0);
         }
-        if (this.settings.softParticles) {
+        if (graph) {
+            this.bindGraph(mat, graph);
+        }
+        if (softParticles) {
             mat.setVector2(
                 'softParams',
                 new BVector2(
@@ -310,11 +354,11 @@ export class SpriteBatch extends VFXBatch {
                 }
             });
         }
-        if (this.settings.materialAlphaTest > 0) {
+        if (this.settings.materialAlphaTest > 0 && !graph) {
             mat.setFloat('alphaTest', this.settings.materialAlphaTest);
         }
         this.bindColorUniforms(mat);
-        if (this.settings.renderMode === RenderMode.Mesh) {
+        if (this.settings.renderMode === RenderMode.Mesh && !graph) {
             mat.setVector3('lightDirection', new BVector3(0.4, -1, 0.6));
             mat.setVector3('lightColor', new BVector3(1, 1, 1));
             mat.setVector3('ambientColor', new BVector3(0.35, 0.35, 0.35));
@@ -333,6 +377,59 @@ export class SpriteBatch extends VFXBatch {
 
         this.mesh.material = mat;
         this.shaderMaterial = mat;
+    }
+
+    /** Binds a graph's textures, and the time, camera and depth it reads, every draw. */
+    private bindGraph(mat: ShaderMaterial, graph: GraphFragment): void {
+        const white = SpriteBatch.whiteTexture(this.scene);
+        const textures = this.settings.materialGraph!.textures;
+        for (const name of graph.samplers) {
+            if (name !== 'depthTexture') {
+                mat.setTexture(name, textures[Number(name.slice('graphTex'.length))]?.texture ?? white);
+            }
+        }
+        const time = new BVector4();
+        const planes = new BVector4();
+        const eye = new BVector3();
+        const forward = new BVector3();
+        let boundDepth = this.depthTexture;
+        if (graph.usesDepth) {
+            // An empty scene depth still needs a texture bound; the shader ignores it.
+            mat.setTexture('depthTexture', boundDepth ?? white);
+        }
+        mat.onBindObservable.add(() => {
+            const t = VFXBatch.graphTime();
+            time.set(t, Math.sin(t), Math.cos(t), this.scene.getEngine().getDeltaTime() / 1000);
+            mat.setVector4('graphTime', time);
+            const camera = this.scene.activeCamera;
+            if (camera) {
+                planes.set(
+                    camera.minZ,
+                    camera.maxZ,
+                    camera.mode === Camera.ORTHOGRAPHIC_CAMERA ? 1 : 0,
+                    this.depthTexture ? 1 : 0
+                );
+                eye.copyFrom(camera.globalPosition);
+                camera.getDirectionToRef(BVector3.Forward(this.scene.useRightHandedSystem), forward);
+                mat.setVector4('graphCamera', planes);
+                mat.setVector3('graphEye', eye);
+                mat.setVector3('graphForward', forward);
+            }
+            if (graph.usesDepth && boundDepth !== this.depthTexture) {
+                boundDepth = this.depthTexture;
+                mat.setTexture('depthTexture', this.depthTexture ?? white);
+            }
+        });
+    }
+
+    applyDepthTexture(depthTexture: BaseTexture | null): void {
+        super.applyDepthTexture(depthTexture);
+        if (this.graphFragment()?.usesDepth && !depthTexture) {
+            (this.mesh.material as ShaderMaterial | null)?.setTexture(
+                'depthTexture',
+                SpriteBatch.whiteTexture(this.scene)
+            );
+        }
     }
 
     private vector_ = new Vector3();

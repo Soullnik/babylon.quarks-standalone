@@ -12,9 +12,13 @@ npx tsx tools/unity-parity-compare/compare.mts QuarksParity_20260928_104449 out 
 npx tsx tools/unity-parity-compare/compare.mts QuarksParity_… out --linear --only "Fire ayra,Water aura"
 ```
 
-`--linear` blends in linear space through a post-processed half-float target, as a Unity project
-in Linear colour space does (check `environment.json` → `activeColorSpace`). Without it the scene is
-Babylon's default gamma-space one.
+`--linear` renders the way the capture did in a Linear project (check `environment.json` →
+`activeColorSpace`): into an 8-bit sRGB target, with the engine's exact sRGB curves. The capture
+renders into an 8-bit sRGB render texture, and URP takes an offscreen camera's colour format from
+its target, so every variant of it — `allowHDR` or not — clamps each fragment to 1 before blending,
+blends in linear space and encodes with the exact curve; a half-float target instead lets boosted
+alpha-blended smoke come out up to 1.6× too bright, and the 2.2 power loses faint edges. Without
+`--linear` the scene is Babylon's default gamma-space one.
 
 It needs a Chromium: Playwright's own, or any other through `PARITY_CHROMIUM=/path/to/chrome`.
 WebGL runs on SwiftShader when there is no GPU, which is fine at 512².
@@ -47,7 +51,10 @@ The report's columns, all babylon.quarks ÷ Unity and averaged over the frames u
 | count          | live particles, summed over systems                                        |
 
 The two simulations use different random numbers, so frames never match pixel for pixel; these
-statistics, the per-system aggregates and the side-by-side sheets are what to compare.
+statistics, the per-system aggregates and the side-by-side sheets are what to compare. babylon.quarks
+draws from a seeded generator, so a run repeats exactly and two exports of one effect compare like
+for like; an effect made of a few large particles (Smoke, Sleep) can still sit ±20 % off Unity's
+single sample.
 
 ## How the view is reproduced
 

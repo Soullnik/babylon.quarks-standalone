@@ -12,6 +12,7 @@ import {WebGPUEngine} from '@babylonjs/core/Engines/webgpuEngine';
 import {ShaderLanguage} from '@babylonjs/core/Materials/shaderLanguage';
 import {Scene} from '@babylonjs/core/scene';
 
+import {buildGraphFragment} from '../../packages/babylon.quarks/src/materialGraph';
 import meshVert from '../../packages/babylon.quarks/src/shaders/local_particle_physics_vert.wgsl';
 import particleFrag from '../../packages/babylon.quarks/src/shaders/particle_frag.wgsl';
 import physicsFrag from '../../packages/babylon.quarks/src/shaders/particle_physics_frag.wgsl';
@@ -19,6 +20,7 @@ import particleVert from '../../packages/babylon.quarks/src/shaders/particle_ver
 import stretchedVert from '../../packages/babylon.quarks/src/shaders/stretched_bb_particle_vert.wgsl';
 import trailFrag from '../../packages/babylon.quarks/src/shaders/trail_frag.wgsl';
 import trailVert from '../../packages/babylon.quarks/src/shaders/trail_vert.wgsl';
+import {kitchenSinkGraph, minimalGraph} from '../../packages/babylon.quarks/test/materialGraphFixtures';
 
 type Case = {
     name: string;
@@ -45,11 +47,13 @@ function cases(): Case[] {
     const mapOptions = [[], ['USE_MAP']];
     const softOptions = [[], ['SOFT_PARTICLES']];
     const alphaOptions = [[], ['USE_ALPHATEST']];
-    // Colour handling: none, a tint alone, and every colour-space path together.
+    // Colour handling: none, a tint alone, every colour-space path together, and the exact sRGB
+    // curves an engine created with useExactSrgbConversions defines.
     const colorOptions = [
         [],
         ['USE_TINT'],
         ['USE_TINT', 'LINEAR_OUTPUT', 'LINEAR_VERTEX_COLOR', 'PREMULTIPLY_VERTEX_ALPHA'],
+        ['USE_TINT', 'LINEAR_VERTEX_COLOR', 'USE_EXACT_SRGB_CONVERSIONS'],
     ];
 
     const push = (
@@ -117,7 +121,11 @@ function cases(): Case[] {
     );
 
     for (const map of mapOptions) {
-        for (const color of [[], ['USE_TINT', 'LINEAR_OUTPUT', 'LINEAR_VERTEX_COLOR', 'PREMULTIPLY_VERTEX_ALPHA']]) {
+        for (const color of [
+            [],
+            ['USE_TINT', 'LINEAR_OUTPUT', 'LINEAR_VERTEX_COLOR', 'PREMULTIPLY_VERTEX_ALPHA'],
+            ['USE_TINT', 'USE_EXACT_SRGB_CONVERSIONS'],
+        ]) {
             const defines = [...map, ...color];
             out.push({
                 name: `trail ${defines.length ? '[' + defines.join(',') + ']' : '[none]'}`,
@@ -136,6 +144,49 @@ function cases(): Case[] {
                 samplers: map.length ? ['map'] : [],
                 defines,
             });
+        }
+    }
+
+    // Material graphs replace the fragment stage of billboards, stretched billboards and meshes: one
+    // reading every operation and input, in both colour spaces, and one reading neither the
+    // screen nor the depth. The vertex stage hands over the clip position when the graph needs it.
+    const graphs = [
+        ['kitchen sink', kitchenSinkGraph()],
+        ['kitchen sink gamma', kitchenSinkGraph('gamma')],
+        ['minimal', minimalGraph()],
+    ] as const;
+    for (const [graphName, graph] of graphs) {
+        const fragment = buildGraphFragment(graph);
+        for (const [vertexName, vertex, attributes, extraUniforms, vertexDefines] of [
+            ['billboard', particleVert, SPRITE_ATTRS, [], []],
+            ['stretched freeform', stretchedVert, [...SPRITE_ATTRS, 'velocity'], ['speedFactor'], ['FREEFORM_STRETCH']],
+            ['mesh', meshVert, [...SPRITE_ATTRS, 'normal'], [], []],
+        ] as const) {
+            for (const tile of [[], ['UV_TILE'], ['UV_TILE', 'TILE_BLEND']])
+                for (const output of [[], ['LINEAR_OUTPUT']])
+                    for (const exact of [[], ['USE_EXACT_SRGB_CONVERSIONS']]) {
+                        const defines = [
+                            ...vertexDefines,
+                            ...tile,
+                            ...output,
+                            ...exact,
+                            ...(fragment.usesScreen ? ['SOFT_PARTICLES'] : []),
+                        ];
+                        out.push({
+                            name: `graph ${graphName} / ${vertexName} [${defines.join(',') || 'none'}]`,
+                            vertex,
+                            fragment: fragment.wgsl,
+                            attributes: [...attributes],
+                            uniforms: [
+                                ...SPRITE_UNIFORMS,
+                                ...extraUniforms,
+                                ...fragment.uniforms,
+                                ...(tile.length ? ['tileCountX', 'tileCountY'] : []),
+                            ],
+                            samplers: fragment.samplers,
+                            defines,
+                        });
+                    }
         }
     }
     return out;

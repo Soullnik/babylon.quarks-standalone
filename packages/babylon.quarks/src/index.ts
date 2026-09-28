@@ -13,6 +13,8 @@ export {
     ensureEnvAtlasFromCube,
     getCachedEnvAtlas,
 } from './envAtlas';
+export {buildGraphFragment} from './materialGraph';
+export type {GraphFragment, MaterialGraph, MaterialGraphNode, MaterialGraphTexture} from './materialGraph';
 export * from './materials/';
 export {MeshSurfaceEmitter, MeshSurfaceEmitterPlugin} from './MeshSurfaceEmitter';
 export {ParticleEmitter} from './ParticleEmitter';

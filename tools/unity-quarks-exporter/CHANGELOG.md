@@ -29,6 +29,21 @@ to be data the exporter did not carry.
 - **Linear colour space.** In a Linear project, materials are exported with
   `vertexColorSpace: "linear"`: Unity hands particle shaders the particle colour unconverted, and
   the runtime then does the same.
+- **Shader Graph materials.** A material whose shader is a Shader Graph in the project is exported
+  with what that graph computes (`graph`): the fragment side of the graph, from the Base Color,
+  Alpha and Alpha Clip blocks back, compiled with the material's own values into a small list of
+  operations the runtime turns into a shader. Masks, noise, UV scrolling and flow distortion, depth
+  fade, texture sheets sampled through Tiling And Offset — whatever the graph wires up from the
+  nodes the compiler knows (arithmetic, Lerp / Step / Smoothstep / Clamp / Remap, Branch and
+  Comparison, Split / Combine, UV, Vertex Color, Time, Sample Texture 2D, Tiling And Offset,
+  Screen Position, Scene Depth, Camera, and the graph's properties). Constant branches are
+  resolved and constants folded, so a toggled-off feature costs nothing. The graph file is
+  recognised by its content, not its name or extension. A graph using a node the compiler does
+  not know is left out with a console warning naming the node; the material then draws as
+  texture × `tint` as before, and `texture` / `tint` stay in every export as that fallback. On the
+  Hovl auras, against Unity's own frames: Water 3.05 → 0.95 of Unity's energy (its masked wave
+  layer drew as a bright rectangle), White 1.23 → 0.98 (its half-masked ring drew whole), Freeze
+  1.19 → 0.96, and Shine's coverage 0.55 → 0.98.
 
 ### Changed
 

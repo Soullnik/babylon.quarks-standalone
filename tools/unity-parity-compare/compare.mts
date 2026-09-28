@@ -5,8 +5,9 @@
  *
  *   npx tsx tools/unity-parity-compare/compare.mts <capture folder> <output folder> [--only "Fire ayra,Water aura"] [--linear]
  *
- * --linear blends in linear space through a post-processed half-float target, as a Unity project in
- * Linear colour space does; without it the scene is Babylon's default gamma-space one.
+ * --linear blends in linear space into an 8-bit sRGB target, as a Unity project in Linear colour
+ * space rendering into the capture's render texture does; without it the scene is Babylon's default
+ * gamma-space one.
  *
  * PARITY_CHROMIUM=<path to chrome> picks the browser when Playwright's own is not installed.
  *

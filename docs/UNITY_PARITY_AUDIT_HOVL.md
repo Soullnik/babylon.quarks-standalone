@@ -18,27 +18,29 @@ babylon.quarks with the same camera. That settled which causes matter and turned
 static audit could not see.
 
 **Energy** is the summed brightness over the frame (babylon.quarks ÷ Unity, mean over 24 frames);
-1.00 is a match. "Before": the exporter and runtime as they were. "After": every fix below, the
-scene blending in linear space.
+1.00 is a match. "Before": the exporter and runtime as they were, in Babylon's default scene.
+"After": every fix below, rendered the way the capture renders — linear blending into an 8-bit
+sRGB target with the exact sRGB curves (see below) — with the simulation's random numbers
+seeded, so a run repeats.
 
-| effect | before | after | | effect | before | after |
-| --- | ---: | ---: | --- | --- | ---: | ---: |
-| Fire | 0.28 | 1.06 | | Meteor | 0.12 | 0.99 |
-| Gold | 0.03 | 1.05 | | Soap | 0.15 | 1.02 |
-| Healing | 0.21 | 1.00 | | Acid | 0.90 | 1.01 |
-| Darkness | 0.02 | 1.13 | | Shine | 0.09 | 1.07 |
-| Lightning | 0.32 | 1.19 | | Smoke | 0.25 | 1.24 |
-| Blood | 0.45 | 1.29 | | Sleep | 0.75 | 1.31 |
-| White | 0.29 | 1.33 | | Freeze | 0.62 | 1.50 |
-| Water | 0.06 | 4.50 | | | | |
+| effect    | before | after |     | effect | before | after |
+| --------- | -----: | ----: | --- | ------ | -----: | ----: |
+| Fire      |   0.28 |  0.96 |     | Meteor |   0.12 |  0.93 |
+| Gold      |   0.03 |  0.97 |     | Soap   |   0.15 |  0.96 |
+| Healing   |   0.21 |  0.97 |     | Acid   |   0.90 |  0.96 |
+| Darkness  |   0.02 |  1.00 |     | Shine  |   0.09 |  0.86 |
+| Lightning |   0.32 |  0.82 |     | Smoke  |   0.25 |  0.80 |
+| Blood     |   0.45 |  1.44 |     | Sleep  |   0.75 |  1.11 |
+| White     |   0.29 |  0.98 |     | Freeze |   0.62 |  0.96 |
+| Water     |   0.06 |  0.95 |     |        |        |       |
 
-Particle counts now match Unity's within a few percent (they were 13–60 % short on seven
-effects), as do per-system positions, sizes and colours, and the centre of each effect sits within
-a few pixels of Unity's (up to 130 px off before). Water, Shine, White and Freeze bind the Shader
-Graph's `_Noise` / `_Flow` / `_Mask` textures — a mask on Water's wave layer, noise distortion —
-which quarks does not have. Blood and Sleep (~1.3) bind none of them; what still lifts them is not
-identified yet. The two simulations draw different random numbers, so an effect made of a few
-large particles (Smoke, Sleep) moves by ±20 % from run to run.
+Particle counts match Unity's within a few percent (they were 13–60 % short on seven effects), as
+do per-system positions, sizes and colours; coverage is within 3 % on eleven effects, and the
+centre of each effect sits within a few pixels of Unity's (up to 130 px off before). Blood, Smoke
+and Sleep are made of a few large particles, and one sample of Unity's random numbers against one
+of ours moves them a lot: Blood reads anywhere from 1.00 to 1.44 depending on the seed. Lightning
+(0.82, and 0.89 of Unity's height) is the one effect still consistently short; why is not
+established yet.
 
 What the measurement showed, in order of how much it moved:
 
@@ -69,6 +71,25 @@ What the measurement showed, in order of how much it moved:
    its Trails — exported as untextured billboards: white squares. _Exporter: such a system goes on
    no layer (still simulated, not drawn), or is drawn as quarks trails when it has trails;
    runtime: `layers` now reaches the batch mesh — it was stored and never applied._
+
+10. **Shader Graph materials.** Water, Shine, White and Freeze draw with Hovl's Shader Graph,
+    which masks, scrolls and distorts its textures (`_Mask`, `_Noise`, `_Flow`) and fades by scene
+    depth. As texture × colour, Water's masked wave layer drew as a bright rectangle (3× Unity's
+    energy), Freeze's swirls as white blobs, White's rotating half-masked ring as a full ring.
+    _Exporter: the graph is compiled with the material's values into a list of operations
+    (`graph`); runtime: billboards, stretched billboards and meshes draw with a fragment shader
+    generated from it._ Water 3.05 → 0.95, White 1.23 → 0.98, Freeze 1.19 → 0.96, Shine's
+    coverage 0.55 → 0.98 (energy 0.62 → 0.86).
+
+Measuring it turned up one thing about the capture itself: it renders into an 8-bit sRGB render
+texture, and URP takes an offscreen camera's colour format from its target, so every variant of
+the capture — `allowHDR` or not — clamps each fragment to 1 before blending (the `post_*`
+variants' energy is within a few percent of the raw ones'). Heavily boosted alpha-blended smoke (Shine's gain is 18×)
+is what that clamps; a half-float target let it come out 1.6× too bright. The comparison now
+renders into the same kind of target, with the exact sRGB curves Unity's hardware uses — the 2.2
+power Babylon uses by default loses faint edges (coverage 0.85 instead of 0.98). In a Unity
+camera with HDR on the clamp does not happen, as it does not in an HDR Babylon pipeline; and
+babylon.quarks follows `useExactSrgbConversions` on the engine for the curves.
 
 And what it ruled out: **bloom and grading barely matter at this distance.** The pack's volume
 (Bloom threshold 1, intensity 5) changes Unity's frames by a few percent — little of any effect

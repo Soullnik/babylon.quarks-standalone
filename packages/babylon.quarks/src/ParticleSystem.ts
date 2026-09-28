@@ -45,6 +45,7 @@ import {
 import {BatchedRenderer, VFXBatchSettings} from './BatchedRenderer';
 import {ensureEnvAtlasFromCube, getCachedEnvAtlas} from './envAtlas';
 import {ensureTriangleIndices} from './geometryUtil';
+import type {MaterialGraph} from './materialGraph';
 import {ParticleEmitter} from './ParticleEmitter';
 import {RenderMode} from './VFXBatch';
 
@@ -82,6 +83,24 @@ function fallbackUVsForPositions(positions: Float32Array): Float32Array {
     return new Float32Array((positions.length / 3) * 2);
 }
 const DEFAULT_INDICES = new Uint32Array([0, 1, 2, 0, 2, 3]);
+
+/** A material graph for JSON: its textures registered in the metadata, like the main texture. */
+function serializeGraph(graph: MaterialGraph, meta: BabylonMetaData): unknown {
+    return {
+        textures: graph.textures.map((entry) => {
+            if (!entry.texture) {
+                return entry.color ? {color: [...entry.color]} : {color: [1, 1, 1, 1]};
+            }
+            const uuid = ParticleSystem.registerTextureMeta(entry.texture, meta);
+            return {texture: uuid, srgb: entry.srgb !== false};
+        }),
+        nodes: graph.nodes.map((node) => ({...node})),
+        color: graph.color,
+        alpha: graph.alpha,
+        ...(graph.alphaClip !== undefined ? {alphaClip: graph.alphaClip} : {}),
+        ...(graph.space ? {space: graph.space} : {}),
+    };
+}
 
 function isTinted(tint: readonly number[] | undefined): boolean {
     return tint !== undefined && (tint[0] !== 1 || tint[1] !== 1 || tint[2] !== 1 || tint[3] !== 1);
@@ -579,6 +598,7 @@ export class ParticleSystem implements IParticleSystem {
             layerMask: parameters.layerMask ?? 0x0fffffff,
             materialTint: [1, 1, 1, 1],
             vertexColorLinear: false,
+            materialGraph: null,
         };
         if (this.rendererSettings.renderMode === RenderMode.Mesh && !this.rendererSettings.instancingNormals) {
             this.rendererSettings.instancingNormals = ParticleSystem.createFallbackNormals(
@@ -736,6 +756,7 @@ export class ParticleSystem implements IParticleSystem {
                 ? [Number(tint[0]), Number(tint[1]), Number(tint[2]), tint.length > 3 ? Number(tint[3]) : 1]
                 : [1, 1, 1, 1];
         this.rendererSettings.vertexColorLinear = material?.vertexColorSpace === 'linear';
+        this.rendererSettings.materialGraph = material?.graph ?? null;
         this.rendererSettings.materialBlendMode = resolvedBlendMode;
         this.rendererSettings.materialTransparent = resolvedTransparent;
         this.rendererSettings.materialDepthTest = resolvedDepthTest;
@@ -1588,6 +1609,13 @@ export class ParticleSystem implements IParticleSystem {
         return geometryUUID;
     }
 
+    /** Registers a texture in the serialization metadata under a fresh uuid. */
+    static registerTextureMeta(texture: BaseTexture, meta: BabylonMetaData): string {
+        const uuid = ParticleSystem.nextSerializationId('quarks_texture');
+        meta.textures[uuid] = texture as Texture;
+        return uuid;
+    }
+
     private ensureMaterialMeta(meta: BabylonMetaData): string {
         const texture = this.rendererSettings.texture;
         let textureUUID: string | undefined;
@@ -1617,6 +1645,9 @@ export class ParticleSystem implements IParticleSystem {
             reflectionLevel: this.rendererSettings.reflectionLevel,
             ...(isTinted(this.rendererSettings.materialTint) ? {tint: [...this.rendererSettings.materialTint!]} : {}),
             ...(this.rendererSettings.vertexColorLinear ? {vertexColorSpace: 'linear'} : {}),
+            ...(this.rendererSettings.materialGraph
+                ? {graph: serializeGraph(this.rendererSettings.materialGraph, meta)}
+                : {}),
             sourceMaterial: this.materialRef ?? undefined,
         };
         return materialUUID;

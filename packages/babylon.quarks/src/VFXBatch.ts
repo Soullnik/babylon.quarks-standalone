@@ -6,10 +6,12 @@ import {Vector4} from '@babylonjs/core/Maths/math.vector';
 import type {AbstractMesh} from '@babylonjs/core/Meshes/abstractMesh';
 import {Mesh} from '@babylonjs/core/Meshes/mesh';
 import type {Observer} from '@babylonjs/core/Misc/observable';
+import {PrecisionDate} from '@babylonjs/core/Misc/precisionDate';
 import {Scene} from '@babylonjs/core/scene';
 import type {Nullable} from '@babylonjs/core/types';
 import {IParticleSystem} from 'quarks.core';
 import {VFXBatchSettings} from './BatchedRenderer';
+import type {MaterialGraph} from './materialGraph';
 
 export enum RenderMode {
     BillBoard = 0,
@@ -47,6 +49,7 @@ export interface StoredBatchSettings {
     stretchFreeform: boolean;
     materialTint: [number, number, number, number];
     vertexColorLinear: boolean;
+    materialGraph: MaterialGraph | null;
 }
 
 export abstract class VFXBatch {
@@ -99,6 +102,7 @@ export abstract class VFXBatch {
             stretchFreeform: settings.stretchFreeform ?? false,
             materialTint: settings.materialTint ? [...settings.materialTint] : [1, 1, 1, 1],
             vertexColorLinear: settings.vertexColorLinear ?? false,
+            materialGraph: settings.materialGraph ?? null,
         };
         this.mesh = this.createBatchMesh('vfxBatch');
         this.imageProcessingObserver = scene.imageProcessingConfiguration.onUpdateParameters.add(() => {
@@ -193,7 +197,20 @@ export abstract class VFXBatch {
         return visibleSystems;
     }
 
+    /** The scene depth the renderer handed over, for soft particles and material graphs. */
+    protected depthTexture: BaseTexture | null = null;
+
+    /** Seconds since the first material graph asked — the clock a graph's Time node reads. */
+    static graphTime(): number {
+        const now = PrecisionDate.Now / 1000;
+        if (VFXBatch.graphClockStart < 0) VFXBatch.graphClockStart = now;
+        return now - VFXBatch.graphClockStart;
+    }
+
+    private static graphClockStart = -1;
+
     applyDepthTexture(depthTexture: BaseTexture | null): void {
+        this.depthTexture = depthTexture;
         const material = this.mesh.material;
         if (material && material instanceof ShaderMaterial) {
             material.setTexture('depthTexture', depthTexture);

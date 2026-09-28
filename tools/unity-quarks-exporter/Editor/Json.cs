@@ -50,6 +50,7 @@ namespace BabylonQuarks.UnityExporter
     {
         private readonly double _v;
         public JNumber(double v) { _v = v; }
+        public double Value => _v;
 
         internal override void Write(StringBuilder sb, int indent)
         {
