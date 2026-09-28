@@ -122,8 +122,10 @@ gradients sample both color and alpha keys.
   cubemap bound (whatever the property is called), it is baked into a 3×2
   `reflectionAtlas` (px py pz / nx ny nz) so babylon.quarks can sample reflections on iOS.
   Materials without a cubemap export lit/diffuse only. Skybox is not used as a fallback.
-- Modules with no quarks counterpart (Lights, Trails ribbon, Custom Data, Collision triggers) are
-  skipped.
+- **Trails:** a system that draws only trails (Render Mode None) exports as quarks trails with its
+  trail material and a length from the trail lifetime; width and colour over the trail are not
+  carried. A system drawing both particles and trails exports its particles only.
+- Modules with no quarks counterpart (Lights, Custom Data, Collision triggers) are skipped.
 
 ## Layout
 

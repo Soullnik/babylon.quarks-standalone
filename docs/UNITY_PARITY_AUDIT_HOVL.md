@@ -23,21 +23,22 @@ scene blending in linear space.
 
 | effect | before | after | | effect | before | after |
 | --- | ---: | ---: | --- | --- | ---: | ---: |
-| Fire | 0.28 | 1.09 | | Meteor | 0.12 | 0.98 |
-| Gold | 0.03 | 1.03 | | Soap | 0.15 | 1.02 |
-| Healing | 0.21 | 1.01 | | Smoke | 0.25 | 0.83 |
-| Darkness | 0.02 | 1.13 | | Lightning | 0.32 | 1.10 |
-| Blood | 0.45 | 1.42 | | White | 0.29 | 1.33 |
-| Acid | 0.90 | 1.51 | | Freeze | 0.62 | 1.49 |
-| Shine | 0.09 | 1.17 | | Sleep | 0.75 | 1.29 |
-| Water | 0.06 | 4.49 | | | | |
+| Fire | 0.28 | 1.06 | | Meteor | 0.12 | 0.99 |
+| Gold | 0.03 | 1.05 | | Soap | 0.15 | 1.02 |
+| Healing | 0.21 | 1.00 | | Acid | 0.90 | 1.01 |
+| Darkness | 0.02 | 1.13 | | Shine | 0.09 | 1.07 |
+| Lightning | 0.32 | 1.19 | | Smoke | 0.25 | 1.24 |
+| Blood | 0.45 | 1.29 | | Sleep | 0.75 | 1.31 |
+| White | 0.29 | 1.33 | | Freeze | 0.62 | 1.50 |
+| Water | 0.06 | 4.50 | | | | |
 
 Particle counts now match Unity's within a few percent (they were 13–60 % short on seven
 effects), as do per-system positions, sizes and colours, and the centre of each effect sits within
 a few pixels of Unity's (up to 130 px off before). Water, Shine, White and Freeze bind the Shader
 Graph's `_Noise` / `_Flow` / `_Mask` textures — a mask on Water's wave layer, noise distortion —
-which quarks does not have. Acid, Blood and Sleep (1.3–1.5) bind none of them; what still lifts
-them is not identified yet.
+which quarks does not have. Blood and Sleep (~1.3) bind none of them; what still lifts them is not
+identified yet. The two simulations draw different random numbers, so an effect made of a few
+large particles (Smoke, Sleep) moves by ±20 % from run to run.
 
 What the measurement showed, in order of how much it moved:
 
@@ -64,6 +65,10 @@ What the measurement showed, in order of how much it moved:
 8. **Default-Particle** (a Legacy premultiply shader) cannot be read statically and exported as
    alpha blend; the measured blend is premultiplied. _Exporter: measured blend when unreadable;
    runtime: premultiplied mode premultiplies the particle colour._
+9. **Systems Unity draws nothing for** — Acid's trail system has Render Mode None and draws only
+   its Trails — exported as untextured billboards: white squares. _Exporter: such a system goes on
+   no layer (still simulated, not drawn), or is drawn as quarks trails when it has trails;
+   runtime: `layers` now reaches the batch mesh — it was stored and never applied._
 
 And what it ruled out: **bloom and grading barely matter at this distance.** The pack's volume
 (Bloom threshold 1, intensity 5) changes Unity's frames by a few percent — little of any effect

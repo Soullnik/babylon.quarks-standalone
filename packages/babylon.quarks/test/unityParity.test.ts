@@ -322,3 +322,19 @@ describe('material colour', () => {
         system.dispose();
     });
 });
+
+describe('layers', () => {
+    it('puts the batch on the systems layers, so a system on none is simulated but not drawn', () => {
+        const renderer = new BatchedRenderer('layers', scene);
+        const hidden = burstSystem([burst(0, 1, 0.01)], {layerMask: 0});
+        const shown = burstSystem([burst(0, 1, 0.01)], {layerMask: 1});
+        renderer.addSystem(hidden);
+        renderer.addSystem(shown);
+        expect(renderer.batches.map((b) => b.mesh.layerMask).sort()).toEqual([0, 1]);
+        renderer.update(STEP);
+        expect(hidden.particleNum).toBe(1);
+        renderer.dispose();
+        hidden.dispose();
+        shown.dispose();
+    });
+});

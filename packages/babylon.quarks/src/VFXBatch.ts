@@ -162,6 +162,8 @@ export abstract class VFXBatch {
     protected createBatchMesh(name: string): Mesh {
         const mesh = new Mesh(name, this.scene);
         mesh.alwaysSelectAsActiveMesh = true;
+        // The systems' layers: a camera draws the batch only when its layerMask shares a bit.
+        mesh.layerMask = this.settings.layerMask;
         VFXBatch.batchMeshes.add(mesh);
         return mesh;
     }

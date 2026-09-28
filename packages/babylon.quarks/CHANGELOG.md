@@ -52,6 +52,10 @@ scale}`, rotation a quaternion) offsets, turns and stretches the emitter shape i
   VelocityOverLife, orbits and the like do not touch: particles rising by velocity-over-life drew as
   short dashes pointing at the camera. The streak now follows the particle's total motion, as
   Unity's does.
+- **`layers` did nothing.** A system's layer mask (`layers` in JSON, `ps.layers.mask`) was stored
+  and batched on but never reached the batch mesh, so every system drew for every camera. It now
+  sets the batch mesh's `layerMask`: a camera draws a system when their masks share a bit, and a
+  system on no layer still simulates but is not drawn.
 - **Premultiplied blending with a fading particle.** In premultiplied mode the particle colour is
   premultiplied by its own alpha in the shader, so fading alpha fades the colour too instead of
   leaving an additive-looking glow.

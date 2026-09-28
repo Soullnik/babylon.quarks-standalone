@@ -15,8 +15,19 @@ namespace BabylonQuarks.UnityExporter
             var main = ps.main;
             var behaviors = new JArray();
 
-            string materialUuid = ctx.AddMaterialForRenderer(renderer);
-            int renderMode = MapRenderMode(renderer.renderMode);
+            // What Unity draws for this system: its particles, their trails, both or nothing.
+            bool drawsParticles = renderer.enabled && renderer.renderMode != ParticleSystemRenderMode.None;
+            bool drawsTrails = renderer.enabled && ps.trails.enabled && renderer.trailMaterial != null;
+            // Particles that are not drawn but leave trails are drawn as quarks trails instead;
+            // quarks draws a system one way, so where Unity draws both, the trails are left out.
+            bool trailsInstead = !drawsParticles && drawsTrails;
+            if (drawsParticles && drawsTrails)
+            {
+                Debug.LogWarning($"[Quarks Exporter] '{ps.name}' draws both particles and trails; quarks draws a system one way, so its trails are not exported.");
+            }
+
+            string materialUuid = trailsInstead ? ctx.AddMaterial(renderer.trailMaterial) : ctx.AddMaterialForRenderer(renderer);
+            int renderMode = trailsInstead ? 3 : MapRenderMode(renderer.renderMode);
             string geometryUuid = renderMode == 2 && renderer.mesh != null ? ctx.AddGeometryForMesh(renderer.mesh) : null;
             JToken emissionOverTime = EmissionRate(ps, true);
             JToken startLife = AvoidKnifeEdgeLifetime(main.startLifetime, ps.emission);
@@ -40,9 +51,11 @@ namespace BabylonQuarks.UnityExporter
                 .Set("onlyUsedByOther", ctx.IsSubTarget(ps))
                 .Set("renderMode", renderMode)
                 .Set("renderOrder", renderer.sortingOrder)
-                .Set("rendererEmitterSettings", BuildRendererSettings(renderer, renderMode))
+                .Set("rendererEmitterSettings", trailsInstead ? BuildTrailSettings(ps) : BuildRendererSettings(renderer, renderMode))
                 .Set("material", materialUuid)
-                .Set("layers", 1);
+                // A system Unity draws nothing for still simulates — it may feed sub-emitters —
+                // but is on no layer, so no camera renders it.
+                .Set("layers", drawsParticles || drawsTrails ? 1 : 0);
 
             if (geometryUuid != null)
             {
@@ -311,6 +324,30 @@ namespace BabylonQuarks.UnityExporter
                 return settings;
             }
             return new JObject();
+        }
+
+        /// <summary>
+        /// Trail length for quarks, which keeps one point per 1/60 s step: Unity's trail lifetime
+        /// is a fraction of the particle's. Width and colour over the trail are not carried.
+        /// </summary>
+        private static JObject BuildTrailSettings(ParticleSystem ps)
+        {
+            float lifetime = MaxOf(ps.main.startLifetime);
+            float fraction = MaxOf(ps.trails.lifetime);
+            int points = Mathf.Clamp(Mathf.RoundToInt(lifetime * fraction * 60f), 2, 256);
+            return new JObject()
+                .Set("startLength", ValueConverter.Constant(points))
+                .Set("followLocalOrigin", false);
+        }
+
+        private static float MaxOf(ParticleSystem.MinMaxCurve c)
+        {
+            switch (c.mode)
+            {
+                case ParticleSystemCurveMode.Constant: return c.constant;
+                case ParticleSystemCurveMode.TwoConstants: return c.constantMax;
+                default: return c.curveMultiplier;
+            }
         }
 
         // ---- Texture Sheet Animation -----------------------------------------------------

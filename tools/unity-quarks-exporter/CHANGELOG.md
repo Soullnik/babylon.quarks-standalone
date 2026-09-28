@@ -63,6 +63,12 @@ to be data the exporter did not carry.
   importer's Alpha Source often takes alpha from the colour's grayscale (or drops it), and particle
   textures are usually opaque files imported that way. They drew as opaque squares. The exported
   image now carries the alpha Unity uses.
+- **Systems Unity draws nothing for.** A system with Render Mode None (or its renderer off) was
+  exported as untextured billboards — white squares. It is now exported on no layer (still
+  simulated, since it may feed sub-emitters, but not drawn), or, when it leaves Trails, drawn as
+  quarks trails with the trail material and a length from the trail lifetime. A system that draws
+  both particles and trails keeps its particles and says in the console that its trails are left
+  out.
 - **Shape module off.** Unity then emits from the system's origin straight along +Z; the exporter
   wrote a point emitter, which sprays in every direction. It now writes a cone of no radius and
   no angle.

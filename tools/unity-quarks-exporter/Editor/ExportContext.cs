@@ -74,9 +74,11 @@ namespace BabylonQuarks.UnityExporter
 
         // ---- material / texture --------------------------------------------------------
 
-        public string AddMaterialForRenderer(ParticleSystemRenderer renderer)
+        public string AddMaterialForRenderer(ParticleSystemRenderer renderer) =>
+            AddMaterial(renderer != null ? renderer.sharedMaterial : null);
+
+        public string AddMaterial(Material mat)
         {
-            Material mat = renderer != null ? renderer.sharedMaterial : null;
             Texture tex = mat != null ? mat.mainTexture : null;
             string textureUuid = tex != null ? AddTexture(tex) : null;
             LastBlendMode = DetectBlend(mat, out string blendSource);
