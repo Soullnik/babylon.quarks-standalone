@@ -21,18 +21,19 @@ static audit could not see.
 1.00 is a match. "Before": the exporter and runtime as they were, in Babylon's default scene.
 "After": every fix below, rendered the way the capture renders — linear blending into an 8-bit
 sRGB target with the exact sRGB curves (see below) — with the simulation's random numbers
-seeded, so a run repeats.
+seeded, so a run repeats. The "after" column is the exporter's own output, from a second capture
+made with it (with texture wrap modes as this version exports them — see note 11).
 
 | effect    | before | after |     | effect | before | after |
 | --------- | -----: | ----: | --- | ------ | -----: | ----: |
 | Fire      |   0.28 |  0.96 |     | Meteor |   0.12 |  0.93 |
 | Gold      |   0.03 |  0.97 |     | Soap   |   0.15 |  0.96 |
-| Healing   |   0.21 |  0.97 |     | Acid   |   0.90 |  0.96 |
-| Darkness  |   0.02 |  1.00 |     | Shine  |   0.09 |  0.86 |
+| Healing   |   0.21 |  0.97 |     | Acid   |   0.90 |  0.99 |
+| Darkness  |   0.02 |  1.00 |     | Shine  |   0.09 |  0.85 |
 | Lightning |   0.32 |  0.82 |     | Smoke  |   0.25 |  0.80 |
 | Blood     |   0.45 |  1.44 |     | Sleep  |   0.75 |  1.11 |
-| White     |   0.29 |  0.98 |     | Freeze |   0.62 |  0.96 |
-| Water     |   0.06 |  0.95 |     |        |        |       |
+| White     |   0.29 |  0.99 |     | Freeze |   0.62 |  0.96 |
+| Water     |   0.06 |  0.96 |     |        |        |       |
 
 Particle counts match Unity's within a few percent (they were 13–60 % short on seven effects), as
 do per-system positions, sizes and colours; coverage is within 3 % on eleven effects, and the
@@ -80,6 +81,16 @@ What the measurement showed, in order of how much it moved:
     (`graph`); runtime: billboards, stretched billboards and meshes draw with a fragment shader
     generated from it._ Water 3.05 → 0.95, White 1.23 → 0.98, Freeze 1.19 → 0.96, Shine's
     coverage 0.55 → 0.98 (energy 0.62 → 0.86).
+
+11. **Texture wrap modes** were all exported as clamp. Hovl's masks and noise are Repeat textures
+    scrolled across the particle; clamped, the scroll smeared the edge row and White's ring drew
+    whole (1.55 → 0.99). _Exporter: each texture keeps its wrap mode._
+12. **The root glow of every aura** — one soft Default-Particle (premultiplied) burst particle a
+    second, living 1.5 s, so each fades in over the last as a steady pulse. In a gamma-space
+    scene the new particle visibly popped in over the old one: the shader premultiplied the
+    particle alpha before the conversion to gamma, so a faint particle added its colour at
+    alpha^(1/2.2). _Runtime: premultiplied in the space the blending runs in._ Linear output was
+    not affected.
 
 Measuring it turned up one thing about the capture itself: it renders into an 8-bit sRGB render
 texture, and URP takes an offscreen camera's colour format from its target, so every variant of

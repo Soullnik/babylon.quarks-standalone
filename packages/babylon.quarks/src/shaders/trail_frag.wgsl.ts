@@ -35,9 +35,6 @@ fn main(input: FragmentInputs) -> FragmentOutputs {
     #else
     var linearColor = quarksToLinear(baseColor.rgb);
     #endif
-    #ifdef PREMULTIPLY_VERTEX_ALPHA
-    linearColor *= fragmentInputs.vColor.a;
-    #endif
     #ifdef USE_TINT
     linearColor *= uniforms.tint.rgb;
     baseColor.a *= uniforms.tint.a;
@@ -48,9 +45,12 @@ fn main(input: FragmentInputs) -> FragmentOutputs {
     baseColor = vec4f(quarksToGamma(linearColor), baseColor.a);
     #endif
 #endif
-#if defined(PREMULTIPLY_VERTEX_ALPHA) && !defined(USE_TINT) && !defined(LINEAR_OUTPUT) && !defined(LINEAR_VERTEX_COLOR)
+#ifdef PREMULTIPLY_VERTEX_ALPHA
     // Premultiplied blending takes the texture as premultiplied, but the particle colour is
     // straight: premultiply it too, or fading a particle's alpha would leave its colour lit.
+    // In the space the blending runs in, so after any conversion to gamma: premultiplied in
+    // linear and then encoded, a faint particle would add far more colour (alpha^(1/2.2)) than
+    // its alpha takes away from what is behind it, and pop in instead of fading in.
     baseColor = vec4f(baseColor.rgb * fragmentInputs.vColor.a, baseColor.a);
 #endif
 

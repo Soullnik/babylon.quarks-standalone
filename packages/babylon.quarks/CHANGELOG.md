@@ -74,7 +74,11 @@ scale}`, rotation a quaternion) offsets, turns and stretches the emitter shape i
   system on no layer still simulates but is not drawn.
 - **Premultiplied blending with a fading particle.** In premultiplied mode the particle colour is
   premultiplied by its own alpha in the shader, so fading alpha fades the colour too instead of
-  leaving an additive-looking glow.
+  leaving an additive-looking glow. It is premultiplied in the space the blending runs in: with a
+  tint or linear vertex colour in a gamma-space scene it was premultiplied before the conversion
+  to gamma, so a particle fading in added its colour at alpha^(1/2.2) — a burst particle fading
+  in over the one before (the soft glow at the root of an aura) popped in over it instead of
+  blending into a steady pulse.
 
 ### Changed
 

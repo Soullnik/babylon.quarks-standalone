@@ -74,6 +74,11 @@ to be data the exporter did not carry.
 
 ### Fixed
 
+- **Texture wrap modes.** Every texture was exported clamped. A texture now keeps its own wrap
+  mode (Repeat, Clamp, Mirror): a Shader Graph scrolling a noise or mask across the particle
+  reads past the edge, and clamped it smeared the edge row instead — White's scrolling mask
+  stopped masking and its ring drew whole, at 1.55× Unity's energy (now 0.99).
+
 - **Texture alpha as Unity imports it.** Textures were embedded as their source files, but the
   importer's Alpha Source often takes alpha from the colour's grayscale (or drops it), and particle
   textures are usually opaque files imported that way. They drew as opaque squares. The exported

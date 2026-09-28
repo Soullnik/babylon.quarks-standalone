@@ -274,6 +274,21 @@ namespace BabylonQuarks.UnityExporter
 
         private static double Round4(float v) => Math.Round(v, 4);
 
+        /// <summary>A Unity wrap mode as the three.js constant the loader reads.</summary>
+        private static int WrapMode(TextureWrapMode mode)
+        {
+            switch (mode)
+            {
+                case TextureWrapMode.Repeat:
+                    return 1000; // RepeatWrapping
+                case TextureWrapMode.Mirror:
+                case TextureWrapMode.MirrorOnce: // nearest there is: mirrored once, then clamped
+                    return 1002; // MirroredRepeatWrapping
+                default:
+                    return 1001; // ClampToEdgeWrapping
+            }
+        }
+
         internal string AddTexture(Texture tex, bool envAtlas = false)
         {
             string url = ResolveTextureUrl(tex);
@@ -284,11 +299,16 @@ namespace BabylonQuarks.UnityExporter
                 Images.Add(new JObject().Set("uuid", imageUuid).Set("url", url));
             }
             string texUuid = NewId("quarks_texture");
+            // The texture's own wrap modes: a Shader Graph scrolling a noise or mask across the
+            // particle reads past 0–1 and needs Repeat where the texture has it. The env atlas is
+            // a baked 3×2 sheet and always clamps.
             var t = new JObject()
                 .Set("uuid", texUuid)
                 .Set("name", tex.name)
                 .Set("image", imageUuid)
-                .Set("wrap", new JArray().Add(1001).Add(1001));
+                .Set("wrap", envAtlas
+                    ? new JArray().Add(1001).Add(1001)
+                    : new JArray().Add(WrapMode(tex.wrapModeU)).Add(WrapMode(tex.wrapModeV)));
             if (envAtlas)
             {
                 // Match babylon.quarks env-atlas sampling (invertY:false, no mips).

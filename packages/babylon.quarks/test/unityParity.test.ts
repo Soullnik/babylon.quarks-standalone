@@ -12,6 +12,9 @@ import {BatchedRenderer} from '../src/BatchedRenderer';
 import type {BurstParameters} from '../src/ParticleSystem';
 import {ParticleSystem} from '../src/ParticleSystem';
 import {QuarksLoader} from '../src/QuarksLoader';
+import particleFragShader from '../src/shaders/particle_frag.glsl';
+import particlePhysicsFragShader from '../src/shaders/particle_physics_frag.glsl';
+import trailFragShader from '../src/shaders/trail_frag.glsl';
 import {RenderMode} from '../src/VFXBatch';
 
 let engine: NullEngine;
@@ -306,6 +309,16 @@ describe('material colour', () => {
             expect.arrayContaining(['PREMULTIPLY_VERTEX_ALPHA'])
         );
         for (const r of [plain, tinted, premultiplied]) r.dispose();
+    });
+
+    it('premultiplies by the particle alpha in the space the blending runs in', () => {
+        // After the conversion to gamma, not before: premultiplied in linear and then encoded, a
+        // particle fading in would add its colour at alpha^(1/2.2) and pop in over the one behind.
+        for (const source of [particleFragShader, particlePhysicsFragShader, trailFragShader]) {
+            const premultiply = source.indexOf('#ifdef PREMULTIPLY_VERTEX_ALPHA');
+            expect(premultiply).toBeGreaterThan(source.indexOf('quarksToGamma(linearColor)'));
+            expect(source.indexOf('#ifdef PREMULTIPLY_VERTEX_ALPHA', premultiply + 1)).toBe(-1);
+        }
     });
 
     it('outputs linear colour while the scene runs image processing as a post-process', () => {
