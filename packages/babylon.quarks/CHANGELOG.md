@@ -44,6 +44,16 @@ scale}`, rotation a quaternion) offsets, turns and stretches the emitter shape i
   back. A graph that does not hold together is refused with a console warning and the material
   draws as texture × colour, as trails always do. `buildGraphFragment(graph)` and the
   `MaterialGraph` types are exported.
+- **Mesh alignment.** `rendererEmitterSettings.alignment` on a mesh system — `'view'`, `'world'` or
+  `'local'` (the default, as before) — lays the mesh along the camera's, the world's or the
+  emitter's axes, as Unity's Render Alignment does; the particle's own rotation applies on top. A
+  View-aligned mesh turns with the camera like a billboard: Unity's default for mesh particles.
+- **Covering alpha that takes the particle alpha twice.** A material with `vertexAlphaPower: 2`
+  multiplies the alpha it covers what is behind with by the particle alpha once more, as Unity's
+  legacy premultiply particle shaders do (they multiply their whole output, alpha included, by it).
+  The soft glow at the root of an aura is one such particle fading in over the last each second;
+  covering by the plain alpha, the newer darkened the middle of the older and the pair showed as
+  a ring instead of one breathing glow.
 - `VFXBatch.isBatchMesh(mesh)` — whether a mesh is one of the renderer's own batch meshes, known by
   identity. Hosts listing scene meshes (e.g. as emission sources) can exclude them without relying
   on their names.
@@ -52,6 +62,11 @@ scale}`, rotation a quaternion) offsets, turns and stretches the emitter shape i
   the two apart from the data.
 
 ### Fixed
+
+- **Premultiplied particles fading in.** Pixels whose alpha is under 0.01 were dropped, but a
+  premultiplied particle adds its colour even there: a particle fading in stayed invisible for its
+  first frames and then appeared at once. Premultiplied pixels are now dropped only when they add
+  nothing.
 
 - **Repeating bursts.** A burst's `cycle` and `interval` were ignored: every burst fired once per
   loop, so a Unity burst of 1 × 20 cycles made one particle instead of twenty. Waves now fire

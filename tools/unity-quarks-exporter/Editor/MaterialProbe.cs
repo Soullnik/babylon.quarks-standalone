@@ -27,6 +27,11 @@ namespace BabylonQuarks.UnityExporter
             public Vector4 Tint;
             /// <summary>The Babylon alpha mode the measurement shows, or -1 when it does not settle one.</summary>
             public int BlendMode;
+            /// <summary>
+            /// How the particle (vertex) alpha enters the alpha that covers what is behind: 1 as is,
+            /// 2 squared — a shader multiplying its whole output, alpha included, by it once more.
+            /// </summary>
+            public int VertexAlphaPower;
             /// <summary>What was seen, for the log.</summary>
             public string Summary;
         }
@@ -151,13 +156,25 @@ namespace BabylonQuarks.UnityExporter
                 copy.mainTexture = _halfWhite;
                 Vector4 srcHalf = RenderOver(0f) - _background0;
                 Vector4 kHalf = Factor(RenderOver(1f), srcHalf);
-                return Interpret(src1, k1, srcHalf, kHalf);
+                // Once more with the particle at half alpha, to see how that alpha covers.
+                copy.mainTexture = _opaqueWhite;
+                SetVertexAlpha(0.5f);
+                Vector4 srcFaded = RenderOver(0f) - _background0;
+                Vector4 kFaded = Factor(RenderOver(1f), srcFaded);
+                SetVertexAlpha(1f);
+                return Interpret(src1, k1, srcHalf, kHalf, kFaded);
             }
             finally
             {
                 _renderer.sharedMaterial = null;
                 UnityEngine.Object.DestroyImmediate(copy);
             }
+        }
+
+        private void SetVertexAlpha(float alpha)
+        {
+            var c = new Color(1f, 1f, 1f, alpha);
+            _mesh.colors = new[] { c, c, c, c };
         }
 
         /// <summary>k per channel: how much of the destination survives, from the render over white.</summary>
@@ -171,7 +188,7 @@ namespace BabylonQuarks.UnityExporter
                 0f);
         }
 
-        private static Result Interpret(Vector4 src1, Vector4 k1, Vector4 srcHalf, Vector4 kHalf)
+        private static Result Interpret(Vector4 src1, Vector4 k1, Vector4 srcHalf, Vector4 kHalf, Vector4 kFaded)
         {
             float kFull = (k1.x + k1.y + k1.z) / 3f;
             float kHalfMean = (kHalf.x + kHalf.y + kHalf.z) / 3f;
@@ -180,7 +197,7 @@ namespace BabylonQuarks.UnityExporter
             string seen = string.Format(System.Globalization.CultureInfo.InvariantCulture,
                 "src {0:0.###},{1:0.###},{2:0.###} k {3:0.###} at texture alpha 1; src {4:0.###} k {5:0.###} at 0.5",
                 src1.x, src1.y, src1.z, kFull, lumHalf, kHalfMean);
-            var result = new Result { Measured = true, BlendMode = -1, Tint = Vector4.one, Summary = seen };
+            var result = new Result { Measured = true, BlendMode = -1, Tint = Vector4.one, VertexAlphaPower = 1, Summary = seen };
 
             if (kFull > 0.9f && kHalfMean > 0.9f)
             {
@@ -205,6 +222,13 @@ namespace BabylonQuarks.UnityExporter
             result.Tint = premultiplied
                 ? new Vector4(src1.x, src1.y, src1.z, alphaFull)
                 : new Vector4(src1.x / alphaFull, src1.y / alphaFull, src1.z / alphaFull, alphaFull);
+
+            // At particle alpha 0.5 the covering alpha is half the full one when the shader takes
+            // the particle alpha once, a quarter when it multiplies it in twice.
+            float alphaFaded = 1f - (kFaded.x + kFaded.y + kFaded.z) / 3f;
+            float fadedRatio = alphaFaded / alphaFull;
+            if (fadedRatio > 0.15f && fadedRatio < 0.375f) result.VertexAlphaPower = 2;
+            result.Summary += string.Format(System.Globalization.CultureInfo.InvariantCulture, "; covering alpha {0:0.###} at particle alpha 0.5", alphaFaded);
 
             // Only call the blend when alpha itself follows the texture the plain way; shaders that
             // reshape alpha (dissolves, masks, opacity boosts) still give a gain, not a verdict.

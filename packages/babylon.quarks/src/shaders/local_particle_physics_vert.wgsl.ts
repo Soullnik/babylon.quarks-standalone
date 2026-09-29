@@ -44,6 +44,25 @@ fn main(input: VertexInputs) -> FragmentInputs {
     let scaledPosition = vertexInputs.position * vertexInputs.size;
     let rotatedPosition = applyQuaternion(scaledPosition, vertexInputs.rotation);
     let rotatedNormal = normalize(applyQuaternion(vertexInputs.normal, vertexInputs.rotation));
+#ifdef MESH_ALIGN_VIEW
+    // Unity's View alignment: the mesh's own axes are the camera's — right, up, forward — so it
+    // turns with the view the way a billboard does, its rotation applied on top.
+    var viewOffset = rotatedPosition;
+    var viewNormal = rotatedNormal;
+    #ifdef MESH_VIEW_RIGHT_HANDED
+    viewOffset.z = -viewOffset.z;
+    viewNormal.z = -viewNormal.z;
+    #endif
+    let worldCenter = uniforms.world * vec4f(vertexInputs.offset, 1.0);
+    var viewPos = uniforms.view * worldCenter;
+    viewPos = vec4f(viewPos.xyz + viewOffset, viewPos.w);
+    let clipPosition = uniforms.projection * viewPos;
+    vertexOutputs.position = clipPosition;
+    // Back to world space through the view's rotation, whose inverse is its transpose.
+    let worldPos = vec4f(worldCenter.xyz + (vec4f(viewOffset, 0.0) * uniforms.view).xyz, 1.0);
+    vertexOutputs.vWorldPos = worldPos.xyz;
+    vertexOutputs.vNormal = normalize((vec4f(viewNormal, 0.0) * uniforms.view).xyz);
+#else
     let localPos = rotatedPosition + vertexInputs.offset;
 
     let worldPos = uniforms.world * vec4f(localPos, 1.0);
@@ -53,6 +72,7 @@ fn main(input: VertexInputs) -> FragmentInputs {
 
     vertexOutputs.vWorldPos = worldPos.xyz;
     vertexOutputs.vNormal = normalize((uniforms.world * vec4f(rotatedNormal, 0.0)).xyz);
+#endif
 
 #ifdef SOFT_PARTICLES
     vertexOutputs.projPosition = clipPosition;

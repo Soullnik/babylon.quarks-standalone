@@ -43,6 +43,24 @@ void main() {
     vec3 scaledPosition = position * size;
     vec3 rotatedPosition = applyQuaternion(scaledPosition, rotation);
     vec3 rotatedNormal = normalize(applyQuaternion(normal, rotation));
+#ifdef MESH_ALIGN_VIEW
+    // Unity's View alignment: the mesh's own axes are the camera's — right, up, forward — so it
+    // turns with the view the way a billboard does, its rotation applied on top.
+    vec3 viewOffset = rotatedPosition;
+    vec3 viewNormal = rotatedNormal;
+    #ifdef MESH_VIEW_RIGHT_HANDED
+    viewOffset.z = -viewOffset.z;
+    viewNormal.z = -viewNormal.z;
+    #endif
+    vec4 worldCenter = world * vec4(offset, 1.0);
+    vec4 viewPos = view * worldCenter;
+    viewPos.xyz += viewOffset;
+    gl_Position = projection * viewPos;
+    // Back to world space through the view's rotation, whose inverse is its transpose.
+    vec4 worldPos = vec4(worldCenter.xyz + (vec4(viewOffset, 0.0) * view).xyz, 1.0);
+    vWorldPos = worldPos.xyz;
+    vNormal = normalize((vec4(viewNormal, 0.0) * view).xyz);
+#else
     vec3 localPos = rotatedPosition + offset;
 
     vec4 worldPos = world * vec4(localPos, 1.0);
@@ -51,6 +69,7 @@ void main() {
 
     vWorldPos = worldPos.xyz;
     vNormal = normalize((world * vec4(rotatedNormal, 0.0)).xyz);
+#endif
 
 #ifdef SOFT_PARTICLES
     projPosition = gl_Position;

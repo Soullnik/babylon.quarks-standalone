@@ -52,6 +52,7 @@ function cases(): Case[] {
         [],
         ['USE_TINT'],
         ['USE_TINT', 'LINEAR_OUTPUT', 'LINEAR_VERTEX_COLOR', 'PREMULTIPLY_VERTEX_ALPHA'],
+        ['LINEAR_VERTEX_COLOR', 'PREMULTIPLY_VERTEX_ALPHA', 'SQUARE_VERTEX_ALPHA'],
     ];
 
     const push = (
@@ -117,9 +118,21 @@ function cases(): Case[] {
         [...SPRITE_UNIFORMS, 'lightDirection', 'lightColor', 'ambientColor'],
         []
     );
+    push(
+        'mesh view-aligned',
+        meshVert,
+        physicsFrag,
+        [...SPRITE_ATTRS, 'normal'],
+        [...SPRITE_UNIFORMS, 'lightDirection', 'lightColor', 'ambientColor'],
+        ['MESH_ALIGN_VIEW', 'MESH_VIEW_RIGHT_HANDED']
+    );
 
     for (const map of mapOptions) {
-        for (const color of [[], ['USE_TINT', 'LINEAR_OUTPUT', 'LINEAR_VERTEX_COLOR', 'PREMULTIPLY_VERTEX_ALPHA']]) {
+        for (const color of [
+            [],
+            ['USE_TINT', 'LINEAR_OUTPUT', 'LINEAR_VERTEX_COLOR', 'PREMULTIPLY_VERTEX_ALPHA'],
+            ['LINEAR_VERTEX_COLOR', 'PREMULTIPLY_VERTEX_ALPHA', 'SQUARE_VERTEX_ALPHA'],
+        ]) {
             const defines = [...map, ...color];
             out.push({
                 name: `trail ${defines.length ? '[' + defines.join(',') + ']' : '[none]'}`,
@@ -155,6 +168,7 @@ function cases(): Case[] {
             ['billboard', particleVert, SPRITE_ATTRS, [], []],
             ['stretched freeform', stretchedVert, [...SPRITE_ATTRS, 'velocity'], ['speedFactor'], ['FREEFORM_STRETCH']],
             ['mesh', meshVert, [...SPRITE_ATTRS, 'normal'], [], []],
+            ['mesh view-aligned', meshVert, [...SPRITE_ATTRS, 'normal'], [], ['MESH_ALIGN_VIEW']],
         ] as const) {
             for (const tile of [[], ['UV_TILE'], ['UV_TILE', 'TILE_BLEND']])
                 for (const output of [[], ['LINEAR_OUTPUT']]) {

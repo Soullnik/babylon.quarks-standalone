@@ -383,6 +383,10 @@ export class QuarksLoader {
             if (matDef.vertexColorSpace === 'linear') {
                 matInfo.vertexColorSpace = 'linear';
             }
+            // 2 when the covering alpha takes the particle alpha twice (Unity's legacy premultiply).
+            if (matDef.vertexAlphaPower === 2) {
+                matInfo.vertexAlphaPower = 2;
+            }
             // The material's own shading (a compiled Shader Graph), its textures resolved.
             if (matDef.graph && Array.isArray(matDef.graph.nodes) && Array.isArray(matDef.graph.textures)) {
                 matInfo.graph = {

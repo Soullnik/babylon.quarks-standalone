@@ -31,6 +31,9 @@ namespace BabylonQuarks.UnityExporter
             string geometryUuid = renderMode == 2 && renderer.mesh != null ? ctx.AddGeometryForMesh(renderer.mesh) : null;
             JToken emissionOverTime = EmissionRate(ps, true);
             JToken startLife = AvoidKnifeEdgeLifetime(main.startLifetime, ps.emission);
+            // Drawn as trails, the particle's colour and size are the trail's: fold in what the
+            // Trails module adds to them.
+            TrailLook trailLook = trailsInstead ? ReadTrailLook(ps) : TrailLook.None;
 
             var obj = new JObject()
                 .Set("version", "3.0")
@@ -43,8 +46,8 @@ namespace BabylonQuarks.UnityExporter
                 .Set("startLife", startLife)
                 .Set("startSpeed", ValueConverter.Curve(main.startSpeed))
                 .Set("startRotation", BuildStartRotation(main, renderMode))
-                .Set("startSize", BuildStartSize(main))
-                .Set("startColor", ValueConverter.StartColor(main.startColor))
+                .Set("startSize", trailLook.Width.HasValue ? BuildTrailWidth(main, ps.trails, trailLook.Width.Value) : BuildStartSize(main))
+                .Set("startColor", ValueConverter.StartColor(trailsInstead ? TrailColor(main.startColor, ps.trails, trailLook.Tint) : main.startColor))
                 .Set("emissionOverTime", emissionOverTime)
                 .Set("emissionOverDistance", EmissionRate(ps, false))
                 .Set("emissionBursts", BuildBursts(ps))
@@ -81,15 +84,19 @@ namespace BabylonQuarks.UnityExporter
             // ---- behaviors from the over-lifetime / by-speed modules ----
             AddGravity(main, behaviors);
             AddRandomizeDirection(ps, behaviors);
-            AddColorOverLife(ps, behaviors);
-            AddSizeOverLife(ps, behaviors);
+            // A trail that does not inherit the particle's colour, or its size, takes neither
+            // from the particle's own modules either.
+            bool colourFromParticle = !trailsInstead || ps.trails.inheritParticleColor;
+            bool sizeFromParticle = !trailsInstead || ps.trails.sizeAffectsWidth;
+            if (colourFromParticle) AddColorOverLife(ps, behaviors);
+            if (sizeFromParticle) AddSizeOverLife(ps, behaviors);
             AddRotationOverLife(ps, behaviors);
             AddVelocityOverLife(ps, behaviors);
             AddInheritVelocity(ps, behaviors);
             AddLimitVelocity(ps, behaviors);
             AddForceOverLife(ps, behaviors);
-            AddColorBySpeed(ps, behaviors);
-            AddSizeBySpeed(ps, behaviors);
+            if (colourFromParticle) AddColorBySpeed(ps, behaviors);
+            if (sizeFromParticle) AddSizeBySpeed(ps, behaviors);
             AddRotationBySpeed(ps, behaviors);
             AddNoise(ps, behaviors);
             AddCollision(ps, behaviors);
@@ -323,12 +330,118 @@ namespace BabylonQuarks.UnityExporter
                 }
                 return settings;
             }
+            if (renderMode == 2) // mesh
+            {
+                // Render Alignment: View (Unity's default for meshes) lays the mesh along the
+                // camera's axes, so it turns with the view like a billboard; World along the
+                // world's; Local along the emitter's, which is what quarks does without a setting.
+                switch (renderer.alignment)
+                {
+                    case ParticleSystemRenderSpace.View:
+                        return new JObject().Set("alignment", "view");
+                    case ParticleSystemRenderSpace.World:
+                        return new JObject().Set("alignment", "world");
+                    case ParticleSystemRenderSpace.Local:
+                        return new JObject();
+                    default:
+                        Debug.LogWarning($"[Quarks Exporter] '{renderer.name}': Render Alignment {renderer.alignment} has no quarks counterpart; exported as View.");
+                        return new JObject().Set("alignment", "view");
+                }
+            }
             return new JObject();
+        }
+
+        /// <summary>What the Trails module multiplies into a trail's colour and width, as constants.</summary>
+        private struct TrailLook
+        {
+            public static readonly TrailLook None = new TrailLook { Tint = Color.white };
+            public Color Tint;
+            public float? Width;
+        }
+
+        /// <summary>
+        /// The Trails module's colour over lifetime and over the trail, and its width over the trail,
+        /// where they are constants — what Hovl-style trails use. A gradient along the trail has no
+        /// quarks counterpart yet: the console says so and the trail keeps the particle's colour.
+        /// </summary>
+        private static TrailLook ReadTrailLook(ParticleSystem ps)
+        {
+            var trails = ps.trails;
+            var look = new TrailLook { Tint = Color.white };
+            foreach (var part in new[] { ("colour over lifetime", trails.colorOverLifetime), ("colour over trail", trails.colorOverTrail) })
+            {
+                if (part.Item2.mode == ParticleSystemGradientMode.Color)
+                {
+                    look.Tint *= part.Item2.color;
+                }
+                else
+                {
+                    Debug.LogWarning($"[Quarks Exporter] '{ps.name}': the trail's {part.Item1} is a gradient, which is not exported; the trail keeps the particle's colour there.");
+                }
+            }
+            var width = trails.widthOverTrail;
+            switch (width.mode)
+            {
+                case ParticleSystemCurveMode.Constant:
+                    look.Width = width.constant;
+                    break;
+                case ParticleSystemCurveMode.TwoConstants:
+                    look.Width = (width.constantMin + width.constantMax) * 0.5f;
+                    break;
+                default:
+                    look.Width = width.curveMultiplier;
+                    Debug.LogWarning($"[Quarks Exporter] '{ps.name}': the trail's width over trail is a curve; exported as its multiplier, {width.curveMultiplier}.");
+                    break;
+            }
+            return look;
+        }
+
+        /// <summary>The trail's colour: the particle's, times the Trails module's, or the module's alone.</summary>
+        private static ParticleSystem.MinMaxGradient TrailColor(ParticleSystem.MinMaxGradient particle, ParticleSystem.TrailModule trails, Color tint)
+        {
+            return trails.inheritParticleColor ? Multiply(particle, tint) : new ParticleSystem.MinMaxGradient(tint);
+        }
+
+        /// <summary>The trail's width: the particle's size times the module's width, or the width alone.</summary>
+        private static JToken BuildTrailWidth(ParticleSystem.MainModule main, ParticleSystem.TrailModule trails, float width)
+        {
+            if (!trails.sizeAffectsWidth) return ValueConverter.Constant(width);
+            return ScaleCurve(main.startSize3D ? main.startSizeX : main.startSize, width);
+        }
+
+        private static ParticleSystem.MinMaxGradient Multiply(ParticleSystem.MinMaxGradient g, Color k)
+        {
+            switch (g.mode)
+            {
+                case ParticleSystemGradientMode.Color:
+                    return new ParticleSystem.MinMaxGradient(g.color * k);
+                case ParticleSystemGradientMode.TwoColors:
+                    return new ParticleSystem.MinMaxGradient(g.colorMin * k, g.colorMax * k);
+                case ParticleSystemGradientMode.TwoGradients:
+                    return new ParticleSystem.MinMaxGradient(Multiply(g.gradientMin, k), Multiply(g.gradientMax, k));
+                case ParticleSystemGradientMode.RandomColor:
+                    var random = new ParticleSystem.MinMaxGradient(Multiply(g.gradient, k));
+                    random.mode = ParticleSystemGradientMode.RandomColor;
+                    return random;
+                default:
+                    return new ParticleSystem.MinMaxGradient(Multiply(g.gradient, k));
+            }
+        }
+
+        private static Gradient Multiply(Gradient g, Color k)
+        {
+            var result = new Gradient { mode = g.mode };
+            var colours = g.colorKeys;
+            var alphas = g.alphaKeys;
+            for (int i = 0; i < colours.Length; i++) colours[i].color *= k;
+            for (int i = 0; i < alphas.Length; i++) alphas[i].alpha *= k.a;
+            result.SetKeys(colours, alphas);
+            return result;
         }
 
         /// <summary>
         /// Trail length for quarks, which keeps one point per 1/60 s step: Unity's trail lifetime
-        /// is a fraction of the particle's. Width and colour over the trail are not carried.
+        /// is a fraction of the particle's.
         /// </summary>
         private static JObject BuildTrailSettings(ParticleSystem ps)
         {

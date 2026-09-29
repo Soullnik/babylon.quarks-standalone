@@ -164,6 +164,12 @@ namespace BabylonQuarks.UnityExporter
                 // approximation for renderers and render modes that draw without it.
                 m.Set("graph", graph);
             }
+            if (measured.Measured && measured.VertexAlphaPower == 2)
+            {
+                // Its shader multiplies the whole colour, alpha included, by the particle alpha
+                // once more (as measured): what covers the background takes it squared.
+                m.Set("vertexAlphaPower", 2);
+            }
             if (measured.Measured && !IsUntinted(measured.Tint))
             {
                 // The linear-space gain the material puts on the particle colour — an HDR colour

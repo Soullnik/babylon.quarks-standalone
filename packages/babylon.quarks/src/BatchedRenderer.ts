@@ -61,6 +61,14 @@ export interface VFXBatchSettings {
      * in Linear colour space hands its particle shaders. Only the texture is then decoded.
      */
     vertexColorLinear?: boolean;
+    /**
+     * The alpha the material covers what is behind it with takes the particle alpha twice — what
+     * Unity's legacy premultiply particle shaders do, multiplying the whole colour, alpha
+     * included, by it once more. A particle fading in over another then barely hides it.
+     */
+    vertexAlphaSquared?: boolean;
+    /** A mesh batch's alignment (see MeshSettings.alignment); `'local'` when absent. */
+    meshAlignment?: 'local' | 'world' | 'view';
     /** The material's own shading, drawn instead of texture × colour (see {@link MaterialGraph}). */
     materialGraph?: MaterialGraph | null;
 }
@@ -174,6 +182,8 @@ export class BatchedRenderer extends TransformNode {
             a.stretchFreeform === (b.stretchFreeform ?? false) &&
             tintEqual(a.materialTint, b.materialTint) &&
             a.vertexColorLinear === (b.vertexColorLinear ?? false) &&
+            a.vertexAlphaSquared === (b.vertexAlphaSquared ?? false) &&
+            a.meshAlignment === (b.meshAlignment ?? 'local') &&
             a.materialGraph === (b.materialGraph ?? null)
         );
     }

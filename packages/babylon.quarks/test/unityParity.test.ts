@@ -6,8 +6,9 @@
 import {Constants} from '@babylonjs/core/Engines/constants';
 import {NullEngine} from '@babylonjs/core/Engines/nullEngine';
 import {ShaderMaterial} from '@babylonjs/core/Materials/shaderMaterial';
+import {Quaternion as BQuaternion, Vector3 as BVector3} from '@babylonjs/core/Maths/math.vector';
 import {Scene} from '@babylonjs/core/scene';
-import {ConeEmitter, ConstantValue, SphereEmitter, VelocityOverLife} from 'quarks.core';
+import {ConeEmitter, ConstantValue, Quaternion, SphereEmitter, VelocityOverLife} from 'quarks.core';
 import {BatchedRenderer} from '../src/BatchedRenderer';
 import type {BurstParameters} from '../src/ParticleSystem';
 import {ParticleSystem} from '../src/ParticleSystem';
@@ -317,8 +318,27 @@ describe('material colour', () => {
         for (const source of [particleFragShader, particlePhysicsFragShader, trailFragShader]) {
             const premultiply = source.indexOf('#ifdef PREMULTIPLY_VERTEX_ALPHA');
             expect(premultiply).toBeGreaterThan(source.indexOf('quarksToGamma(linearColor)'));
-            expect(source.indexOf('#ifdef PREMULTIPLY_VERTEX_ALPHA', premultiply + 1)).toBe(-1);
+            // Premultiplied colour shows at nearly zero alpha: it is only dropped when it adds nothing.
+            expect(source).toMatch(/PREMULTIPLY_VERTEX_ALPHA[\s\S]*baseColor\.a < 0\.01 && max\(/);
         }
+    });
+
+    it('takes the particle alpha twice in the covering alpha when the material says so', () => {
+        const system = load({alphaMode: Constants.ALPHA_PREMULTIPLIED, vertexAlphaPower: 2});
+        expect(system.getRendererSettings().vertexAlphaSquared).toBe(true);
+        const renderer = new BatchedRenderer('squared', scene);
+        expect(definesFor(system, renderer)).toEqual(
+            expect.arrayContaining(['PREMULTIPLY_VERTEX_ALPHA', 'SQUARE_VERTEX_ALPHA'])
+        );
+        const meta: any = {textures: {}, materials: {}, geometries: {}};
+        const json = system.toJSON(meta);
+        expect(meta.materials[json.material!].vertexAlphaPower).toBe(2);
+        renderer.dispose();
+        system.dispose();
+
+        const plain = load({alphaMode: Constants.ALPHA_PREMULTIPLIED});
+        expect(plain.getRendererSettings().vertexAlphaSquared).toBe(false);
+        plain.dispose();
     });
 
     it('outputs linear colour while the scene runs image processing as a post-process', () => {
@@ -349,5 +369,71 @@ describe('layers', () => {
         renderer.dispose();
         hidden.dispose();
         shown.dispose();
+    });
+});
+
+describe('mesh alignment', () => {
+    function meshSystem(alignment?: 'view' | 'world') {
+        const system = new ParticleSystem({
+            scene,
+            renderMode: RenderMode.Mesh,
+            rendererEmitterSettings: alignment ? {alignment} : {},
+            startLife: new ConstantValue(10),
+            startSpeed: new ConstantValue(0),
+            emissionOverTime: new ConstantValue(0),
+            emissionBursts: [burst(0, 1, 0.01)],
+            shape: new SphereEmitter(),
+            worldSpace: false,
+        });
+        // Turn the emitter half a turn about Y.
+        system.emitter.rotationQuaternion = BQuaternion.RotationAxis(BVector3.Up(), Math.PI);
+        return system;
+    }
+
+    function drawnRotation(system: ParticleSystem, renderer: BatchedRenderer): number[] {
+        renderer.addSystem(system);
+        renderer.update(STEP);
+        renderer.update(STEP);
+        return Array.from(((renderer.batches[0] as any).rotationBuffer as Float32Array).subarray(0, 4));
+    }
+
+    it('lays a View-aligned mesh along the camera, ignoring the emitter’s rotation', () => {
+        const renderer = new BatchedRenderer('mesh-view', scene);
+        const system = meshSystem('view');
+        const rotation = drawnRotation(system, renderer);
+        // The particle's own rotation alone, not the emitter's half turn on top of it.
+        const own = system.particles[0].rotation as Quaternion;
+        expect(rotation.map((v) => +v.toFixed(5))).toEqual([own.x, own.y, own.z, own.w].map((v) => +v.toFixed(5)));
+        expect((renderer.batches[0].mesh.material as ShaderMaterial).options.defines).toContain('MESH_ALIGN_VIEW');
+        const meta: any = {textures: {}, materials: {}, geometries: {}};
+        expect(system.toJSON(meta).rendererEmitterSettings).toEqual({alignment: 'view'});
+        expect((system.clone() as ParticleSystem).getRendererSettings().meshAlignment).toBe('view');
+        renderer.dispose();
+        system.dispose();
+    });
+
+    it('keeps following the emitter by default', () => {
+        const renderer = new BatchedRenderer('mesh-local', scene);
+        const system = meshSystem();
+        const rotation = drawnRotation(system, renderer);
+        const own = system.particles[0].rotation as Quaternion;
+        const turned = new Quaternion(0, 1, 0, 0).multiply(own);
+        const sign = Math.sign(rotation[3] * turned.w) || 1;
+        expect(rotation.map((v) => +(v * sign).toFixed(4))).toEqual(
+            [turned.x, turned.y, turned.z, turned.w].map((v) => +v.toFixed(4))
+        );
+        expect((renderer.batches[0].mesh.material as ShaderMaterial).options.defines).not.toContain('MESH_ALIGN_VIEW');
+        const meta: any = {textures: {}, materials: {}, geometries: {}};
+        expect(system.toJSON(meta).rendererEmitterSettings).toEqual({});
+        renderer.dispose();
+        system.dispose();
+    });
+
+    it('reads the alignment from JSON', () => {
+        const meta: any = {textures: {}, materials: {}, geometries: {}};
+        const json = meshSystem('world').toJSON(meta);
+        const loaded = ParticleSystem.fromJSON(json, meta, {}, scene);
+        expect(loaded.getRendererSettings().meshAlignment).toBe('world');
+        loaded.dispose();
     });
 });

@@ -74,6 +74,18 @@ to be data the exporter did not carry.
 
 ### Fixed
 
+- **Trail colour and width.** The Trails module's colour over lifetime and over the trail, and its
+  width over the trail, were dropped: Acid's trails, green in Unity through a constant Color over
+  Trail, came out grey. For a system drawn as trails they now multiply into the particle's start
+  colour and size (or replace them when the trail inherits neither), as constants; a gradient along
+  the trail is reported in the console and left out.
+- **Mesh Render Alignment.** Mesh particles are exported with their alignment — View (Unity's
+  default), World or Local. White's shockwave ring is a View-aligned mesh and faced the world
+  instead of the camera.
+- **How the particle alpha covers.** The material probe renders once more with the particle at half
+  alpha and exports `vertexAlphaPower: 2` when the material's covering alpha takes it twice, as the
+  built-in Default-Particle material does; the root glow of the auras rendered as a ring without it.
+
 - **Texture wrap modes.** Every texture was exported clamped. A texture now keeps its own wrap
   mode (Repeat, Clamp, Mirror): a Shader Graph scrolling a noise or mask across the particle
   reads past the edge, and clamped it smeared the edge row instead — White's scrolling mask

@@ -49,6 +49,8 @@ export interface StoredBatchSettings {
     stretchFreeform: boolean;
     materialTint: [number, number, number, number];
     vertexColorLinear: boolean;
+    vertexAlphaSquared: boolean;
+    meshAlignment: 'local' | 'world' | 'view';
     materialGraph: MaterialGraph | null;
 }
 
@@ -102,6 +104,8 @@ export abstract class VFXBatch {
             stretchFreeform: settings.stretchFreeform ?? false,
             materialTint: settings.materialTint ? [...settings.materialTint] : [1, 1, 1, 1],
             vertexColorLinear: settings.vertexColorLinear ?? false,
+            vertexAlphaSquared: settings.vertexAlphaSquared ?? false,
+            meshAlignment: settings.meshAlignment ?? 'local',
             materialGraph: settings.materialGraph ?? null,
         };
         this.mesh = this.createBatchMesh('vfxBatch');
@@ -146,6 +150,9 @@ export abstract class VFXBatch {
         }
         if (this.settings.materialTransparent && this.settings.materialBlendMode === Constants.ALPHA_PREMULTIPLIED) {
             defines.push('PREMULTIPLY_VERTEX_ALPHA');
+        }
+        if (this.settings.vertexAlphaSquared) {
+            defines.push('SQUARE_VERTEX_ALPHA');
         }
     }
 

@@ -68,6 +68,12 @@ export interface TrailSettings {
 
 export interface MeshSettings {
     /**
+     * Which axes the mesh is laid out along, as Unity's Render Alignment: `'local'` (default) the
+     * emitter's, `'world'` the world's, `'view'` the camera's — the mesh then turns with the view
+     * the way a billboard does. The particle's own rotation applies on top in each.
+     */
+    alignment?: 'local' | 'world' | 'view';
+    /**
      * Rotation axis.
      * @type {Vector3}
      */

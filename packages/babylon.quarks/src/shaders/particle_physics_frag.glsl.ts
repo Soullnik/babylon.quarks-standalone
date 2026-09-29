@@ -124,11 +124,22 @@ void main() {
     // its alpha takes away from what is behind it, and pop in instead of fading in.
     baseColor = vec4(baseColor.rgb * vColor.a, baseColor.a);
 #endif
+#ifdef SQUARE_VERTEX_ALPHA
+    // The alpha that covers what is behind takes the particle alpha once more, as Unity's legacy
+    // premultiply shaders multiply the whole colour, alpha included, by it: a particle fading in
+    // over another barely hides it, and the two add up to one glow instead of a ring.
+    baseColor.a *= vColor.a;
+#endif
 
 #ifdef USE_ALPHATEST
     if (baseColor.a < alphaTest) discard;
 #else
+#ifdef PREMULTIPLY_VERTEX_ALPHA
+    // Premultiplied colour shows even where alpha is nearly zero: only drop what adds nothing.
+    if (baseColor.a < 0.01 && max(baseColor.r, max(baseColor.g, baseColor.b)) < 0.002) discard;
+#else
     if (baseColor.a < 0.01) discard;
+#endif
 #endif
 
     vec3 N = normalize(vNormal);

@@ -246,6 +246,12 @@ export class SpriteBatch extends VFXBatch {
         if (this.settings.renderMode === RenderMode.StretchedBillBoard && this.settings.stretchFreeform) {
             defines.push('FREEFORM_STRETCH');
         }
+        if (this.settings.renderMode === RenderMode.Mesh && this.settings.meshAlignment === 'view') {
+            defines.push('MESH_ALIGN_VIEW');
+            if (this.scene.useRightHandedSystem) {
+                defines.push('MESH_VIEW_RIGHT_HANDED');
+            }
+        }
 
         const shaderLanguage = shaderLanguageFor(this.scene.getEngine());
         registerShaders(shaderName, vertexShader, fragmentShader, shaderLanguage);
@@ -449,6 +455,7 @@ export class SpriteBatch extends VFXBatch {
         let particleCount = 0;
         const renderMode = this.settings.renderMode;
         const isMeshRender = renderMode === RenderMode.Mesh;
+        const meshIgnoresEmitter = isMeshRender && this.settings.meshAlignment !== 'local';
         const isStretchedRender = renderMode === RenderMode.StretchedBillBoard;
 
         const visibleSystems = this.getVisibleSystems();
@@ -602,7 +609,8 @@ export class SpriteBatch extends VFXBatch {
                             .multiply(SpriteBatch.partialTurn(step, stepFraction, this.quaternion5_));
                     }
                     let q: Quaternion;
-                    if (systemWorldSpace) {
+                    // Aligned to the world or the view, a mesh ignores the emitter's rotation.
+                    if (systemWorldSpace || meshIgnoresEmitter) {
                         q = own;
                     } else {
                         let parentQ: Quaternion;

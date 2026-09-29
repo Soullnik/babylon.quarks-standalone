@@ -22,6 +22,7 @@ import {
     IParticleSystem,
     Matrix3,
     Matrix4,
+    MeshSettings,
     Particle,
     ParticleStore,
     ParticleSystemEvent,
@@ -598,6 +599,7 @@ export class ParticleSystem implements IParticleSystem {
             layerMask: parameters.layerMask ?? 0x0fffffff,
             materialTint: [1, 1, 1, 1],
             vertexColorLinear: false,
+            vertexAlphaSquared: false,
             materialGraph: null,
         };
         if (this.rendererSettings.renderMode === RenderMode.Mesh && !this.rendererSettings.instancingNormals) {
@@ -756,6 +758,7 @@ export class ParticleSystem implements IParticleSystem {
                 ? [Number(tint[0]), Number(tint[1]), Number(tint[2]), tint.length > 3 ? Number(tint[3]) : 1]
                 : [1, 1, 1, 1];
         this.rendererSettings.vertexColorLinear = material?.vertexColorSpace === 'linear';
+        this.rendererSettings.vertexAlphaSquared = material?.vertexAlphaPower === 2;
         this.rendererSettings.materialGraph = material?.graph ?? null;
         this.rendererSettings.materialBlendMode = resolvedBlendMode;
         this.rendererSettings.materialTransparent = resolvedTransparent;
@@ -1475,6 +1478,10 @@ export class ParticleSystem implements IParticleSystem {
             if (json.speedFactor !== undefined) {
                 (rendererEmitterSettings as StretchedBillBoardSettings).speedFactor = json.speedFactor;
             }
+        } else if (json.renderMode === RenderMode.Mesh) {
+            const alignment = (json.rendererEmitterSettings as MeshSettings | undefined)?.alignment;
+            rendererEmitterSettings =
+                alignment === 'view' || alignment === 'world' ? ({alignment} as MeshSettings) : {};
         } else {
             rendererEmitterSettings = {};
         }
@@ -1591,6 +1598,10 @@ export class ParticleSystem implements IParticleSystem {
                 ...(settings.freeform ? {freeform: true} : {}),
             };
         }
+        if (this.renderMode === RenderMode.Mesh) {
+            const alignment = (this.rendererEmitterSettings as MeshSettings).alignment;
+            return alignment && alignment !== 'local' ? ({alignment} as MeshSettings) : {};
+        }
         return {};
     }
 
@@ -1645,6 +1656,7 @@ export class ParticleSystem implements IParticleSystem {
             reflectionLevel: this.rendererSettings.reflectionLevel,
             ...(isTinted(this.rendererSettings.materialTint) ? {tint: [...this.rendererSettings.materialTint!]} : {}),
             ...(this.rendererSettings.vertexColorLinear ? {vertexColorSpace: 'linear'} : {}),
+            ...(this.rendererSettings.vertexAlphaSquared ? {vertexAlphaPower: 2} : {}),
             ...(this.rendererSettings.materialGraph
                 ? {graph: serializeGraph(this.rendererSettings.materialGraph, meta)}
                 : {}),
@@ -1718,6 +1730,11 @@ export class ParticleSystem implements IParticleSystem {
         this.rendererSettings.stretchFreeform =
             this.rendererSettings.renderMode === RenderMode.StretchedBillBoard &&
             (this.rendererEmitterSettings as StretchedBillBoardSettings).freeform === true;
+        // So is a mesh's alignment.
+        this.rendererSettings.meshAlignment =
+            this.rendererSettings.renderMode === RenderMode.Mesh
+                ? ((this.rendererEmitterSettings as MeshSettings).alignment ?? 'local')
+                : 'local';
         return this.rendererSettings;
     }
 
@@ -1768,6 +1785,9 @@ export class ParticleSystem implements IParticleSystem {
                 speedFactor: (this.rendererEmitterSettings as StretchedBillBoardSettings).speedFactor,
                 freeform: (this.rendererEmitterSettings as StretchedBillBoardSettings).freeform,
             };
+        } else if (this.renderMode === RenderMode.Mesh) {
+            const alignment = (this.rendererEmitterSettings as MeshSettings).alignment;
+            rendererEmitterSettings = alignment ? ({alignment} as MeshSettings) : {};
         } else {
             rendererEmitterSettings = {};
         }
