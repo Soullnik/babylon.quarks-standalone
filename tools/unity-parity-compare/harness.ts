@@ -78,11 +78,8 @@ const canvas = document.createElement('canvas');
 document.body.appendChild(canvas);
 let engine: Engine | null = null;
 
-/**
- * The engine, created on first use. `exactSrgb` picks the exact sRGB curves over the 2.2 power in
- * every shader, as Unity's hardware sRGB conversions are; a page renders all its effects one way.
- */
-function getEngine(size: number, exactSrgb: boolean): Engine {
+/** The engine, created on first use. */
+function getEngine(size: number): Engine {
     canvas.width = size;
     canvas.height = size;
     canvas.style.width = `${size}px`;
@@ -94,7 +91,6 @@ function getEngine(size: number, exactSrgb: boolean): Engine {
             premultipliedAlpha: false,
             stencil: true,
             antialias: false,
-            useExactSrgbConversions: exactSrgb,
         });
     }
     engine.setSize(size, size);
@@ -165,7 +161,7 @@ function seededRandom(seed: number): () => number {
  * renders a frame at each requested time.
  */
 async function render(request: RenderRequest): Promise<RenderedFrame[]> {
-    const eng = getEngine(request.size, request.linear);
+    const eng = getEngine(request.size);
     const scene = new Scene(eng);
     try {
         const background = new Color4(...request.background);
@@ -183,8 +179,7 @@ async function render(request: RenderRequest): Promise<RenderedFrame[]> {
         // camera's colour format from its target — so every variant of it, allowHDR or not, clamps
         // each fragment to 0–1 before blending and blends in linear space. The same target here:
         // the shaders leave colour linear (image processing is flagged as a post-process, which
-        // is what they read) and the target encodes it, clamped, on write. The engine decodes
-        // textures with the same exact curve the target encodes with, as Unity's hardware does.
+        // is what they read) and the target encodes it, clamped, on write.
         let output: RenderTargetTexture | null = null;
         if (request.linear) {
             scene.imageProcessingConfiguration.applyByPostProcess = true;

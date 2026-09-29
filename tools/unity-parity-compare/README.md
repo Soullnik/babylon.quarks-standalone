@@ -12,13 +12,13 @@ npx tsx tools/unity-parity-compare/compare.mts QuarksParity_20260928_104449 out 
 npx tsx tools/unity-parity-compare/compare.mts QuarksParity_… out --linear --only "Fire ayra,Water aura"
 ```
 
-`--linear` renders the way the capture did in a Linear project (check `environment.json` →
-`activeColorSpace`): into an 8-bit sRGB target, with the engine's exact sRGB curves. The capture
-renders into an 8-bit sRGB render texture, and URP takes an offscreen camera's colour format from
-its target, so every variant of it — `allowHDR` or not — clamps each fragment to 1 before blending,
-blends in linear space and encodes with the exact curve; a half-float target instead lets boosted
-alpha-blended smoke come out up to 1.6× too bright, and the 2.2 power loses faint edges. Without
-`--linear` the scene is Babylon's default gamma-space one.
+By default the scene is Babylon's default gamma-space one — what babylon.quarks is made to look
+right in, with nothing to set up. `--linear` instead renders the way the capture did in a Linear
+project (check `environment.json` → `activeColorSpace`), to separate what the engines' blending
+contributes from everything else: into an 8-bit sRGB target, as the capture renders into an 8-bit
+sRGB render texture — URP takes an offscreen camera's colour format from its target, so every
+variant of the capture, `allowHDR` or not, clamps each fragment to 1 before blending and blends in
+linear space.
 
 It needs a Chromium: Playwright's own, or any other through `PARITY_CHROMIUM=/path/to/chrome`.
 WebGL runs on SwiftShader when there is no GPU, which is fine at 512².

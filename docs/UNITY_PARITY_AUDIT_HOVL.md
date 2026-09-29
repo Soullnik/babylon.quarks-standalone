@@ -59,7 +59,9 @@ What the measurement showed, in order of how much it moved:
    and yellows orange. _Exporter: `vertexColorSpace: "linear"`; runtime: honours it._
 5. **Blending happens in linear space.** In a gamma-space Babylon scene soft glows come out at
    0.4–0.9 of Unity's energy even with everything else fixed. _Runtime: particle colour leaves the
-   shaders linear when the scene's image processing runs as a post-process._
+   shaders linear when the scene's image processing runs as a post-process._ babylon.quarks does
+   not ask for such a pipeline, though: the default scene is the target, and what remains of this
+   difference there is handled case by case.
 6. **Burst cycles were ignored by the runtime** — 16 of 51 systems emit through repeating bursts
    (20 × 0.05 s, say) and emitted once per loop.
 7. **Stretched billboards**: the direction ignored speeds under 1e-6 (the 0.001-speed glows), and
@@ -97,10 +99,10 @@ texture, and URP takes an offscreen camera's colour format from its target, so e
 the capture — `allowHDR` or not — clamps each fragment to 1 before blending (the `post_*`
 variants' energy is within a few percent of the raw ones'). Heavily boosted alpha-blended smoke (Shine's gain is 18×)
 is what that clamps; a half-float target let it come out 1.6× too bright. The comparison now
-renders into the same kind of target, with the exact sRGB curves Unity's hardware uses — the 2.2
-power Babylon uses by default loses faint edges (coverage 0.85 instead of 0.98). In a Unity
-camera with HDR on the clamp does not happen, as it does not in an HDR Babylon pipeline; and
-babylon.quarks follows `useExactSrgbConversions` on the engine for the curves.
+renders into the same kind of target (the "after" column was measured with the exact sRGB curves
+Unity's hardware uses; with the 2.2 power the particle shaders use, faint edges cover about 0.85
+of Unity's instead of 0.98). In a Unity camera with HDR on the clamp does not happen, as it does
+not in an HDR Babylon pipeline.
 
 And what it ruled out: **bloom and grading barely matter at this distance.** The pack's volume
 (Bloom threshold 1, intensity 5) changes Unity's frames by a few percent — little of any effect

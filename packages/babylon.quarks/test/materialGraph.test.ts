@@ -101,11 +101,11 @@ describe('buildGraphFragment', () => {
         expect(broken((g) => (g.textures = []))).toThrow('texture 0 missing');
     });
 
-    it('decodes and encodes with the curves the engine uses', () => {
+    it('decodes and encodes with the same curve as the particle shaders', () => {
         const fragment = buildGraphFragment(minimalGraph());
         for (const code of [fragment.glsl, fragment.wgsl, particleFragShader, particleFragShaderWgsl]) {
-            expect(code).toContain('#ifdef USE_EXACT_SRGB_CONVERSIONS');
             expect(code).toContain('quarksToLinear(');
+            expect(code).not.toContain('USE_EXACT_SRGB_CONVERSIONS');
         }
     });
 

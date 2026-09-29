@@ -47,13 +47,11 @@ function cases(): Case[] {
     const mapOptions = [[], ['USE_MAP']];
     const softOptions = [[], ['SOFT_PARTICLES']];
     const alphaOptions = [[], ['USE_ALPHATEST']];
-    // Colour handling: none, a tint alone, every colour-space path together, and the exact sRGB
-    // curves an engine created with useExactSrgbConversions defines.
+    // Colour handling: none, a tint alone, and every colour-space path together.
     const colorOptions = [
         [],
         ['USE_TINT'],
         ['USE_TINT', 'LINEAR_OUTPUT', 'LINEAR_VERTEX_COLOR', 'PREMULTIPLY_VERTEX_ALPHA'],
-        ['USE_TINT', 'LINEAR_VERTEX_COLOR', 'USE_EXACT_SRGB_CONVERSIONS'],
     ];
 
     const push = (
@@ -121,11 +119,7 @@ function cases(): Case[] {
     );
 
     for (const map of mapOptions) {
-        for (const color of [
-            [],
-            ['USE_TINT', 'LINEAR_OUTPUT', 'LINEAR_VERTEX_COLOR', 'PREMULTIPLY_VERTEX_ALPHA'],
-            ['USE_TINT', 'USE_EXACT_SRGB_CONVERSIONS'],
-        ]) {
+        for (const color of [[], ['USE_TINT', 'LINEAR_OUTPUT', 'LINEAR_VERTEX_COLOR', 'PREMULTIPLY_VERTEX_ALPHA']]) {
             const defines = [...map, ...color];
             out.push({
                 name: `trail ${defines.length ? '[' + defines.join(',') + ']' : '[none]'}`,
@@ -163,30 +157,28 @@ function cases(): Case[] {
             ['mesh', meshVert, [...SPRITE_ATTRS, 'normal'], [], []],
         ] as const) {
             for (const tile of [[], ['UV_TILE'], ['UV_TILE', 'TILE_BLEND']])
-                for (const output of [[], ['LINEAR_OUTPUT']])
-                    for (const exact of [[], ['USE_EXACT_SRGB_CONVERSIONS']]) {
-                        const defines = [
-                            ...vertexDefines,
-                            ...tile,
-                            ...output,
-                            ...exact,
-                            ...(fragment.usesScreen ? ['SOFT_PARTICLES'] : []),
-                        ];
-                        out.push({
-                            name: `graph ${graphName} / ${vertexName} [${defines.join(',') || 'none'}]`,
-                            vertex,
-                            fragment: fragment.wgsl,
-                            attributes: [...attributes],
-                            uniforms: [
-                                ...SPRITE_UNIFORMS,
-                                ...extraUniforms,
-                                ...fragment.uniforms,
-                                ...(tile.length ? ['tileCountX', 'tileCountY'] : []),
-                            ],
-                            samplers: fragment.samplers,
-                            defines,
-                        });
-                    }
+                for (const output of [[], ['LINEAR_OUTPUT']]) {
+                    const defines = [
+                        ...vertexDefines,
+                        ...tile,
+                        ...output,
+                        ...(fragment.usesScreen ? ['SOFT_PARTICLES'] : []),
+                    ];
+                    out.push({
+                        name: `graph ${graphName} / ${vertexName} [${defines.join(',') || 'none'}]`,
+                        vertex,
+                        fragment: fragment.wgsl,
+                        attributes: [...attributes],
+                        uniforms: [
+                            ...SPRITE_UNIFORMS,
+                            ...extraUniforms,
+                            ...fragment.uniforms,
+                            ...(tile.length ? ['tileCountX', 'tileCountY'] : []),
+                        ],
+                        samplers: fragment.samplers,
+                        defines,
+                    });
+                }
         }
     }
     return out;

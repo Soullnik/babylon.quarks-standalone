@@ -91,8 +91,8 @@ gradients sample both color and alpha keys.
 - **Colour:** each material is rendered once during export to measure the gain it puts on the
   particle colour (its HDR colour, intensity, …), written as `tint`, and — when the blend cannot be
   read from the shader — how it blends. In a Linear project the materials also say
-  `vertexColorSpace: "linear"`. For the look to match, the Babylon scene must blend in linear space
-  too: see "Effects exported from Unity" in the babylon.quarks README.
+  `vertexColorSpace: "linear"`. The effects are made to look right in a default Babylon scene,
+  with nothing to set up.
 - **Shader Graph:** a material whose shader is a Shader Graph in the project exports what the graph
   computes for colour and alpha (`graph`) — masks, noise, UV scrolling, flow distortion, depth
   fade — compiled with the material's values; babylon.quarks draws billboards, stretched billboards
