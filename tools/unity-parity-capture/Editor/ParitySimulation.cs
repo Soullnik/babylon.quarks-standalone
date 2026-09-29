@@ -272,7 +272,7 @@ namespace BabylonQuarks.ParityCapture
         }
 
         /// <summary>Hierarchy path of names — a label for people, not an identity.</summary>
-        private string PathOf(Transform t)
+        internal string PathOf(Transform t)
         {
             var parts = new List<string>();
             for (Transform c = t; c != null; c = c.parent)

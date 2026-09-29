@@ -19,6 +19,8 @@ namespace BabylonQuarks.ParityCapture
         public int Resolution = 512;
         public int Frames = 24;
         public int GrayKeyframes = 4;
+        /// <summary>Frames per second of each system rendered on its own; 0 leaves that out.</summary>
+        public float SoloFps = 12f;
         public float CsvRate = 30f;
         public int SnapshotCap = 1500;
         public uint Seed = 12345;
@@ -27,7 +29,7 @@ namespace BabylonQuarks.ParityCapture
 
         public JMap ToJson() => new JMap()
             .Set("assetFolder", AssetFolder).Set("resolution", Resolution).Set("frames", Frames)
-            .Set("grayKeyframes", GrayKeyframes).Set("csvRate", CsvRate).Set("snapshotCap", SnapshotCap)
+            .Set("grayKeyframes", GrayKeyframes).Set("soloFps", SoloFps).Set("csvRate", CsvRate).Set("snapshotCap", SnapshotCap)
             .Set("seed", Seed).Set("maxVolumeProfiles", MaxVolumeProfiles).Set("maxAssetBytes", MaxAssetBytes);
     }
 
@@ -40,6 +42,7 @@ namespace BabylonQuarks.ParityCapture
     /// Batch: Unity -batchmode -projectPath &lt;project&gt; -executeMethod
     ///   BabylonQuarks.ParityCapture.ParityCaptureTool.RunBatch
     ///   -quarksParityFolder "Assets/…" -quarksParityOut "&lt;dir&gt;" [-quarksParityResolution 512] [-quarksParityFrames 24]
+    ///   [-quarksParitySoloFps 12]
     ///   (do not pass -nographics: the frames and the blend probe need a GPU).
     /// </summary>
     public static class ParityCaptureTool
@@ -95,6 +98,7 @@ namespace BabylonQuarks.ParityCapture
                 };
                 if (int.TryParse(Arg(args, "-quarksParityResolution"), NumberStyles.Integer, CultureInfo.InvariantCulture, out int res)) settings.Resolution = res;
                 if (int.TryParse(Arg(args, "-quarksParityFrames"), NumberStyles.Integer, CultureInfo.InvariantCulture, out int frames)) settings.Frames = frames;
+                if (float.TryParse(Arg(args, "-quarksParitySoloFps"), NumberStyles.Float, CultureInfo.InvariantCulture, out float soloFps)) settings.SoloFps = soloFps;
                 if (string.IsNullOrEmpty(settings.AssetFolder) || string.IsNullOrEmpty(settings.OutputRoot))
                 {
                     Debug.LogError("[Quarks Parity] Pass -quarksParityFolder \"Assets/…\" and -quarksParityOut \"<dir>\".");
@@ -418,12 +422,91 @@ namespace BabylonQuarks.ParityCapture
                         }
                     });
                 }
+                if (settings.SoloFps > 0f)
+                {
+                    log.Step("solo", entry, () => CaptureSolo(instance, dir, settings, render, variants, sim, camera, progress));
+                }
                 PJson.Write(Path.Combine(dir, "camera.json"), camera);
             }
             finally
             {
                 UnityEngine.Object.DestroyImmediate(instance);
             }
+        }
+
+        /// <summary>
+        /// Each system on its own: every other renderer off, the simulation untouched, through the
+        /// same camera — at <see cref="ParitySettings.SoloFps"/> over black and at a few keyframes over
+        /// grey. What one layer of an effect looks like, and how it changes from frame to frame,
+        /// without the others drawn over it. Written to solo/&lt;system&gt;/&lt;variant&gt;/NNN.png and
+        /// described under "solo" in camera.json.
+        /// </summary>
+        private static void CaptureSolo(GameObject instance, string dir, ParitySettings settings, ParityRender render,
+            List<RenderVariant> variants, ParitySimulation sim, JMap camera, Action<string, float> progress)
+        {
+            ParticleSystem[] systems = instance.GetComponentsInChildren<ParticleSystem>(true);
+            var renderers = systems.Select(s => s.GetComponent<ParticleSystemRenderer>()).ToArray();
+            var drawn = renderers.Select(r => r != null && r.enabled).ToArray();
+            int count = Math.Max(1, (int)Math.Floor(sim.Duration * settings.SoloFps + 1e-4));
+            var times = new float[count];
+            for (int k = 0; k < count; k++) times[k] = (k + 1) / settings.SoloFps;
+            var soloVariants = variants.Where(v => !v.PostProcessing).ToList();
+            var list = new List<object>();
+            try
+            {
+                for (int i = 0; i < systems.Length; i++)
+                {
+                    // A system Unity draws nothing for has nothing to show on its own.
+                    if (!drawn[i]) continue;
+                    for (int j = 0; j < renderers.Length; j++)
+                    {
+                        if (renderers[j] != null) renderers[j].enabled = j == i;
+                    }
+                    var variantInfo = new JMap();
+                    foreach (RenderVariant variant in soloVariants)
+                    {
+                        progress("solo " + i + " " + variant.Id, 0.95f);
+                        string framesDir = Path.Combine(dir, "solo", i.ToString(CultureInfo.InvariantCulture), variant.Id);
+                        Directory.CreateDirectory(framesDir);
+                        render.Apply(variant);
+                        instance.SetActive(false);
+                        Color32[] empty = render.Render();
+                        instance.SetActive(true);
+                        var indices = new List<int>();
+                        if (variant.KeyframesOnly)
+                        {
+                            for (int k = 1; k <= settings.GrayKeyframes; k++) indices.Add(Math.Max(0, count * k / settings.GrayKeyframes - 1));
+                        }
+                        else
+                        {
+                            for (int k = 0; k < count; k++) indices.Add(k);
+                        }
+                        var coverage = new List<object>();
+                        foreach (int k in indices)
+                        {
+                            sim.SimulateTo(times[k]);
+                            render.Capture(Path.Combine(framesDir, k.ToString("000", CultureInfo.InvariantCulture) + ".png"), empty, out double cov);
+                            coverage.Add(PJson.Round(cov, 4));
+                        }
+                        variantInfo.Set(variant.Id, new JMap().Set("frameIndices", indices.ToArray()).Set("coverage", coverage));
+                    }
+                    list.Add(new JMap()
+                        .Set("system", i)
+                        .Set("path", sim.PathOf(systems[i].transform))
+                        .Set("variants", variantInfo));
+                }
+            }
+            finally
+            {
+                for (int j = 0; j < renderers.Length; j++)
+                {
+                    if (renderers[j] != null) renderers[j].enabled = drawn[j];
+                }
+            }
+            camera.Set("solo", new JMap()
+                .Set("fps", settings.SoloFps)
+                .Set("times", times.Select(t => (object)PJson.Round(t, 4)).ToList())
+                .Set("systems", list));
         }
 
         /// <summary>Which materials each system renders with, by the ids used in materials/.</summary>
@@ -551,6 +634,7 @@ namespace BabylonQuarks.ParityCapture
             "effects/<name>/    effect.json (exporter output), export-log.txt, renderers.json,\n" +
             "                   simulation.json + simulation.csv (per-system aggregates, fixed seed),\n" +
             "                   snapshots.json (every particle at 25/50/100%), camera.json,\n" +
-            "                   frames/<variant>/NNN.png, contact_<variant>.png\n";
+            "                   frames/<variant>/NNN.png, contact_<variant>.png,\n" +
+            "                   solo/<system>/<variant>/NNN.png (each system alone, times in camera.json)\n";
     }
 }
