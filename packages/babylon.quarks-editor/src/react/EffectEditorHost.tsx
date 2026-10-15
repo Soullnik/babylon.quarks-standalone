@@ -83,6 +83,7 @@ import {GalleryViewportPicker} from '../core/viewportPicker';
 import {AssetsPanel} from './AssetsPanel';
 import {ChoiceDialog} from './ChoiceDialog';
 import {EffectEditor} from './EffectEditor';
+import {EffectTreeView} from './EffectTreeView';
 import {MessageDialog} from './MessageDialog';
 import {PromptDialog} from './PromptDialog';
 import {ScenePanel} from './ScenePanel';
@@ -1658,47 +1659,69 @@ export function EffectEditorHost(props: EffectEditorHostProps) {
                             }}
                         >
                             {prefabInfo ? (
-                                <div
-                                    style={{
-                                        display: 'flex',
-                                        flexDirection: 'column',
-                                        gap: 10,
-                                        padding: 12,
-                                        border: `1px solid ${theme.borderActive}`,
-                                        borderRadius: 8,
-                                        background: 'rgba(120, 165, 255, 0.08)',
-                                        fontSize: 12,
-                                        color: theme.textDim,
-                                        lineHeight: 1.5,
-                                    }}
-                                >
-                                    <div style={{fontSize: 13, fontWeight: 600, color: theme.text}}>
-                                        {prefabInfo.name}
-                                        {prefabDirty ? ' *' : ''}
+                                <div style={{display: 'flex', flexDirection: 'column', gap: 10, flex: 1, minHeight: 0}}>
+                                    <div
+                                        style={{
+                                            display: 'flex',
+                                            flexDirection: 'column',
+                                            gap: 10,
+                                            padding: 12,
+                                            border: `1px solid ${theme.borderActive}`,
+                                            borderRadius: 8,
+                                            background: 'rgba(120, 165, 255, 0.08)',
+                                            fontSize: 12,
+                                            color: theme.textDim,
+                                            lineHeight: 1.5,
+                                        }}
+                                    >
+                                        <div style={{fontSize: 13, fontWeight: 600, color: theme.text}}>
+                                            {prefabInfo.name}
+                                            {prefabDirty ? ' *' : ''}
+                                        </div>
+                                        <div style={{wordBreak: 'break-all'}}>{prefabInfo.path}</div>
+                                        <div>
+                                            Save (Ctrl+S) overwrites this asset. Effects already placed in the scene
+                                            keep their own copy and do not change.
+                                        </div>
+                                        <div style={{display: 'flex', gap: 6}}>
+                                            <button
+                                                type="button"
+                                                className="qe-hover"
+                                                style={buttonStyle}
+                                                onClick={requestPrefabExit}
+                                            >
+                                                ← Scene
+                                            </button>
+                                            <button
+                                                type="button"
+                                                className="qe-hover"
+                                                style={buttonStyle}
+                                                onClick={() => setPrefabDialog('overwrite')}
+                                            >
+                                                Save prefab
+                                            </button>
+                                        </div>
                                     </div>
-                                    <div style={{wordBreak: 'break-all'}}>{prefabInfo.path}</div>
-                                    <div>
-                                        Save (Ctrl+S) overwrites this asset. Effects already placed in the scene keep
-                                        their own copy and do not change.
-                                    </div>
-                                    <div style={{display: 'flex', gap: 6}}>
-                                        <button
-                                            type="button"
-                                            className="qe-hover"
-                                            style={buttonStyle}
-                                            onClick={requestPrefabExit}
+                                    {sceneEntries[0] && (
+                                        <div
+                                            style={{
+                                                flex: 1,
+                                                minHeight: 0,
+                                                overflowY: 'auto',
+                                                border: `1px solid ${theme.border}`,
+                                                borderRadius: 8,
+                                                background: theme.sectionBg,
+                                                padding: '4px 0',
+                                            }}
                                         >
-                                            ← Scene
-                                        </button>
-                                        <button
-                                            type="button"
-                                            className="qe-hover"
-                                            style={buttonStyle}
-                                            onClick={() => setPrefabDialog('overwrite')}
-                                        >
-                                            Save prefab
-                                        </button>
-                                    </div>
+                                            <EffectTreeView
+                                                includeRoot
+                                                root={sceneEntries[0].root}
+                                                selectedNode={selectedNode}
+                                                onSelect={setSelectedNode}
+                                            />
+                                        </div>
+                                    )}
                                 </div>
                             ) : (
                                 <ScenePanel
@@ -1712,6 +1735,13 @@ export function EffectEditorHost(props: EffectEditorHostProps) {
                                     onSaveAsAsset={(entry) => setSaveAsTarget(entry)}
                                     onDelete={(entry) => actionsRef.current.deleteEntry(entry)}
                                     onCreateDefault={() => actionsRef.current.createDefault()}
+                                    selectedNode={selectedNode}
+                                    onSelectNode={(entry, node) => {
+                                        if (stateRef.current?.binding?.root !== entry.root) {
+                                            actionsRef.current.focusEntry(entry);
+                                        }
+                                        setSelectedNode(node);
+                                    }}
                                 />
                             )}
                         </div>

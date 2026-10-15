@@ -28,6 +28,8 @@ export {EffectEditor} from './EffectEditor';
 export type {EffectEditorProps} from './EffectEditor';
 export {EffectEditorHost, QuarksEffectEditor} from './EffectEditorHost';
 export type {EffectEditorHostHandle, EffectEditorHostProps} from './EffectEditorHost';
+export {EffectTreeView} from './EffectTreeView';
+export type {EffectTreeViewProps} from './EffectTreeView';
 export {CheckboxField, NumberField, Row, SelectField} from './fields';
 export {GradientEditor} from './GradientEditor';
 export {MessageDialog} from './MessageDialog';

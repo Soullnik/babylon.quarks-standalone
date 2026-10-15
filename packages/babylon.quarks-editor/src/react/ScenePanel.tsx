@@ -1,8 +1,18 @@
 import type {TransformNode} from '@babylonjs/core/Meshes/transformNode';
-import {EyeIcon, EyeSlashIcon, SparklesIcon, TrashIcon, ViewfinderCircleIcon} from '@heroicons/react/24/solid';
-import React, {useState} from 'react';
+import {
+    ChevronDownIcon,
+    ChevronRightIcon,
+    EyeIcon,
+    EyeSlashIcon,
+    SparklesIcon,
+    TrashIcon,
+    ViewfinderCircleIcon,
+} from '@heroicons/react/24/solid';
+import React, {useEffect, useState} from 'react';
+import {buildEffectTree} from '../core/effectTree';
 import type {SceneEntry} from '../core/sceneEntries';
 import {ContextMenu, type ContextMenuItem} from './ContextMenu';
+import {EffectTreeView} from './EffectTreeView';
 import {iconStyle} from './icons';
 import {buttonStyle, theme} from './theme';
 
@@ -23,6 +33,10 @@ export interface ScenePanelProps {
     /** "Save as new asset…" in the row's right-click menu. */
     onSaveAsAsset?: (entry: SceneEntry) => void;
     onCreateDefault: () => void;
+    /** Node shown in the inspector; highlighted in the expanded effect trees. */
+    selectedNode?: TransformNode | null;
+    /** Picks a group/emitter inside an effect (focusing the effect first when needed). */
+    onSelectNode?: (entry: SceneEntry, node: TransformNode) => void;
 }
 
 export const rowIconButtonStyle: React.CSSProperties = {
@@ -48,8 +62,24 @@ function SceneRow(props: {
     onToggleSolo: (entry: SceneEntry) => void;
     onDelete: (entry: SceneEntry) => void;
     onContextMenu: (e: React.MouseEvent, entry: SceneEntry) => void;
+    hasTree: boolean;
+    expanded: boolean;
+    onToggleExpanded: (entry: SceneEntry) => void;
 }): React.ReactElement {
-    const {entry, focused, visible, solo, onFocus, onToggleVisible, onToggleSolo, onDelete, onContextMenu} = props;
+    const {
+        entry,
+        focused,
+        visible,
+        solo,
+        onFocus,
+        onToggleVisible,
+        onToggleSolo,
+        onDelete,
+        onContextMenu,
+        hasTree,
+        expanded,
+        onToggleExpanded,
+    } = props;
     const isLooping = entry.systems.some((system) => system.looping);
     return (
         <div
@@ -94,7 +124,7 @@ function SceneRow(props: {
                     border: 'none',
                     background: 'transparent',
                     color: focused ? theme.text : visible ? theme.textDim : 'rgba(183, 198, 234, 0.5)',
-                    padding: '0 8px',
+                    padding: '0 8px 0 4px',
                     fontSize: 12.5,
                     cursor: 'pointer',
                     fontFamily: theme.font,
@@ -107,6 +137,21 @@ function SceneRow(props: {
                     onFocus(entry);
                 }}
             >
+                <span
+                    title={expanded ? 'Collapse' : 'Show its groups and emitters'}
+                    style={{
+                        width: 12,
+                        flexShrink: 0,
+                        display: 'inline-flex',
+                        visibility: hasTree ? 'visible' : 'hidden',
+                    }}
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        onToggleExpanded(entry);
+                    }}
+                >
+                    {expanded ? <ChevronDownIcon style={iconStyle(11)} /> : <ChevronRightIcon style={iconStyle(11)} />}
+                </span>
                 <span style={{width: 14, flexShrink: 0, display: 'inline-flex', opacity: visible ? 1 : 0.4}}>
                     <SparklesIcon style={iconStyle(14)} />
                 </span>
@@ -162,8 +207,27 @@ export function ScenePanel(props: ScenePanelProps): React.ReactElement {
         onDelete,
         onSaveAsAsset,
         onCreateDefault,
+        selectedNode = null,
+        onSelectNode,
     } = props;
     const [menu, setMenu] = useState<{x: number; y: number; items: ContextMenuItem[]} | null>(null);
+    const [expanded, setExpanded] = useState<Set<number>>(() => new Set());
+    // The focused effect opens its tree, so its sub-emitters are one click away.
+    useEffect(() => {
+        if (focusedRoot) {
+            setExpanded((prev) => (prev.has(focusedRoot.uniqueId) ? prev : new Set(prev).add(focusedRoot.uniqueId)));
+        }
+    }, [focusedRoot]);
+    const toggleExpanded = (entry: SceneEntry) =>
+        setExpanded((prev) => {
+            const next = new Set(prev);
+            if (next.has(entry.root.uniqueId)) {
+                next.delete(entry.root.uniqueId);
+            } else {
+                next.add(entry.root.uniqueId);
+            }
+            return next;
+        });
     const openMenu = (e: React.MouseEvent, entry: SceneEntry) => {
         e.preventDefault();
         const visible = visibleRootIds.has(entry.root.uniqueId);
@@ -214,20 +278,38 @@ export function ScenePanel(props: ScenePanelProps): React.ReactElement {
                         background: theme.sectionBg,
                     }}
                 >
-                    {entries.map((entry) => (
-                        <SceneRow
-                            key={entry.root.uniqueId}
-                            entry={entry}
-                            focused={focusedRoot === entry.root}
-                            visible={visibleRootIds.has(entry.root.uniqueId)}
-                            solo={soloRootId === entry.root.uniqueId}
-                            onFocus={onFocus}
-                            onToggleVisible={onToggleVisible}
-                            onToggleSolo={onToggleSolo}
-                            onDelete={onDelete}
-                            onContextMenu={openMenu}
-                        />
-                    ))}
+                    {entries.map((entry) => {
+                        const hasTree = onSelectNode !== undefined && buildEffectTree(entry.root).children.length > 0;
+                        const open = hasTree && expanded.has(entry.root.uniqueId);
+                        return (
+                            <React.Fragment key={entry.root.uniqueId}>
+                                <SceneRow
+                                    entry={entry}
+                                    hasTree={hasTree}
+                                    expanded={open}
+                                    onToggleExpanded={toggleExpanded}
+                                    focused={focusedRoot === entry.root}
+                                    visible={visibleRootIds.has(entry.root.uniqueId)}
+                                    solo={soloRootId === entry.root.uniqueId}
+                                    onFocus={onFocus}
+                                    onToggleVisible={onToggleVisible}
+                                    onToggleSolo={onToggleSolo}
+                                    onDelete={onDelete}
+                                    onContextMenu={openMenu}
+                                />
+                                {open && (
+                                    <div style={{borderBottom: `1px solid ${theme.border}`, padding: '2px 0'}}>
+                                        <EffectTreeView
+                                            root={entry.root}
+                                            selectedNode={selectedNode}
+                                            indent={34}
+                                            onSelect={(node) => onSelectNode!(entry, node)}
+                                        />
+                                    </div>
+                                )}
+                            </React.Fragment>
+                        );
+                    })}
                 </div>
             )}
             {menu && <ContextMenu x={menu.x} y={menu.y} items={menu.items} onClose={() => setMenu(null)} />}
