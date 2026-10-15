@@ -5,6 +5,7 @@ import {GizmoManager} from '@babylonjs/core/Gizmos/gizmoManager';
 import {DirectionalLight} from '@babylonjs/core/Lights/directionalLight';
 import {Color3, Color4} from '@babylonjs/core/Maths/math.color';
 import {Vector3 as BVector3} from '@babylonjs/core/Maths/math.vector';
+import {Viewport} from '@babylonjs/core/Maths/math.viewport';
 import type {Mesh} from '@babylonjs/core/Meshes/mesh';
 import {MeshBuilder} from '@babylonjs/core/Meshes/meshBuilder';
 import type {TransformNode} from '@babylonjs/core/Meshes/transformNode';
@@ -297,6 +298,9 @@ export function EffectEditorHost(props: EffectEditorHostProps) {
     const drawerPinnedRef = useRef(false);
     drawerPinnedRef.current = drawerPinned;
     const timelineCounterRef = useRef<HTMLSpanElement>(null);
+    const mainAreaRef = useRef<HTMLDivElement>(null);
+    /** Pixels at the bottom of the viewport covered by the floating Assets drawer. */
+    const [viewportInset, setViewportInset] = useState(0);
     const [sceneDirty, setSceneDirty] = useState(false);
     const [projectLoading, setProjectLoading] = useState(Boolean(props.project));
     const [toast, setToast] = useState<string | null>(null);
@@ -1380,6 +1384,29 @@ export function EffectEditorHost(props: EffectEditorHostProps) {
         emitterWireframesRef.current?.setVisible(showEmitterWireframes);
     }, [showEmitterWireframes]);
 
+    // The floating drawer is opaque, so render the scene only in the part of the viewport above
+    // it: the view — and every "frame this effect" camera move — re-centres on what is visible.
+    useEffect(() => {
+        const update = () => {
+            const camera = stateRef.current?.camera;
+            const canvas = canvasRef.current;
+            const area = mainAreaRef.current;
+            if (!camera || !canvas || !area) return;
+            const canvasRect = canvas.getBoundingClientRect();
+            const drawerTop = area.getBoundingClientRect().bottom - DRAWER_HEIGHT;
+            const covered =
+                drawerOpen && !drawerPinned
+                    ? Math.max(0, Math.min(canvasRect.height * 0.8, canvasRect.bottom - drawerTop))
+                    : 0;
+            const fraction = canvasRect.height > 0 ? covered / canvasRect.height : 0;
+            camera.viewport = new Viewport(0, fraction, 1, 1 - fraction);
+            setViewportInset(covered);
+        };
+        update();
+        window.addEventListener('resize', update);
+        return () => window.removeEventListener('resize', update);
+    }, [drawerOpen, drawerPinned, timelineCollapsed]);
+
     useEffect(() => {
         if (!props.project || !sceneDirty) return;
         const onBeforeUnload = (e: BeforeUnloadEvent) => {
@@ -1526,6 +1553,7 @@ export function EffectEditorHost(props: EffectEditorHostProps) {
         >
             <style>{globalEditorStyles}</style>
             <div
+                ref={mainAreaRef}
                 style={{
                     position: 'relative',
                     flex: 1,
@@ -1738,7 +1766,7 @@ export function EffectEditorHost(props: EffectEditorHostProps) {
                         <div
                             style={{
                                 position: 'absolute',
-                                bottom: 12,
+                                bottom: 12 + viewportInset,
                                 left: 12,
                                 background: theme.panelBg,
                                 border: `1px solid ${theme.border}`,
@@ -1757,7 +1785,7 @@ export function EffectEditorHost(props: EffectEditorHostProps) {
                             <div
                                 style={{
                                     position: 'absolute',
-                                    bottom: 12,
+                                    bottom: 12 + viewportInset,
                                     left: '50%',
                                     transform: 'translateX(-50%)',
                                 }}
