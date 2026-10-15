@@ -110,6 +110,8 @@ export interface ParticleSystemParameters {
     emissionOverTime?: ValueGenerator | FunctionValueGenerator;
     emissionOverDistance?: ValueGenerator | FunctionValueGenerator;
     emissionBursts?: Array<BurstParameters>;
+    /** Most particles alive at once; emission past it is dropped. Leave unset for no limit. */
+    maxParticles?: number;
     onlyUsedByOther?: boolean;
     behaviors?: Array<Behavior>;
     instancingGeometry?: Float32Array;
@@ -167,6 +169,7 @@ export interface ParticleSystemJSONParameters {
     emissionOverTime: FunctionJSON;
     emissionOverDistance: FunctionJSON;
     emissionBursts?: Array<BurstParametersJSON>;
+    maxParticles?: number;
     onlyUsedByOther: boolean;
     rendererEmitterSettings: RendererEmitterSettings;
     instancingGeometry?: any;
@@ -231,6 +234,8 @@ export class ParticleSystem implements IParticleSystem {
     emissionOverTime: ValueGenerator | FunctionValueGenerator;
     emissionOverDistance: ValueGenerator | FunctionValueGenerator;
     emissionBursts: Array<BurstParameters>;
+    /** Most particles alive at once (Unity's Max Particles); emission past it is dropped. Undefined means no limit. */
+    maxParticles?: number;
     onlyUsedByOther: boolean;
     worldSpace: boolean;
     particleNum: number;
@@ -515,6 +520,7 @@ export class ParticleSystem implements IParticleSystem {
         this.emissionOverTime = parameters.emissionOverTime ?? new ConstantValue(10);
         this.emissionOverDistance = parameters.emissionOverDistance ?? new ConstantValue(0);
         this.emissionBursts = parameters.emissionBursts ?? [];
+        this.maxParticles = parameters.maxParticles;
         this.onlyUsedByOther = parameters.onlyUsedByOther ?? false;
         this.emitterShape = parameters.shape ?? new SphereEmitter();
         this.behaviors = parameters.behaviors ?? [];
@@ -773,6 +779,10 @@ export class ParticleSystem implements IParticleSystem {
         const timeRatio = emissionState.time / this.duration;
         const trailSettings = isTrailMode ? (this.rendererEmitterSettings as TrailSettings) : undefined;
         const followLocalOrigin = Boolean(trailSettings?.followLocalOrigin);
+        if (this.maxParticles !== undefined) {
+            // Like Unity, a full system skips the particles it has no room for rather than queueing them.
+            count = Math.min(count, Math.max(0, this.maxParticles - this.particleNum));
+        }
 
         for (let i = 0; i < count; i++) {
             emissionState.burstParticleIndex = i;
@@ -1382,6 +1392,7 @@ export class ParticleSystem implements IParticleSystem {
                 interval: burst.interval,
                 cycle: burst.cycle,
             })),
+            ...(this.maxParticles !== undefined ? {maxParticles: this.maxParticles} : {}),
             onlyUsedByOther: this.onlyUsedByOther,
             instancingGeometry: geometryUUID,
             renderMode: this.renderMode,
@@ -1475,6 +1486,7 @@ export class ParticleSystem implements IParticleSystem {
                 interval: burst.interval ?? 0.1,
                 cycle: burst.cycle ?? burst.cycleCount ?? 1,
             })),
+            maxParticles: typeof json.maxParticles === 'number' ? json.maxParticles : undefined,
             onlyUsedByOther: json.onlyUsedByOther,
             instancingGeometry: resolvedGeometry.positions,
             instancingIndices: resolvedGeometry.indices,
@@ -1727,6 +1739,7 @@ export class ParticleSystem implements IParticleSystem {
             emissionOverTime: this.emissionOverTime.clone(),
             emissionOverDistance: this.emissionOverDistance.clone(),
             emissionBursts: this.emissionBursts.map((b) => ({...b})),
+            maxParticles: this.maxParticles,
             onlyUsedByOther: this.onlyUsedByOther,
             instancingGeometry: this.rendererSettings.instancingGeometry,
             instancingIndices: this.rendererSettings.instancingIndices,

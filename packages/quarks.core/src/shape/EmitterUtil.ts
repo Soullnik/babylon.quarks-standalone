@@ -11,6 +11,9 @@ export interface ShapeJSON {
     angle?: number;
     width?: number;
     height?: number;
+    depth?: number;
+    emitFrom?: number;
+    boxThickness?: number[];
     column?: number;
     row?: number;
     mesh?: string;

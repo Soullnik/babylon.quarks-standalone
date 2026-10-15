@@ -62,9 +62,9 @@ death-triggered spark sub-emitter).
 
 | Unity module                         | Quarks mapping                                                                                                                                                                                                                                                                                                                                        |
 | ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Main**                             | duration, loop, prewarm, start delay/lifetime/speed/size (incl. 3D size), start rotation, start color (constant / two colors / gradient / two gradients), simulation space → `worldSpace`, gravity → `ApplyForce`                                                                                                                                     |
+| **Main**                             | duration, loop, prewarm, start delay/lifetime/speed/size (incl. 3D size), start rotation, start color (constant / two colors / gradient / two gradients) × material tint, max particles → `maxParticles`, simulation space → `worldSpace`, gravity → `ApplyForce`                                                                                     |
 | **Emission**                         | rate over time, rate over distance, bursts (time / count / cycles / interval / probability)                                                                                                                                                                                                                                                           |
-| **Shape**                            | Cone, Sphere, Hemisphere, Circle, Donut (radius, angle, arc, thickness), **Mesh** → `mesh_surface`, Position / Rotation / Scale → shape `transform`, randomize direction → `ChangeEmitDirection`                                                                                                                                                      |
+| **Shape**                            | Cone, Sphere, Hemisphere, Circle, Donut (radius, angle, arc, thickness), **Mesh** → `mesh_surface`, Box / Box Shell / Box Edge (size, box thickness) and Rectangle → `box`, Edge → `edge` (radius, mode), Position / Rotation / Scale → shape `transform`, randomize direction → `ChangeEmitDirection`                                                |
 | **Color over Lifetime**              | `ColorOverLife` (gradient)                                                                                                                                                                                                                                                                                                                            |
 | **Size over Lifetime**               | `SizeOverLife` (curve → piecewise Bézier; separate axes → per-axis `Vector3Function`)                                                                                                                                                                                                                                                                 |
 | **Rotation over Lifetime**           | `RotationOverLife` (radians, sign flipped for billboards — Unity spins them clockwise)                                                                                                                                                                                                                                                                |
@@ -90,7 +90,14 @@ gradients sample both color and alpha keys.
   tweak; effects authored at the origin are unaffected.
 - **Mesh shape:** exported as a `mesh_surface` emitter plus a `Mesh` source node holding the
   geometry. That node is a real (visible) mesh in the loaded scene — hide/disable it if you only
-  want it as an emission source. Box / Edge shapes still fall back to a point emitter.
+  want it as an emission source. Mesh Renderer, Skinned Mesh Renderer and Sprite shapes still
+  fall back to a point emitter, with a warning.
+- **Box shapes:** Box Shell and Box Edge pick a face or edge direction evenly per axis and sink
+  half their particles into the box by up to twice the Box Thickness, as measured in Unity 6;
+  Unity doesn't document either.
+- **Material tint:** the material's `_BaseColor`, `_Color` or (doubled, as the legacy particle
+  shaders do) `_TintColor` is multiplied into the start color, so HDR tints above 1 brighten the
+  particles the same way. Other shader properties (emission, color mode) aren't read.
 - **Collision:** only `bounce` is exported. quarks resolves collisions against a host-provided
   collider (e.g. the editor's ground plane), so Unity's collision planes/world aren't carried over.
 - **3D rotation:** 3D _start_ rotation is exported as an Euler generator for **Mesh** render mode
@@ -114,8 +121,8 @@ gradients sample both color and alpha keys.
 - **Horizontal and stretched billboards** draw their texture the other way up along V in quarks,
   so every exported one carries `flip` with V set to `1 − Unity's Flip V` (usually `1`), which
   turns it back the right way.
-- **Max Particles** isn't exported: quarks has no per-system particle cap, so an effect that
-  relies on Unity's cap to thin itself out shows more particles.
+- **Max Particles** caps live particles per system like Unity's; emission past it is dropped
+  rather than queued.
 - **Blend mode** is inferred from the material's shader name / `_SrcBlend`/`_DstBlend`.
   Alpha Blended / Premultiply map to alpha blend; Additive → additive; Multiply/Modulate →
   multiply. Unusual custom shaders default to alpha blend.

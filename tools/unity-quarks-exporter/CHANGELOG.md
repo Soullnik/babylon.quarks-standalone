@@ -12,6 +12,17 @@ All notable changes to the Unity Quarks Exporter are documented here.
 - **Renderer Pivot** and **Flip** export as `pivot` / `flip` for billboard, vertical, horizontal
   and stretched billboard systems, mapped so that each quad lands where Unity puts it (checked
   vertex by vertex against `ParticleSystemRenderer.BakeMesh`). Mesh systems log a warning.
+- **Material tint:** the particle (or trail) material's `_BaseColor`, `_Color` or legacy
+  `_TintColor` (doubled, as the legacy particle shaders do) is multiplied into the start color.
+  Effects such as EnergyMissile and EnergyMuzzle, whose materials carry an HDR tint, rendered
+  dimmer or in the wrong hue without it.
+- **Max Particles** is exported as the system's `maxParticles`, so effects that lean on Unity's
+  cap to thin themselves out (Flamethrower, SoftFireBig) no longer overfill. Needs
+  `ParticleSystem.maxParticles` added to babylon.quarks alongside this change.
+- **Box**, **Box Shell**, **Box Edge** and **Rectangle** shapes export as a quarks `box` emitter
+  (sized by the shape's Scale, with Box Thickness), and the single-sided **Edge** shape as an
+  `edge` emitter; they all fell back to a point emitter, collapsing fog banks, coin showers and
+  zone walls onto one spot. The shapes still left as a point emitter now log a warning.
 
 ### Fixed
 
