@@ -54,7 +54,7 @@ export interface EffectEditorProps {
  * Embed it anywhere React runs — the standalone examples page or a BabylonJS Editor plugin.
  * Module order mirrors Unity's Particle System inspector.
  */
-export function EffectEditor(props: EffectEditorProps) {
+export const EffectEditor = React.memo(function EffectEditor(props: EffectEditorProps) {
     useSyncExternalStore(
         (onStoreChange) => props.binding.subscribe(onStoreChange),
         () => props.binding.getRevision()
@@ -132,4 +132,4 @@ export function EffectEditor(props: EffectEditorProps) {
             />
         </div>
     );
-}
+});

@@ -27,7 +27,7 @@ import {
     XMarkIcon,
 } from '@heroicons/react/24/solid';
 import {BatchedRenderer, QuarksUtil} from 'babylon.quarks';
-import React, {useCallback, useEffect, useMemo, useReducer, useRef, useState} from 'react';
+import React, {useCallback, useDeferredValue, useEffect, useMemo, useReducer, useRef, useState} from 'react';
 import {createRoot} from 'react-dom/client';
 import {getAssetDragSession, setAssetDragSession} from '../core/assetDragSession';
 import {ASSET_DRAG_MIME, describeAssetDrag, readAssetDrag, type AssetDragPayload} from '../core/assetTree';
@@ -1516,7 +1516,20 @@ export function EffectEditorHost(props: EffectEditorHostProps) {
 
     const allSystems = binding ? [binding.system, ...binding.subSystems] : [];
     const activeSystem = binding ? (allSystems.find((s) => s.emitter === selectedNode) ?? binding.system) : null;
-    const gizmoTargetLabel = gizmoNode?.name || 'Node';
+    // The inspector is the expensive part of a selection change (every module re-renders for the
+    // new system). It renders from deferred values, so the click, tree highlight and gizmo update
+    // at once and the inspector catches up in an interruptible render instead of stalling frames.
+    const deferredBinding = useDeferredValue(binding);
+    const deferredNode = useDeferredValue(selectedNode);
+    const inspectorBinding = deferredBinding && !deferredBinding.root.isDisposed() ? deferredBinding : binding;
+    const inspectorNode =
+        deferredNode && !deferredNode.isDisposed() && inspectorBinding === deferredBinding
+            ? deferredNode
+            : (inspectorBinding?.root ?? null);
+    const inspectorSystems = inspectorBinding ? [inspectorBinding.system, ...inspectorBinding.subSystems] : [];
+    const inspectorSystem = inspectorBinding
+        ? (inspectorSystems.find((s) => s.emitter === inspectorNode) ?? inspectorBinding.system)
+        : null;
     const visibleRootIdSet = useMemo(() => new Set(visibleRootIds), [visibleRootIds]);
     const instanceCounts = useMemo(() => countInstancesByAsset(sceneEntries), [sceneEntries]);
     const showTimeline = Boolean(binding && activeSystem && state);
@@ -2151,12 +2164,12 @@ export function EffectEditorHost(props: EffectEditorHostProps) {
                             </div>
                         </div>
                         <div style={{flex: 1, minHeight: 0, overflowY: 'auto', padding: '6px 14px 20px'}}>
-                            {binding && activeSystem && gizmoNode ? (
+                            {inspectorBinding && inspectorSystem && inspectorNode ? (
                                 <EffectEditor
-                                    binding={binding}
-                                    selectedSystem={activeSystem}
-                                    gizmoTargetNode={gizmoNode}
-                                    gizmoTargetLabel={gizmoTargetLabel}
+                                    binding={inspectorBinding}
+                                    selectedSystem={inspectorSystem}
+                                    gizmoTargetNode={inspectorNode}
+                                    gizmoTargetLabel={inspectorNode.name || 'Node'}
                                     textureOptions={props.textureOptions}
                                     geometryOptions={props.geometryOptions}
                                     resolveTexture={props.resolveTexture ? resolveTextureForEditor : undefined}
