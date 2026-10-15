@@ -37,8 +37,10 @@ namespace BabylonQuarks.UnityExporter
         }
 
         /// <summary>AnimationCurve (0..1 time domain) → PiecewiseBezier via Hermite→Bézier per segment.</summary>
-        public static JToken Bezier(AnimationCurve curve, float multiplier)
+        /// <param name="cycles">Replays the curve this many times across 0..1 (a sawtooth for frames).</param>
+        public static JToken Bezier(AnimationCurve curve, float multiplier, int cycles = 1)
         {
+            cycles = Mathf.Max(1, cycles);
             var functions = new JArray();
             Keyframe[] keys = curve != null ? curve.keys : null;
 
@@ -53,20 +55,25 @@ namespace BabylonQuarks.UnityExporter
             }
             else
             {
-                for (int i = 0; i < keys.Length - 1; i++)
+                for (int cycle = 0; cycle < cycles; cycle++)
                 {
-                    Keyframe k0 = keys[i];
-                    Keyframe k1 = keys[i + 1];
-                    float dt = k1.time - k0.time;
-                    if (dt <= 0f) continue;
+                    for (int i = 0; i < keys.Length - 1; i++)
+                    {
+                        Keyframe k0 = keys[i];
+                        Keyframe k1 = keys[i + 1];
+                        float dt = k1.time - k0.time;
+                        if (dt <= 0f) continue;
 
-                    float p0 = k0.value * multiplier;
-                    float p3 = k1.value * multiplier;
-                    float outT = Finite(k0.outTangent);
-                    float inT = Finite(k1.inTangent);
-                    float p1 = (k0.value + outT * dt / 3f) * multiplier;
-                    float p2 = (k1.value - inT * dt / 3f) * multiplier;
-                    functions.Add(BezierPiece(p0, p1, p2, p3, k0.time));
+                        float p0 = k0.value * multiplier;
+                        float p3 = k1.value * multiplier;
+                        float outT = Finite(k0.outTangent);
+                        float inT = Finite(k1.inTangent);
+                        float p1 = (k0.value + outT * dt / 3f) * multiplier;
+                        float p2 = (k1.value - inT * dt / 3f) * multiplier;
+                        // Control points are in value space, so squeezing a cycle into 1/cycles
+                        // of the time range only moves where each piece starts.
+                        functions.Add(BezierPiece(p0, p1, p2, p3, (cycle + k0.time) / cycles));
+                    }
                 }
                 if (functions.Items.Count == 0)
                 {
