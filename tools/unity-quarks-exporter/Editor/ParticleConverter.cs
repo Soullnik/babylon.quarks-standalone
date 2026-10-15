@@ -78,7 +78,7 @@ namespace BabylonQuarks.UnityExporter
             // A trail only takes the particle's size when Unity's Size affects Width is on.
             bool sizeMatters = !trailOnly || ps.trails.sizeAffectsWidth;
             if (sizeMatters) AddSizeOverLife(ps, behaviors);
-            AddRotationOverLife(ps, behaviors);
+            AddRotationOverLife(ps, behaviors, renderMode);
             AddVelocityOverLife(ps, behaviors);
             AddInheritVelocity(ps, behaviors);
             AddLimitVelocity(ps, behaviors);
@@ -86,7 +86,7 @@ namespace BabylonQuarks.UnityExporter
             // Without Inherit Particle Color, nothing about the particle's color reaches its trail.
             if (!trailOnly || ps.trails.inheritParticleColor) AddColorBySpeed(ps, behaviors);
             if (sizeMatters) AddSizeBySpeed(ps, behaviors);
-            AddRotationBySpeed(ps, behaviors);
+            AddRotationBySpeed(ps, behaviors, renderMode);
             AddNoise(ps, behaviors);
             AddCollision(ps, behaviors);
             AddSubEmitters(ps, ctx, behaviors);
@@ -111,7 +111,7 @@ namespace BabylonQuarks.UnityExporter
                         ValueConverter.Curve(main.startRotationY),
                         ValueConverter.Curve(main.startRotationZ));
                 }
-                return ValueConverter.Curve(main.startRotationZ);
+                return ScaleCurve(main.startRotationZ, SpinSign(renderMode));
             }
             if (mesh)
             {
@@ -119,8 +119,17 @@ namespace BabylonQuarks.UnityExporter
                 // spin around Y, so wrap it as a Z-only Euler to keep the axis correct.
                 return Euler(ValueConverter.Constant(0), ValueConverter.Constant(0), ValueConverter.Curve(main.startRotation));
             }
-            return ValueConverter.Curve(main.startRotation);
+            return ScaleCurve(main.startRotation, SpinSign(renderMode));
         }
+
+        /// <summary>
+        /// Unity turns a camera-facing quad clockwise for a positive angle, quarks counter-clockwise,
+        /// so billboard angles and spins flip sign. Unity's API already gives radians (the inspector
+        /// shows degrees), as quarks expects. Horizontal billboards and meshes keep their sign: their
+        /// direction hasn't been checked against Unity.
+        /// </summary>
+        private static float SpinSign(int renderMode) =>
+            renderMode == 0 || renderMode == 5 ? -1f : 1f;
 
         private static JToken Euler(JToken x, JToken y, JToken z) =>
             // Unity's intrinsic ZXY order (rotate Z, then X, then Y) is the same rotation as quarks'
@@ -441,12 +450,28 @@ namespace BabylonQuarks.UnityExporter
                     .Set("uTileCount", u)
                     .Set("vTileCount", v)
                     .Set("blendTiles", false);
-                // Unity frameOverTime is authored in normalized tile space (0..1), so scale it to
-                // the concrete tile indices used by quarks. This preserves constants, random
-                // ranges and curves instead of flattening everything into a linear sweep.
+                // Unity frameOverTime is authored in normalized tile space (0..1) and shows tile
+                // floor(value x tiles), holding 1.0 on the last tile. quarks floors the value it is
+                // given, so scale by just under `tiles`: every tile then gets an equal share of the
+                // sweep, where scaling by tiles - 1 left the last tile on screen for an instant at
+                // most (and a random pick never chose it). Constants, random ranges and curves keep
+                // their shape.
+                float frameScale = tiles - 0.001f;
+                var frameOverTime = tsa.frameOverTime;
+                int cycles = Mathf.Max(1, tsa.cycleCount);
+                bool curved = frameOverTime.mode == ParticleSystemCurveMode.Curve
+                    || frameOverTime.mode == ParticleSystemCurveMode.TwoCurves;
+                // Cycles replay the curve that many times over the particle's life; a constant or
+                // random frame is the same in every cycle.
+                JToken frame = curved && cycles > 1
+                    ? ValueConverter.Bezier(
+                        frameOverTime.mode == ParticleSystemCurveMode.TwoCurves ? frameOverTime.curveMax : frameOverTime.curve,
+                        frameOverTime.curveMultiplier * frameScale,
+                        cycles)
+                    : ScaleCurve(frameOverTime, frameScale);
                 behaviors.Add(new JObject()
                     .Set("type", "FrameOverLife")
-                    .Set("frame", ScaleCurve(tsa.frameOverTime, tiles - 1)));
+                    .Set("frame", frame));
             }
             else
             {
@@ -470,19 +495,25 @@ namespace BabylonQuarks.UnityExporter
         {
             var m = ps.sizeOverLifetime;
             if (!m.enabled) return;
-            // quarks SizeOverLife is uniform; with separate axes Unity throws on `.size`, so use X.
-            var curve = m.separateAxes ? m.x : m.size;
-            behaviors.Add(new JObject().Set("type", "SizeOverLife").Set("size", ValueConverter.Curve(curve)));
+            // Separate axes become a per-axis Vector3Function; Unity throws on `.size` in that mode.
+            JToken size = m.separateAxes
+                ? new JObject()
+                    .Set("type", "Vector3Function")
+                    .Set("x", ValueConverter.Curve(m.x))
+                    .Set("y", ValueConverter.Curve(m.y))
+                    .Set("z", ValueConverter.Curve(m.z))
+                : ValueConverter.Curve(m.size);
+            behaviors.Add(new JObject().Set("type", "SizeOverLife").Set("size", size));
         }
 
-        private static void AddRotationOverLife(ParticleSystem ps, JArray behaviors)
+        private static void AddRotationOverLife(ParticleSystem ps, JArray behaviors, int renderMode)
         {
             var m = ps.rotationOverLifetime;
             if (!m.enabled) return;
-            // Unity rotation-over-lifetime is in degrees/sec; quarks angularVelocity is radians/sec.
+            // Radians/sec on both sides; only the direction differs (see SpinSign).
             behaviors.Add(new JObject()
                 .Set("type", "RotationOverLife")
-                .Set("angularVelocity", ScaleCurve(m.z, Mathf.Deg2Rad)));
+                .Set("angularVelocity", ScaleCurve(m.z, SpinSign(renderMode))));
         }
 
         private static void AddVelocityOverLife(ParticleSystem ps, JArray behaviors)
@@ -576,13 +607,13 @@ namespace BabylonQuarks.UnityExporter
                 .Set("speedRange", SpeedRange(m.range)));
         }
 
-        private static void AddRotationBySpeed(ParticleSystem ps, JArray behaviors)
+        private static void AddRotationBySpeed(ParticleSystem ps, JArray behaviors, int renderMode)
         {
             var m = ps.rotationBySpeed;
             if (!m.enabled) return;
             behaviors.Add(new JObject()
                 .Set("type", "RotationBySpeed")
-                .Set("angularVelocity", ScaleCurve(m.z, Mathf.Deg2Rad))
+                .Set("angularVelocity", ScaleCurve(m.z, SpinSign(renderMode)))
                 .Set("speedRange", SpeedRange(m.range)));
         }
 
@@ -608,27 +639,29 @@ namespace BabylonQuarks.UnityExporter
                 ParticleSystem sub = m.GetSubEmitterSystem(i);
                 string uuid = ctx.GetNodeUuid(sub);
                 if (sub == null || uuid == null) continue;
+                var type = m.GetSubEmitterType(i);
+                if (type != ParticleSystemSubEmitterType.Birth && type != ParticleSystemSubEmitterType.Death)
+                {
+                    // quarks has no collision, trigger or scripted emit event. Its only other mode
+                    // starts the sub-system's whole emission again on every frame, which buried
+                    // rain and waterfalls under thousands of particles, so leave these out.
+                    Debug.LogWarning($"[Quarks Exporter] '{ps.name}': {type} sub-emitter '{sub.name}' has no quarks counterpart and is skipped.");
+                    continue;
+                }
                 behaviors.Add(new JObject()
                     .Set("type", "EmitSubParticleSystem")
                     .Set("subParticleSystem", uuid)
                     .Set("useVelocityAsBasis", false)
-                    .Set("mode", MapSubEmitMode(m.GetSubEmitterType(i)))
+                    .Set("mode", type == ParticleSystemSubEmitterType.Birth ? SubEmitBirth : SubEmitDeath)
                     .Set("emitProbability", m.GetSubEmitterEmitProbability(i)));
             }
         }
 
         // ---- helpers ---------------------------------------------------------------------
 
-        private static int MapSubEmitMode(ParticleSystemSubEmitterType type)
-        {
-            // quarks SubParticleEmitMode: Death=0, Birth=1, Frame=2
-            switch (type)
-            {
-                case ParticleSystemSubEmitterType.Birth: return 1;
-                case ParticleSystemSubEmitterType.Death: return 0;
-                default: return 2;
-            }
-        }
+        // quarks SubParticleEmitMode: Death=0, Birth=1 (Frame=2 has no Unity counterpart).
+        private const int SubEmitDeath = 0;
+        private const int SubEmitBirth = 1;
 
         private static float ConstantOf(ParticleSystem.MinMaxCurve c)
         {
