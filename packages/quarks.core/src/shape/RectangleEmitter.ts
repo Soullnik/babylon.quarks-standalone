@@ -10,6 +10,7 @@ import {Matrix4, Quaternion} from '../math';
 import {Particle} from '../Particle';
 import {UP_VEC3, ZERO_VEC3} from '../util/MathUtil';
 import {EmitterMode, EmitterShape, getValueFromEmitterMode, ShapeJSON} from './EmitterUtil';
+import {ShapeTransform} from './ShapeTransform';
 
 /**
  * Interface representing the parameters for a rectangle emitter.
@@ -43,6 +44,11 @@ export interface RectangleEmitterParameters {
      * {@link EmitterMode}
      */
     speed?: ValueGenerator | FunctionValueGenerator;
+    /**
+     * Offset, rotation and scale of the shape within the particle system.
+     * {@link ShapeTransform}
+     */
+    transform?: ShapeTransform;
 }
 
 /**
@@ -57,6 +63,7 @@ export class RectangleEmitter implements EmitterShape {
     spread: number;
     speed: ValueGenerator | FunctionValueGenerator;
     memory: GeneratorMemory;
+    transform?: ShapeTransform;
 
     private currentValue = 0;
 
@@ -70,6 +77,7 @@ export class RectangleEmitter implements EmitterShape {
         this.spread = parameters.spread ?? 0;
         this.speed = parameters.speed ?? new ConstantValue(1);
         this.memory = [];
+        this.transform = parameters.transform;
 
         this._m1 = new Matrix4();
     }
@@ -127,6 +135,7 @@ export class RectangleEmitter implements EmitterShape {
                 p.rotation.setFromRotationMatrix(this._m1);
             }
         }
+        this.transform?.apply(p);
     }
 
     toJSON(): ShapeJSON {
@@ -138,6 +147,7 @@ export class RectangleEmitter implements EmitterShape {
             mode: this.mode,
             spread: this.spread,
             speed: this.speed.toJSON(),
+            ...ShapeTransform.toShapeJSON(this.transform),
         };
     }
 
@@ -148,6 +158,7 @@ export class RectangleEmitter implements EmitterShape {
             thickness: json.thickness,
             mode: json.mode,
             speed: json.speed ? ValueGeneratorFromJSON(json.speed) : undefined,
+            transform: ShapeTransform.fromJSON(json.transform),
             spread: json.spread,
         });
     }
@@ -159,6 +170,7 @@ export class RectangleEmitter implements EmitterShape {
             thickness: this.thickness,
             mode: this.mode,
             speed: this.speed.clone(),
+            transform: this.transform?.clone(),
             spread: this.spread,
         });
     }

@@ -22,6 +22,11 @@ uniform float tileCountX;
 uniform float tileCountY;
 #endif
 
+#ifdef PIVOT
+// Streak offset in particle-size units: x from head to tail, y across.
+uniform vec3 pivot;
+#endif
+
 // Varyings
 varying vec2 vUV;
 varying vec4 vColor;
@@ -36,7 +41,9 @@ varying float linearDepth;
 
 void main() {
     float lengthFactor = velocity.w;
-    float avgSize = (size.x + size.y) * 0.5;
+    // A flipped particle arrives with a negative size: the streak keeps its
+    // extent and mirrors its texture instead (see quadUV below).
+    float avgSize = (abs(size.x) + abs(size.y)) * 0.5;
     vec4 mvPosition = view * world * vec4(offset, 1.0);
     vec3 viewVelocity = mat3(view * world) * velocity.xyz;
     float vlength = length(viewVelocity);
@@ -44,11 +51,17 @@ void main() {
     // Deriving it via normalize keeps the stretch aligned even when the speed contribution is ~0
     // (e.g. speedFactor 0), instead of collapsing the whole burst onto a fixed screen axis.
     vec3 vdir = vlength > 0.000001 ? viewVelocity / vlength : vec3(0.0, 0.0, 1.0);
-    mvPosition.xyz += position.y * normalize(cross(mvPosition.xyz, vdir)) * avgSize;
+    vec3 side = normalize(cross(mvPosition.xyz, vdir));
+    mvPosition.xyz += position.y * side * avgSize;
     // Equivalent to viewVelocity * (1.0 + lengthFactor / vlength) for moving particles, but the
     // size-based term (vdir * lengthFactor) survives when the velocity contribution vanishes.
     mvPosition.xyz -= (position.x + 0.5) * (viewVelocity + vdir * lengthFactor) * avgSize;
+#ifdef PIVOT
+    // In particle-size units along the quad's own axes: x from head to tail, y across.
+    mvPosition.xyz += (pivot.y * side - pivot.x * vdir) * avgSize;
+#endif
     gl_Position = projection * mvPosition;
+    vec2 quadUV = vec2(size.x < 0.0 ? 1.0 - uv.x : uv.x, size.y < 0.0 ? 1.0 - uv.y : uv.y);
 #ifdef SOFT_PARTICLES
     projPosition = gl_Position;
     linearDepth = -mvPosition.z;
@@ -59,16 +72,16 @@ void main() {
         float baseTile = floor(uvTile);
         float tileU = mod(baseTile, tc.x) / tc.x;
         float tileV = 1.0 - floor(baseTile / tc.x) / tc.y - 1.0 / tc.y;
-        vUV = uv / tc + vec2(tileU, tileV);
+        vUV = quadUV / tc + vec2(tileU, tileV);
         #ifdef TILE_BLEND
             float nextTile = ceil(uvTile);
             float nextU = mod(nextTile, tc.x) / tc.x;
             float nextV = 1.0 - floor(nextTile / tc.x) / tc.y - 1.0 / tc.y;
-            vUV2 = uv / tc + vec2(nextU, nextV);
+            vUV2 = quadUV / tc + vec2(nextU, nextV);
             vTileBlend = fract(uvTile);
         #endif
     #else
-        vUV = uv;
+        vUV = quadUV;
     #endif
 
     vColor = color;

@@ -7,4 +7,5 @@ export * from './GridEmitter';
 export * from './HemisphereEmitter';
 export * from './PointEmitter';
 export * from './RectangleEmitter';
+export * from './ShapeTransform';
 export * from './SphereEmitter';

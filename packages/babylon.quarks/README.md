@@ -134,6 +134,28 @@ await engine.initAsync();
 
 All render modes (billboard, stretched billboard, mesh, trail) are validated to create WebGPU pipelines with zero validation errors. The [live demos](https://soullnik.github.io/babylon.quarks-standalone/) and the [benchmark page](https://soullnik.github.io/babylon.quarks-standalone/benchmark.html) accept `?engine=webgpu` in the URL to switch engines.
 
+## Unity-style emitter options
+
+A few optional settings mirror Shuriken so Unity exports look the same; all are off by default and
+only written to the effect JSON when set.
+
+```ts
+import {ConeEmitter, Quaternion, ShapeTransform, Vector2, Vector3} from 'quarks.core';
+
+const system = new ParticleSystem({
+    // Shape module Position / Rotation / Scale: spawn points and start directions go through it.
+    shape: new ConeEmitter({
+        radius: 0.5,
+        transform: new ShapeTransform(new Vector3(0, 1, 0), new Quaternion(), new Vector3(2, 1, 1)),
+    }),
+    // Renderer Pivot, in particle-size units (billboards and stretched billboards).
+    pivot: new Vector3(0, 0.5, 0),
+    // Renderer Flip: mirror the texture of 50% of particles along U.
+    flip: new Vector2(0.5, 0),
+    // ...
+});
+```
+
 ## Author & load effects
 
 Design an effect with one of these tools, then load the exported JSON with `QuarksLoader`:

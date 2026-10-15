@@ -4,7 +4,19 @@ All notable changes to the Unity Quarks Exporter are documented here.
 
 ## [Unreleased]
 
+### Added
+
+- **Shape Position / Rotation / Scale** export as the shape's `transform` (rotation as Unity's own
+  Euler → quaternion). They were ignored, so offset and turned emitters (SoftFireBig*,
+  SpikyFireBig* and ~230 other Epic Toon FX prefabs) spawned from the system's origin.
+- **Renderer Pivot** and **Flip** export as `pivot` / `flip` for billboard, vertical, horizontal
+  and stretched billboard systems, mapped so that each quad lands where Unity puts it (checked
+  vertex by vertex against `ParticleSystemRenderer.BakeMesh`). Mesh systems log a warning.
+
 ### Fixed
+
+- **Horizontal and stretched billboards** drew their texture upside down along V next to Unity.
+  They now export `flip` with V set to `1 − Flip V`, which mirrors it back.
 
 - A system that draws only its **trails** (Render Mode None + per-particle Trails) lost its
   texture and rendered as plain billboards: the exporter read the empty particle material and
@@ -18,6 +30,19 @@ All notable changes to the Unity Quarks Exporter are documented here.
   are exported as the curve's mean instead of its multiplier, which is the curve's peak scale.
 - Systems that draw particles _and_ trails, and ribbon trails, now log a warning instead of
   dropping the trails silently.
+- **Rotation over Lifetime** and **Rotation by Speed** spun 57× too slowly: Unity's API already
+  returns radians, and the exporter converted them from degrees a second time.
+- Billboards **turned the wrong way**: Unity rotates a camera-facing quad clockwise for a
+  positive angle, quarks counter-clockwise. Start rotation, Rotation over Lifetime and Rotation
+  by Speed are negated for billboard and vertical-billboard systems.
+- **Texture Sheet Animation** frames were scaled to `tiles − 1`, so the last tile was on screen
+  for an instant at most and a random tile pick never chose it. Frames now span every tile, and
+  **Cycles** above 1 repeat the frame curve instead of playing it once.
+- **Collision, Trigger and Manual sub-emitters** were exported as quarks' every-frame mode, which
+  restarts the sub-system's emission on every frame (rain and waterfalls reached ~15,000
+  particles). quarks has no matching event, so they are skipped with a warning.
+- **Size over Lifetime with Separate Axes** exported the X curve only; it now exports a per-axis
+  `Vector3Function`.
 
 ## [0.19.0] — 2026-07-25
 

@@ -9,6 +9,7 @@ import {EmissionState, IParticleSystem} from '../IParticleSystem';
 import {MathUtils} from '../math';
 import {Particle} from '../Particle';
 import {EmitterMode, EmitterShape, getValueFromEmitterMode, ShapeJSON} from './EmitterUtil';
+import {ShapeTransform} from './ShapeTransform';
 /**
  * Interface representing the parameters for a circle emitter.
  */
@@ -41,6 +42,11 @@ export interface CircleEmitterParameters {
      * {@link EmitterMode}
      */
     speed?: ValueGenerator | FunctionValueGenerator;
+    /**
+     * Offset, rotation and scale of the shape within the particle system.
+     * {@link ShapeTransform}
+     */
+    transform?: ShapeTransform;
 }
 
 /**
@@ -55,6 +61,7 @@ export class CircleEmitter implements EmitterShape {
     spread: number;
     speed: ValueGenerator | FunctionValueGenerator;
     memory: GeneratorMemory;
+    transform?: ShapeTransform;
 
     private currentValue = 0;
 
@@ -66,6 +73,7 @@ export class CircleEmitter implements EmitterShape {
         this.spread = parameters.spread ?? 0;
         this.speed = parameters.speed ?? new ConstantValue(1);
         this.memory = [];
+        this.transform = parameters.transform;
     }
 
     update(system: IParticleSystem, delta: number): void {
@@ -82,6 +90,7 @@ export class CircleEmitter implements EmitterShape {
         p.velocity.copy(p.position).multiplyScalar(p.startSpeed);
         //const v = Math.random();
         p.position.multiplyScalar(this.radius * r);
+        this.transform?.apply(p);
     }
 
     toJSON(): ShapeJSON {
@@ -93,6 +102,7 @@ export class CircleEmitter implements EmitterShape {
             mode: this.mode,
             spread: this.spread,
             speed: this.speed.toJSON(),
+            ...ShapeTransform.toShapeJSON(this.transform),
         };
     }
 
@@ -103,6 +113,7 @@ export class CircleEmitter implements EmitterShape {
             thickness: json.thickness,
             mode: json.mode,
             speed: json.speed ? ValueGeneratorFromJSON(json.speed) : undefined,
+            transform: ShapeTransform.fromJSON(json.transform),
             spread: json.spread,
         });
     }
@@ -114,6 +125,7 @@ export class CircleEmitter implements EmitterShape {
             thickness: this.thickness,
             mode: this.mode,
             speed: this.speed.clone(),
+            transform: this.transform?.clone(),
             spread: this.spread,
         });
     }

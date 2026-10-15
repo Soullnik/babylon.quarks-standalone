@@ -22,6 +22,11 @@ uniform tileCountX: f32;
 uniform tileCountY: f32;
 #endif
 
+#ifdef PIVOT
+// Streak offset in particle-size units: x from head to tail, y across.
+uniform pivot: vec3f;
+#endif
+
 // Varyings
 varying vUV: vec2f;
 varying vColor: vec4f;
@@ -37,7 +42,9 @@ varying linearDepth: f32;
 @vertex
 fn main(input: VertexInputs) -> FragmentInputs {
     let lengthFactor = vertexInputs.velocity.w;
-    let avgSize = (vertexInputs.size.x + vertexInputs.size.y) * 0.5;
+    // A flipped particle arrives with a negative size: the streak keeps its
+    // extent and mirrors its texture instead (see quadUV below).
+    let avgSize = (abs(vertexInputs.size.x) + abs(vertexInputs.size.y)) * 0.5;
     var mvPosition = uniforms.view * uniforms.world * vec4f(vertexInputs.offset, 1.0);
     let viewWorld = uniforms.view * uniforms.world;
     let viewWorld3 = mat3x3f(viewWorld[0].xyz, viewWorld[1].xyz, viewWorld[2].xyz);
@@ -50,17 +57,23 @@ fn main(input: VertexInputs) -> FragmentInputs {
     if (vlength > 0.000001) {
         vdir = viewVelocity / vlength;
     }
-    let widthOffset = vertexInputs.position.y * normalize(cross(mvPosition.xyz, vdir)) * avgSize;
+    let side = normalize(cross(mvPosition.xyz, vdir));
+    let widthOffset = vertexInputs.position.y * side * avgSize;
     // Equivalent to viewVelocity * (1.0 + lengthFactor / vlength) for moving particles, but the
     // size-based term (vdir * lengthFactor) survives when the velocity contribution vanishes.
     let lengthOffset = (vertexInputs.position.x + 0.5) * (viewVelocity + vdir * lengthFactor) * avgSize;
-    let stretched = mvPosition.xyz + widthOffset - lengthOffset;
+    var stretched = mvPosition.xyz + widthOffset - lengthOffset;
+#ifdef PIVOT
+    // In particle-size units along the quad's own axes: x from head to tail, y across.
+    stretched += (uniforms.pivot.y * side - uniforms.pivot.x * vdir) * avgSize;
+#endif
     mvPosition.x = stretched.x;
     mvPosition.y = stretched.y;
     mvPosition.z = stretched.z;
 
     let clipPosition = uniforms.projection * mvPosition;
     vertexOutputs.position = clipPosition;
+    let quadUV = select(vertexInputs.uv, 1.0 - vertexInputs.uv, vertexInputs.size.xy < vec2f(0.0));
 #ifdef SOFT_PARTICLES
     vertexOutputs.projPosition = clipPosition;
     vertexOutputs.linearDepth = -mvPosition.z;
@@ -71,16 +84,16 @@ fn main(input: VertexInputs) -> FragmentInputs {
         let baseTile = floor(vertexInputs.uvTile);
         let tileU = (baseTile % tc.x) / tc.x;
         let tileV = 1.0 - floor(baseTile / tc.x) / tc.y - 1.0 / tc.y;
-        vertexOutputs.vUV = vertexInputs.uv / tc + vec2f(tileU, tileV);
+        vertexOutputs.vUV = quadUV / tc + vec2f(tileU, tileV);
         #ifdef TILE_BLEND
             let nextTile = ceil(vertexInputs.uvTile);
             let nextU = (nextTile % tc.x) / tc.x;
             let nextV = 1.0 - floor(nextTile / tc.x) / tc.y - 1.0 / tc.y;
-            vertexOutputs.vUV2 = vertexInputs.uv / tc + vec2f(nextU, nextV);
+            vertexOutputs.vUV2 = quadUV / tc + vec2f(nextU, nextV);
             vertexOutputs.vTileBlend = fract(vertexInputs.uvTile);
         #endif
     #else
-        vertexOutputs.vUV = vertexInputs.uv;
+        vertexOutputs.vUV = quadUV;
     #endif
 
     vertexOutputs.vColor = vertexInputs.color;

@@ -7,6 +7,7 @@ import {Mesh} from '@babylonjs/core/Meshes/mesh';
 import {VertexData} from '@babylonjs/core/Meshes/mesh.vertexData';
 import {Scene} from '@babylonjs/core/scene';
 import {
+    IParticle,
     IParticleSystem,
     Matrix3,
     ParticleStore,
@@ -208,6 +209,10 @@ export class SpriteBatch extends VFXBatch {
         if (this.settings.renderMode === RenderMode.HorizontalBillBoard) {
             defines.push('HORIZONTAL');
         }
+        const pivot = SpriteBatch.takesPivotAndFlip(this.settings.renderMode) ? this.settings.pivot : undefined;
+        if (pivot) {
+            defines.push('PIVOT');
+        }
 
         const shaderLanguage = shaderLanguageFor(this.scene.getEngine());
         registerShaders(shaderName, vertexShader, fragmentShader, shaderLanguage);
@@ -245,6 +250,9 @@ export class SpriteBatch extends VFXBatch {
         }
         if (this.settings.materialAlphaTest > 0) {
             uniforms.push('alphaTest');
+        }
+        if (pivot) {
+            uniforms.push('pivot');
         }
         if (this.settings.renderMode === RenderMode.Mesh) {
             uniforms.push('lightDirection');
@@ -311,6 +319,9 @@ export class SpriteBatch extends VFXBatch {
         if (this.settings.materialAlphaTest > 0) {
             mat.setFloat('alphaTest', this.settings.materialAlphaTest);
         }
+        if (pivot) {
+            mat.setVector3('pivot', new BVector3(pivot.x, pivot.y, pivot.z));
+        }
         if (this.settings.renderMode === RenderMode.Mesh) {
             mat.setVector3('lightDirection', new BVector3(0.4, -1, 0.6));
             mat.setVector3('lightColor', new BVector3(1, 1, 1));
@@ -350,6 +361,7 @@ export class SpriteBatch extends VFXBatch {
         const renderMode = this.settings.renderMode;
         const isMeshRender = renderMode === RenderMode.Mesh;
         const isStretchedRender = renderMode === RenderMode.StretchedBillBoard;
+        const flipsSprites = SpriteBatch.takesPivotAndFlip(renderMode);
 
         const visibleSystems = this.getVisibleSystems();
         for (let i = 0; i < visibleSystems.length; i++) {
@@ -487,6 +499,7 @@ export class SpriteBatch extends VFXBatch {
                 copiedPositionAndSize = true;
             }
 
+            const firstIndex = index;
             for (let j = 0; j < particleNum; j++, index++) {
                 const particle = particles[j] as SpriteParticle;
 
@@ -600,6 +613,10 @@ export class SpriteBatch extends VFXBatch {
                     this.velocityBuffer[vi + 3] = lengthFactor;
                 }
             }
+
+            if (flipsSprites && system.flip !== undefined) {
+                SpriteBatch.applyFlip(this.sizeBuffer, firstIndex * 3, particles, particleNum);
+            }
         }
 
         if (isStretchedRender && visibleSystems.length > 0) {
@@ -645,6 +662,33 @@ export class SpriteBatch extends VFXBatch {
         if (clampedSpeedFactor !== this.lastStretchedSpeedFactor) {
             material.setFloat('speedFactor', clampedSpeedFactor);
             this.lastStretchedSpeedFactor = clampedSpeedFactor;
+        }
+    }
+
+    /** The quads that take a pivot and flip: every billboard kind, stretched included, but not meshes. */
+    private static takesPivotAndFlip(renderMode: RenderMode): boolean {
+        return (
+            renderMode === RenderMode.BillBoard ||
+            renderMode === RenderMode.StretchedBillBoard ||
+            renderMode === RenderMode.VerticalBillBoard ||
+            renderMode === RenderMode.HorizontalBillBoard
+        );
+    }
+
+    /**
+     * Negates the size of each flipped particle along the axes it flips on,
+     * starting at `base` in `sizes`. The billboard shader scales the quad by
+     * the size, so a negative one mirrors it — and with it the texture, the
+     * quad being centred — the way Unity's renderer Flip mirrors U and V. The
+     * stretched shader reads the sign and mirrors the texture coordinates.
+     */
+    private static applyFlip(sizes: Float32Array, base: number, particles: IParticle[], count: number): void {
+        for (let j = 0, o = base; j < count; j++, o += 3) {
+            const flip = (particles[j] as SpriteParticle).flip;
+            if (flip !== 0) {
+                if (flip & 1) sizes[o] = -sizes[o];
+                if (flip & 2) sizes[o + 1] = -sizes[o + 1];
+            }
         }
     }
 

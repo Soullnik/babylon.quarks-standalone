@@ -1,6 +1,6 @@
 import {VertexBuffer} from '@babylonjs/core/Buffers/buffer';
 import {Mesh} from '@babylonjs/core/Meshes/mesh';
-import {EmitterShape, IParticleSystem, Particle, Plugin, ShapeJSON, Vector3} from 'quarks.core';
+import {EmitterShape, IParticleSystem, Particle, Plugin, ShapeJSON, ShapeTransform, Vector3} from 'quarks.core';
 
 export class MeshSurfaceEmitter implements EmitterShape {
     type = 'mesh_surface';
@@ -10,6 +10,8 @@ export class MeshSurfaceEmitter implements EmitterShape {
     private _positions?: Float32Array;
     private _indices?: Uint32Array | Int32Array;
     private _meshReferenceId?: string;
+    /** Offset, rotation and scale of the mesh within the particle system. */
+    transform?: ShapeTransform;
 
     get mesh() {
         return this._mesh;
@@ -53,8 +55,9 @@ export class MeshSurfaceEmitter implements EmitterShape {
         }
     }
 
-    constructor(mesh?: Mesh, meshReferenceId?: string) {
+    constructor(mesh?: Mesh, meshReferenceId?: string, transform?: ShapeTransform) {
         this._meshReferenceId = meshReferenceId;
+        this.transform = transform;
         if (mesh) this.mesh = mesh;
     }
 
@@ -62,6 +65,7 @@ export class MeshSurfaceEmitter implements EmitterShape {
         if (!this._positions || !this._indices) {
             p.position.set(0, 0, 0);
             p.velocity.set(0, 0, 1).multiplyScalar(p.startSpeed);
+            this.transform?.apply(p);
             return;
         }
 
@@ -107,21 +111,23 @@ export class MeshSurfaceEmitter implements EmitterShape {
         const nz = bx * cy - by * cx;
         const len = Math.sqrt(nx * nx + ny * ny + nz * nz) || 1;
         p.velocity.set(nx / len, ny / len, nz / len).multiplyScalar(p.startSpeed);
+        this.transform?.apply(p);
     }
 
     toJSON(): ShapeJSON {
         return {
             type: 'mesh_surface',
             mesh: this._mesh ? (this._mesh as any).uniqueId?.toString() : (this._meshReferenceId ?? ''),
+            ...ShapeTransform.toShapeJSON(this.transform),
         };
     }
 
     static fromJSON(json: any): MeshSurfaceEmitter {
-        return new MeshSurfaceEmitter(undefined, json?.mesh);
+        return new MeshSurfaceEmitter(undefined, json?.mesh, ShapeTransform.fromJSON(json?.transform));
     }
 
     clone(): EmitterShape {
-        return new MeshSurfaceEmitter(this._mesh, this._meshReferenceId);
+        return new MeshSurfaceEmitter(this._mesh, this._meshReferenceId, this.transform?.clone());
     }
 
     update(_system: IParticleSystem, _delta: number): void {}

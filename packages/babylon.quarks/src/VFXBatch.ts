@@ -2,7 +2,7 @@ import {BaseTexture} from '@babylonjs/core/Materials/Textures/baseTexture';
 import {ShaderMaterial} from '@babylonjs/core/Materials/shaderMaterial';
 import {Mesh} from '@babylonjs/core/Meshes/mesh';
 import {Scene} from '@babylonjs/core/scene';
-import {IParticleSystem} from 'quarks.core';
+import {IParticleSystem, Vector3} from 'quarks.core';
 import {VFXBatchSettings} from './BatchedRenderer';
 
 export enum RenderMode {
@@ -38,6 +38,8 @@ export interface StoredBatchSettings {
     reflectionFaces: BaseTexture[] | null;
     reflectionAtlas: BaseTexture | null;
     layerMask: number;
+    /** Billboard pivot in particle-size units, see {@link VFXBatchSettings.pivot}. */
+    pivot?: Vector3;
 }
 
 export abstract class VFXBatch {
@@ -75,6 +77,7 @@ export abstract class VFXBatch {
             reflectionLevel: settings.reflectionLevel ?? 1,
             reflectionFaces: settings.reflectionFaces ?? null,
             reflectionAtlas: settings.reflectionAtlas ?? null,
+            pivot: settings.pivot?.clone(),
             layerMask: settings.layerMask,
         };
         this.mesh = new Mesh('vfxBatch', scene);

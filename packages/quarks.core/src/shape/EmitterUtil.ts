@@ -1,5 +1,6 @@
 import {EmissionState, IParticleSystem} from '../IParticleSystem';
 import {Particle} from '../Particle';
+import type {ShapeTransform, ShapeTransformJSON} from './ShapeTransform';
 
 export interface ShapeJSON {
     type: string;
@@ -17,6 +18,8 @@ export interface ShapeJSON {
     particleSystem?: string;
     spread?: number;
     speed?: any;
+    /** Local offset / rotation / scale of the shape; omitted when there is none. */
+    transform?: ShapeTransformJSON;
 }
 
 /**
@@ -75,4 +78,9 @@ export interface EmitterShape {
     toJSON(): ShapeJSON;
     update(system: IParticleSystem, delta: number): void;
     clone(): EmitterShape;
+    /**
+     * Optional local transform of the shape inside its particle system, applied
+     * by the shape itself at the end of {@link initialize}.
+     */
+    transform?: ShapeTransform;
 }

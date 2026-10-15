@@ -10,6 +10,7 @@ import {MathUtils, Matrix4, Quaternion} from '../math';
 import {Particle} from '../Particle';
 import {UP_VEC3, ZERO_VEC3} from '../util/MathUtil';
 import {EmitterMode, EmitterShape, getValueFromEmitterMode, ShapeJSON} from './EmitterUtil';
+import {ShapeTransform} from './ShapeTransform';
 
 /**
  * Interface representing the parameters for a sphere emitter.
@@ -42,6 +43,11 @@ export interface SphereEmitterParameters {
      * {@link EmitterMode}
      */
     speed?: ValueGenerator | FunctionValueGenerator;
+    /**
+     * Offset, rotation and scale of the shape within the particle system.
+     * {@link ShapeTransform}
+     */
+    transform?: ShapeTransform;
 }
 
 export class SphereEmitter implements EmitterShape {
@@ -53,6 +59,7 @@ export class SphereEmitter implements EmitterShape {
     spread: number;
     speed: ValueGenerator | FunctionValueGenerator;
     memory: GeneratorMemory;
+    transform?: ShapeTransform;
 
     _m1: Matrix4;
 
@@ -64,6 +71,7 @@ export class SphereEmitter implements EmitterShape {
         this.spread = parameters.spread ?? 0;
         this.speed = parameters.speed ?? new ConstantValue(1);
         this.memory = [];
+        this.transform = parameters.transform;
 
         this._m1 = new Matrix4();
     }
@@ -101,6 +109,7 @@ export class SphereEmitter implements EmitterShape {
                 p.rotation.setFromRotationMatrix(this._m1);
             }
         }
+        this.transform?.apply(p);
     }
 
     toJSON(): ShapeJSON {
@@ -112,6 +121,7 @@ export class SphereEmitter implements EmitterShape {
             mode: this.mode,
             spread: this.spread,
             speed: this.speed.toJSON(),
+            ...ShapeTransform.toShapeJSON(this.transform),
         };
     }
 
@@ -122,6 +132,7 @@ export class SphereEmitter implements EmitterShape {
             thickness: json.thickness,
             mode: json.mode,
             speed: json.speed ? ValueGeneratorFromJSON(json.speed) : undefined,
+            transform: ShapeTransform.fromJSON(json.transform),
             spread: json.spread,
         });
     }
@@ -133,6 +144,7 @@ export class SphereEmitter implements EmitterShape {
             thickness: this.thickness,
             mode: this.mode,
             speed: this.speed.clone(),
+            transform: this.transform?.clone(),
             spread: this.spread,
         });
     }
