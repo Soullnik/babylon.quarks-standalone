@@ -384,6 +384,62 @@ describe('QuarksLoader matrix decomposition', () => {
         engine.dispose();
     });
 
+    it('fetches geometries exported as files relative to the effect and inlines them', async () => {
+        const engine = new NullEngine();
+        const scene = new Scene(engine);
+        const loader = new QuarksLoader(scene);
+        const responses: Record<string, unknown> = {
+            'https://example.com/fx/sub/effect.json': {
+                geometries: [{uuid: 'geo', type: 'QuarksGeometry', url: '../assets/geometries/Quad.json'}],
+                object: {uuid: 'm', type: 'Mesh', name: 'quad', geometry: 'geo'},
+            },
+            'https://example.com/fx/sub/../assets/geometries/Quad.json': {
+                metadata: {type: 'QuarksGeometry'},
+                positions: [0, 0, 0, 1, 0, 0, 1, 1, 0],
+                indices: [0, 1, 2],
+                uvs: [0, 0, 1, 0, 1, 1],
+            },
+        };
+        const fetchSpy = jest.spyOn(global, 'fetch').mockImplementation(async (input: any) => {
+            const body = responses[String(input)];
+            return {ok: body !== undefined, status: body ? 200 : 404, json: async () => body} as any;
+        });
+
+        const root = await loader.load('https://example.com/fx/sub/effect.json');
+        expect(root).toBeInstanceOf(Mesh);
+        expect((root as Mesh).getTotalVertices()).toBe(3);
+
+        fetchSpy.mockRestore();
+        scene.dispose();
+        engine.dispose();
+    });
+
+    it('resolveExternalGeometries leaves a geometry that fails to load in place and warns', async () => {
+        const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+        const json = {
+            geometries: [
+                {uuid: 'a', type: 'QuarksGeometry', url: 'missing.json'},
+                {uuid: 'b', type: 'QuarksGeometry', positions: [0, 0, 0]},
+            ],
+        };
+        await QuarksLoader.resolveExternalGeometries(json, async () => {
+            throw new Error('404');
+        });
+        expect(json.geometries[0]).toEqual({uuid: 'a', type: 'QuarksGeometry', url: 'missing.json'});
+        expect(warn).toHaveBeenCalledWith(expect.stringContaining('missing.json'), expect.any(Error));
+
+        // parse() without resolving names the external file instead of silently rendering nothing.
+        const engine = new NullEngine();
+        const scene = new Scene(engine);
+        new QuarksLoader(scene).parse({...json, object: {uuid: 'root', type: 'Group'}});
+        expect(warn).toHaveBeenCalledWith(expect.stringContaining('is an external file'));
+
+        await QuarksLoader.resolveExternalGeometries({}, async () => ({}));
+        warn.mockRestore();
+        scene.dispose();
+        engine.dispose();
+    });
+
     it('parses interleaved buffer geometry, textures and material mapping', () => {
         const engine = new NullEngine();
         const scene = new Scene(engine);

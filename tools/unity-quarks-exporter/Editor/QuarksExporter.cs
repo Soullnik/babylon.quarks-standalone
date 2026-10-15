@@ -33,7 +33,12 @@ namespace BabylonQuarks.UnityExporter
             string path = EditorUtility.SaveFilePanel("Export Quarks effect", "", root.name + ".json", "json");
             if (string.IsNullOrEmpty(path)) return;
 
-            ExportToFile(root, path);
+            ExportOptions options = ExportOptions.Load();
+            AssetFileStore store = ExportToFile(root, path, options);
+            if (store != null)
+            {
+                Debug.Log($"[Quarks Exporter] Wrote {store.TexturesWritten} texture(s) and {store.GeometriesWritten} geometry file(s) to {store.RootDir}");
+            }
             EditorUtility.RevealInFinder(path);
         }
 
@@ -54,26 +59,55 @@ namespace BabylonQuarks.UnityExporter
             string outputFolder = EditorUtility.OpenFolderPanel("Export Quarks effects to", "", "");
             if (string.IsNullOrEmpty(outputFolder)) return;
 
-            ExportFolder(assetFolder, outputFolder);
+            ExportFolder(assetFolder, outputFolder, ExportOptions.Load());
         }
 
         [MenuItem("Tools/Quarks/Export Folder of Effects to JSON", true)]
         private static bool ValidateExportSelectedFolder() => !string.IsNullOrEmpty(GetSelectedAssetFolder());
 
-        /// <summary>Writes one effect hierarchy to a JSON file on disk.</summary>
-        public static void ExportToFile(GameObject root, string path)
+        /// <summary>Writes one self-contained effect (textures and geometry inline) to a JSON file.</summary>
+        public static void ExportToFile(GameObject root, string path) => ExportToFile(root, path, new ExportOptions());
+
+        /// <summary>
+        /// Writes one effect to a JSON file. When <paramref name="options"/> sends assets to files they
+        /// go to <paramref name="store"/>, or to a new store in an assets folder next to the JSON.
+        /// Returns the store used, or null when everything stayed inline.
+        /// </summary>
+        public static AssetFileStore ExportToFile(GameObject root, string path, ExportOptions options, AssetFileStore store = null)
         {
-            string json = Export(root);
+            string effectDir = Path.GetDirectoryName(Path.GetFullPath(path));
+            if (options != null && options.AnyAsFiles && store == null)
+            {
+                store = new AssetFileStore(Path.Combine(effectDir, options.AssetsFolderOrDefault));
+            }
+            var ctx = options != null && options.AnyAsFiles
+                ? new ExportContext(options, store, effectDir)
+                : new ExportContext();
+            string json = Export(root, ctx);
             File.WriteAllText(path, json);
             Debug.Log($"[Quarks Exporter] Exported '{root.name}' → {path}");
+            return ctx.Store;
         }
 
         /// <summary>
         /// Exports every prefab with a ParticleSystem under <paramref name="assetFolder"/>.
         /// Output mirrors the subfolder layout relative to the selected Assets folder.
         /// </summary>
-        public static void ExportFolder(string assetFolder, string outputFolder)
+        public static void ExportFolder(string assetFolder, string outputFolder) =>
+            ExportFolder(assetFolder, outputFolder, new ExportOptions());
+
+        /// <summary>
+        /// Folder export with <paramref name="options"/>. Assets sent to files land in one shared
+        /// folder at the root of <paramref name="outputFolder"/>, so a texture or mesh used by many
+        /// effects is written once.
+        /// </summary>
+        public static void ExportFolder(string assetFolder, string outputFolder, ExportOptions options)
         {
+            options = options ?? new ExportOptions();
+            AssetFileStore store = options.AnyAsFiles
+                ? new AssetFileStore(Path.Combine(outputFolder, options.AssetsFolderOrDefault))
+                : null;
+
             string[] guids = AssetDatabase.FindAssets("t:Prefab", new[] { assetFolder });
             var prefabPaths = new List<string>();
             foreach (string guid in guids)
@@ -138,7 +172,7 @@ namespace BabylonQuarks.UnityExporter
                             : Path.Combine(outputFolder, relativeDir);
                         Directory.CreateDirectory(outDir);
                         string outPath = Path.Combine(outDir, prefabName + ".json");
-                        ExportToFile(instance, outPath);
+                        ExportToFile(instance, outPath, options, store);
                         exported++;
                     }
                     finally
@@ -155,6 +189,12 @@ namespace BabylonQuarks.UnityExporter
             string message = cancelled
                 ? $"Cancelled after exporting {exported} of {prefabPaths.Count} effect(s)."
                 : $"Exported {exported} effect(s) to:\n{outputFolder}";
+            if (store != null)
+            {
+                message += $"
+
+Shared assets: {store.TexturesWritten} texture(s), {store.GeometriesWritten} geometry file(s) in '{options.AssetsFolderOrDefault}/'.";
+            }
             if (skipped > 0)
             {
                 message += $"\n\nSkipped {skipped} prefab(s) that could not be instantiated.";
@@ -174,10 +214,12 @@ namespace BabylonQuarks.UnityExporter
             return AssetDatabase.IsValidFolder(path) ? path : null;
         }
 
+        /// <summary>Serializes a GameObject hierarchy into a self-contained Quarks JSON envelope string.</summary>
+        public static string Export(GameObject root) => Export(root, new ExportContext());
+
         /// <summary>Serializes a GameObject hierarchy into the Quarks JSON envelope string.</summary>
-        public static string Export(GameObject root)
+        public static string Export(GameObject root, ExportContext ctx)
         {
-            var ctx = new ExportContext();
 
             // Pass 1: assign a stable node uuid to every transform (emitters too), then flag which
             // systems are sub-emitter targets — so their nodes serialize with onlyUsedByOther=true
