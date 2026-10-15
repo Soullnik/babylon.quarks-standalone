@@ -191,9 +191,7 @@ namespace BabylonQuarks.UnityExporter
                 : $"Exported {exported} effect(s) to:\n{outputFolder}";
             if (store != null)
             {
-                message += $"
-
-Shared assets: {store.TexturesWritten} texture(s), {store.GeometriesWritten} geometry file(s) in '{options.AssetsFolderOrDefault}/'.";
+                message += $"\n\nShared assets: {store.TexturesWritten} texture(s), {store.GeometriesWritten} geometry file(s) in '{options.AssetsFolderOrDefault}/'.";
             }
             if (skipped > 0)
             {

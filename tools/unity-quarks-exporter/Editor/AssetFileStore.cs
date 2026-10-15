@@ -18,9 +18,11 @@ namespace BabylonQuarks.UnityExporter
         /// <summary>Absolute folder the files are written to (e.g. <c>{output}/assets</c>).</summary>
         public readonly string RootDir;
 
-        private readonly Dictionary<int, string> _textureFiles = new Dictionary<int, string>();
-        private readonly Dictionary<int, string> _envAtlasFiles = new Dictionary<int, string>();
-        private readonly Dictionary<int, string> _geometryFiles = new Dictionary<int, string>();
+        // Keyed by the asset itself: GetInstanceID() is a compile error from Unity 6.6 on, and its
+        // replacement doesn't exist on the older versions this package supports.
+        private readonly Dictionary<Texture, string> _textureFiles = new Dictionary<Texture, string>();
+        private readonly Dictionary<Cubemap, string> _envAtlasFiles = new Dictionary<Cubemap, string>();
+        private readonly Dictionary<Mesh, string> _geometryFiles = new Dictionary<Mesh, string>();
         private readonly HashSet<string> _takenPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         public int TexturesWritten { get; private set; }
@@ -39,8 +41,7 @@ namespace BabylonQuarks.UnityExporter
         public string WriteTexture(Texture tex)
         {
             if (tex == null) return null;
-            int id = tex.GetInstanceID();
-            if (_textureFiles.TryGetValue(id, out var existing)) return existing;
+            if (_textureFiles.TryGetValue(tex, out var existing)) return existing;
 
             string sourcePath = AssetDatabase.GetAssetPath(tex);
             string written = null;
@@ -70,7 +71,7 @@ namespace BabylonQuarks.UnityExporter
 
             if (written != null)
             {
-                _textureFiles[id] = written;
+                _textureFiles[tex] = written;
                 TexturesWritten++;
             }
             return written;
@@ -80,15 +81,14 @@ namespace BabylonQuarks.UnityExporter
         public string WriteEnvAtlas(Cubemap source, Texture2D atlas)
         {
             if (source == null || atlas == null) return null;
-            int id = source.GetInstanceID();
-            if (_envAtlasFiles.TryGetValue(id, out var existing)) return existing;
+            if (_envAtlasFiles.TryGetValue(source, out var existing)) return existing;
             try
             {
                 byte[] png = atlas.EncodeToPNG();
                 if (png == null) return null;
                 string target = ReservePath("textures", atlas.name, ".png");
                 File.WriteAllBytes(target, png);
-                _envAtlasFiles[id] = target;
+                _envAtlasFiles[source] = target;
                 TexturesWritten++;
                 return target;
             }
@@ -101,7 +101,7 @@ namespace BabylonQuarks.UnityExporter
 
         /// <summary>True when this mesh was already written by an earlier effect of the same export.</summary>
         public bool TryGetGeometry(Mesh mesh, out string path) =>
-            _geometryFiles.TryGetValue(mesh.GetInstanceID(), out path);
+            _geometryFiles.TryGetValue(mesh, out path);
 
         /// <summary>
         /// Writes a geometry file — the same <c>positions / indices / uvs / normals</c> fields an
@@ -120,7 +120,7 @@ namespace BabylonQuarks.UnityExporter
             }
             string target = ReservePath("geometries", mesh.name, ".json");
             File.WriteAllText(target, file.ToString());
-            _geometryFiles[mesh.GetInstanceID()] = target;
+            _geometryFiles[mesh] = target;
             GeometriesWritten++;
             return target;
         }
