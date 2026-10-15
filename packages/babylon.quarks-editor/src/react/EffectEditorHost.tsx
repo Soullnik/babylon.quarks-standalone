@@ -244,7 +244,7 @@ export function EffectEditorHost(props: EffectEditorHostProps) {
         deleteAssets: (_payload: AssetDragPayload) => {},
         saveEntryAsAsset: (_entry: SceneEntry, _path: string) => {},
         saveScene: async (): Promise<boolean> => false,
-        openPrefab: (_assetId: number) => {},
+        openPrefab: (_assetId: number, _discardChanges?: boolean) => {},
         overwritePrefab: () => {},
         savePrefabAsNew: (_path: string) => {},
         closePrefab: () => {},
@@ -306,6 +306,8 @@ export function EffectEditorHost(props: EffectEditorHostProps) {
     const [prefabInfo, setPrefabInfo] = useState<{name: string; path: string} | null>(null);
     const [prefabDirty, setPrefabDirty] = useState(false);
     const [prefabDialog, setPrefabDialog] = useState<'overwrite' | 'exit' | 'saveAs' | null>(null);
+    /** Asset waiting to replace an open prefab that has unsaved edits. */
+    const [prefabSwitch, setPrefabSwitch] = useState<{id: number; name: string} | null>(null);
     const toastTimerRef = useRef(0);
     const showToast = (text: string) => {
         window.clearTimeout(toastTimerRef.current);
@@ -818,15 +820,31 @@ export function EffectEditorHost(props: EffectEditorHostProps) {
         const prefabInstanceCount = () =>
             prefab ? prefab.stash.entries.filter((entry) => entry.assetId === prefab!.asset.id).length : 0;
 
-        const openPrefab = (assetId: number) => {
-            if (prefab) {
-                if (prefab.asset.id !== assetId) {
-                    showToast('Close the open prefab first (← Scene)');
-                }
+        /** Drops the prefab instance(s) currently in `state.sceneEntries`, with their history. */
+        const disposePrefabInstances = () => {
+            for (const entry of state.sceneEntries) {
+                const id = entry.root.uniqueId;
+                disposeSceneEntry(entry, renderer);
+                historyByRoot.delete(id);
+                clearFocusFinished(playbackRef.current, id);
+                playbackRef.current.focusElapsedByRoot.delete(id);
+            }
+        };
+
+        /**
+         * Opens an asset as a prefab. With another prefab open it is swapped in place — the scene stays
+         * set aside — after asking about unsaved edits unless `discardChanges`.
+         */
+        const openPrefab = (assetId: number, discardChanges = false) => {
+            if (prefab?.asset.id === assetId) {
                 return;
             }
             const asset = state.assets.find((item) => item.id === assetId);
             if (!asset) return;
+            if (prefab && prefabChanged && !discardChanges) {
+                setPrefabSwitch({id: asset.id, name: asset.name});
+                return;
+            }
             let entry: SceneEntry | null = null;
             try {
                 entry = instantiateSceneEntry(scene, renderer, asset, []);
@@ -835,6 +853,22 @@ export function EffectEditorHost(props: EffectEditorHostProps) {
             }
             if (!entry) {
                 showMessage('Open prefab', `“${asset.name}” has no particle systems to edit.`);
+                return;
+            }
+            if (prefab) {
+                selectionMarker.hide();
+                disposePrefabInstances();
+                prefab.asset = asset;
+                prefabChanged = false;
+                setPrefabDirty(false);
+                setPrefabInfo({name: asset.name, path: asset.path});
+                entry.root.setEnabled(true);
+                state.sceneEntries = [entry];
+                setSceneEntries([entry]);
+                state.visibleRootIds = [entry.root.uniqueId];
+                setVisibleRootIds([entry.root.uniqueId]);
+                focusEntry(entry);
+                refreshPlayback();
                 return;
             }
             exitSolo();
@@ -870,13 +904,7 @@ export function EffectEditorHost(props: EffectEditorHostProps) {
             const {stash} = prefab;
             prefab = null;
             selectionMarker.hide();
-            for (const entry of state.sceneEntries) {
-                const id = entry.root.uniqueId;
-                disposeSceneEntry(entry, renderer);
-                historyByRoot.delete(id);
-                clearFocusFinished(playbackRef.current, id);
-                playbackRef.current.focusElapsedByRoot.delete(id);
-            }
+            disposePrefabInstances();
             state.sceneEntries = stash.entries;
             setSceneEntries(stash.entries);
             state.visibleRootIds = stash.visible;
@@ -2329,6 +2357,33 @@ export function EffectEditorHost(props: EffectEditorHostProps) {
                         },
                     ]}
                     onCancel={() => setPrefabDialog(null)}
+                />
+            )}
+            {prefabSwitch && prefabInfo && (
+                <ChoiceDialog
+                    title={`Save changes to prefab “${prefabInfo.name}”?`}
+                    message={`Before opening “${prefabSwitch.name}”. Saving overwrites the prefab asset; effects already in the scene will not change.`}
+                    actions={[
+                        {label: 'Cancel', onSelect: () => setPrefabSwitch(null)},
+                        {
+                            label: "Don't save",
+                            danger: true,
+                            onSelect: () => {
+                                setPrefabSwitch(null);
+                                actionsRef.current.openPrefab(prefabSwitch.id, true);
+                            },
+                        },
+                        {
+                            label: 'Save',
+                            primary: true,
+                            onSelect: () => {
+                                setPrefabSwitch(null);
+                                actionsRef.current.overwritePrefab();
+                                actionsRef.current.openPrefab(prefabSwitch.id, true);
+                            },
+                        },
+                    ]}
+                    onCancel={() => setPrefabSwitch(null)}
                 />
             )}
             {prefabDialog === 'exit' && prefabInfo && (
