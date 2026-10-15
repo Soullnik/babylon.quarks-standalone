@@ -7,6 +7,7 @@ import {TransformNode} from '@babylonjs/core/Meshes/transformNode';
 import type {Scene} from '@babylonjs/core/scene';
 import type {ParticleSystem} from 'babylon.quarks';
 import {EDITOR_SCENE_NODE_METADATA} from './editorScene';
+import './lineShaders';
 import {getShapeType, readShapeParams} from './shapes';
 
 const LINE_COLOR = new Color3(0.45, 0.82, 1);
