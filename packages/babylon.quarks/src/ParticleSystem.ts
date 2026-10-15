@@ -83,6 +83,16 @@ function fallbackUVsForPositions(positions: Float32Array): Float32Array {
 }
 const DEFAULT_INDICES = new Uint32Array([0, 1, 2, 0, 2, 3]);
 
+/** The optional trail flags that are switched on, so JSON and clones only carry the ones in use. */
+function trailFlags(settings: TrailSettings | undefined): Partial<TrailSettings> {
+    const flags: Partial<TrailSettings> = {};
+    if (settings?.uvFromHead) flags.uvFromHead = true;
+    if (settings?.colorFromParticle) flags.colorFromParticle = true;
+    if (settings?.dieWithParticle) flags.dieWithParticle = true;
+    if (settings?.recordWorldSpace) flags.recordWorldSpace = true;
+    return flags;
+}
+
 export interface ParticleSystemParameters {
     autoDestroy?: boolean;
     looping?: boolean;
@@ -1141,8 +1151,30 @@ export class ParticleSystem implements IParticleSystem {
         }
 
         if (isTrailMode) {
+            const trailSettings = this.rendererEmitterSettings as TrailSettings;
+            const dieWithParticle = trailSettings.dieWithParticle;
+            // A world-space system records world positions already.
+            const recordWorldSpace = trailSettings.recordWorldSpace && !this.worldSpace;
+            const emitterMatrix = this.emitter.matrixWorld;
             for (let i = 0; i < particleCount; i++) {
-                (particles[i] as TrailParticle).update();
+                const trail = particles[i] as TrailParticle;
+                // Emptying the history lets the removal pass below take the
+                // particle this same step.
+                if (dieWithParticle && trail.age >= trail.life) {
+                    trail.resetHistory();
+                    continue;
+                }
+                trail.update();
+                // update() wrote a sample only while the particle is alive.
+                if (recordWorldSpace && trail.age <= trail.life) {
+                    const offset = ((trail.historyHead + trail.historyCapacity - 1) % trail.historyCapacity) * 3;
+                    const positions = trail.historyPositions;
+                    tempV.set(positions[offset], positions[offset + 1], positions[offset + 2]);
+                    tempV.applyMatrix4(trail.parentMatrix ?? emitterMatrix);
+                    positions[offset] = tempV.x;
+                    positions[offset + 1] = tempV.y;
+                    positions[offset + 2] = tempV.z;
+                }
             }
         }
 
@@ -1348,6 +1380,7 @@ export class ParticleSystem implements IParticleSystem {
                         ? ValueGeneratorFromJSON(trailSettings.startLength)
                         : new ConstantValue(30),
                 followLocalOrigin: trailSettings?.followLocalOrigin ?? false,
+                ...trailFlags(trailSettings),
             };
         } else if (json.renderMode === RenderMode.StretchedBillBoard) {
             rendererEmitterSettings = {...(json.rendererEmitterSettings ?? {})};
@@ -1459,6 +1492,7 @@ export class ParticleSystem implements IParticleSystem {
             return {
                 startLength: (this.rendererEmitterSettings as TrailSettings).startLength.toJSON(),
                 followLocalOrigin: (this.rendererEmitterSettings as TrailSettings).followLocalOrigin,
+                ...trailFlags(this.rendererEmitterSettings as TrailSettings),
             };
         }
         if (this.renderMode === RenderMode.StretchedBillBoard) {
@@ -1621,6 +1655,7 @@ export class ParticleSystem implements IParticleSystem {
             rendererEmitterSettings = {
                 startLength: (this.rendererEmitterSettings as TrailSettings).startLength.clone(),
                 followLocalOrigin: (this.rendererEmitterSettings as TrailSettings).followLocalOrigin,
+                ...trailFlags(this.rendererEmitterSettings as TrailSettings),
             };
         } else if (this.renderMode === RenderMode.StretchedBillBoard) {
             rendererEmitterSettings = {

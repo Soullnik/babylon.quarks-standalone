@@ -57,6 +57,31 @@ export interface TrailSettings {
      * @type {boolean}
      */
     followLocalOrigin: boolean;
+    /**
+     * Run the texture's U from the particle (0) back to the tail (1), the way
+     * Unity's stretched trails map it. Off, U runs from the tail to the particle.
+     * @type {boolean}
+     */
+    uvFromHead?: boolean;
+    /**
+     * Draw the whole trail in the particle's current color, as Unity's trails
+     * do, instead of the color each sample had when it was recorded.
+     * @type {boolean}
+     */
+    colorFromParticle?: boolean;
+    /**
+     * Drop the trail the moment its particle dies, instead of letting it
+     * shrink away one sample per step.
+     * @type {boolean}
+     */
+    dieWithParticle?: boolean;
+    /**
+     * Record trail points in world space even though the system simulates in
+     * local space, so the trail streaks behind a moving emitter instead of
+     * moving rigidly with it (Unity's Trails > World Space).
+     * @type {boolean}
+     */
+    recordWorldSpace?: boolean;
 }
 
 export interface MeshSettings {
