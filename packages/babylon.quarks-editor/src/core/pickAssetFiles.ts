@@ -1,4 +1,4 @@
-import {collectJsonFiles} from './loadEffectGallery';
+import {isAssetImportFile, relativePathOf} from './assets';
 
 interface DirectoryPickerWindow {
     showDirectoryPicker?: (options?: {mode?: 'read' | 'readwrite'}) => Promise<FileSystemDirectoryHandle>;
@@ -13,12 +13,15 @@ interface DirectoryHandleWithEntries {
     entries(): AsyncIterableIterator<[string, FileSystemDirectoryHandle | FileSystemFileHandle]>;
 }
 
-/** Recursively collects `.json` files from a directory handle (File System Access API). */
-async function readJsonFilesFromDirectory(dir: DirectoryHandleWithEntries, prefix = ''): Promise<File[]> {
+/**
+ * Recursively collects effect `.json` files and the image files they may reference from a
+ * directory handle (File System Access API).
+ */
+async function readAssetFilesFromDirectory(dir: DirectoryHandleWithEntries, prefix = ''): Promise<File[]> {
     const files: File[] = [];
     for await (const [name, entry] of dir.entries()) {
         if (entry.kind === 'file') {
-            if (!name.toLowerCase().endsWith('.json')) continue;
+            if (!isAssetImportFile(name)) continue;
             const file = await entry.getFile();
             Object.defineProperty(file, 'webkitRelativePath', {
                 value: prefix + name,
@@ -29,7 +32,7 @@ async function readJsonFilesFromDirectory(dir: DirectoryHandleWithEntries, prefi
         }
         if (entry.kind === 'directory') {
             files.push(
-                ...(await readJsonFilesFromDirectory(
+                ...(await readAssetFilesFromDirectory(
                     entry as unknown as DirectoryHandleWithEntries,
                     `${prefix}${name}/`
                 ))
@@ -41,9 +44,10 @@ async function readJsonFilesFromDirectory(dir: DirectoryHandleWithEntries, prefi
 
 /**
  * Opens a native folder picker when the host supports it. Returns `null` when the user
- * cancels, or when the API is unavailable (caller should fall back to `<input webkitdirectory>`).
+ * cancels, or `undefined` when the API is unavailable (caller should fall back to
+ * `<input webkitdirectory>`).
  */
-export async function pickGalleryJsonFiles(): Promise<File[] | null | undefined> {
+export async function pickAssetFolderFiles(): Promise<File[] | null | undefined> {
     const picker = (window as DirectoryPickerWindow).showDirectoryPicker;
     if (typeof picker !== 'function') {
         return undefined;
@@ -51,7 +55,8 @@ export async function pickGalleryJsonFiles(): Promise<File[] | null | undefined>
 
     try {
         const dir = (await picker.call(window, {mode: 'read'})) as DirectoryHandleWithEntries;
-        return collectJsonFiles(await readJsonFilesFromDirectory(dir));
+        const files = await readAssetFilesFromDirectory(dir);
+        return files.sort((a, b) => relativePathOf(a).localeCompare(relativePathOf(b)));
     } catch (err) {
         if (err instanceof DOMException && err.name === 'AbortError') {
             return null;

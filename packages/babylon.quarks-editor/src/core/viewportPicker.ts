@@ -4,7 +4,7 @@ import {TransformNode} from '@babylonjs/core/Meshes/transformNode';
 import type {Scene} from '@babylonjs/core/scene';
 import {EDITOR_SCENE_NODE_METADATA} from './editorScene';
 import {GROUND_RING_RADIUS, GalleryHoverMarker} from './gallerySelectionMarker';
-import type {GalleryEntry} from './loadEffectGallery';
+import type {SceneEntry} from './sceneEntries';
 
 interface PickMetadata {
     quarksEditorPick: true;
@@ -15,7 +15,7 @@ interface PickMetadata {
 const PICK_DIAMETER = GROUND_RING_RADIUS * 2;
 
 /**
- * Viewport pick/hover for in-scene gallery effect roots only (not child emitters).
+ * Viewport pick/hover for visible scene effect roots only (not child emitters).
  * Hover uses the same ground ring as focus selection, in yellow.
  */
 export class GalleryViewportPicker {
@@ -30,8 +30,8 @@ export class GalleryViewportPicker {
         this.hoverMarker = new GalleryHoverMarker(scene);
     }
 
-    /** Rebuilds root pick colliders when the gallery changes. */
-    sync(entries: GalleryEntry[], soloRoot: TransformNode | null, syncKey: string): void {
+    /** Rebuilds root pick colliders when the scene changes. */
+    sync(entries: SceneEntry[], soloRoot: TransformNode | null, syncKey: string): void {
         if (syncKey === this.syncKey) {
             return;
         }
@@ -39,7 +39,7 @@ export class GalleryViewportPicker {
         this.clearHandles();
         if (entries.length > 0) {
             for (const entry of entries) {
-                if (!entry.inScene || entry.root.isDisposed()) {
+                if (entry.root.isDisposed() || !entry.root.isEnabled(false)) {
                     continue;
                 }
                 this.createHandle(entry.root);

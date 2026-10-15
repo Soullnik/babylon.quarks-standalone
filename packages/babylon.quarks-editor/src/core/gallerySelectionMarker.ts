@@ -4,6 +4,7 @@ import {LinesMesh} from '@babylonjs/core/Meshes/linesMesh';
 import {MeshBuilder} from '@babylonjs/core/Meshes/meshBuilder';
 import {TransformNode} from '@babylonjs/core/Meshes/transformNode';
 import type {Scene} from '@babylonjs/core/scene';
+import './lineShaders';
 
 export const GROUND_RING_RADIUS = 1.2;
 const RING_SEGMENTS = 64;

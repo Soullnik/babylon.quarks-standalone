@@ -15,6 +15,7 @@ import {
 } from '../core/playback';
 import {pauseFocus, playFocus, scrubFocusTo, scrubFocusToSettled} from '../core/scrub';
 import {computeTimelineRows, computeTimelineSpan} from '../core/timeline';
+import {PLAYBACK_SPEEDS, restartFocusPlayback, toggleStagePlayback} from '../core/transport';
 import {TimelineTrackRow} from './TimelineTrackRow';
 import {iconStyle} from './icons';
 import {buttonStyle, theme} from './theme';
@@ -34,8 +35,15 @@ export interface TimelinePanelProps {
     setStagePlaying: (playing: boolean) => void;
     speed: number;
     setSpeed: (speed: number) => void;
-    /** False when a catalog entry is selected but not yet dropped into the viewport. */
+    /** False when the focused effect is hidden — it has nothing to play. */
     playbackEnabled?: boolean;
+    /** Fills its parent (e.g. a bottom dock) instead of drawing its own fixed-height bar. */
+    docked?: boolean;
+    /**
+     * Play/step/restart/speed buttons and the counter in the timeline header (default true).
+     * Hosts that show a TransportBar in the viewport turn this off.
+     */
+    showTransport?: boolean;
 }
 
 const LABEL_WIDTH = 200;
@@ -72,6 +80,8 @@ export function TimelinePanel(props: TimelinePanelProps): React.ReactElement {
         speed,
         setSpeed,
         playbackEnabled = true,
+        docked = false,
+        showTransport = true,
     } = props;
 
     const [bodyWidthPx, setBodyWidthPx] = useState(600);
@@ -256,35 +266,14 @@ export function TimelinePanel(props: TimelinePanelProps): React.ReactElement {
     };
 
     const restartFocus = () => {
-        scrubFocusTo(binding, renderer, 0);
-        const state = playbackRef.current;
-        setFocusElapsed(state, focusRootId, 0);
-        clearFocusFinished(state, focusRootId);
-        if (stagePlaying) {
-            playFocus(binding);
-        }
+        restartFocusPlayback(binding, renderer, scene, playbackRef.current);
         if (playheadRef.current) {
             playheadRef.current.style.left = `${LABEL_WIDTH + TIMELINE_INSET}px`;
         }
-        scene.render();
     };
 
-    const handleStagePlayPause = () => {
-        const state = playbackRef.current;
-        if (!stagePlaying) {
-            if (isFocusFinished(state, focusRootId)) {
-                binding.restart();
-                clearFocusFinished(state, focusRootId);
-                setFocusElapsed(state, focusRootId, 0);
-                scene.render();
-            }
-            state.stagePlaying = true;
-            setStagePlaying(true);
-            return;
-        }
-        state.stagePlaying = false;
-        setStagePlaying(false);
-    };
+    const handleStagePlayPause = () =>
+        toggleStagePlayback(binding, scene, playbackRef.current, stagePlaying, setStagePlaying);
 
     const ticks: number[] = [];
     for (let t = 0; t <= timelineSpan; t += pickTickInterval(pxPerSecond)) {
@@ -304,9 +293,9 @@ export function TimelinePanel(props: TimelinePanelProps): React.ReactElement {
     return (
         <div
             style={{
-                flexShrink: 0,
-                height: PANEL_HEIGHT,
-                borderTop: `1px solid ${theme.border}`,
+                ...(docked
+                    ? {flex: 1, minHeight: 0}
+                    : {flexShrink: 0, height: PANEL_HEIGHT, borderTop: `1px solid ${theme.border}`}),
                 background: theme.panelBg,
                 display: 'flex',
                 flexDirection: 'column',
@@ -314,82 +303,92 @@ export function TimelinePanel(props: TimelinePanelProps): React.ReactElement {
                 color: theme.text,
             }}
         >
-            <div
-                style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 6,
-                    padding: '6px 10px',
-                    borderBottom: `1px solid ${theme.border}`,
-                }}
-            >
-                <button
-                    className="qe-hover"
-                    style={{...overlayButton, opacity: playbackEnabled ? 1 : 0.45}}
-                    title={stagePlaying ? 'Pause stage preview' : 'Play stage preview'}
-                    disabled={!playbackEnabled}
-                    onClick={handleStagePlayPause}
-                >
-                    {stagePlaying ? <PauseIcon style={iconStyle(14)} /> : <PlayIcon style={iconStyle(14)} />}
-                </button>
-                <button
-                    className="qe-hover"
-                    style={{...overlayButton, opacity: playbackEnabled ? 1 : 0.45}}
-                    title="Step one frame (stage)"
-                    disabled={!playbackEnabled || stagePlaying}
-                    onClick={() => (playbackRef.current.stepQueued = true)}
-                >
-                    <ForwardIcon style={iconStyle(14)} />
-                </button>
-                <button
-                    className="qe-hover"
-                    style={{...overlayButton, opacity: playbackEnabled ? 1 : 0.45}}
-                    title="Restart focused effect only"
-                    disabled={!playbackEnabled}
-                    onClick={restartFocus}
-                >
-                    <ArrowPathIcon style={iconStyle(14)} />
-                </button>
-                <select
-                    className="qe-hover"
-                    style={{...overlayButton, padding: '5px 4px', opacity: playbackEnabled ? 1 : 0.45}}
-                    title="Playback speed"
-                    value={speed}
-                    disabled={!playbackEnabled}
-                    onChange={(e) => {
-                        const next = Number(e.target.value);
-                        playbackRef.current.speed = next;
-                        setSpeed(next);
-                    }}
-                >
-                    {[0.1, 0.25, 0.5, 1, 2, 4].map((s) => (
-                        <option key={s} value={s}>
-                            ×{s}
-                        </option>
-                    ))}
-                </select>
-                <span
-                    ref={counterRef}
+            {(showTransport || groupSelection.size >= 2) && (
+                <div
                     style={{
-                        fontSize: 12,
-                        color: theme.textDim,
-                        fontVariantNumeric: 'tabular-nums',
-                        paddingLeft: 4,
-                        minWidth: 120,
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 6,
+                        padding: '6px 10px',
+                        borderBottom: `1px solid ${theme.border}`,
                     }}
-                />
-                {groupSelection.size >= 2 && (
-                    <button
-                        className="qe-hover"
-                        style={overlayButton}
-                        title="Group the checked rows"
-                        onClick={groupSelectedNodes}
-                    >
-                        <RectangleGroupIcon style={iconStyle(14)} />
-                        Group ({groupSelection.size})
-                    </button>
-                )}
-            </div>
+                >
+                    {showTransport && (
+                        <>
+                            <button
+                                className="qe-hover"
+                                style={{...overlayButton, opacity: playbackEnabled ? 1 : 0.45}}
+                                title={stagePlaying ? 'Pause stage preview' : 'Play stage preview'}
+                                disabled={!playbackEnabled}
+                                onClick={handleStagePlayPause}
+                            >
+                                {stagePlaying ? (
+                                    <PauseIcon style={iconStyle(14)} />
+                                ) : (
+                                    <PlayIcon style={iconStyle(14)} />
+                                )}
+                            </button>
+                            <button
+                                className="qe-hover"
+                                style={{...overlayButton, opacity: playbackEnabled ? 1 : 0.45}}
+                                title="Step one frame (stage)"
+                                disabled={!playbackEnabled || stagePlaying}
+                                onClick={() => (playbackRef.current.stepQueued = true)}
+                            >
+                                <ForwardIcon style={iconStyle(14)} />
+                            </button>
+                            <button
+                                className="qe-hover"
+                                style={{...overlayButton, opacity: playbackEnabled ? 1 : 0.45}}
+                                title="Restart focused effect only"
+                                disabled={!playbackEnabled}
+                                onClick={restartFocus}
+                            >
+                                <ArrowPathIcon style={iconStyle(14)} />
+                            </button>
+                            <select
+                                className="qe-hover"
+                                style={{...overlayButton, padding: '5px 4px', opacity: playbackEnabled ? 1 : 0.45}}
+                                title="Playback speed"
+                                value={speed}
+                                disabled={!playbackEnabled}
+                                onChange={(e) => {
+                                    const next = Number(e.target.value);
+                                    playbackRef.current.speed = next;
+                                    setSpeed(next);
+                                }}
+                            >
+                                {PLAYBACK_SPEEDS.map((s) => (
+                                    <option key={s} value={s}>
+                                        ×{s}
+                                    </option>
+                                ))}
+                            </select>
+                            <span
+                                ref={counterRef}
+                                style={{
+                                    fontSize: 12,
+                                    color: theme.textDim,
+                                    fontVariantNumeric: 'tabular-nums',
+                                    paddingLeft: 4,
+                                    minWidth: 120,
+                                }}
+                            />
+                        </>
+                    )}
+                    {groupSelection.size >= 2 && (
+                        <button
+                            className="qe-hover"
+                            style={overlayButton}
+                            title="Group the checked rows"
+                            onClick={groupSelectedNodes}
+                        >
+                            <RectangleGroupIcon style={iconStyle(14)} />
+                            Group ({groupSelection.size})
+                        </button>
+                    )}
+                </div>
+            )}
             <div ref={bodyRef} style={{position: 'relative', flex: 1, minHeight: 0}}>
                 {!playbackEnabled ? (
                     <div
@@ -406,7 +405,7 @@ export function TimelinePanel(props: TimelinePanelProps): React.ReactElement {
                             lineHeight: 1.5,
                         }}
                     >
-                        Selected effect is not in the scene. Drag it into the viewport to preview playback.
+                        The focused effect is hidden. Show it in the Scene list to preview playback.
                     </div>
                 ) : (
                     <>

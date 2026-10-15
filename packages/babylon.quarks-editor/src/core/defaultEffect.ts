@@ -11,9 +11,9 @@ import {
     Vector4,
 } from 'babylon.quarks';
 import {DEFAULT_GRADIENT_STOPS, buildGradient} from './colors';
-import type {GalleryEntry} from './loadEffectGallery';
+import {uniqueEntryName, type SceneEntry} from './sceneEntries';
 
-export interface CreateGalleryDefaultOptions {
+export interface CreateSceneDefaultOptions {
     resolveTexture?: (url: string, scene: Scene) => unknown;
     textureUrl?: string;
 }
@@ -44,31 +44,18 @@ export function createDefaultEffect(
     return system;
 }
 
-/** Adds a blank preset effect to the hidden gallery catalog (not in the renderer yet). */
-export function createGalleryDefaultEntry(
+/** Creates a preset effect as a new scene entry (systems not registered with the renderer yet). */
+export function createSceneDefaultEntry(
     scene: Scene,
-    catalogRoot: TransformNode,
-    existing: GalleryEntry[],
-    options: CreateGalleryDefaultOptions = {}
-): GalleryEntry {
-    const takenNames = new Set(existing.map((entry) => entry.name));
-    const takenPaths = new Set(existing.map((entry) => entry.path));
-
-    let name = existing.length === 0 ? 'Effect' : 'New Effect';
-    let suffix = 2;
-    while (takenNames.has(name) || takenPaths.has(`_created/${name}.json`)) {
-        name = `New Effect ${suffix}`;
-        suffix++;
-    }
-
-    const path = `_created/${name}.json`;
+    existing: SceneEntry[],
+    options: CreateSceneDefaultOptions = {}
+): SceneEntry {
+    const name = uniqueEntryName(existing.length === 0 ? 'Effect' : 'New Effect', existing);
     const system = createDefaultEffect(scene, options.resolveTexture, options.textureUrl);
     system.pause();
 
     const root = new TransformNode(name, scene);
     system.emitter.parent = root;
-    root.parent = catalogRoot;
-    root.setEnabled(false);
 
-    return {name, path, root, systems: [system], inScene: false};
+    return {name, path: `_created/${name}.json`, assetId: null, root, systems: [system]};
 }

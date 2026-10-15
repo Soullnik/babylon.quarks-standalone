@@ -42,7 +42,43 @@ export class QuarksLoader {
         const baseUrl = this.options.baseUrl || url.substring(0, url.lastIndexOf('/') + 1);
         const response = await fetch(url);
         const json = await response.json();
+        await QuarksLoader.resolveExternalGeometries(json, async (geometryUrl) => {
+            const geometryResponse = await fetch(QuarksLoader.resolveUrl(baseUrl, geometryUrl));
+            if (!geometryResponse.ok) {
+                throw new Error(`HTTP ${geometryResponse.status}`);
+            }
+            return geometryResponse.json();
+        });
         return this.parse(json, baseUrl);
+    }
+
+    /**
+     * Inlines geometries that an export wrote to their own file (`{uuid, type: 'QuarksGeometry',
+     * url}` — e.g. the Unity exporter's "geometries as files"): each `url` is passed to
+     * `loadGeometry`, and the `positions / indices / uvs / normals` it returns replace the url in
+     * place, so `parse()` (which is synchronous) sees an ordinary inline geometry. `load()` does
+     * this with `fetch`; call it yourself before `parse()` when the files come from elsewhere.
+     * A geometry that fails to load is left as is and warned about.
+     */
+    static async resolveExternalGeometries(json: any, loadGeometry: (url: string) => Promise<any>): Promise<void> {
+        const geometries: any[] = Array.isArray(json?.geometries) ? json.geometries : [];
+        await Promise.all(
+            geometries
+                .filter((geom) => typeof geom?.url === 'string' && !geom.positions)
+                .map(async (geom) => {
+                    try {
+                        const data = await loadGeometry(geom.url);
+                        for (const key of ['positions', 'indices', 'uvs', 'normals']) {
+                            if (data?.[key] !== undefined) {
+                                geom[key] = data[key];
+                            }
+                        }
+                        delete geom.url;
+                    } catch (err) {
+                        console.warn(`[QuarksLoader] Could not load geometry "${geom.url}":`, err);
+                    }
+                })
+        );
     }
 
     parse(json: any, baseUrl: string = ''): TransformNode {
@@ -89,6 +125,12 @@ export class QuarksLoader {
                 const parsed = this.parseBufferGeometry(geom.data);
                 meta.geometries[geom.uuid] = parsed;
             } else if (geom.type === 'QuarksGeometry') {
+                if (typeof geom.url === 'string' && !geom.positions) {
+                    console.warn(
+                        `[QuarksLoader] Geometry "${geom.url}" is an external file; use load() or ` +
+                            'QuarksLoader.resolveExternalGeometries() before parse().'
+                    );
+                }
                 meta.geometries[geom.uuid] = {
                     positions: new Float32Array(geom.positions ?? []),
                     indices: geom.indices ? new Uint32Array(geom.indices) : new Uint32Array(0),
@@ -257,7 +299,7 @@ export class QuarksLoader {
             if (img.url) {
                 QuarksLoader.warnIfNotAnImageUrl(img.url);
             }
-            (this as any)._images[img.uuid] = img.url ? this.resolveImageUrl(baseUrl, img.url) : null;
+            (this as any)._images[img.uuid] = img.url ? QuarksLoader.resolveUrl(baseUrl, img.url) : null;
         }
     }
 
@@ -286,7 +328,7 @@ export class QuarksLoader {
      * babylon.quarks-editor). Prepending baseUrl to those turns e.g.
      * "data:image/png;base64,AAAA" into an invalid path like "/some/dir/data:image/png;base64,AAAA".
      */
-    private resolveImageUrl(baseUrl: string, url: string): string {
+    private static resolveUrl(baseUrl: string, url: string): string {
         if (/^(data|blob):/i.test(url) || /^[a-z][a-z0-9+.-]*:\/\//i.test(url) || url.startsWith('/')) {
             return url;
         }

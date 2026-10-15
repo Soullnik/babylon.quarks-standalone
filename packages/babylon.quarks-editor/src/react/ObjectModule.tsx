@@ -41,38 +41,42 @@ function AxisRow(props: {
     );
 }
 
-export function ObjectModule(props: {node: TransformNode; label: string}) {
+export function ObjectModule(props: {
+    node: TransformNode;
+    label: string;
+    /** Called before a field mutates the node — lets the host capture an undo snapshot. */
+    onBeforeChange?: () => void;
+    /** Called after a field mutated the node. */
+    onChanged?: () => void;
+}) {
     useSyncExternalStore(subscribeTransform, getTransformRevision);
     const {node} = props;
     const euler = getEulerDegrees(node);
+    const change = (mutate: () => void) => {
+        props.onBeforeChange?.();
+        mutate();
+        notifyTransformChanged();
+        props.onChanged?.();
+    };
     return (
         <ModuleSection title={`Object — ${props.label}`}>
             <AxisRow
                 label="Position"
                 values={{x: node.position.x, y: node.position.y, z: node.position.z}}
                 step={0.1}
-                onChange={(axis, v) => {
-                    node.position[axis] = v;
-                    notifyTransformChanged();
-                }}
+                onChange={(axis, v) => change(() => (node.position[axis] = v))}
             />
             <AxisRow
                 label="Rotation"
                 values={euler}
                 step={1}
-                onChange={(axis, v) => {
-                    setEulerDegreeAxis(node, axis, v);
-                    notifyTransformChanged();
-                }}
+                onChange={(axis, v) => change(() => setEulerDegreeAxis(node, axis, v))}
             />
             <AxisRow
                 label="Scale"
                 values={{x: node.scaling.x, y: node.scaling.y, z: node.scaling.z}}
                 step={0.1}
-                onChange={(axis, v) => {
-                    node.scaling[axis] = v;
-                    notifyTransformChanged();
-                }}
+                onChange={(axis, v) => change(() => (node.scaling[axis] = v))}
             />
         </ModuleSection>
     );

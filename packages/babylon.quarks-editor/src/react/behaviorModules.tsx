@@ -25,7 +25,7 @@ import {
 } from 'babylon.quarks';
 import React from 'react';
 import {EffectBinding} from '../core/binding';
-import {DEFAULT_GRADIENT_STOPS, buildGradient, findBehavior, readGradientStops} from '../core/colors';
+import {buildGradient, DEFAULT_GRADIENT_STOPS, findBehavior, readGradientStops} from '../core/colors';
 import {buildCurve, buildScalar, readPieces, readScalar} from '../core/values';
 import {CurveEditor} from './CurveEditor';
 import {NumberField, Row, SelectField} from './fields';
@@ -468,8 +468,8 @@ export function CollisionModule({binding}: ModuleProps) {
                         />
                     </Row>
                     <div style={{fontSize: 11, opacity: 0.6, marginTop: 4}}>
-                        Bounce is saved with the effect. Colliders come from the host
-                        (setPhysicsResolver) — without one, Collision is inert.
+                        Bounce is saved with the effect. Colliders come from the host (setPhysicsResolver) — without
+                        one, Collision is inert.
                     </div>
                 </>
             )}

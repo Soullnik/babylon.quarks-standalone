@@ -10,7 +10,9 @@ namespace BabylonQuarks.UnityExporter
     /// <summary>
     /// Accumulates the shared meta arrays (geometries / materials / textures / images) of the
     /// Quarks envelope while the hierarchy is serialized, and holds the node-uuid maps used to
-    /// wire sub-emitters. Textures are embedded as data URIs so the exported JSON is self-contained.
+    /// wire sub-emitters. Textures are embedded as data URIs so the exported JSON is self-contained,
+    /// unless <see cref="Store"/> is set: then textures and/or geometries (per <see cref="Options"/>)
+    /// are written as files and referenced by a url relative to <see cref="EffectDir"/>.
     /// </summary>
     public class ExportContext
     {
@@ -23,6 +25,27 @@ namespace BabylonQuarks.UnityExporter
         public int LastBlendMode = 2;
 
         public bool EmbedTextures = true;
+
+        /// <summary>Which assets go to separate files. Ignored while <see cref="Store"/> is null.</summary>
+        public readonly ExportOptions Options;
+
+        /// <summary>Shared asset folder for this export; null keeps everything inline.</summary>
+        public readonly AssetFileStore Store;
+
+        /// <summary>Folder the effect JSON is written to — asset urls are relative to it.</summary>
+        public readonly string EffectDir;
+
+        public ExportContext() : this(null, null, null) { }
+
+        public ExportContext(ExportOptions options, AssetFileStore store, string effectDir)
+        {
+            Options = options ?? new ExportOptions();
+            Store = store;
+            EffectDir = effectDir;
+        }
+
+        private bool TexturesToFiles => Store != null && EffectDir != null && Options.TexturesAsFiles;
+        private bool GeometriesToFiles => Store != null && EffectDir != null && Options.GeometriesAsFiles;
 
         /// <summary>Mesh nodes emitted for mesh-shape emitters; appended to the root object's children.</summary>
         public readonly System.Collections.Generic.List<JObject> MeshSourceNodes = new System.Collections.Generic.List<JObject>();
@@ -98,9 +121,9 @@ namespace BabylonQuarks.UnityExporter
             return uuid;
         }
 
-        private string AddTexture(Texture tex, bool envAtlas = false)
+        private string AddTexture(Texture tex, bool envAtlas = false, string url = null)
         {
-            string url = ResolveTextureUrl(tex);
+            url = url ?? ResolveTextureUrl(tex);
             if (!_imageByUrl.TryGetValue(url, out var imageUuid))
             {
                 imageUuid = NewId("quarks_image");
@@ -170,7 +193,13 @@ namespace BabylonQuarks.UnityExporter
             try
             {
                 atlas.name = cube.name + "_envAtlas";
-                return AddTexture(atlas, envAtlas: true);
+                string url = null;
+                if (TexturesToFiles)
+                {
+                    string file = Store.WriteEnvAtlas(cube, atlas);
+                    if (file != null) url = AssetFileStore.RelativeUrl(EffectDir, file);
+                }
+                return AddTexture(atlas, envAtlas: true, url: url);
             }
             finally
             {
@@ -314,16 +343,25 @@ namespace BabylonQuarks.UnityExporter
         private string ResolveTextureUrl(Texture tex)
         {
             string path = AssetDatabase.GetAssetPath(tex);
+            if (TexturesToFiles)
+            {
+                string file = Store.WriteTexture(tex);
+                if (file != null)
+                {
+                    return AssetFileStore.RelativeUrl(EffectDir, file);
+                }
+                // Could not write the file — fall through and embed it instead.
+            }
             if (EmbedTextures)
             {
                 // Only the source file of a format a browser can decode is worth
                 // embedding as-is.
-                if (!string.IsNullOrEmpty(path) && File.Exists(path) && IsWebImageFile(path))
+                if (!string.IsNullOrEmpty(path) && File.Exists(path) && TextureEncoding.IsWebImageFile(path))
                 {
                     try
                     {
                         byte[] bytes = File.ReadAllBytes(path);
-                        return "data:" + MimeTypeOf(path) + ";base64," + Convert.ToBase64String(bytes);
+                        return "data:" + TextureEncoding.MimeTypeOf(path) + ";base64," + Convert.ToBase64String(bytes);
                     }
                     catch (Exception e)
                     {
@@ -337,10 +375,10 @@ namespace BabylonQuarks.UnityExporter
                 // .tga or .psd are not something a browser can decode. Both used to
                 // fall through to the branch below and export the asset path as if
                 // it were an image url.
-                string encoded = EncodeTextureToPngDataUrl(tex);
-                if (!string.IsNullOrEmpty(encoded))
+                byte[] png = TextureEncoding.EncodeToPng(tex);
+                if (png != null)
                 {
-                    return encoded;
+                    return "data:image/png;base64," + Convert.ToBase64String(png);
                 }
                 Debug.LogWarning(
                     $"[Quarks Exporter] Texture '{tex.name}' could not be embedded; the effect will reference '{path}' and will not load outside Unity.");
@@ -348,72 +386,36 @@ namespace BabylonQuarks.UnityExporter
             return !string.IsNullOrEmpty(path) ? path : tex.name;
         }
 
-        private static bool IsWebImageFile(string path)
-        {
-            string ext = Path.GetExtension(path).ToLowerInvariant();
-            return ext == ".png" || ext == ".jpg" || ext == ".jpeg" || ext == ".webp";
-        }
-
-        private static string MimeTypeOf(string path)
-        {
-            string ext = Path.GetExtension(path).ToLowerInvariant();
-            return ext == ".jpg" || ext == ".jpeg" ? "image/jpeg"
-                : ext == ".webp" ? "image/webp"
-                : "image/png";
-        }
-
-        /// <summary>
-        /// Re-encodes any texture to a PNG data URI by way of a render texture.
-        /// Works for built-in, compressed and non-readable textures, none of which
-        /// can be read from disk or through <c>EncodeToPNG</c> directly.
-        /// </summary>
-        private static string EncodeTextureToPngDataUrl(Texture tex)
-        {
-            if (tex == null || tex.width <= 0 || tex.height <= 0)
-            {
-                return null;
-            }
-
-            RenderTexture previous = RenderTexture.active;
-            RenderTexture rt = RenderTexture.GetTemporary(
-                tex.width, tex.height, 0, RenderTextureFormat.ARGB32, RenderTextureReadWrite.sRGB);
-            Texture2D readable = null;
-            try
-            {
-                Graphics.Blit(tex, rt);
-                RenderTexture.active = rt;
-                readable = new Texture2D(tex.width, tex.height, TextureFormat.RGBA32, false);
-                readable.ReadPixels(new Rect(0, 0, tex.width, tex.height), 0, 0);
-                readable.Apply();
-                byte[] png = readable.EncodeToPNG();
-                return png == null ? null : "data:image/png;base64," + Convert.ToBase64String(png);
-            }
-            catch (Exception e)
-            {
-                Debug.LogWarning($"[Quarks Exporter] Could not re-encode texture '{tex.name}': {e.Message}");
-                return null;
-            }
-            finally
-            {
-                RenderTexture.active = previous;
-                RenderTexture.ReleaseTemporary(rt);
-                if (readable != null)
-                {
-                    UnityEngine.Object.DestroyImmediate(readable);
-                }
-            }
-        }
-
         // ---- mesh geometry (Mesh render mode) ------------------------------------------
 
         public string AddGeometryForMesh(Mesh mesh)
         {
             string uuid = NewId("quarks_geometry");
+            var entry = new JObject().Set("uuid", uuid).Set("type", "QuarksGeometry");
+            if (GeometriesToFiles)
+            {
+                // QuarksLoader.load() fetches `url` and reads the same fields an inline entry has.
+                string file = Store.TryGetGeometry(mesh, out var written)
+                    ? written
+                    : Store.WriteGeometry(mesh, BuildGeometryData(mesh));
+                entry.Set("url", AssetFileStore.RelativeUrl(EffectDir, file));
+            }
+            else
+            {
+                entry.Members.AddRange(BuildGeometryData(mesh).Members);
+            }
+            Geometries.Add(entry);
+            return uuid;
+        }
+
+        /// <summary>positions / indices / uvs / normals of a mesh, in QuarksGeometry layout.</summary>
+        private static JObject BuildGeometryData(Mesh mesh)
+        {
             var positions = new JArray();
             foreach (var v in mesh.vertices) { positions.Add(v.x); positions.Add(v.y); positions.Add(v.z); }
             var indices = new JArray();
             foreach (var idx in mesh.triangles) { indices.Add(idx); }
-            var g = new JObject().Set("uuid", uuid).Set("type", "QuarksGeometry").Set("positions", positions).Set("indices", indices);
+            var g = new JObject().Set("positions", positions).Set("indices", indices);
 
             Vector2[] uv = mesh.uv;
             if (uv.Length > 0)
@@ -435,8 +437,7 @@ namespace BabylonQuarks.UnityExporter
                 foreach (var v in normals) { n.Add(v.x); n.Add(v.y); n.Add(v.z); }
                 g.Set("normals", n);
             }
-            Geometries.Add(g);
-            return uuid;
+            return g;
         }
 
         /// <summary>
@@ -482,6 +483,65 @@ namespace BabylonQuarks.UnityExporter
                 if (src == 2) return 4; // Src = DstColor → multiply/modulate
             }
             return 2;
+        }
+    }
+
+    /// <summary>Texture helpers shared by inline embedding and the file asset store.</summary>
+    internal static class TextureEncoding
+    {
+        public static bool IsWebImageFile(string path)
+        {
+            string ext = Path.GetExtension(path).ToLowerInvariant();
+            return ext == ".png" || ext == ".jpg" || ext == ".jpeg" || ext == ".webp";
+        }
+
+        public static string MimeTypeOf(string path)
+        {
+            string ext = Path.GetExtension(path).ToLowerInvariant();
+            return ext == ".jpg" || ext == ".jpeg" ? "image/jpeg"
+                : ext == ".webp" ? "image/webp"
+                : "image/png";
+        }
+
+        /// <summary>
+        /// Re-encodes any texture to PNG bytes by way of a render texture.
+        /// Works for built-in, compressed and non-readable textures, none of which
+        /// can be read from disk or through <c>EncodeToPNG</c> directly.
+        /// </summary>
+        public static byte[] EncodeToPng(Texture tex)
+        {
+            if (tex == null || tex.width <= 0 || tex.height <= 0)
+            {
+                return null;
+            }
+
+            RenderTexture previous = RenderTexture.active;
+            RenderTexture rt = RenderTexture.GetTemporary(
+                tex.width, tex.height, 0, RenderTextureFormat.ARGB32, RenderTextureReadWrite.sRGB);
+            Texture2D readable = null;
+            try
+            {
+                Graphics.Blit(tex, rt);
+                RenderTexture.active = rt;
+                readable = new Texture2D(tex.width, tex.height, TextureFormat.RGBA32, false);
+                readable.ReadPixels(new Rect(0, 0, tex.width, tex.height), 0, 0);
+                readable.Apply();
+                return readable.EncodeToPNG();
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning($"[Quarks Exporter] Could not re-encode texture '{tex.name}': {e.Message}");
+                return null;
+            }
+            finally
+            {
+                RenderTexture.active = previous;
+                RenderTexture.ReleaseTemporary(rt);
+                if (readable != null)
+                {
+                    UnityEngine.Object.DestroyImmediate(readable);
+                }
+            }
         }
     }
 }

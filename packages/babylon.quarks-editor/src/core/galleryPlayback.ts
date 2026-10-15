@@ -1,13 +1,13 @@
 import {QuarksUtil} from 'babylon.quarks';
-import type {GalleryEntry} from './loadEffectGallery';
+import type {SceneEntry} from './sceneEntries';
 
-function isPreviewEntry(entry: GalleryEntry, previewRootIds: ReadonlySet<number>): boolean {
-    return entry.inScene && previewRootIds.has(entry.root.uniqueId);
+function isPreviewEntry(entry: SceneEntry, previewRootIds: ReadonlySet<number>): boolean {
+    return previewRootIds.has(entry.root.uniqueId);
 }
 
-/** Freezes every gallery entry; unpauses all in-scene entries in the preview set when transport is playing. */
+/** Freezes every scene entry; unpauses the visible ones (the preview set) when transport is playing. */
 export function applyGalleryPlayback(
-    entries: GalleryEntry[],
+    entries: SceneEntry[],
     previewRootIds: ReadonlySet<number>,
     transportPlaying: boolean,
     focusFinishedRootIds: ReadonlySet<number> = new Set()
@@ -36,17 +36,17 @@ export function applyGalleryPlayback(
 }
 
 /** Whether any preview effect on stage should keep simulating. */
-export function hasActivePreview(entries: GalleryEntry[], previewRootIds: ReadonlySet<number>): boolean {
+export function hasActivePreview(entries: SceneEntry[], previewRootIds: ReadonlySet<number>): boolean {
     return entries.some((entry) => isPreviewEntry(entry, previewRootIds));
 }
 
 /** In-scene preview effects currently in the preview set. */
-export function countActivePreviews(entries: GalleryEntry[], previewRootIds: ReadonlySet<number>): number {
+export function countActivePreviews(entries: SceneEntry[], previewRootIds: ReadonlySet<number>): number {
     return entries.filter((entry) => isPreviewEntry(entry, previewRootIds)).length;
 }
 
 /** Particle count across all active preview effects. */
-export function countGalleryParticles(entries: GalleryEntry[], previewRootIds: ReadonlySet<number>): number {
+export function countGalleryParticles(entries: SceneEntry[], previewRootIds: ReadonlySet<number>): number {
     let count = 0;
     for (const entry of entries) {
         if (!isPreviewEntry(entry, previewRootIds)) {
@@ -64,7 +64,7 @@ export function countGalleryParticles(entries: GalleryEntry[], previewRootIds: R
  * Returns true when any entry was paused (caller should refresh renderer batches).
  */
 export function pauseFinishedPreviews(
-    entries: GalleryEntry[],
+    entries: SceneEntry[],
     previewRootIds: ReadonlySet<number>,
     focusFinishedRootIds: ReadonlySet<number> = new Set()
 ): boolean {
