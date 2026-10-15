@@ -16,8 +16,19 @@ export type {GradientStop} from './core/colors';
 export {buildEffectTree, collectSystems, serializeEffectForest, serializeEffectTree} from './core/effectTree';
 export type {EffectTreeNode} from './core/effectTree';
 export {EffectHistory} from './core/history';
+export type {HistoryStacks} from './core/history';
+export {IndexedDbProjectStore} from './core/indexedDbProjectStore';
 export {applyRendererMaterial, getMaterialLabel} from './core/material';
 export type {RendererMaterialPatch} from './core/material';
+export {formatBytes} from './core/projectStore';
+export type {
+    ProjectMeta,
+    ProjectStore,
+    StorageEstimate,
+    StoredAsset,
+    StoredScene,
+    StoredSceneEntry,
+} from './core/projectStore';
 export {
     DEFAULT_SHAPE_PARAMS,
     SHAPE_PARAM_KEYS,

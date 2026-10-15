@@ -1,6 +1,6 @@
 import type {TransformNode} from '@babylonjs/core/Meshes/transformNode';
 import type {ParticleSystem} from 'babylon.quarks';
-import React, {useSyncExternalStore} from 'react';
+import React, {useEffect, useSyncExternalStore} from 'react';
 import {EffectBinding} from '../core/binding';
 import {
     CollisionModule,
@@ -73,6 +73,12 @@ export function EffectEditor(props: EffectEditorProps) {
         nested.onBeforeChange = () => props.binding.onBeforeChange?.();
         return nested;
     }, [props.binding, activeSystem]);
+    // A sub-system edit is a change of the whole effect: the host's undo buttons, timeline and
+    // wireframes all listen to the root binding.
+    useEffect(
+        () => (binding === props.binding ? undefined : binding.subscribe(() => props.binding.markChanged())),
+        [binding, props.binding]
+    );
     useSyncExternalStore(
         (onStoreChange) => binding.subscribe(onStoreChange),
         () => binding.getRevision()
@@ -82,7 +88,12 @@ export function EffectEditor(props: EffectEditorProps) {
 
     return (
         <div style={{fontFamily: theme.font, color: theme.text}}>
-            <ObjectModule node={props.gizmoTargetNode} label={props.gizmoTargetLabel} />
+            <ObjectModule
+                node={props.gizmoTargetNode}
+                label={props.gizmoTargetLabel}
+                onBeforeChange={() => props.binding.onBeforeChange?.()}
+                onChanged={() => props.binding.markChanged()}
+            />
             {!gizmoTargetIsEmitter && (
                 <div style={{fontSize: 11, color: theme.textDim, margin: '0 0 10px', lineHeight: 1.45}}>
                     Modules below edit <strong>{activeSystem.emitter.name || 'particle system'}</strong>. Select its

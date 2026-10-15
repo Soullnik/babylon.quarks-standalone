@@ -3,6 +3,12 @@ import type {EffectBinding} from './binding';
 const COALESCE_MS = 400;
 const MAX_DEPTH = 50;
 
+/** Undo/redo stacks of one effect, kept by the host while another effect is focused. */
+export interface HistoryStacks {
+    undo: string[];
+    redo: string[];
+}
+
 /**
  * Snapshot-based undo/redo over serialized effect JSON. Owned by the host (not the
  * binding) so history survives rebinding when a restore rebuilds the systems.
@@ -36,16 +42,31 @@ export class EffectHistory {
         this.lastCaptureTime = 0;
     }
 
-    /** Pushes an undo snapshot; rapid consecutive edits are coalesced into one step. */
+    /** The current stacks, to hand back to `restoreStacks` when this effect is focused again. */
+    saveStacks(): HistoryStacks {
+        return {undo: this.undoStack, redo: this.redoStack};
+    }
+
+    restoreStacks(stacks: HistoryStacks | undefined): void {
+        this.undoStack = stacks?.undo ?? [];
+        this.redoStack = stacks?.redo ?? [];
+        this.lastCaptureTime = 0;
+    }
+
+    /**
+     * Pushes an undo snapshot. A burst of edits — typing a number, dragging a curve handle or a
+     * slider — is one step: each edit within COALESCE_MS of the previous one extends the burst.
+     */
     capture(): void {
         if (!this.binding) {
             return;
         }
         const now = Date.now();
-        if (now - this.lastCaptureTime < COALESCE_MS && this.undoStack.length > 0) {
+        const continuesBurst = now - this.lastCaptureTime < COALESCE_MS && this.undoStack.length > 0;
+        this.lastCaptureTime = now;
+        if (continuesBurst) {
             return;
         }
-        this.lastCaptureTime = now;
         this.undoStack.push(this.binding.exportJSON());
         if (this.undoStack.length > MAX_DEPTH) {
             this.undoStack.shift();

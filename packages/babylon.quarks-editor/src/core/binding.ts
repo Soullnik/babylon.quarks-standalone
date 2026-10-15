@@ -77,6 +77,14 @@ export class EffectBinding {
         this.notify();
     }
 
+    /**
+     * Notifies subscribers of a change made outside `apply()` — e.g. a transform edited by the
+     * gizmo, or a sub-system edited through its own nested binding.
+     */
+    markChanged(): void {
+        this.notify();
+    }
+
     private notify(): void {
         this.revision++;
         for (const listener of this.listeners) {
