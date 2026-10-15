@@ -20,8 +20,12 @@ export class PiecewiseBezier extends PiecewiseFunction<Bezier> implements Functi
      * See {@link refreshTable}.
      */
     private table: Float32Array | null = null;
-    /** Control points the table was built from, used to detect edits. */
-    private tableSignature: Float32Array | null = null;
+    /**
+     * Control points the table was built from, used to detect edits. Float64 on purpose: the
+     * points are doubles, and a Float32Array rounds most of them (0.2, almost any exported value),
+     * so the comparison never matched and the table was resampled on every call.
+     */
+    private tableSignature: Float64Array | null = null;
 
     /**
      * Rebuilds the sampled table when the curve changed, otherwise does nothing.
@@ -51,7 +55,7 @@ export class PiecewiseBezier extends PiecewiseFunction<Bezier> implements Functi
         let signature = this.tableSignature;
         let changed = signature === null || signature.length !== signatureLength;
         if (changed) {
-            signature = new Float32Array(signatureLength);
+            signature = new Float64Array(signatureLength);
         }
         for (let i = 0, s = 0; i < count; i++, s += 5) {
             const p = functions[i][0].p;

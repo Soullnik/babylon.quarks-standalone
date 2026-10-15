@@ -110,6 +110,33 @@ describe('sampled curve tables', () => {
         expect((curve as any).table).toBe(first);
     });
 
+    // 0.2, 0.3, 0.7 have no exact float32 form. A signature kept in a Float32Array rounded them,
+    // never matched again, and resampled the whole table on every refresh.
+    it('does not resample an unchanged curve whose points are not float32-exact', () => {
+        const curve = new PiecewiseBezier([[new Bezier(0.2, 0.3, 0.7, 0.1), 0]]);
+        curve.refreshTable();
+        const exact = jest.spyOn(curve, 'genValueExact');
+        curve.refreshTable();
+        expect(exact).not.toHaveBeenCalled();
+    });
+
+    it('does not resample an unchanged gradient whose keys are not float32-exact', () => {
+        const gradient = new Gradient(
+            [
+                [new Vector3(0.2, 0.3, 0.7), 0],
+                [new Vector3(0.1, 0.9, 0.3), 0.3],
+            ],
+            [
+                [0.7, 0],
+                [0.2, 0.3],
+            ]
+        );
+        gradient.refreshTable();
+        const exact = jest.spyOn(gradient, 'genColorExact');
+        gradient.refreshTable();
+        expect(exact).not.toHaveBeenCalled();
+    });
+
     it('falls back to evaluating the curve when no table was built', () => {
         const curve = new PiecewiseBezier([[new Bezier(0, 0.3, 0.7, 1), 0]]);
         const reference = new PiecewiseBezier([[new Bezier(0, 0.3, 0.7, 1), 0]]);

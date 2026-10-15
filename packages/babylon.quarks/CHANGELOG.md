@@ -29,8 +29,25 @@ and the project follows the `quarks.core` 0.x version line.
 - Both are saved in the effect JSON (`pivot: [x, y, z]`, `flip: [u, v]`) only when non-zero, and
   carried by `clone()`.
 
+### Changed
+
+- `QuarksLoader` shares one `Texture` per scene between every effect that uses the same image with
+  the same sampling, and one copy of identical mesh geometry. The renderer only batches systems
+  that share these objects, so each loaded effect used to get batches of its own: 661 Epic Toon
+  FX combat effects loaded together drew 2,577 batches, and draw 180 now. Turn it off per loader
+  with `shareResources: false`; `QuarksLoader.clearSharedResources(scene)` forgets the shared set.
+
 ### Fixed
 
+- `PiecewiseBezier` and `Gradient` (`quarks.core`) resampled their 257-point lookup tables on
+  every refresh, which runs every simulation step for every behavior using them. The "unchanged"
+  check compared the control points against a `Float32Array` copy, and any value float32 can't
+  hold exactly (0.2, 0.3, …) never compared equal. With such curves, 1,000 systems took 22.9 ms
+  per frame and now take 12.7 ms.
+- An idle sprite batch uploaded its cleared instance (five or six vertex buffer updates) on every
+  frame; it now does so once each time it goes empty. Systems with no particles are skipped when
+  the batch is filled, and the emitter's matrix is only fully decomposed for local-space mesh
+  particles.
 - A trail texture now reaches the end of the ribbon on frames that draw no live tip (with
   `followLocalOrigin`, while paused, or exactly on a simulation step). The newest recorded sample
   stopped one segment short of the texture's end, which cut the end of the texture off and made
