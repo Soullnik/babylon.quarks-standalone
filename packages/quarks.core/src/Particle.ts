@@ -307,6 +307,12 @@ export class SpriteParticle implements Particle {
      * @type {number}
      */
     uvTile = 0;
+    /**
+     * Mirroring picked at birth from the system's `flip` fractions: bit 1
+     * mirrors the sprite along U, bit 2 along V. 0 draws it as is.
+     * @type {number}
+     */
+    flip = 0;
 
     /**
      * @param store - Column storage to bind to. A private single-row store is

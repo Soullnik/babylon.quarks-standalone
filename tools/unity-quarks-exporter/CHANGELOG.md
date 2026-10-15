@@ -4,7 +4,19 @@ All notable changes to the Unity Quarks Exporter are documented here.
 
 ## [Unreleased]
 
+### Added
+
+- **Shape Position / Rotation / Scale** export as the shape's `transform` (rotation as Unity's own
+  Euler → quaternion). They were ignored, so offset and turned emitters (SoftFireBig*,
+  SpikyFireBig* and ~230 other Epic Toon FX prefabs) spawned from the system's origin.
+- **Renderer Pivot** and **Flip** export as `pivot` / `flip` for billboard, vertical, horizontal
+  and stretched billboard systems, mapped so that each quad lands where Unity puts it (checked
+  vertex by vertex against `ParticleSystemRenderer.BakeMesh`). Mesh systems log a warning.
+
 ### Fixed
+
+- **Horizontal and stretched billboards** drew their texture upside down along V next to Unity.
+  They now export `flip` with V set to `1 − Flip V`, which mirrors it back.
 
 - A system that draws only its **trails** (Render Mode None + per-particle Trails) lost its
   texture and rendered as plain billboards: the exporter read the empty particle material and

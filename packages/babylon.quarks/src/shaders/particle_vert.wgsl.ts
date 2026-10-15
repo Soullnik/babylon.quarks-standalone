@@ -20,6 +20,11 @@ uniform tileCountX: f32;
 uniform tileCountY: f32;
 #endif
 
+#ifdef PIVOT
+// Quad offset in particle-size units: xy in the quad's plane, z toward the camera.
+uniform pivot: vec3f;
+#endif
+
 // Varyings
 varying vUV: vec2f;
 varying vColor: vec4f;
@@ -37,7 +42,12 @@ fn main(input: VertexInputs) -> FragmentInputs {
     let c = cos(vertexInputs.rotation);
     let s = sin(vertexInputs.rotation);
 
-    let alignedPosition = vertexInputs.position.xy * vertexInputs.size.xy;
+    // A negative size mirrors the quad, which is how flipped particles arrive.
+    var alignedPosition = vertexInputs.position.xy * vertexInputs.size.xy;
+#ifdef PIVOT
+    // The pivot turns with the particle but is not mirrored with it.
+    alignedPosition += uniforms.pivot.xy * abs(vertexInputs.size.xy);
+#endif
     let rotatedPosition = vec2f(
         c * alignedPosition.x - s * alignedPosition.y,
         s * alignedPosition.x + c * alignedPosition.y);
@@ -46,6 +56,9 @@ fn main(input: VertexInputs) -> FragmentInputs {
     var mvPosition = uniforms.world * vec4f(vertexInputs.offset, 1.0);
     mvPosition.x += rotatedPosition.x;
     mvPosition.z -= rotatedPosition.y;
+#ifdef PIVOT
+    mvPosition.y += uniforms.pivot.z * abs(vertexInputs.size.x);
+#endif
     mvPosition = uniforms.view * mvPosition;
 #elif defined(VERTICAL)
     var mvPosition = uniforms.world * vec4f(vertexInputs.offset, 1.0);
@@ -56,6 +69,13 @@ fn main(input: VertexInputs) -> FragmentInputs {
     var mvPosition = uniforms.view * uniforms.world * vec4f(vertexInputs.offset, 1.0);
     mvPosition.x += rotatedPosition.x;
     mvPosition.y += rotatedPosition.y;
+#endif
+#ifdef PIVOT
+#ifndef HORIZONTAL
+    // Toward the camera along its view axis, whichever way the view space
+    // faces: anything in front of the camera has the sign of the far side.
+    mvPosition.z -= sign(mvPosition.z) * uniforms.pivot.z * abs(vertexInputs.size.x);
+#endif
 #endif
 
     let clipPosition = uniforms.projection * mvPosition;

@@ -2,7 +2,7 @@ import {BaseTexture} from '@babylonjs/core/Materials/Textures/baseTexture';
 import {Texture} from '@babylonjs/core/Materials/Textures/texture';
 import {TransformNode} from '@babylonjs/core/Meshes/transformNode';
 import {Scene} from '@babylonjs/core/scene';
-import {EmitSubParticleSystem, IParticleSystem} from 'quarks.core';
+import {EmitSubParticleSystem, IParticleSystem, Vector3} from 'quarks.core';
 import {ParticleSystem} from './ParticleSystem';
 import {SpriteBatch} from './SpriteBatch';
 import {TrailBatch} from './TrailBatch';
@@ -47,6 +47,14 @@ export interface VFXBatchSettings {
      */
     reflectionAtlas: BaseTexture | null;
     layerMask: number;
+    /**
+     * Offset of billboard quads from their particle, in particle-size units
+     * (Unity's renderer Pivot). On billboards x/y move the quad in its own plane
+     * before it is rotated and z moves it toward the camera (up for horizontal
+     * billboards). On stretched billboards x runs from the head to the tail and
+     * y across, and z is unused. Absent or zero: no offset. Meshes ignore it.
+     */
+    pivot?: Vector3;
 }
 
 export interface AdaptivePerformanceOptions {
@@ -55,6 +63,11 @@ export interface AdaptivePerformanceOptions {
     maxQuality: number;
     decreaseStep: number;
     increaseStep: number;
+}
+
+/** True when both pivots put the quad in the same place; a missing pivot is zero. */
+function pivotEqual(a: Vector3 | undefined, b: Vector3 | undefined): boolean {
+    return (a?.x ?? 0) === (b?.x ?? 0) && (a?.y ?? 0) === (b?.y ?? 0) && (a?.z ?? 0) === (b?.z ?? 0);
 }
 
 /** True when both face lists are the same six texture references (or both empty). */
@@ -147,7 +160,8 @@ export class BatchedRenderer extends TransformNode {
             a.vTileCount === b.vTileCount &&
             a.instancingGeometry === b.instancingGeometry &&
             a.renderOrder === b.renderOrder &&
-            a.layerMask === b.layerMask
+            a.layerMask === b.layerMask &&
+            pivotEqual(a.pivot, b.pivot)
         );
     }
 

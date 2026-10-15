@@ -14,6 +14,20 @@ and the project follows the `quarks.core` 0.x version line.
   disappears the moment its particle dies, and a local-space system lays its trail points down in
   world space so they streak behind a moving emitter. Saved in the effect JSON only when switched
   on.
+- Emitter shapes take an optional local `transform` (`ShapeTransform`: position, rotation
+  quaternion, scale) like the Position / Rotation / Scale of Unity's Shape module. The spawn point
+  goes through scale, rotation and offset, and the start direction through scale and rotation
+  without changing the start speed. Every `quarks.core` shape and `MeshSurfaceEmitter` support
+  it; the shape JSON gets a `transform` entry only when one is set.
+- `ParticleSystem.pivot` (Unity's renderer Pivot): offsets billboard and stretched billboard quads
+  from their particle, in particle-size units. Billboards turn the offset with the particle and
+  move it toward the camera by z (up, for horizontal billboards); stretched billboards measure x
+  from head to tail and y across. Systems with different pivots batch separately; the shaders
+  only compile it in (`PIVOT`) when a pivot is set.
+- `ParticleSystem.flip` (Unity's renderer Flip): the fraction of billboard and stretched billboard
+  particles whose texture is mirrored along U and V, picked per particle at birth.
+- Both are saved in the effect JSON (`pivot: [x, y, z]`, `flip: [u, v]`) only when non-zero, and
+  carried by `clone()`.
 
 ### Fixed
 

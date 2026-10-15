@@ -56,6 +56,7 @@ namespace BabylonQuarks.UnityExporter
             {
                 obj.Set("instancingGeometry", geometryUuid);
             }
+            if (!trailOnly) AddPivotAndFlip(ps, renderer, renderMode, obj);
 
             BuildTextureSheet(ps, obj, behaviors, trailOnly);
 
@@ -226,7 +227,42 @@ namespace BabylonQuarks.UnityExporter
         private static JToken BuildShape(ParticleSystem.ShapeModule shape, ExportContext ctx)
         {
             if (!shape.enabled) return new JObject().Set("type", "point");
+            return AddShapeTransform(BuildShapeType(shape, ctx), shape);
+        }
 
+        /// <summary>
+        /// Unity's Shape Position / Rotation / Scale → the quarks shape <c>transform</c>, written only
+        /// when one of them is set. Both apply them the same way (measured in Unity): the spawn point
+        /// goes to <c>position + rotation · (scale · p)</c> and the start direction through the same
+        /// scale and rotation, keeping its speed. The rotation is Unity's own Euler → quaternion.
+        /// </summary>
+        private static JObject AddShapeTransform(JObject json, ParticleSystem.ShapeModule shape)
+        {
+            var transform = new JObject();
+            Vector3 p = shape.position, r = shape.rotation, s = shape.scale;
+            if (p != Vector3.zero) transform.Set("position", Vec3(p.x, p.y, p.z));
+            if (r != Vector3.zero)
+            {
+                Quaternion q = Quaternion.Euler(r);
+                transform.Set("rotation", new JArray().Add(q.x).Add(q.y).Add(q.z).Add(q.w));
+            }
+            if (s != Vector3.one && !ScaleIsShapeSize(shape.shapeType)) transform.Set("scale", Vec3(s.x, s.y, s.z));
+            if (transform.Members.Count > 0) json.Set("transform", transform);
+            return json;
+        }
+
+        /// <summary>
+        /// Box and rectangle shapes have no size of their own in Unity: Shape Scale is their size, and
+        /// it goes into the shape's own width / height / depth rather than into the transform.
+        /// </summary>
+        private static bool ScaleIsShapeSize(ParticleSystemShapeType type) =>
+            type == ParticleSystemShapeType.Box
+            || type == ParticleSystemShapeType.BoxShell
+            || type == ParticleSystemShapeType.BoxEdge
+            || type == ParticleSystemShapeType.Rectangle;
+
+        private static JObject BuildShapeType(ParticleSystem.ShapeModule shape, ExportContext ctx)
+        {
             float arc = shape.arc * Mathf.Deg2Rad;
             float thickness = shape.radiusThickness;
             switch (shape.shapeType)
@@ -294,6 +330,49 @@ namespace BabylonQuarks.UnityExporter
                     .Set("lengthFactor", renderer.lengthScale);
             }
             return new JObject();
+        }
+
+        /// <summary>
+        /// Renderer Pivot and Flip, measured against Unity's own baked geometry. Flip is the fraction
+        /// of particles whose texture is mirrored along U / V; the pivot is never mirrored with them.
+        /// <list type="bullet">
+        /// <item>Billboards: the pivot is in particle-size units, x/y turn with the particle and z
+        /// moves the quad toward the camera (up for horizontal billboards) — the same as quarks.</item>
+        /// <item>Horizontal billboards: quarks lays the quad's Y along world -Z where Unity lays it
+        /// along +Z, so the pivot's Y flips sign, and the texture is upside down next to Unity's, so
+        /// mirroring the other fraction along V puts it right.</item>
+        /// <item>Stretched billboards: Unity moves the streak across itself by -x·size and along the
+        /// velocity by 2·y·size and ignores z; quarks measures x from head to tail and y across. The
+        /// quarks streak's V also runs the other way to Unity's, fixed by the same V complement.</item>
+        /// </list>
+        /// </summary>
+        private static void AddPivotAndFlip(ParticleSystem ps, ParticleSystemRenderer renderer, int renderMode, JObject obj)
+        {
+            Vector3 pivot = renderer.pivot;
+            float flipU = Mathf.Clamp01(renderer.flip.x);
+            float flipV = Mathf.Clamp01(renderer.flip.y);
+            switch (renderMode)
+            {
+                case 0: // billboard
+                case 5: // vertical billboard
+                    break;
+                case 4: // horizontal billboard
+                    pivot.y = -pivot.y;
+                    flipV = 1f - flipV;
+                    break;
+                case 1: // stretched billboard
+                    pivot = new Vector3(-2f * pivot.y, -pivot.x, 0f);
+                    flipV = 1f - flipV;
+                    break;
+                default:
+                    if (pivot != Vector3.zero || flipU > 0f || flipV > 0f)
+                    {
+                        Debug.LogWarning($"[Quarks Exporter] '{ps.name}': renderer Pivot / Flip have no quarks counterpart for {renderer.renderMode} and are skipped.");
+                    }
+                    return;
+            }
+            if (pivot != Vector3.zero) obj.Set("pivot", Vec3(pivot.x, pivot.y, pivot.z));
+            if (flipU > 0f || flipV > 0f) obj.Set("flip", new JArray().Add(flipU).Add(flipV));
         }
 
         // ---- Trails ----------------------------------------------------------------------

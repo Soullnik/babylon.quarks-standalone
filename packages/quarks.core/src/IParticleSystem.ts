@@ -1,5 +1,5 @@
 import {FunctionValueGenerator, ValueGenerator} from './functions';
-import {Matrix4, Vector3} from './math';
+import {Matrix4, Vector2, Vector3} from './math';
 import {IParticle} from './Particle';
 import {ParticleStore} from './ParticleStore';
 export interface EmissionState {
@@ -200,6 +200,12 @@ export interface IParticleSystem {
     //_renderer?: BatchedRenderer;
     //instancingGeometry: BufferGeometry;
     rendererEmitterSettings: RendererEmitterSettings;
+    /**
+     * Fraction of billboard particles mirrored along U (x) and V (y), each
+     * picked at random when the particle is born — Unity's renderer Flip.
+     * Absent: nothing is mirrored.
+     */
+    flip?: Vector2;
     emissionState: EmissionState;
 
     //getRendererSettings(): VFXBatchSettings;

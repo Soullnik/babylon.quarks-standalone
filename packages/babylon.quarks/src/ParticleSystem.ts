@@ -38,6 +38,7 @@ import {
     TrailSettings,
     ValueGenerator,
     ValueGeneratorFromJSON,
+    Vector2,
     Vector3,
     Vector3Generator,
     Vector4,
@@ -135,6 +136,10 @@ export interface ParticleSystemParameters {
     depthWrite?: boolean;
     alphaTest?: number;
     layerMask?: number;
+    /** Billboard pivot in particle-size units, see {@link VFXBatchSettings.pivot}. */
+    pivot?: Vector3;
+    /** Fraction of billboard particles mirrored along U (x) and V (y), see {@link ParticleSystem.flip}. */
+    flip?: Vector2;
     scene?: Scene;
 }
 
@@ -185,6 +190,10 @@ export interface ParticleSystemJSONParameters {
     alphaTest?: number;
     behaviors: Array<any>;
     worldSpace: boolean;
+    /** `[x, y, z]`; written only when non-zero. */
+    pivot?: number[];
+    /** `[u, v]`; written only when non-zero. */
+    flip?: number[];
 }
 
 export interface BabylonMetaData {
@@ -213,6 +222,12 @@ export class ParticleSystem implements IParticleSystem {
     startColor: ColorGenerator | FunctionColorGenerator;
     startTileIndex: ValueGenerator;
     rendererEmitterSettings: RendererEmitterSettings;
+    /**
+     * Fraction of billboard particles mirrored along U (x) and V (y), each
+     * picked at random when the particle is born — Unity's renderer Flip.
+     * Undefined: nothing is mirrored. Meshes ignore it.
+     */
+    flip?: Vector2;
     emissionOverTime: ValueGenerator | FunctionValueGenerator;
     emissionOverDistance: ValueGenerator | FunctionValueGenerator;
     emissionBursts: Array<BurstParameters>;
@@ -364,6 +379,28 @@ export class ParticleSystem implements IParticleSystem {
     set softParticles(v: boolean) {
         this.rendererSettings.softParticles = v;
         this.neededToUpdateRender = true;
+    }
+
+    /**
+     * Billboard pivot in particle-size units (Unity's renderer Pivot), see
+     * {@link VFXBatchSettings.pivot}. Assign a new vector to change it: editing
+     * the returned one in place does not reach the renderer.
+     */
+    get pivot(): Vector3 | undefined {
+        return this.rendererSettings.pivot;
+    }
+
+    set pivot(v: Vector3 | undefined) {
+        this.rendererSettings.pivot = ParticleSystem.nonZeroPivot(v);
+        this.neededToUpdateRender = true;
+    }
+
+    private static nonZeroPivot(v: Vector3 | undefined): Vector3 | undefined {
+        return v && (v.x !== 0 || v.y !== 0 || v.z !== 0) ? v.clone() : undefined;
+    }
+
+    private static nonZeroFlip(v: Vector2 | undefined): Vector2 | undefined {
+        return v && (v.x > 0 || v.y > 0) ? v.clone() : undefined;
     }
 
     get softNearFade() {
@@ -519,7 +556,9 @@ export class ParticleSystem implements IParticleSystem {
             reflectionFaces: null,
             reflectionAtlas: null,
             layerMask: parameters.layerMask ?? 0x0fffffff,
+            pivot: ParticleSystem.nonZeroPivot(parameters.pivot),
         };
+        this.flip = ParticleSystem.nonZeroFlip(parameters.flip);
         if (this.rendererSettings.renderMode === RenderMode.Mesh && !this.rendererSettings.instancingNormals) {
             this.rendererSettings.instancingNormals = ParticleSystem.createFallbackNormals(
                 this.rendererSettings.instancingGeometry
@@ -805,6 +844,9 @@ export class ParticleSystem implements IParticleSystem {
                     // Set until a turning behavior says otherwise, so the
                     // renderer never carries a recycled particle's old spin.
                     sprite.angularVelocity = 0;
+                    const flip = this.flip;
+                    sprite.flip =
+                        flip === undefined ? 0 : (Math.random() < flip.x ? 1 : 0) | (Math.random() < flip.y ? 2 : 0);
                 }
             } else if (trailSettings) {
                 const trail = particle as TrailParticle;
@@ -1361,6 +1403,8 @@ export class ParticleSystem implements IParticleSystem {
             alphaTest: this.rendererSettings.materialAlphaTest,
             behaviors: this.behaviors.map((b) => b.toJSON()),
             worldSpace: this.worldSpace,
+            ...(this.pivot ? {pivot: [this.pivot.x, this.pivot.y, this.pivot.z]} : {}),
+            ...(this.flip ? {flip: [this.flip.x, this.flip.y]} : {}),
         };
     }
 
@@ -1459,6 +1503,8 @@ export class ParticleSystem implements IParticleSystem {
             behaviors: [],
             worldSpace: json.worldSpace,
             layerMask: json.layers,
+            pivot: json.pivot ? new Vector3(json.pivot[0] ?? 0, json.pivot[1] ?? 0, json.pivot[2] ?? 0) : undefined,
+            flip: json.flip ? new Vector2(json.flip[0] ?? 0, json.flip[1] ?? 0) : undefined,
         });
         ps.behaviors = (json.behaviors ?? [])
             .map((behaviorJson) => {
@@ -1706,6 +1752,8 @@ export class ParticleSystem implements IParticleSystem {
             depthWrite: this.rendererSettings.materialDepthWrite,
             alphaTest: this.rendererSettings.materialAlphaTest,
             layerMask: this.rendererSettings.layerMask,
+            pivot: this.pivot,
+            flip: this.flip,
             scene: this.emitter.getScene(),
         });
     }

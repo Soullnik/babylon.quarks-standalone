@@ -1,6 +1,7 @@
 import {IParticleSystem} from '../IParticleSystem';
 import {Particle} from '../Particle';
 import {EmitterShape, ShapeJSON} from './EmitterUtil';
+import {ShapeTransform} from './ShapeTransform';
 
 /**
  * Interface representing the parameters for a grid emitter.
@@ -22,6 +23,11 @@ export interface GridEmitterParameters {
      * The number of rows in the grid.
      */
     row?: number;
+    /**
+     * Offset, rotation and scale of the shape within the particle system.
+     * {@link ShapeTransform}
+     */
+    transform?: ShapeTransform;
 }
 
 export class GridEmitter implements EmitterShape {
@@ -30,12 +36,14 @@ export class GridEmitter implements EmitterShape {
     height: number; // [0, Math.PI * 2]
     column: number; // [0, 1]
     row: number; // [0, Math.PI / 2]
+    transform?: ShapeTransform;
 
     constructor(parameters: GridEmitterParameters = {}) {
         this.width = parameters.width ?? 1;
         this.height = parameters.height ?? 1;
         this.column = parameters.column ?? 10;
         this.row = parameters.row ?? 10;
+        this.transform = parameters.transform;
     }
 
     initialize(p: Particle) {
@@ -46,6 +54,7 @@ export class GridEmitter implements EmitterShape {
         p.position.y = (r * this.height) / this.row - this.height / 2;
         p.position.z = 0;
         p.velocity.set(0, 0, p.startSpeed);
+        this.transform?.apply(p);
     }
 
     toJSON(): ShapeJSON {
@@ -55,11 +64,12 @@ export class GridEmitter implements EmitterShape {
             height: this.height,
             column: this.column,
             row: this.row,
+            ...ShapeTransform.toShapeJSON(this.transform),
         };
     }
 
     static fromJSON(json: any): GridEmitter {
-        return new GridEmitter(json);
+        return new GridEmitter({...json, transform: ShapeTransform.fromJSON(json.transform)});
     }
 
     clone(): EmitterShape {
@@ -68,6 +78,7 @@ export class GridEmitter implements EmitterShape {
             height: this.height,
             column: this.column,
             row: this.row,
+            transform: this.transform?.clone(),
         });
     }
 

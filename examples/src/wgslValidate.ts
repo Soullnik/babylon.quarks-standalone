@@ -83,6 +83,21 @@ function cases(): Case[] {
     push('billboard', particleVert, particleFrag, SPRITE_ATTRS, SPRITE_UNIFORMS, []);
     push('vertical billboard', particleVert, particleFrag, SPRITE_ATTRS, SPRITE_UNIFORMS, ['VERTICAL']);
     push('horizontal billboard', particleVert, particleFrag, SPRITE_ATTRS, SPRITE_UNIFORMS, ['HORIZONTAL']);
+    const PIVOT_UNIFORMS = [...SPRITE_UNIFORMS, 'pivot'];
+    push('billboard pivot', particleVert, particleFrag, SPRITE_ATTRS, PIVOT_UNIFORMS, ['PIVOT']);
+    push('vertical billboard pivot', particleVert, particleFrag, SPRITE_ATTRS, PIVOT_UNIFORMS, ['VERTICAL', 'PIVOT']);
+    push('horizontal billboard pivot', particleVert, particleFrag, SPRITE_ATTRS, PIVOT_UNIFORMS, [
+        'HORIZONTAL',
+        'PIVOT',
+    ]);
+    push(
+        'stretched pivot',
+        stretchedVert,
+        particleFrag,
+        [...SPRITE_ATTRS, 'velocity'],
+        [...PIVOT_UNIFORMS, 'speedFactor'],
+        ['PIVOT']
+    );
     push(
         'stretched',
         stretchedVert,

@@ -44,6 +44,27 @@ describe('MeshSurfaceEmitter', () => {
         expect(json.mesh).toBe('mesh-ref-id');
     });
 
+    it('applies and round-trips a shape transform', () => {
+        const box = MeshBuilder.CreateBox('moved-box', {size: 2}, scene);
+        const json = {type: 'mesh_surface', mesh: 'ref', transform: {position: [10, 0, 0], scale: [0.5, 0.5, 0.5]}};
+        const emitter = MeshSurfaceEmitter.fromJSON(json);
+        emitter.mesh = box;
+        expect(emitter.toJSON().transform).toEqual(json.transform);
+        const copy = emitter.clone() as MeshSurfaceEmitter;
+        expect(copy.transform).not.toBe(emitter.transform);
+        expect(copy.toJSON().transform).toEqual(json.transform);
+
+        const particle = new SpriteParticle();
+        particle.startSpeed = 1;
+        for (let i = 0; i < 20; i++) {
+            emitter.initialize(particle);
+            expect(particle.position.x).toBeGreaterThanOrEqual(9.49);
+            expect(particle.position.x).toBeLessThanOrEqual(10.51);
+            expect(particle.velocity.length()).toBeCloseTo(1, 5);
+        }
+        expect('transform' in new MeshSurfaceEmitter(box).toJSON()).toBe(false);
+    });
+
     it('falls back when mesh has no position or index data', () => {
         const emptyMesh = new Mesh('empty-surface', scene);
         const emitter = new MeshSurfaceEmitter(emptyMesh);
