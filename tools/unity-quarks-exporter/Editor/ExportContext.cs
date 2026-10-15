@@ -80,9 +80,10 @@ namespace BabylonQuarks.UnityExporter
 
         // ---- material / texture --------------------------------------------------------
 
-        public string AddMaterialForRenderer(ParticleSystemRenderer renderer)
+        /// <param name="trail">Use the renderer's trail material rather than its particle material.</param>
+        public string AddMaterialForRenderer(ParticleSystemRenderer renderer, bool trail = false)
         {
-            Material mat = renderer != null ? renderer.sharedMaterial : null;
+            Material mat = renderer == null ? null : trail ? renderer.trailMaterial : renderer.sharedMaterial;
             Texture tex = mat != null ? mat.mainTexture : null;
             string textureUuid = tex != null ? AddTexture(tex) : null;
             LastBlendMode = DetectBlend(mat);

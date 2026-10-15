@@ -2,6 +2,23 @@
 
 All notable changes to the Unity Quarks Exporter are documented here.
 
+## [Unreleased]
+
+### Fixed
+
+- A system that draws only its **trails** (Render Mode None + per-particle Trails) lost its
+  texture and rendered as plain billboards: the exporter read the empty particle material and
+  ignored the Trails module. It now exports a quarks trail system with the trail material,
+  width, length, colors, Die with Particles and World Space, textured from the particle back like
+  Unity's Stretch mode. Texture Sheet Animation is left off trails (Unity ignores it there), and
+  Color by Speed only reaches a trail with Inherit Particle Color on. Needs the `uvFromHead` /
+  `colorFromParticle` / `dieWithParticle` / `recordWorldSpace` trail settings added to
+  babylon.quarks alongside this change.
+- Values authored as curves (gravity modifier, collision bounce, trail lifetime and width scale)
+  are exported as the curve's mean instead of its multiplier, which is the curve's peak scale.
+- Systems that draw particles _and_ trails, and ribbon trails, now log a warning instead of
+  dropping the trails silently.
+
 ## [0.19.0] — 2026-07-25
 
 ### Added

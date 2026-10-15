@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace BabylonQuarks.UnityExporter
@@ -14,8 +15,14 @@ namespace BabylonQuarks.UnityExporter
             var main = ps.main;
             var behaviors = new JArray();
 
-            string materialUuid = ctx.AddMaterialForRenderer(renderer);
-            int renderMode = MapRenderMode(renderer.renderMode);
+            // Unity draws trails in a pass of their own beside the particles, but a quarks system has
+            // one render mode. A system that draws only its trails (Render Mode None) becomes a quarks
+            // trail system; one that draws both keeps its particles and loses the trails.
+            bool trailOnly = IsTrailOnly(ps, renderer);
+            WarnAboutTrails(ps, renderer, trailOnly);
+
+            string materialUuid = ctx.AddMaterialForRenderer(renderer, trailOnly);
+            int renderMode = trailOnly ? RenderModeTrail : MapRenderMode(renderer.renderMode);
             string geometryUuid = renderMode == 2 && renderer.mesh != null ? ctx.AddGeometryForMesh(renderer.mesh) : null;
             JToken emissionOverTime = EmissionRate(ps, true);
             JToken startLife = AvoidKnifeEdgeLifetime(main.startLifetime, ps.emission);
@@ -31,15 +38,17 @@ namespace BabylonQuarks.UnityExporter
                 .Set("startLife", startLife)
                 .Set("startSpeed", ValueConverter.Curve(main.startSpeed))
                 .Set("startRotation", BuildStartRotation(main, renderMode))
-                .Set("startSize", BuildStartSize(main))
-                .Set("startColor", ValueConverter.StartColor(main.startColor))
+                .Set("startSize", trailOnly ? BuildTrailWidth(ps) : BuildStartSize(main))
+                .Set("startColor", trailOnly && !ps.trails.inheritParticleColor
+                    ? ValueConverter.ConstantColor(UnityEngine.Color.white)
+                    : ValueConverter.StartColor(main.startColor))
                 .Set("emissionOverTime", emissionOverTime)
                 .Set("emissionOverDistance", EmissionRate(ps, false))
                 .Set("emissionBursts", BuildBursts(ps))
                 .Set("onlyUsedByOther", ctx.IsSubTarget(ps))
                 .Set("renderMode", renderMode)
                 .Set("renderOrder", renderer.sortingOrder)
-                .Set("rendererEmitterSettings", BuildRendererSettings(renderer, renderMode))
+                .Set("rendererEmitterSettings", trailOnly ? BuildTrailSettings(ps) : BuildRendererSettings(renderer, renderMode))
                 .Set("material", materialUuid)
                 .Set("layers", 1);
 
@@ -48,7 +57,7 @@ namespace BabylonQuarks.UnityExporter
                 obj.Set("instancingGeometry", geometryUuid);
             }
 
-            BuildTextureSheet(ps, obj, behaviors);
+            BuildTextureSheet(ps, obj, behaviors, trailOnly);
 
             obj.Set("blending", ctx.LastBlendMode)
                 .Set("transparent", true)
@@ -57,15 +66,26 @@ namespace BabylonQuarks.UnityExporter
             // ---- behaviors from the over-lifetime / by-speed modules ----
             AddGravity(main, behaviors);
             AddRandomizeDirection(ps, behaviors);
-            AddColorOverLife(ps, behaviors);
-            AddSizeOverLife(ps, behaviors);
+            if (trailOnly)
+            {
+                AddTrailColor(ps, behaviors);
+                AddTrailWidthOverLength(ps, behaviors);
+            }
+            else
+            {
+                AddColorOverLife(ps, behaviors);
+            }
+            // A trail only takes the particle's size when Unity's Size affects Width is on.
+            bool sizeMatters = !trailOnly || ps.trails.sizeAffectsWidth;
+            if (sizeMatters) AddSizeOverLife(ps, behaviors);
             AddRotationOverLife(ps, behaviors);
             AddVelocityOverLife(ps, behaviors);
             AddInheritVelocity(ps, behaviors);
             AddLimitVelocity(ps, behaviors);
             AddForceOverLife(ps, behaviors);
-            AddColorBySpeed(ps, behaviors);
-            AddSizeBySpeed(ps, behaviors);
+            // Without Inherit Particle Color, nothing about the particle's color reaches its trail.
+            if (!trailOnly || ps.trails.inheritParticleColor) AddColorBySpeed(ps, behaviors);
+            if (sizeMatters) AddSizeBySpeed(ps, behaviors);
             AddRotationBySpeed(ps, behaviors);
             AddNoise(ps, behaviors);
             AddCollision(ps, behaviors);
@@ -267,12 +287,152 @@ namespace BabylonQuarks.UnityExporter
             return new JObject();
         }
 
+        // ---- Trails ----------------------------------------------------------------------
+
+        private const int RenderModeTrail = 3;
+
+        /// <summary>quarks steps its simulation at 60Hz and records one trail sample per step.</summary>
+        private const float TrailSamplesPerSecond = 60f;
+
+        private static bool IsTrailOnly(ParticleSystem ps, ParticleSystemRenderer renderer)
+        {
+            var trails = ps.trails;
+            return renderer.renderMode == ParticleSystemRenderMode.None
+                && trails.enabled
+                && trails.mode == ParticleSystemTrailMode.PerParticle;
+        }
+
+        private static void WarnAboutTrails(ParticleSystem ps, ParticleSystemRenderer renderer, bool trailOnly)
+        {
+            var trails = ps.trails;
+            if (!trails.enabled) return;
+            string who = $"[Quarks Exporter] '{ps.name}':";
+            if (trails.mode == ParticleSystemTrailMode.Ribbon)
+            {
+                Debug.LogWarning($"{who} Ribbon trails have no quarks counterpart and are skipped.");
+                return;
+            }
+            if (!trailOnly)
+            {
+                Debug.LogWarning($"{who} draws particles and trails; a quarks system has one render mode, so only the particles are exported.");
+                return;
+            }
+            if (trails.textureMode != ParticleSystemTrailTextureMode.Stretch)
+            {
+                Debug.LogWarning($"{who} trail Texture Mode {trails.textureMode} is exported as Stretch.");
+            }
+            if (ConstantOf(trails.ratio) < 0.999f)
+            {
+                Debug.LogWarning($"{who} trail Ratio below 1 is exported as 1 (every particle gets a trail).");
+            }
+            if (trails.colorOverTrail.mode != ParticleSystemGradientMode.Color)
+            {
+                Debug.LogWarning($"{who} trail Color over Trail varies along the trail; only its value at the head is exported.");
+            }
+        }
+
+        /// <summary>
+        /// The trail width as quarks reads it — from the particle size. Unity's width is
+        /// Width over Trail, times the particle size when Size affects Width is on.
+        /// </summary>
+        private static JToken BuildTrailWidth(ParticleSystem ps)
+        {
+            var trails = ps.trails;
+            var main = ps.main;
+            var size = main.startSize3D ? main.startSizeX : main.startSize;
+            // A curved Width over Trail is applied along the trail by WidthOverLength; the head
+            // sample is written from the particle size before that runs, so give it the head width.
+            float width = trails.widthOverTrail.mode == ParticleSystemCurveMode.Curve
+                || trails.widthOverTrail.mode == ParticleSystemCurveMode.TwoCurves
+                ? trails.widthOverTrail.Evaluate(0f)
+                : ConstantOf(trails.widthOverTrail);
+            return trails.sizeAffectsWidth ? ScaleCurve(size, width) : ValueConverter.Constant(width);
+        }
+
+        private static void AddTrailWidthOverLength(ParticleSystem ps, JArray behaviors)
+        {
+            var trails = ps.trails;
+            var width = trails.widthOverTrail;
+            bool curved = width.mode == ParticleSystemCurveMode.Curve || width.mode == ParticleSystemCurveMode.TwoCurves;
+            if (!curved) return;
+            // WidthOverLength writes absolute widths, so the particle size is folded in up front
+            // (and any size-over-lifetime change is lost along a curved trail).
+            float sizeScale = trails.sizeAffectsWidth ? ConstantOf(ps.main.startSize3D ? ps.main.startSizeX : ps.main.startSize) : 1f;
+            var curve = width.mode == ParticleSystemCurveMode.TwoCurves ? width.curveMax : width.curve;
+            behaviors.Add(new JObject()
+                .Set("type", "WidthOverLength")
+                .Set("width", ValueConverter.Bezier(curve, width.curveMultiplier * sizeScale)));
+        }
+
+        private static JToken BuildTrailSettings(ParticleSystem ps)
+        {
+            var trails = ps.trails;
+            var main = ps.main;
+            // Unity's trail Lifetime is how long each trail point lives, as a fraction of the
+            // particle's lifetime; quarks keeps a fixed number of samples, one per step.
+            float seconds = ConstantOf(trails.lifetime) * ConstantOf(main.startLifetime);
+            if (trails.sizeAffectsLifetime)
+            {
+                seconds *= ConstantOf(main.startSize3D ? main.startSizeX : main.startSize);
+            }
+            float samples = Mathf.Max(2f, Mathf.Ceil(seconds * TrailSamplesPerSecond));
+
+            var settings = new JObject()
+                .Set("startLength", ValueConverter.Constant(samples))
+                .Set("followLocalOrigin", false)
+                // Unity stretches the texture from the particle (U = 0) back to the tail and tints
+                // the whole trail with the particle's current color.
+                .Set("uvFromHead", true)
+                .Set("colorFromParticle", true);
+            if (trails.dieWithParticles)
+            {
+                settings.Set("dieWithParticle", true);
+            }
+            // Trails > World Space: the points stay where they were laid down even though the
+            // particles themselves move with the emitter.
+            if (trails.worldSpace && main.simulationSpace == ParticleSystemSimulationSpace.Local)
+            {
+                settings.Set("recordWorldSpace", true);
+            }
+            return settings;
+        }
+
+        /// <summary>
+        /// The trail is drawn in the particle's current color (colorFromParticle), so everything
+        /// Unity multiplies into the whole trail over the particle's life — the particle's own
+        /// Color over Lifetime, the trail's Color over Lifetime and the head of Color over Trail —
+        /// folds into one ColorOverLife gradient.
+        /// </summary>
+        private static void AddTrailColor(ParticleSystem ps, JArray behaviors)
+        {
+            var trails = ps.trails;
+            var particleColor = ps.colorOverLifetime;
+            bool useParticleColor = trails.inheritParticleColor && particleColor.enabled;
+            var trailColor = trails.colorOverLifetime;
+            Color overTrail = trails.colorOverTrail.Evaluate(0f, 1f);
+
+            var times = new SortedSet<float> { 0f, 1f };
+            // Products of linear pieces are not linear, so sample in between the keys too.
+            for (int i = 1; i < 10; i++) times.Add(i / 10f);
+            ValueConverter.AddKeyTimes(times, trailColor.gradient);
+            if (useParticleColor) ValueConverter.AddKeyTimes(times, particleColor.color.gradient);
+
+            behaviors.Add(new JObject()
+                .Set("type", "ColorOverLife")
+                .Set("color", ValueConverter.SampledGradient(times, t =>
+                {
+                    Color c = trailColor.Evaluate(t, 1f) * overTrail;
+                    return useParticleColor ? c * particleColor.color.Evaluate(t, 1f) : c;
+                })));
+        }
+
         // ---- Texture Sheet Animation -----------------------------------------------------
 
-        private static void BuildTextureSheet(ParticleSystem ps, JObject obj, JArray behaviors)
+        /// <param name="trail">Unity's trails ignore Texture Sheet Animation, so trail systems keep one tile.</param>
+        private static void BuildTextureSheet(ParticleSystem ps, JObject obj, JArray behaviors, bool trail)
         {
             var tsa = ps.textureSheetAnimation;
-            if (tsa.enabled)
+            if (tsa.enabled && !trail)
             {
                 int u = Mathf.Max(1, tsa.numTilesX);
                 int v = Mathf.Max(1, tsa.numTilesY);
@@ -476,7 +636,22 @@ namespace BabylonQuarks.UnityExporter
             {
                 case ParticleSystemCurveMode.Constant: return c.constant;
                 case ParticleSystemCurveMode.TwoConstants: return (c.constantMin + c.constantMax) * 0.5f;
-                default: return c.constantMax != 0 ? c.constantMax : c.constant;
+                case ParticleSystemCurveMode.Curve:
+                case ParticleSystemCurveMode.TwoCurves:
+                    // A curve has no single value, so take its mean over the normalized time range.
+                    // (constantMax doubles as the curve multiplier — the curve's peak scale, not a
+                    // typical value.)
+                    const int samples = 16;
+                    float sum = 0f;
+                    for (int i = 0; i <= samples; i++)
+                    {
+                        float t = i / (float)samples;
+                        sum += c.mode == ParticleSystemCurveMode.TwoCurves
+                            ? (c.Evaluate(t, 0f) + c.Evaluate(t, 1f)) * 0.5f
+                            : c.Evaluate(t);
+                    }
+                    return sum / (samples + 1);
+                default: return c.constant;
             }
         }
 
