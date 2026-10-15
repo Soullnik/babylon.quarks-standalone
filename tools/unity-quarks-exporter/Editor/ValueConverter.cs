@@ -153,17 +153,29 @@ namespace BabylonQuarks.UnityExporter
         public static JToken Gradient(Gradient g)
         {
             var times = new SortedSet<float> { 0f, 1f };
-            if (g != null)
-            {
-                foreach (var k in g.colorKeys) times.Add(Mathf.Clamp01(k.time));
-                foreach (var k in g.alphaKeys) times.Add(Mathf.Clamp01(k.time));
-            }
-            var timeList = new List<float>(times);
+            AddKeyTimes(times, g);
+            return SampledGradient(times, t => g != null ? g.Evaluate(t) : UnityEngine.Color.white);
+        }
 
+        /// <summary>Adds the color and alpha key times of <paramref name="g"/> (0..1) to <paramref name="times"/>.</summary>
+        public static void AddKeyTimes(ISet<float> times, Gradient g)
+        {
+            if (g == null) return;
+            foreach (var k in g.colorKeys) times.Add(Mathf.Clamp01(k.time));
+            foreach (var k in g.alphaKeys) times.Add(Mathf.Clamp01(k.time));
+        }
+
+        /// <summary>
+        /// A quarks Gradient through <paramref name="evaluate"/> sampled at <paramref name="times"/>
+        /// (0..1), linear in between — exact wherever the source is piecewise linear on those times.
+        /// </summary>
+        public static JToken SampledGradient(IEnumerable<float> times, System.Func<float, Color> evaluate)
+        {
+            var timeList = new List<float>(times);
             var stops = new List<Color>();
             foreach (float t in timeList)
             {
-                stops.Add(g != null ? g.Evaluate(t) : UnityEngine.Color.white);
+                stops.Add(evaluate(t));
             }
             if (stops.Count == 1)
             {

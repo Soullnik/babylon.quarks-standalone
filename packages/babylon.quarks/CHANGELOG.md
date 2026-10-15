@@ -4,6 +4,24 @@ All notable changes to the `babylon.quarks` package are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project follows the `quarks.core` 0.x version line.
 
+## [Unreleased]
+
+### Added
+
+- Trail settings `uvFromHead`, `colorFromParticle`, `dieWithParticle` and `recordWorldSpace`
+  (all optional, off by default) for trails that behave like Unity's: the texture runs from the
+  particle back to the tail, the whole trail takes the particle's current color, the trail
+  disappears the moment its particle dies, and a local-space system lays its trail points down in
+  world space so they streak behind a moving emitter. Saved in the effect JSON only when switched
+  on.
+
+### Fixed
+
+- A trail texture now reaches the end of the ribbon on frames that draw no live tip (with
+  `followLocalOrigin`, while paused, or exactly on a simulation step). The newest recorded sample
+  stopped one segment short of the texture's end, which cut the end of the texture off and made
+  it pop in and out as the tip came and went.
+
 ## [0.17.9] — 2026-07-14
 
 ### Fixed

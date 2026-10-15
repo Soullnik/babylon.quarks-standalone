@@ -158,6 +158,160 @@ describe('TrailBatch', () => {
         system.dispose();
     });
 
+    it('runs U from the tail by default and from the particle with uvFromHead', () => {
+        const firstU = (uvFromHead: boolean) => {
+            const renderer = new BatchedRenderer('trail-uv', scene);
+            const system = createTrailSystem({
+                rendererEmitterSettings: {startLength: new ConstantValue(8), followLocalOrigin: false, uvFromHead},
+            });
+            renderer.addSystem(system);
+            for (let i = 0; i < 30; i++) {
+                renderer.update(1 / 60);
+            }
+            // The first vertex pair is the oldest sample of the first trail.
+            const u = ((getTrailBatch(renderer) as any).uvBuffer as Float32Array)[0];
+            renderer.dispose();
+            system.dispose();
+            return u;
+        };
+        expect(firstU(false)).toBe(0);
+        expect(firstU(true)).toBe(1);
+    });
+
+    it('anchors U = 0 on the newest sample when no live tip is drawn', () => {
+        const renderer = new BatchedRenderer('trail-uv-head', scene);
+        // followLocalOrigin draws no live tip, so the recorded head is the ribbon's end.
+        const system = createTrailSystem({
+            rendererEmitterSettings: {startLength: new ConstantValue(8), followLocalOrigin: true, uvFromHead: true},
+        });
+        renderer.addSystem(system);
+        for (let i = 0; i < 30; i++) {
+            renderer.update(1 / 60);
+        }
+        const n = (system.particles[0] as any).historyCount as number;
+        const uv = (getTrailBatch(renderer) as any).uvBuffer as Float32Array;
+        expect(n).toBeGreaterThan(1);
+        expect(uv[0]).toBe(1);
+        expect(uv[(n - 1) * 4]).toBe(0);
+        renderer.dispose();
+        system.dispose();
+    });
+
+    it('keeps recorded points in place behind a moving local-space emitter with recordWorldSpace', () => {
+        const oldestX = (recordWorldSpace: boolean) => {
+            const renderer = new BatchedRenderer('trail-world', scene);
+            const system = createTrailSystem({
+                worldSpace: false,
+                rendererEmitterSettings: {
+                    startLength: new ConstantValue(8),
+                    followLocalOrigin: false,
+                    recordWorldSpace,
+                },
+            });
+            renderer.addSystem(system);
+            for (let i = 0; i < 30; i++) {
+                renderer.update(1 / 60);
+            }
+            // Jump the emitter; points recorded before the jump stay at x = 0 only in world space.
+            system.emitter.position.x = 10;
+            renderer.update(1 / 60);
+            const x = ((getTrailBatch(renderer) as any).positionBuffer as Float32Array)[0];
+            renderer.dispose();
+            system.dispose();
+            return x;
+        };
+        expect(oldestX(false)).toBeCloseTo(10);
+        expect(oldestX(true)).toBeCloseTo(0);
+    });
+
+    it('paints the whole trail in the current particle color with colorFromParticle', () => {
+        const tailRed = (colorFromParticle: boolean) => {
+            const renderer = new BatchedRenderer('trail-color', scene);
+            const system = createTrailSystem({
+                rendererEmitterSettings: {
+                    startLength: new ConstantValue(8),
+                    followLocalOrigin: false,
+                    colorFromParticle,
+                },
+            });
+            renderer.addSystem(system);
+            for (let i = 0; i < 30; i++) {
+                renderer.update(1 / 60);
+            }
+            // Samples recorded so far are white; turn the particles green now.
+            for (let i = 0; i < system.particleNum; i++) {
+                system.particles[i].color.set(0, 1, 0, 1);
+            }
+            renderer.update(1 / 60);
+            const red = ((getTrailBatch(renderer) as any).colorBuffer as Float32Array)[0];
+            renderer.dispose();
+            system.dispose();
+            return red;
+        };
+        expect(tailRed(false)).toBe(1);
+        expect(tailRed(true)).toBe(0);
+    });
+
+    it('drops a trail as soon as its particle dies with dieWithParticle', () => {
+        const survivors = (dieWithParticle: boolean) => {
+            const renderer = new BatchedRenderer('trail-die', scene);
+            const system = createTrailSystem({
+                looping: false,
+                duration: 0.05,
+                startLife: new ConstantValue(0.1),
+                rendererEmitterSettings: {startLength: new ConstantValue(8), followLocalOrigin: false, dieWithParticle},
+            });
+            renderer.addSystem(system);
+            // The last particle dies around 0.15s; its trail would take another 8 steps to drain.
+            for (let i = 0; i < 12; i++) {
+                renderer.update(1 / 60);
+            }
+            const count = system.particleNum;
+            renderer.dispose();
+            system.dispose();
+            return count;
+        };
+        expect(survivors(false)).toBeGreaterThan(0);
+        expect(survivors(true)).toBe(0);
+    });
+
+    it('round-trips the trail flags through JSON and clone', () => {
+        const system = createTrailSystem({
+            rendererEmitterSettings: {
+                startLength: new ConstantValue(8),
+                followLocalOrigin: false,
+                uvFromHead: true,
+                colorFromParticle: true,
+                dieWithParticle: true,
+                recordWorldSpace: true,
+            },
+        });
+        const meta: any = {textures: {}, materials: {}, geometries: {}};
+        const json = system.toJSON(meta);
+        expect(json.rendererEmitterSettings).toMatchObject({
+            uvFromHead: true,
+            colorFromParticle: true,
+            dieWithParticle: true,
+            recordWorldSpace: true,
+        });
+        for (const copy of [ParticleSystem.fromJSON(json, meta, {}, scene), system.clone()]) {
+            expect(copy.rendererEmitterSettings).toMatchObject({
+                uvFromHead: true,
+                colorFromParticle: true,
+                dieWithParticle: true,
+                recordWorldSpace: true,
+            });
+            copy.dispose();
+        }
+        // Flags left off stay out of the JSON.
+        const plain = createTrailSystem();
+        expect(
+            Object.keys(plain.toJSON({textures: {}, materials: {}, geometries: {}} as any).rendererEmitterSettings)
+        ).toEqual(['startLength', 'followLocalOrigin']);
+        plain.dispose();
+        system.dispose();
+    });
+
     it('disposes trail material safely', () => {
         const renderer = new BatchedRenderer('trail-dispose', scene);
         const system = createTrailSystem();

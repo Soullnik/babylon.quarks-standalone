@@ -276,9 +276,13 @@ export class TrailBatch extends VFXBatch {
             // body still and the tip moving without that pulse. A trail pinned
             // to the emitter's origin is driven by the emitter's transform
             // rather than by the particle's velocity, so it is left alone.
-            const residual = (system.rendererEmitterSettings as TrailSettings).followLocalOrigin
-                ? 0
-                : (system.simulationResidual ?? 0);
+            const trailSettings = system.rendererEmitterSettings as TrailSettings;
+            const uvFromHead = Boolean(trailSettings.uvFromHead);
+            const colorFromParticle = Boolean(trailSettings.colorFromParticle);
+            // Recorded samples already sit in world space; the live tip still comes
+            // from the particle's own (local) position.
+            const samplesInWorld = systemWorldSpace || Boolean(trailSettings.recordWorldSpace);
+            const residual = trailSettings.followLocalOrigin ? 0 : (system.simulationResidual ?? 0);
             // Measured from the step the particle just took, not from its
             // velocity: a trail pulled along by an orbit or by a plugin's own
             // behavior has motion no velocity term describes.
@@ -293,7 +297,10 @@ export class TrailBatch extends VFXBatch {
                 const historyCapacity = particle.historyCapacity;
                 const historyPositions = particle.historyPositions;
                 const historySizes = particle.historySizes;
-                const historyColors = particle.historyColors;
+                // Every sample takes its color from one place: its own recorded slot, or
+                // the particle's current row in the store.
+                const colors = colorFromParticle ? particle.store.color : particle.historyColors;
+                const particleColorIndex = particle.storeIndex * 4;
                 const col = particle.uvTile % vTileCount;
                 const row = Math.floor(particle.uvTile / vTileCount + 0.001);
                 const particleMatrix = particle.parentMatrix as unknown as Matrix4 | undefined;
@@ -314,7 +321,10 @@ export class TrailBatch extends VFXBatch {
                     m31 = me[13],
                     m32 = me[14],
                     m33 = me[15];
-                const invHistoryLength = 1 / particleHistoryLength;
+                // The texture spans the ribbon end to end: up to the live tip when one is
+                // drawn, otherwise up to the newest recorded sample.
+                const invHistoryLength =
+                    1 / (stepFraction !== 0 ? particleHistoryLength : Math.max(1, particleHistoryLength - 1));
 
                 // Walk the ring buffer oldest-first with hand-rolled wrapping so the
                 // inner loop stays free of modulo operations.
@@ -344,16 +354,16 @@ export class TrailBatch extends VFXBatch {
                     let nextZ = historyPositions[nextPosIndex + 2];
 
                     const currentSize = historySizes[currentSlot];
-                    const currentColorIndex = currentSlot * 4;
-                    const currentColorX = historyColors[currentColorIndex];
-                    const currentColorY = historyColors[currentColorIndex + 1];
-                    const currentColorZ = historyColors[currentColorIndex + 2];
-                    const currentColorW = historyColors[currentColorIndex + 3];
+                    const currentColorIndex = colorFromParticle ? particleColorIndex : currentSlot * 4;
+                    const currentColorX = colors[currentColorIndex];
+                    const currentColorY = colors[currentColorIndex + 1];
+                    const currentColorZ = colors[currentColorIndex + 2];
+                    const currentColorW = colors[currentColorIndex + 3];
 
                     previousSlot = currentSlot;
                     currentSlot = nextSlot;
 
-                    if (!systemWorldSpace) {
+                    if (!samplesInWorld) {
                         // Inlined point transforms — three per trail sample.
                         let w = 1 / (m03 * currentX + m13 * currentY + m23 * currentZ + m33);
                         let tx = (m00 * currentX + m10 * currentY + m20 * currentZ + m30) * w;
@@ -411,7 +421,8 @@ export class TrailBatch extends VFXBatch {
                     }
 
                     const ui = index * 2;
-                    const u = (i * invHistoryLength + col) * tileWidth;
+                    const along = i * invHistoryLength;
+                    const u = ((uvFromHead ? 1 - along : along) + col) * tileWidth;
                     this.uvBuffer[ui] = u;
                     this.uvBuffer[ui + 1] = (vTileCount - row - 1) * tileHeight;
                     this.uvBuffer[ui + 2] = u;
@@ -507,7 +518,7 @@ export class TrailBatch extends VFXBatch {
                     }
 
                     const tipUi = index * 2;
-                    const tipU = (1 + col) * tileWidth;
+                    const tipU = ((uvFromHead ? 0 : 1) + col) * tileWidth;
                     this.uvBuffer[tipUi] = tipU;
                     this.uvBuffer[tipUi + 1] = (vTileCount - row - 1) * tileHeight;
                     this.uvBuffer[tipUi + 2] = tipU;
