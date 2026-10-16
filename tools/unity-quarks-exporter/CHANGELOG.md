@@ -2,7 +2,7 @@
 
 All notable changes to the Unity Quarks Exporter are documented here.
 
-## [Unreleased]
+## [0.20.0] — 2026-10-16
 
 ### Added
 
