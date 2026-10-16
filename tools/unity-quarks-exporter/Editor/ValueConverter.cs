@@ -101,26 +101,26 @@ namespace BabylonQuarks.UnityExporter
         public static JToken ConstantColor(Color c) =>
             new JObject().Set("type", "ConstantColor").Set("color", Color(c));
 
-        /// <summary>Unity MinMaxGradient → a quarks color generator.</summary>
-        public static JToken StartColor(ParticleSystem.MinMaxGradient g)
+        /// <summary>Unity MinMaxGradient → a quarks color generator, every color multiplied by <paramref name="tint"/>.</summary>
+        public static JToken StartColor(ParticleSystem.MinMaxGradient g, Color tint)
         {
             switch (g.mode)
             {
                 case ParticleSystemGradientMode.Color:
-                    return ConstantColor(g.color);
+                    return ConstantColor(g.color * tint);
                 case ParticleSystemGradientMode.TwoColors:
-                    return new JObject().Set("type", "RandomColor").Set("a", Color(g.colorMin)).Set("b", Color(g.colorMax));
+                    return new JObject().Set("type", "RandomColor").Set("a", Color(g.colorMin * tint)).Set("b", Color(g.colorMax * tint));
                 case ParticleSystemGradientMode.Gradient:
-                    return Gradient(g.gradient);
+                    return Gradient(g.gradient, tint);
                 case ParticleSystemGradientMode.TwoGradients:
                     return new JObject()
                         .Set("type", "RandomColorBetweenGradient")
-                        .Set("gradient1", Gradient(g.gradientMin))
-                        .Set("gradient2", Gradient(g.gradientMax));
+                        .Set("gradient1", Gradient(g.gradientMin, tint))
+                        .Set("gradient2", Gradient(g.gradientMax, tint));
                 case ParticleSystemGradientMode.RandomColor:
-                    return Gradient(g.gradient);
+                    return Gradient(g.gradient, tint);
                 default:
-                    return ConstantColor(g.color);
+                    return ConstantColor(g.color * tint);
             }
         }
 
@@ -157,11 +157,14 @@ namespace BabylonQuarks.UnityExporter
         /// Gradient.fromJSON accepts. Color and alpha keys are unified by sampling Evaluate() at
         /// every key time (Evaluate returns interpolated RGBA), so both channels round-trip.
         /// </summary>
-        public static JToken Gradient(Gradient g)
+        public static JToken Gradient(Gradient g) => Gradient(g, UnityEngine.Color.white);
+
+        /// <summary>Like <see cref="Gradient(UnityEngine.Gradient)"/>, every stop multiplied by <paramref name="tint"/>.</summary>
+        public static JToken Gradient(Gradient g, Color tint)
         {
             var times = new SortedSet<float> { 0f, 1f };
             AddKeyTimes(times, g);
-            return SampledGradient(times, t => g != null ? g.Evaluate(t) : UnityEngine.Color.white);
+            return SampledGradient(times, t => (g != null ? g.Evaluate(t) : UnityEngine.Color.white) * tint);
         }
 
         /// <summary>Adds the color and alpha key times of <paramref name="g"/> (0..1) to <paramref name="times"/>.</summary>

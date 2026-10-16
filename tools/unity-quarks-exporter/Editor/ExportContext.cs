@@ -24,6 +24,9 @@ namespace BabylonQuarks.UnityExporter
         /// <summary>Blend mode of the most recently built material — read straight after AddMaterialForRenderer.</summary>
         public int LastBlendMode = 2;
 
+        /// <summary>Tint color of the most recently built material — read straight after AddMaterialForRenderer.</summary>
+        public Color LastTint = Color.white;
+
         public bool EmbedTextures = true;
 
         /// <summary>Which assets go to separate files. Ignored while <see cref="Store"/> is null.</summary>
@@ -87,6 +90,7 @@ namespace BabylonQuarks.UnityExporter
             Texture tex = mat != null ? mat.mainTexture : null;
             string textureUuid = tex != null ? AddTexture(tex) : null;
             LastBlendMode = DetectBlend(mat);
+            LastTint = ReadTint(mat);
 
             string reflectionAtlasUuid = null;
             float reflectionLevel = 1f;
@@ -458,6 +462,20 @@ namespace BabylonQuarks.UnityExporter
                 .Set("type", "Mesh")
                 .Set("geometry", geometryUuid));
             return nodeUuid;
+        }
+
+        /// <summary>
+        /// The color the material's shader multiplies every particle by: URP's _BaseColor, the
+        /// built-in particle and Standard shaders' _Color, or the legacy particle shaders'
+        /// _TintColor, which they double (its neutral value is mid-grey).
+        /// </summary>
+        private static Color ReadTint(Material mat)
+        {
+            if (mat == null) return Color.white;
+            if (mat.HasProperty("_BaseColor")) return mat.GetColor("_BaseColor");
+            if (mat.HasProperty("_Color")) return mat.GetColor("_Color");
+            if (mat.HasProperty("_TintColor")) return mat.GetColor("_TintColor") * 2f;
+            return Color.white;
         }
 
         private static int DetectBlend(Material mat)

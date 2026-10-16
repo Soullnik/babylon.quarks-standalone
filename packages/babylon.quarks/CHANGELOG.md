@@ -4,9 +4,17 @@ All notable changes to the `babylon.quarks` package are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project follows the `quarks.core` 0.x version line.
 
-## [Unreleased]
+## [0.20.0] — 2026-10-16
 
 ### Added
+
+- `ParticleSystem.maxParticles` (optional, no limit when unset) caps how many particles a system
+  keeps alive, like Unity's Max Particles: emission past the cap is dropped rather than queued.
+  Saved in the effect JSON only when set.
+- quarks.core `BoxEmitter` (`box`) emits from the volume, faces or edges of a box, with an
+  optional per-axis thickness, moving particles along +Z; a box with no depth is a flat rectangle.
+  `EdgeEmitter` (`edge`) emits from a line along X, moving particles along +Y. Both match the
+  Unity shapes of the same name.
 
 - Trail settings `uvFromHead`, `colorFromParticle`, `dieWithParticle` and `recordWorldSpace`
   (all optional, off by default) for trails that behave like Unity's: the texture runs from the

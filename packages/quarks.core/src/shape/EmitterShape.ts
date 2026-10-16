@@ -1,8 +1,10 @@
 import {JsonMetaData} from '../IParticleSystem';
 import {Constructable, ParameterPair} from '../TypeUtil';
+import {BoxEmitter} from './BoxEmitter';
 import {CircleEmitter} from './CircleEmitter';
 import {ConeEmitter} from './ConeEmitter';
 import {DonutEmitter} from './DonutEmitter';
+import {EdgeEmitter} from './EdgeEmitter';
 import {GridEmitter} from './GridEmitter';
 import {HemisphereEmitter} from './HemisphereEmitter';
 import {PointEmitter} from './PointEmitter';
@@ -19,6 +21,18 @@ export interface EmitterShapePlugin {
 }
 
 export const EmitterShapes: {[key: string]: EmitterShapePlugin} = {
+    box: {
+        type: 'box',
+        params: [
+            ['width', ['number']],
+            ['height', ['number']],
+            ['depth', ['number']],
+            ['emitFrom', ['number']],
+            ['boxThickness', ['vec3']],
+        ],
+        constructor: BoxEmitter,
+        loadJSON: BoxEmitter.fromJSON,
+    },
     circle: {
         type: 'circle',
         params: [
@@ -59,6 +73,17 @@ export const EmitterShapes: {[key: string]: EmitterShapePlugin} = {
         ],
         constructor: DonutEmitter,
         loadJSON: DonutEmitter.fromJSON,
+    },
+    edge: {
+        type: 'edge',
+        params: [
+            ['radius', ['number']],
+            ['mode', ['emitterMode']],
+            ['spread', ['number']],
+            ['speed', ['valueFunc', 'value']],
+        ],
+        constructor: EdgeEmitter,
+        loadJSON: EdgeEmitter.fromJSON,
     },
     point: {type: 'point', params: [], constructor: PointEmitter, loadJSON: PointEmitter.fromJSON},
     sphere: {

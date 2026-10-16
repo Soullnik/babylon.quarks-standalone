@@ -575,6 +575,61 @@ describe('ParticleSystem', () => {
         expect(ps.particleNum).toBe(2);
     });
 
+    describe('maxParticles', () => {
+        const capped = (maxParticles?: number) =>
+            new ParticleSystem({
+                scene,
+                duration: 5,
+                looping: true,
+                startLife: new ConstantValue(10),
+                emissionOverTime: new ConstantValue(100),
+                emissionBursts: [{time: 0, count: new ConstantValue(8), probability: 1, interval: 0.1, cycle: 1}],
+                maxParticles,
+                shape: new PointEmitter(),
+            });
+
+        it('caps a burst at maxParticles', () => {
+            const ps = capped(5);
+            ps.emit(0.001, ps.emissionState, ps.emitter.matrixWorld);
+            expect(ps.particleNum).toBe(5);
+        });
+
+        it('drops continuous emission while the system is full instead of queueing it', () => {
+            const ps = capped(5);
+            for (let i = 0; i < 30; i++) {
+                ps.update(1 / 60);
+            }
+            expect(ps.particleNum).toBe(5);
+            expect(ps.emissionState.waitEmiting).toBeLessThan(1);
+        });
+
+        it('spawns nothing with a cap of zero', () => {
+            const ps = capped(0);
+            ps.update(1 / 60);
+            expect(ps.particleNum).toBe(0);
+        });
+
+        it('has no limit when unset', () => {
+            const ps = capped();
+            expect(ps.maxParticles).toBeUndefined();
+            ps.emit(0.001, ps.emissionState, ps.emitter.matrixWorld);
+            expect(ps.particleNum).toBe(8);
+        });
+
+        it('round-trips through JSON and clone', () => {
+            const ps = capped(7);
+            const meta: any = {textures: {}, materials: {}, geometries: {}};
+            const json = ps.toJSON(meta);
+            expect(json.maxParticles).toBe(7);
+            expect(ParticleSystem.fromJSON(json, meta, {}, scene).maxParticles).toBe(7);
+            expect(ps.clone().maxParticles).toBe(7);
+
+            const unlimited = capped().toJSON(meta);
+            expect('maxParticles' in unlimited).toBe(false);
+            expect(ParticleSystem.fromJSON(unlimited, meta, {}, scene).maxParticles).toBeUndefined();
+        });
+    });
+
     it('emits extra particles from emissionOverDistance travel', () => {
         const ps = new ParticleSystem({
             scene,

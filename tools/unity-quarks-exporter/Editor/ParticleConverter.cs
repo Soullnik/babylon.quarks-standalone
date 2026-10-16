@@ -22,6 +22,9 @@ namespace BabylonQuarks.UnityExporter
             WarnAboutTrails(ps, renderer, trailOnly);
 
             string materialUuid = ctx.AddMaterialForRenderer(renderer, trailOnly);
+            // The material's tint multiplies every particle (or the whole trail), so fold it into
+            // the start color; the color-over-life behaviors multiply onto that.
+            Color tint = ctx.LastTint;
             int renderMode = trailOnly ? RenderModeTrail : MapRenderMode(renderer.renderMode);
             string geometryUuid = renderMode == 2 && renderer.mesh != null ? ctx.AddGeometryForMesh(renderer.mesh) : null;
             JToken emissionOverTime = EmissionRate(ps, true);
@@ -34,17 +37,18 @@ namespace BabylonQuarks.UnityExporter
                 .Set("prewarm", main.prewarm)
                 .Set("duration", main.duration)
                 .Set("startDelay", ValueConverter.Curve(main.startDelay))
-                .Set("shape", BuildShape(ps.shape, ctx))
+                .Set("shape", BuildShape(ps.shape, ctx, ps.name))
                 .Set("startLife", startLife)
                 .Set("startSpeed", ValueConverter.Curve(main.startSpeed))
                 .Set("startRotation", BuildStartRotation(main, renderMode))
                 .Set("startSize", trailOnly ? BuildTrailWidth(ps) : BuildStartSize(main))
                 .Set("startColor", trailOnly && !ps.trails.inheritParticleColor
-                    ? ValueConverter.ConstantColor(UnityEngine.Color.white)
-                    : ValueConverter.StartColor(main.startColor))
+                    ? ValueConverter.ConstantColor(tint)
+                    : ValueConverter.StartColor(main.startColor, tint))
                 .Set("emissionOverTime", emissionOverTime)
                 .Set("emissionOverDistance", EmissionRate(ps, false))
                 .Set("emissionBursts", BuildBursts(ps))
+                .Set("maxParticles", main.maxParticles)
                 .Set("onlyUsedByOther", ctx.IsSubTarget(ps))
                 .Set("renderMode", renderMode)
                 .Set("renderOrder", renderer.sortingOrder)
@@ -224,7 +228,7 @@ namespace BabylonQuarks.UnityExporter
 
         // ---- Shape -----------------------------------------------------------------------
 
-        private static JToken BuildShape(ParticleSystem.ShapeModule shape, ExportContext ctx)
+        private static JToken BuildShape(ParticleSystem.ShapeModule shape, ExportContext ctx, string owner)
         {
             if (!shape.enabled) return new JObject().Set("type", "point");
             return AddShapeTransform(BuildShapeType(shape, ctx), shape);
@@ -285,10 +289,51 @@ namespace BabylonQuarks.UnityExporter
                         return new JObject().Set("type", "mesh_surface").Set("mesh", meshNodeUuid);
                     }
                     return new JObject().Set("type", "point");
+                case ParticleSystemShapeType.Box:
+                    return BoxShape(shape, shape.scale, BoxEmitFromVolume);
+                case ParticleSystemShapeType.BoxShell:
+                    return BoxShape(shape, shape.scale, BoxEmitFromShell);
+                case ParticleSystemShapeType.BoxEdge:
+                    return BoxShape(shape, shape.scale, BoxEmitFromEdge);
+                case ParticleSystemShapeType.Rectangle:
+                    // A filled rectangle in the XY plane, moving along +Z: a box with no depth.
+                    return BoxShape(shape, new Vector3(shape.scale.x, shape.scale.y, 0f), BoxEmitFromVolume);
+                case ParticleSystemShapeType.SingleSidedEdge:
+                    return new JObject()
+                        .Set("type", "edge")
+                        .Set("radius", shape.radius)
+                        // Unity's Random/Loop/PingPong/BurstSpread line up with quarks' EmitterMode.
+                        .Set("mode", (int)shape.radiusMode)
+                        .Set("spread", shape.radiusSpread)
+                        .Set("speed", ValueConverter.Curve(shape.radiusSpeed));
                 default:
-                    // Box/Edge and other volumes have no direct quarks equivalent yet.
+                    // MeshRenderer, SkinnedMeshRenderer, Sprite and SpriteRenderer shapes have no
+                    // quarks equivalent yet.
+                    Debug.LogWarning($"[Quarks Exporter] '{owner}': shape {shape.shapeType} has no quarks counterpart and is exported as a point.");
                     return new JObject().Set("type", "point");
             }
+        }
+
+        // quarks BoxEmitFrom: Volume=0, Shell=1, Edge=2.
+        private const int BoxEmitFromVolume = 0;
+        private const int BoxEmitFromShell = 1;
+        private const int BoxEmitFromEdge = 2;
+
+        /// <summary>Unity sizes its box shapes by the shape's Scale; all of them move particles along +Z.</summary>
+        private static JObject BoxShape(ParticleSystem.ShapeModule shape, Vector3 size, int emitFrom)
+        {
+            var obj = new JObject()
+                .Set("type", "box")
+                .Set("width", size.x)
+                .Set("height", size.y)
+                .Set("depth", size.z)
+                .Set("emitFrom", emitFrom);
+            if (emitFrom != BoxEmitFromVolume)
+            {
+                Vector3 t = shape.boxThickness;
+                obj.Set("boxThickness", Vec3(Mathf.Clamp01(t.x), Mathf.Clamp01(t.y), Mathf.Clamp01(t.z)));
+            }
+            return obj;
         }
 
         private static JObject ShapeBase(string type, float radius, float arc, float thickness)

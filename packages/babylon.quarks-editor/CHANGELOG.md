@@ -4,6 +4,34 @@ All notable changes to the `babylon.quarks-editor` package are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project follows the `quarks.core` 0.x version line.
 
+## [0.20.0] — 2026-10-16
+
+### Added
+
+- **Projects**: a start page lists the projects saved in IndexedDB (new, rename, duplicate,
+  delete), with storage usage and a "make storage persistent" button. `ProjectStore` with an
+  `IndexedDbProjectStore` default keeps each texture once per project by content hash. The scene
+  is saved explicitly (Save / Ctrl+S, `*` while unsaved), and assets are written as they change.
+- **Scene and Assets panels**: the Scene panel lists only the effects placed in the viewport
+  (show/hide, solo, delete, "Save as new asset…"), and the Assets drawer holds the library.
+- **Prefab mode**: open an asset to edit it on its own, with the scene set aside. Double-clicking
+  another asset swaps it in place, asking Save / Don't save / Cancel when there are unsaved edits.
+- **Effect tree** in the Scene and prefab panels: each effect unfolds into its group/emitter tree,
+  and clicking a node selects it for the inspector and gizmo, sub-emitters included, without
+  opening the timeline.
+
+### Changed
+
+- Selecting a node no longer stalls the viewport: the inspector renders after the selection
+  instead of in the same frame, cutting main-thread blocking per switch from ~50 ms to ~15–19 ms.
+
+### Fixed
+
+- The camera renders only above the floating Assets drawer, so a focused effect or an opened
+  prefab is centred where it can be seen.
+- Selection rings rendered nothing under Vite's dev server: the color shaders they use are now
+  registered up front instead of being fetched at runtime.
+
 ## [0.17.9] — 2026-07-14
 
 ### Added
