@@ -354,6 +354,8 @@ export class SpriteBatch extends VFXBatch {
     private rotationMat_ = new Matrix3();
     private rotationMat2_ = new Matrix3();
     private lastStretchedSpeedFactor = Number.NaN;
+    /** Slot 0 holds the zero-alpha instance since the batch last went empty. */
+    private clearedInstanceUploaded = false;
 
     update(): void {
         let index = 0;
@@ -373,15 +375,34 @@ export class SpriteBatch extends VFXBatch {
 
         for (let s = 0; s < visibleSystems.length; s++) {
             const system = visibleSystems[s];
-            const particles = system.particles;
             const particleNum = system.particleNum;
+            // A finished or between-bursts system adds nothing to the batch. With many effects
+            // loaded most systems are idle at any moment, so skip their per-system setup.
+            if (particleNum === 0) {
+                continue;
+            }
+            const particles = system.particles;
             const rotation = this.quaternion2_;
             const translation = this.vector2_;
             const scale = this.vector3_;
             const systemWorldSpace = system.worldSpace;
             const emitterMatrix = system.emitter.matrixWorld;
-            emitterMatrix.decompose(translation, rotation, scale);
-            this.rotationMat_.setFromMatrix4(emitterMatrix);
+            // Only a local-space mesh needs the emitter's turn as a quaternion, and only a
+            // local-space stretched billboard its rotation matrix. Everything else needs at most
+            // the scale, which the basis column lengths give without a full decompose.
+            if (isMeshRender && !systemWorldSpace) {
+                emitterMatrix.decompose(translation, rotation, scale);
+            } else {
+                const e = emitterMatrix.elements;
+                scale.set(
+                    Math.sqrt(e[0] * e[0] + e[1] * e[1] + e[2] * e[2]),
+                    Math.sqrt(e[4] * e[4] + e[5] * e[5] + e[6] * e[6]),
+                    Math.sqrt(e[8] * e[8] + e[9] * e[9] + e[10] * e[10])
+                );
+            }
+            if (isStretchedRender && !systemWorldSpace) {
+                this.rotationMat_.setFromMatrix4(emitterMatrix);
+            }
             const absScaleX = Math.abs(scale.x);
             const absScaleY = Math.abs(scale.y);
             const absScaleZ = Math.abs(scale.z);
@@ -628,9 +649,15 @@ export class SpriteBatch extends VFXBatch {
         this.mesh.forcedInstanceCount = index;
 
         if (index === 0) {
-            this.uploadClearedInstance(isMeshRender, isStretchedRender);
+            // Slot 0 only needs clearing once per stretch of empty frames; re-uploading it every
+            // frame cost five buffer uploads per idle batch per frame.
+            if (!this.clearedInstanceUploaded) {
+                this.uploadClearedInstance(isMeshRender, isStretchedRender);
+                this.clearedInstanceUploaded = true;
+            }
             return;
         }
+        this.clearedInstanceUploaded = false;
 
         // Upload only the slots actually filled this frame: the buffers are sized
         // for the high-water mark and are usually far larger than the live count.

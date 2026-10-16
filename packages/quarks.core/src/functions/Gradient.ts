@@ -33,8 +33,8 @@ export class Gradient implements FunctionColorGenerator {
 
     /** Sampled RGBA copy of the gradient, or null while none has been built. */
     private table: Float32Array | null = null;
-    /** Keys the tables were built from, used to detect edits. */
-    private tableSignature: Float32Array | null = null;
+    /** Keys the tables were built from, used to detect edits. Float64 for the same reason as PiecewiseBezier's. */
+    private tableSignature: Float64Array | null = null;
 
     /**
      * Rebuilds the sampled table when the gradient changed, otherwise does
@@ -48,7 +48,7 @@ export class Gradient implements FunctionColorGenerator {
         let signature = this.tableSignature;
         let changed = signature === null || signature.length !== signatureLength;
         if (changed) {
-            signature = new Float32Array(signatureLength);
+            signature = new Float64Array(signatureLength);
         }
         let s = 0;
         for (let i = 0; i < colorKeys.length; i++, s += 4) {

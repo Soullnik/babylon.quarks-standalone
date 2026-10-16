@@ -94,6 +94,44 @@ describe('SpriteBatch', () => {
         system.dispose();
     });
 
+    it('uploads the cleared instance once per empty stretch, not every frame', () => {
+        const renderer = new BatchedRenderer('sprite-empty-once', scene);
+        const system = createSpriteSystem({
+            looping: false,
+            duration: 1,
+            emissionOverTime: new ConstantValue(0),
+            startLife: new ConstantValue(0.05),
+            emissionBursts: [{time: 0, count: new ConstantValue(4), probability: 1, interval: 0.01, cycle: 1}],
+        });
+        renderer.addSystem(system);
+        for (let i = 0; i < 10; i++) {
+            renderer.update(1 / 60);
+        }
+        expect(system.particleNum).toBe(0);
+        const batch = getSpriteBatch(renderer);
+        const colorUploads = jest.spyOn((batch as any).colorVB, 'update');
+        for (let i = 0; i < 20; i++) {
+            renderer.update(1 / 60);
+        }
+        expect(colorUploads).not.toHaveBeenCalled();
+
+        // Particles again, then empty again: one more clearing upload is due.
+        system.restart();
+        for (let i = 0; i < 2; i++) {
+            renderer.update(1 / 60);
+        }
+        expect(system.particleNum).toBeGreaterThan(0);
+        colorUploads.mockClear();
+        for (let i = 0; i < 20; i++) {
+            renderer.update(1 / 60);
+        }
+        expect(system.particleNum).toBe(0);
+        expect(colorUploads).toHaveBeenCalledTimes(1);
+
+        renderer.dispose();
+        system.dispose();
+    });
+
     it('populates instance buffers and applies local-space scale', () => {
         const renderer = new BatchedRenderer('sprite-local-space', scene);
         const system = createSpriteSystem({worldSpace: false});

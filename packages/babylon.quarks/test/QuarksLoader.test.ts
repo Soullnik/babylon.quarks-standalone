@@ -1051,3 +1051,95 @@ describe('QuarksLoader matrix decomposition', () => {
         }
     });
 });
+
+describe('QuarksLoader shared resources', () => {
+    const PNG =
+        'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+ip1sAAAAASUVORK5CYII=';
+
+    /** One mesh-mode emitter whose material samples `imageUrl` and whose geometry is a triangle. */
+    const effect = (imageUrl: string, wrap = [1001, 1001]) => ({
+        images: [{uuid: 'img', url: imageUrl}],
+        textures: [{uuid: 'tex', image: 'img', wrap}],
+        materials: [{uuid: 'mat', type: 'QuarksMaterial', texture: 'tex', transparent: true, blending: 2}],
+        geometries: [
+            {uuid: 'geo', type: 'QuarksGeometry', positions: [0, 1, 0, -1, -1, 0, 1, -1, 0], indices: [0, 1, 2]},
+        ],
+        object: {
+            uuid: 'root',
+            type: 'ParticleEmitter',
+            ps: {
+                version: '3.0',
+                looping: true,
+                duration: 1,
+                shape: {type: 'point'},
+                startLife: {type: 'ConstantValue', value: 1},
+                startSpeed: {type: 'ConstantValue', value: 0},
+                startRotation: {type: 'ConstantValue', value: 0},
+                startSize: {type: 'ConstantValue', value: 1},
+                startColor: {type: 'ConstantColor', color: {r: 1, g: 1, b: 1, a: 1}},
+                emissionOverTime: {type: 'ConstantValue', value: 1},
+                emissionOverDistance: {type: 'ConstantValue', value: 0},
+                emissionBursts: [],
+                instancingGeometry: 'geo',
+                renderOrder: 0,
+                renderMode: 2,
+                rendererEmitterSettings: {},
+                material: 'mat',
+                layers: 1,
+                startTileIndex: {type: 'ConstantValue', value: 0},
+                uTileCount: 1,
+                vTileCount: 1,
+                behaviors: [],
+                worldSpace: true,
+            },
+        },
+    });
+
+    const settingsOf = (root: any) => ((root as ParticleEmitter).system as ParticleSystem).getRendererSettings();
+
+    it('gives every load of the same image and mesh the same Texture and geometry', () => {
+        const engine = new NullEngine();
+        const scene = new Scene(engine);
+        const a = settingsOf(new QuarksLoader(scene).parse(effect(PNG)));
+        const b = settingsOf(new QuarksLoader(scene).parse(effect(PNG)));
+        expect(a.texture).toBeInstanceOf(Texture);
+        expect(b.texture).toBe(a.texture);
+        expect(b.instancingGeometry).toBe(a.instancingGeometry);
+        scene.dispose();
+        engine.dispose();
+    });
+
+    it('keeps textures apart when the image or the sampling differs', () => {
+        const engine = new NullEngine();
+        const scene = new Scene(engine);
+        const a = settingsOf(new QuarksLoader(scene).parse(effect(PNG)));
+        const otherImage = settingsOf(new QuarksLoader(scene).parse(effect(PNG + '#other')));
+        const otherWrap = settingsOf(new QuarksLoader(scene).parse(effect(PNG, [1000, 1000])));
+        expect(otherImage.texture).not.toBe(a.texture);
+        expect(otherWrap.texture).not.toBe(a.texture);
+        scene.dispose();
+        engine.dispose();
+    });
+
+    it('does not share across scenes, with shareResources off, or after a dispose', () => {
+        const engine = new NullEngine();
+        const scene = new Scene(engine);
+        const otherScene = new Scene(engine);
+        const a = settingsOf(new QuarksLoader(scene).parse(effect(PNG)));
+        expect(settingsOf(new QuarksLoader(otherScene).parse(effect(PNG))).texture).not.toBe(a.texture);
+
+        const unshared = settingsOf(new QuarksLoader(scene, {shareResources: false}).parse(effect(PNG)));
+        expect(unshared.texture).not.toBe(a.texture);
+        expect(unshared.instancingGeometry).not.toBe(a.instancingGeometry);
+
+        a.texture.dispose();
+        const afterDispose = settingsOf(new QuarksLoader(scene).parse(effect(PNG)));
+        expect(afterDispose.texture).not.toBe(a.texture);
+
+        QuarksLoader.clearSharedResources(scene);
+        expect(settingsOf(new QuarksLoader(scene).parse(effect(PNG))).texture).not.toBe(afterDispose.texture);
+        scene.dispose();
+        otherScene.dispose();
+        engine.dispose();
+    });
+});

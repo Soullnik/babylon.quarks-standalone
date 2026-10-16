@@ -14,6 +14,15 @@ import {ensureTriangleIndices} from './geometryUtil';
 
 export interface QuarksLoaderOptions {
     baseUrl?: string;
+    /**
+     * Reuse one Texture per scene for every effect that references the same image with the same
+     * sampling, and one copy of the data for identical mesh geometry. The renderer only batches
+     * systems that share the texture (and geometry) object, so without this every loaded effect
+     * gets batches — draw calls and buffer uploads — of its own even when its images are the same
+     * as another effect's. Default true; turn off to give each effect private textures, e.g. to
+     * change one effect's texture settings without touching the others.
+     */
+    shareResources?: boolean;
 }
 
 interface ParsedGeometry {
@@ -21,6 +30,45 @@ interface ParsedGeometry {
     indices: Uint32Array | Uint16Array;
     uvs?: Float32Array;
     normals?: Float32Array;
+}
+
+/** Textures and geometries reused across loads, per scene. See QuarksLoaderOptions.shareResources. */
+const sharedTextures = new WeakMap<Scene, Map<string, Texture>>();
+const sharedGeometries = new WeakMap<Scene, Map<string, ParsedGeometry>>();
+
+function sceneMap<T>(maps: WeakMap<Scene, Map<string, T>>, scene: Scene): Map<string, T> {
+    let map = maps.get(scene);
+    if (map === undefined) {
+        map = new Map();
+        maps.set(scene, map);
+    }
+    return map;
+}
+
+/** Content key for a geometry: two independent 32-bit hashes over every array's bytes, plus lengths. */
+function geometryKey(geometry: ParsedGeometry): string {
+    let h1 = 0x811c9dc5;
+    let h2 = 0x9e3779b9;
+    const parts: Array<ArrayBufferView | undefined> = [
+        geometry.positions,
+        geometry.indices,
+        geometry.uvs,
+        geometry.normals,
+    ];
+    let lengths = '';
+    for (const part of parts) {
+        if (part === undefined) {
+            lengths += '-,';
+            continue;
+        }
+        const bytes = new Uint8Array(part.buffer, part.byteOffset, part.byteLength);
+        lengths += bytes.length + ',';
+        for (let i = 0; i < bytes.length; i++) {
+            h1 = Math.imul(h1 ^ bytes[i], 0x01000193);
+            h2 = Math.imul(h2 ^ bytes[i], 0x5bd1e995) ^ (h2 >>> 15);
+        }
+    }
+    return `${lengths}${(h1 >>> 0).toString(16)}${(h2 >>> 0).toString(16)}`;
 }
 
 interface LoadedMeta {
@@ -131,14 +179,39 @@ export class QuarksLoader {
                             'QuarksLoader.resolveExternalGeometries() before parse().'
                     );
                 }
-                meta.geometries[geom.uuid] = {
+                meta.geometries[geom.uuid] = this.share({
                     positions: new Float32Array(geom.positions ?? []),
                     indices: geom.indices ? new Uint32Array(geom.indices) : new Uint32Array(0),
                     uvs: geom.uvs ? new Float32Array(geom.uvs) : undefined,
                     normals: geom.normals ? new Float32Array(geom.normals) : undefined,
-                };
+                });
             }
         }
+    }
+
+    /** The scene's copy of an identical geometry when resources are shared, else `geometry` itself. */
+    private share(geometry: ParsedGeometry): ParsedGeometry {
+        if (this.options.shareResources === false) {
+            return geometry;
+        }
+        const geometries = sceneMap(sharedGeometries, this.scene);
+        const key = geometryKey(geometry);
+        const existing = geometries.get(key);
+        if (existing !== undefined) {
+            return existing;
+        }
+        geometries.set(key, geometry);
+        return geometry;
+    }
+
+    /**
+     * Forgets the textures and geometries shared between loads into `scene` (see
+     * {@link QuarksLoaderOptions.shareResources}). Effects already loaded keep theirs; the next
+     * load creates new ones. Textures are not disposed — they may still be in use.
+     */
+    static clearSharedResources(scene: Scene): void {
+        sharedTextures.delete(scene);
+        sharedGeometries.delete(scene);
     }
 
     private parseSphereGeometry(geom: any): ParsedGeometry {
@@ -342,6 +415,28 @@ export class QuarksLoader {
             if (imageUrl) {
                 const invertY = texDef.invertY !== undefined ? !!texDef.invertY : true;
                 const noMipmap = !!texDef.noMipmap;
+                // Everything below that ends up on the Texture object is part of the key, so a
+                // shared texture always looks the way each of its effects asked for.
+                const share = this.options.shareResources !== false;
+                const key = share
+                    ? [
+                          invertY,
+                          noMipmap,
+                          texDef.samplingMode,
+                          texDef.wrap,
+                          texDef.repeat,
+                          texDef.offset,
+                          texDef.rotation,
+                      ].join('|') +
+                      '|' +
+                      imageUrl
+                    : '';
+                const cache = share ? sceneMap(sharedTextures, this.scene) : undefined;
+                const cached = cache?.get(key);
+                if (cached !== undefined) {
+                    meta.textures[texDef.uuid] = cached;
+                    continue;
+                }
                 const texture = new Texture(imageUrl, this.scene, {
                     noMipmap,
                     invertY,
@@ -361,6 +456,15 @@ export class QuarksLoader {
                 }
                 if (typeof texDef.rotation === 'number') {
                     texture.wAng = texDef.rotation;
+                }
+                if (cache !== undefined) {
+                    cache.set(key, texture);
+                    // Something outside the library may dispose it; never hand out a dead texture.
+                    texture.onDisposeObservable.addOnce(() => {
+                        if (cache.get(key) === texture) {
+                            cache.delete(key);
+                        }
+                    });
                 }
                 meta.textures[texDef.uuid] = texture;
             } else {
