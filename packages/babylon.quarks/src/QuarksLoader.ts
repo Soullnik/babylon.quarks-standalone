@@ -12,6 +12,20 @@ import {ParticleSystem} from './ParticleSystem';
 import {QuarksPrefab} from './QuarksPrefab';
 import {ensureTriangleIndices} from './geometryUtil';
 
+/** Kind of linked asset the loader asks a {@link QuarksResourceResolver} to handle. */
+export type QuarksResourceKind = 'effect' | 'geometry' | 'image';
+
+/**
+ * Hooks for resolving relative source links (textures, geometry files) and loading their JSON.
+ * Omit either method to keep the default (`baseUrl` join / `fetch`).
+ */
+export interface QuarksResourceResolver {
+    /** Resolve a relative url to an absolute / blob / data url. Default: {@link QuarksLoader.joinUrl}. */
+    resolve?(url: string, kind: QuarksResourceKind, baseUrl: string): string | Promise<string>;
+    /** Load a JSON asset (geometry files). Default: `fetch(resolvedUrl).json()`. */
+    fetchJson?(resolvedUrl: string): Promise<unknown>;
+}
+
 export interface QuarksLoaderOptions {
     baseUrl?: string;
     /**
@@ -23,6 +37,38 @@ export interface QuarksLoaderOptions {
      * change one effect's texture settings without touching the others.
      */
     shareResources?: boolean;
+    /** Custom url / fetch backend (File picker, CDN, IndexedDB). */
+    resolver?: QuarksResourceResolver;
+}
+
+/** One in-memory effect for {@link QuarksLoader.loadFromJSONAll}. */
+export interface QuarksJSONLoadEntry {
+    json: unknown;
+    /** Overrides loader `baseUrl` for relative texture / geometry links in this effect. */
+    baseUrl?: string;
+}
+
+/**
+ * Options for {@link QuarksLoader.loadAll} / {@link QuarksLoader.loadFromJSONAll}.
+ * Batch loads share the per-scene fetch cache and `shareResources`, so N effects that point at
+ * the same `assets/geometries/*.json` or texture only pay for that asset once.
+ */
+export interface QuarksBatchLoadOptions {
+    /**
+     * Max concurrent effect-document fetches (phase 1). Linked geometry/image resolve still runs
+     * across the whole pack in parallel so shared urls coalesce. Default: all at once.
+     */
+    concurrency?: number;
+    /**
+     * Called once per effect when it has fully settled (parsed successfully, or failed under
+     * `continueOnError`). `done` is how many of `total` have settled so far.
+     */
+    onProgress?: (done: number, total: number) => void;
+    /**
+     * When true, a failed effect becomes `null` in the result array and the rest keep loading.
+     * When false (default), the first failure rejects the whole batch.
+     */
+    continueOnError?: boolean;
 }
 
 interface ParsedGeometry {
@@ -35,6 +81,8 @@ interface ParsedGeometry {
 /** Textures and geometries reused across loads, per scene. See QuarksLoaderOptions.shareResources. */
 const sharedTextures = new WeakMap<Scene, Map<string, Texture>>();
 const sharedGeometries = new WeakMap<Scene, Map<string, ParsedGeometry>>();
+/** In-flight / completed JSON fetches keyed by `json|resolvedUrl`, per scene. */
+const sharedFetches = new WeakMap<Scene, Map<string, Promise<unknown>>>();
 
 function sceneMap<T>(maps: WeakMap<Scene, Map<string, T>>, scene: Scene): Map<string, T> {
     let map = maps.get(scene);
@@ -86,47 +134,129 @@ export class QuarksLoader {
         this.options = options;
     }
 
+    /** Fetches an effect JSON from `url`, resolves linked sources, and parses it. */
     async load(url: string): Promise<TransformNode> {
-        const baseUrl = this.options.baseUrl || url.substring(0, url.lastIndexOf('/') + 1);
-        const response = await fetch(url);
-        const json = await response.json();
-        await QuarksLoader.resolveExternalGeometries(json, async (geometryUrl) => {
-            const geometryResponse = await fetch(QuarksLoader.resolveUrl(baseUrl, geometryUrl));
-            if (!geometryResponse.ok) {
-                throw new Error(`HTTP ${geometryResponse.status}`);
+        const {json, baseUrl} = await this.fetchEffectDocument(url);
+        return this.loadFromJSON(json, baseUrl);
+    }
+
+    /**
+     * Resolves linked geometry / image urls on `json` (via {@link resolveResources}) then parses.
+     * Use when the effect JSON is already in hand (File, CDN payload, editor import).
+     */
+    async loadFromJSON(json: any, baseUrl?: string): Promise<TransformNode> {
+        const resolvedBase = baseUrl ?? this.options.baseUrl ?? '';
+        await this.resolveResources(json, resolvedBase);
+        return this.parse(json, resolvedBase);
+    }
+
+    /**
+     * Loads many effects in parallel for battle / level preload. Phase 1 fetches every effect
+     * JSON (optionally concurrency-limited); phase 2 resolves all linked geometries/images across
+     * the pack together so shared asset urls hit the fetch cache once; phase 3 parses.
+     *
+     * @example
+     * ```ts
+     * const roots = await loader.loadAll([
+     *   'fx/hit.json', 'fx/explosion.json', 'fx/heal.json',
+     * ], { concurrency: 6, continueOnError: true });
+     * ```
+     */
+    loadAll(urls: string[], options?: QuarksBatchLoadOptions & {continueOnError?: false}): Promise<TransformNode[]>;
+    loadAll(
+        urls: string[],
+        options: QuarksBatchLoadOptions & {continueOnError: true}
+    ): Promise<(TransformNode | null)[]>;
+    async loadAll(urls: string[], options: QuarksBatchLoadOptions = {}): Promise<(TransformNode | null)[]> {
+        const docs = await QuarksLoader.mapPool(urls, options.concurrency, async (url, index) => {
+            try {
+                return await this.fetchEffectDocument(url);
+            } catch (err) {
+                if (!options.continueOnError) {
+                    throw err;
+                }
+                console.warn(`[QuarksLoader] Failed to fetch effect "${url}" (${index + 1}/${urls.length}):`, err);
+                return null;
             }
-            return geometryResponse.json();
         });
-        return this.parse(json, baseUrl);
+        return this.loadDocuments(docs, options);
+    }
+
+    /**
+     * Same two-phase batch as {@link loadAll}, but effect JSON is already in memory (asset pack,
+     * IndexedDB, editor). Entries may be bare JSON or `{ json, baseUrl }`.
+     */
+    loadFromJSONAll(
+        entries: Array<QuarksJSONLoadEntry | unknown>,
+        options?: QuarksBatchLoadOptions & {continueOnError?: false}
+    ): Promise<TransformNode[]>;
+    loadFromJSONAll(
+        entries: Array<QuarksJSONLoadEntry | unknown>,
+        options: QuarksBatchLoadOptions & {continueOnError: true}
+    ): Promise<(TransformNode | null)[]>;
+    async loadFromJSONAll(
+        entries: Array<QuarksJSONLoadEntry | unknown>,
+        options: QuarksBatchLoadOptions = {}
+    ): Promise<(TransformNode | null)[]> {
+        const docs: Array<{json: any; baseUrl: string} | null> = entries.map((entry) => {
+            if (entry !== null && typeof entry === 'object' && 'json' in (entry as object)) {
+                const typed = entry as QuarksJSONLoadEntry;
+                return {json: typed.json as any, baseUrl: typed.baseUrl ?? this.options.baseUrl ?? ''};
+            }
+            return {json: entry as any, baseUrl: this.options.baseUrl ?? ''};
+        });
+        return this.loadDocuments(docs, options);
+    }
+
+    /**
+     * Inlines external geometry files and rewrites relative image urls through the loader's
+     * {@link QuarksResourceResolver}. Idempotent for already-inlined geometries. Failures warn
+     * and leave the entry as is.
+     */
+    async resolveResources(json: any, baseUrl: string = ''): Promise<void> {
+        await QuarksLoader.resolveLinkedResources(json, {
+            baseUrl,
+            resolver: this.options.resolver,
+            scene: this.scene,
+        });
+    }
+
+    /**
+     * Same as instance {@link resolveResources}, but usable without constructing a loader (e.g.
+     * editor import that only prepares JSON). Pass `scene` to share the per-scene fetch cache.
+     */
+    static async resolveLinkedResources(
+        json: any,
+        options: {baseUrl?: string; resolver?: QuarksResourceResolver; scene?: Scene} = {}
+    ): Promise<void> {
+        const baseUrl = options.baseUrl ?? '';
+        const resolver = options.resolver;
+        const scene = options.scene;
+
+        await QuarksLoader.inlineGeometryEntries(json, async (geometryUrl) => {
+            const resolved = await QuarksLoader.resolveWith(resolver, geometryUrl, 'geometry', baseUrl);
+            return QuarksLoader.fetchJsonWith(resolver, resolved, scene);
+        });
+
+        const images: any[] = Array.isArray(json?.images) ? json.images : [];
+        await Promise.all(
+            images.map(async (img) => {
+                if (typeof img?.url !== 'string' || !img.url) {
+                    return;
+                }
+                img.url = await QuarksLoader.resolveWith(resolver, img.url, 'image', baseUrl);
+            })
+        );
     }
 
     /**
      * Inlines geometries that an export wrote to their own file (`{uuid, type: 'QuarksGeometry',
-     * url}` — e.g. the Unity exporter's "geometries as files"): each `url` is passed to
-     * `loadGeometry`, and the `positions / indices / uvs / normals` it returns replace the url in
-     * place, so `parse()` (which is synchronous) sees an ordinary inline geometry. `load()` does
-     * this with `fetch`; call it yourself before `parse()` when the files come from elsewhere.
-     * A geometry that fails to load is left as is and warned about.
+     * url}`). Prefer {@link load}, {@link loadFromJSON}, or {@link resolveResources} — those use
+     * the loader's resolver and fetch cache. Kept for callers that already have a custom
+     * `loadGeometry` and no `QuarksLoader` instance.
      */
     static async resolveExternalGeometries(json: any, loadGeometry: (url: string) => Promise<any>): Promise<void> {
-        const geometries: any[] = Array.isArray(json?.geometries) ? json.geometries : [];
-        await Promise.all(
-            geometries
-                .filter((geom) => typeof geom?.url === 'string' && !geom.positions)
-                .map(async (geom) => {
-                    try {
-                        const data = await loadGeometry(geom.url);
-                        for (const key of ['positions', 'indices', 'uvs', 'normals']) {
-                            if (data?.[key] !== undefined) {
-                                geom[key] = data[key];
-                            }
-                        }
-                        delete geom.url;
-                    } catch (err) {
-                        console.warn(`[QuarksLoader] Could not load geometry "${geom.url}":`, err);
-                    }
-                })
-        );
+        await QuarksLoader.inlineGeometryEntries(json, loadGeometry);
     }
 
     parse(json: any, baseUrl: string = ''): TransformNode {
@@ -175,8 +305,8 @@ export class QuarksLoader {
             } else if (geom.type === 'QuarksGeometry') {
                 if (typeof geom.url === 'string' && !geom.positions) {
                     console.warn(
-                        `[QuarksLoader] Geometry "${geom.url}" is an external file; use load() or ` +
-                            'QuarksLoader.resolveExternalGeometries() before parse().'
+                        `[QuarksLoader] Geometry "${geom.url}" is an external file; use load(), ` +
+                            'loadFromJSON(), or resolveResources() before parse().'
                     );
                 }
                 meta.geometries[geom.uuid] = this.share({
@@ -205,13 +335,22 @@ export class QuarksLoader {
     }
 
     /**
-     * Forgets the textures and geometries shared between loads into `scene` (see
-     * {@link QuarksLoaderOptions.shareResources}). Effects already loaded keep theirs; the next
-     * load creates new ones. Textures are not disposed — they may still be in use.
+     * Forgets the textures, geometries, and in-flight JSON fetches shared between loads into
+     * `scene` (see {@link QuarksLoaderOptions.shareResources}). Effects already loaded keep
+     * theirs; the next load creates new ones. Textures are not disposed — they may still be in use.
      */
     static clearSharedResources(scene: Scene): void {
         sharedTextures.delete(scene);
         sharedGeometries.delete(scene);
+        sharedFetches.delete(scene);
+    }
+
+    /** Joins `baseUrl` with a relative `url`; leaves data/blob/absolute/root-absolute urls alone. */
+    static joinUrl(baseUrl: string, url: string): string {
+        if (/^(data|blob):/i.test(url) || /^[a-z][a-z0-9+.-]*:\/\//i.test(url) || url.startsWith('/')) {
+            return url;
+        }
+        return baseUrl + url;
     }
 
     private parseSphereGeometry(geom: any): ParsedGeometry {
@@ -366,13 +505,191 @@ export class QuarksLoader {
         return new Float32Array(buffer) as any;
     }
 
+    private async resolveResourceUrl(url: string, kind: QuarksResourceKind, baseUrl: string): Promise<string> {
+        return QuarksLoader.resolveWith(this.options.resolver, url, kind, baseUrl);
+    }
+
+    /** Fetches one effect JSON; documents are not fetch-cached because resolve mutates them. */
+    private async fetchEffectDocument(url: string): Promise<{json: any; baseUrl: string}> {
+        const baseUrl = this.options.baseUrl || url.substring(0, url.lastIndexOf('/') + 1);
+        const resolvedEffect = await this.resolveResourceUrl(url, 'effect', baseUrl);
+        const json = await QuarksLoader.fetchJsonWith(this.options.resolver, resolvedEffect, undefined);
+        return {json, baseUrl};
+    }
+
+    /**
+     * Resolve every document's linked resources in parallel (shared urls coalesce via the
+     * scene fetch cache), then parse. Each index settles exactly once for `onProgress`.
+     */
+    private async loadDocuments(
+        docs: Array<{json: any; baseUrl: string} | null>,
+        options: QuarksBatchLoadOptions
+    ): Promise<(TransformNode | null)[]> {
+        const total = docs.length;
+        if (total === 0) {
+            return [];
+        }
+
+        const results: (TransformNode | null)[] = new Array(total);
+        const settled = new Array<boolean>(total).fill(false);
+        let done = 0;
+        const settle = (index: number, value: TransformNode | null) => {
+            if (settled[index]) {
+                return;
+            }
+            settled[index] = true;
+            results[index] = value;
+            done++;
+            options.onProgress?.(done, total);
+        };
+
+        await Promise.all(
+            docs.map(async (doc, i) => {
+                if (!doc) {
+                    return;
+                }
+                try {
+                    await this.resolveResources(doc.json, doc.baseUrl);
+                } catch (err) {
+                    if (!options.continueOnError) {
+                        throw err;
+                    }
+                    console.warn(`[QuarksLoader] Failed to resolve resources for effect ${i + 1}/${total}:`, err);
+                    docs[i] = null;
+                    settle(i, null);
+                }
+            })
+        );
+
+        for (let i = 0; i < total; i++) {
+            if (settled[i]) {
+                continue;
+            }
+            const doc = docs[i];
+            if (!doc) {
+                settle(i, null);
+                continue;
+            }
+            try {
+                settle(i, this.parse(doc.json, doc.baseUrl));
+            } catch (err) {
+                if (!options.continueOnError) {
+                    throw err;
+                }
+                console.warn(`[QuarksLoader] Failed to parse effect ${i + 1}/${total}:`, err);
+                settle(i, null);
+            }
+        }
+        return results;
+    }
+
+    /** Runs `fn` over `items` with at most `concurrency` in flight (or all if unset/≤0). */
+    private static async mapPool<T, R>(
+        items: T[],
+        concurrency: number | undefined,
+        fn: (item: T, index: number) => Promise<R>
+    ): Promise<R[]> {
+        if (items.length === 0) {
+            return [];
+        }
+        const limit = concurrency !== undefined && concurrency > 0 ? concurrency : items.length;
+        const results = new Array<R>(items.length);
+        let next = 0;
+
+        const worker = async () => {
+            while (next < items.length) {
+                const index = next++;
+                results[index] = await fn(items[index], index);
+            }
+        };
+
+        const workers = Math.min(limit, items.length);
+        await Promise.all(Array.from({length: workers}, () => worker()));
+        return results;
+    }
+
+    private static async resolveWith(
+        resolver: QuarksResourceResolver | undefined,
+        url: string,
+        kind: QuarksResourceKind,
+        baseUrl: string
+    ): Promise<string> {
+        if (resolver?.resolve) {
+            return resolver.resolve(url, kind, baseUrl);
+        }
+        return QuarksLoader.joinUrl(baseUrl, url);
+    }
+
+    /** One in-flight fetch per scene + resolved url when `scene` is set; otherwise uncached. */
+    private static fetchJsonWith(
+        resolver: QuarksResourceResolver | undefined,
+        resolvedUrl: string,
+        scene: Scene | undefined
+    ): Promise<unknown> {
+        const load = async () => {
+            if (resolver?.fetchJson) {
+                return resolver.fetchJson(resolvedUrl);
+            }
+            const response = await fetch(resolvedUrl);
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+            return response.json();
+        };
+
+        if (!scene) {
+            return load();
+        }
+
+        const cache = sceneMap(sharedFetches, scene);
+        const key = `json|${resolvedUrl}`;
+        let pending = cache.get(key);
+        if (pending === undefined) {
+            pending = load().catch((err) => {
+                if (cache.get(key) === pending) {
+                    cache.delete(key);
+                }
+                throw err;
+            });
+            cache.set(key, pending);
+        }
+        return pending;
+    }
+
+    private static async inlineGeometryEntries(json: any, loadGeometry: (url: string) => Promise<any>): Promise<void> {
+        const geometries: any[] = Array.isArray(json?.geometries) ? json.geometries : [];
+        await Promise.all(
+            geometries
+                .filter((geom) => typeof geom?.url === 'string' && !geom.positions)
+                .map(async (geom) => {
+                    try {
+                        const data = await loadGeometry(geom.url);
+                        // Copy arrays so a shared fetch-cache document is not aliased across
+                        // effects — mutating one effect's inlined geometry must not corrupt others.
+                        for (const key of ['positions', 'indices', 'uvs', 'normals']) {
+                            const value = data?.[key];
+                            if (value === undefined) {
+                                continue;
+                            }
+                            geom[key] = Array.isArray(value) ? value.slice() : value;
+                        }
+                        delete geom.url;
+                    } catch (err) {
+                        console.warn(`[QuarksLoader] Could not load geometry "${geom.url}":`, err);
+                    }
+                })
+        );
+    }
+
     private parseImages(images: any[], baseUrl: string, _meta: LoadedMeta): void {
         (this as any)._images = {};
         for (const img of images) {
             if (img.url) {
                 QuarksLoader.warnIfNotAnImageUrl(img.url);
             }
-            (this as any)._images[img.uuid] = img.url ? QuarksLoader.resolveUrl(baseUrl, img.url) : null;
+            // Urls are usually already absolute after resolveResources; joinUrl is a no-op for
+            // data/blob/http(s) and still supports callers that use parse() with a baseUrl only.
+            (this as any)._images[img.uuid] = img.url ? QuarksLoader.joinUrl(baseUrl, img.url) : null;
         }
     }
 
@@ -393,19 +710,6 @@ export class QuarksLoader {
             `[QuarksLoader] Image "${url}" does not look like an image; its texture will fail to load. ` +
                 'This usually means the effect was exported without embedding that texture.'
         );
-    }
-
-    /**
-     * `img.url` is already absolute for data/blob URIs and full http(s) URLs — common for
-     * "portable" exports that embed textures as base64 (see ensurePortableTextureUrl in
-     * babylon.quarks-editor). Prepending baseUrl to those turns e.g.
-     * "data:image/png;base64,AAAA" into an invalid path like "/some/dir/data:image/png;base64,AAAA".
-     */
-    private static resolveUrl(baseUrl: string, url: string): string {
-        if (/^(data|blob):/i.test(url) || /^[a-z][a-z0-9+.-]*:\/\//i.test(url) || url.startsWith('/')) {
-            return url;
-        }
-        return baseUrl + url;
     }
 
     private parseTextures(textures: any[], meta: LoadedMeta): void {
