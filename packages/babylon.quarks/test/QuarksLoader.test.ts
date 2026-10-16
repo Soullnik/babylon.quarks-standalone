@@ -366,6 +366,8 @@ describe('QuarksLoader matrix decomposition', () => {
         const scene = new Scene(engine);
         const loader = new QuarksLoader(scene);
         const fetchSpy = jest.spyOn(global, 'fetch').mockResolvedValue({
+            ok: true,
+            status: 200,
             json: async () => ({
                 object: {
                     uuid: 'root',
@@ -436,6 +438,253 @@ describe('QuarksLoader matrix decomposition', () => {
 
         await QuarksLoader.resolveExternalGeometries({}, async () => ({}));
         warn.mockRestore();
+        scene.dispose();
+        engine.dispose();
+    });
+
+    it('loadFromJSON inlines external geometries and resolves relative image urls', async () => {
+        const engine = new NullEngine();
+        const scene = new Scene(engine);
+        const loader = new QuarksLoader(scene);
+        const geometryBody = {
+            positions: [0, 0, 0, 1, 0, 0, 1, 1, 0],
+            indices: [0, 1, 2],
+        };
+        const fetchSpy = jest.spyOn(global, 'fetch').mockImplementation(async (input: any) => {
+            const url = String(input);
+            if (url.endsWith('Quad.json')) {
+                return {ok: true, status: 200, json: async () => geometryBody} as any;
+            }
+            return {ok: false, status: 404, json: async () => null} as any;
+        });
+
+        const json: any = {
+            images: [{uuid: 'img', url: 'textures/smoke.png'}],
+            geometries: [{uuid: 'geo', type: 'QuarksGeometry', url: 'geometries/Quad.json'}],
+            object: {uuid: 'm', type: 'Mesh', name: 'quad', geometry: 'geo'},
+        };
+        const root = await loader.loadFromJSON(json, 'https://cdn.example.com/fx/');
+        expect(root).toBeInstanceOf(Mesh);
+        expect((root as Mesh).getTotalVertices()).toBe(3);
+        expect(json.geometries[0].url).toBeUndefined();
+        expect(json.geometries[0].positions).toEqual(geometryBody.positions);
+        expect(json.images[0].url).toBe('https://cdn.example.com/fx/textures/smoke.png');
+        expect(fetchSpy).toHaveBeenCalledWith('https://cdn.example.com/fx/geometries/Quad.json');
+
+        fetchSpy.mockRestore();
+        scene.dispose();
+        engine.dispose();
+    });
+
+    it('dedupes geometry JSON fetches for the same resolved url across parallel loads', async () => {
+        const engine = new NullEngine();
+        const scene = new Scene(engine);
+        const loader = new QuarksLoader(scene);
+        let geometryFetches = 0;
+        const geometryBody = {
+            positions: [0, 0, 0, 1, 0, 0, 1, 1, 0],
+            indices: [0, 1, 2],
+        };
+        const effectJson = () => ({
+            geometries: [{uuid: 'geo', type: 'QuarksGeometry', url: 'assets/geometries/Quad.json'}],
+            object: {uuid: 'm', type: 'Mesh', name: 'quad', geometry: 'geo'},
+        });
+        const fetchSpy = jest.spyOn(global, 'fetch').mockImplementation(async (input: any) => {
+            const url = String(input);
+            if (url.endsWith('effect-a.json') || url.endsWith('effect-b.json')) {
+                return {ok: true, status: 200, json: async () => effectJson()} as any;
+            }
+            if (url.endsWith('Quad.json')) {
+                geometryFetches++;
+                return {ok: true, status: 200, json: async () => geometryBody} as any;
+            }
+            return {ok: false, status: 404, json: async () => null} as any;
+        });
+
+        const [a, b] = await Promise.all([
+            loader.load('https://example.com/fx/effect-a.json'),
+            loader.load('https://example.com/fx/effect-b.json'),
+        ]);
+        expect(a).toBeInstanceOf(Mesh);
+        expect(b).toBeInstanceOf(Mesh);
+        expect(geometryFetches).toBe(1);
+
+        fetchSpy.mockRestore();
+        scene.dispose();
+        engine.dispose();
+    });
+
+    it('uses a custom resolver for geometry and image urls', async () => {
+        const engine = new NullEngine();
+        const scene = new Scene(engine);
+        const fetchJson = jest.fn(async (resolved: string) => {
+            expect(resolved).toBe('vfs:geometries/Box.json');
+            return {positions: [0, 0, 0, 1, 0, 0, 0, 1, 0], indices: [0, 1, 2]};
+        });
+        const loader = new QuarksLoader(scene, {
+            resolver: {
+                resolve: (url, kind) => `vfs:${kind === 'image' ? 'images' : 'geometries'}/${url.split('/').pop()}`,
+                fetchJson,
+            },
+        });
+
+        const json: any = {
+            images: [{uuid: 'img', url: 'folder/tex.png'}],
+            geometries: [{uuid: 'geo', type: 'QuarksGeometry', url: 'folder/Box.json'}],
+            object: {uuid: 'm', type: 'Mesh', name: 'box', geometry: 'geo'},
+        };
+        const root = await loader.loadFromJSON(json, 'ignored/');
+        expect(root).toBeInstanceOf(Mesh);
+        expect(fetchJson).toHaveBeenCalledTimes(1);
+        expect(json.images[0].url).toBe('vfs:images/tex.png');
+        expect(json.geometries[0].positions).toHaveLength(9);
+
+        scene.dispose();
+        engine.dispose();
+    });
+
+    it('loadAll preloads a pack with one shared geometry fetch and progress', async () => {
+        const engine = new NullEngine();
+        const scene = new Scene(engine);
+        const loader = new QuarksLoader(scene);
+        let geometryFetches = 0;
+        const geometryBody = {
+            positions: [0, 0, 0, 1, 0, 0, 1, 1, 0],
+            indices: [0, 1, 2],
+        };
+        const effectJson = (name: string) => ({
+            geometries: [{uuid: 'geo', type: 'QuarksGeometry', url: 'assets/geometries/Shared.json'}],
+            object: {uuid: name, type: 'Mesh', name, geometry: 'geo'},
+        });
+        const fetchSpy = jest.spyOn(global, 'fetch').mockImplementation(async (input: any) => {
+            const url = String(input);
+            if (/effect-[abc]\.json$/.test(url)) {
+                const name = url.slice(url.lastIndexOf('/') + 1, -5);
+                return {ok: true, status: 200, json: async () => effectJson(name)} as any;
+            }
+            if (url.endsWith('Shared.json')) {
+                geometryFetches++;
+                return {ok: true, status: 200, json: async () => geometryBody} as any;
+            }
+            return {ok: false, status: 404, json: async () => null} as any;
+        });
+
+        const progress: Array<[number, number]> = [];
+        const roots = await loader.loadAll(
+            [
+                'https://example.com/fx/effect-a.json',
+                'https://example.com/fx/effect-b.json',
+                'https://example.com/fx/effect-c.json',
+            ],
+            {onProgress: (done, total) => progress.push([done, total])}
+        );
+
+        expect(roots).toHaveLength(3);
+        expect(roots.every((r) => r instanceof Mesh)).toBe(true);
+        expect(geometryFetches).toBe(1);
+        expect(progress).toEqual([
+            [1, 3],
+            [2, 3],
+            [3, 3],
+        ]);
+
+        fetchSpy.mockRestore();
+        scene.dispose();
+        engine.dispose();
+    });
+
+    it('loadAll continueOnError keeps successes when one url fails', async () => {
+        const engine = new NullEngine();
+        const scene = new Scene(engine);
+        const loader = new QuarksLoader(scene);
+        const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+        const fetchSpy = jest.spyOn(global, 'fetch').mockImplementation(async (input: any) => {
+            const url = String(input);
+            if (url.endsWith('bad.json')) {
+                return {ok: false, status: 404, json: async () => null} as any;
+            }
+            return {
+                ok: true,
+                status: 200,
+                json: async () => ({object: {uuid: 'ok', type: 'Group', name: 'ok'}}),
+            } as any;
+        });
+
+        const progress: Array<[number, number]> = [];
+        const roots = await loader.loadAll(['https://example.com/fx/ok.json', 'https://example.com/fx/bad.json'], {
+            continueOnError: true,
+            onProgress: (done, total) => progress.push([done, total]),
+        });
+        expect(roots[0]?.name).toBe('ok');
+        expect(roots[1]).toBeNull();
+        expect(warn).toHaveBeenCalled();
+        // One settle callback per effect (success or fail), never double-counted across phases.
+        expect(progress).toEqual([
+            [1, 2],
+            [2, 2],
+        ]);
+
+        fetchSpy.mockRestore();
+        warn.mockRestore();
+        scene.dispose();
+        engine.dispose();
+    });
+
+    it('loadFromJSONAll resolves a pack of in-memory effects', async () => {
+        const engine = new NullEngine();
+        const scene = new Scene(engine);
+        let geometryFetches = 0;
+        const loader = new QuarksLoader(scene, {
+            resolver: {
+                fetchJson: async () => {
+                    geometryFetches++;
+                    return {positions: [0, 0, 0, 1, 0, 0, 0, 1, 0], indices: [0, 1, 2]};
+                },
+            },
+        });
+
+        const make = (name: string) => ({
+            geometries: [{uuid: 'geo', type: 'QuarksGeometry', url: 'shared.json'}],
+            object: {uuid: name, type: 'Mesh', name, geometry: 'geo'},
+        });
+        const roots = await loader.loadFromJSONAll([
+            {json: make('a'), baseUrl: 'pack/'},
+            {json: make('b'), baseUrl: 'pack/'},
+        ]);
+        expect(roots).toHaveLength(2);
+        expect(roots[0]).toBeInstanceOf(Mesh);
+        expect(roots[1]).toBeInstanceOf(Mesh);
+        expect(geometryFetches).toBe(1);
+
+        scene.dispose();
+        engine.dispose();
+    });
+
+    it('does not alias cached geometry arrays across effects in a batch', async () => {
+        const engine = new NullEngine();
+        const scene = new Scene(engine);
+        const shared = {positions: [0, 0, 0, 1, 0, 0, 0, 1, 0], indices: [0, 1, 2]};
+        const loader = new QuarksLoader(scene, {
+            resolver: {fetchJson: async () => shared},
+        });
+        const a: any = {
+            geometries: [{uuid: 'geo', type: 'QuarksGeometry', url: 'shared.json'}],
+            object: {uuid: 'a', type: 'Group'},
+        };
+        const b: any = {
+            geometries: [{uuid: 'geo', type: 'QuarksGeometry', url: 'shared.json'}],
+            object: {uuid: 'b', type: 'Group'},
+        };
+        await loader.loadFromJSONAll([
+            {json: a, baseUrl: 'pack/'},
+            {json: b, baseUrl: 'pack/'},
+        ]);
+        expect(a.geometries[0].positions).not.toBe(b.geometries[0].positions);
+        expect(a.geometries[0].positions).not.toBe(shared.positions);
+        a.geometries[0].positions[0] = 99;
+        expect(b.geometries[0].positions[0]).toBe(0);
+        expect(shared.positions[0]).toBe(0);
+
         scene.dispose();
         engine.dispose();
     });

@@ -25,7 +25,13 @@ export type {
     ParticleSystemParameters,
 } from './ParticleSystem';
 export {QuarksLoader} from './QuarksLoader';
-export type {QuarksLoaderOptions} from './QuarksLoader';
+export type {
+    QuarksBatchLoadOptions,
+    QuarksJSONLoadEntry,
+    QuarksLoaderOptions,
+    QuarksResourceKind,
+    QuarksResourceResolver,
+} from './QuarksLoader';
 export {QuarksPrefab} from './QuarksPrefab';
 export type {AnimationData, QuarksTimelineClip} from './QuarksPrefab';
 export {QuarksUtil} from './QuarksUtil';

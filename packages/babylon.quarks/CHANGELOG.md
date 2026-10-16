@@ -4,6 +4,28 @@ All notable changes to the `babylon.quarks` package are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project follows the `quarks.core` 0.x version line.
 
+## [0.21.0] — 2026-10-16
+
+### Added
+
+- `QuarksResourceResolver` on `QuarksLoaderOptions` (`resolve` / `fetchJson`) so File pickers,
+  CDN layouts and virtual FS backends can resolve relative texture and geometry links without
+  calling `resolveExternalGeometries` by hand.
+- `loadFromJSON(json, baseUrl?)` — same pipeline as `load(url)` when the effect document is
+  already in memory; `resolveResources` / static `resolveLinkedResources` for prepare-only.
+- `loadAll(urls)` and `loadFromJSONAll(entries)` for battle / level preload: fetch effect docs
+  (optional `concurrency`), resolve every linked geometry/image across the pack so shared asset
+  urls hit a per-scene fetch cache once, then parse. `continueOnError` and `onProgress` (once per
+  settled effect) supported; without `continueOnError` the return type is `TransformNode[]`.
+- `QuarksLoader.joinUrl` for portable baseUrl joining (data/blob/absolute urls left alone).
+
+### Changed
+
+- `load(url)` goes through `loadFromJSON` after fetching the effect JSON. Geometry JSON fetches
+  are deduped per scene; inlined array fields are copied so cached documents are not aliased
+  across effects. Prefer `load` / `loadFromJSON` / `resolveResources` over
+  `resolveExternalGeometries` (kept for compatibility).
+
 ## [0.20.0] — 2026-10-16
 
 ### Added

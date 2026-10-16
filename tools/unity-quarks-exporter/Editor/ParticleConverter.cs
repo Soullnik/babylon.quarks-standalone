@@ -231,7 +231,7 @@ namespace BabylonQuarks.UnityExporter
         private static JToken BuildShape(ParticleSystem.ShapeModule shape, ExportContext ctx, string owner)
         {
             if (!shape.enabled) return new JObject().Set("type", "point");
-            return AddShapeTransform(BuildShapeType(shape, ctx), shape);
+            return AddShapeTransform(BuildShapeType(shape, ctx, owner), shape);
         }
 
         /// <summary>
@@ -265,7 +265,7 @@ namespace BabylonQuarks.UnityExporter
             || type == ParticleSystemShapeType.BoxEdge
             || type == ParticleSystemShapeType.Rectangle;
 
-        private static JObject BuildShapeType(ParticleSystem.ShapeModule shape, ExportContext ctx)
+        private static JObject BuildShapeType(ParticleSystem.ShapeModule shape, ExportContext ctx, string owner)
         {
             float arc = shape.arc * Mathf.Deg2Rad;
             float thickness = shape.radiusThickness;

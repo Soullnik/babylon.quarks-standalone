@@ -170,6 +170,8 @@ import {BatchedRenderer, QuarksLoader, QuarksUtil} from 'babylon.quarks';
 const batchRenderer = new BatchedRenderer('particles', scene);
 const loader = new QuarksLoader(scene);
 const effect = await loader.load('effects/explosion.json');
+// Or preload a battle pack — shared textures/geometries fetch once:
+// const roots = await loader.loadAll(['fx/hit.json', 'fx/explosion.json'], { concurrency: 6 });
 QuarksUtil.addToBatchRenderer(effect, batchRenderer);
 QuarksUtil.play(effect);
 ```

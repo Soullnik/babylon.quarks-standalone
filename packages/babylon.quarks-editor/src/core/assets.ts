@@ -1,3 +1,4 @@
+import type {QuarksResourceKind, QuarksResourceResolver} from 'babylon.quarks';
 import {QuarksLoader} from 'babylon.quarks';
 
 /**
@@ -124,33 +125,55 @@ class ImportedFileIndex {
 }
 
 /**
- * Inlines what an "assets as files" export put in separate files: image urls become data URIs
- * and external geometries are read into the JSON, so the effect loads (and later exports) as a
+ * File-backed {@link QuarksResourceResolver}: relative image urls become data URIs and geometry
+ * urls load from the imported file set. Collects missing references into `missing`.
+ */
+function createFileResolver(effectPath: string, index: ImportedFileIndex, missing: string[]): QuarksResourceResolver {
+    return {
+        async resolve(url: string, kind: QuarksResourceKind, baseUrl: string): Promise<string> {
+            if (kind === 'image') {
+                if (isExternalUrl(url)) {
+                    return url;
+                }
+                const file = index.find(baseUrl || effectPath, url);
+                if (!file) {
+                    missing.push(url);
+                    return url;
+                }
+                return index.read(file, readAsDataUrl);
+            }
+            // Geometry (and other kinds): stable path key for fetchJson.
+            const file = index.find(baseUrl || effectPath, url);
+            if (!file) {
+                missing.push(url);
+                throw new Error('not among the imported files');
+            }
+            return relativePathOf(file);
+        },
+        fetchJson(resolvedUrl: string): Promise<unknown> {
+            // resolvedUrl is relativePathOf(file) from resolve(); look up by path (empty base).
+            const file = index.find('', resolvedUrl);
+            if (!file) {
+                throw new Error(`missing file "${resolvedUrl}"`);
+            }
+            return index.read(file, async (f) => JSON.parse(await f.text()));
+        },
+    };
+}
+
+/**
+ * Inlines what an "assets as files" export put in separate files via
+ * {@link QuarksLoader.resolveLinkedResources}, so the effect loads (and later exports) as a
  * self-contained effect. Returns the references that could not be found among the files.
  */
 async function inlineExternalFiles(json: any, effectPath: string, index: ImportedFileIndex): Promise<string[]> {
     const missing: string[] = [];
-
-    for (const image of Array.isArray(json.images) ? json.images : []) {
-        const url = image?.url;
-        if (typeof url !== 'string' || isExternalUrl(url)) continue;
-        const file = index.find(effectPath, url);
-        if (file) {
-            image.url = await index.read(file, readAsDataUrl);
-        } else {
-            missing.push(url);
-        }
-    }
-
-    await QuarksLoader.resolveExternalGeometries(json, async (url) => {
-        const file = index.find(effectPath, url);
-        if (!file) {
-            missing.push(url);
-            throw new Error('not among the imported files');
-        }
-        return index.read(file, async (f) => JSON.parse(await f.text()));
+    // baseUrl is the effect file path so resolveRelativePath can walk from its folder; the
+    // File resolver ignores HTTP join and looks up files by path/name instead.
+    await QuarksLoader.resolveLinkedResources(json, {
+        baseUrl: effectPath,
+        resolver: createFileResolver(effectPath, index, missing),
     });
-
     return missing;
 }
 

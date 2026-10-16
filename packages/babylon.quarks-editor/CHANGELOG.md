@@ -4,6 +4,14 @@ All notable changes to the `babylon.quarks-editor` package are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project follows the `quarks.core` 0.x version line.
 
+## [0.21.0] — 2026-10-16
+
+### Changed
+
+- Asset folder import inlines external textures and geometries through
+  `QuarksLoader.resolveLinkedResources` and a File-backed `QuarksResourceResolver`, matching the
+  runtime loader path instead of a private `resolveExternalGeometries` helper.
+
 ## [0.20.0] — 2026-10-16
 
 ### Added
