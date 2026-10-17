@@ -12,6 +12,12 @@ and the project follows the `quarks.core` 0.x version line.
   each rolling `probability` on its own. Repeats past the system's `duration` are dropped (a
   looping system starts them over every loop), a `cycle` below 1 fires once, and a zero interval
   fires every wave at once. Previously every burst fired a single wave.
+- Emission over distance spreads the particles it owes along the path the emitter travelled
+  this step, each at its own metre mark (the spacing carries across steps), instead of spawning
+  all of them at the emitter's current position — a fast world-space emitter now leaves a
+  continuous trail rather than one clump per frame. Only the position is interpolated (rotation
+  and scale are the emitter's current ones) and the particles start at age 0. Local-space
+  systems, whose particles move with the emitter, are unchanged.
 
 ## [0.21.0] — 2026-10-16
 

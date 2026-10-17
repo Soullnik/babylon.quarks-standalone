@@ -259,6 +259,8 @@ export class ParticleSystem implements IParticleSystem {
     private previousEmitterPos?: Vector3;
     private tempEmitterPos: Vector3 = new Vector3();
     private temp: Vector3 = new Vector3();
+    /** Emitter matrix moved along the step's path, see spawnAlongPath. */
+    private pathMatrix: Matrix4 = new Matrix4();
     private normalMatrix: Matrix3 = new Matrix3();
     private memory: GeneratorMemory = [];
     private listeners: {[event: string]: Array<(event: ParticleSystemEvent) => void>} = {};
@@ -1372,6 +1374,43 @@ export class ParticleSystem implements IParticleSystem {
         return false;
     }
 
+    /**
+     * Spawns `count` particles owed to emission over distance, each where the
+     * emitter crossed its metre mark on the way from `from` to where
+     * `emitterMatrix` has it now, rather than all of them at the end of the
+     * path: a fast emitter then leaves a continuous trail instead of one clump
+     * per step.
+     *
+     * `carried` is how far the emitter had already gone past its last mark
+     * before this step, so the marks keep their spacing across steps. Only the
+     * position is interpolated; the emitter's current rotation and scale are
+     * used for every particle.
+     */
+    private spawnAlongPath(
+        count: number,
+        emissionState: EmissionState,
+        emitterMatrix: Matrix4,
+        from: Vector3,
+        carried: number,
+        spacing: number,
+        length: number
+    ): void {
+        const matrix = this.pathMatrix.copy(emitterMatrix);
+        const target = emitterMatrix.elements;
+        const elements = matrix.elements;
+        const tx = target[12];
+        const ty = target[13];
+        const tz = target[14];
+        for (let k = 1; k <= count; k++) {
+            const travelled = k * spacing - carried;
+            const f = travelled <= 0 ? 0 : travelled >= length ? 1 : travelled / length;
+            elements[12] = from.x + (tx - from.x) * f;
+            elements[13] = from.y + (ty - from.y) * f;
+            elements[14] = from.z + (tz - from.z) * f;
+            this.spawn(1, emissionState, matrix);
+        }
+    }
+
     emit(delta: number, emissionState: EmissionState, emitterMatrix: Matrix4) {
         if (emissionState.time > this.duration) {
             if (this.looping) {
@@ -1402,19 +1441,34 @@ export class ParticleSystem implements IParticleSystem {
             this.emitBursts(emissionState, emitterMatrix);
         }
 
+        // Particles owed to the distance travelled this step, spawned along it.
+        let pathSpawn = 0;
+        let pathSpacing = 0;
+        let pathCarried = 0;
+        let pathLength = 0;
+        const previousWorldPos = emissionState.previousWorldPos;
         if (!this.emitEnded) {
             const timeRatio = emissionState.time / this.duration;
             emissionState.waitEmiting += delta * this.emissionOverTime.genValue(this.memory, timeRatio) * qualityFactor;
 
-            const previousWorldPos = emissionState.previousWorldPos;
             if (previousWorldPos !== undefined) {
                 this.temp.set(emitterMatrix.elements[12], emitterMatrix.elements[13], emitterMatrix.elements[14]);
-                emissionState.travelDistance += previousWorldPos.distanceTo(this.temp);
+                pathLength = previousWorldPos.distanceTo(this.temp);
+                pathCarried = emissionState.travelDistance;
+                emissionState.travelDistance += pathLength;
                 const emitPerMeter = this.emissionOverDistance.genValue(this.memory, timeRatio) * qualityFactor;
                 if (emissionState.travelDistance * emitPerMeter > 0) {
                     const count = Math.floor(emissionState.travelDistance * emitPerMeter);
                     emissionState.travelDistance -= count / emitPerMeter;
-                    emissionState.waitEmiting += count;
+                    // A world-space particle stays where it is born, so it is born
+                    // where the emitter passed its mark. A local-space one moves
+                    // with the emitter and has no path to be spread along.
+                    if (this.worldSpace && pathLength > 0) {
+                        pathSpawn = count;
+                        pathSpacing = 1 / emitPerMeter;
+                    } else {
+                        emissionState.waitEmiting += count;
+                    }
                 }
             }
         }
@@ -1425,6 +1479,17 @@ export class ParticleSystem implements IParticleSystem {
         if (totalSpawn > 0) {
             this.spawn(totalSpawn, emissionState, emitterMatrix);
             emissionState.waitEmiting -= totalSpawn;
+        }
+        if (pathSpawn > 0) {
+            this.spawnAlongPath(
+                pathSpawn,
+                emissionState,
+                emitterMatrix,
+                previousWorldPos!,
+                pathCarried,
+                pathSpacing,
+                pathLength
+            );
         }
 
         if (emissionState.previousWorldPos === undefined) emissionState.previousWorldPos = new Vector3();
