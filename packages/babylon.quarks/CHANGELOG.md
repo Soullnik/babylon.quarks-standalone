@@ -6,6 +6,20 @@ and the project follows the `quarks.core` 0.x version line.
 
 ## [Unreleased]
 
+### Changed
+
+- **Behaviour change:** quarks.core `WidthOverLength` (Width over Trail) now reads its curve as a
+  multiplier on the width each trail sample was recorded with (the particle's `size.x` at that
+  moment), the way Unity's Width over Trail works, and gives the head sample the curve's value at
+  0, so a trail no longer flares out behind its head or steps at the tip. A new `absolute` flag
+  (`new WidthOverLength(curve, absolute = false)`, JSON field `absolute`) keeps the old reading —
+  the curve as the width in world units, the head at the particle's size. `toJSON` always writes
+  the flag; JSON without it (everything written by 0.21 and earlier, including the Unity
+  exporter's output) loads as `absolute: true`, so authored effects keep their look. Code that
+  builds `new WidthOverLength(curve)` gets the new multiplier behaviour: divide an absolute curve
+  by the start size, or pass `true`. `TrailParticle` gains `historyBaseSizes` (the unscaled
+  recorded widths) and `headWidthScale`.
+
 ### Fixed
 
 - Burst `cycle` / `interval` are honoured: a burst fires `cycle` waves, `interval` seconds apart,
