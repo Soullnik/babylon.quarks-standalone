@@ -1011,11 +1011,24 @@ export class QuarksLoader {
                     if (system.behaviors[i] instanceof EmitSubParticleSystem) {
                         const subEmitter = system.behaviors[i] as EmitSubParticleSystem;
                         const targetUUID = subEmitter.subParticleSystem as any;
-                        if (typeof targetUUID === 'string' && nodesMap[targetUUID]) {
-                            const resolved = nodesMap[targetUUID];
+                        if (typeof targetUUID !== 'string') {
+                            continue;
+                        }
+                        const resolved = nodesMap[targetUUID];
+                        if (resolved instanceof ParticleEmitter) {
                             (subEmitter as any).subParticleSystem = resolved;
-                            if (resolved instanceof ParticleEmitter) {
-                                (resolved.system as ParticleSystem).onlyUsedByOther = true;
+                            (resolved.system as ParticleSystem).onlyUsedByOther = true;
+                        } else {
+                            // An export that dropped the target emitter, or kept only
+                            // some emitters of a prefab: emit nothing rather than leave
+                            // a string the behavior would treat as an emitter.
+                            subEmitter.subParticleSystem = undefined;
+                            if (targetUUID !== '') {
+                                console.warn(
+                                    `[QuarksLoader] Emitter "${node.name}" has a sub emitter targeting "${targetUUID}", ` +
+                                        (resolved ? 'which is not a particle emitter' : 'which is not in the effect') +
+                                        '; that sub emitter is skipped.'
+                                );
                             }
                         }
                     }

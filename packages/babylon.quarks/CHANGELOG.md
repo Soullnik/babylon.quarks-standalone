@@ -18,6 +18,11 @@ and the project follows the `quarks.core` 0.x version line.
   continuous trail rather than one clump per frame. Only the position is interpolated (rotation
   and scale are the emitter's current ones) and the particles start at age 0. Local-space
   systems, whose particles move with the emitter, are unchanged.
+- A sub emitter whose target uuid is not in the effect no longer throws on every frame.
+  `QuarksLoader` unlinks it (`subParticleSystem = undefined`) with one `console.warn` naming the
+  emitter and the uuid — also when the uuid names a node that is not a particle emitter — and
+  quarks.core `EmitSubParticleSystem` skips any value that is not a resolved emitter. An
+  unresolved uuid string is written back unchanged by `toJSON`.
 
 ## [0.21.0] — 2026-10-16
 
