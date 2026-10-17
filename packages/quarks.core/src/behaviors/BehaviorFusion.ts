@@ -76,13 +76,16 @@ function fragmentFor(behavior: Behavior, k: number): Fragment | null {
             };
         case 'RotationOverLife':
             return {
-                setup: `const g${k} = behaviors[${k}].angularVelocity;`,
+                setup: `const b${k} = behaviors[${k}];
+                    const g${k} = b${k}.angularVelocity;`,
                 // The rate is kept on the particle for the renderer, which draws
-                // between simulation steps.
+                // between simulation steps. A mesh particle turns about its own Z.
                 body: `if (typeof p.rotation === 'number') {
                         const rate = g${k}.genValue(p.memory, t);
                         p.rotation += delta * rate;
                         p.angularVelocity = rate;
+                    } else if (p.rotation instanceof deps.Quaternion) {
+                        b${k}.turnAboutZ(p, p.rotation, g${k}.genValue(p.memory, t) * delta);
                     }`,
             };
         case 'FrameOverLife':

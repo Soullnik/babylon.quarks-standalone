@@ -23,6 +23,11 @@ and the project follows the `quarks.core` 0.x version line.
   emitter and the uuid — also when the uuid names a node that is not a particle emitter — and
   quarks.core `EmitSubParticleSystem` skips any value that is not a resolved emitter. An
   unresolved uuid string is written back unchanged by `toJSON`.
+- quarks.core `RotationOverLife` turns mesh particles too: a quaternion rotation is turned about
+  the particle's local Z axis (the axis a number `startRotation` uses, and what Unity's Rotation
+  over Lifetime without separate axes does to meshes), in its own pass and in the fused pass, and
+  the step is kept for the renderer's in-between-step interpolation. It used to do nothing on
+  meshes, silently. `Rotation3DOverLife` remains the behavior for any other axis.
 
 ## [0.21.0] — 2026-10-16
 
