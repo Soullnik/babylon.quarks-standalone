@@ -4,6 +4,15 @@ All notable changes to the `babylon.quarks-editor` package are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project follows the `quarks.core` 0.x version line.
 
+## [0.22.0] — 2026-10-17
+
+### Added
+
+- Renderer module: a "Lighting" selector for mesh particles (`fixed` / `unlit` / `scene`) and
+  rim (Fresnel) controls — colour, power, strength, add or mix.
+- Width over Trail module: an "Absolute width" checkbox for `WidthOverLength`'s `absolute`
+  flag (the curve as world-unit widths, the pre-0.22 reading).
+
 ## [0.21.0] — 2026-10-16
 
 ### Changed
