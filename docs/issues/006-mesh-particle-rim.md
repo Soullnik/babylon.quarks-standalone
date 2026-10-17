@@ -2,6 +2,8 @@
 
 **Kind:** feature · **Package:** `babylon.quarks` · **Version:** 0.21.0 (`0a3331c`)
 
+**Status:** implemented in `fe0a523` — `ParticleSystem.rim = {color, power, strength, mode}` (defaults `[1,1,1]`, 2, 1, `'add'`; JSON: `rim` on the QuarksMaterial), `MESH_RIM` / `MESH_RIM_MIX` defines, editor Renderer module. Test: `packages/babylon.quarks/test/meshRim.test.ts`.
+
 ## Summary
 
 Stylised games draw volume effects with a bright or dark edge where the surface turns away from

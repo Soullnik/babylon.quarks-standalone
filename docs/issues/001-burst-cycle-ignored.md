@@ -2,6 +2,8 @@
 
 **Kind:** bug · **Package:** `babylon.quarks` · **Version:** 0.21.0 (`0a3331c`)
 
+**Status:** fixed in `1213255` (branch `fix/greedbound-vfx-issues`) — waves tracked per burst in `EmissionState.burstWaves`; repeats past `duration` dropped, restarted each loop; `cycle < 1` fires once. Test: `packages/babylon.quarks/test/burstCycles.test.ts`.
+
 ## Summary
 
 A burst with `cycle: N` and `interval: t` fires once. `cycle` and `interval` are parsed,

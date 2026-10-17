@@ -2,6 +2,8 @@
 
 **Kind:** feature · **Package:** `babylon.quarks` · **Version:** 0.21.0 (`0a3331c`)
 
+**Status:** implemented in `d4ac371` — `ParticleSystem.lighting: 'fixed' | 'unlit' | 'scene'` (default `'fixed'`, JSON: `lighting` on the QuarksMaterial), `BatchedRenderer.setMeshLighting({direction, color, ambient})`, `MESH_UNLIT` define, editor Renderer module. Test: `packages/babylon.quarks/test/meshLighting.test.ts`.
+
 ## Summary
 
 Mesh particles (`RenderMode.Mesh`) are lit by a light fixed in `SpriteBatch`:

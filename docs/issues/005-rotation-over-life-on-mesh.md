@@ -3,6 +3,8 @@
 **Kind:** developer experience · **Packages:** `quarks.core`, `babylon.quarks` (`QuarksLoader`)
 · **Version:** 0.21.0 (`0a3331c`)
 
+**Status:** fixed in `dd7badb` (proposal 2) — `RotationOverLife` turns quaternion rotations about the particle's local Z, in update, updateAll and the fused pass; no load-time warning needed. Tests: `packages/quarks.core/test/behaviors/RotationOverLife.test.ts`, `packages/babylon.quarks/test/meshRotationOverLife.test.ts`.
+
 ## Summary
 
 `RotationOverLife` only turns particles whose `rotation` is a number (billboards):

@@ -3,6 +3,8 @@
 **Kind:** bug · **Packages:** `quarks.core` (`EmitSubParticleSystem`), `babylon.quarks` (`QuarksLoader`)
 · **Version:** 0.21.0 (`0a3331c`)
 
+**Status:** fixed in `9eff806` — the loader sets `subParticleSystem = undefined` and warns once (also for a target that is not a ParticleEmitter); `EmitSubParticleSystem` guards on the resolved shape. Test: `packages/babylon.quarks/test/subEmitterMissing.test.ts`.
+
 ## Summary
 
 When an `EmitSubParticleSystem` behaviour names a sub-system uuid that is not in the file — an

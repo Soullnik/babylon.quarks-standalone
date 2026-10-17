@@ -2,6 +2,8 @@
 
 **Kind:** bug · **Package:** `quarks.core` (`WidthOverLength`) · **Version:** 0.21.0 (`0a3331c`)
 
+**Status:** fixed in `6c0d094` — the curve multiplies each sample's recorded size (`TrailParticle.historyBaseSizes`) and the head gets `curve(0)`. New `absolute` flag (constructor arg / JSON field) keeps the old reading; JSON without the field loads as `absolute: true`, so existing effects are unchanged, while `new WidthOverLength(curve)` in code gets the new behaviour. Test: `packages/babylon.quarks/test/widthOverLength.test.ts`.
+
 ## Summary
 
 `WidthOverLength` overwrites every recorded sample's width with the curve's value itself, not

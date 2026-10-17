@@ -2,6 +2,8 @@
 
 **Kind:** bug · **Package:** `babylon.quarks` · **Version:** 0.21.0 (`0a3331c`)
 
+**Status:** fixed in `dba1626` — world-space systems spawn each distance-owed particle at its metre mark along the step's path (remainder carried across steps). Position only (no rotation slerp); particles start at age 0 (an age offset would break the newborn smoothing and Birth-mode sub emitters); local-space systems unchanged. Test: `packages/babylon.quarks/test/emissionOverDistance.test.ts`.
+
 ## Summary
 
 `emissionOverDistance` counts correctly how many particles the emitter's travel this frame is
