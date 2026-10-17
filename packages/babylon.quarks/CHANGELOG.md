@@ -4,6 +4,15 @@ All notable changes to the `babylon.quarks` package are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project follows the `quarks.core` 0.x version line.
 
+## [Unreleased]
+
+### Fixed
+
+- Burst `cycle` / `interval` are honoured: a burst fires `cycle` waves, `interval` seconds apart,
+  each rolling `probability` on its own. Repeats past the system's `duration` are dropped (a
+  looping system starts them over every loop), a `cycle` below 1 fires once, and a zero interval
+  fires every wave at once. Previously every burst fired a single wave.
+
 ## [0.21.0] — 2026-10-16
 
 ### Added
