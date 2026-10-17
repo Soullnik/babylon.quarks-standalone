@@ -90,19 +90,23 @@ describe('burst cycle / interval', () => {
     });
 
     it('rolls the probability per wave', () => {
-        const random = jest.spyOn(Math, 'random');
-        // Wave 0 fails, waves 1 and 2 pass.
-        random.mockReturnValueOnce(0.9).mockReturnValueOnce(0.1).mockReturnValueOnce(0.1);
-        try {
+        // Rolled once per burst, every system would get all three waves or
+        // none (and with the cycle ignored, one or none); rolled per wave,
+        // some get exactly two. Counted over many
+        // systems rather than by mocking Math.random, which other code (the
+        // source-map support behind stack traces) also calls.
+        const counts = new Set<number>();
+        for (let i = 0; i < 200; i++) {
             const system = burstSystem([
-                {time: 0, count: new ConstantValue(3), probability: 0.5, interval: 0.1, cycle: 3},
+                {time: 0, count: new ConstantValue(1), probability: 0.5, interval: 0.1, cycle: 3},
             ]);
             system.play();
             run(system, 0.5);
-            expect(system.particleNum).toBe(6);
-        } finally {
-            random.mockRestore();
+            counts.add(system.particleNum);
+            system.dispose();
         }
+        expect(counts.has(2)).toBe(true);
+        for (const count of counts) expect(count).toBeLessThanOrEqual(3);
     });
 
     it('restarts the waves every loop of a looping system', () => {
