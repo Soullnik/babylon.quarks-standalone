@@ -1,7 +1,7 @@
 import {Texture} from '@babylonjs/core/Materials/Textures/texture';
 import {Mesh} from '@babylonjs/core/Meshes/mesh';
 import {PlusIcon, XMarkIcon} from '@heroicons/react/24/solid';
-import type {Behavior, MeshLighting, ParticleSystem} from 'babylon.quarks';
+import type {Behavior, MeshLighting, MeshRim, ParticleSystem} from 'babylon.quarks';
 import {
     ColorOverLife,
     ConstantColor,
@@ -1135,6 +1135,68 @@ export function RendererModule({
                     />
                 </Row>
             )}
+            {system.renderMode === RenderMode.Mesh && (
+                <Row label="Rim">
+                    <CheckboxField
+                        value={!!system.rim}
+                        onChange={(v) => binding.apply((s) => (s.rim = v ? {} : undefined))}
+                    />
+                </Row>
+            )}
+            {system.renderMode === RenderMode.Mesh &&
+                system.rim &&
+                (() => {
+                    const rim = system.rim;
+                    const patchRim = (patch: Partial<MeshRim>) => binding.apply((s) => (s.rim = {...s.rim, ...patch}));
+                    const setChannel = (channel: number, value: number) => {
+                        const color: [number, number, number] = [...rim.color];
+                        color[channel] = value;
+                        patchRim({color});
+                    };
+                    return (
+                        <>
+                            <Row label="Rim mode">
+                                <SelectField<MeshRim['mode']>
+                                    value={rim.mode}
+                                    options={[
+                                        {value: 'add', label: 'Add (glow)'},
+                                        {value: 'mix', label: 'Mix (outline)'},
+                                    ]}
+                                    onChange={(mode) => patchRim({mode})}
+                                />
+                            </Row>
+                            <Row label="Rim color">
+                                <div style={{display: 'flex', gap: 6}}>
+                                    {[0, 1, 2].map((channel) => (
+                                        <NumberField
+                                            key={channel}
+                                            value={rim.color[channel]}
+                                            min={0}
+                                            step={0.05}
+                                            onChange={(v) => setChannel(channel, v)}
+                                        />
+                                    ))}
+                                </div>
+                            </Row>
+                            <Row label="Rim power">
+                                <NumberField
+                                    value={rim.power}
+                                    min={0.01}
+                                    step={0.25}
+                                    onChange={(power) => patchRim({power})}
+                                />
+                            </Row>
+                            <Row label="Rim strength">
+                                <NumberField
+                                    value={rim.strength}
+                                    min={0}
+                                    step={0.05}
+                                    onChange={(strength) => patchRim({strength})}
+                                />
+                            </Row>
+                        </>
+                    );
+                })()}
             <Row label="Render order">
                 <NumberField
                     value={system.renderOrder}

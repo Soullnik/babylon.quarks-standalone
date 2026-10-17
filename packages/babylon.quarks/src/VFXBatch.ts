@@ -50,6 +50,62 @@ export function defaultMeshLighting(): MeshLightingSettings {
     };
 }
 
+/**
+ * A rim (Fresnel) term on mesh particles: a colour that grows where the surface
+ * turns away from the camera, `pow(1 - |N·V|, power) * strength`. Unset: no rim.
+ * Only mesh particles draw it.
+ */
+export interface MeshRim {
+    /** Edge colour, linear RGB. Default `[1, 1, 1]`. */
+    color: [number, number, number];
+    /** Falloff exponent; higher keeps the rim to a thinner edge. Default 2. */
+    power: number;
+    /** How much of the rim is applied, usually 0…1. Default 1. */
+    strength: number;
+    /**
+     * `'add'` (default) adds the colour, for a glowing edge; `'mix'` blends the
+     * surface toward it, for an outline (a dark ink line with a dark colour).
+     */
+    mode: 'add' | 'mix';
+}
+
+/**
+ * A complete rim from a partial one, every field defaulted and kept in range,
+ * or undefined when `rim` is unset.
+ */
+export function normalizeMeshRim(rim: Partial<MeshRim> | null | undefined): MeshRim | undefined {
+    if (!rim || typeof rim !== 'object') {
+        return undefined;
+    }
+    const color = Array.isArray(rim.color) ? rim.color : [1, 1, 1];
+    const channel = (value: unknown, fallback: number) =>
+        typeof value === 'number' && Number.isFinite(value) ? value : fallback;
+    return {
+        color: [channel(color[0], 1), channel(color[1], 1), channel(color[2], 1)],
+        power: Math.max(0.01, channel(rim.power, 2)),
+        strength: Math.max(0, channel(rim.strength, 1)),
+        mode: rim.mode === 'mix' ? 'mix' : 'add',
+    };
+}
+
+/** True when both describe the same rim (or both none). */
+export function meshRimEqual(a: MeshRim | undefined, b: MeshRim | undefined): boolean {
+    if (a === b) {
+        return true;
+    }
+    if (!a || !b) {
+        return false;
+    }
+    return (
+        a.mode === b.mode &&
+        a.power === b.power &&
+        a.strength === b.strength &&
+        a.color[0] === b.color[0] &&
+        a.color[1] === b.color[1] &&
+        a.color[2] === b.color[2]
+    );
+}
+
 export interface StoredBatchSettings {
     instancingGeometry: Float32Array;
     instancingIndices: Uint32Array | Uint16Array;
@@ -78,6 +134,8 @@ export interface StoredBatchSettings {
     pivot?: Vector3;
     /** Mesh particle lighting, see {@link VFXBatchSettings.lighting}. */
     lighting?: MeshLighting;
+    /** Mesh particle rim, see {@link VFXBatchSettings.rim}. */
+    rim?: MeshRim;
 }
 
 export abstract class VFXBatch {
@@ -118,6 +176,7 @@ export abstract class VFXBatch {
             pivot: settings.pivot?.clone(),
             layerMask: settings.layerMask,
             lighting: settings.lighting,
+            rim: normalizeMeshRim(settings.rim),
         };
         this.mesh = new Mesh('vfxBatch', scene);
         this.mesh.alwaysSelectAsActiveMesh = true;

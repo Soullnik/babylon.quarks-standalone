@@ -224,6 +224,14 @@ export class SpriteBatch extends VFXBatch {
         if (isMesh && !lit) {
             defines.push('MESH_UNLIT');
         }
+        const rim = isMesh ? this.settings.rim : undefined;
+        if (rim) {
+            defines.push('MESH_RIM');
+            if (rim.mode === 'mix') {
+                defines.push('MESH_RIM_MIX');
+            }
+        }
+        const needsEyePosition = useEnvAtlas || !!rim;
 
         const shaderLanguage = shaderLanguageFor(this.scene.getEngine());
         registerShaders(shaderName, vertexShader, fragmentShader, shaderLanguage);
@@ -248,8 +256,14 @@ export class SpriteBatch extends VFXBatch {
         }
         if (useEnvAtlas) {
             samplers.push('envAtlas');
-            uniforms.push('eyePosition');
             uniforms.push('reflectionLevel');
+        }
+        if (needsEyePosition) {
+            uniforms.push('eyePosition');
+        }
+        if (rim) {
+            uniforms.push('rimColor');
+            uniforms.push('rimParams');
         }
         if (this.settings.renderMode === RenderMode.StretchedBillBoard) {
             uniforms.push('speedFactor');
@@ -291,7 +305,14 @@ export class SpriteBatch extends VFXBatch {
         if (useEnvAtlas && atlas) {
             mat.setTexture('envAtlas', atlas);
             mat.setFloat('reflectionLevel', this.settings.reflectionLevel);
+        }
+        if (rim) {
+            mat.setVector3('rimColor', new BVector3(rim.color[0], rim.color[1], rim.color[2]));
+            mat.setVector2('rimParams', new BVector2(rim.power, rim.strength));
+        }
+        if (needsEyePosition) {
             const eyePosition = new BVector3();
+            mat.setVector3('eyePosition', eyePosition);
             mat.onBindObservable.add(() => {
                 const camera = this.scene.activeCamera;
                 if (!camera) {

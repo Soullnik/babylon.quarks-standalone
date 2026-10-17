@@ -20,6 +20,13 @@ and the project follows the `quarks.core` 0.x version line.
   any subset) sets the `'fixed'` light for every mesh batch of the renderer, including later ones;
   `getMeshLighting()` returns a copy, `defaultMeshLighting()` the built-in values
   (`(0.4, -1, 0.6)`, white, `0.35` grey). Exposed in the editor's Renderer module as "Lighting".
+- Mesh particle rim (Fresnel) term: `ParticleSystem.rim` (constructor option `rim`, saved as
+  `rim` on the effect's `QuarksMaterial`) — `{color: [r, g, b], power, strength, mode}` with
+  defaults `[1, 1, 1]`, `2`, `1`, `'add'`; any field may be left out. The edge term is
+  `pow(1 - |N·V|, power) * strength`; `'add'` adds `color` (glowing edge), `'mix'` blends toward it
+  (outline). Compiled in only when set (`MESH_RIM` / `MESH_RIM_MIX`), batched by value, written to
+  JSON only when set, and exposed in the editor's Renderer module. `normalizeMeshRim` /
+  `meshRimEqual` are exported.
 
 ### Changed
 

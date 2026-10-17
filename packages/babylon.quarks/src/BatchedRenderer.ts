@@ -10,6 +10,8 @@ import {
     defaultMeshLighting,
     MeshLighting,
     MeshLightingSettings,
+    MeshRim,
+    meshRimEqual,
     RenderMode,
     StoredBatchSettings,
     VFXBatch,
@@ -67,6 +69,8 @@ export interface VFXBatchSettings {
      * `'fixed'`. See {@link MeshLighting}. Other render modes ignore it.
      */
     lighting?: MeshLighting;
+    /** Rim (Fresnel) term on mesh particles; unset draws none. See {@link MeshRim}. */
+    rim?: MeshRim;
 }
 
 export interface AdaptivePerformanceOptions {
@@ -175,7 +179,8 @@ export class BatchedRenderer extends TransformNode {
             a.renderOrder === b.renderOrder &&
             a.layerMask === b.layerMask &&
             pivotEqual(a.pivot, b.pivot) &&
-            (a.lighting ?? 'fixed') === (b.lighting ?? 'fixed')
+            (a.lighting ?? 'fixed') === (b.lighting ?? 'fixed') &&
+            meshRimEqual(a.rim, b.rim)
         );
     }
 

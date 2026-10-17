@@ -47,7 +47,7 @@ import {BatchedRenderer, VFXBatchSettings} from './BatchedRenderer';
 import {ensureEnvAtlasFromCube, getCachedEnvAtlas} from './envAtlas';
 import {ensureTriangleIndices} from './geometryUtil';
 import {ParticleEmitter} from './ParticleEmitter';
-import {MeshLighting, RenderMode} from './VFXBatch';
+import {MeshLighting, MeshRim, normalizeMeshRim, RenderMode} from './VFXBatch';
 
 export interface BurstParameters {
     time: number;
@@ -144,6 +144,8 @@ export interface ParticleSystemParameters {
     flip?: Vector2;
     /** How mesh particles are lit, see {@link ParticleSystem.lighting}. Default `'fixed'`. */
     lighting?: MeshLighting;
+    /** Rim (Fresnel) term on mesh particles, see {@link ParticleSystem.rim}. Default none. */
+    rim?: Partial<MeshRim>;
     scene?: Scene;
 }
 
@@ -423,6 +425,23 @@ export class ParticleSystem implements IParticleSystem {
         this.neededToUpdateRender = true;
     }
 
+    /**
+     * Rim (Fresnel) term on mesh particles — a glowing edge (`mode: 'add'`) or
+     * an outline (`'mix'`), see {@link MeshRim}. Undefined (the default) draws
+     * none. Fields left out of an assigned rim take their defaults; assign a
+     * new object to change it, editing the returned one does not reach the
+     * renderer. Saved with the material in the effect JSON. Other render modes
+     * ignore it.
+     */
+    get rim(): MeshRim | undefined {
+        return this.rendererSettings.rim;
+    }
+
+    set rim(rim: Partial<MeshRim> | undefined) {
+        this.rendererSettings.rim = normalizeMeshRim(rim);
+        this.neededToUpdateRender = true;
+    }
+
     /** `lighting` if it is one of the modes, else the default. */
     private static validLighting(lighting: unknown): MeshLighting {
         return lighting === 'unlit' || lighting === 'scene' ? lighting : 'fixed';
@@ -592,6 +611,7 @@ export class ParticleSystem implements IParticleSystem {
             layerMask: parameters.layerMask ?? 0x0fffffff,
             pivot: ParticleSystem.nonZeroPivot(parameters.pivot),
             lighting: ParticleSystem.validLighting(parameters.lighting),
+            rim: normalizeMeshRim(parameters.rim),
         };
         this.flip = ParticleSystem.nonZeroFlip(parameters.flip);
         if (this.rendererSettings.renderMode === RenderMode.Mesh && !this.rendererSettings.instancingNormals) {
@@ -1692,6 +1712,7 @@ export class ParticleSystem implements IParticleSystem {
             pivot: json.pivot ? new Vector3(json.pivot[0] ?? 0, json.pivot[1] ?? 0, json.pivot[2] ?? 0) : undefined,
             flip: json.flip ? new Vector2(json.flip[0] ?? 0, json.flip[1] ?? 0) : undefined,
             lighting: materialMeta?.lighting,
+            rim: materialMeta?.rim,
         });
         ps.behaviors = (json.behaviors ?? [])
             .map((behaviorJson) => {
@@ -1781,6 +1802,7 @@ export class ParticleSystem implements IParticleSystem {
             reflectionLevel: this.rendererSettings.reflectionLevel,
             // Written only when not the default, so existing effects serialise as before.
             ...(this.lighting !== 'fixed' ? {lighting: this.lighting} : {}),
+            ...(this.rim ? {rim: {...this.rim, color: [...this.rim.color]}} : {}),
             sourceMaterial: this.materialRef ?? undefined,
         };
         return materialUUID;
@@ -1945,6 +1967,7 @@ export class ParticleSystem implements IParticleSystem {
             pivot: this.pivot,
             flip: this.flip,
             lighting: this.lighting,
+            rim: this.rim,
             scene: this.emitter.getScene(),
         });
     }

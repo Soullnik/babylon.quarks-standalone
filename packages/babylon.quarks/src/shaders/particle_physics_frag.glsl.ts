@@ -19,11 +19,19 @@ varying float vTileBlend;
 uniform sampler2D map;
 #endif
 
+#if defined(USE_ENVMAP_ATLAS) || defined(MESH_RIM)
+uniform vec3 eyePosition;
+#endif
+
+#ifdef MESH_RIM
+uniform vec3 rimColor;
+uniform vec2 rimParams;
+#endif
+
 // One 3×2 atlas (px py pz / nx ny nz). Avoids samplerCube and multi-face
 // sampler bindings that raise GL_INVALID_OPERATION on iOS WebKit.
 #ifdef USE_ENVMAP_ATLAS
 uniform sampler2D envAtlas;
-uniform vec3 eyePosition;
 uniform float reflectionLevel;
 
 vec3 sampleEnvAtlas(vec3 r) {
@@ -110,6 +118,17 @@ void main() {
     vec3 viewDir = normalize(vWorldPos - eyePosition);
     vec3 reflectionCoords = reflect(viewDir, N);
     color += sampleEnvAtlas(reflectionCoords) * reflectionLevel;
+#endif
+
+#ifdef MESH_RIM
+    // Fresnel: strongest where the surface turns away from the camera.
+    vec3 V = normalize(eyePosition - vWorldPos);
+    float rim = pow(1.0 - abs(dot(N, V)), rimParams.x) * rimParams.y;
+    #ifdef MESH_RIM_MIX
+    color = mix(color, rimColor, clamp(rim, 0.0, 1.0));
+    #else
+    color += rimColor * rim;
+    #endif
 #endif
 
     gl_FragColor = vec4(color, baseColor.a);

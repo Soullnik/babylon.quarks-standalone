@@ -115,6 +115,23 @@ function cases(): Case[] {
         []
     );
     push('mesh unlit', meshVert, physicsFrag, [...SPRITE_ATTRS, 'normal'], SPRITE_UNIFORMS, ['MESH_UNLIT']);
+    const RIM_UNIFORMS = ['eyePosition', 'rimColor', 'rimParams'];
+    push(
+        'mesh rim',
+        meshVert,
+        physicsFrag,
+        [...SPRITE_ATTRS, 'normal'],
+        [...SPRITE_UNIFORMS, 'lightDirection', 'lightColor', 'ambientColor', ...RIM_UNIFORMS],
+        ['MESH_RIM']
+    );
+    push(
+        'mesh unlit rim mix',
+        meshVert,
+        physicsFrag,
+        [...SPRITE_ATTRS, 'normal'],
+        [...SPRITE_UNIFORMS, ...RIM_UNIFORMS],
+        ['MESH_UNLIT', 'MESH_RIM', 'MESH_RIM_MIX']
+    );
 
     for (const map of mapOptions) {
         out.push({

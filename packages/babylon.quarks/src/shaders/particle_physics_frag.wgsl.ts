@@ -20,10 +20,18 @@ var mapSampler: sampler;
 var map: texture_2d<f32>;
 #endif
 
+#if defined(USE_ENVMAP_ATLAS) || defined(MESH_RIM)
+uniform eyePosition: vec3f;
+#endif
+
+#ifdef MESH_RIM
+uniform rimColor: vec3f;
+uniform rimParams: vec2f;
+#endif
+
 #ifdef USE_ENVMAP_ATLAS
 var envAtlasSampler: sampler;
 var envAtlas: texture_2d<f32>;
-uniform eyePosition: vec3f;
 uniform reflectionLevel: f32;
 
 fn sampleEnvAtlas(r: vec3f) -> vec3f {
@@ -111,6 +119,17 @@ fn main(input: FragmentInputs) -> FragmentOutputs {
     let viewDir = normalize(fragmentInputs.vWorldPos - uniforms.eyePosition);
     let reflectionCoords = reflect(viewDir, N);
     color += sampleEnvAtlas(reflectionCoords) * uniforms.reflectionLevel;
+#endif
+
+#ifdef MESH_RIM
+    // Fresnel: strongest where the surface turns away from the camera.
+    let V = normalize(uniforms.eyePosition - fragmentInputs.vWorldPos);
+    let rimTerm = pow(1.0 - abs(dot(N, V)), uniforms.rimParams.x) * uniforms.rimParams.y;
+    #ifdef MESH_RIM_MIX
+    color = mix(color, uniforms.rimColor, clamp(rimTerm, 0.0, 1.0));
+    #else
+    color += uniforms.rimColor * rimTerm;
+    #endif
 #endif
 
     var finalColor = vec4f(color, baseColor.a);

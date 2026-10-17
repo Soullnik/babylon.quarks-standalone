@@ -820,6 +820,10 @@ export class QuarksLoader {
             if (matDef.lighting === 'unlit' || matDef.lighting === 'fixed' || matDef.lighting === 'scene') {
                 matInfo.lighting = matDef.lighting;
             }
+            // Mesh particle rim (QuarksMaterial): {color, power, strength, mode}.
+            if (matDef.rim && typeof matDef.rim === 'object') {
+                matInfo.rim = matDef.rim;
+            }
 
             // QuarksMaterial (what ParticleSystem.ensureMaterialMeta emits) writes `alphaMode`
             // directly as a Babylon alpha-mode constant; three.js materials (MeshBasicMaterial
