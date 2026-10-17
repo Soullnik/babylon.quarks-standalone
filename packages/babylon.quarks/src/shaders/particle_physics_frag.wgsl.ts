@@ -4,9 +4,11 @@ varying vColor: vec4f;
 varying vNormal: vec3f;
 varying vWorldPos: vec3f;
 
+#ifndef MESH_UNLIT
 uniform lightDirection: vec3f;
 uniform lightColor: vec3f;
 uniform ambientColor: vec3f;
+#endif
 
 #ifdef TILE_BLEND
 varying vUV2: vec2f;
@@ -95,11 +97,15 @@ fn main(input: FragmentInputs) -> FragmentOutputs {
 #endif
 
     let N = normalize(fragmentInputs.vNormal);
+#ifdef MESH_UNLIT
+    var color = baseColor.rgb;
+#else
     let L = normalize(-uniforms.lightDirection);
     let NdotL = max(dot(N, L), 0.0);
     let litColor = uniforms.ambientColor + uniforms.lightColor * NdotL;
 
     var color = baseColor.rgb * litColor;
+#endif
 
 #ifdef USE_ENVMAP_ATLAS
     let viewDir = normalize(fragmentInputs.vWorldPos - uniforms.eyePosition);

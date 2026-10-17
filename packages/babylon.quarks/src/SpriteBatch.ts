@@ -28,7 +28,7 @@ import particle_vert_wgsl from './shaders/particle_vert.wgsl';
 import {registerShaders, shaderLanguageFor, ShaderSources} from './shaders/shaderLanguageSupport';
 import stretched_bb_particle_vert from './shaders/stretched_bb_particle_vert.glsl';
 import stretched_bb_particle_vert_wgsl from './shaders/stretched_bb_particle_vert.wgsl';
-import {RenderMode, VFXBatch} from './VFXBatch';
+import {defaultMeshLighting, MeshLightingSettings, RenderMode, VFXBatch} from './VFXBatch';
 
 export class SpriteBatch extends VFXBatch {
     private static whiteTextureByScene = new WeakMap<Scene, RawTexture>();
@@ -52,6 +52,10 @@ export class SpriteBatch extends VFXBatch {
 
     /** Concretely typed handle on the batch material, see syncStretchedSpeedFactor. */
     private shaderMaterial: ShaderMaterial | null = null;
+    /** The `'fixed'` mesh light, as shader uniforms; see applyMeshLighting. */
+    private readonly fixedLightDirection = new BVector3();
+    private readonly fixedLightColor = new BVector3();
+    private readonly fixedAmbientColor = new BVector3();
 
     private offsetVB!: VertexBuffer;
     private rotationVB!: VertexBuffer;
@@ -62,6 +66,7 @@ export class SpriteBatch extends VFXBatch {
 
     constructor(settings: VFXBatchSettings, scene: Scene) {
         super(settings, scene);
+        this.storeFixedLighting(defaultMeshLighting());
         this.maxParticles = 1000;
         this.setupBuffers();
         this.rebuildMaterial();
@@ -213,6 +218,12 @@ export class SpriteBatch extends VFXBatch {
         if (pivot) {
             defines.push('PIVOT');
         }
+        const isMesh = this.settings.renderMode === RenderMode.Mesh;
+        const lighting = this.settings.lighting ?? 'fixed';
+        const lit = isMesh && lighting !== 'unlit';
+        if (isMesh && !lit) {
+            defines.push('MESH_UNLIT');
+        }
 
         const shaderLanguage = shaderLanguageFor(this.scene.getEngine());
         registerShaders(shaderName, vertexShader, fragmentShader, shaderLanguage);
@@ -254,7 +265,7 @@ export class SpriteBatch extends VFXBatch {
         if (pivot) {
             uniforms.push('pivot');
         }
-        if (this.settings.renderMode === RenderMode.Mesh) {
+        if (lit) {
             uniforms.push('lightDirection');
             uniforms.push('lightColor');
             uniforms.push('ambientColor');
@@ -322,10 +333,22 @@ export class SpriteBatch extends VFXBatch {
         if (pivot) {
             mat.setVector3('pivot', new BVector3(pivot.x, pivot.y, pivot.z));
         }
-        if (this.settings.renderMode === RenderMode.Mesh) {
-            mat.setVector3('lightDirection', new BVector3(0.4, -1, 0.6));
-            mat.setVector3('lightColor', new BVector3(1, 1, 1));
-            mat.setVector3('ambientColor', new BVector3(0.35, 0.35, 0.35));
+        if (lit) {
+            this.writeFixedLighting(mat);
+            if (lighting === 'scene') {
+                const direction = new BVector3();
+                const color = new BVector3();
+                const ambient = new BVector3();
+                mat.onBindObservable.add(() => {
+                    if (SpriteBatch.readSceneLight(this.scene, direction, color, ambient)) {
+                        mat.setVector3('lightDirection', direction);
+                        mat.setVector3('lightColor', color);
+                        mat.setVector3('ambientColor', ambient);
+                    } else {
+                        this.writeFixedLighting(mat);
+                    }
+                });
+            }
         }
 
         mat.backFaceCulling = false;
@@ -341,6 +364,64 @@ export class SpriteBatch extends VFXBatch {
 
         this.mesh.material = mat;
         this.shaderMaterial = mat;
+    }
+
+    applyMeshLighting(lighting: MeshLightingSettings): void {
+        this.storeFixedLighting(lighting);
+        const material = this.shaderMaterial;
+        if (material !== null && this.settings.renderMode === RenderMode.Mesh && this.settings.lighting !== 'unlit') {
+            this.writeFixedLighting(material);
+        }
+    }
+
+    private storeFixedLighting(lighting: MeshLightingSettings): void {
+        this.fixedLightDirection.copyFrom(lighting.direction);
+        this.fixedLightColor.set(lighting.color.r, lighting.color.g, lighting.color.b);
+        this.fixedAmbientColor.set(lighting.ambient.r, lighting.ambient.g, lighting.ambient.b);
+    }
+
+    private writeFixedLighting(material: ShaderMaterial): void {
+        material.setVector3('lightDirection', this.fixedLightDirection);
+        material.setVector3('lightColor', this.fixedLightColor);
+        material.setVector3('ambientColor', this.fixedAmbientColor);
+    }
+
+    /**
+     * Reads the scene's key light for `'scene'` mesh lighting: the first
+     * enabled directional or hemispheric light, its diffuse colour times its
+     * intensity, plus the scene's ambient colour. A hemispheric light lights
+     * from its `direction` (which points at the sky) and adds its ground colour
+     * to the ambient, which approximates its sky-to-ground blend with the one
+     * directional term the shader has. False when there is no such light.
+     */
+    static readSceneLight(scene: Scene, direction: BVector3, color: BVector3, ambient: BVector3): boolean {
+        const lights = scene.lights;
+        for (let i = 0; i < lights.length; i++) {
+            const light = lights[i];
+            const kind = light.getClassName();
+            if ((kind !== 'DirectionalLight' && kind !== 'HemisphericLight') || !light.isEnabled()) {
+                continue;
+            }
+            const intensity = light.intensity;
+            const diffuse = light.diffuse;
+            const sceneAmbient = scene.ambientColor;
+            color.set(diffuse.r * intensity, diffuse.g * intensity, diffuse.b * intensity);
+            ambient.set(sceneAmbient.r, sceneAmbient.g, sceneAmbient.b);
+            const lightDirection = (light as unknown as {direction: BVector3}).direction;
+            if (kind === 'DirectionalLight') {
+                direction.copyFrom(lightDirection);
+            } else {
+                direction.copyFrom(lightDirection).scaleInPlace(-1);
+                const ground = (light as unknown as {groundColor?: {r: number; g: number; b: number}}).groundColor;
+                if (ground) {
+                    ambient.x += ground.r * intensity;
+                    ambient.y += ground.g * intensity;
+                    ambient.z += ground.b * intensity;
+                }
+            }
+            return true;
+        }
+        return false;
     }
 
     private vector_ = new Vector3();

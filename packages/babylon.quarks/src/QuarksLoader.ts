@@ -816,6 +816,10 @@ export class QuarksLoader {
             if (typeof matDef.reflectionLevel === 'number') {
                 matInfo.reflectionLevel = matDef.reflectionLevel;
             }
+            // Mesh particle lighting (QuarksMaterial): 'unlit' | 'fixed' | 'scene'.
+            if (matDef.lighting === 'unlit' || matDef.lighting === 'fixed' || matDef.lighting === 'scene') {
+                matInfo.lighting = matDef.lighting;
+            }
 
             // QuarksMaterial (what ParticleSystem.ensureMaterialMeta emits) writes `alphaMode`
             // directly as a Babylon alpha-mode constant; three.js materials (MeshBasicMaterial

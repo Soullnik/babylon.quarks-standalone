@@ -114,6 +114,7 @@ function cases(): Case[] {
         [...SPRITE_UNIFORMS, 'lightDirection', 'lightColor', 'ambientColor'],
         []
     );
+    push('mesh unlit', meshVert, physicsFrag, [...SPRITE_ATTRS, 'normal'], SPRITE_UNIFORMS, ['MESH_UNLIT']);
 
     for (const map of mapOptions) {
         out.push({

@@ -1,5 +1,7 @@
 import {BaseTexture} from '@babylonjs/core/Materials/Textures/baseTexture';
 import {ShaderMaterial} from '@babylonjs/core/Materials/shaderMaterial';
+import {Color3} from '@babylonjs/core/Maths/math.color';
+import {Vector3 as BVector3} from '@babylonjs/core/Maths/math.vector';
 import {Mesh} from '@babylonjs/core/Meshes/mesh';
 import {Scene} from '@babylonjs/core/scene';
 import {IParticleSystem, Vector3} from 'quarks.core';
@@ -12,6 +14,40 @@ export enum RenderMode {
     Trail = 3,
     HorizontalBillBoard = 4,
     VerticalBillBoard = 5,
+}
+
+/**
+ * How mesh particles are lit.
+ *
+ * - `'fixed'` (default): one directional light plus ambient, the same for every
+ *   mesh batch of a renderer, set with {@link BatchedRenderer.setMeshLighting}.
+ * - `'unlit'`: no lighting term — the texture times the particle colour, for
+ *   emissive meshes (fire, energy, glowing blades).
+ * - `'scene'`: follows the scene's first enabled `DirectionalLight` or
+ *   `HemisphericLight` every frame, falling back to the fixed light when there
+ *   is none.
+ *
+ * Only mesh particles are lit; other render modes ignore it.
+ */
+export type MeshLighting = 'unlit' | 'fixed' | 'scene';
+
+/** The light {@link MeshLighting} `'fixed'` mesh particles are lit by. */
+export interface MeshLightingSettings {
+    /** Direction the light travels in, world space. Default `(0.4, -1, 0.6)`. */
+    direction: BVector3;
+    /** Light colour, intensity folded in. Default white. */
+    color: Color3;
+    /** Light every face gets regardless of its direction. Default `(0.35, 0.35, 0.35)`. */
+    ambient: Color3;
+}
+
+/** The light mesh particles have always been lit by. */
+export function defaultMeshLighting(): MeshLightingSettings {
+    return {
+        direction: new BVector3(0.4, -1, 0.6),
+        color: new Color3(1, 1, 1),
+        ambient: new Color3(0.35, 0.35, 0.35),
+    };
 }
 
 export interface StoredBatchSettings {
@@ -40,6 +76,8 @@ export interface StoredBatchSettings {
     layerMask: number;
     /** Billboard pivot in particle-size units, see {@link VFXBatchSettings.pivot}. */
     pivot?: Vector3;
+    /** Mesh particle lighting, see {@link VFXBatchSettings.lighting}. */
+    lighting?: MeshLighting;
 }
 
 export abstract class VFXBatch {
@@ -79,6 +117,7 @@ export abstract class VFXBatch {
             reflectionAtlas: settings.reflectionAtlas ?? null,
             pivot: settings.pivot?.clone(),
             layerMask: settings.layerMask,
+            lighting: settings.lighting,
         };
         this.mesh = new Mesh('vfxBatch', scene);
         this.mesh.alwaysSelectAsActiveMesh = true;
@@ -115,6 +154,9 @@ export abstract class VFXBatch {
             material.setTexture('depthTexture', depthTexture);
         }
     }
+
+    /** Sets the light `'fixed'` mesh particles are lit by. Batches that draw no meshes ignore it. */
+    applyMeshLighting(_lighting: MeshLightingSettings): void {}
 
     abstract setupBuffers(): void;
     abstract expandBuffers(target: number): void;

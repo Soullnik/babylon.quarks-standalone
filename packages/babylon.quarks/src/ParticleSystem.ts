@@ -47,7 +47,7 @@ import {BatchedRenderer, VFXBatchSettings} from './BatchedRenderer';
 import {ensureEnvAtlasFromCube, getCachedEnvAtlas} from './envAtlas';
 import {ensureTriangleIndices} from './geometryUtil';
 import {ParticleEmitter} from './ParticleEmitter';
-import {RenderMode} from './VFXBatch';
+import {MeshLighting, RenderMode} from './VFXBatch';
 
 export interface BurstParameters {
     time: number;
@@ -142,6 +142,8 @@ export interface ParticleSystemParameters {
     pivot?: Vector3;
     /** Fraction of billboard particles mirrored along U (x) and V (y), see {@link ParticleSystem.flip}. */
     flip?: Vector2;
+    /** How mesh particles are lit, see {@link ParticleSystem.lighting}. Default `'fixed'`. */
+    lighting?: MeshLighting;
     scene?: Scene;
 }
 
@@ -405,6 +407,27 @@ export class ParticleSystem implements IParticleSystem {
         this.neededToUpdateRender = true;
     }
 
+    /**
+     * How mesh particles are lit: `'fixed'` (the default — the renderer's
+     * light, see {@link BatchedRenderer.setMeshLighting}), `'unlit'` (texture
+     * times colour, for emissive meshes) or `'scene'` (the scene's first
+     * directional or hemispheric light). Saved with the material in the effect
+     * JSON. Other render modes ignore it.
+     */
+    get lighting(): MeshLighting {
+        return this.rendererSettings.lighting ?? 'fixed';
+    }
+
+    set lighting(lighting: MeshLighting) {
+        this.rendererSettings.lighting = ParticleSystem.validLighting(lighting);
+        this.neededToUpdateRender = true;
+    }
+
+    /** `lighting` if it is one of the modes, else the default. */
+    private static validLighting(lighting: unknown): MeshLighting {
+        return lighting === 'unlit' || lighting === 'scene' ? lighting : 'fixed';
+    }
+
     private static nonZeroPivot(v: Vector3 | undefined): Vector3 | undefined {
         return v && (v.x !== 0 || v.y !== 0 || v.z !== 0) ? v.clone() : undefined;
     }
@@ -568,6 +591,7 @@ export class ParticleSystem implements IParticleSystem {
             reflectionAtlas: null,
             layerMask: parameters.layerMask ?? 0x0fffffff,
             pivot: ParticleSystem.nonZeroPivot(parameters.pivot),
+            lighting: ParticleSystem.validLighting(parameters.lighting),
         };
         this.flip = ParticleSystem.nonZeroFlip(parameters.flip);
         if (this.rendererSettings.renderMode === RenderMode.Mesh && !this.rendererSettings.instancingNormals) {
@@ -1667,6 +1691,7 @@ export class ParticleSystem implements IParticleSystem {
             layerMask: json.layers,
             pivot: json.pivot ? new Vector3(json.pivot[0] ?? 0, json.pivot[1] ?? 0, json.pivot[2] ?? 0) : undefined,
             flip: json.flip ? new Vector2(json.flip[0] ?? 0, json.flip[1] ?? 0) : undefined,
+            lighting: materialMeta?.lighting,
         });
         ps.behaviors = (json.behaviors ?? [])
             .map((behaviorJson) => {
@@ -1754,6 +1779,8 @@ export class ParticleSystem implements IParticleSystem {
             texture: textureUUID,
             reflectionAtlas: reflectionAtlasUUID,
             reflectionLevel: this.rendererSettings.reflectionLevel,
+            // Written only when not the default, so existing effects serialise as before.
+            ...(this.lighting !== 'fixed' ? {lighting: this.lighting} : {}),
             sourceMaterial: this.materialRef ?? undefined,
         };
         return materialUUID;
@@ -1917,6 +1944,7 @@ export class ParticleSystem implements IParticleSystem {
             layerMask: this.rendererSettings.layerMask,
             pivot: this.pivot,
             flip: this.flip,
+            lighting: this.lighting,
             scene: this.emitter.getScene(),
         });
     }

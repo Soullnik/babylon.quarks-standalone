@@ -6,6 +6,21 @@ and the project follows the `quarks.core` 0.x version line.
 
 ## [Unreleased]
 
+### Added
+
+- Mesh particle lighting modes: `ParticleSystem.lighting` (constructor option `lighting`, saved
+  as `lighting` on the effect's `QuarksMaterial` and read back by `QuarksLoader`) is `'fixed'`
+  (default — exactly the light mesh particles had before), `'unlit'` (the lighting term is
+  compiled out with `MESH_UNLIT`: texture × particle colour, for emissive meshes) or `'scene'`
+  (the scene's first enabled `DirectionalLight` / `HemisphericLight`, re-read every frame:
+  direction, diffuse × intensity, `scene.ambientColor`, plus a hemispheric light's ground colour
+  in the ambient; falls back to the fixed light when the scene has neither). Systems with
+  different lighting are batched apart. The default is not written to JSON.
+- `BatchedRenderer.setMeshLighting({direction, color, ambient})` (Babylon `Vector3` / `Color3`,
+  any subset) sets the `'fixed'` light for every mesh batch of the renderer, including later ones;
+  `getMeshLighting()` returns a copy, `defaultMeshLighting()` the built-in values
+  (`(0.4, -1, 0.6)`, white, `0.35` grey). Exposed in the editor's Renderer module as "Lighting".
+
 ### Changed
 
 - **Behaviour change:** quarks.core `WidthOverLength` (Width over Trail) now reads its curve as a

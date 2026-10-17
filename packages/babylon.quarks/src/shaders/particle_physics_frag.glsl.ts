@@ -4,9 +4,11 @@ varying vec4 vColor;
 varying vec3 vNormal;
 varying vec3 vWorldPos;
 
+#ifndef MESH_UNLIT
 uniform vec3 lightDirection;
 uniform vec3 lightColor;
 uniform vec3 ambientColor;
+#endif
 
 #ifdef TILE_BLEND
 varying vec2 vUV2;
@@ -94,11 +96,15 @@ void main() {
 #endif
 
     vec3 N = normalize(vNormal);
+#ifdef MESH_UNLIT
+    vec3 color = baseColor.rgb;
+#else
     vec3 L = normalize(-lightDirection);
     float NdotL = max(dot(N, L), 0.0);
     vec3 litColor = ambientColor + lightColor * NdotL;
 
     vec3 color = baseColor.rgb * litColor;
+#endif
 
 #ifdef USE_ENVMAP_ATLAS
     vec3 viewDir = normalize(vWorldPos - eyePosition);

@@ -38,8 +38,8 @@ export {QuarksUtil} from './QuarksUtil';
 export * from './shaders/';
 export {SpriteBatch} from './SpriteBatch';
 export {TrailBatch} from './TrailBatch';
-export {RenderMode, VFXBatch} from './VFXBatch';
-export type {StoredBatchSettings} from './VFXBatch';
+export {defaultMeshLighting, RenderMode, VFXBatch} from './VFXBatch';
+export type {MeshLighting, MeshLightingSettings, StoredBatchSettings} from './VFXBatch';
 
 // Re-export quarks.core types (interfaces - type-only)
 export type {

@@ -1,7 +1,7 @@
 import {Texture} from '@babylonjs/core/Materials/Textures/texture';
 import {Mesh} from '@babylonjs/core/Meshes/mesh';
 import {PlusIcon, XMarkIcon} from '@heroicons/react/24/solid';
-import type {Behavior, ParticleSystem} from 'babylon.quarks';
+import type {Behavior, MeshLighting, ParticleSystem} from 'babylon.quarks';
 import {
     ColorOverLife,
     ConstantColor,
@@ -1122,6 +1122,19 @@ export function RendererModule({
                         </Row>
                     );
                 })()}
+            {system.renderMode === RenderMode.Mesh && (
+                <Row label="Lighting">
+                    <SelectField<MeshLighting>
+                        value={system.lighting}
+                        options={[
+                            {value: 'fixed', label: 'Fixed light'},
+                            {value: 'scene', label: 'Scene light'},
+                            {value: 'unlit', label: 'Unlit'},
+                        ]}
+                        onChange={(v) => binding.apply((s) => (s.lighting = v))}
+                    />
+                </Row>
+            )}
             <Row label="Render order">
                 <NumberField
                     value={system.renderOrder}

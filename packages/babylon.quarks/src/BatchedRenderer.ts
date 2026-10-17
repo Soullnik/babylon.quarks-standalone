@@ -6,7 +6,14 @@ import {EmitSubParticleSystem, IParticleSystem, Vector3} from 'quarks.core';
 import {ParticleSystem} from './ParticleSystem';
 import {SpriteBatch} from './SpriteBatch';
 import {TrailBatch} from './TrailBatch';
-import {RenderMode, StoredBatchSettings, VFXBatch} from './VFXBatch';
+import {
+    defaultMeshLighting,
+    MeshLighting,
+    MeshLightingSettings,
+    RenderMode,
+    StoredBatchSettings,
+    VFXBatch,
+} from './VFXBatch';
 
 export interface VFXBatchSettings {
     instancingGeometry: Float32Array;
@@ -55,6 +62,11 @@ export interface VFXBatchSettings {
      * y across, and z is unused. Absent or zero: no offset. Meshes ignore it.
      */
     pivot?: Vector3;
+    /**
+     * How mesh particles are lit (`'unlit'`, `'fixed'` or `'scene'`); unset is
+     * `'fixed'`. See {@link MeshLighting}. Other render modes ignore it.
+     */
+    lighting?: MeshLighting;
 }
 
 export interface AdaptivePerformanceOptions {
@@ -130,6 +142,7 @@ export class BatchedRenderer extends TransformNode {
         lastFrameCpuMs: 0,
     };
     private lastAppliedQuality = Number.NaN;
+    private meshLighting: MeshLightingSettings = defaultMeshLighting();
 
     constructor(name: string, scene: Scene) {
         super(name, scene);
@@ -161,7 +174,8 @@ export class BatchedRenderer extends TransformNode {
             a.instancingGeometry === b.instancingGeometry &&
             a.renderOrder === b.renderOrder &&
             a.layerMask === b.layerMask &&
-            pivotEqual(a.pivot, b.pivot)
+            pivotEqual(a.pivot, b.pivot) &&
+            (a.lighting ?? 'fixed') === (b.lighting ?? 'fixed')
         );
     }
 
@@ -209,6 +223,7 @@ export class BatchedRenderer extends TransformNode {
         if (this.depthTexture) {
             batch.applyDepthTexture(this.depthTexture);
         }
+        batch.applyMeshLighting(this.meshLighting);
         batch.addSystem(system);
         this.batches.push(batch);
         this.batchEmptyFrames.push(0);
@@ -257,6 +272,43 @@ export class BatchedRenderer extends TransformNode {
         for (const batch of this.batches) {
             batch.applyDepthTexture(depthTexture);
         }
+    }
+
+    /**
+     * Sets the light mesh particles with `lighting: 'fixed'` (the default) are
+     * lit by, for every mesh batch of this renderer, including ones created
+     * later. Fields left out keep their current value. Also the fallback for
+     * `'scene'` lighting when the scene has no directional or hemispheric light.
+     *
+     * @example
+     * ```ts
+     * renderer.setMeshLighting({direction: new Vector3(-0.3, -1, 0.2), color: new Color3(1, 0.9, 0.75)});
+     * ```
+     */
+    setMeshLighting(lighting: Partial<MeshLightingSettings>): void {
+        const current = this.meshLighting;
+        if (lighting.direction) {
+            current.direction = lighting.direction.clone();
+        }
+        if (lighting.color) {
+            current.color = lighting.color.clone();
+        }
+        if (lighting.ambient) {
+            current.ambient = lighting.ambient.clone();
+        }
+        for (const batch of this.batches) {
+            batch.applyMeshLighting(current);
+        }
+    }
+
+    /** A copy of the light set with {@link setMeshLighting}. */
+    getMeshLighting(): MeshLightingSettings {
+        const current = this.meshLighting;
+        return {
+            direction: current.direction.clone(),
+            color: current.color.clone(),
+            ambient: current.ambient.clone(),
+        };
     }
 
     configureAdaptivePerformance(options: Partial<AdaptivePerformanceOptions> = {}) {
