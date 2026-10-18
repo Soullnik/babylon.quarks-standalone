@@ -791,9 +791,9 @@ describe('ParticleSystem', () => {
         expect(ps.particleNum).toBeGreaterThan(0);
         const trail = ps.particles[0] as TrailParticle;
         expect(trail.historyCount).toBeGreaterThan(1);
-        // The newest sample is recorded after the behavior pass, so it still
-        // carries the raw particle size until the next step.
-        for (let i = 0; i < trail.historyCount - 1; i++) {
+        // The newest sample, recorded after the behavior pass, gets the curve's
+        // head value too.
+        for (let i = 0; i < trail.historyCount; i++) {
             expect(trail.historySizes[trail.getHistoryIndex(i)]).toBeCloseTo(0.5);
         }
     });
