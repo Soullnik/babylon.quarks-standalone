@@ -63,6 +63,7 @@ export function EditorWorkspace(props: EditorWorkspaceProps): React.ReactElement
             <ProjectsPage
                 store={store}
                 title={hostProps.title}
+                backLink={hostProps.backLink}
                 onOpen={(meta) => {
                     setProject(meta);
                     onProjectChange?.(meta.id);

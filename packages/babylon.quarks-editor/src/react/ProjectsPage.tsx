@@ -1,4 +1,4 @@
-import {FolderIcon, PlusIcon} from '@heroicons/react/24/solid';
+import {ArrowLeftIcon, FolderIcon, PlusIcon} from '@heroicons/react/24/solid';
 import React, {useCallback, useEffect, useState} from 'react';
 import {formatBytes, type ProjectMeta, type ProjectStore, type StorageEstimate} from '../core/projectStore';
 import {ChoiceDialog} from './ChoiceDialog';
@@ -11,6 +11,8 @@ export interface ProjectsPageProps {
     store: ProjectStore;
     onOpen: (project: ProjectMeta) => void;
     title?: string;
+    /** Optional link back to the page that hosts the editor (e.g. a gallery), shown above the title. */
+    backLink?: {href: string; label: string};
 }
 
 type Dialog =
@@ -79,7 +81,7 @@ function StorageBar(props: {estimate: StorageEstimate | null; onPersist: () => v
 
 /** Start page: the projects saved in the store, plus storage usage. */
 export function ProjectsPage(props: ProjectsPageProps): React.ReactElement {
-    const {store, onOpen, title = 'Effect editor'} = props;
+    const {store, onOpen, title = 'Effect editor', backLink} = props;
     const [projects, setProjects] = useState<ProjectMeta[] | null>(null);
     const [estimate, setEstimate] = useState<StorageEstimate | null>(null);
     const [dialog, setDialog] = useState<Dialog>(null);
@@ -145,6 +147,29 @@ export function ProjectsPage(props: ProjectsPageProps): React.ReactElement {
                     gap: 18,
                 }}
             >
+                {backLink && (
+                    <a
+                        className="qe-hover"
+                        href={backLink.href}
+                        style={{
+                            alignSelf: 'flex-start',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 6,
+                            background: theme.panelBg,
+                            border: `1px solid ${theme.border}`,
+                            borderRadius: 8,
+                            padding: '6px 12px',
+                            fontSize: 13,
+                            fontWeight: 500,
+                            color: theme.text,
+                            textDecoration: 'none',
+                        }}
+                    >
+                        <ArrowLeftIcon style={iconStyle(14)} />
+                        {backLink.label.replace(/^←\s*/, '')}
+                    </a>
+                )}
                 <div style={{display: 'flex', alignItems: 'center', gap: 12}}>
                     <div>
                         <div style={{fontSize: 22, fontWeight: 700}}>{title}</div>
