@@ -1,6 +1,6 @@
 {
     "name": "babylon.quarks",
-    "version": "0.22.0",
+    "version": "0.23.0",
     "description": "A High-Performance Particle System for Babylon.js",
     "type": "module",
     "types": "./dist/types/index.d.ts",

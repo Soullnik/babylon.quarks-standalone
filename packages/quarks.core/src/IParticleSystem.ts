@@ -3,8 +3,15 @@ import {Matrix4, Vector2, Vector3} from './math';
 import {IParticle} from './Particle';
 import {ParticleStore} from './ParticleStore';
 export interface EmissionState {
+    /** Bursts whose first wave has fired this loop, in time order. */
     burstIndex: number;
+    /** Wave of the burst being spawned right now (0 for its first wave). */
     burstWaveIndex: number;
+    /**
+     * Waves fired so far this loop, per burst. Created by the system on first
+     * use, so states made elsewhere (sub emitters) can leave it out.
+     */
+    burstWaves?: number[];
     burstParticleIndex: number;
     burstParticleCount: number;
     isBursting: boolean;

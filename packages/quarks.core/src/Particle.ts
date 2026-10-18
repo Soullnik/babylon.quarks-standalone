@@ -626,8 +626,20 @@ export class TrailParticle implements Particle {
 
     /** Ring buffer of recorded positions, 3 floats per sample. */
     historyPositions: Float32Array = EMPTY_HISTORY;
-    /** Ring buffer of recorded widths, 1 float per sample. */
+    /** Ring buffer of the widths the renderer draws, 1 float per sample. */
     historySizes: Float32Array = EMPTY_HISTORY;
+    /**
+     * Ring buffer of the particle's size (`size.x`) at each sample, before any
+     * behavior rescaled it. Width behaviors scale this rather than
+     * `historySizes`, so their factor is never compounded step after step.
+     */
+    historyBaseSizes: Float32Array = EMPTY_HISTORY;
+    /**
+     * Factor the next recorded sample's width is drawn with — what a width
+     * behavior gives the head of the trail, which is recorded after the
+     * behaviors have run. 1 unless such a behavior sets it.
+     */
+    headWidthScale = 1;
     /** Ring buffer of recorded colors, 4 floats per sample. */
     historyColors: Float32Array = EMPTY_HISTORY;
     /** Number of samples the ring buffers can hold. */
@@ -700,6 +712,7 @@ export class TrailParticle implements Particle {
         this.historyCapacity = capacity;
         this.historyPositions = new Float32Array(capacity * 3);
         this.historySizes = new Float32Array(capacity);
+        this.historyBaseSizes = new Float32Array(capacity);
         this.historyColors = new Float32Array(capacity * 4);
         this.historyHead = 0;
         this.historyCount = 0;
@@ -750,7 +763,9 @@ export class TrailParticle implements Particle {
         positions[positionIndex] = storePositions[o3];
         positions[positionIndex + 1] = storePositions[o3 + 1];
         positions[positionIndex + 2] = storePositions[o3 + 2];
-        this.historySizes[head] = store.size[o3];
+        const size = store.size[o3];
+        this.historyBaseSizes[head] = size;
+        this.historySizes[head] = size * this.headWidthScale;
         const colorIndex = head * 4;
         const colors = this.historyColors;
         const storeColors = store.color;
@@ -779,6 +794,7 @@ export class TrailParticle implements Particle {
      */
     reset() {
         this.memory.length = 0;
+        this.headWidthScale = 1;
         this.resetHistory();
     }
 

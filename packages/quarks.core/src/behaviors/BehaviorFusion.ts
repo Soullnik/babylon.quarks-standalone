@@ -117,7 +117,7 @@ function scalarValue(n: string, out: string, t: string): string {
         } else if (${n}_const) ${out} = ${n}_cv;
         else if (${n}_iv) {
             // The particle's own sample, from the memory column when it holds it.
-            let r = ${n}_col ? mem[i * ms + ${n}_slot] : NaN;
+            let r = ${n}_col ? mem[row * ms + ${n}_slot] : NaN;
             if (r !== r) r = p.memory[${n}_slot];
             ${out} = (1 - r) * ${n}_a + r * ${n}_b;
         } else ${out} = ${n}.genValue(p.memory, ${t});`;
@@ -170,7 +170,7 @@ function colorWrite(n: string, t: string): string {
             color[o4 + 2] = Math.fround(b) * startColor[o4 + 2];
             color[o4 + 3] = Math.fround(a) * startColor[o4 + 3];
         } else if (${n}_cr) {
-            let r = ${n}_col ? mem[i * ms + ${n}_slot] : NaN;
+            let r = ${n}_col ? mem[row * ms + ${n}_slot] : NaN;
             if (r !== r) r = p.memory[${n}_slot];
             color[o4] = Math.fround(${n}_ax + (${n}_bx - ${n}_ax) * r) * startColor[o4];
             color[o4 + 1] = Math.fround(${n}_ay + (${n}_by - ${n}_ay) * r) * startColor[o4 + 1];
@@ -265,23 +265,37 @@ function fragmentFor(behavior: Behavior, k: number): Fragment | null {
             };
         case 'RotationOverLife':
             return {
-                // Whether the particles rotate by an angle is a property of the
-                // system (mesh particles rotate by quaternion, trails not at all),
+                // Whether the particles rotate by an angle or by quaternion is a
+                // property of the system (billboard or mesh; trails do neither),
                 // so it is read off the first particle once rather than per particle.
                 setup: `${scalarSetup(`g${k}`, `behaviors[${k}].angularVelocity`)}
-                    const angle_${k} = count > 0 && typeof particles[0].rotation === 'number';`,
-                // The rate is kept on the particle for the renderer, which draws
-                // between simulation steps.
+                    const rotation_${k} = count > 0 ? particles[0].rotation : undefined;
+                    const angle_${k} = typeof rotation_${k} === 'number';
+                    const rq${k} = store.rotationQuaternion, aq${k} = store.angularVelocityQuaternion;
+                    const quat_${k} = !angle_${k} && rq${k}.length > 0 && rotation_${k} instanceof deps.Quaternion;`,
+                // The rate (or the step's turn) is kept for the renderer, which
+                // draws between simulation steps. A mesh particle turns about its
+                // own Z, as RotationOverLife.turnAboutZ does.
                 body: `if (angle_${k}) {
                         ${scalarValue(`g${k}`, 'rate', 't')}
-                        rot[i] += delta * rate;
-                        angVel[i] = rate;
+                        rot[row] += delta * rate;
+                        angVel[row] = rate;
+                    } else if (quat_${k}) {
+                        ${scalarValue(`g${k}`, 'rate', 't')}
+                        const half = (rate * delta) / 2;
+                        const qz = Math.sin(half), qw = Math.cos(half);
+                        const ax = rq${k}[o4], ay = rq${k}[o4 + 1], az = rq${k}[o4 + 2], aw = rq${k}[o4 + 3];
+                        rq${k}[o4] = ax * qw + ay * qz;
+                        rq${k}[o4 + 1] = ay * qw - ax * qz;
+                        rq${k}[o4 + 2] = az * qw + aw * qz;
+                        rq${k}[o4 + 3] = aw * qw - az * qz;
+                        aq${k}[o4] = 0; aq${k}[o4 + 1] = 0; aq${k}[o4 + 2] = qz; aq${k}[o4 + 3] = qw;
                     }`,
             };
         case 'FrameOverLife':
             return {
                 setup: scalarSetup(`g${k}`, `behaviors[${k}].frame`),
-                body: `{${scalarValue(`g${k}`, 'v', 't')} uvTile[i] = v;}`,
+                body: `{${scalarValue(`g${k}`, 'v', 't')} uvTile[row] = v;}`,
             };
         case 'SpeedOverLife':
             return {
@@ -338,7 +352,7 @@ function fragmentFor(behavior: Behavior, k: number): Fragment | null {
                     ${colorSetup(`g${k}`, `b${k}.color`)}
                     const lo${k} = b${k}.speedRange.a;
                     const span${k} = b${k}.speedRange.b - lo${k};`,
-                body: `{const ts = (startSpeed[i] - lo${k}) / span${k};
+                body: `{const ts = (startSpeed[row] - lo${k}) / span${k};
                     ${colorWrite(`g${k}`, 'ts')}}`,
             };
         case 'SizeBySpeed':
@@ -349,7 +363,7 @@ function fragmentFor(behavior: Behavior, k: number): Fragment | null {
                     const span${k} = b${k}.speedRange.b - lo${k};
                     const vec3_${k} = g${k} instanceof deps.Vector3Function;
                     ${scalarSetup(`sg${k}`, `g${k}`)}`,
-                body: `{const ts = (startSpeed[i] - lo${k}) / span${k};
+                body: `{const ts = (startSpeed[row] - lo${k}) / span${k};
                     if (vec3_${k}) {
                         g${k}.genValue(p.memory, p.size, ts).multiply(p.startSize);
                     } else {
@@ -367,10 +381,10 @@ function fragmentFor(behavior: Behavior, k: number): Fragment | null {
                     const span${k} = b${k}.speedRange.b - lo${k};
                     const angle_${k} = count > 0 && typeof particles[0].rotation === 'number';`,
                 body: `if (angle_${k}) {
-                        const ts = (startSpeed[i] - lo${k}) / span${k};
+                        const ts = (startSpeed[row] - lo${k}) / span${k};
                         ${scalarValue(`g${k}`, 'rate', 'ts')}
-                        rot[i] += delta * rate;
-                        angVel[i] = rate;
+                        rot[row] += delta * rate;
+                        angVel[row] = rate;
                     }`,
             };
         case 'OrbitOverLife':
@@ -544,8 +558,8 @@ function compile(fragments: Array<Fragment>, indices: Array<number>, key: string
 
 function generate(fragments: Array<Fragment>, indices: Array<number>): FusedPass | undefined {
     const source = `
+        if (count === 0) return;
         if (store === undefined) {
-            if (count === 0) return;
             store = particles[0].store;
             if (store === undefined) {
                 // Particles of some other implementation, without columns: run the behaviors as they are.
@@ -567,11 +581,17 @@ function generate(fragments: Array<Fragment>, indices: Array<number>): FusedPass
         const uvTile = store.uvTile, startSpeed = store.startSpeed;
         const mem = store.memory, ms = store.memoryStride;
         ${fragments.map((f) => f.setup).join('\n')}
-        for (let i = 0, o3 = 0, o4 = 0, s = 0; i < count; i++, o3 += 3, o4 += 4, s += 3) {
+        // The system keeps particles[i] on row i. Anything else (a hand-built
+        // list) is caught by its ends and read through each particle's row.
+        const mapped = particles[0].storeIndex !== 0 || particles[count - 1].storeIndex !== count - 1;
+        for (let i = 0; i < count; i++) {
+            const p = particles[i];
+            const row = mapped ? p.storeIndex : i;
+            const s = row * 3;
             const age = scalars[s], life = scalars[s + 1];
             if (age >= life) continue;
             const t = age / life;
-            const p = particles[i];
+            const o3 = row * 3, o4 = row * 4;
             ${fragments.map((f) => f.body).join('\n')}
         }`;
     try {

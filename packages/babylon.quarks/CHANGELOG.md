@@ -4,7 +4,7 @@ All notable changes to the `babylon.quarks` package are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project follows the `quarks.core` 0.x version line.
 
-## [0.22.0] — 2026-10-18
+## [0.23.0] — 2026-10-18
 
 ### Changed
 
@@ -25,6 +25,67 @@ and the project follows the `quarks.core` 0.x version line.
   the particle's store row; reading the property back returns a view of that row rather than the
   assigned object. `RandomQuatGenerator` stores its sample as four numbers in the particle's
   memory instead of a `Quaternion`. `TrailParticle.previous` (deprecated) is created on first use.
+
+## [0.22.0] — 2026-10-17
+
+### Added
+
+- Mesh particle lighting modes: `ParticleSystem.lighting` (constructor option `lighting`, saved
+  as `lighting` on the effect's `QuarksMaterial` and read back by `QuarksLoader`) is `'fixed'`
+  (default — exactly the light mesh particles had before), `'unlit'` (the lighting term is
+  compiled out with `MESH_UNLIT`: texture × particle colour, for emissive meshes) or `'scene'`
+  (the scene's first enabled `DirectionalLight` / `HemisphericLight`, re-read every frame:
+  direction, diffuse × intensity, `scene.ambientColor`, plus a hemispheric light's ground colour
+  in the ambient; falls back to the fixed light when the scene has neither). Systems with
+  different lighting are batched apart. The default is not written to JSON.
+- `BatchedRenderer.setMeshLighting({direction, color, ambient})` (Babylon `Vector3` / `Color3`,
+  any subset) sets the `'fixed'` light for every mesh batch of the renderer, including later ones;
+  `getMeshLighting()` returns a copy, `defaultMeshLighting()` the built-in values
+  (`(0.4, -1, 0.6)`, white, `0.35` grey). Exposed in the editor's Renderer module as "Lighting".
+- Mesh particle rim (Fresnel) term: `ParticleSystem.rim` (constructor option `rim`, saved as
+  `rim` on the effect's `QuarksMaterial`) — `{color: [r, g, b], power, strength, mode}` with
+  defaults `[1, 1, 1]`, `2`, `1`, `'add'`; any field may be left out. The edge term is
+  `pow(1 - |N·V|, power) * strength`; `'add'` adds `color` (glowing edge), `'mix'` blends toward it
+  (outline). Compiled in only when set (`MESH_RIM` / `MESH_RIM_MIX`), batched by value, written to
+  JSON only when set, and exposed in the editor's Renderer module. `normalizeMeshRim` /
+  `meshRimEqual` are exported.
+
+### Changed
+
+- **Behaviour change:** quarks.core `WidthOverLength` (Width over Trail) now reads its curve as a
+  multiplier on the width each trail sample was recorded with (the particle's `size.x` at that
+  moment), the way Unity's Width over Trail works, and gives the head sample the curve's value at
+  0, so a trail no longer flares out behind its head or steps at the tip. A new `absolute` flag
+  (`new WidthOverLength(curve, absolute = false)`, JSON field `absolute`) keeps the old reading —
+  the curve as the width in world units, the head at the particle's size. `toJSON` always writes
+  the flag; JSON without it (everything written by 0.21 and earlier, including the Unity
+  exporter's output) loads as `absolute: true`, so authored effects keep their look. Code that
+  builds `new WidthOverLength(curve)` gets the new multiplier behaviour: divide an absolute curve
+  by the start size, or pass `true`. `TrailParticle` gains `historyBaseSizes` (the unscaled
+  recorded widths) and `headWidthScale`.
+
+### Fixed
+
+- Burst `cycle` / `interval` are honoured: a burst fires `cycle` waves, `interval` seconds apart,
+  each rolling `probability` on its own. Repeats past the system's `duration` are dropped (a
+  looping system starts them over every loop), a `cycle` below 1 fires once, and a zero interval
+  fires every wave at once. Previously every burst fired a single wave.
+- Emission over distance spreads the particles it owes along the path the emitter travelled
+  this step, each at its own metre mark (the spacing carries across steps), instead of spawning
+  all of them at the emitter's current position — a fast world-space emitter now leaves a
+  continuous trail rather than one clump per frame. Only the position is interpolated (rotation
+  and scale are the emitter's current ones) and the particles start at age 0. Local-space
+  systems, whose particles move with the emitter, are unchanged.
+- A sub emitter whose target uuid is not in the effect no longer throws on every frame.
+  `QuarksLoader` unlinks it (`subParticleSystem = undefined`) with one `console.warn` naming the
+  emitter and the uuid — also when the uuid names a node that is not a particle emitter — and
+  quarks.core `EmitSubParticleSystem` skips any value that is not a resolved emitter. An
+  unresolved uuid string is written back unchanged by `toJSON`.
+- quarks.core `RotationOverLife` turns mesh particles too: a quaternion rotation is turned about
+  the particle's local Z axis (the axis a number `startRotation` uses, and what Unity's Rotation
+  over Lifetime without separate axes does to meshes), in its own pass and in the fused pass, and
+  the step is kept for the renderer's in-between-step interpolation. It used to do nothing on
+  meshes, silently. `Rotation3DOverLife` remains the behavior for any other axis.
 
 ## [0.21.0] — 2026-10-16
 

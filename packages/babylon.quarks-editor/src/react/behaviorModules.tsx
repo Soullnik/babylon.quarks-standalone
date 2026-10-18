@@ -28,7 +28,7 @@ import {EffectBinding} from '../core/binding';
 import {buildGradient, DEFAULT_GRADIENT_STOPS, findBehavior, readGradientStops} from '../core/colors';
 import {buildCurve, buildScalar, readPieces, readScalar} from '../core/values';
 import {CurveEditor} from './CurveEditor';
-import {NumberField, Row, SelectField} from './fields';
+import {CheckboxField, NumberField, Row, SelectField} from './fields';
 import {GradientEditor} from './GradientEditor';
 import {ModuleSection} from './ModuleSection';
 import {ValueField} from './ValueField';
@@ -614,13 +614,22 @@ export function WidthOverTrailModule({binding}: ModuleProps) {
             }
         >
             {(behavior) => (
-                <div style={{marginTop: 6}}>
-                    <CurveEditor
-                        pieces={readPieces(behavior.width as never)}
-                        maxValue={2}
-                        onChange={(pieces) => binding.apply(() => (behavior.width = buildCurve(pieces) as never))}
-                    />
-                </div>
+                <>
+                    <div style={{marginTop: 6}}>
+                        <CurveEditor
+                            pieces={readPieces(behavior.width as never)}
+                            maxValue={2}
+                            onChange={(pieces) => binding.apply(() => (behavior.width = buildCurve(pieces) as never))}
+                        />
+                    </div>
+                    {/* Off: the curve multiplies the particle size. On: it is the width in world units (files from 0.21 and earlier). */}
+                    <Row label="Absolute width">
+                        <CheckboxField
+                            value={behavior.absolute}
+                            onChange={(v) => binding.apply(() => (behavior.absolute = v))}
+                        />
+                    </Row>
+                </>
             )}
         </BehaviorModule>
     );

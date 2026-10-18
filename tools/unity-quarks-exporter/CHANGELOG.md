@@ -2,11 +2,18 @@
 
 All notable changes to the Unity Quarks Exporter are documented here.
 
-## [0.22.0] — 2026-10-18
+## [0.23.0] — 2026-10-18
 
 ### Changed
 
-- Version aligned with babylon.quarks 0.22.0 (no exporter behavior changes).
+- Version aligned with babylon.quarks 0.23.0 (no exporter behavior changes).
+
+## [0.22.0] — 2026-10-17
+
+### Changed
+
+- Version aligned with babylon.quarks 0.22.0 (no exporter behavior changes). Its width-over-trail
+  curves carry no `absolute` field, so they load in the absolute reading and keep their look.
 
 ## [0.21.0] — 2026-10-16
 

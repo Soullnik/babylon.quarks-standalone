@@ -37,8 +37,9 @@ export class EmitSubParticleSystem implements Behavior {
         public mode: SubParticleEmitMode = SubParticleEmitMode.Frame,
         public emitProbability: number = 1
     ) {
-        if (this.subParticleSystem && this.subParticleSystem.system) {
-            (this.subParticleSystem.system as any).onlyUsedByOther = true;
+        const target = this.target;
+        if (target) {
+            (target as any).onlyUsedByOther = true;
         }
     }
 
@@ -62,8 +63,22 @@ export class EmitSubParticleSystem implements Behavior {
         }
     }
 
+    /**
+     * The system to emit into, or undefined when `subParticleSystem` does not
+     * hold a resolved emitter — unset, or a uuid string a loader could not
+     * link. Every use goes through here, so a bad value is skipped rather
+     * than thrown on.
+     */
+    private get target(): IParticleSystem | undefined {
+        const sub = this.subParticleSystem as unknown;
+        if (sub === null || typeof sub !== 'object') {
+            return undefined;
+        }
+        return (sub as IEmitter).system as IParticleSystem | undefined;
+    }
+
     private emit(particle: Particle, delta: number) {
-        if (!this.subParticleSystem) return;
+        if (!this.target) return;
         if (Math.random() > this.emitProbability) {
             return;
         }
@@ -100,9 +115,13 @@ export class EmitSubParticleSystem implements Behavior {
     }
 
     frameUpdate(delta: number): void {
-        if (!this.subParticleSystem) return;
+        const target = this.target;
+        if (!target) {
+            this.subEmissions.length = 0;
+            return;
+        }
         for (let i = 0; i < this.subEmissions.length; i++) {
-            if (this.subEmissions[i].time >= (this.subParticleSystem!.system as IParticleSystem).duration) {
+            if (this.subEmissions[i].time >= target.duration) {
                 const finished = this.subEmissions[i];
                 finished.particle = undefined;
                 this.spareEmissions.push(finished);
@@ -116,11 +135,7 @@ export class EmitSubParticleSystem implements Behavior {
                 } else {
                     subEmissionState.particle = undefined;
                 }
-                (this.subParticleSystem.system as IParticleSystem).emit(
-                    delta,
-                    subEmissionState,
-                    subEmissionState.matrix
-                );
+                target.emit(delta, subEmissionState, subEmissionState.matrix);
             }
         }
     }
@@ -128,7 +143,13 @@ export class EmitSubParticleSystem implements Behavior {
     toJSON(): any {
         return {
             type: this.type,
-            subParticleSystem: this.subParticleSystem ? this.subParticleSystem.uuid : '',
+            // An unresolved uuid is written back as it was read.
+            subParticleSystem:
+                typeof this.subParticleSystem === 'string'
+                    ? this.subParticleSystem
+                    : this.subParticleSystem
+                      ? this.subParticleSystem.uuid
+                      : '',
             useVelocityAsBasis: this.useVelocityAsBasis,
             mode: this.mode,
             emitProbability: this.emitProbability,
