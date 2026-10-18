@@ -17,7 +17,7 @@ import {
     RenderMode,
     Vector4,
 } from 'babylon.quarks';
-import {SHARED_ASSETS, createColorOverLifeRange, createSharedTexture} from './shared/common';
+import {SHARED_ASSETS, createColorOverLifeGradient, createSharedTexture} from './shared/common';
 import {createEngineFromQuery} from './shared/engineFactory';
 
 const LIFETIME = 2;
@@ -116,8 +116,10 @@ const quarksBackend: () => Backend = () => {
                     transparent: true,
                     blendMode: Constants.ALPHA_ADD,
                 });
+                // A gradient over the particle's life, the same the native systems get from
+                // addColorGradient; a ColorRange would pick one fixed colour per particle.
                 system.addBehavior(
-                    createColorOverLifeRange(
+                    createColorOverLifeGradient(
                         new Vector4(COLOR_START.r, COLOR_START.g, COLOR_START.b, COLOR_START.a),
                         new Vector4(COLOR_END.r, COLOR_END.g, COLOR_END.b, COLOR_END.a)
                     )
