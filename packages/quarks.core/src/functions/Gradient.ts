@@ -99,6 +99,15 @@ export class Gradient implements FunctionColorGenerator {
         this.table = table;
     }
 
+    /**
+     * The sampled table {@link genColor} currently reads from, or null while
+     * none has been built. Lets a compiled behavior pass interpolate the table
+     * inline instead of calling in here once per particle.
+     */
+    sampledTable(): Float32Array | null {
+        return this.table;
+    }
+
     /** Drops the sampled table, so later reads go back to evaluating the keys. */
     clearTable(): void {
         this.table = null;

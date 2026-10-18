@@ -4,6 +4,28 @@ All notable changes to the `babylon.quarks` package are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project follows the `quarks.core` 0.x version line.
 
+## [0.23.0] — 2026-10-18
+
+### Changed
+
+- CPU simulation and batch upload rewritten to work on the `ParticleStore` columns instead of
+  walking particle objects. Scalar attributes (`rotation`, `angularVelocity`, `uvTile`, `flip`,
+  `startSpeed`) and mesh quaternion rotations now live in store columns; the sprite batch copies
+  them as ranges and only visits particle objects for sub-emitted systems. Compiled behavior passes
+  (now built for single behaviors too) read and write the columns, interpolate sampled curves and
+  gradients inline and take per-particle random samples from a mirrored memory column, so a step
+  no longer touches the particle object for the built-in behaviors. Snapshots of size and colour
+  for the renderer are only kept when a behavior can change them, and the step's integration,
+  newborn fix-up and compaction run in one pass. Trail ribbons transform each recorded sample
+  once, upload indices straight to the GPU buffer (no per-frame sub mesh rebuild) and recompute
+  the emitter matrix only when its transform changed. `Noise` and `TurbulenceField` evaluate
+  constant generators once per frame and update through the columns. Measured on 50k particles:
+  billboards 2.1–2.9x faster per frame, trails 1.5x, noise/turbulence 1.2x.
+- Assigning a `Quaternion` to a sprite particle's `rotation` or `angularVelocity` copies it into
+  the particle's store row; reading the property back returns a view of that row rather than the
+  assigned object. `RandomQuatGenerator` stores its sample as four numbers in the particle's
+  memory instead of a `Quaternion`. `TrailParticle.previous` (deprecated) is created on first use.
+
 ## [0.22.0] — 2026-10-17
 
 ### Added

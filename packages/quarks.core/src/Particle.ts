@@ -1,6 +1,6 @@
 import {GeneratorMemory} from './functions';
 import {EmissionState} from './IParticleSystem';
-import {Matrix4, Quaternion, Vector3, Vector3View, Vector4, Vector4View} from './math';
+import {Matrix4, Quaternion, QuaternionView, Vector3, Vector3View, Vector4, Vector4View} from './math';
 import {ParticleStore} from './ParticleStore';
 import {LinkedList} from './util/LinkedList';
 
@@ -205,10 +205,16 @@ export class SpriteParticle implements Particle {
      */
     parentMatrix?: Matrix4;
     /**
-     * Initial speed of the particle.
+     * Initial speed of the particle, kept in the store's `startSpeed` column.
      * @type {number}
      */
-    startSpeed = 0;
+    get startSpeed(): number {
+        return this.store.startSpeed[this.storeIndex];
+    }
+
+    set startSpeed(value: number) {
+        this.store.startSpeed[this.storeIndex] = value;
+    }
     /**
      * Initial color of the particle.
      * @type {Vector4}
@@ -285,34 +291,107 @@ export class SpriteParticle implements Particle {
     set speedModifier(value: number) {
         this.scalars[this.scalarOffset + 2] = value;
     }
-    // extra properties
     /**
-     * Angular velocity of the particle.
+     * View of this particle's row in the store's quaternion rotation column,
+     * when it rotates by quaternion (mesh render mode); undefined while it
+     * rotates by an angle, which then lives in the store's `rotation` column.
+     * Always present so every sprite particle keeps one hidden class.
+     */
+    private rotationQuaternion: QuaternionView | undefined = undefined;
+    /** Same split for the turn rate: a quaternion step here, a scalar rate in the store. */
+    private angularVelocityQuaternion: QuaternionView | undefined = undefined;
+
+    /**
+     * Angular velocity of the particle: a rate in radians per second for an
+     * angle rotation, one step's turn for a quaternion rotation. Both live in
+     * the store so the renderer and compiled behaviors read them as ranges;
+     * assigning a quaternion copies it into the particle's row and returns a
+     * view of that row from then on.
      * @type {number | Quaternion}
      */
-    angularVelocity?: number | Quaternion;
-    // GPU properties
+    get angularVelocity(): number | Quaternion {
+        const q = this.angularVelocityQuaternion;
+        return q !== undefined ? q : this.store.angularVelocity[this.storeIndex];
+    }
+
+    set angularVelocity(value: number | Quaternion | undefined) {
+        if (typeof value === 'number') {
+            this.angularVelocityQuaternion = undefined;
+            this.store.angularVelocity[this.storeIndex] = value;
+        } else if (value === undefined) {
+            this.angularVelocityQuaternion = undefined;
+            this.store.angularVelocity[this.storeIndex] = 0;
+        } else {
+            let view = this.angularVelocityQuaternion;
+            if (view === undefined) {
+                this.store.ensureQuaternionColumns();
+                view = new QuaternionView(this.store.angularVelocityQuaternion, this.storeIndex * 4);
+                this.angularVelocityQuaternion = view;
+            }
+            if (view !== value) {
+                view.copy(value);
+            }
+        }
+    }
+
     /**
-     * Rotation of the particle.
+     * Rotation of the particle: an angle, or a quaternion for mesh particles.
+     * Both live in the store; see {@link angularVelocity} for how assigning a
+     * quaternion behaves.
      * @type {number | Quaternion}
      */
-    rotation: number | Quaternion = 0;
+    get rotation(): number | Quaternion {
+        const q = this.rotationQuaternion;
+        return q !== undefined ? q : this.store.rotation[this.storeIndex];
+    }
+
+    set rotation(value: number | Quaternion) {
+        if (typeof value === 'number') {
+            this.rotationQuaternion = undefined;
+            this.store.rotation[this.storeIndex] = value;
+        } else {
+            let view = this.rotationQuaternion;
+            if (view === undefined) {
+                this.store.ensureQuaternionColumns();
+                view = new QuaternionView(this.store.rotationQuaternion, this.storeIndex * 4);
+                this.rotationQuaternion = view;
+            }
+            if (view !== value) {
+                view.copy(value);
+            }
+        }
+    }
+
     /**
      * Color of the particle.
      * @type {Vector4}
      */
     color: Vector4;
     /**
-     * UV tile index.
+     * UV tile index, kept in the store's `uvTile` column.
      * @type {number}
      */
-    uvTile = 0;
+    get uvTile(): number {
+        return this.store.uvTile[this.storeIndex];
+    }
+
+    set uvTile(value: number) {
+        this.store.uvTile[this.storeIndex] = value;
+    }
+
     /**
      * Mirroring picked at birth from the system's `flip` fractions: bit 1
-     * mirrors the sprite along U, bit 2 along V. 0 draws it as is.
+     * mirrors the sprite along U, bit 2 along V. 0 draws it as is. Kept in
+     * the store's `flip` column.
      * @type {number}
      */
-    flip = 0;
+    get flip(): number {
+        return this.store.flip[this.storeIndex];
+    }
+
+    set flip(value: number) {
+        this.store.flip[this.storeIndex] = value;
+    }
 
     /**
      * @param store - Column storage to bind to. A private single-row store is
@@ -362,6 +441,8 @@ export class SpriteParticle implements Particle {
         (this.startSize as Vector3View).bind(store.startSize, offset3);
         (this.color as Vector4View).bind(store.color, offset4);
         (this.startColor as Vector4View).bind(store.startColor, offset4);
+        this.rotationQuaternion?.bind(store.rotationQuaternion, offset4);
+        this.angularVelocityQuaternion?.bind(store.angularVelocityQuaternion, offset4);
         this.scalars = store.scalars;
         this.scalarOffset = this.storeIndex * ParticleStore.SCALAR_STRIDE;
     }
@@ -412,10 +493,16 @@ export class TrailParticle implements Particle {
      */
     parentMatrix?: Matrix4;
     /**
-     * Initial speed of the particle.
+     * Initial speed of the particle, kept in the store's `startSpeed` column.
      * @type {number}
      */
-    startSpeed = 0;
+    get startSpeed(): number {
+        return this.store.startSpeed[this.storeIndex];
+    }
+
+    set startSpeed(value: number) {
+        this.store.startSpeed[this.storeIndex] = value;
+    }
     /**
      * Initial color of the particle.
      * @type {Vector4}
@@ -516,12 +603,26 @@ export class TrailParticle implements Particle {
      * sample without allocating. This list is no longer populated or rendered.
      * @type {LinkedList<RecordState>}
      */
-    previous: LinkedList<RecordState> = new LinkedList<RecordState>();
+    get previous(): LinkedList<RecordState> {
+        return (this._previous ??= new LinkedList<RecordState>());
+    }
+
+    set previous(value: LinkedList<RecordState>) {
+        this._previous = value;
+    }
+
+    private _previous: LinkedList<RecordState> | undefined = undefined;
     /**
-     * UV tile index.
+     * UV tile index, kept in the store's `uvTile` column.
      * @type {number}
      */
-    uvTile = 0;
+    get uvTile(): number {
+        return this.store.uvTile[this.storeIndex];
+    }
+
+    set uvTile(value: number) {
+        this.store.uvTile[this.storeIndex] = value;
+    }
 
     /** Ring buffer of recorded positions, 3 floats per sample. */
     historyPositions: Float32Array = EMPTY_HISTORY;
@@ -637,30 +738,42 @@ export class TrailParticle implements Particle {
      * oldest sample once the particle is dead. Allocation free.
      */
     update() {
-        this.ensureHistoryCapacity(Math.max(1, Math.ceil(this.length)));
+        // Sized at spawn; this only catches a particle driven without one.
+        if (this.historyCapacity === 0) {
+            this.ensureHistoryCapacity(Math.max(1, Math.ceil(this.length)));
+        }
         const capacity = this.historyCapacity;
+        const store = this.store;
+        const row = this.storeIndex;
+        const scalar = row * ParticleStore.SCALAR_STRIDE;
 
-        if (this.age > this.life) {
+        if (store.scalars[scalar + ParticleStore.AGE] > store.scalars[scalar + ParticleStore.LIFE]) {
             if (this.historyCount > 0) {
                 this.historyCount--;
             }
             return;
         }
 
+        // Straight off the store's columns rather than through the vector views.
         const head = this.historyHead;
         const positionIndex = head * 3;
         const positions = this.historyPositions;
-        positions[positionIndex] = this.position.x;
-        positions[positionIndex + 1] = this.position.y;
-        positions[positionIndex + 2] = this.position.z;
-        this.historyBaseSizes[head] = this.size.x;
-        this.historySizes[head] = this.size.x * this.headWidthScale;
+        const storePositions = store.position;
+        const o3 = row * 3;
+        positions[positionIndex] = storePositions[o3];
+        positions[positionIndex + 1] = storePositions[o3 + 1];
+        positions[positionIndex + 2] = storePositions[o3 + 2];
+        const size = store.size[o3];
+        this.historyBaseSizes[head] = size;
+        this.historySizes[head] = size * this.headWidthScale;
         const colorIndex = head * 4;
         const colors = this.historyColors;
-        colors[colorIndex] = this.color.x;
-        colors[colorIndex + 1] = this.color.y;
-        colors[colorIndex + 2] = this.color.z;
-        colors[colorIndex + 3] = this.color.w;
+        const storeColors = store.color;
+        const o4 = row * 4;
+        colors[colorIndex] = storeColors[o4];
+        colors[colorIndex + 1] = storeColors[o4 + 1];
+        colors[colorIndex + 2] = storeColors[o4 + 2];
+        colors[colorIndex + 3] = storeColors[o4 + 3];
 
         this.historyHead = (head + 1) % capacity;
         if (this.historyCount < capacity) {

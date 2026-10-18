@@ -12,9 +12,10 @@ export class RandomQuatGenerator implements RotationGenerator {
 
     indexCount = 0;
 
+    // Four numeric slots rather than one Quaternion object: nothing is allocated
+    // per spawn, and the numbers can be mirrored into the store's memory column.
     startGen(memory: GeneratorMemory): void {
         this.indexCount = memory.length;
-        memory.push(new Quaternion());
         let x, y, z, u, v, w;
         do {
             x = Math.random() * 2 - 1;
@@ -27,14 +28,15 @@ export class RandomQuatGenerator implements RotationGenerator {
             w = u * u + v * v;
         } while (w > 1);
         const s = Math.sqrt((1 - z) / w);
-        memory[this.indexCount].set(x, y, s * u, s * v);
+        memory.push(x, y, s * u, s * v);
     }
 
     genValue(memory: GeneratorMemory, quat: Quaternion, delta: number, t: number): Quaternion {
         if (this.indexCount === -1) {
             this.startGen(memory);
         }
-        quat.copy(memory[this.indexCount] as Quaternion);
+        const index = this.indexCount;
+        quat.set(memory[index], memory[index + 1], memory[index + 2], memory[index + 3]);
         return quat;
     }
 

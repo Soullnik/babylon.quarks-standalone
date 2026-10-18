@@ -4,6 +4,18 @@ All notable changes to the `babylon.quarks-editor` package are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project follows the `quarks.core` 0.x version line.
 
+## [0.23.0] — 2026-10-18
+
+### Added
+
+- The projects page shows the host's `backLink` (the same one the editor viewport shows), so a
+  workspace embedded in a site can be left for the hosting page without the browser's back button.
+
+### Changed
+
+- Version aligned with babylon.quarks 0.23.0, whose simulation now runs on store columns; the
+  editor's preview and gallery get the same speed-up with no editor changes.
+
 ## [0.22.0] — 2026-10-17
 
 ### Added

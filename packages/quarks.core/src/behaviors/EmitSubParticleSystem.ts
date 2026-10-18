@@ -27,6 +27,8 @@ export class EmitSubParticleSystem implements Behavior {
     private v2_ = new Vector3();
 
     private subEmissions = new Array<SubEmissionState>();
+    /** Finished emission states, kept for reuse: a burst of deaths would otherwise allocate one plus a matrix each. */
+    private spareEmissions = new Array<SubEmissionState>();
 
     constructor(
         private particleSystem: IParticleSystem,
@@ -80,20 +82,35 @@ export class EmitSubParticleSystem implements Behavior {
         if (Math.random() > this.emitProbability) {
             return;
         }
-        const m = new Matrix4();
-        this.setMatrixFromParticle(m, particle);
-        this.subEmissions.push({
-            burstParticleCount: 0,
-            burstParticleIndex: 0,
-            isBursting: false,
-            burstIndex: 0,
-            burstWaveIndex: 0,
-            time: 0,
-            waitEmiting: 0,
-            matrix: m,
-            travelDistance: 0,
-            particle: particle,
-        });
+        const spare = this.spareEmissions.pop();
+        const state: SubEmissionState =
+            spare !== undefined
+                ? spare
+                : {
+                      burstParticleCount: 0,
+                      burstParticleIndex: 0,
+                      isBursting: false,
+                      burstIndex: 0,
+                      burstWaveIndex: 0,
+                      time: 0,
+                      waitEmiting: 0,
+                      matrix: new Matrix4(),
+                      travelDistance: 0,
+                      particle: undefined,
+                      previousWorldPos: undefined,
+                  };
+        state.burstParticleCount = 0;
+        state.burstParticleIndex = 0;
+        state.isBursting = false;
+        state.burstIndex = 0;
+        state.burstWaveIndex = 0;
+        state.time = 0;
+        state.waitEmiting = 0;
+        state.travelDistance = 0;
+        state.particle = particle;
+        state.previousWorldPos = undefined;
+        this.setMatrixFromParticle(state.matrix, particle);
+        this.subEmissions.push(state);
         //(this.subParticleSystem.system as ParticleSystem).emit(delta, particle.emissionState, m);
     }
 
@@ -105,6 +122,9 @@ export class EmitSubParticleSystem implements Behavior {
         }
         for (let i = 0; i < this.subEmissions.length; i++) {
             if (this.subEmissions[i].time >= target.duration) {
+                const finished = this.subEmissions[i];
+                finished.particle = undefined;
+                this.spareEmissions.push(finished);
                 this.subEmissions[i] = this.subEmissions[this.subEmissions.length - 1];
                 this.subEmissions.length = this.subEmissions.length - 1;
                 i--;

@@ -1,4 +1,5 @@
 import {Particle} from '../Particle';
+import {ParticleStore} from '../ParticleStore';
 import {Vector3} from '../math';
 import SimplexNoise from '../util/SimplexNoise';
 import {Behavior} from './Behavior';
@@ -44,6 +45,60 @@ export class TurbulenceField implements Behavior {
         }
         this.temp.multiply(this.velocityMultiplier);
         particle.velocity.addScaledVector(this.temp, delta);
+    }
+
+    updateAll(particles: Array<Particle>, count: number, delta: number): void {
+        const store = count > 0 ? (particles[0] as Particle & {store?: ParticleStore}).store : undefined;
+        if (store === undefined) {
+            for (let i = 0; i < count; i++) {
+                const particle = particles[i];
+                if (particle.age < particle.life) {
+                    this.update(particle, delta);
+                }
+            }
+            return;
+        }
+        // Everything but the noise itself is hoisted: the inverse scale, the
+        // per-octave time offsets and the velocity multiplier.
+        const positions = store.position;
+        const velocities = store.velocity;
+        const scalars = store.scalars;
+        const stride = ParticleStore.SCALAR_STRIDE;
+        const generator = this.generator;
+        const octaves = this.octaves;
+        const inverseScaleX = 1 / this.scale.x;
+        const inverseScaleY = 1 / this.scale.y;
+        const inverseScaleZ = 1 / this.scale.z;
+        const multiplierX = this.velocityMultiplier.x * delta;
+        const multiplierY = this.velocityMultiplier.y * delta;
+        const multiplierZ = this.velocityMultiplier.z * delta;
+        const timeX = this.timeOffset.x;
+        const timeY = this.timeOffset.y;
+        const timeZ = this.timeOffset.z;
+        for (let i = 0, o3 = 0, s = 0; i < count; i++, o3 += 3, s += stride) {
+            if (scalars[s] >= scalars[s + 1]) {
+                continue;
+            }
+            const x = positions[o3] * inverseScaleX;
+            const y = positions[o3 + 1] * inverseScaleY;
+            const z = positions[o3 + 2] * inverseScaleZ;
+            let tx = 0;
+            let ty = 0;
+            let tz = 0;
+            let lvl = 1;
+            for (let octave = 0; octave < octaves; octave++) {
+                const lx = x * lvl;
+                const ly = y * lvl;
+                const lz = z * lvl;
+                tx += generator.noise4D(lx, ly, lz, timeX * lvl) / lvl;
+                ty += generator.noise4D(lx, ly, lz, timeY * lvl) / lvl;
+                tz += generator.noise4D(lx, ly, lz, timeZ * lvl) / lvl;
+                lvl *= 2;
+            }
+            velocities[o3] += tx * multiplierX;
+            velocities[o3 + 1] += ty * multiplierY;
+            velocities[o3 + 2] += tz * multiplierZ;
+        }
     }
 
     toJSON(): any {
