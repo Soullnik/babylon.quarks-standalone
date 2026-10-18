@@ -62,6 +62,7 @@ type StoreBackedParticle = Particle & {storeIndex: number; setStoreIndex(index: 
 
 const UP = new Vector3(0, 0, 1);
 const tempQ = new Quaternion();
+const IDENTITY_QUATERNION = new Quaternion();
 const tempV = new Vector3();
 const tempV2 = new Vector3();
 const PREWARM_FPS = 60;
@@ -74,6 +75,30 @@ const MAX_SIMULATION_STEPS_PER_FRAME = 8;
 // real display (real frame times essentially never land on the tie exactly)
 // and keeps the well-tested "half a step is no step yet" behavior.
 const ROUND_TIE_BIAS = 1e-9;
+
+/** Built-in behaviors that write a particle's size / colour, and those that touch neither. */
+const SIZE_BEHAVIORS = new Set(['SizeOverLife', 'SizeBySpeed']);
+const COLOR_BEHAVIORS = new Set(['ColorOverLife', 'ColorBySpeed']);
+const INERT_FOR_SIZE_AND_COLOR = new Set([
+    'ApplyForce',
+    'Noise',
+    'TurbulenceField',
+    'GravityForce',
+    'RotationOverLife',
+    'Rotation3DOverLife',
+    'RotationBySpeed',
+    'SpeedOverLife',
+    'FrameOverLife',
+    'ForceOverLife',
+    'VelocityOverLife',
+    'InheritVelocity',
+    'OrbitOverLife',
+    'WidthOverLength',
+    'ChangeEmitDirection',
+    'EmitSubParticleSystem',
+    'LimitSpeedOverLife',
+    'ApplyCollision',
+]);
 
 const DEFAULT_POSITIONS = new Float32Array([-0.5, -0.5, 0, 0.5, -0.5, 0, 0.5, 0.5, 0, -0.5, 0.5, 0]);
 const DEFAULT_UVS = new Float32Array([0, 0, 1, 0, 1, 1, 0, 1]);
@@ -271,6 +296,12 @@ export class ParticleSystem implements IParticleSystem {
     /** Behaviors the cached plan was built from, compared by identity. */
     private fusionPlan?: Array<Behavior>;
     private fusionSteps: Array<FusionStep> = [];
+    /**
+     * Whether any behavior in the plan can change a particle's size or colour
+     * after birth. Only then does a step have to snapshot them for the renderer.
+     */
+    private planChangesSize = true;
+    private planChangesColor = true;
     /** @internal **/
     _renderer?: BatchedRenderer;
 
@@ -821,7 +852,9 @@ export class ParticleSystem implements IParticleSystem {
                 this.startRotation.startGen(particle.memory);
                 if (isMeshMode) {
                     if (!(sprite.rotation instanceof Quaternion)) {
-                        sprite.rotation = new Quaternion();
+                        // Assigning a quaternion gives the particle a row in the
+                        // store's quaternion column; the value is overwritten below.
+                        sprite.rotation = IDENTITY_QUATERNION;
                     }
                     // A recycled particle can still carry the turn of whatever
                     // it was last time; the renderer would draw a fraction of it
@@ -893,6 +926,9 @@ export class ParticleSystem implements IParticleSystem {
             for (let j = 0; j < behaviorCount; j++) {
                 behaviors[j].initialize(particle, this);
             }
+            // Every generator has claimed its slot by now; give the compiled
+            // behavior passes a column copy of the samples.
+            this.store.recordMemory((particle as StoreBackedParticle).storeIndex, particle.memory);
         }
     }
 
@@ -1079,6 +1115,22 @@ export class ParticleSystem implements IParticleSystem {
         }
         this.fusionPlan = behaviors.slice();
         this.fusionSteps = planBehaviorFusion(behaviors);
+        let changesSize = false;
+        let changesColor = false;
+        for (let i = 0; i < behaviors.length; i++) {
+            const type = behaviors[i].type;
+            if (SIZE_BEHAVIORS.has(type)) {
+                changesSize = true;
+            } else if (COLOR_BEHAVIORS.has(type)) {
+                changesColor = true;
+            } else if (!INERT_FOR_SIZE_AND_COLOR.has(type)) {
+                // Unknown to this list, so it may write anything.
+                changesSize = true;
+                changesColor = true;
+            }
+        }
+        this.planChangesSize = changesSize;
+        this.planChangesColor = changesColor;
         return this.fusionSteps;
     }
 
@@ -1104,18 +1156,29 @@ export class ParticleSystem implements IParticleSystem {
         // held before, and so is drawn at the emitter instead of jumping.
         const columns = this.store;
         const vector3Rows = particleCount * 3;
+        const steps = this.behaviorSteps();
+        // Size and colour are only snapshotted when some behavior can change
+        // them; otherwise the columns stay what spawn wrote and the renderer
+        // reads them as they are.
+        const snapshotSize = this.planChangesSize;
+        const snapshotColor = this.planChangesColor;
+        columns.useSizeSnapshot(snapshotSize);
+        columns.useColorSnapshot(snapshotColor);
         columns.previousPosition.set(columns.position.subarray(0, vector3Rows));
-        columns.previousSize.set(columns.size.subarray(0, vector3Rows));
+        if (snapshotSize) {
+            columns.previousSize.set(columns.size.subarray(0, vector3Rows));
+        }
         if (stretched) {
             if (columns.keepPreviousVelocity()) {
                 this.rebindParticles();
             }
             columns.previousVelocity.set(columns.velocity.subarray(0, vector3Rows));
         }
-        columns.previousColor.set(columns.color.subarray(0, particleCount * 4));
+        if (snapshotColor) {
+            columns.previousColor.set(columns.color.subarray(0, particleCount * 4));
+        }
 
         this.emitterShape.update(this, delta);
-        const steps = this.behaviorSteps();
         for (let s = 0; s < steps.length; s++) {
             const step = steps[s];
             const stepBehaviors = step.behaviors;
@@ -1129,7 +1192,7 @@ export class ParticleSystem implements IParticleSystem {
                 continue;
             }
             if (step.run !== undefined) {
-                step.run(behaviors, particles, particleCount, delta);
+                step.run(behaviors, particles, particleCount, delta, this.store);
                 continue;
             }
             const behavior = stepBehaviors[0];
@@ -1146,34 +1209,111 @@ export class ParticleSystem implements IParticleSystem {
             }
         }
 
-        // Newborns were snapshotted above with spawn size/color (startSize /
-        // startColor) before SizeOverLife / ColorOverLife ran. That false jump
-        // is then extrapolated by the renderer when simulationResidual is
-        // negative (common with rounded fixed-step) and flashes the start
-        // appearance at the emitter. Collapse it so birth matches t=0 on the
-        // curves. Age is still 0 here — integration below ages them.
+        const notifyDeaths = this.hasListeners('particleDied');
+        const store = this.store;
+        const scalars = store.scalars;
+        const stride = ParticleStore.SCALAR_STRIDE;
+        let liveParticleCount = this.particleNum;
+
+        if (!isTrailMode) {
+            // One pass over the columns does three things the sprite path needs,
+            // none of which touches a particle object until a death:
+            //
+            // Newborns were snapshotted above with their spawn size and colour,
+            // before SizeOverLife / ColorOverLife ran. That false jump would be
+            // extrapolated by the renderer when the residual is negative (common
+            // with the rounded fixed step) and flash the start appearance at the
+            // emitter, so the snapshot is collapsed onto the curves' t=0 value.
+            // Age is still 0 at that point; the same iteration then ages it.
+            //
+            // Position is integrated along the velocity.
+            //
+            // A particle whose age reached its life is swapped with the last live
+            // one, rows included, so slot k always owns row k and the live
+            // particles stay one contiguous range the renderer copies as is. The
+            // survivor moved into the slot has not been visited yet, so the slot
+            // is processed again.
+            const positions = store.position;
+            const velocities = store.velocity;
+            const prevSize = store.previousSize;
+            const curSize = store.size;
+            const prevColor = store.previousColor;
+            const curColor = store.color;
+            const collapseSize = snapshotSize;
+            const collapseColor = snapshotColor;
+            for (let i = 0; i < liveParticleCount; i++) {
+                const scalar = i * stride;
+                let age = scalars[scalar + ParticleStore.AGE];
+                const offset = i * 3;
+                if (age === 0) {
+                    if (collapseSize) {
+                        prevSize[offset] = curSize[offset];
+                        prevSize[offset + 1] = curSize[offset + 1];
+                        prevSize[offset + 2] = curSize[offset + 2];
+                    }
+                    if (collapseColor) {
+                        const o4 = i * 4;
+                        prevColor[o4] = curColor[o4];
+                        prevColor[o4 + 1] = curColor[o4 + 1];
+                        prevColor[o4 + 2] = curColor[o4 + 2];
+                        prevColor[o4 + 3] = curColor[o4 + 3];
+                    }
+                }
+                const step = delta * scalars[scalar + ParticleStore.SPEED_MODIFIER];
+                positions[offset] += velocities[offset] * step;
+                positions[offset + 1] += velocities[offset + 1] * step;
+                positions[offset + 2] += velocities[offset + 2] * step;
+                age += delta;
+                scalars[scalar + ParticleStore.AGE] = age;
+                if (age >= scalars[scalar + ParticleStore.LIFE]) {
+                    const last = liveParticleCount - 1;
+                    const particle = particles[i];
+                    const survivor = particles[last] as StoreBackedParticle;
+                    particles[i] = survivor;
+                    particles[last] = particle;
+                    if (i !== last) {
+                        store.swapRows(i, last);
+                        survivor.setStoreIndex(i);
+                        (particle as StoreBackedParticle).setStoreIndex(last);
+                    }
+                    liveParticleCount--;
+                    i--;
+                    if (notifyDeaths) {
+                        this.fire({type: 'particleDied', particleSystem: this, particle: particle});
+                    }
+                }
+            }
+            this.particleNum = liveParticleCount;
+            this.notifyFinished();
+            return;
+        }
+
+        // Trails: the newborn collapse, then motion, then the trail history,
+        // then removal, each over the particle objects the history lives on.
         if (particleCount > 0) {
             const prevSize = columns.previousSize;
             const curSize = columns.size;
             const prevColor = columns.previousColor;
             const curColor = columns.color;
-            const scalars = columns.scalars;
-            const stride = ParticleStore.SCALAR_STRIDE;
             for (let i = 0, o3 = 0, o4 = 0, s = 0; i < particleCount; i++, o3 += 3, o4 += 4, s += stride) {
                 if (scalars[s + ParticleStore.AGE] !== 0) {
                     continue;
                 }
-                prevSize[o3] = curSize[o3];
-                prevSize[o3 + 1] = curSize[o3 + 1];
-                prevSize[o3 + 2] = curSize[o3 + 2];
-                prevColor[o4] = curColor[o4];
-                prevColor[o4 + 1] = curColor[o4 + 1];
-                prevColor[o4 + 2] = curColor[o4 + 2];
-                prevColor[o4 + 3] = curColor[o4 + 3];
+                if (snapshotSize) {
+                    prevSize[o3] = curSize[o3];
+                    prevSize[o3 + 1] = curSize[o3 + 1];
+                    prevSize[o3 + 2] = curSize[o3 + 2];
+                }
+                if (snapshotColor) {
+                    prevColor[o4] = curColor[o4];
+                    prevColor[o4 + 1] = curColor[o4 + 1];
+                    prevColor[o4 + 2] = curColor[o4 + 2];
+                    prevColor[o4 + 3] = curColor[o4 + 3];
+                }
             }
         }
 
-        const followLocalOrigin = isTrailMode && (this.rendererEmitterSettings as TrailSettings).followLocalOrigin;
+        const followLocalOrigin = (this.rendererEmitterSettings as TrailSettings).followLocalOrigin;
         if (followLocalOrigin) {
             const emitterMatrix = this.emitter.matrixWorld;
             for (let i = 0; i < particleCount; i++) {
@@ -1187,12 +1327,8 @@ export class ParticleSystem implements IParticleSystem {
                 particle.age += delta;
             }
         } else {
-            // Live particles own rows [0, particleNum), so integrate straight
-            // over the columns. Nothing in here touches a particle object.
-            const positions = this.store.position;
-            const velocities = this.store.velocity;
-            const scalars = this.store.scalars;
-            const stride = ParticleStore.SCALAR_STRIDE;
+            const positions = store.position;
+            const velocities = store.velocity;
             for (let i = 0, offset = 0, scalar = 0; i < particleCount; i++, offset += 3, scalar += stride) {
                 const step = delta * scalars[scalar + ParticleStore.SPEED_MODIFIER];
                 positions[offset] += velocities[offset] * step;
@@ -1202,7 +1338,7 @@ export class ParticleSystem implements IParticleSystem {
             }
         }
 
-        if (isTrailMode) {
+        {
             const trailSettings = this.rendererEmitterSettings as TrailSettings;
             const dieWithParticle = trailSettings.dieWithParticle;
             // A world-space system records world positions already.
@@ -1230,23 +1366,15 @@ export class ParticleSystem implements IParticleSystem {
             }
         }
 
-        const notifyDeaths = this.hasListeners('particleDied');
-        const store = this.store;
-        const scalars = store.scalars;
-        const scalarStride = ParticleStore.SCALAR_STRIDE;
-        let liveParticleCount = this.particleNum;
         for (let i = 0; i < liveParticleCount; i++) {
-            const particle = particles[i];
-            const scalar = i * scalarStride;
+            const particle = particles[i] as TrailParticle;
+            const scalar = i * stride;
             const dead = scalars[scalar + ParticleStore.AGE] >= scalars[scalar + ParticleStore.LIFE];
-            if (dead && (!isTrailMode || (particle as TrailParticle).historyCount === 0)) {
+            if (dead && particle.historyCount === 0) {
                 const last = liveParticleCount - 1;
                 const survivor = particles[last] as StoreBackedParticle;
                 particles[i] = survivor;
                 particles[last] = particle;
-                // Move the rows along with the particles so slot k always owns
-                // row k. Live particles then stay one contiguous range, which is
-                // what lets the renderer copy them without gathering.
                 if (i !== last) {
                     store.swapRows(i, last);
                     survivor.setStoreIndex(i);

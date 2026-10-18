@@ -1,4 +1,5 @@
 import {Particle} from '../Particle';
+import {ParticleStore} from '../ParticleStore';
 import {ConstantValue, FunctionValueGenerator, ValueGenerator, ValueGeneratorFromJSON} from '../functions';
 import {Quaternion, Vector3} from '../math';
 import {randomInt} from '../util/MathUtil';
@@ -85,6 +86,19 @@ export class Noise implements Behavior {
         state.generatorW = getGenerator(randomInt(0, GENERATOR_COUNT));
     }
 
+    /**
+     * Values of the generators that are constants, cached by {@link frameUpdate};
+     * NaN where the generator has to be evaluated per particle.
+     */
+    private _frequency = NaN;
+    private _power = NaN;
+    private _positionAmount = NaN;
+    private _rotationAmount = NaN;
+
+    private static constantOf(generator: FunctionValueGenerator | ValueGenerator): number {
+        return generator instanceof ConstantValue ? generator.value : NaN;
+    }
+
     update(particle: Particle, _: number): void {
         const state = (particle as NoisyParticle)._noiseState;
         if (state === undefined) {
@@ -92,10 +106,14 @@ export class Noise implements Behavior {
         }
         const memory = particle.memory;
         const t = particle.age / particle.life;
-        const frequency = this.frequency.genValue(memory, t);
-        const power = this.power.genValue(memory, t);
-        const positionAmount = this.positionAmount.genValue(memory, t);
-        const rotationAmount = this.rotationAmount.genValue(memory, t);
+        const cf = this._frequency;
+        const frequency = cf === cf ? cf : this.frequency.genValue(memory, t);
+        const cp = this._power;
+        const power = cp === cp ? cp : this.power.genValue(memory, t);
+        const cpa = this._positionAmount;
+        const positionAmount = cpa === cpa ? cpa : this.positionAmount.genValue(memory, t);
+        const cra = this._rotationAmount;
+        const rotationAmount = cra === cra ? cra : this.rotationAmount.genValue(memory, t);
         const noiseTime = particle.age * frequency;
 
         if (positionAmount > 0) {
@@ -135,14 +153,80 @@ export class Noise implements Behavior {
     }
 
     updateAll(particles: Array<Particle>, count: number, delta: number): void {
-        // Each particle carries its own noise state and simplex generators, so
-        // there is nothing to hoist out of the body. The gain here is only that
-        // this call site sees one implementation and can be inlined, unlike the
-        // shared dispatch in the system.
-        for (let i = 0; i < count; i++) {
-            const particle = particles[i];
-            if (particle.age < particle.life) {
-                this.update(particle, delta);
+        const store = count > 0 ? (particles[0] as Particle & {store?: ParticleStore}).store : undefined;
+        if (store === undefined) {
+            for (let i = 0; i < count; i++) {
+                const particle = particles[i];
+                if (particle.age < particle.life) {
+                    this.update(particle, delta);
+                }
+            }
+            return;
+        }
+        // Each particle still carries its own noise state and simplex
+        // generators, but position and angle go through the store's columns
+        // rather than the particle's vector views.
+        const positions = store.position;
+        const rotations = store.rotation;
+        const scalars = store.scalars;
+        const stride = ParticleStore.SCALAR_STRIDE;
+        const cf = this._frequency;
+        const cp = this._power;
+        const cpa = this._positionAmount;
+        const cra = this._rotationAmount;
+        for (let i = 0, o3 = 0, s = 0; i < count; i++, o3 += 3, s += stride) {
+            const age = scalars[s];
+            const life = scalars[s + 1];
+            if (age >= life) {
+                continue;
+            }
+            const particle = particles[i] as NoisyParticle;
+            const state = particle._noiseState;
+            if (state === undefined) {
+                continue;
+            }
+            const memory = particle.memory;
+            const t = age / life;
+            const frequency = cf === cf ? cf : this.frequency.genValue(memory, t);
+            const power = cp === cp ? cp : this.power.genValue(memory, t);
+            const positionAmount = cpa === cpa ? cpa : this.positionAmount.genValue(memory, t);
+            const rotationAmount = cra === cra ? cra : this.rotationAmount.genValue(memory, t);
+            const noiseTime = age * frequency;
+
+            if (positionAmount > 0) {
+                const amount = power * positionAmount;
+                const lastPos = state.lastPos;
+                const nx = state.generatorX.noise2D(0, noiseTime) * amount;
+                const ny = state.generatorY.noise2D(0, noiseTime) * amount;
+                const nz = state.generatorZ.noise2D(0, noiseTime) * amount;
+                // Rounded between the two steps as the vector view path is.
+                positions[o3] = Math.fround(positions[o3] - lastPos.x) + nx;
+                positions[o3 + 1] = Math.fround(positions[o3 + 1] - lastPos.y) + ny;
+                positions[o3 + 2] = Math.fround(positions[o3 + 2] - lastPos.z) + nz;
+                lastPos.set(nx, ny, nz);
+            }
+
+            if (rotationAmount > 0) {
+                const amount = power * rotationAmount;
+                if (typeof particle.rotation === 'number') {
+                    const noise = state.generatorW.noise2D(0, noiseTime) * Math.PI * amount;
+                    rotations[i] = rotations[i] - state.lastRot + noise;
+                    state.lastRot = noise;
+                } else if (state.lastRotQ !== null) {
+                    const rotation = particle.rotation as Quaternion;
+                    state.lastRotQ.invert();
+                    rotation.multiply(state.lastRotQ);
+                    tempQ
+                        .set(
+                            state.generatorX.noise2D(0, noiseTime) * amount,
+                            state.generatorY.noise2D(0, noiseTime) * amount,
+                            state.generatorZ.noise2D(0, noiseTime) * amount,
+                            state.generatorW.noise2D(0, noiseTime) * amount
+                        )
+                        .normalize();
+                    rotation.multiply(tempQ);
+                    state.lastRotQ.copy(tempQ);
+                }
             }
         }
     }
@@ -159,6 +243,10 @@ export class Noise implements Behavior {
 
     frameUpdate(delta: number): void {
         this.duration += delta;
+        this._frequency = Noise.constantOf(this.frequency);
+        this._power = Noise.constantOf(this.power);
+        this._positionAmount = Noise.constantOf(this.positionAmount);
+        this._rotationAmount = Noise.constantOf(this.rotationAmount);
     }
 
     static fromJSON(json: any): Behavior {

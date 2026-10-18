@@ -438,7 +438,9 @@ export class SpriteBatch extends VFXBatch {
             const residual = system.simulationResidual ?? 0;
             const stepFraction = residual === 0 ? 0 : residual / (system.simulationStep ?? residual);
             if (copiedColor) {
-                if (stepFraction !== 0 && particleNum > 0) {
+                // An aliased previous column means nothing changed since the
+                // step; the copy is then the carried value.
+                if (stepFraction !== 0 && particleNum > 0 && store!.previousColor !== store!.color) {
                     SpriteBatch.continueColor(this.colorBuffer, index * 4, store!, particleNum, stepFraction);
                 } else {
                     this.colorBuffer.set(store!.color.subarray(0, particleNum * 4), index * 4);
@@ -451,7 +453,7 @@ export class SpriteBatch extends VFXBatch {
                 } else {
                     this.offsetBuffer.set(store.position.subarray(0, particleNum * 3), index * 3);
                 }
-                if (stepFraction !== 0 && particleNum > 0) {
+                if (stepFraction !== 0 && particleNum > 0 && store.previousSize !== store.size) {
                     SpriteBatch.continueVector3(
                         this.sizeBuffer,
                         index * 3,
@@ -500,7 +502,7 @@ export class SpriteBatch extends VFXBatch {
                     offsets[o + 2] = (m02 * px + m12 * py + m22 * pz + m32) * w;
                 }
                 const sizes = this.sizeBuffer;
-                if (stepFraction !== 0) {
+                if (stepFraction !== 0 && store!.previousSize !== store!.size) {
                     SpriteBatch.continueVector3(
                         sizes,
                         base,
@@ -521,122 +523,172 @@ export class SpriteBatch extends VFXBatch {
             }
 
             const firstIndex = index;
-            for (let j = 0; j < particleNum; j++, index++) {
-                const particle = particles[j] as SpriteParticle;
-
-                if (isMeshRender) {
-                    // Turning behaviors leave the last step's turn on the
-                    // particle; a fraction of it carries the mesh the rest of
-                    // the way to now.
-                    let own = particle.rotation as Quaternion;
-                    const step = particle.angularVelocity;
-                    if (stepFraction !== 0 && step instanceof Quaternion) {
-                        own = this.quaternion4_
-                            .copy(own)
-                            .multiply(SpriteBatch.partialTurn(step, stepFraction, this.quaternion5_));
-                    }
-                    let q: Quaternion;
-                    if (systemWorldSpace) {
-                        q = own;
-                    } else {
-                        let parentQ: Quaternion;
-                        if (particle.parentMatrix) {
-                            parentQ = this.quaternion3_.setFromRotationMatrix(particle.parentMatrix);
-                        } else {
-                            parentQ = rotation;
-                        }
-                        q = this.quaternion_;
-                        q.copy(parentQ).multiply(own);
-                    }
-                    const ri = index * 4;
-                    this.rotationBuffer[ri] = q.x;
-                    this.rotationBuffer[ri + 1] = q.y;
-                    this.rotationBuffer[ri + 2] = q.z;
-                    this.rotationBuffer[ri + 3] = q.w;
-                } else {
-                    const spin = particle.angularVelocity;
-                    this.rotationBuffer[index] =
-                        (particle.rotation as number) + (typeof spin === 'number' ? spin * residual : 0);
-                }
-
-                if (!copiedPositionAndSize) {
-                    const position = particle.position;
-                    const previous = particle.previousPosition;
-                    let px = position.x + (position.x - previous.x) * stepFraction;
-                    let py = position.y + (position.y - previous.y) * stepFraction;
-                    let pz = position.z + (position.z - previous.z) * stepFraction;
-                    if (!systemWorldSpace) {
-                        // Inlined point transform: this is the default (local space)
-                        // path and runs for every particle every frame.
-                        const me = (particle.parentMatrix ?? emitterMatrix).elements;
-                        const w = 1 / (me[3] * px + me[7] * py + me[11] * pz + me[15]);
-                        const tx = (me[0] * px + me[4] * py + me[8] * pz + me[12]) * w;
-                        const ty = (me[1] * px + me[5] * py + me[9] * pz + me[13]) * w;
-                        pz = (me[2] * px + me[6] * py + me[10] * pz + me[14]) * w;
-                        px = tx;
-                        py = ty;
-                    }
-
-                    const oi = index * 3;
-                    this.offsetBuffer[oi] = px;
-                    this.offsetBuffer[oi + 1] = py;
-                    this.offsetBuffer[oi + 2] = pz;
-
-                    const size = particle.size;
-                    const si = index * 3;
-                    // Particle size is already in world units when the system is in world
-                    // space or the particle carries its own parent transform.
-                    if (systemWorldSpace || particle.parentMatrix) {
-                        this.sizeBuffer[si] = size.x;
-                        this.sizeBuffer[si + 1] = size.y;
-                        this.sizeBuffer[si + 2] = size.z;
-                    } else {
-                        this.sizeBuffer[si] = size.x * absScaleX;
-                        this.sizeBuffer[si + 1] = size.y * absScaleY;
-                        this.sizeBuffer[si + 2] = size.z * absScaleZ;
+            // Every particle of a system that emits for itself shares the emitter's transform and,
+            // outside mesh mode, rotates by an angle: its scalar attributes are then store columns
+            // and go to the buffers as ranges. Only meshes (quaternion rotations) and particles that
+            // carry their own parent transform still need to be visited one by one.
+            if (sharedTransform && !isMeshRender) {
+                const columns = store!;
+                this.uvTileBuffer.set(columns.uvTile.subarray(0, particleNum), firstIndex);
+                const rotations = this.rotationBuffer;
+                rotations.set(columns.rotation.subarray(0, particleNum), firstIndex);
+                if (residual !== 0) {
+                    // Carry the spin on by the time since the last step, as the
+                    // per-particle path does.
+                    const rates = columns.angularVelocity;
+                    for (let j = 0; j < particleNum; j++) {
+                        rotations[firstIndex + j] += rates[j] * residual;
                     }
                 }
-
-                if (!copiedColor) {
-                    const color = particle.color;
-                    const ci = index * 4;
-                    this.colorBuffer[ci] = color.x;
-                    this.colorBuffer[ci + 1] = color.y;
-                    this.colorBuffer[ci + 2] = color.z;
-                    this.colorBuffer[ci + 3] = color.w;
-                }
-
-                this.uvTileBuffer[index] = particle.uvTile;
-
                 if (isStretchedRender && this.velocityBuffer) {
-                    // The streak points along the velocity and is as long as it,
-                    // so a velocity frozen between steps makes the sprite's
-                    // outline pop at the step rate while its position glides.
-                    const velocity = particle.velocity;
-                    const previousVelocity = particle.previousVelocity;
-                    const vx = velocity.x + (velocity.x - previousVelocity.x) * stepFraction;
-                    const vy = velocity.y + (velocity.y - previousVelocity.y) * stepFraction;
-                    const vz = velocity.z + (velocity.z - previousVelocity.z) * stepFraction;
-                    let vel: Vector3 = this.vector_;
-                    vel.set(vx, vy, vz);
-                    if (!systemWorldSpace) {
-                        if (particle.parentMatrix) {
-                            this.rotationMat2_.setFromMatrix4(particle.parentMatrix);
-                            vel.applyMatrix3(this.rotationMat2_);
+                    SpriteBatch.writeVelocities(
+                        this.velocityBuffer,
+                        firstIndex * 4,
+                        columns,
+                        particleNum,
+                        stepFraction,
+                        systemWorldSpace ? null : this.rotationMat_,
+                        speedFactor,
+                        lengthFactor
+                    );
+                }
+                index += particleNum;
+            } else if (sharedTransform && store!.rotationQuaternion.length > 0) {
+                // Meshes rotate by quaternion, kept in the store too: turn them in
+                // bulk, by the emitter's rotation when the system is local.
+                const columns = store!;
+                this.uvTileBuffer.set(columns.uvTile.subarray(0, particleNum), firstIndex);
+                SpriteBatch.writeQuaternions(
+                    this.rotationBuffer,
+                    firstIndex * 4,
+                    columns,
+                    particleNum,
+                    stepFraction,
+                    systemWorldSpace ? null : rotation
+                );
+                index += particleNum;
+            } else {
+                for (let j = 0; j < particleNum; j++, index++) {
+                    const particle = particles[j] as SpriteParticle;
+
+                    if (isMeshRender) {
+                        // Turning behaviors leave the last step's turn on the
+                        // particle; a fraction of it carries the mesh the rest of
+                        // the way to now.
+                        let own = particle.rotation as Quaternion;
+                        const step = particle.angularVelocity;
+                        if (stepFraction !== 0 && step instanceof Quaternion) {
+                            own = this.quaternion4_
+                                .copy(own)
+                                .multiply(SpriteBatch.partialTurn(step, stepFraction, this.quaternion5_));
+                        }
+                        let q: Quaternion;
+                        if (systemWorldSpace) {
+                            q = own;
                         } else {
-                            vel.applyMatrix3(this.rotationMat_);
+                            let parentQ: Quaternion;
+                            if (particle.parentMatrix) {
+                                parentQ = this.quaternion3_.setFromRotationMatrix(particle.parentMatrix);
+                            } else {
+                                parentQ = rotation;
+                            }
+                            q = this.quaternion_;
+                            q.copy(parentQ).multiply(own);
+                        }
+                        const ri = index * 4;
+                        this.rotationBuffer[ri] = q.x;
+                        this.rotationBuffer[ri + 1] = q.y;
+                        this.rotationBuffer[ri + 2] = q.z;
+                        this.rotationBuffer[ri + 3] = q.w;
+                    } else {
+                        const spin = particle.angularVelocity;
+                        this.rotationBuffer[index] =
+                            (particle.rotation as number) + (typeof spin === 'number' ? spin * residual : 0);
+                    }
+
+                    if (!copiedPositionAndSize) {
+                        const position = particle.position;
+                        const previous = particle.previousPosition;
+                        let px = position.x + (position.x - previous.x) * stepFraction;
+                        let py = position.y + (position.y - previous.y) * stepFraction;
+                        let pz = position.z + (position.z - previous.z) * stepFraction;
+                        if (!systemWorldSpace) {
+                            // Inlined point transform: this is the default (local space)
+                            // path and runs for every particle every frame.
+                            const me = (particle.parentMatrix ?? emitterMatrix).elements;
+                            const w = 1 / (me[3] * px + me[7] * py + me[11] * pz + me[15]);
+                            const tx = (me[0] * px + me[4] * py + me[8] * pz + me[12]) * w;
+                            const ty = (me[1] * px + me[5] * py + me[9] * pz + me[13]) * w;
+                            pz = (me[2] * px + me[6] * py + me[10] * pz + me[14]) * w;
+                            px = tx;
+                            py = ty;
+                        }
+
+                        const oi = index * 3;
+                        this.offsetBuffer[oi] = px;
+                        this.offsetBuffer[oi + 1] = py;
+                        this.offsetBuffer[oi + 2] = pz;
+
+                        const size = particle.size;
+                        const si = index * 3;
+                        // Particle size is already in world units when the system is in world
+                        // space or the particle carries its own parent transform.
+                        if (systemWorldSpace || particle.parentMatrix) {
+                            this.sizeBuffer[si] = size.x;
+                            this.sizeBuffer[si + 1] = size.y;
+                            this.sizeBuffer[si + 2] = size.z;
+                        } else {
+                            this.sizeBuffer[si] = size.x * absScaleX;
+                            this.sizeBuffer[si + 1] = size.y * absScaleY;
+                            this.sizeBuffer[si + 2] = size.z * absScaleZ;
                         }
                     }
-                    const vi = index * 4;
-                    this.velocityBuffer[vi] = vel.x * speedFactor;
-                    this.velocityBuffer[vi + 1] = vel.y * speedFactor;
-                    this.velocityBuffer[vi + 2] = vel.z * speedFactor;
-                    this.velocityBuffer[vi + 3] = lengthFactor;
+
+                    if (!copiedColor) {
+                        const color = particle.color;
+                        const ci = index * 4;
+                        this.colorBuffer[ci] = color.x;
+                        this.colorBuffer[ci + 1] = color.y;
+                        this.colorBuffer[ci + 2] = color.z;
+                        this.colorBuffer[ci + 3] = color.w;
+                    }
+
+                    this.uvTileBuffer[index] = particle.uvTile;
+
+                    if (isStretchedRender && this.velocityBuffer) {
+                        // The streak points along the velocity and is as long as it,
+                        // so a velocity frozen between steps makes the sprite's
+                        // outline pop at the step rate while its position glides.
+                        const velocity = particle.velocity;
+                        const previousVelocity = particle.previousVelocity;
+                        const vx = velocity.x + (velocity.x - previousVelocity.x) * stepFraction;
+                        const vy = velocity.y + (velocity.y - previousVelocity.y) * stepFraction;
+                        const vz = velocity.z + (velocity.z - previousVelocity.z) * stepFraction;
+                        let vel: Vector3 = this.vector_;
+                        vel.set(vx, vy, vz);
+                        if (!systemWorldSpace) {
+                            if (particle.parentMatrix) {
+                                this.rotationMat2_.setFromMatrix4(particle.parentMatrix);
+                                vel.applyMatrix3(this.rotationMat2_);
+                            } else {
+                                vel.applyMatrix3(this.rotationMat_);
+                            }
+                        }
+                        const vi = index * 4;
+                        this.velocityBuffer[vi] = vel.x * speedFactor;
+                        this.velocityBuffer[vi + 1] = vel.y * speedFactor;
+                        this.velocityBuffer[vi + 2] = vel.z * speedFactor;
+                        this.velocityBuffer[vi + 3] = lengthFactor;
+                    }
                 }
             }
 
             if (flipsSprites && system.flip !== undefined) {
-                SpriteBatch.applyFlip(this.sizeBuffer, firstIndex * 3, particles, particleNum);
+                if (store !== undefined) {
+                    SpriteBatch.applyFlip(this.sizeBuffer, firstIndex * 3, store.flip, particleNum);
+                } else {
+                    SpriteBatch.applyFlipFromParticles(this.sizeBuffer, firstIndex * 3, particles, particleNum);
+                }
             }
         }
 
@@ -709,13 +761,136 @@ export class SpriteBatch extends VFXBatch {
      * quad being centred — the way Unity's renderer Flip mirrors U and V. The
      * stretched shader reads the sign and mirrors the texture coordinates.
      */
-    private static applyFlip(sizes: Float32Array, base: number, particles: IParticle[], count: number): void {
+    private static applyFlip(sizes: Float32Array, base: number, flips: Uint8Array, count: number): void {
+        for (let j = 0, o = base; j < count; j++, o += 3) {
+            const flip = flips[j];
+            if (flip !== 0) {
+                if (flip & 1) sizes[o] = -sizes[o];
+                if (flip & 2) sizes[o + 1] = -sizes[o + 1];
+            }
+        }
+    }
+
+    /** The same for a system without a store, read off the particles. */
+    private static applyFlipFromParticles(
+        sizes: Float32Array,
+        base: number,
+        particles: IParticle[],
+        count: number
+    ): void {
         for (let j = 0, o = base; j < count; j++, o += 3) {
             const flip = (particles[j] as SpriteParticle).flip;
             if (flip !== 0) {
                 if (flip & 1) sizes[o] = -sizes[o];
                 if (flip & 2) sizes[o + 1] = -sizes[o + 1];
             }
+        }
+    }
+
+    /**
+     * Writes the mesh rotations for rows `[0, count)` of a store: each
+     * particle's quaternion, carried on by `fraction` of its last turn (see
+     * {@link partialTurn}) and, for a local-space system, turned by the
+     * emitter's rotation `parent`.
+     */
+    private static writeQuaternions(
+        target: Float32Array,
+        base: number,
+        store: ParticleStore,
+        count: number,
+        fraction: number,
+        parent: Quaternion | null
+    ): void {
+        const rotations = store.rotationQuaternion;
+        const turns = store.angularVelocityQuaternion;
+        const hasParent = parent !== null;
+        const px = hasParent ? parent.x : 0;
+        const py = hasParent ? parent.y : 0;
+        const pz = hasParent ? parent.z : 0;
+        const pw = hasParent ? parent.w : 1;
+        for (let i = 0, o = 0, t = base; i < count; i++, o += 4, t += 4) {
+            let x = rotations[o];
+            let y = rotations[o + 1];
+            let z = rotations[o + 2];
+            let w = rotations[o + 3];
+            if (fraction !== 0) {
+                // The fraction of the step's turn, as a normalised lerp from no
+                // rotation, then own = own * turn.
+                const sx = turns[o] * fraction;
+                const sy = turns[o + 1] * fraction;
+                const sz = turns[o + 2] * fraction;
+                const sw = 1 + (turns[o + 3] - 1) * fraction;
+                const inverseLength = 1 / Math.sqrt(sx * sx + sy * sy + sz * sz + sw * sw);
+                const tx = sx * inverseLength;
+                const ty = sy * inverseLength;
+                const tz = sz * inverseLength;
+                const tw = sw * inverseLength;
+                const nx = x * tw + w * tx + y * tz - z * ty;
+                const ny = y * tw + w * ty + z * tx - x * tz;
+                const nz = z * tw + w * tz + x * ty - y * tx;
+                w = w * tw - x * tx - y * ty - z * tz;
+                x = nx;
+                y = ny;
+                z = nz;
+            }
+            if (hasParent) {
+                // q = parent * own
+                const nx = px * w + pw * x + py * z - pz * y;
+                const ny = py * w + pw * y + pz * x - px * z;
+                const nz = pz * w + pw * z + px * y - py * x;
+                w = pw * w - px * x - py * y - pz * z;
+                x = nx;
+                y = ny;
+                z = nz;
+            }
+            target[t] = x;
+            target[t + 1] = y;
+            target[t + 2] = z;
+            target[t + 3] = w;
+        }
+    }
+
+    /**
+     * Writes the stretched billboards' velocity attribute for rows `[0, count)`
+     * of a store: the velocity carried on by `fraction` of the last step (see
+     * {@link extrapolate}), turned into world space by `rotation` when the
+     * system simulates locally, scaled by the speed factor, with the length
+     * factor in `w`.
+     */
+    private static writeVelocities(
+        target: Float32Array,
+        base: number,
+        store: ParticleStore,
+        count: number,
+        fraction: number,
+        rotation: Matrix3 | null,
+        speedFactor: number,
+        lengthFactor: number
+    ): void {
+        const velocities = store.velocity;
+        // Empty until the first stretched step has run; the velocity then has no history yet.
+        const previous = store.previousVelocity.length >= count * 3 ? store.previousVelocity : velocities;
+        const e = rotation !== null ? rotation.elements : null;
+        for (let i = 0, o = 0, t = base; i < count; i++, o += 3, t += 4) {
+            let vx = velocities[o];
+            let vy = velocities[o + 1];
+            let vz = velocities[o + 2];
+            if (fraction !== 0) {
+                vx += (vx - previous[o]) * fraction;
+                vy += (vy - previous[o + 1]) * fraction;
+                vz += (vz - previous[o + 2]) * fraction;
+            }
+            if (e !== null) {
+                const x = e[0] * vx + e[3] * vy + e[6] * vz;
+                const y = e[1] * vx + e[4] * vy + e[7] * vz;
+                vz = e[2] * vx + e[5] * vy + e[8] * vz;
+                vx = x;
+                vy = y;
+            }
+            target[t] = vx * speedFactor;
+            target[t + 1] = vy * speedFactor;
+            target[t + 2] = vz * speedFactor;
+            target[t + 3] = lengthFactor;
         }
     }
 

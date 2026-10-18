@@ -169,9 +169,9 @@ describe('behavior fusion', () => {
 
         const steps = planBehaviorFusion([before, middle, afterA, afterB]);
         expect(steps).toHaveLength(3);
-        // A lone recognised behavior is not worth wrapping in generated code.
+        // A lone recognised behavior is still compiled: it gains the column access.
         expect(steps[0].behaviors).toEqual([before]);
-        expect(steps[0].run).toBeUndefined();
+        expect(steps[0].run).toBeDefined();
         expect(steps[1].behaviors).toEqual([middle]);
         expect(steps[1].run).toBeUndefined();
         expect(steps[2].behaviors).toEqual([afterA, afterB]);

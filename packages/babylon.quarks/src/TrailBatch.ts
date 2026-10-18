@@ -56,6 +56,12 @@ export class TrailBatch extends VFXBatch {
         this.widthBuffer = new Float32Array(this.maxParticles * 2);
         this.colorBuffer = new Float32Array(this.maxParticles * 8);
         this.indexBuffer = new Uint32Array(this.maxParticles * 6);
+        // Vertices come in pairs, one per side of the ribbon, so the side never
+        // changes: written once here and never uploaded again.
+        for (let i = 0; i < this.sideBuffer.length; i += 2) {
+            this.sideBuffer[i] = 1;
+            this.sideBuffer[i + 1] = -1;
+        }
 
         // Initialize with full-capacity buffers (updatable) and a dummy triangle
         this.positionBuffer[0] = 0;
@@ -216,10 +222,21 @@ export class TrailBatch extends VFXBatch {
     private vector3_ = new Vector3();
     private quaternion_ = new Quaternion();
 
-    /** Forces the emitter's world matrix to be current before sampling it. */
+    /**
+     * Brings the emitter's world matrix up to date when its transform changed.
+     *
+     * Babylon only recomputes a world matrix once per render id, so a frame that
+     * moves the emitter after that (or a step driven without rendering) would
+     * draw the ribbon against the old one. Recomputing unconditionally every
+     * frame costs a matrix compose per system; checking the transform cache
+     * first makes a still emitter free.
+     */
     private static ensureWorldMatrix(system: IParticleSystem): void {
-        const emitter = system.emitter as {computeWorldMatrix?: (force: boolean) => void};
-        if (emitter.computeWorldMatrix) {
+        const emitter = system.emitter as {
+            computeWorldMatrix?: (force: boolean) => void;
+            isSynchronized?: () => boolean;
+        };
+        if (emitter.computeWorldMatrix && (!emitter.isSynchronized || !emitter.isSynchronized())) {
             emitter.computeWorldMatrix(true);
         }
     }
@@ -327,31 +344,46 @@ export class TrailBatch extends VFXBatch {
                     1 / (stepFraction !== 0 ? particleHistoryLength : Math.max(1, particleHistoryLength - 1));
 
                 // Walk the ring buffer oldest-first with hand-rolled wrapping so the
-                // inner loop stays free of modulo operations.
+                // inner loop stays free of modulo operations. Each sample is brought
+                // into world space once: the point written as `next` on one
+                // iteration is `current` on the following one and `previous` on
+                // the one after that.
                 let currentSlot = particle.getHistoryIndex(0);
-                let previousSlot = currentSlot;
+                let currentX = historyPositions[currentSlot * 3];
+                let currentY = historyPositions[currentSlot * 3 + 1];
+                let currentZ = historyPositions[currentSlot * 3 + 2];
+                if (!samplesInWorld) {
+                    const w = 1 / (m03 * currentX + m13 * currentY + m23 * currentZ + m33);
+                    const tx = (m00 * currentX + m10 * currentY + m20 * currentZ + m30) * w;
+                    const ty = (m01 * currentX + m11 * currentY + m21 * currentZ + m31) * w;
+                    currentZ = (m02 * currentX + m12 * currentY + m22 * currentZ + m32) * w;
+                    currentX = tx;
+                    currentY = ty;
+                }
+                let previousX = currentX;
+                let previousY = currentY;
+                let previousZ = currentZ;
 
                 for (let i = 0; i < particleHistoryLength; i++, index += 2) {
-                    const nextSlot =
-                        i + 1 < particleHistoryLength
-                            ? currentSlot + 1 === historyCapacity
-                                ? 0
-                                : currentSlot + 1
-                            : currentSlot;
-
-                    const currentPosIndex = currentSlot * 3;
-                    const previousPosIndex = previousSlot * 3;
-                    const nextPosIndex = nextSlot * 3;
-
-                    let currentX = historyPositions[currentPosIndex];
-                    let currentY = historyPositions[currentPosIndex + 1];
-                    let currentZ = historyPositions[currentPosIndex + 2];
-                    let previousX = historyPositions[previousPosIndex];
-                    let previousY = historyPositions[previousPosIndex + 1];
-                    let previousZ = historyPositions[previousPosIndex + 2];
-                    let nextX = historyPositions[nextPosIndex];
-                    let nextY = historyPositions[nextPosIndex + 1];
-                    let nextZ = historyPositions[nextPosIndex + 2];
+                    let nextX = currentX;
+                    let nextY = currentY;
+                    let nextZ = currentZ;
+                    let nextSlot = currentSlot;
+                    if (i + 1 < particleHistoryLength) {
+                        nextSlot = currentSlot + 1 === historyCapacity ? 0 : currentSlot + 1;
+                        const nextPosIndex = nextSlot * 3;
+                        nextX = historyPositions[nextPosIndex];
+                        nextY = historyPositions[nextPosIndex + 1];
+                        nextZ = historyPositions[nextPosIndex + 2];
+                        if (!samplesInWorld) {
+                            const w = 1 / (m03 * nextX + m13 * nextY + m23 * nextZ + m33);
+                            const tx = (m00 * nextX + m10 * nextY + m20 * nextZ + m30) * w;
+                            const ty = (m01 * nextX + m11 * nextY + m21 * nextZ + m31) * w;
+                            nextZ = (m02 * nextX + m12 * nextY + m22 * nextZ + m32) * w;
+                            nextX = tx;
+                            nextY = ty;
+                        }
+                    }
 
                     const currentSize = historySizes[currentSlot];
                     const currentColorIndex = colorFromParticle ? particleColorIndex : currentSlot * 4;
@@ -359,33 +391,6 @@ export class TrailBatch extends VFXBatch {
                     const currentColorY = colors[currentColorIndex + 1];
                     const currentColorZ = colors[currentColorIndex + 2];
                     const currentColorW = colors[currentColorIndex + 3];
-
-                    previousSlot = currentSlot;
-                    currentSlot = nextSlot;
-
-                    if (!samplesInWorld) {
-                        // Inlined point transforms — three per trail sample.
-                        let w = 1 / (m03 * currentX + m13 * currentY + m23 * currentZ + m33);
-                        let tx = (m00 * currentX + m10 * currentY + m20 * currentZ + m30) * w;
-                        let ty = (m01 * currentX + m11 * currentY + m21 * currentZ + m31) * w;
-                        currentZ = (m02 * currentX + m12 * currentY + m22 * currentZ + m32) * w;
-                        currentX = tx;
-                        currentY = ty;
-
-                        w = 1 / (m03 * previousX + m13 * previousY + m23 * previousZ + m33);
-                        tx = (m00 * previousX + m10 * previousY + m20 * previousZ + m30) * w;
-                        ty = (m01 * previousX + m11 * previousY + m21 * previousZ + m31) * w;
-                        previousZ = (m02 * previousX + m12 * previousY + m22 * previousZ + m32) * w;
-                        previousX = tx;
-                        previousY = ty;
-
-                        w = 1 / (m03 * nextX + m13 * nextY + m23 * nextZ + m33);
-                        tx = (m00 * nextX + m10 * nextY + m20 * nextZ + m30) * w;
-                        ty = (m01 * nextX + m11 * nextY + m21 * nextZ + m31) * w;
-                        nextZ = (m02 * nextX + m12 * nextY + m22 * nextZ + m32) * w;
-                        nextX = tx;
-                        nextY = ty;
-                    }
 
                     const pi = index * 3;
                     this.positionBuffer[pi] = currentX;
@@ -408,9 +413,6 @@ export class TrailBatch extends VFXBatch {
                     this.nextBuffer[pi + 3] = nextX;
                     this.nextBuffer[pi + 4] = nextY;
                     this.nextBuffer[pi + 5] = nextZ;
-
-                    this.sideBuffer[index] = 1;
-                    this.sideBuffer[index + 1] = -1;
 
                     if (systemWorldSpace || particle.parentMatrix) {
                         this.widthBuffer[index] = currentSize;
@@ -448,6 +450,14 @@ export class TrailBatch extends VFXBatch {
                         this.indexBuffer[triangles * 3 + 2] = index + 3;
                         triangles++;
                     }
+
+                    previousX = currentX;
+                    previousY = currentY;
+                    previousZ = currentZ;
+                    currentX = nextX;
+                    currentY = nextY;
+                    currentZ = nextZ;
+                    currentSlot = nextSlot;
                 }
 
                 // Live tip: same place a sprite would be drawn this frame, past
@@ -505,9 +515,6 @@ export class TrailBatch extends VFXBatch {
                     this.nextBuffer[headPi + 4] = tipY;
                     this.nextBuffer[headPi + 5] = tipZ;
 
-                    this.sideBuffer[index] = 1;
-                    this.sideBuffer[index + 1] = -1;
-
                     const tipSize = particle.size.x;
                     if (systemWorldSpace || particle.parentMatrix) {
                         this.widthBuffer[index] = tipSize;
@@ -560,22 +567,30 @@ export class TrailBatch extends VFXBatch {
      * costs that loop its optimised code.
      */
     private uploadGeometry(index: number, triangles: number): void {
+        const geometry = this.mesh.geometry;
+        const indexBuffer = geometry?.getIndexBuffer();
         if (index > 0 && triangles > 0) {
             // Upload only the vertices written this frame; the buffers are sized for
             // the high-water mark of every system in the batch.
             this.mesh.updateVerticesData(VertexBuffer.PositionKind, this.positionBuffer.subarray(0, index * 3));
             this.mesh.updateVerticesData(VertexBuffer.UVKind, this.uvBuffer.subarray(0, index * 2));
-            this.mesh.updateIndices(this.indexBuffer.subarray(0, triangles * 3));
+            // Straight to the GPU buffer. Going through `mesh.updateIndices` with a
+            // range whose length changes every frame makes Babylon copy the
+            // indices, rebuild the sub mesh and recompute its bounds from the
+            // whole position buffer, all of which this batch then undoes.
+            if (indexBuffer) {
+                this.scene
+                    .getEngine()
+                    .updateDynamicIndexBuffer(indexBuffer, this.indexBuffer.subarray(0, triangles * 3), 0);
+            }
             this.previousVB.update(this.previousBuffer.subarray(0, index * 3));
             this.nextVB.update(this.nextBuffer.subarray(0, index * 3));
-            this.sideVB.update(this.sideBuffer.subarray(0, index));
             this.widthVB.update(this.widthBuffer.subarray(0, index));
 
             const colorVB = this.mesh.getVertexBuffer(VertexBuffer.ColorKind);
             if (colorVB) colorVB.update(this.colorBuffer.subarray(0, index * 4));
 
             if (this.mesh.subMeshes && this.mesh.subMeshes.length > 0) {
-                this.adoptMeshBounds();
                 this.mesh.subMeshes[0].indexCount = triangles * 3;
                 this.mesh.subMeshes[0].verticesCount = index;
             }
@@ -593,8 +608,9 @@ export class TrailBatch extends VFXBatch {
             // every empty frame.
             if (!this.drawsNothing) {
                 this.indexBuffer.fill(0, 0, 6);
-                this.mesh.updateIndices(this.indexBuffer.subarray(0, 6));
-                this.adoptMeshBounds();
+                if (indexBuffer) {
+                    this.scene.getEngine().updateDynamicIndexBuffer(indexBuffer, this.indexBuffer.subarray(0, 6), 0);
+                }
                 this.drawsNothing = true;
             }
             this.mesh.subMeshes[0].indexCount = 6;
