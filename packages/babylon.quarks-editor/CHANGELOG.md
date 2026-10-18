@@ -4,6 +4,13 @@ All notable changes to the `babylon.quarks-editor` package are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project follows the `quarks.core` 0.x version line.
 
+## [0.22.0] — 2026-10-18
+
+### Changed
+
+- Version aligned with babylon.quarks 0.22.0, whose simulation now runs on store columns; the
+  editor's preview and gallery get the same speed-up with no editor changes.
+
 ## [0.21.0] — 2026-10-16
 
 ### Changed
