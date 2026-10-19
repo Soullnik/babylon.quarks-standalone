@@ -1,3 +1,4 @@
+import {random} from '../util/random';
 import {Euler} from './Euler';
 import * as MathUtils from './MathUtils';
 import {Matrix3} from './Matrix3';
@@ -569,9 +570,9 @@ class Vector3 {
     }*/
 
     random() {
-        this.x = Math.random();
-        this.y = Math.random();
-        this.z = Math.random();
+        this.x = random();
+        this.y = random();
+        this.z = random();
 
         return this;
     }
@@ -579,8 +580,8 @@ class Vector3 {
     randomDirection() {
         // https://mathworld.wolfram.com/SpherePointPicking.html
 
-        const theta = Math.random() * Math.PI * 2;
-        const u = Math.random() * 2 - 1;
+        const theta = random() * Math.PI * 2;
+        const u = random() * 2 - 1;
         const c = Math.sqrt(1 - u * u);
 
         this.x = c * Math.cos(theta);

@@ -1,5 +1,6 @@
 import {Vector4} from '../math';
 import {ColorToJSON, JSONToColor} from '../util/JSONUtil';
+import {random} from '../util/random';
 import {ColorGenerator} from './ColorGenerator';
 import {FunctionJSON} from './FunctionJSON';
 import {GeneratorMemory} from './GeneratorMemory';
@@ -16,7 +17,7 @@ export class ColorRange implements ColorGenerator {
 
     startGen(memory: GeneratorMemory): void {
         this.indexCount = memory.length;
-        memory.push(Math.random());
+        memory.push(random());
     }
     genColor(memory: GeneratorMemory, color: Vector4): Vector4 {
         if (this.indexCount === -1) {

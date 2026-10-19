@@ -1,7 +1,8 @@
 import {Vector3} from '../math';
+import {random} from './random';
 
 export function randomInt(a: number, b: number): number {
-    return Math.floor(Math.random() * (b - a)) + a;
+    return Math.floor(random() * (b - a)) + a;
 }
 
 export const UP_VEC3 = new Vector3(0, 1, 0);

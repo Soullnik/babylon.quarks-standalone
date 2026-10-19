@@ -60,6 +60,10 @@ namespace BabylonQuarks.UnityExporter
             {
                 obj.Set("playbackSpeed", main.simulationSpeed);
             }
+            if (!ps.useAutoRandomSeed)
+            {
+                obj.Set("seed", ps.randomSeed);
+            }
             // Automatic and Always Simulate both keep simulating off screen, the runtime's default.
             switch (main.cullingMode)
             {
@@ -70,12 +74,42 @@ namespace BabylonQuarks.UnityExporter
                     obj.Set("cullingMode", "pauseAndCatchUp");
                     break;
             }
+            switch (renderer.sortMode)
+            {
+                case ParticleSystemSortMode.Distance:
+                case ParticleSystemSortMode.Depth:
+                    obj.Set("sortMode", "distance");
+                    break;
+                case ParticleSystemSortMode.OldestInFront:
+                    obj.Set("sortMode", "oldestInFront");
+                    break;
+                case ParticleSystemSortMode.YoungestInFront:
+                    obj.Set("sortMode", "youngestInFront");
+                    break;
+            }
+            // Unity's screen-size limits (fractions of the viewport) only apply to billboards; the
+            // runtime's default is unlimited, so Unity's default maximum of 0.5 is written out.
+            if (renderMode != 2 && renderMode != 3)
+            {
+                if (renderer.minParticleSize > 0f)
+                {
+                    obj.Set("minParticleSize", renderer.minParticleSize);
+                }
+                if (renderer.maxParticleSize < 1f)
+                {
+                    obj.Set("maxParticleSize", renderer.maxParticleSize);
+                }
+            }
 
             if (geometryUuid != null)
             {
                 obj.Set("instancingGeometry", geometryUuid);
             }
             if (!trailOnly) AddPivotAndFlip(ps, renderer, renderMode, obj);
+            if (!trailOnly && ps.shape.enabled && ps.shape.alignToDirection)
+            {
+                obj.Set("alignToDirection", true);
+            }
 
             BuildTextureSheet(ps, obj, behaviors, trailOnly);
 
@@ -667,7 +701,9 @@ namespace BabylonQuarks.UnityExporter
                 .Set("orbitalX", ValueConverter.Curve(m.orbitalX))
                 .Set("orbitalY", ValueConverter.Curve(m.orbitalY))
                 .Set("orbitalZ", ValueConverter.Curve(m.orbitalZ))
-                .Set("space", m.space == ParticleSystemSimulationSpace.World ? "world" : "local"));
+                .Set("space", m.space == ParticleSystemSimulationSpace.World ? "world" : "local")
+                .Set("radial", ValueConverter.Curve(m.radial))
+                .Set("orbitalOffset", new JArray(ConstantOf(m.orbitalOffsetX), ConstantOf(m.orbitalOffsetY), ConstantOf(m.orbitalOffsetZ))));
         }
 
         private static void AddLimitVelocity(ParticleSystem ps, JArray behaviors)
@@ -697,12 +733,20 @@ namespace BabylonQuarks.UnityExporter
         {
             var m = ps.noise;
             if (!m.enabled) return;
-            behaviors.Add(new JObject()
+            var noise = new JObject()
                 .Set("type", "Noise")
                 .Set("frequency", ValueConverter.Constant(m.frequency))
                 .Set("power", ValueConverter.Curve(m.strength))
                 .Set("positionAmount", ValueConverter.Constant(1))
-                .Set("rotationAmount", ValueConverter.Constant(0)));
+                .Set("rotationAmount", ValueConverter.Constant(0))
+                // The runtime samples the scroll speed once per frame, so only its constant travels.
+                .Set("scrollSpeed", ValueConverter.Constant(ConstantOf(m.scrollSpeed)));
+            if (m.remapEnabled)
+            {
+                // Unity reads the remap curve at the raw noise mapped from [-1, 1] to [0, 1]; so does the runtime.
+                noise.Set("remap", ValueConverter.Curve(m.remap));
+            }
+            behaviors.Add(noise);
         }
 
         private static void AddInheritVelocity(ParticleSystem ps, JArray behaviors)
@@ -787,12 +831,20 @@ namespace BabylonQuarks.UnityExporter
                     Debug.LogWarning($"[Quarks Exporter] '{ps.name}': {type} sub-emitter '{sub.name}' has no quarks counterpart and is skipped.");
                     continue;
                 }
-                behaviors.Add(new JObject()
+                var behavior = new JObject()
                     .Set("type", "EmitSubParticleSystem")
                     .Set("subParticleSystem", uuid)
                     .Set("useVelocityAsBasis", false)
                     .Set("mode", type == ParticleSystemSubEmitterType.Birth ? SubEmitBirth : SubEmitDeath)
-                    .Set("emitProbability", m.GetSubEmitterEmitProbability(i)));
+                    .Set("emitProbability", m.GetSubEmitterEmitProbability(i));
+                var inherit = new JArray();
+                var properties = m.GetSubEmitterProperties(i);
+                if ((properties & ParticleSystemSubEmitterProperties.InheritColor) != 0) inherit.Add("color");
+                if ((properties & ParticleSystemSubEmitterProperties.InheritSize) != 0) inherit.Add("size");
+                if ((properties & ParticleSystemSubEmitterProperties.InheritRotation) != 0) inherit.Add("rotation");
+                if ((properties & ParticleSystemSubEmitterProperties.InheritLifetime) != 0) inherit.Add("lifetime");
+                if (inherit.Count > 0) behavior.Set("inherit", inherit);
+                behaviors.Add(behavior);
             }
         }
 

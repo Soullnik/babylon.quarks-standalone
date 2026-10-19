@@ -1,5 +1,6 @@
 import {IParticleSystem} from '../IParticleSystem';
 import {Particle} from '../Particle';
+import {random} from '../util/random';
 import {EmitterShape, ShapeJSON} from './EmitterUtil';
 import {ShapeTransform} from './ShapeTransform';
 
@@ -47,8 +48,8 @@ export class GridEmitter implements EmitterShape {
     }
 
     initialize(p: Particle) {
-        const r = Math.floor(Math.random() * this.row);
-        const c = Math.floor(Math.random() * this.column);
+        const r = Math.floor(random() * this.row);
+        const c = Math.floor(random() * this.column);
 
         p.position.x = (c * this.width) / this.column - this.width / 2;
         p.position.y = (r * this.height) / this.row - this.height / 2;

@@ -1,5 +1,6 @@
 import {EmissionState, IParticleSystem} from '../IParticleSystem';
 import {Particle} from '../Particle';
+import {random} from '../util/random';
 import type {ShapeTransform, ShapeTransformJSON} from './ShapeTransform';
 
 export interface ShapeJSON {
@@ -55,7 +56,7 @@ export function getValueFromEmitterMode(
 ): number {
     let u;
     if (EmitterMode.Random === mode) {
-        currentValue = Math.random();
+        currentValue = random();
     } else if (EmitterMode.Burst === mode && emissionState.isBursting) {
         currentValue = emissionState.burstParticleIndex / emissionState.burstParticleCount;
     }

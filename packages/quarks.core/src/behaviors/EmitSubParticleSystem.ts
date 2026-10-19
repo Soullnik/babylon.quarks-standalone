@@ -2,6 +2,7 @@ import {EmissionState, IEmitter, IParticleSystem} from '../IParticleSystem';
 import {Matrix4, Quaternion, Vector3} from '../math';
 import {Particle} from '../Particle';
 import {ONE_VEC3, Z_VEC3} from '../util/MathUtil';
+import {random} from '../util/random';
 import {Behavior} from './Behavior';
 
 export enum SubParticleEmitMode {
@@ -13,6 +14,26 @@ export enum SubParticleEmitMode {
 interface SubEmissionState extends EmissionState {
     matrix: Matrix4;
     particle: undefined | Particle;
+}
+
+/** A parent particle property sub emitted particles can take over (Unity's sub emitter Inherit). */
+export type SubEmitterInheritance = 'color' | 'size' | 'rotation' | 'lifetime';
+
+/** Bits of `EmissionState.inherit`, one per {@link SubEmitterInheritance}. */
+export const SubEmitterInheritMask = {
+    color: 1,
+    size: 2,
+    rotation: 4,
+    lifetime: 8,
+} as const;
+
+/** The mask for a list of inherited properties. */
+export function subEmitterInheritMask(inherit: ReadonlyArray<SubEmitterInheritance>): number {
+    let mask = 0;
+    for (const property of inherit) {
+        mask |= SubEmitterInheritMask[property] ?? 0;
+    }
+    return mask;
 }
 
 /**
@@ -31,11 +52,18 @@ export class EmitSubParticleSystem implements Behavior {
     private spareEmissions = new Array<SubEmissionState>();
 
     constructor(
-        private particleSystem: IParticleSystem,
+        public particleSystem: IParticleSystem,
         public useVelocityAsBasis: boolean,
         public subParticleSystem: IEmitter | undefined,
         public mode: SubParticleEmitMode = SubParticleEmitMode.Frame,
-        public emitProbability: number = 1
+        public emitProbability: number = 1,
+        /**
+         * Which of the parent particle's properties the sub particles start
+         * from: its current colour and size multiply theirs, its rotation adds
+         * to theirs, and its remaining lifetime fraction scales theirs (so
+         * lifetime suits birth sub emitters, not death ones).
+         */
+        public inherit: SubEmitterInheritance[] = []
     ) {
         const target = this.target;
         if (target) {
@@ -79,7 +107,7 @@ export class EmitSubParticleSystem implements Behavior {
 
     private emit(particle: Particle, delta: number) {
         if (!this.target) return;
-        if (Math.random() > this.emitProbability) {
+        if (random() > this.emitProbability) {
             return;
         }
         const spare = this.spareEmissions.pop();
@@ -108,6 +136,7 @@ export class EmitSubParticleSystem implements Behavior {
         state.waitEmiting = 0;
         state.travelDistance = 0;
         state.particle = particle;
+        state.inherit = subEmitterInheritMask(this.inherit);
         state.previousWorldPos = undefined;
         this.setMatrixFromParticle(state.matrix, particle);
         this.subEmissions.push(state);
@@ -153,6 +182,7 @@ export class EmitSubParticleSystem implements Behavior {
             useVelocityAsBasis: this.useVelocityAsBasis,
             mode: this.mode,
             emitProbability: this.emitProbability,
+            ...(this.inherit.length > 0 ? {inherit: this.inherit.slice()} : {}),
         };
     }
 
@@ -162,7 +192,8 @@ export class EmitSubParticleSystem implements Behavior {
             json.useVelocityAsBasis,
             json.subParticleSystem,
             json.mode,
-            json.emitProbability
+            json.emitProbability,
+            EmitSubParticleSystem.validInherit(json.inherit)
         );
     }
 
@@ -172,10 +203,18 @@ export class EmitSubParticleSystem implements Behavior {
             this.useVelocityAsBasis,
             this.subParticleSystem,
             this.mode,
-            this.emitProbability
+            this.emitProbability,
+            this.inherit.slice()
         );
     }
     reset(): void {}
+
+    private static validInherit(value: unknown): SubEmitterInheritance[] {
+        if (!Array.isArray(value)) {
+            return [];
+        }
+        return value.filter((v): v is SubEmitterInheritance => v in SubEmitterInheritMask);
+    }
 
     private setMatrixFromParticle(m: Matrix4, particle: Particle) {
         let rotation;

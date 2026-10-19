@@ -1,4 +1,5 @@
 import {MathUtils} from '../math';
+import {random} from '../util/random';
 import {FunctionJSON} from './FunctionJSON';
 import {GeneratorMemory} from './GeneratorMemory';
 import {ValueGenerator} from './ValueGenerator';
@@ -18,7 +19,7 @@ export class IntervalValue implements ValueGenerator {
     // GeneratorMemory.ts for the slot-allocation pattern.
     startGen(memory: GeneratorMemory) {
         this.indexCount = memory.length;
-        memory.push(Math.random());
+        memory.push(random());
     }
 
     genValue(memory: GeneratorMemory): number {

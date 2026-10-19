@@ -34,13 +34,68 @@ and the project follows the `quarks.core` 0.x version line.
   emitter targets are never culled; `BatchedRenderer.cullingEnabled = false` turns the test off.
   With 400 systems in a ring around the camera and three quarters of them out of view, a frame goes
   from 9.6 ms to 1.6 ms. The Unity exporter writes Pause and Pause And Catch-up.
+- Deterministic randomness. Every roll the simulation makes now goes through quarks.core's
+  `random()`, whose source is replaceable: `setRandomSource(createSeededRandom(seed))` makes a whole
+  scene reproducible, `withRandomSource` scopes it, and `getRandomSource` reads it back. The noise
+  generators are seeded by slot, so a Noise behavior looks the same on every run. UUIDs keep using
+  `Math.random`.
+- `ParticleSystem.seed` (constructor option, JSON `seed`, written only when set): the system rolls
+  on its own generator started from the seed while it steps, and restarts it on `restart()`, so the
+  effect plays out identically every time; systems it emits into roll on it too. The editor has a
+  "Fixed seed" field; the Unity exporter writes Main → Random Seed when Auto Random Seed is off.
+- `EffectPool`: a pool of copies of one effect for things played many times over. `acquire(position,
+  parent)` takes an idle copy (or makes one, up to `maxSize`), places it and plays it; a copy whose
+  systems have all finished returns to the pool by itself; `stop(copy)` ends a looping copy's
+  emission and lets it die out first; `release(copy)` takes it back at once; `prewarm` makes copies
+  up front. Idle copies stay disabled in the renderer's batches, so acquiring allocates nothing.
+- `QuarksUtil.instantiate(root)`: a deep copy of an effect tree, with sub emitter links pointing at
+  the copied emitters.
+- `ParticleSystem.sortMode` (constructor option, JSON `sortMode`, written only when not `'none'`):
+  Unity's Sort Mode. `'distance'` draws the particles of the batch farthest from the active camera
+  first, so nearer alpha-blended particles cover farther ones; `'oldestInFront'` and
+  `'youngestInFront'` order by age. The order is a radix sort over the whole batch after each fill
+  (about 2.5 ms per 50k particles), so systems with different modes are batched apart; trails are
+  not sorted. The editor's Renderer module and the Unity exporter carry it (Distance and Depth both
+  map to `'distance'`).
+- `ParticleSystem.minParticleSize` / `maxParticleSize` (constructor options, JSON, written only when
+  set): Unity's Min / Max Particle Size, the smallest and largest size a billboard or stretched
+  particle is drawn at as a fraction of the viewport height, clamped in the vertex shader (GLSL and
+  WGSL). Meshes and trails ignore them. The editor's Renderer module has them under "Limit screen
+  size"; the exporter writes Unity's values, its default maximum of 0.5 included.
+- `ParticleSystem.alignToDirection` (constructor option, JSON `alignToDirection`, written only when
+  true): Unity's Align To Direction. A mesh particle's +Z is turned along the direction its shape
+  sends it; a billboard's top is turned toward it in the emitter's XY plane. The start rotation is
+  applied on top; a particle with no speed is left alone. Shape module checkbox in the editor; the
+  exporter writes Shape → Align To Direction.
+- quarks.core `Noise` gains `scrollSpeed` (Unity's Scroll Speed: the field moves past the particles,
+  sampled once per frame, reset with the behavior) and `remap` (Unity's Remap: a curve read at the
+  raw noise mapped from [-1, 1] to [0, 1], whose value replaces it). Both in JSON, the editor's Noise
+  module and the exporter.
+- quarks.core `VelocityOverLife` gains `radial` (Unity's Radial: speed away from the orbit centre)
+  and `orbitalOffset` (Unity's Orbital Offset: where the orbital speeds turn around, relative to
+  the emitter). In JSON, the editor's Velocity module and the exporter.
+- quarks.core `EmitSubParticleSystem` gains `inherit` (Unity's sub emitter Inherit): `'color'` and
+  `'size'` multiply the sub particles' start values by the parent's current ones, `'rotation'` adds
+  the parent's, `'lifetime'` scales theirs by the parent's remaining lifetime fraction. The mask
+  travels in the emission state, so a host that emits into a system by hand can set it too. In
+  JSON, the editor's Sub Emitters module (four checkboxes) and the exporter.
 - `BatchedRenderer.simulationBudgetMs` (unlimited by default): once a frame's simulation has taken
   this long, the systems still to be advanced run one step instead of catching up on the long
   frame, and the time the skipped steps would have covered is dropped — so a frame that already ran
   long cannot make the next one longer still.
 
+### Changed
+
+- `ParticleSystem.isFinished()` is true for a looping system whose emission was ended with
+  `endEmit()` once its particles are gone, and for a sub emitter target whenever it is empty,
+  looping or not; `finished` fires accordingly. `QuarksUtil.isEffectFinished` follows, so an effect
+  with looping systems is finished after `endEmit` rather than never.
+
 ### Fixed
 
+- `ParticleSystem.clone()` left cloned `EmitSubParticleSystem` behaviors transforming by the
+  original system's emitter; they now follow the clone. `ParticleEmitter.clone()` no longer
+  disables the clone itself when only an ancestor of the original was disabled.
 - `renderOrder` now reaches the batch mesh as `alphaIndex`, so it orders the batch among the
   scene's transparent meshes instead of only keying the batching; it used to have no effect on
   what was drawn first. `layerMask` likewise now reaches the batch mesh — cameras with a

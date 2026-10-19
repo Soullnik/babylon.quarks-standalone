@@ -27,7 +27,11 @@ export class VelocityOverLife implements Behavior {
         public orbitalX: FunctionValueGenerator | ValueGenerator = new ConstantValue(0),
         public orbitalY: FunctionValueGenerator | ValueGenerator = new ConstantValue(0),
         public orbitalZ: FunctionValueGenerator | ValueGenerator = new ConstantValue(0),
-        public space: VelocityOverLifeSpace = 'local'
+        public space: VelocityOverLifeSpace = 'local',
+        /** Speed away from the orbit centre (Unity's Radial), in the authored space's units. */
+        public radial: FunctionValueGenerator | ValueGenerator = new ConstantValue(0),
+        /** Where the orbital speeds turn around, relative to the emitter (Unity's Orbital Offset). */
+        public orbitalOffset: Vector3 = new Vector3()
     ) {}
 
     _temp = new Vector3();
@@ -46,6 +50,8 @@ export class VelocityOverLife implements Behavior {
     _axisX = new Vector3(1, 0, 0);
     _axisY = new Vector3(0, 1, 0);
     _axisZ = new Vector3(0, 0, 1);
+    /** The orbit centre in the simulation space, refreshed with the axes. */
+    _center = new Vector3();
 
     initialize(particle: Particle, particleSystem: IParticleSystem): void {
         this.ps = particleSystem;
@@ -55,6 +61,7 @@ export class VelocityOverLife implements Behavior {
         this.orbitalX.startGen(particle.memory);
         this.orbitalY.startGen(particle.memory);
         this.orbitalZ.startGen(particle.memory);
+        this.radial.startGen(particle.memory);
     }
 
     frameUpdate(delta: number): void {
@@ -65,10 +72,12 @@ export class VelocityOverLife implements Behavior {
             this._axisX.copy(UNIT_X);
             this._axisY.copy(UNIT_Y);
             this._axisZ.copy(UNIT_Z);
+            this._center.copy(this.orbitalOffset);
             if (this.ps.worldSpace) {
                 this._axisX.applyQuaternion(this._tempQ);
                 this._axisY.applyQuaternion(this._tempQ);
                 this._axisZ.applyQuaternion(this._tempQ);
+                this._center.multiply(this._tempScale).applyQuaternion(this._tempQ).add(this._tempEmitterPos);
             }
         }
     }
@@ -92,19 +101,25 @@ export class VelocityOverLife implements Behavior {
         }
         particle.position.addScaledVector(this._temp, delta);
 
+        const radial = this.radial.genValue(particle.memory, t);
+        if (radial !== 0) {
+            // Away from the centre, along the line through the particle.
+            this._temp.copy(particle.position).sub(this._center);
+            const length = this._temp.length();
+            if (length > 0) {
+                particle.position.addScaledVector(this._temp, (radial * delta) / length);
+            }
+        }
+
         const angleX = this.orbitalX.genValue(particle.memory, t) * delta;
         const angleY = this.orbitalY.genValue(particle.memory, t) * delta;
         const angleZ = this.orbitalZ.genValue(particle.memory, t) * delta;
         if (angleX !== 0 || angleY !== 0 || angleZ !== 0) {
-            if (worldSpace) {
-                particle.position.sub(this._tempEmitterPos);
-            }
+            particle.position.sub(this._center);
             this.orbit(particle.position, this._axisX, angleX);
             this.orbit(particle.position, this._axisY, angleY);
             this.orbit(particle.position, this._axisZ, angleZ);
-            if (worldSpace) {
-                particle.position.add(this._tempEmitterPos);
-            }
+            particle.position.add(this._center);
         }
     }
 
@@ -126,6 +141,8 @@ export class VelocityOverLife implements Behavior {
             orbitalY: this.orbitalY.toJSON(),
             orbitalZ: this.orbitalZ.toJSON(),
             space: this.space,
+            radial: this.radial.toJSON(),
+            orbitalOffset: [this.orbitalOffset.x, this.orbitalOffset.y, this.orbitalOffset.z],
         };
     }
 
@@ -139,7 +156,11 @@ export class VelocityOverLife implements Behavior {
             readValue(json.orbitalX),
             readValue(json.orbitalY),
             readValue(json.orbitalZ),
-            json.space === 'world' ? 'world' : 'local'
+            json.space === 'world' ? 'world' : 'local',
+            readValue(json.radial),
+            Array.isArray(json.orbitalOffset)
+                ? new Vector3(json.orbitalOffset[0] ?? 0, json.orbitalOffset[1] ?? 0, json.orbitalOffset[2] ?? 0)
+                : new Vector3()
         );
     }
 
@@ -151,7 +172,9 @@ export class VelocityOverLife implements Behavior {
             this.orbitalX.clone(),
             this.orbitalY.clone(),
             this.orbitalZ.clone(),
-            this.space
+            this.space,
+            this.radial.clone(),
+            this.orbitalOffset.clone()
         );
     }
     reset(): void {}

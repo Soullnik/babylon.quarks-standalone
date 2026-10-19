@@ -15,7 +15,8 @@ const tempQ = new Quaternion();
 function getGenerator(index: number): SimplexNoise {
     let generator = generators[index];
     if (generator === undefined) {
-        generator = new SimplexNoise();
+        // Seeded by slot, so the same effect looks the same on every run.
+        generator = new SimplexNoise(index);
         generators[index] = generator;
     }
     return generator;
@@ -51,8 +52,33 @@ export class Noise implements Behavior {
         public frequency: FunctionValueGenerator | ValueGenerator,
         public power: FunctionValueGenerator | ValueGenerator,
         public positionAmount: FunctionValueGenerator | ValueGenerator = new ConstantValue(1),
-        public rotationAmount: FunctionValueGenerator | ValueGenerator = new ConstantValue(0)
-    ) {}
+        public rotationAmount: FunctionValueGenerator | ValueGenerator = new ConstantValue(0),
+        /**
+         * How fast the noise field moves past the particles (Unity's Scroll
+         * Speed), in noise time per second; 0 leaves it still. Sampled once per
+         * frame, so a curve is read at t = 0.
+         */
+        public scrollSpeed: FunctionValueGenerator | ValueGenerator = new ConstantValue(0),
+        /**
+         * Reshapes the raw noise (Unity's Remap): the curve is read at the
+         * noise value mapped from [-1, 1] to [0, 1], and what it returns is
+         * used in its place. Unset, the noise is used as is.
+         */
+        public remap?: FunctionValueGenerator
+    ) {
+        this.scrollSpeed.startGen(this.scrollMemory);
+    }
+
+    /** Noise time the field has scrolled by so far. */
+    private scrollOffset = 0;
+    private readonly scrollMemory: number[] = [];
+
+    /** The noise value a generator gives at `time`, through the remap when there is one. */
+    private sample(generator: SimplexNoise, time: number, memory: number[]): number {
+        const raw = generator.noise2D(0, time);
+        const remap = this.remap;
+        return remap === undefined ? raw : remap.genValue(memory, (raw + 1) * 0.5);
+    }
 
     initialize(particle: Particle): void {
         const isScalarRotation = typeof particle.rotation === 'number';
@@ -114,15 +140,15 @@ export class Noise implements Behavior {
         const positionAmount = cpa === cpa ? cpa : this.positionAmount.genValue(memory, t);
         const cra = this._rotationAmount;
         const rotationAmount = cra === cra ? cra : this.rotationAmount.genValue(memory, t);
-        const noiseTime = particle.age * frequency;
+        const noiseTime = particle.age * frequency + this.scrollOffset;
 
         if (positionAmount > 0) {
             const amount = power * positionAmount;
             particle.position.sub(state.lastPos);
             tempV.set(
-                state.generatorX.noise2D(0, noiseTime) * amount,
-                state.generatorY.noise2D(0, noiseTime) * amount,
-                state.generatorZ.noise2D(0, noiseTime) * amount
+                this.sample(state.generatorX, noiseTime, memory) * amount,
+                this.sample(state.generatorY, noiseTime, memory) * amount,
+                this.sample(state.generatorZ, noiseTime, memory) * amount
             );
             particle.position.add(tempV);
             state.lastPos.copy(tempV);
@@ -131,7 +157,7 @@ export class Noise implements Behavior {
         if (rotationAmount > 0) {
             const amount = power * rotationAmount;
             if (typeof particle.rotation === 'number') {
-                const noise = state.generatorW.noise2D(0, noiseTime) * Math.PI * amount;
+                const noise = this.sample(state.generatorW, noiseTime, memory) * Math.PI * amount;
                 particle.rotation = particle.rotation - state.lastRot + noise;
                 state.lastRot = noise;
             } else if (state.lastRotQ !== null) {
@@ -140,10 +166,10 @@ export class Noise implements Behavior {
                 rotation.multiply(state.lastRotQ);
                 tempQ
                     .set(
-                        state.generatorX.noise2D(0, noiseTime) * amount,
-                        state.generatorY.noise2D(0, noiseTime) * amount,
-                        state.generatorZ.noise2D(0, noiseTime) * amount,
-                        state.generatorW.noise2D(0, noiseTime) * amount
+                        this.sample(state.generatorX, noiseTime, memory) * amount,
+                        this.sample(state.generatorY, noiseTime, memory) * amount,
+                        this.sample(state.generatorZ, noiseTime, memory) * amount,
+                        this.sample(state.generatorW, noiseTime, memory) * amount
                     )
                     .normalize();
                 rotation.multiply(tempQ);
@@ -191,14 +217,14 @@ export class Noise implements Behavior {
             const power = cp === cp ? cp : this.power.genValue(memory, t);
             const positionAmount = cpa === cpa ? cpa : this.positionAmount.genValue(memory, t);
             const rotationAmount = cra === cra ? cra : this.rotationAmount.genValue(memory, t);
-            const noiseTime = age * frequency;
+            const noiseTime = age * frequency + this.scrollOffset;
 
             if (positionAmount > 0) {
                 const amount = power * positionAmount;
                 const lastPos = state.lastPos;
-                const nx = state.generatorX.noise2D(0, noiseTime) * amount;
-                const ny = state.generatorY.noise2D(0, noiseTime) * amount;
-                const nz = state.generatorZ.noise2D(0, noiseTime) * amount;
+                const nx = this.sample(state.generatorX, noiseTime, memory) * amount;
+                const ny = this.sample(state.generatorY, noiseTime, memory) * amount;
+                const nz = this.sample(state.generatorZ, noiseTime, memory) * amount;
                 // Rounded between the two steps as the vector view path is.
                 positions[o3] = Math.fround(positions[o3] - lastPos.x) + nx;
                 positions[o3 + 1] = Math.fround(positions[o3 + 1] - lastPos.y) + ny;
@@ -209,7 +235,7 @@ export class Noise implements Behavior {
             if (rotationAmount > 0) {
                 const amount = power * rotationAmount;
                 if (typeof particle.rotation === 'number') {
-                    const noise = state.generatorW.noise2D(0, noiseTime) * Math.PI * amount;
+                    const noise = this.sample(state.generatorW, noiseTime, memory) * Math.PI * amount;
                     rotations[i] = rotations[i] - state.lastRot + noise;
                     state.lastRot = noise;
                 } else if (state.lastRotQ !== null) {
@@ -218,10 +244,10 @@ export class Noise implements Behavior {
                     rotation.multiply(state.lastRotQ);
                     tempQ
                         .set(
-                            state.generatorX.noise2D(0, noiseTime) * amount,
-                            state.generatorY.noise2D(0, noiseTime) * amount,
-                            state.generatorZ.noise2D(0, noiseTime) * amount,
-                            state.generatorW.noise2D(0, noiseTime) * amount
+                            this.sample(state.generatorX, noiseTime, memory) * amount,
+                            this.sample(state.generatorY, noiseTime, memory) * amount,
+                            this.sample(state.generatorZ, noiseTime, memory) * amount,
+                            this.sample(state.generatorW, noiseTime, memory) * amount
                         )
                         .normalize();
                     rotation.multiply(tempQ);
@@ -238,11 +264,14 @@ export class Noise implements Behavior {
             power: this.power.toJSON(),
             positionAmount: this.positionAmount.toJSON(),
             rotationAmount: this.rotationAmount.toJSON(),
+            scrollSpeed: this.scrollSpeed.toJSON(),
+            ...(this.remap !== undefined ? {remap: this.remap.toJSON()} : {}),
         };
     }
 
     frameUpdate(delta: number): void {
         this.duration += delta;
+        this.scrollOffset += this.scrollSpeed.genValue(this.scrollMemory, 0) * delta;
         this._frequency = Noise.constantOf(this.frequency);
         this._power = Noise.constantOf(this.power);
         this._positionAmount = Noise.constantOf(this.positionAmount);
@@ -254,7 +283,9 @@ export class Noise implements Behavior {
             ValueGeneratorFromJSON(json.frequency),
             ValueGeneratorFromJSON(json.power),
             ValueGeneratorFromJSON(json.positionAmount),
-            ValueGeneratorFromJSON(json.rotationAmount)
+            ValueGeneratorFromJSON(json.rotationAmount),
+            json.scrollSpeed ? ValueGeneratorFromJSON(json.scrollSpeed) : new ConstantValue(0),
+            json.remap ? (ValueGeneratorFromJSON(json.remap) as FunctionValueGenerator) : undefined
         );
     }
 
@@ -263,9 +294,13 @@ export class Noise implements Behavior {
             this.frequency.clone(),
             this.power.clone(),
             this.positionAmount.clone(),
-            this.rotationAmount.clone()
+            this.rotationAmount.clone(),
+            this.scrollSpeed.clone(),
+            this.remap?.clone() as FunctionValueGenerator | undefined
         );
     }
 
-    reset(): void {}
+    reset(): void {
+        this.scrollOffset = 0;
+    }
 }

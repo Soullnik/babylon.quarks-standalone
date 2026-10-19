@@ -7,6 +7,14 @@ All notable changes to the Unity Quarks Exporter are documented here.
 ### Added
 
 - Main → Simulation Speed is exported as `playbackSpeed` (only when not 1).
+- Main → Random Seed is exported as `seed` when Auto Random Seed is off.
+- Shape → Align To Direction is exported as `alignToDirection`. Noise → Scroll Speed (its constant)
+  and Remap (when enabled) are exported as `scrollSpeed` / `remap`. Velocity over Lifetime → Radial
+  and Orbital Offset are exported as `radial` / `orbitalOffset`. Sub Emitters → Inherit (color,
+  size, rotation, lifetime) is exported as `inherit`.
+- Renderer → Sort Mode is exported as `sortMode` (Distance and Depth → `distance`, Oldest in Front,
+  Youngest in Front). Renderer → Min / Max Particle Size are exported as `minParticleSize` /
+  `maxParticleSize` for billboard and stretched renderers, Unity's default maximum of 0.5 included.
 - Main → Culling Mode: Pause and Pause And Catch-up are exported as `cullingMode` (`pause`,
   `pauseAndCatchUp`); Automatic and Always Simulate keep the runtime's default of always
   simulating.

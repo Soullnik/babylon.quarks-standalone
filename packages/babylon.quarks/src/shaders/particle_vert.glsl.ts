@@ -40,16 +40,31 @@ varying vec4 projPosition;
 varying float linearDepth;
 #endif
 
+#ifdef SIZE_LIMITS
+// Smallest and largest size a particle may have on screen, as fractions of the viewport height.
+uniform vec2 sizeLimits;
+#endif
 ${fogVertexDeclarationGLSL}
 void main() {
     float c = cos(rotation);
     float s = sin(rotation);
 
+#ifdef SIZE_LIMITS
+    // The particle's size on screen as a fraction of the viewport height, held
+    // between the limits; a perspective projection divides by the view depth.
+    vec4 limitCenter = view * world * vec4(offset, 1.0);
+    float limitDepth = abs(projection[2][3]) > 0.0 ? abs(limitCenter.z) : 1.0;
+    float screenSize = max(abs(size.x), abs(size.y)) * projection[1][1] / (2.0 * limitDepth);
+    float sizeScale = screenSize > 0.0 ? clamp(screenSize, sizeLimits.x, sizeLimits.y) / screenSize : 1.0;
+    vec3 limitedSize = size * sizeScale;
+#else
+    vec3 limitedSize = size;
+#endif
     // A negative size mirrors the quad, which is how flipped particles arrive.
-    vec2 alignedPosition = position.xy * size.xy;
+    vec2 alignedPosition = position.xy * limitedSize.xy;
 #ifdef PIVOT
     // The pivot turns with the particle but is not mirrored with it.
-    alignedPosition += pivot.xy * abs(size.xy);
+    alignedPosition += pivot.xy * abs(limitedSize.xy);
 #endif
     vec2 rotatedPosition;
     rotatedPosition.x = c * alignedPosition.x - s * alignedPosition.y;
@@ -60,7 +75,7 @@ void main() {
     mvPosition.x += rotatedPosition.x;
     mvPosition.z -= rotatedPosition.y;
 #ifdef PIVOT
-    mvPosition.y += pivot.z * abs(size.x);
+    mvPosition.y += pivot.z * abs(limitedSize.x);
 #endif
     mvPosition = view * mvPosition;
 #elif defined(VERTICAL)
@@ -76,7 +91,7 @@ void main() {
 #ifndef HORIZONTAL
     // Toward the camera along its view axis, whichever way the view space
     // faces: anything in front of the camera has the sign of the far side.
-    mvPosition.z -= sign(mvPosition.z) * pivot.z * abs(size.x);
+    mvPosition.z -= sign(mvPosition.z) * pivot.z * abs(limitedSize.x);
 #endif
 #endif
 

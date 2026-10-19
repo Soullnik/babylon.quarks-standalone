@@ -8,7 +8,7 @@ Three tiers: ✅ shipped · 🟡 runtime supports it, editor UI missing · 🔴 
 - ✅ prewarm, start rotation (constant/random angle, 3D random), start color random-between-two
 - ✅ start delay (constant/random, ignored with prewarm, re-armed by restart)
 - ✅ 3D start size (uniform / per-axis `Vector3Function`), gradient start color (single `Gradient` and random-between-two-gradients `RandomColorBetweenGradient`)
-- ✅ max particles (`maxParticles`), simulation speed (`playbackSpeed`), culling mode (`cullingMode`: always / pause / pause and catch up)
+- ✅ max particles (`maxParticles`), simulation speed (`playbackSpeed`), culling mode (`cullingMode`: always / pause / pause and catch up), random seed (`seed`)
 - 🔴 stop action, ring buffer
 
 ## Emission
@@ -21,12 +21,13 @@ Three tiers: ✅ shipped · 🟡 runtime supports it, editor UI missing · 🔴 
 - ✅ emitter mode (random/loop/ping-pong/burst) + spread per shape
 - ✅ randomize direction (`ChangeEmitDirection`, angle generator)
 - 🟡 per-shape speed generator
-- 🔴 edge shape, texture-based emission, align-to-direction
+- ✅ edge shape (`EdgeEmitter`), align-to-direction (`alignToDirection`)
+- 🔴 texture-based emission
 
 ## Velocity / forces
 - ✅ Speed over Lifetime (curve), Limit Speed over Lifetime (curve + dampen), Force over Lifetime (XYZ), Gravity
 - ✅ Orbit over Lifetime
-- ✅ Velocity over Lifetime (linear XYZ local/world + orbital XYZ), Inherit Velocity (initial/current)
+- ✅ Velocity over Lifetime (linear XYZ local/world + orbital XYZ, orbital offset, radial), Inherit Velocity (initial/current)
 - 🔴 orbital offset, radial velocity, Lifetime by Emitter Speed
 
 ## Color / size / rotation
@@ -36,7 +37,8 @@ Three tiers: ✅ shipped · 🟡 runtime supports it, editor UI missing · 🔴 
 ## Noise
 - ✅ frequency + strength, position/rotation amounts as separate fields
 - ✅ Turbulence field as its own module (scale XYZ, octaves, strength XYZ, time scale) — multi-octave curl noise
-- 🔴 Noise scroll speed, remap, quality
+- ✅ Noise scroll speed (`scrollSpeed`), remap (`remap`)
+- 🔴 Noise quality (octaves per axis)
 
 ## Collision / triggers / external forces / lights / custom data
 - ✅ Collision module — bounce off a ground plane (editor-supplied `GroundPlaneResolver`; hosts can register their own via `setPhysicsResolver`)
@@ -44,8 +46,8 @@ Three tiers: ✅ shipped · 🟡 runtime supports it, editor UI missing · 🔴 
 - 🔴 collision triggers, arbitrary collider shapes (plane only), lights, custom data
 
 ## Sub Emitters
-- ✅ death/birth/frame triggers, probability, velocity basis, target edited via hierarchy
-- 🔴 collision/trigger/manual triggers, inherit properties
+- ✅ death/birth/frame triggers, probability, velocity basis, target edited via hierarchy, inherit properties (`inherit`: color / size / rotation / lifetime)
+- 🔴 collision/trigger/manual triggers
 
 ## Texture Sheet Animation
 - ✅ tiles U/V, start tile, frame-over-life curve, atlas preview with tile grid + start-tile highlight
@@ -63,7 +65,8 @@ Three tiers: ✅ shipped · 🟡 runtime supports it, editor UI missing · 🔴 
 - ✅ texture thumbnail + mesh wireframe previews in the inspector
 - ✅ soft particles (+near/far fade), alpha test, depth write/test
 - 🟡 layer mask
-- 🔴 sort mode, min/max particle size, pivot, shadows
+- ✅ sort mode (`sortMode`: distance / oldest in front / youngest in front), min/max particle size (`minParticleSize` / `maxParticleSize`, billboards and stretched), pivot (`pivot`)
+- 🔴 shadows
 
 ## Editor UX (Particle Effect panel)
 - ✅ restart, undo/redo, import/export, example presets, hierarchy panel
@@ -80,4 +83,5 @@ Three tiers: ✅ shipped · 🟡 runtime supports it, editor UI missing · 🔴 
 5. ~~Core (vendored fork): startDelay, rate over distance UI, Velocity over Lifetime, Inherit Velocity~~ (done)
 6. ~~Collision module + Turbulence + Noise position/rotation amounts~~ (done)
 7. ~~3D start size + gradient start color + Randomize Direction + host mesh assets (`geometryOptions`)~~ (done)
-8. Remaining core work: noise scroll/remap → radial/orbital-offset velocity → collision triggers/shapes → align-to-direction
+8. ~~Noise scroll/remap, radial/orbital-offset velocity, align-to-direction, sub emitter inherit~~ (done)
+9. Remaining core work: collision triggers/shapes → noise quality → texture-based emission

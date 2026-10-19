@@ -2,6 +2,7 @@ import {IParticleSystem} from '../IParticleSystem';
 import {Matrix4, Quaternion} from '../math';
 import {Particle} from '../Particle';
 import {UP_VEC3, ZERO_VEC3} from '../util/MathUtil';
+import {random} from '../util/random';
 import {EmitterShape, ShapeJSON} from './EmitterUtil';
 import {ShapeTransform} from './ShapeTransform';
 
@@ -26,11 +27,11 @@ export class PointEmitter implements EmitterShape {
     update(system: IParticleSystem, delta: number): void {}
 
     initialize(p: Particle) {
-        const u = Math.random();
-        const v = Math.random();
+        const u = random();
+        const v = random();
         const theta = u * Math.PI * 2;
         const phi = Math.acos(2.0 * v - 1.0);
-        const r = Math.cbrt(Math.random());
+        const r = Math.cbrt(random());
         const sinTheta = Math.sin(theta);
         const cosTheta = Math.cos(theta);
         const sinPhi = Math.sin(phi);

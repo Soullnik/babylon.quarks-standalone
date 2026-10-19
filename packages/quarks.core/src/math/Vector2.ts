@@ -1,3 +1,4 @@
+import {random} from '../util/random';
 import * as MathUtils from './MathUtils';
 import {Matrix3} from './Matrix3';
 
@@ -361,8 +362,8 @@ class Vector2 {
     }
 
     random() {
-        this.x = Math.random();
-        this.y = Math.random();
+        this.x = random();
+        this.y = random();
 
         return this;
     }

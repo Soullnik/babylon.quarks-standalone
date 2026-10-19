@@ -41,14 +41,27 @@ varying projPosition: vec4f;
 varying linearDepth: f32;
 #endif
 
+#ifdef SIZE_LIMITS
+// Smallest and largest size a particle may have on screen, as fractions of the viewport height.
+uniform sizeLimits: vec2f;
+#endif
 ${fogVertexDeclarationWGSL}
 @vertex
 fn main(input: VertexInputs) -> FragmentInputs {
     let lengthFactor = vertexInputs.velocity.w;
     // A flipped particle arrives with a negative size: the streak keeps its
     // extent and mirrors its texture instead (see quadUV below).
-    let avgSize = (abs(vertexInputs.size.x) + abs(vertexInputs.size.y)) * 0.5;
+    var avgSize = (abs(vertexInputs.size.x) + abs(vertexInputs.size.y)) * 0.5;
     var mvPosition = uniforms.view * uniforms.world * vec4f(vertexInputs.offset, 1.0);
+#ifdef SIZE_LIMITS
+    // The streak's width on screen as a fraction of the viewport height, held
+    // between the limits; a perspective projection divides by the view depth.
+    let limitDepth = select(1.0, abs(mvPosition.z), abs(uniforms.projection[2][3]) > 0.0);
+    let screenSize = avgSize * uniforms.projection[1][1] / (2.0 * limitDepth);
+    if (screenSize > 0.0) {
+        avgSize *= clamp(screenSize, uniforms.sizeLimits.x, uniforms.sizeLimits.y) / screenSize;
+    }
+#endif
     let viewWorld = uniforms.view * uniforms.world;
     let viewWorld3 = mat3x3f(viewWorld[0].xyz, viewWorld[1].xyz, viewWorld[2].xyz);
     let viewVelocity = viewWorld3 * vertexInputs.velocity.xyz;

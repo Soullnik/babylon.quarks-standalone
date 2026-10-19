@@ -1,3 +1,4 @@
+import {random as quarksRandom} from './random';
 /*
  * A fast javascript implementation of simplex noise by Jonas Wagner
 Based on a speed-improved simplex noise algorithm for 2D, 3D and 4D in Java.
@@ -62,7 +63,7 @@ export class SimplexNoise {
      * @param randomOrSeed A random number generator or a seed (string|number).
      * Defaults to Math.random (random irreproducible initialization).
      */
-    constructor(randomOrSeed: RandomFn | string | number = Math.random) {
+    constructor(randomOrSeed: RandomFn | string | number = quarksRandom) {
         const random = typeof randomOrSeed == 'function' ? randomOrSeed : alea(randomOrSeed);
         this.p = buildPermutationTable(random);
         this.perm = new Uint8Array(512);

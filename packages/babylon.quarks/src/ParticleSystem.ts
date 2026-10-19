@@ -10,7 +10,9 @@ import {
     ColorGeneratorFromJSON,
     ConstantColor,
     ConstantValue,
+    createSeededRandom,
     EmissionState,
+    EmitSubParticleSystem,
     EmitterFromJSON,
     EmitterShape,
     FunctionColorGenerator,
@@ -28,12 +30,16 @@ import {
     ParticleSystemEventType,
     planBehaviorFusion,
     Quaternion,
+    random,
+    RandomSource,
     RendererEmitterSettings,
     RotationGenerator,
     SerializationOptions,
+    setRandomSource,
     SphereEmitter,
     SpriteParticle,
     StretchedBillBoardSettings,
+    SubEmitterInheritMask,
     TrailParticle,
     TrailSettings,
     ValueGenerator,
@@ -47,7 +53,7 @@ import {BatchedRenderer, VFXBatchSettings} from './BatchedRenderer';
 import {ensureEnvAtlasFromCube, getCachedEnvAtlas} from './envAtlas';
 import {ensureTriangleIndices} from './geometryUtil';
 import {ParticleEmitter} from './ParticleEmitter';
-import {MeshLighting, MeshRim, normalizeMeshRim, RenderMode} from './VFXBatch';
+import {MeshLighting, MeshRim, normalizeMeshRim, RenderMode, SortMode} from './VFXBatch';
 
 export interface BurstParameters {
     time: number;
@@ -197,6 +203,16 @@ export interface ParticleSystemParameters {
     playbackSpeed?: number;
     /** What the system does while off screen, see {@link CullingMode}. Default `'always'`. */
     cullingMode?: CullingMode;
+    /** Seed for this system's own random generator, see {@link ParticleSystem.seed}. Default none. */
+    seed?: number;
+    /** Draw order within the batch, see {@link ParticleSystem.sortMode}. Default `'none'`. */
+    sortMode?: SortMode;
+    /** Whether particles start turned along their direction of travel, see {@link ParticleSystem.alignToDirection}. Default false. */
+    alignToDirection?: boolean;
+    /** Smallest on-screen size, as a fraction of the viewport height, see {@link ParticleSystem.minParticleSize}. Default 0. */
+    minParticleSize?: number;
+    /** Largest on-screen size, as a fraction of the viewport height, see {@link ParticleSystem.maxParticleSize}. Default unlimited. */
+    maxParticleSize?: number;
     /** Babylon rendering group of the batch, see {@link ParticleSystem.renderingGroupId}. Default 0. */
     renderingGroupId?: number;
     /** Whether the scene's fog applies, see {@link ParticleSystem.applyFog}. Default true. */
@@ -242,6 +258,16 @@ export interface ParticleSystemJSONParameters {
     playbackSpeed?: number;
     /** Written only when not `'always'`. */
     cullingMode?: CullingMode;
+    /** Written only when set. */
+    seed?: number;
+    /** Written only when not `'none'`. */
+    sortMode?: SortMode;
+    /** Written only when true. */
+    alignToDirection?: boolean;
+    /** Written only when not 0. */
+    minParticleSize?: number;
+    /** Written only when limited. */
+    maxParticleSize?: number;
     speedFactor?: number;
     texture?: string;
     material?: string;
@@ -392,16 +418,22 @@ export class ParticleSystem implements IParticleSystem {
         return this.emissionOverDistance.genValue(this.memory, timeRatio) > 0;
     }
 
-    /** Non-looping system with no particles left and nothing left to emit. */
+    /**
+     * No particles left and nothing left to emit: a non-looping system that
+     * ran its course, or a looping one whose emission was ended with
+     * {@link endEmit} and whose last particle has died.
+     */
     isFinished(): boolean {
-        if (this.looping) {
-            return false;
-        }
         if (this.particleNum > 0) {
             return false;
         }
+        // A sub emitter target emits nothing of its own: empty is finished,
+        // looping or not. Its parent decides when the effect is done.
         if (this.onlyUsedByOther) {
             return true;
+        }
+        if (this.looping) {
+            return this.emitEnded;
         }
         return !this.hasPendingEmission();
     }
@@ -469,6 +501,50 @@ export class ParticleSystem implements IParticleSystem {
      * {@link VFXBatchSettings.pivot}. Assign a new vector to change it: editing
      * the returned one in place does not reach the renderer.
      */
+    /**
+     * The order this system's batch draws its particles in (Unity's Sort
+     * Mode), `'none'` by default. Alpha blended smoke wants `'distance'`;
+     * additive effects need nothing. Sorting covers the whole batch, so systems
+     * with different modes are batched apart. See {@link SortMode}.
+     */
+    get sortMode(): SortMode {
+        return this.rendererSettings.sortMode;
+    }
+
+    set sortMode(mode: SortMode) {
+        this.rendererSettings.sortMode = ParticleSystem.validSortMode(mode);
+        this.neededToUpdateRender = true;
+    }
+
+    /**
+     * Smallest size a billboard or stretched particle is drawn at, as a
+     * fraction of the viewport height (Unity's Min Particle Size); 0 by
+     * default. Keeps distant sparks from vanishing. Meshes and trails ignore it.
+     */
+    get minParticleSize(): number {
+        return this.rendererSettings.minParticleSize;
+    }
+
+    set minParticleSize(size: number) {
+        this.rendererSettings.minParticleSize = Math.max(0, size);
+        this.neededToUpdateRender = true;
+    }
+
+    /**
+     * Largest size a billboard or stretched particle is drawn at, as a fraction
+     * of the viewport height (Unity's Max Particle Size, 0.5 there); unlimited
+     * by default. Keeps a close particle from filling the screen. Meshes and
+     * trails ignore it.
+     */
+    get maxParticleSize(): number {
+        return this.rendererSettings.maxParticleSize;
+    }
+
+    set maxParticleSize(size: number) {
+        this.rendererSettings.maxParticleSize = size > 0 ? size : Infinity;
+        this.neededToUpdateRender = true;
+    }
+
     get pivot(): Vector3 | undefined {
         return this.rendererSettings.pivot;
     }
@@ -514,6 +590,10 @@ export class ParticleSystem implements IParticleSystem {
     /** `lighting` if it is one of the modes, else the default. */
     private static validLighting(lighting: unknown): MeshLighting {
         return lighting === 'unlit' || lighting === 'scene' ? lighting : 'fixed';
+    }
+
+    private static validSortMode(mode: unknown): SortMode {
+        return mode === 'distance' || mode === 'oldestInFront' || mode === 'youngestInFront' ? mode : 'none';
     }
 
     private static validCullingMode(mode: unknown): CullingMode {
@@ -654,6 +734,41 @@ export class ParticleSystem implements IParticleSystem {
     cullingMode: CullingMode = 'always';
 
     /**
+     * Whether each particle starts turned along the direction its shape sends
+     * it (Unity's Align To Direction): a mesh particle's +Z is pointed along
+     * the velocity, a billboard's top is turned toward it in the emitter's XY
+     * plane. The start rotation is applied on top. A particle with no speed is
+     * left as it is. False by default.
+     */
+    alignToDirection = false;
+
+    private seedValue?: number;
+    /** The system's own generator while it steps, when seeded; see {@link seed}. */
+    private rng?: RandomSource;
+
+    /**
+     * Seed for this system's own random generator. Set, every roll the system
+     * makes while it steps (spawn positions, interval values, random colours
+     * and rotations, burst probability) comes from a generator started from
+     * this seed, and restarted with it on {@link restart}: the effect plays out
+     * identically every time, on every machine — for replays, lock-step
+     * multiplayer and reproducible tests. Systems this one emits into roll on
+     * its generator too. Unset (the default), rolls come from the global source
+     * (`setRandomSource` in quarks.core). Saved in the effect JSON when set.
+     *
+     * Not covered: randomness outside the step, such as a `TurbulenceField`'s
+     * offsets, which are rolled when the behavior is created.
+     */
+    get seed(): number | undefined {
+        return this.seedValue;
+    }
+
+    set seed(seed: number | undefined) {
+        this.seedValue = seed;
+        this.rng = seed === undefined ? undefined : createSeededRandom(seed);
+    }
+
+    /**
      * Set by the renderer each frame: true while no active camera sees the
      * system's bounds and its {@link cullingMode} is not `'always'`.
      * @internal
@@ -758,6 +873,9 @@ export class ParticleSystem implements IParticleSystem {
             reflectionAtlas: null,
             layerMask: parameters.layerMask ?? 0x0fffffff,
             pivot: ParticleSystem.nonZeroPivot(parameters.pivot),
+            sortMode: ParticleSystem.validSortMode(parameters.sortMode),
+            minParticleSize: Math.max(0, parameters.minParticleSize ?? 0),
+            maxParticleSize: parameters.maxParticleSize ?? Infinity,
             renderingGroupId: parameters.renderingGroupId ?? 0,
             applyFog: parameters.applyFog ?? true,
             lighting: ParticleSystem.validLighting(parameters.lighting),
@@ -766,6 +884,8 @@ export class ParticleSystem implements IParticleSystem {
         this.flip = ParticleSystem.nonZeroFlip(parameters.flip);
         this.playbackSpeed = parameters.playbackSpeed ?? 1;
         this.cullingMode = parameters.cullingMode ?? 'always';
+        this.alignToDirection = parameters.alignToDirection === true;
+        this.seed = parameters.seed;
         if (this.rendererSettings.renderMode === RenderMode.Mesh && !this.rendererSettings.instancingNormals) {
             this.rendererSettings.instancingNormals = ParticleSystem.createFallbackNormals(
                 this.rendererSettings.instancingGeometry
@@ -1058,8 +1178,7 @@ export class ParticleSystem implements IParticleSystem {
                     // renderer never carries a recycled particle's old spin.
                     sprite.angularVelocity = 0;
                     const flip = this.flip;
-                    sprite.flip =
-                        flip === undefined ? 0 : (Math.random() < flip.x ? 1 : 0) | (Math.random() < flip.y ? 2 : 0);
+                    sprite.flip = flip === undefined ? 0 : (random() < flip.x ? 1 : 0) | (random() < flip.y ? 2 : 0);
                 }
             } else if (trailSettings) {
                 const trail = particle as TrailParticle;
@@ -1070,6 +1189,16 @@ export class ParticleSystem implements IParticleSystem {
             }
 
             this.emitterShape.initialize(particle, emissionState);
+
+            if (this.alignToDirection && isSpriteMode) {
+                this.alignParticleToDirection(particle as SpriteParticle, isMeshMode);
+            }
+
+            const parent = emissionState.particle;
+            const inherit = emissionState.inherit;
+            if (parent !== undefined && inherit !== undefined && inherit !== 0) {
+                this.inheritFromParent(particle, parent, inherit, isSpriteMode);
+            }
 
             if (isTrailMode && followLocalOrigin) {
                 const trail = particle as TrailParticle;
@@ -1102,6 +1231,53 @@ export class ParticleSystem implements IParticleSystem {
         }
     }
 
+    /** Turns a newborn so that it faces the way its shape sent it; see {@link alignToDirection}. */
+    private alignParticleToDirection(sprite: SpriteParticle, isMeshMode: boolean): void {
+        const velocity = sprite.velocity;
+        const speedSq = velocity.x * velocity.x + velocity.y * velocity.y + velocity.z * velocity.z;
+        if (speedSq === 0) {
+            return;
+        }
+        if (isMeshMode) {
+            // +Z along the velocity, with the start rotation applied first.
+            const rotation = sprite.rotation as Quaternion;
+            tempV.copy(velocity).divideScalar(Math.sqrt(speedSq));
+            tempQ.setFromUnitVectors(UP, tempV);
+            rotation.multiplyQuaternions(tempQ, rotation);
+        } else {
+            // The quad's top (its +Y) toward the velocity in the emitter's XY plane.
+            if (velocity.x !== 0 || velocity.y !== 0) {
+                sprite.rotation = (sprite.rotation as number) + Math.atan2(-velocity.x, velocity.y);
+            }
+        }
+    }
+
+    /** Applies the parent particle's inherited properties to a sub emitted newborn; see `EmitSubParticleSystem.inherit`. */
+    private inheritFromParent(particle: Particle, parent: Particle, inherit: number, isSpriteMode: boolean): void {
+        if (inherit & SubEmitterInheritMask.color) {
+            particle.startColor.multiply(parent.color);
+            particle.color.copy(particle.startColor);
+        }
+        if (inherit & SubEmitterInheritMask.size) {
+            particle.startSize.multiply(parent.size);
+            particle.size.copy(particle.startSize);
+        }
+        if (inherit & SubEmitterInheritMask.rotation && isSpriteMode) {
+            const sprite = particle as SpriteParticle;
+            const parentRotation = parent.rotation;
+            if (typeof sprite.rotation === 'number') {
+                if (typeof parentRotation === 'number') {
+                    sprite.rotation += parentRotation;
+                }
+            } else if (parentRotation instanceof Quaternion) {
+                (sprite.rotation as Quaternion).multiplyQuaternions(parentRotation, sprite.rotation as Quaternion);
+            }
+        }
+        if (inherit & SubEmitterInheritMask.lifetime && parent.life > 0) {
+            particle.life *= Math.max(0, 1 - parent.age / parent.life);
+        }
+    }
+
     endEmit() {
         this.emitEnded = true;
         if (this.autoDestroy) {
@@ -1126,6 +1302,10 @@ export class ParticleSystem implements IParticleSystem {
         this.particleNum = 0;
         this.boundsValid = false;
         this.pendingCatchUp = 0;
+        if (this.seedValue !== undefined) {
+            // The same seed again, so a restart replays the same effect.
+            this.rng = createSeededRandom(this.seedValue);
+        }
         this.emissionState.isBursting = false;
         this.emissionState.burstIndex = 0;
         this.emissionState.burstWaveIndex = 0;
@@ -1490,8 +1670,25 @@ export class ParticleSystem implements IParticleSystem {
         return this.fusionSteps;
     }
 
-    /** Advances emission, behaviors, motion and culling by one fixed timestep. */
+    /**
+     * Advances emission, behaviors, motion and culling by one fixed timestep,
+     * on the system's own random generator when it has a {@link seed}.
+     */
     private simulateStep(delta: number): void {
+        const rng = this.rng;
+        if (rng === undefined) {
+            this.stepOnce(delta);
+            return;
+        }
+        const previous = setRandomSource(rng);
+        try {
+            this.stepOnce(delta);
+        } finally {
+            setRandomSource(previous);
+        }
+    }
+
+    private stepOnce(delta: number): void {
         if (!this.onlyUsedByOther) {
             this.emit(delta, this.emissionState, this.emitter.matrixWorld);
         }
@@ -1859,7 +2056,7 @@ export class ParticleSystem implements IParticleSystem {
 
     /** Spawns one wave of `burst`, if its probability roll passes. */
     private fireBurstWave(burst: BurstParameters, emissionState: EmissionState, emitterMatrix: Matrix4): void {
-        if (Math.random() >= burst.probability) {
+        if (random() >= burst.probability) {
             return;
         }
         const rawCount = burst.count.genValue(this.memory, this.time);
@@ -2068,6 +2265,11 @@ export class ParticleSystem implements IParticleSystem {
             ...(this.applyFog ? {} : {applyFog: false}),
             ...(this.playbackSpeed !== 1 ? {playbackSpeed: this.playbackSpeed} : {}),
             ...(this.cullingMode !== 'always' ? {cullingMode: this.cullingMode} : {}),
+            ...(this.seedValue !== undefined ? {seed: this.seedValue} : {}),
+            ...(this.sortMode !== 'none' ? {sortMode: this.sortMode} : {}),
+            ...(this.alignToDirection ? {alignToDirection: true} : {}),
+            ...(this.minParticleSize > 0 ? {minParticleSize: this.minParticleSize} : {}),
+            ...(this.maxParticleSize !== Infinity ? {maxParticleSize: this.maxParticleSize} : {}),
             rendererEmitterSettings: rendererEmitterSettingsJSON,
             material: materialUUID,
             layers: this.rendererSettings.layerMask,
@@ -2170,6 +2372,11 @@ export class ParticleSystem implements IParticleSystem {
             applyFog: json.applyFog !== false,
             playbackSpeed: typeof json.playbackSpeed === 'number' ? json.playbackSpeed : undefined,
             cullingMode: ParticleSystem.validCullingMode(json.cullingMode),
+            seed: typeof json.seed === 'number' ? json.seed : undefined,
+            sortMode: ParticleSystem.validSortMode(json.sortMode),
+            alignToDirection: json.alignToDirection === true,
+            minParticleSize: typeof json.minParticleSize === 'number' ? json.minParticleSize : undefined,
+            maxParticleSize: typeof json.maxParticleSize === 'number' ? json.maxParticleSize : undefined,
             texture,
             material: materialMeta?.sourceMaterial ?? materialMeta,
             blendMode: materialMeta?.alphaMode ?? json.blending ?? Constants.ALPHA_ADD,
@@ -2404,7 +2611,7 @@ export class ParticleSystem implements IParticleSystem {
             rendererEmitterSettings = {};
         }
 
-        return new ParticleSystem({
+        const copy = new ParticleSystem({
             autoDestroy: this.autoDestroy,
             looping: this.looping,
             prewarm: this.prewarm,
@@ -2431,6 +2638,11 @@ export class ParticleSystem implements IParticleSystem {
             applyFog: this.applyFog,
             playbackSpeed: this.playbackSpeed,
             cullingMode: this.cullingMode,
+            seed: this.seedValue,
+            sortMode: this.sortMode,
+            alignToDirection: this.alignToDirection,
+            minParticleSize: this.minParticleSize,
+            maxParticleSize: this.maxParticleSize,
             rendererEmitterSettings,
             material: this.materialRef,
             texture: this.rendererSettings.texture,
@@ -2455,5 +2667,13 @@ export class ParticleSystem implements IParticleSystem {
             rim: this.rim,
             scene: this.emitter.getScene(),
         });
+        // A sub emitter behavior transforms by its parent system's emitter;
+        // the cloned behaviors still pointed at this one.
+        for (const behavior of newBehaviors) {
+            if (behavior instanceof EmitSubParticleSystem) {
+                behavior.particleSystem = copy;
+            }
+        }
+        return copy;
     }
 }

@@ -35,6 +35,16 @@ jobs:
             - name: Validate build, tests and package artifacts
               run: npm run check
 
+            - name: Install Chromium for the demo smoke
+              run: npx playwright install --with-deps chromium
+
+            # Every demo opened in headless WebGL; any page or console error fails the job.
+            - name: Smoke-test the demos
+              run: |
+                  npm run preview -w examples -- --host 127.0.0.1 --port 3010 --strictPort &
+                  for i in $(seq 1 60); do curl -sf http://127.0.0.1:3010/ >/dev/null && break; sleep 1; done
+                  npm run check:demos
+
             # Pages build only on main / manual dispatch. Runs after `npm run check` because
             # check's build:examples writes examples/dist and would otherwise wipe the docs.
             - name: Build API docs

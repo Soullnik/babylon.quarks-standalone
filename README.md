@@ -117,9 +117,32 @@ Full API reference, WebGPU setup and more: [package README](packages/babylon.qua
 | [![Custom Blending](examples/public/previews/custom-blending.png)](https://soullnik.github.io/babylon.quarks-standalone/babylonDemo.html#CustomBlendingDemo)<br>[Custom Blending](https://soullnik.github.io/babylon.quarks-standalone/babylonDemo.html#CustomBlendingDemo) | [![Follow Object](examples/public/previews/follow-object.png)](https://soullnik.github.io/babylon.quarks-standalone/babylonDemo.html#FollowObjectDemo)<br>[Follow Moving Objects](https://soullnik.github.io/babylon.quarks-standalone/babylonDemo.html#FollowObjectDemo) | [![Pick-Up Burst](examples/public/previews/pick-up.png)](https://soullnik.github.io/babylon.quarks-standalone/babylonDemo.html#PickUpDemo)<br>[Pick-Up Burst](https://soullnik.github.io/babylon.quarks-standalone/babylonDemo.html#PickUpDemo)                     | [![Level-Up](examples/public/previews/level-up.png)](https://soullnik.github.io/babylon.quarks-standalone/babylonDemo.html#LevelUpDemo)<br>[Level-Up](https://soullnik.github.io/babylon.quarks-standalone/babylonDemo.html#LevelUpDemo)                            |
 | [![Electric Ball](examples/public/previews/electric-ball.png)](https://soullnik.github.io/babylon.quarks-standalone/babylonDemo.html#ElectricBallDemo)<br>[Electric Ball](https://soullnik.github.io/babylon.quarks-standalone/babylonDemo.html#ElectricBallDemo)           | [![Black Hole](examples/public/previews/black-hole.png)](https://soullnik.github.io/babylon.quarks-standalone/babylonDemo.html#BlackHoleDemo)<br>[Black Hole](https://soullnik.github.io/babylon.quarks-standalone/babylonDemo.html#BlackHoleDemo)                        |                                                                                                                                                                                                                                                                     |                                                                                                                                                                                                                                                                     |
 
+## Performance
+
+The simulation runs on a column store with compiled behavior passes, and every system of a
+scene is drawn through a few batched instanced draws. Measured against Babylon's built-in CPU
+`ParticleSystem` on the same scenario (cone emitters, additive billboards, colour over life;
+`renderer.update` + `scene.render` per frame on a `NullEngine`, so CPU time only, on a
+GitHub-Actions-class VM):
+
+| Particles | Emitters | babylon.quarks | Babylon `ParticleSystem` | Ratio |
+| --------: | -------: | -------------: | -----------------------: | ----: |
+|    10 000 |        1 |         0.9 ms |                   3.7 ms |  3.9× |
+|    10 000 |       16 |         0.9 ms |                   5.0 ms |  5.5× |
+|    50 000 |        1 |         4.1 ms |                  25.1 ms |  6.1× |
+|    50 000 |       16 |         4.2 ms |                  25.3 ms |  6.1× |
+|   100 000 |        1 |         9.0 ms |                  47.6 ms |  5.3× |
+|   100 000 |       16 |         9.0 ms |                  58.3 ms |  6.5× |
+
+The [benchmark page](https://soullnik.github.io/babylon.quarks-standalone/benchmark.html) runs
+the same scenario in your browser, GPU included, against both the CPU and the GPU built-in
+systems. Systems no camera sees can pause themselves (`cullingMode`), and `EffectPool` keeps
+copies of a one-shot effect ready so playing one allocates nothing.
+
 ## Roadmap
 
-See [ROADMAP.md](ROADMAP.md) for planned improvements (WebGPU, GPU simulation, benchmarks, Playground build) and promotion plans.
+See [ROADMAP.md](ROADMAP.md) for what is next (WebGPU on real hardware, the editor's remaining
+items, GPU simulation) and how the library is positioned.
 
 ## Workspace structure
 

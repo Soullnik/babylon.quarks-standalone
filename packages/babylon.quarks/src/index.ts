@@ -6,6 +6,8 @@ export * from 'quarks.core';
 export {BatchedParticleRenderer} from './BatchedParticleRenderer';
 export {BatchedRenderer} from './BatchedRenderer';
 export type {AdaptivePerformanceOptions, AdaptivePerformanceState, VFXBatchSettings} from './BatchedRenderer';
+export {EffectPool} from './EffectPool';
+export type {EffectPoolOptions} from './EffectPool';
 export {
     cacheEnvAtlas,
     createEnvAtlasFromFaceUrls,
@@ -40,7 +42,7 @@ export * from './shaders/';
 export {SpriteBatch} from './SpriteBatch';
 export {TrailBatch} from './TrailBatch';
 export {defaultMeshLighting, meshRimEqual, normalizeMeshRim, RenderMode, VFXBatch} from './VFXBatch';
-export type {MeshLighting, MeshLightingSettings, MeshRim, StoredBatchSettings} from './VFXBatch';
+export type {MeshLighting, MeshLightingSettings, MeshRim, SortMode, StoredBatchSettings} from './VFXBatch';
 
 // Re-export quarks.core types (interfaces - type-only)
 export type {

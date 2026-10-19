@@ -69,6 +69,21 @@ export function SubEmittersModule(props: {binding: EffectBinding; rootBinding: E
                             onChange={(v) => binding.apply(() => (behavior.useVelocityAsBasis = v))}
                         />
                     </Row>
+                    {(['color', 'size', 'rotation', 'lifetime'] as const).map((property) => (
+                        <Row key={property} label={`Inherit ${property}`}>
+                            <CheckboxField
+                                value={behavior.inherit.includes(property)}
+                                onChange={(v) =>
+                                    binding.apply(
+                                        () =>
+                                            (behavior.inherit = v
+                                                ? [...behavior.inherit.filter((p) => p !== property), property]
+                                                : behavior.inherit.filter((p) => p !== property))
+                                    )
+                                }
+                            />
+                        </Row>
+                    ))}
                     <p style={{margin: '8px 0 2px', color: theme.textDim, fontSize: 11.5}}>
                         Spawns “{target?.emitter.name ?? 'sub-emitter'}” — select it in the hierarchy above to edit it.
                     </p>

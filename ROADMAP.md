@@ -1,122 +1,71 @@
 # Roadmap
 
-Improvement and promotion plan for `babylon.quarks`, based on a full repository review (July 2026).
+Where `babylon.quarks` stands and what comes next. Rewritten in October 2026 after the
+performance and gap-closing pass; the older plan is in the git history.
 
 ## Where we are
 
-- Publishable package `babylon.quarks` (~4.3k LOC) built on `quarks.core`, ESM + CJS + types, `@babylonjs/core >= 9` as peer dependency.
-- Strong test culture: ~3.2k LOC of tests with 97% statement coverage threshold, CI validating build, tests and tarball contents, npm publish on release.
-- Feature set already competitive: batched rendering (sprite/trail), all billboard modes + stretched + mesh + trail, soft particles, texture tiles, sub-emitters, mesh surface emitter plugin, `QuarksLoader` for quarks.art / Unity-exported JSON, adaptive performance budget.
-- 18 interactive demos deployed to GitHub Pages with automated preview capture.
+- Three published packages: `babylon.quarks` (runtime), `babylon.quarks-editor` (headless
+  edit model + React UI, embeddable through `QuarksEffectEditor.Show()`), and the Unity
+  exporter (`tools/unity-quarks-exporter`, shipped as a `.unitypackage`). `quarks.core` is a
+  vendored fork of the three.quarks core and is where the simulation lives.
+- Runtime: batched rendering for every render mode (billboard, stretched, horizontal, vertical,
+  mesh, trail), soft particles, texture tiles, sub emitters, mesh surface emitter, 20+
+  behaviors, native WGSL shaders for WebGPU, scene integration (render order, rendering groups,
+  layer masks, fog), bounds and frustum culling with Unity's culling modes, sort modes, screen-size
+  limits, effect pool, deterministic randomness, adaptive performance.
+- Simulation runs on a column store (structure of arrays) with compiled behavior passes. On
+  this project's CI-class VM, 50k particles simulate and upload in about 3.5 ms per frame, 5–7×
+  faster than Babylon's built-in CPU `ParticleSystem` on the same scenario (see the README's
+  benchmark table and `examples/benchmark.html`).
+- Editor: 19 Shuriken-style modules, hierarchy of systems, undo/redo, timeline, projects in
+  IndexedDB, import/export round-trips through `QuarksLoader`. Its core is unit tested.
+- Quality gates in CI: build of every package, unit tests of core, runtime and editor core, a
+  smoothness sweep, a tarball content check, and a headless WebGL smoke over every demo.
+- Parity with Unity's Shuriken: see [docs/SHURIKEN_PARITY.md](docs/SHURIKEN_PARITY.md). What is
+  left is collision triggers and arbitrary collider shapes, ring buffer / stop action, noise
+  quality (octaves), texture-based emission, lights, custom data and renderer shadows.
 
-## Strategic direction: own effect editor + GPU backend
+## Next
 
-The project does **not** depend on the quarks.art editor going forward. The two flagship efforts are:
+In rough priority order; each is a few days of work.
 
-### Effect editor (Shuriken-style, in progress)
+1. **WebGPU on real hardware** ([#19](https://github.com/Soullnik/babylon.quarks-standalone/issues/19)).
+   The shaders are native WGSL and compile under a real WGSL compiler in CI, but headless
+   software adapters cannot run the demos end to end. A pass on real hardware across every
+   demo, with the soft-particle depth path and texture uploads checked, then `check:demos
+--webgpu` on a runner that has an adapter.
+2. **Editor to done** (the remainder of the former #16): layer mask field, a warning when the
+   exported JSON references `blob:` textures, min/max placeholders on random fields, a
+   BabylonJS Editor window host, an embedding guide, a keyboard/accessibility pass on the curve
+   and gradient editors.
+3. **Shuriken leftovers**: collision triggers and sub emitters on collision, collider shapes
+   beyond planes, stop action, ring buffer, noise quality.
+4. **Perf, round two** (from the profiling report): a shared store per batch for scenes with
+   hundreds of small systems, one interleaved instance buffer (one upload instead of five), trail
+   colour in RGBA8 and neighbours through the vertex id instead of `previous`/`next` attributes.
+5. **Docs**: a step-by-step effect authoring guide with screenshots, StackBlitz / CodeSandbox
+   starters, an integration example with react-babylonjs.
 
-A stacked-module editor modeled after Unity's Particle System inspector — the quarks.core data
-model (behaviors = modules) maps to it 1:1, and Unity tutorials translate directly. Explicitly
-**not** a node editor: Babylon already ships NPE for node-based authoring, and a dataflow graph
-only pays off when it compiles to GPU code (see GPU backend below — revisit then).
+## Later
 
-Architecture (designed for embedding into [BabylonJS Editor](https://github.com/BabylonJS/Editor)):
+- **GPU simulation** ([#18](https://github.com/Soullnik/babylon.quarks-standalone/issues/18)): a
+  compute-shader backend on WebGPU behind the same `ParticleSystem` API, for the scenes where
+  Babylon's `GPUParticleSystem` still wins on sheer count. Weeks, not days; the design document
+  in #18 stands. Worth doing as the headline of a 1.0.
+- **Per-particle ribbon trails** on billboard systems (Unity's Trails module): a different
+  render architecture from the trail render mode.
+- **Node-based authoring**: not planned. Babylon's own Node Particle Editor covers it, and a
+  graph only pays off once it compiles to GPU code.
 
-- `packages/babylon.quarks-editor` — `.` export is the headless core (`EffectBinding`
-  edit-model, value/shape/gradient helpers, Quarks JSON export), `./react` export is the UI
-  (module stack, curve editor, gradient editor, field widgets). React is a peer dependency;
-  the same components can mount in the standalone page or in a BabylonJS Editor plugin.
-- Standalone host: `/editor.html` in the examples app (live preview + Export JSON).
+## Positioning
 
-Shipped modules (Unity inspector order): Main, Emission (rate + bursts), Shape (7 emitter
-types), Speed over Lifetime, Limit Speed over Lifetime, Force over Lifetime, Gravity,
-Color over Lifetime (gradient), Size over Lifetime (curve), Rotation over Lifetime, Noise,
-Texture Sheet Animation (tiles + frame-over-life), Renderer (render/blend mode, texture
-picker with host-provided presets, render order). JSON export verified to round-trip
-through `QuarksLoader` with all behaviors active.
+The competition is Babylon's built-ins: `ParticleSystem`, `GPUParticleSystem` and the Node
+Particle Editor. What this library adds: trails, mesh particles with lighting and rim, sub
+emitters and behavior composition, batching of many systems into few draw calls, a CPU
+simulation that is 5–7× faster than the built-in one, the Shuriken-style editor, the Unity
+exporter, and a format shared with three.js through quarks.core.
 
-Also shipped: Sub Emitters module (trigger mode/probability/velocity basis + nested sub-effect
-editing via reused Main/Emission/Shape modules; `EffectBinding` handles multiple systems and
-serializes sub systems as children with resolvable references) and JSON import on the
-standalone page (round-trips with export, including sub emitters).
-
-Also shipped: undo/redo — `EffectHistory` (host-owned, snapshot-based over the effect JSON,
-coalesces rapid edits, survives rebinding on restore) wired to toolbar buttons and
-Ctrl+Z / Ctrl+Shift+Z on the standalone page; sub-effect edits route into the same history.
-
-Also shipped: multi-system effects — Unity's hierarchy pattern. An `EffectHierarchy` panel
-(root + child systems, add/remove/rename) sits above the inspector; selecting a system points
-the module stack at it via a per-system binding routed into the shared undo history. Sub
-Emitters targets live in the hierarchy and are edited by selecting them there.
-
-Also shipped: `EffectEditorHost` + `QuarksEffectEditor.Show({hostElement, effectJson, onSave})` — the NME-style imperative entry point BabylonJS Editor uses for its node editors; the host owns engine/scene/preview/toolbar (undo/redo/restart/import/export/save) and the standalone page is now a thin wrapper over it.
-
-Also shipped: `babylon.quarks-editor` is now wired into `publish.yml` alongside `babylon.quarks`
-(built via `npm run build:editor`, tarball validated by `check-pack-contents.mjs`, published on
-the next GitHub release with its own LICENSE/CHANGELOG).
-
-Next: `startDelay` support (needs a quarks.core contribution — Unity's Start Delay has no
-core equivalent; only prewarm exists), BabylonJS Editor plugin host.
-
-## Technical directions
-
-### 1. WebGPU support — verified
-
-All shaders are GLSL registered via `Effect.ShadersStore` and used through `ShaderMaterial`; under `WebGPUEngine` Babylon transpiles them to WGSL automatically (glslang/twgsl).
-
-- Done: validated under `WebGPUEngine` in headless Chromium (SwiftShader adapter) — all four render modes (billboard, stretched billboard, mesh, trail) create pipelines and render 90 frames with zero WebGPU validation errors. Support stated in the README; the live demos and the benchmark page accept `?engine=webgpu`.
-- Remaining: a visual pass on real hardware (headless SwiftShader cannot capture WebGPU canvas pixels), and eventually native WGSL shader variants via `ShaderLanguage.WGSL` to drop the transpiler dependency.
-
-### 2. GPU particle simulation (second flagship effort)
-
-Simulation is fully CPU-side (inherited from three.quarks). Babylon ships a built-in `GPUParticleSystem`, which is the main argument against this library in large scenes. The previously reverted "pluggable simulation backend API" idea is worth revisiting: a simulation backend abstraction with a compute-shader implementation on WebGPU would be the headline differentiator for a 1.0 release. Notably, Babylon's Node Particle Editor currently generates CPU-only systems — this is an open window.
-
-### 3. Public benchmarks — page shipped
-
-The examples app now has a benchmark page (`benchmark.html`, linked from the gallery toolbar) comparing `babylon.quarks` batched rendering against Babylon's native `ParticleSystem` and `GPUParticleSystem` on an equivalent scenario (cone emitters, additive billboards, color over life). It reports CPU frame ms, FPS, draw calls and active particle count, supports 1/4/16 emitters and 2k–50k particles, and has a "run full benchmark" sweep with copy-as-markdown results. Remaining: run the sweep on real hardware and publish the numbers in the README.
-
-### 4. API cleanliness and tree-shaking — mostly done
-
-- ~~`BatchedRenderer` `as any` casts~~: replaced with typed `ParticleSystem` narrowing; public signatures unchanged.
-- ~~`Array.from(Float32Array)` copies~~: `SpriteBatch.setupBuffers` and `QuarksLoader.createMeshNode` now pass typed arrays to `VertexData` directly (JSON serialization keeps `Array.from`, as it must).
-- ~~Types referenced by the public API but not exported~~ (`AdaptivePerformanceOptions/State`, `ParticleSystemJSONParameters`, `BabylonMetaData`, `AnimationData`, `QuarksTimelineClip`, `BurstParametersJSON`) are now exported from the index.
-- Remaining: `sideEffects` is moot while the package ships a single bundle file — revisit if the build moves to `preserveModules`; registration could then move to an explicit `init()`.
-
-### 5. UMD/CDN build for the Playground — done
-
-The Babylon community lives in the Playground (playground.babylonjs.com). The package now ships `dist/babylon.quarks.umd.min.js` (global `BabylonQuarks`, `quarks.core` bundled, `@babylonjs/core` mapped to the `BABYLON` global) with `unpkg`/`jsdelivr` fields in `package.json`. A paste-ready Playground snippet lives in the package README. Remaining: publish a release, then share saved Playground links on the forum.
-
-## Documentation & DX
-
-- README previews: done — both READMEs now show the demo gallery (previews were already captured by `npm run capture:previews`).
-- ~~API documentation~~: TypeDoc now builds in the Pages workflow and deploys to `/docs/` next to the demos, linked from the gallery toolbar and both READMEs.
-- ~~Document the killer workflow front and center~~ (done: both READMEs now lead with the in-house effect editor and the Unity exporter, with quarks.art JSON noted as still-compatible, and link out to `QuarksLoader`). Remaining: a step-by-step guide with screenshots.
-- ~~Add CHANGELOG.md, CONTRIBUTING.md~~ (done: changelog ships with the npm package, contributing guide covers setup/checks/demo guide/release flow). Remaining: GitHub repo topics and a social preview image (repo settings, maintainer-only).
-- Starter templates: StackBlitz/CodeSandbox (Vite + Babylon + quarks), plus an integration example with react-babylonjs / Reactylon.
-
-## Promotion & positioning
-
-The competition is not other libraries but Babylon's built-ins: `ParticleSystem`, `GPUParticleSystem` and the Node Particle Editor (v8.14+). Advantages to state explicitly:
-
-- **Trail rendering** — Babylon has no built-in particle trails.
-- **Sub-emitters** and rich behavior composition.
-- **Batching** of heterogeneous systems into few draw calls.
-- **Cross-engine format** — one effect runs in three.js and Babylon.
-- **Unity effect import** and our own **Shuriken-style effect editor**.
-
-Channels, in order of expected impact:
-
-1. **Babylon.js forum** — the existing thread is the main reach; post a short update with a GIF for every release in "Demos and projects".
-2. **Official Babylon docs** — get listed in the community/extensions section; PR to awesome-babylonjs.
-3. **Playground snippets** (after the UMD build) — pasteable into forum answers; the main viral mechanism in the Babylon ecosystem.
-4. Short videos/posts with effects — VFX is highly showable content.
-5. Ecosystem sync — have quarks.art and three.quarks reference babylon.quarks as the official Babylon port.
-
-## Suggested order
-
-1. ~~README with previews and the effect editor / Unity exporter → `QuarksLoader` guide~~ (done)
-2. ~~UMD build + Playground examples~~ (done; Playground links pending a release)
-3. ~~Benchmark page~~ (done; publish real-hardware numbers pending)
-4. ~~WebGPU compatibility verification / statement~~ (done; real-hardware visual pass pending)
-5. ~~TypeDoc on Pages~~ (done)
-6. GPU simulation backend — strategic goal, a good reason for v1.0
+Channels, in order of reach: the Babylon.js forum thread (an update with a GIF per release),
+the community extensions list and awesome-babylonjs, Playground snippets built on the UMD
+bundle, short videos of effects.

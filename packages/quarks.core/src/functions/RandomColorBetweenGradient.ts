@@ -1,4 +1,5 @@
 import {Vector4} from '../math';
+import {random} from '../util/random';
 import {FunctionColorGenerator} from './ColorGenerator';
 import {FunctionJSON} from './FunctionJSON';
 import {GeneratorMemory} from './GeneratorMemory';
@@ -20,7 +21,7 @@ export class RandomColorBetweenGradient implements FunctionColorGenerator {
 
     startGen(memory: GeneratorMemory): void {
         this.indexCount = memory.length;
-        memory.push(Math.random());
+        memory.push(random());
     }
 
     genColor(memory: GeneratorMemory, color: Vector4, t: number): Vector4 {
@@ -29,7 +30,7 @@ export class RandomColorBetweenGradient implements FunctionColorGenerator {
         if (memory && memory[this.indexCount] !== undefined) {
             color.lerp(tempColor, memory[this.indexCount]);
         } else {
-            color.lerp(tempColor, Math.random());
+            color.lerp(tempColor, random());
         }
         return color;
     }
