@@ -1,7 +1,7 @@
 import {Texture} from '@babylonjs/core/Materials/Textures/texture';
 import {Mesh} from '@babylonjs/core/Meshes/mesh';
 import {PlusIcon, XMarkIcon} from '@heroicons/react/24/solid';
-import type {Behavior, MeshLighting, MeshRim, ParticleSystem} from 'babylon.quarks';
+import type {Behavior, CullingMode, MeshLighting, MeshRim, ParticleSystem} from 'babylon.quarks';
 import {
     ColorOverLife,
     ConstantColor,
@@ -194,6 +194,25 @@ export function MainModule({binding}: ModuleProps) {
             </Row>
             <Row label="Prewarm">
                 <CheckboxField value={system.prewarm} onChange={(v) => binding.apply((s) => (s.prewarm = v))} />
+            </Row>
+            <Row label="Playback speed">
+                <NumberField
+                    value={system.playbackSpeed}
+                    step={0.1}
+                    min={0}
+                    onChange={(v) => binding.apply((s) => (s.playbackSpeed = Math.max(0, v)))}
+                />
+            </Row>
+            <Row label="Off screen">
+                <SelectField
+                    value={system.cullingMode}
+                    options={[
+                        {value: 'always', label: 'Always simulate'},
+                        {value: 'pause', label: 'Pause'},
+                        {value: 'pauseAndCatchUp', label: 'Pause and catch up'},
+                    ]}
+                    onChange={(mode) => binding.apply((s) => (s.cullingMode = mode as CullingMode))}
+                />
             </Row>
             <ValueField
                 label="Start delay"
@@ -1203,6 +1222,17 @@ export function RendererModule({
                     step={1}
                     onChange={(v) => binding.apply((s) => (s.renderOrder = Math.round(v)))}
                 />
+            </Row>
+            <Row label="Rendering group">
+                <NumberField
+                    value={system.renderingGroupId}
+                    step={1}
+                    min={0}
+                    onChange={(v) => binding.apply((s) => (s.renderingGroupId = Math.max(0, Math.round(v))))}
+                />
+            </Row>
+            <Row label="Apply fog">
+                <CheckboxField value={system.applyFog} onChange={(v) => binding.apply((s) => (s.applyFog = v))} />
             </Row>
             <Row label="Soft particles">
                 <CheckboxField

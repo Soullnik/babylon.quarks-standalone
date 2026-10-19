@@ -56,6 +56,21 @@ namespace BabylonQuarks.UnityExporter
                 .Set("material", materialUuid)
                 .Set("layers", 1);
 
+            if (!Mathf.Approximately(main.simulationSpeed, 1f))
+            {
+                obj.Set("playbackSpeed", main.simulationSpeed);
+            }
+            // Automatic and Always Simulate both keep simulating off screen, the runtime's default.
+            switch (main.cullingMode)
+            {
+                case ParticleSystemCullingMode.Pause:
+                    obj.Set("cullingMode", "pause");
+                    break;
+                case ParticleSystemCullingMode.PauseAndCatchup:
+                    obj.Set("cullingMode", "pauseAndCatchUp");
+                    break;
+            }
+
             if (geometryUuid != null)
             {
                 obj.Set("instancingGeometry", geometryUuid);

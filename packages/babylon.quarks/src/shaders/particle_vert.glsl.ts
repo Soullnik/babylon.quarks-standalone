@@ -1,3 +1,5 @@
+import {fogVertexDeclarationGLSL, fogVertexGLSL} from './chunks/fog';
+
 export default /* glsl */ `
 // Per-vertex attributes
 attribute vec3 position;
@@ -38,6 +40,7 @@ varying vec4 projPosition;
 varying float linearDepth;
 #endif
 
+${fogVertexDeclarationGLSL}
 void main() {
     float c = cos(rotation);
     float s = sin(rotation);
@@ -78,6 +81,7 @@ void main() {
 #endif
 
     gl_Position = projection * mvPosition;
+${fogVertexGLSL('mvPosition.xyz')}
 #ifdef SOFT_PARTICLES
     projPosition = gl_Position;
     linearDepth = -mvPosition.z;

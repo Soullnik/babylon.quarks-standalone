@@ -21,6 +21,7 @@ export type {
     BabylonMetaData,
     BurstParameters,
     BurstParametersJSON,
+    CullingMode,
     ParticleSystemJSONParameters,
     ParticleSystemParameters,
 } from './ParticleSystem';

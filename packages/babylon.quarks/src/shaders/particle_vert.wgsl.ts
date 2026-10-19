@@ -1,3 +1,5 @@
+import {fogVertexDeclarationWGSL, fogVertexWGSL} from './chunks/fog';
+
 export default /* wgsl */ `
 // Per-vertex attributes
 attribute position: vec3f;
@@ -37,6 +39,7 @@ varying projPosition: vec4f;
 varying linearDepth: f32;
 #endif
 
+${fogVertexDeclarationWGSL}
 @vertex
 fn main(input: VertexInputs) -> FragmentInputs {
     let c = cos(vertexInputs.rotation);
@@ -80,6 +83,7 @@ fn main(input: VertexInputs) -> FragmentInputs {
 
     let clipPosition = uniforms.projection * mvPosition;
     vertexOutputs.position = clipPosition;
+${fogVertexWGSL('mvPosition.xyz')}
 #ifdef SOFT_PARTICLES
     vertexOutputs.projPosition = clipPosition;
     vertexOutputs.linearDepth = -mvPosition.z;

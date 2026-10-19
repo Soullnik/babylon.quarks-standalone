@@ -1,3 +1,5 @@
+import {fogVertexDeclarationWGSL, fogVertexWGSL} from './chunks/fog';
+
 export default /* wgsl */ `
 attribute position: vec3f;
 attribute uv: vec2f;
@@ -39,6 +41,7 @@ fn applyQuaternion(v: vec3f, q: vec4f) -> vec3f {
     return v + qW * t + cross(qVec, t);
 }
 
+${fogVertexDeclarationWGSL}
 @vertex
 fn main(input: VertexInputs) -> FragmentInputs {
     let scaledPosition = vertexInputs.position * vertexInputs.size;
@@ -50,6 +53,7 @@ fn main(input: VertexInputs) -> FragmentInputs {
     let viewPos = uniforms.view * worldPos;
     let clipPosition = uniforms.projection * viewPos;
     vertexOutputs.position = clipPosition;
+${fogVertexWGSL('viewPos.xyz')}
 
     vertexOutputs.vWorldPos = worldPos.xyz;
     vertexOutputs.vNormal = normalize((uniforms.world * vec4f(rotatedNormal, 0.0)).xyz);

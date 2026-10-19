@@ -3,6 +3,7 @@ import {Particle} from '../Particle';
 import {Constructable, ParameterPair} from '../TypeUtil';
 import {ApplyCollision} from './ApplyCollision';
 import {ApplyForce} from './ApplyForce';
+import {ApplySequences} from './ApplySequences';
 import {ChangeEmitDirection} from './ChangeEmitDirection';
 import {ColorBySpeed} from './ColorBySpeed';
 import {ColorOverLife} from './ColorOverLife';
@@ -215,6 +216,13 @@ export const BehaviorTypes: {[key: string]: BehaviorPlugin} = {
         constructor: ChangeEmitDirection,
         params: [['angle', ['value']]],
         loadJSON: ChangeEmitDirection.fromJSON,
+    },
+    ApplySequences: {
+        type: 'ApplySequences',
+        constructor: ApplySequences,
+        // The sequencers are appended in code (appendSequencer); only the delay is a plain parameter.
+        params: [['delay', ['number']]],
+        loadJSON: ApplySequences.fromJSON,
     },
     EmitSubParticleSystem: {
         type: 'EmitSubParticleSystem',

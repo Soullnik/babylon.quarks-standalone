@@ -1,3 +1,5 @@
+import {fogVertexDeclarationGLSL, fogVertexGLSL} from './chunks/fog';
+
 export default /* glsl */ `
 // Per-vertex attributes
 attribute vec3 position;
@@ -39,6 +41,7 @@ varying vec4 projPosition;
 varying float linearDepth;
 #endif
 
+${fogVertexDeclarationGLSL}
 void main() {
     float lengthFactor = velocity.w;
     // A flipped particle arrives with a negative size: the streak keeps its
@@ -61,6 +64,7 @@ void main() {
     mvPosition.xyz += (pivot.y * side - pivot.x * vdir) * avgSize;
 #endif
     gl_Position = projection * mvPosition;
+${fogVertexGLSL('mvPosition.xyz')}
     vec2 quadUV = vec2(size.x < 0.0 ? 1.0 - uv.x : uv.x, size.y < 0.0 ? 1.0 - uv.y : uv.y);
 #ifdef SOFT_PARTICLES
     projPosition = gl_Position;

@@ -1,3 +1,5 @@
+import {fogVertexDeclarationGLSL, fogVertexGLSL} from './chunks/fog';
+
 export default /* glsl */ `
 attribute vec3 position;
 attribute vec2 uv;
@@ -39,6 +41,7 @@ vec3 applyQuaternion(vec3 v, vec4 q) {
     return v + qW * t + cross(qVec, t);
 }
 
+${fogVertexDeclarationGLSL}
 void main() {
     vec3 scaledPosition = position * size;
     vec3 rotatedPosition = applyQuaternion(scaledPosition, rotation);
@@ -48,6 +51,7 @@ void main() {
     vec4 worldPos = world * vec4(localPos, 1.0);
     vec4 viewPos = view * worldPos;
     gl_Position = projection * viewPos;
+${fogVertexGLSL('viewPos.xyz')}
 
     vWorldPos = worldPos.xyz;
     vNormal = normalize((world * vec4(rotatedNormal, 0.0)).xyz);

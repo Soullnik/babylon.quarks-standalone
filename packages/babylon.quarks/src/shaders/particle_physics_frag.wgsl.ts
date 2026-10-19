@@ -1,3 +1,5 @@
+import {fogFragmentDeclarationWGSL, fogFragmentWGSL} from './chunks/fog';
+
 export default /* wgsl */ `
 varying vUV: vec2f;
 varying vColor: vec4f;
@@ -85,6 +87,7 @@ varying linearDepth: f32;
 uniform alphaTest: f32;
 #endif
 
+${fogFragmentDeclarationWGSL}
 @fragment
 fn main(input: FragmentInputs) -> FragmentOutputs {
     var baseColor = fragmentInputs.vColor;
@@ -145,6 +148,7 @@ fn main(input: FragmentInputs) -> FragmentOutputs {
     finalColor *= fade;
 #endif
 
+${fogFragmentWGSL('finalColor')}
     fragmentOutputs.color = finalColor;
 }
 `;
