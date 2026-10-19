@@ -12,8 +12,10 @@ import {
     LimitSpeedOverLifeModule,
     NoiseModule,
     OrbitOverLifeModule,
+    Rotation3DOverLifeModule,
     RotationBySpeedModule,
     RotationOverLifeModule,
+    SequencesModule,
     SizeBySpeedModule,
     SpeedOverLifeModule,
     TextureSheetModule,
@@ -116,6 +118,7 @@ export const EffectEditor = React.memo(function EffectEditor(props: EffectEditor
             <SizeOverLifeModule binding={binding} />
             <SizeBySpeedModule binding={binding} />
             <RotationOverLifeModule binding={binding} />
+            <Rotation3DOverLifeModule binding={binding} />
             <RotationBySpeedModule binding={binding} />
             <NoiseModule binding={binding} />
             <TurbulenceModule binding={binding} />
@@ -123,6 +126,7 @@ export const EffectEditor = React.memo(function EffectEditor(props: EffectEditor
             <WidthOverTrailModule binding={binding} />
             <SubEmittersModule binding={binding} rootBinding={props.binding} />
             <TextureSheetModule binding={binding} />
+            <SequencesModule binding={binding} textureOptions={props.textureOptions} />
             <RendererModule
                 binding={binding}
                 textureOptions={props.textureOptions}

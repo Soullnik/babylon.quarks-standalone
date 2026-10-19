@@ -1,3 +1,4 @@
+import React from 'react';
 import {ScalarGenerator, ScalarValueState, buildCurve, buildScalar, readPieces, readScalar} from '../core/values';
 import {CurveEditor} from './CurveEditor';
 import {NumberField, Row, SelectField} from './fields';
@@ -6,6 +7,8 @@ import {NumberField, Row, SelectField} from './fields';
  * Unity-like value field: Constant | Random Between Two Constants | Curve,
  * bound to a quarks value generator.
  */
+const captionStyle: React.CSSProperties = {fontSize: 10.5, opacity: 0.6, flex: 'none'};
+
 export function ValueField(props: {
     label: string;
     hint?: string;
@@ -41,8 +44,10 @@ export function ValueField(props: {
             )}
             {state.mode === 'random' && (
                 <Row label="">
-                    <div style={{display: 'flex', gap: 6}}>
+                    <div style={{display: 'flex', gap: 6, alignItems: 'center'}}>
+                        <span style={captionStyle}>min</span>
                         <NumberField value={state.min} min={props.min} onChange={(min) => commit({min})} />
+                        <span style={captionStyle}>max</span>
                         <NumberField value={state.max} min={props.min} onChange={(max) => commit({max})} />
                     </div>
                 </Row>

@@ -93,6 +93,8 @@ and the project follows the `quarks.core` 0.x version line.
 
 ### Fixed
 
+- quarks.core `ApplySequences` threw on update while it had no sequences yet (an editor adds the
+  behavior before its first sequence); it now leaves the particles alone until one is appended.
 - `ParticleSystem.clone()` left cloned `EmitSubParticleSystem` behaviors transforming by the
   original system's emitter; they now follow the clone. `ParticleEmitter.clone()` no longer
   disables the clone itself when only an ancestor of the original was disabled.

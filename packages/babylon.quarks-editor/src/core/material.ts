@@ -7,6 +7,9 @@ export interface RendererMaterialPatch {
     depthWrite?: boolean;
     alphaTest?: number;
     texture?: unknown;
+    /** A 3×2 cube-face atlas mesh particles reflect, or null for none. */
+    reflectionAtlas?: unknown;
+    reflectionLevel?: number;
 }
 
 function isEditableMaterialRecord(material: unknown): material is Record<string, unknown> {
@@ -35,6 +38,12 @@ export function applyRendererMaterial(system: ParticleSystem, patch: RendererMat
     if (patch.texture !== undefined) {
         system.texture = patch.texture as never;
     }
+    if (patch.reflectionAtlas !== undefined) {
+        settings.reflectionAtlas = patch.reflectionAtlas as never;
+    }
+    if (patch.reflectionLevel !== undefined) {
+        settings.reflectionLevel = patch.reflectionLevel;
+    }
 
     const material = system.material;
     if (isEditableMaterialRecord(material)) {
@@ -57,6 +66,12 @@ export function applyRendererMaterial(system: ParticleSystem, patch: RendererMat
         if (patch.texture !== undefined) {
             material.texture = patch.texture;
             material.map = patch.texture;
+        }
+        if (patch.reflectionAtlas !== undefined) {
+            material.reflectionAtlas = patch.reflectionAtlas;
+        }
+        if (patch.reflectionLevel !== undefined) {
+            material.reflectionLevel = patch.reflectionLevel;
         }
     }
 

@@ -14,6 +14,17 @@ and the project follows the `quarks.core` 0.x version line.
   screen size" (min / max particle size as fractions of the viewport). Shape module: "Align to
   direction". Noise module: "Scroll speed" and "Remap" (with its curve). Velocity module: "Orbital
   offset" and "Radial". Sub Emitters module: "Inherit color / size / rotation / lifetime".
+- The editor now reaches everything the runtime can do. Shape module: Box (with emit from
+  volume / shell / edges) and Edge shapes. Main module: "Blend between two" start colour
+  (`ColorRange`) and "3D (axis + angle)" start rotation (`AxisAngleGenerator`). New modules:
+  "Rotation over Lifetime (3D)" for mesh particles (axis + angle, per axis, random) and
+  "Sequences" (`ApplySequences`: sequences read from an image's opaque pixels, with time window,
+  scale and position). Renderer module: "Layer mask", "Max particles", billboard "Pivot", the
+  trail flags (record in world space, UV from head, color from particle, die with particle, head
+  width scale) and, for meshes, an environment-map atlas picked from the host's textures with its
+  reflection level.
+- "Random between two" fields label their min and max inputs. Export and Save warn when the
+  effect references `blob:` textures, which do not survive a reload.
 
 ## [0.23.0] — 2026-10-18
 
