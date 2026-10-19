@@ -1,11 +1,15 @@
+import {PlusIcon, XMarkIcon} from '@heroicons/react/24/solid';
 import type {Behavior} from 'babylon.quarks';
 import {
     ApplyCollision,
     ApplyForce,
+    ApplySequences,
+    AxisAngleGenerator,
     Bezier,
     ChangeEmitDirection,
     ColorBySpeed,
     ConstantValue,
+    EulerGenerator,
     ForceOverLife,
     FrameOverLife,
     getPhysicsResolver,
@@ -16,10 +20,13 @@ import {
     Noise,
     OrbitOverLife,
     PiecewiseBezier,
+    RandomQuatGenerator,
+    Rotation3DOverLife,
     RotationBySpeed,
     RotationOverLife,
     SizeBySpeed,
     SpeedOverLife,
+    TextureSequencer,
     TurbulenceField,
     Vector3,
     VelocityOverLife,
@@ -32,7 +39,10 @@ import {buildCurve, buildScalar, readPieces, readScalar} from '../core/values';
 import {CurveEditor} from './CurveEditor';
 import {CheckboxField, NumberField, Row, SelectField} from './fields';
 import {GradientEditor} from './GradientEditor';
+import {iconStyle} from './icons';
+import type {TextureOption} from './modules';
 import {ModuleSection} from './ModuleSection';
+import {theme} from './theme';
 import {ValueField} from './ValueField';
 
 interface ModuleProps {
@@ -315,6 +325,271 @@ export function RotationOverLifeModule({binding}: ModuleProps) {
                     curveMax={Math.PI * 4}
                     onChange={(g) => binding.apply(() => (behavior.angularVelocity = g))}
                 />
+            )}
+        </BehaviorModule>
+    );
+}
+
+/** Turns mesh particles by a 3D angular velocity; billboards turn through Rotation over Lifetime. */
+export function Rotation3DOverLifeModule({binding}: ModuleProps) {
+    return (
+        <BehaviorModule<Rotation3DOverLife>
+            binding={binding}
+            title="Rotation over Lifetime (3D)"
+            type="Rotation3DOverLife"
+            create={() =>
+                new Rotation3DOverLife(new AxisAngleGenerator(new Vector3(0, 1, 0), new ConstantValue(Math.PI)))
+            }
+        >
+            {(behavior) => {
+                const generator = behavior.angularVelocity;
+                const mode =
+                    generator instanceof AxisAngleGenerator
+                        ? 'axisAngle'
+                        : generator instanceof EulerGenerator
+                          ? 'euler'
+                          : 'random';
+                const axisAngle = generator instanceof AxisAngleGenerator ? generator : undefined;
+                const euler = generator instanceof EulerGenerator ? generator : undefined;
+                return (
+                    <>
+                        <p style={{margin: '2px 0 6px', color: theme.textDim, fontSize: 11.5}}>
+                            Mesh particles only; billboards spin with Rotation over Lifetime.
+                        </p>
+                        <Row label="Mode">
+                            <SelectField
+                                value={mode}
+                                options={[
+                                    {value: 'axisAngle', label: 'Axis + angle'},
+                                    {value: 'euler', label: 'Per axis'},
+                                    {value: 'random', label: 'Random'},
+                                ]}
+                                onChange={(next) =>
+                                    binding.apply(() => {
+                                        behavior.angularVelocity =
+                                            next === 'axisAngle'
+                                                ? new AxisAngleGenerator(
+                                                      new Vector3(0, 1, 0),
+                                                      new ConstantValue(Math.PI)
+                                                  )
+                                                : next === 'euler'
+                                                  ? new EulerGenerator(
+                                                        new ConstantValue(0),
+                                                        new ConstantValue(Math.PI),
+                                                        new ConstantValue(0)
+                                                    )
+                                                  : new RandomQuatGenerator();
+                                    })
+                                }
+                            />
+                        </Row>
+                        {axisAngle && (
+                            <>
+                                <Vector3Row
+                                    label="Axis"
+                                    value={axisAngle.axis}
+                                    step={0.1}
+                                    onChange={(v) =>
+                                        binding.apply(
+                                            () =>
+                                                (behavior.angularVelocity = new AxisAngleGenerator(v, axisAngle.angle))
+                                        )
+                                    }
+                                />
+                                <ValueField
+                                    label="Angle (rad/s)"
+                                    generator={axisAngle.angle}
+                                    curveMax={Math.PI * 4}
+                                    onChange={(g) =>
+                                        binding.apply(
+                                            () =>
+                                                (behavior.angularVelocity = new AxisAngleGenerator(
+                                                    axisAngle.axis.clone(),
+                                                    g
+                                                ))
+                                        )
+                                    }
+                                />
+                            </>
+                        )}
+                        {euler &&
+                            (['angleX', 'angleY', 'angleZ'] as const).map((key) => (
+                                <ValueField
+                                    key={key}
+                                    label={`${key.slice(-1)} (rad/s)`}
+                                    generator={euler[key]}
+                                    curveMax={Math.PI * 4}
+                                    onChange={(g) =>
+                                        binding.apply(
+                                            () =>
+                                                (behavior.angularVelocity = new EulerGenerator(
+                                                    key === 'angleX' ? g : euler.angleX,
+                                                    key === 'angleY' ? g : euler.angleY,
+                                                    key === 'angleZ' ? g : euler.angleZ
+                                                ))
+                                        )
+                                    }
+                                />
+                            ))}
+                    </>
+                );
+            }}
+        </BehaviorModule>
+    );
+}
+
+/**
+ * Moves particles, one after another, onto the opaque pixels of an image (a
+ * logo or a word drawn from sparks). Each sequence is read from an image once;
+ * its points, scale, position and time window are what gets saved.
+ */
+export function SequencesModule({binding, textureOptions}: ModuleProps & {textureOptions?: TextureOption[]}) {
+    const [imageUrl, setImageUrl] = React.useState(textureOptions?.[0]?.url ?? '');
+    const [threshold, setThreshold] = React.useState(0.5);
+    const [status, setStatus] = React.useState<string | null>(null);
+    const addFromImage = async (behavior: ApplySequences) => {
+        if (!imageUrl) {
+            setStatus('Pick an image first.');
+            return;
+        }
+        try {
+            const image = new Image();
+            image.crossOrigin = 'anonymous';
+            image.src = imageUrl;
+            await image.decode();
+            const sequencer = new TextureSequencer(0.05, 0.05, new Vector3());
+            sequencer.fromImage(image, threshold);
+            const last = behavior.sequencers[behavior.sequencers.length - 1];
+            const start = last ? last[0].b : 0;
+            binding.apply(() => behavior.appendSequencer(new IntervalValue(start, start + 2), sequencer));
+            setStatus(`${sequencer.locations.length} points read.`);
+        } catch (error) {
+            setStatus(`Could not read the image: ${error instanceof Error ? error.message : String(error)}`);
+        }
+    };
+    const pair = (a: number, b: number, onA: (v: number) => void, onB: (v: number) => void, step: number) => (
+        <div style={{display: 'flex', gap: 6}}>
+            <NumberField value={a} step={step} onChange={onA} />
+            <NumberField value={b} step={step} onChange={onB} />
+        </div>
+    );
+    return (
+        <BehaviorModule<ApplySequences>
+            binding={binding}
+            title="Sequences"
+            type="ApplySequences"
+            create={() => new ApplySequences(0.001)}
+        >
+            {(behavior) => (
+                <>
+                    <p style={{margin: '2px 0 6px', color: theme.textDim, fontSize: 11.5}}>
+                        Particles fly, one after another, onto the opaque pixels of an image during each sequence's time
+                        window.
+                    </p>
+                    <Row label="Delay per particle">
+                        <NumberField
+                            value={behavior.delay}
+                            min={0}
+                            step={0.001}
+                            onChange={(v) => binding.apply(() => (behavior.delay = Math.max(0, v)))}
+                        />
+                    </Row>
+                    {behavior.sequencers.map(([range, sequencer], index) => {
+                        const texture = sequencer as TextureSequencer;
+                        return (
+                            <div
+                                key={index}
+                                style={{
+                                    border: `1px solid ${theme.border}`,
+                                    borderRadius: 6,
+                                    padding: '4px 6px',
+                                    marginTop: 6,
+                                }}
+                            >
+                                <Row label={`Sequence ${index + 1}`}>
+                                    <span style={{fontSize: 11.5, color: theme.textDim}}>
+                                        {texture.locations?.length ?? 0} points
+                                    </span>
+                                    <button
+                                        className="qe-hover"
+                                        style={{
+                                            marginLeft: 'auto',
+                                            background: 'none',
+                                            border: 'none',
+                                            cursor: 'pointer',
+                                        }}
+                                        title="Remove sequence"
+                                        onClick={() => binding.apply(() => behavior.sequencers.splice(index, 1))}
+                                    >
+                                        <XMarkIcon style={iconStyle(13)} />
+                                    </button>
+                                </Row>
+                                <Row label="Time from / to (s)">
+                                    {pair(
+                                        range.a,
+                                        range.b,
+                                        (v) => binding.apply(() => (range.a = v)),
+                                        (v) => binding.apply(() => (range.b = v)),
+                                        0.1
+                                    )}
+                                </Row>
+                                {texture.locations !== undefined && (
+                                    <>
+                                        <Row label="Scale X / Y">
+                                            {pair(
+                                                texture.scaleX,
+                                                texture.scaleY,
+                                                (v) => binding.apply(() => (texture.scaleX = v)),
+                                                (v) => binding.apply(() => (texture.scaleY = v)),
+                                                0.01
+                                            )}
+                                        </Row>
+                                        <Vector3Row
+                                            label="Position"
+                                            value={texture.position}
+                                            step={0.1}
+                                            onChange={(v) => binding.apply(() => texture.position.copy(v))}
+                                        />
+                                    </>
+                                )}
+                            </div>
+                        );
+                    })}
+                    <Row label="Image">
+                        {textureOptions && textureOptions.length > 0 ? (
+                            <SelectField
+                                value={imageUrl}
+                                options={textureOptions.map((option) => ({value: option.url, label: option.label}))}
+                                onChange={(url) => setImageUrl(url)}
+                            />
+                        ) : (
+                            <input
+                                className="qe-hover"
+                                style={{flex: 1, minWidth: 0, fontSize: 12}}
+                                placeholder="Image URL"
+                                value={imageUrl}
+                                onChange={(event) => setImageUrl(event.target.value)}
+                            />
+                        )}
+                    </Row>
+                    <Row label="Alpha threshold">
+                        <NumberField
+                            value={threshold}
+                            min={0}
+                            step={0.05}
+                            onChange={(v) => setThreshold(Math.min(1, v))}
+                        />
+                    </Row>
+                    <button
+                        className="qe-hover"
+                        style={{display: 'flex', alignItems: 'center', gap: 4, marginTop: 6, fontSize: 12}}
+                        onClick={() => void addFromImage(behavior)}
+                    >
+                        <PlusIcon style={iconStyle(13)} />
+                        Add sequence from image
+                    </button>
+                    {status && <p style={{margin: '4px 0 0', color: theme.textDim, fontSize: 11.5}}>{status}</p>}
+                </>
             )}
         </BehaviorModule>
     );

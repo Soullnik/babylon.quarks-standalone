@@ -40,6 +40,10 @@ export class ApplySequences implements Behavior {
 
     update(particle: Particle, delta: number): void {
         const sequencer = this.sequencers[this.index];
+        if (sequencer === undefined) {
+            // Nothing appended yet (an editor adds the behavior before its sequences).
+            return;
+        }
         const delay = (particle as any).id * this.delay;
         if (this.time >= sequencer[0].a + delay && this.time <= sequencer[0].b + delay) {
             if (!(particle as any).inMotion) {

@@ -93,6 +93,21 @@ import {iconStyle, type HeroIcon} from './icons';
 import type {GeometryData, GeometryOption, TextureOption} from './modules';
 import {buttonStyle, globalEditorStyles, theme} from './theme';
 
+/**
+ * The effect's JSON, with a warning when it points at object URLs: a texture
+ * dropped in from disk lives at a `blob:` URL that dies with the page, so the
+ * exported effect would load without it.
+ */
+function exportEffectJSON(binding: EffectBinding, warn: (message: string) => void): string {
+    const json = binding.exportJSON('EditorEffect');
+    if (json.includes('"blob:')) {
+        warn(
+            'This effect references blob: textures, which will not load after a reload. Re-pick them from a hosted URL.'
+        );
+    }
+    return json;
+}
+
 export interface EffectEditorHostHandle {
     binding: EffectBinding;
     history: EffectHistory;
@@ -2139,7 +2154,7 @@ export function EffectEditorHost(props: EffectEditorHostProps) {
                                     disabled={!binding}
                                     onClick={() => {
                                         if (!binding) return;
-                                        const blob = new Blob([binding.exportJSON('EditorEffect')], {
+                                        const blob = new Blob([exportEffectJSON(binding, showToast)], {
                                             type: 'application/json',
                                         });
                                         const link = document.createElement('a');
@@ -2156,7 +2171,7 @@ export function EffectEditorHost(props: EffectEditorHostProps) {
                                         className="qe-hover"
                                         style={buttonStyle}
                                         disabled={!binding}
-                                        onClick={() => binding && props.onSave!(binding.exportJSON('EditorEffect'))}
+                                        onClick={() => binding && props.onSave!(exportEffectJSON(binding, showToast))}
                                     >
                                         Save
                                     </button>

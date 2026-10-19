@@ -1,4 +1,5 @@
 import {
+    ApplySequences,
     Bezier,
     ConstantValue,
     createSeededRandom,
@@ -169,6 +170,17 @@ describe('Noise scroll speed and remap', () => {
         const plain = Noise.fromJSON(new Noise(new ConstantValue(1), new ConstantValue(1)).toJSON()) as Noise;
         expect(plain.remap).toBeUndefined();
         expect((plain.scrollSpeed as ConstantValue).value).toBe(0);
+    });
+});
+
+describe('ApplySequences without sequences', () => {
+    it('leaves particles alone until a sequence is appended', () => {
+        const behavior = new ApplySequences(0.01);
+        const p = particleAt(1, 2, 3);
+        behavior.initialize(p);
+        behavior.frameUpdate(1 / 60);
+        expect(() => behavior.update(p, 1 / 60)).not.toThrow();
+        expect(p.position.toArray()).toEqual([1, 2, 3]);
     });
 });
 

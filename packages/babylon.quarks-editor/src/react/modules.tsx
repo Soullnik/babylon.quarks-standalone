@@ -3,7 +3,10 @@ import {Mesh} from '@babylonjs/core/Meshes/mesh';
 import {PlusIcon, XMarkIcon} from '@heroicons/react/24/solid';
 import type {Behavior, CullingMode, MeshLighting, MeshRim, ParticleSystem, SortMode} from 'babylon.quarks';
 import {
+    AxisAngleGenerator,
+    BoxEmitFrom,
     ColorOverLife,
+    ColorRange,
     ConstantColor,
     ConstantValue,
     EulerGenerator,
@@ -14,6 +17,7 @@ import {
     RandomQuatGenerator,
     RenderMode,
     SizeOverLife,
+    Vector3,
     Vector3Function,
     Vector4,
 } from 'babylon.quarks';
@@ -97,6 +101,8 @@ const PARAM_LABELS: {[key: string]: string} = {
     height: 'Height',
     column: 'Columns',
     row: 'Rows',
+    depth: 'Depth',
+    speed: 'Speed (lengths/s)',
 };
 
 function ColorInput(props: {value: Vector4; onChange: (next: Vector4) => void}) {
@@ -133,28 +139,35 @@ function ColorInput(props: {value: Vector4; onChange: (next: Vector4) => void}) 
 export function MainModule({binding}: ModuleProps) {
     const system = binding.system;
     const startColor = system.startColor;
-    const colorMode = startColor instanceof RandomColor ? 'random' : 'constant';
-    const colorA =
-        startColor instanceof RandomColor
-            ? (startColor as never as {a: Vector4}).a
-            : startColor instanceof ConstantColor
-              ? startColor.color
-              : new Vector4(1, 1, 1, 1);
-    const colorB =
-        startColor instanceof RandomColor ? (startColor as never as {b: Vector4}).b : new Vector4(1, 0.5, 0.2, 1);
+    const colorMode =
+        startColor instanceof RandomColor ? 'random' : startColor instanceof ColorRange ? 'range' : 'constant';
+    const twoColors = startColor instanceof RandomColor || startColor instanceof ColorRange;
+    const colorA = twoColors
+        ? (startColor as never as {a: Vector4}).a
+        : startColor instanceof ConstantColor
+          ? startColor.color
+          : new Vector4(1, 1, 1, 1);
+    const colorB = twoColors ? (startColor as never as {b: Vector4}).b : new Vector4(1, 0.5, 0.2, 1);
+    /** The two-colour generator of the current mode. */
+    const makeTwoColors = (a: Vector4, b: Vector4) =>
+        colorMode === 'range' ? new ColorRange(a, b) : new RandomColor(a, b);
     const rotation = system.startRotation;
     const isEuler = rotation instanceof EulerGenerator;
+    const isAxisAngle = rotation instanceof AxisAngleGenerator;
     const rotationMode =
         rotation instanceof RandomQuatGenerator
             ? '3d'
             : isEuler
               ? 'euler'
-              : readScalar(rotation as never).mode === 'random'
-                ? 'random'
-                : 'angle';
+              : isAxisAngle
+                ? 'axisAngle'
+                : readScalar(rotation as never).mode === 'random'
+                  ? 'random'
+                  : 'angle';
     const rotationState = readScalar(
-        rotation instanceof RandomQuatGenerator || isEuler ? undefined : (rotation as never)
+        rotation instanceof RandomQuatGenerator || isEuler || isAxisAngle ? undefined : (rotation as never)
     );
+    const axisAngle = isAxisAngle ? (rotation as AxisAngleGenerator) : undefined;
     const eulerAngles = {
         x: isEuler ? readScalar((rotation as EulerGenerator).angleX as never).value : 0,
         y: isEuler ? readScalar((rotation as EulerGenerator).angleY as never).value : 0,
@@ -313,6 +326,7 @@ export function MainModule({binding}: ModuleProps) {
                     options={[
                         {value: 'constant', label: 'Constant'},
                         {value: 'random', label: 'Random between two'},
+                        {value: 'range', label: 'Blend between two'},
                         {value: 'gradient', label: 'Gradient'},
                         {value: 'gradient2', label: 'Random between gradients'},
                     ]}
@@ -320,6 +334,8 @@ export function MainModule({binding}: ModuleProps) {
                         binding.apply((s) => {
                             if (mode === 'random') {
                                 s.startColor = new RandomColor(colorA, colorB);
+                            } else if (mode === 'range') {
+                                s.startColor = new ColorRange(colorA, colorB);
                             } else if (mode === 'gradient') {
                                 s.startColor = buildGradient(DEFAULT_GRADIENT_STOPS);
                             } else if (mode === 'gradient2') {
@@ -334,24 +350,23 @@ export function MainModule({binding}: ModuleProps) {
                     }
                 />
             </Row>
-            {(colorGenMode === 'constant' || colorGenMode === 'random') && (
+            {(colorGenMode === 'constant' || twoColors) && (
                 <Row label="">
                     <ColorInput
                         value={colorA}
                         onChange={(next) =>
                             binding.apply((s) => {
-                                s.startColor =
-                                    colorGenMode === 'random' ? new RandomColor(next, colorB) : new ConstantColor(next);
+                                s.startColor = twoColors ? makeTwoColors(next, colorB) : new ConstantColor(next);
                             })
                         }
                     />
                 </Row>
             )}
-            {colorGenMode === 'random' && (
+            {twoColors && (
                 <Row label="">
                     <ColorInput
                         value={colorB}
-                        onChange={(next) => binding.apply((s) => (s.startColor = new RandomColor(colorA, next)))}
+                        onChange={(next) => binding.apply((s) => (s.startColor = makeTwoColors(colorA, next)))}
                     />
                 </Row>
             )}
@@ -392,6 +407,7 @@ export function MainModule({binding}: ModuleProps) {
                         {value: 'angle', label: 'Angle (rad)'},
                         {value: 'random', label: 'Random angle'},
                         {value: 'euler', label: '3D (per axis)'},
+                        {value: 'axisAngle', label: '3D (axis + angle)'},
                         {value: '3d', label: 'Random 3D'},
                     ]}
                     onChange={(mode) =>
@@ -399,15 +415,20 @@ export function MainModule({binding}: ModuleProps) {
                             s.startRotation =
                                 mode === '3d'
                                     ? new RandomQuatGenerator()
-                                    : mode === 'euler'
-                                      ? new EulerGenerator(
-                                            new ConstantValue(eulerAngles.x),
-                                            new ConstantValue(eulerAngles.y),
-                                            new ConstantValue(eulerAngles.z)
+                                    : mode === 'axisAngle'
+                                      ? new AxisAngleGenerator(
+                                            new Vector3(0, 1, 0),
+                                            new ConstantValue(rotationState.value)
                                         )
-                                      : mode === 'random'
-                                        ? new IntervalValue(0, Math.PI * 2)
-                                        : new ConstantValue(rotationState.value);
+                                      : mode === 'euler'
+                                        ? new EulerGenerator(
+                                              new ConstantValue(eulerAngles.x),
+                                              new ConstantValue(eulerAngles.y),
+                                              new ConstantValue(eulerAngles.z)
+                                          )
+                                        : mode === 'random'
+                                          ? new IntervalValue(0, Math.PI * 2)
+                                          : new ConstantValue(rotationState.value);
                         })
                     }
                 />
@@ -419,6 +440,36 @@ export function MainModule({binding}: ModuleProps) {
                             <NumberField value={eulerAngles[axis]} step={0.1} onChange={(v) => setEulerAxis(axis, v)} />
                         </Row>
                     ))}
+                </>
+            )}
+            {axisAngle && (
+                <>
+                    <Row label="  Axis">
+                        <div style={{display: 'flex', gap: 6}}>
+                            {(['x', 'y', 'z'] as const).map((axis) => (
+                                <NumberField
+                                    key={axis}
+                                    value={axisAngle.axis[axis]}
+                                    step={0.1}
+                                    onChange={(v) =>
+                                        binding.apply((s) => {
+                                            const next = axisAngle.axis.clone();
+                                            next[axis] = v;
+                                            s.startRotation = new AxisAngleGenerator(next, axisAngle.angle);
+                                        })
+                                    }
+                                />
+                            ))}
+                        </div>
+                    </Row>
+                    <ValueField
+                        label="  Angle (rad)"
+                        generator={axisAngle.angle}
+                        curveMax={Math.PI * 2}
+                        onChange={(g) =>
+                            binding.apply((s) => (s.startRotation = new AxisAngleGenerator(axisAngle.axis.clone(), g)))
+                        }
+                    />
                 </>
             )}
             {rotationMode === 'angle' && (
@@ -574,7 +625,7 @@ export function EmissionModule({binding}: ModuleProps) {
 // Shapes whose constructor doesn't accept `mode`/`spread` at all — showing those controls
 // for them would edit a value the shape silently ignores, just like the old "default to
 // first texture" bug: a control that looks live but does nothing.
-const SHAPES_WITHOUT_MODE_SPREAD = new Set<ShapeType>(['point', 'grid', 'mesh_surface']);
+const SHAPES_WITHOUT_MODE_SPREAD = new Set<ShapeType>(['point', 'grid', 'box', 'mesh_surface']);
 
 export function ShapeModule({binding}: ModuleProps) {
     const system = binding.system;
@@ -619,6 +670,21 @@ export function ShapeModule({binding}: ModuleProps) {
                                 id === '__none' ? undefined : meshOptions.find((m) => String(m.uniqueId) === id);
                             binding.apply((s) => (s.emitterShape = createShape('mesh_surface', {...params, mesh})));
                         }}
+                    />
+                </Row>
+            )}
+            {type === 'box' && (
+                <Row label="Emit from">
+                    <SelectField
+                        value={params.emitFrom}
+                        options={[
+                            {value: BoxEmitFrom.Volume, label: 'Volume'},
+                            {value: BoxEmitFrom.Shell, label: 'Shell (faces)'},
+                            {value: BoxEmitFrom.Edge, label: 'Edges'},
+                        ]}
+                        onChange={(emitFrom) =>
+                            binding.apply((s) => (s.emitterShape = createShape(type, {...params, emitFrom})))
+                        }
                     />
                 </Row>
             )}
@@ -903,6 +969,37 @@ export function RendererModule({
                             onChange={(v) =>
                                 binding.apply((s) => {
                                     (s.rendererEmitterSettings as {followLocalOrigin?: boolean}).followLocalOrigin = v;
+                                })
+                            }
+                        />
+                    </Row>
+                    {(
+                        [
+                            ['recordWorldSpace', 'Record in world space'],
+                            ['uvFromHead', 'UV from head'],
+                            ['colorFromParticle', 'Color from particle'],
+                            ['dieWithParticle', 'Die with particle'],
+                        ] as const
+                    ).map(([key, label]) => (
+                        <Row key={key} label={label}>
+                            <CheckboxField
+                                value={!!(system.rendererEmitterSettings as Record<string, unknown>)[key]}
+                                onChange={(v) =>
+                                    binding.apply((s) => {
+                                        (s.rendererEmitterSettings as Record<string, unknown>)[key] = v;
+                                    })
+                                }
+                            />
+                        </Row>
+                    ))}
+                    <Row label="Head width scale">
+                        <NumberField
+                            value={(system.rendererEmitterSettings as {headWidthScale?: number}).headWidthScale ?? 1}
+                            min={0}
+                            step={0.1}
+                            onChange={(v) =>
+                                binding.apply((s) => {
+                                    (s.rendererEmitterSettings as {headWidthScale?: number}).headWidthScale = v;
                                 })
                             }
                         />
@@ -1251,6 +1348,70 @@ export function RendererModule({
                     onChange={(v) => binding.apply((s) => (s.renderingGroupId = Math.max(0, Math.round(v))))}
                 />
             </Row>
+            <Row label="Layer mask">
+                <NumberField
+                    value={system.layers.mask}
+                    min={0}
+                    step={1}
+                    onChange={(v) => binding.apply((s) => (s.layers.mask = Math.max(0, Math.floor(v))))}
+                />
+            </Row>
+            <Row label="Max particles">
+                <CheckboxField
+                    value={system.maxParticles !== undefined}
+                    onChange={(v) => binding.apply((s) => (s.maxParticles = v ? 1000 : undefined))}
+                />
+                {system.maxParticles !== undefined && (
+                    <NumberField
+                        value={system.maxParticles}
+                        min={1}
+                        step={10}
+                        onChange={(v) => binding.apply((s) => (s.maxParticles = Math.max(1, Math.floor(v))))}
+                    />
+                )}
+            </Row>
+            {system.renderMode !== RenderMode.Mesh && system.renderMode !== RenderMode.Trail && (
+                <Row label="Pivot">
+                    <div style={{display: 'flex', gap: 6}}>
+                        {(['x', 'y', 'z'] as const).map((axis) => (
+                            <NumberField
+                                key={axis}
+                                value={system.pivot?.[axis] ?? 0}
+                                step={0.05}
+                                onChange={(v) =>
+                                    binding.apply((s) => {
+                                        const next = (s.pivot ?? new Vector3()).clone();
+                                        next[axis] = v;
+                                        s.pivot = next;
+                                    })
+                                }
+                            />
+                        ))}
+                    </div>
+                </Row>
+            )}
+            {system.renderMode === RenderMode.Mesh && (
+                <>
+                    <Row label="Env map atlas">
+                        <SelectField
+                            value={(system.getRendererSettings().reflectionAtlas as {url?: string} | null)?.url ?? ''}
+                            options={[
+                                {value: '', label: 'None'},
+                                ...(textureOptions ?? []).map((option) => ({value: option.url, label: option.label})),
+                            ]}
+                            onChange={(url) => patchMaterial({reflectionAtlas: url ? loadTexture(url) : null})}
+                        />
+                    </Row>
+                    <Row label="Reflection level">
+                        <NumberField
+                            value={system.getRendererSettings().reflectionLevel ?? 1}
+                            min={0}
+                            step={0.1}
+                            onChange={(v) => patchMaterial({reflectionLevel: Math.max(0, v)})}
+                        />
+                    </Row>
+                </>
+            )}
             <Row label="Sort mode">
                 <SelectField
                     value={system.sortMode}

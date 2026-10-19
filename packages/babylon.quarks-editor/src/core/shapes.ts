@@ -1,9 +1,13 @@
 import type {Mesh} from '@babylonjs/core/Meshes/mesh';
 import type {EmitterShape} from 'babylon.quarks';
 import {
+    BoxEmitFrom,
+    BoxEmitter,
     CircleEmitter,
     ConeEmitter,
+    ConstantValue,
     DonutEmitter,
+    EdgeEmitter,
     EmitterMode,
     GridEmitter,
     HemisphereEmitter,
@@ -22,6 +26,8 @@ export type ShapeType =
     | 'donut'
     | 'rectangle'
     | 'grid'
+    | 'box'
+    | 'edge'
     | 'mesh_surface';
 
 export const SHAPE_TYPES: Array<{value: ShapeType; label: string}> = [
@@ -32,6 +38,8 @@ export const SHAPE_TYPES: Array<{value: ShapeType; label: string}> = [
     {value: 'donut', label: 'Donut'},
     {value: 'rectangle', label: 'Rectangle'},
     {value: 'grid', label: 'Grid'},
+    {value: 'box', label: 'Box'},
+    {value: 'edge', label: 'Edge'},
     {value: 'mesh_surface', label: 'Mesh surface'},
     {value: 'point', label: 'Point'},
 ];
@@ -48,6 +56,12 @@ export interface ShapeParams {
     spread: number;
     column: number;
     row: number;
+    /** Box depth (Z). */
+    depth: number;
+    /** Where a box emits from: its volume, its faces or its edges. */
+    emitFrom: BoxEmitFrom;
+    /** How fast an edge emitter's loop / ping-pong point travels, in lengths per second. */
+    speed: number;
     mesh?: Mesh;
 }
 
@@ -63,6 +77,9 @@ export const DEFAULT_SHAPE_PARAMS: ShapeParams = {
     spread: 0,
     column: 10,
     row: 10,
+    depth: 1,
+    emitFrom: BoxEmitFrom.Volume,
+    speed: 1,
     mesh: undefined,
 };
 
@@ -87,6 +104,9 @@ export function readShapeParams(shape: EmitterShape): ShapeParams {
         height: num('height', DEFAULT_SHAPE_PARAMS.height),
         column: num('column', DEFAULT_SHAPE_PARAMS.column),
         row: num('row', DEFAULT_SHAPE_PARAMS.row),
+        depth: num('depth', DEFAULT_SHAPE_PARAMS.depth),
+        emitFrom: num('emitFrom', DEFAULT_SHAPE_PARAMS.emitFrom) as BoxEmitFrom,
+        speed: anyShape.speed instanceof ConstantValue ? anyShape.speed.value : DEFAULT_SHAPE_PARAMS.speed,
         mesh: anyShape.mesh as Mesh | undefined,
     };
 }
@@ -102,6 +122,8 @@ export const SHAPE_PARAM_KEYS: {[K in ShapeType]: Array<keyof ShapeParams>} = {
     donut: ['radius', 'arc', 'thickness', 'donutRadius'],
     rectangle: ['width', 'height'],
     grid: ['width', 'height', 'column', 'row'],
+    box: ['width', 'height', 'depth'],
+    edge: ['radius', 'speed'],
     mesh_surface: [],
 };
 
@@ -164,6 +186,20 @@ export function createShape(type: ShapeType, params: ShapeParams): EmitterShape 
                 height: params.height,
                 column: params.column,
                 row: params.row,
+            });
+        case 'box':
+            return new BoxEmitter({
+                width: params.width,
+                height: params.height,
+                depth: params.depth,
+                emitFrom: params.emitFrom,
+            });
+        case 'edge':
+            return new EdgeEmitter({
+                radius: params.radius,
+                mode: params.mode,
+                spread: params.spread,
+                speed: new ConstantValue(params.speed),
             });
         case 'mesh_surface':
             return new MeshSurfaceEmitter(params.mesh);

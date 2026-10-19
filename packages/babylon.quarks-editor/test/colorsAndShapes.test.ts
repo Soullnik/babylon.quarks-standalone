@@ -1,4 +1,12 @@
-import {ColorOverLife, ConeEmitter, EmitterMode, GridEmitter, PointEmitter, SphereEmitter} from 'babylon.quarks';
+import {
+    BoxEmitFrom,
+    ColorOverLife,
+    ConeEmitter,
+    EmitterMode,
+    GridEmitter,
+    PointEmitter,
+    SphereEmitter,
+} from 'babylon.quarks';
 import {
     buildColorOverLife,
     buildGradient,
@@ -80,9 +88,14 @@ describe('shapes', () => {
             height: 4,
             column: 5,
             row: 6,
+            depth: 2.5,
+            emitFrom: BoxEmitFrom.Shell,
+            speed: 3,
             mode: EmitterMode.Loop,
             spread: 0.25,
         };
+        expect(readShapeParams(createShape('box', params)).emitFrom).toBe(BoxEmitFrom.Shell);
+        expect(readShapeParams(createShape('edge', params)).mode).toBe(EmitterMode.Loop);
         for (const type of Object.keys(SHAPE_PARAM_KEYS) as ShapeType[]) {
             if (type === 'mesh_surface') {
                 continue;
