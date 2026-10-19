@@ -1,3 +1,5 @@
+import {fogFragmentDeclarationGLSL, fogFragmentGLSL} from './chunks/fog';
+
 export default /* glsl */ `
 varying vec2 vUV;
 varying vec4 vColor;
@@ -85,6 +87,7 @@ varying float linearDepth;
 uniform float alphaTest;
 #endif
 
+${fogFragmentDeclarationGLSL}
 void main() {
     vec4 baseColor = vColor;
 
@@ -131,6 +134,7 @@ void main() {
     #endif
 #endif
 
+${fogFragmentGLSL('color')}
     gl_FragColor = vec4(color, baseColor.a);
 
 #ifdef SOFT_PARTICLES

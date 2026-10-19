@@ -43,7 +43,7 @@ export class TrailBatch extends VFXBatch {
     setupBuffers(): void {
         this.mesh.dispose();
         this.mesh = new Mesh('trailBatch', this.scene);
-        this.mesh.alwaysSelectAsActiveMesh = true;
+        this.configureMesh();
         this.buildGeometryBuffers();
     }
 
@@ -139,7 +139,7 @@ export class TrailBatch extends VFXBatch {
         // Stable name: the trail shader source never varies, so registering it once
         // keeps Effect.ShadersStore bounded and lets Babylon reuse compiled effects.
         const shaderName = 'quarksTrail';
-        const defines: string[] = [];
+        const defines: string[] = this.fogDefines();
 
         if (this.settings.texture) {
             defines.push('USE_MAP');
@@ -162,6 +162,7 @@ export class TrailBatch extends VFXBatch {
             'lineWidth',
             'resolution',
             'sizeAttenuation',
+            ...VFXBatch.FOG_UNIFORMS,
         ];
         const samplers: string[] = [];
 
@@ -203,6 +204,7 @@ export class TrailBatch extends VFXBatch {
             }
         });
 
+        this.bindFog(mat);
         mat.backFaceCulling = false;
 
         if (this.settings.materialTransparent) {

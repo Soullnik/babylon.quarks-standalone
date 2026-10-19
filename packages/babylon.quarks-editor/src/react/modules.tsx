@@ -195,6 +195,14 @@ export function MainModule({binding}: ModuleProps) {
             <Row label="Prewarm">
                 <CheckboxField value={system.prewarm} onChange={(v) => binding.apply((s) => (s.prewarm = v))} />
             </Row>
+            <Row label="Playback speed">
+                <NumberField
+                    value={system.playbackSpeed}
+                    step={0.1}
+                    min={0}
+                    onChange={(v) => binding.apply((s) => (s.playbackSpeed = Math.max(0, v)))}
+                />
+            </Row>
             <ValueField
                 label="Start delay"
                 generator={system.startDelay}
@@ -1203,6 +1211,17 @@ export function RendererModule({
                     step={1}
                     onChange={(v) => binding.apply((s) => (s.renderOrder = Math.round(v)))}
                 />
+            </Row>
+            <Row label="Rendering group">
+                <NumberField
+                    value={system.renderingGroupId}
+                    step={1}
+                    min={0}
+                    onChange={(v) => binding.apply((s) => (s.renderingGroupId = Math.max(0, Math.round(v))))}
+                />
+            </Row>
+            <Row label="Apply fog">
+                <CheckboxField value={system.applyFog} onChange={(v) => binding.apply((s) => (s.applyFog = v))} />
             </Row>
             <Row label="Soft particles">
                 <CheckboxField

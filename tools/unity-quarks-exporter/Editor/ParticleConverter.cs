@@ -56,6 +56,11 @@ namespace BabylonQuarks.UnityExporter
                 .Set("material", materialUuid)
                 .Set("layers", 1);
 
+            if (!Mathf.Approximately(main.simulationSpeed, 1f))
+            {
+                obj.Set("playbackSpeed", main.simulationSpeed);
+            }
+
             if (geometryUuid != null)
             {
                 obj.Set("instancingGeometry", geometryUuid);

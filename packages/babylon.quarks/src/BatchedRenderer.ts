@@ -57,6 +57,17 @@ export interface VFXBatchSettings {
     reflectionAtlas: BaseTexture | null;
     layerMask: number;
     /**
+     * Babylon rendering group (`mesh.renderingGroupId`) the batch draws in,
+     * 0 by default. Systems with different groups are batched apart.
+     */
+    renderingGroupId: number;
+    /**
+     * Whether the scene's fog applies to the particles, as it does to any other
+     * mesh; true by default. Additive particles fade toward black rather than
+     * the fog colour. Systems that differ are batched apart.
+     */
+    applyFog: boolean;
+    /**
      * Offset of billboard quads from their particle, in particle-size units
      * (Unity's renderer Pivot). On billboards x/y move the quad in its own plane
      * before it is rotated and z moves it toward the camera (up for horizontal
@@ -178,6 +189,8 @@ export class BatchedRenderer extends TransformNode {
             a.instancingGeometry === b.instancingGeometry &&
             a.renderOrder === b.renderOrder &&
             a.layerMask === b.layerMask &&
+            a.renderingGroupId === b.renderingGroupId &&
+            a.applyFog === b.applyFog &&
             pivotEqual(a.pivot, b.pivot) &&
             (a.lighting ?? 'fixed') === (b.lighting ?? 'fixed') &&
             meshRimEqual(a.rim, b.rim)

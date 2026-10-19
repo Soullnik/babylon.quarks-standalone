@@ -4,6 +4,30 @@ All notable changes to the `babylon.quarks` package are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project follows the `quarks.core` 0.x version line.
 
+## [Unreleased]
+
+### Added
+
+- `ParticleSystem.renderingGroupId` (constructor option, JSON `renderingGroupId`, written only when
+  not 0): the Babylon rendering group the batch mesh draws in. Systems with different groups are
+  batched apart.
+- `ParticleSystem.applyFog` (constructor option, JSON `applyFog`, written only when false): the
+  scene's fog now reaches the particles in every render mode, in GLSL and WGSL, the way it reaches
+  any other mesh. Additive blending fades toward black instead of the fog colour. Fog is bound from
+  the scene on every draw, so enabling or disabling it at runtime needs no recompile.
+- `ParticleSystem.playbackSpeed` (constructor option, JSON `playbackSpeed`, written only when
+  not 1): a multiplier on the time the system is advanced by — Unity's Simulation Speed. The
+  Unity exporter writes it from Main → Simulation Speed.
+- quarks.core `ApplySequences` is registered in `BehaviorTypes`, so an effect using it serialises
+  and loads like any other behavior.
+
+### Fixed
+
+- `renderOrder` now reaches the batch mesh as `alphaIndex`, so it orders the batch among the
+  scene's transparent meshes instead of only keying the batching; it used to have no effect on
+  what was drawn first. `layerMask` likewise now reaches the batch mesh — cameras with a
+  non-matching mask used to draw the particles anyway.
+
 ## [0.23.0] — 2026-10-18
 
 ### Changed

@@ -2,6 +2,12 @@
 
 All notable changes to the Unity Quarks Exporter are documented here.
 
+## [Unreleased]
+
+### Added
+
+- Main → Simulation Speed is exported as `playbackSpeed` (only when not 1).
+
 ## [0.23.0] — 2026-10-18
 
 ### Changed

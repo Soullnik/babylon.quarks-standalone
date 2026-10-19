@@ -75,7 +75,7 @@ export class SpriteBatch extends VFXBatch {
     setupBuffers(): void {
         this.mesh.dispose();
         this.mesh = new Mesh('spriteBatch', this.scene);
-        this.mesh.alwaysSelectAsActiveMesh = true;
+        this.configureMesh();
 
         const vertexData = new VertexData();
         vertexData.positions = this.settings.instancingGeometry;
@@ -161,7 +161,7 @@ export class SpriteBatch extends VFXBatch {
         // Effect.ShadersStore and defeat Babylon's compiled-effect cache.
         const shaderName = `quarksParticle_${this.settings.renderMode}`;
         this.lastStretchedSpeedFactor = Number.NaN;
-        const defines: string[] = [];
+        const defines: string[] = this.fogDefines();
 
         let vertexShader: ShaderSources;
         let fragmentShader: ShaderSources;
@@ -244,7 +244,7 @@ export class SpriteBatch extends VFXBatch {
             attributes.push('velocity');
         }
 
-        const uniforms = ['world', 'view', 'projection', 'worldView', 'worldViewProjection'];
+        const uniforms = ['world', 'view', 'projection', 'worldView', 'worldViewProjection', ...VFXBatch.FOG_UNIFORMS];
         const samplers: string[] = [];
 
         if (this.settings.uTileCount > 1 || this.settings.vTileCount > 1) {
@@ -372,6 +372,7 @@ export class SpriteBatch extends VFXBatch {
             }
         }
 
+        this.bindFog(mat);
         mat.backFaceCulling = false;
 
         if (this.settings.materialTransparent) {

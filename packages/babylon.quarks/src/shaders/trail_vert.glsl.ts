@@ -1,3 +1,5 @@
+import {fogVertexDeclarationGLSL, fogVertexGLSL} from './chunks/fog';
+
 export default /* glsl */ `
 attribute vec3 position;
 attribute vec3 previous;
@@ -22,6 +24,7 @@ vec2 fix(vec4 i, float aspect) {
     return res;
 }
 
+${fogVertexDeclarationGLSL}
 void main() {
     float aspect = resolution.x / resolution.y;
     vec4 finalPosition = projection * view * vec4(position, 1.0);
@@ -52,6 +55,7 @@ void main() {
     }
     finalPosition.xy += normal.xy * side;
     gl_Position = finalPosition;
+${fogVertexGLSL('(view * vec4(position, 1.0)).xyz')}
     vUV = uv;
     vColor = color;
 }

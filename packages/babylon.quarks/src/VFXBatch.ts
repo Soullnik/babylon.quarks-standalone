@@ -1,3 +1,4 @@
+import {Constants} from '@babylonjs/core/Engines/constants';
 import {BaseTexture} from '@babylonjs/core/Materials/Textures/baseTexture';
 import {ShaderMaterial} from '@babylonjs/core/Materials/shaderMaterial';
 import {Color3} from '@babylonjs/core/Maths/math.color';
@@ -130,6 +131,10 @@ export interface StoredBatchSettings {
     reflectionFaces: BaseTexture[] | null;
     reflectionAtlas: BaseTexture | null;
     layerMask: number;
+    /** Babylon rendering group the batch mesh draws in, see {@link VFXBatchSettings.renderingGroupId}. */
+    renderingGroupId: number;
+    /** Whether the scene's fog is applied, see {@link VFXBatchSettings.applyFog}. */
+    applyFog: boolean;
     /** Billboard pivot in particle-size units, see {@link VFXBatchSettings.pivot}. */
     pivot?: Vector3;
     /** Mesh particle lighting, see {@link VFXBatchSettings.lighting}. */
@@ -175,11 +180,67 @@ export abstract class VFXBatch {
             reflectionAtlas: settings.reflectionAtlas ?? null,
             pivot: settings.pivot?.clone(),
             layerMask: settings.layerMask,
+            renderingGroupId: settings.renderingGroupId ?? 0,
+            applyFog: settings.applyFog ?? true,
             lighting: settings.lighting,
             rim: normalizeMeshRim(settings.rim),
         };
         this.mesh = new Mesh('vfxBatch', scene);
-        this.mesh.alwaysSelectAsActiveMesh = true;
+        this.configureMesh();
+    }
+
+    /**
+     * Applies the batch-level scene settings to {@link mesh}. Called on every
+     * mesh the batch creates, since the buffers rebuild it.
+     *
+     * The bounds of a batch mesh are not kept, so Babylon cannot sort it among
+     * the scene's transparent meshes by distance; `alphaIndex` from the
+     * system's render order puts it where the author said, and the rendering
+     * group and layer mask reach the mesh at all (they used to stop at the
+     * settings).
+     */
+    protected configureMesh(): void {
+        const mesh = this.mesh;
+        mesh.alwaysSelectAsActiveMesh = true;
+        mesh.layerMask = this.settings.layerMask;
+        mesh.renderingGroupId = this.settings.renderingGroupId;
+        mesh.alphaIndex = this.settings.renderOrder;
+        // The shaders fog themselves; Babylon's own fog pass does not apply to a ShaderMaterial.
+        mesh.applyFog = false;
+    }
+
+    /**
+     * Fog defines and uniforms for a material of this batch, and the per-bind
+     * upload of the scene's current fog. Mode 0 (none) when the scene has fog
+     * disabled, so toggling fog at runtime needs no recompile.
+     */
+    protected static readonly FOG_UNIFORMS = ['vFogInfos', 'vFogColor'];
+
+    protected fogDefines(): string[] {
+        if (!this.settings.applyFog) {
+            return [];
+        }
+        const additive =
+            this.settings.materialTransparent &&
+            (this.settings.materialBlendMode === Constants.ALPHA_ADD ||
+                this.settings.materialBlendMode === Constants.ALPHA_ONEONE);
+        return additive ? ['FOG', 'FOG_ADDITIVE'] : ['FOG'];
+    }
+
+    protected bindFog(material: ShaderMaterial): void {
+        if (!this.settings.applyFog) {
+            return;
+        }
+        const scene = this.scene;
+        material.onBindObservable.add(() => {
+            const effect = material.getEffect();
+            if (!effect) {
+                return;
+            }
+            const mode = scene.fogEnabled ? scene.fogMode : Scene.FOGMODE_NONE;
+            effect.setFloat4('vFogInfos', mode, scene.fogStart, scene.fogEnd, scene.fogDensity);
+            effect.setColor3('vFogColor', scene.fogColor);
+        });
     }
 
     addSystem(system: IParticleSystem) {

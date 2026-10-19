@@ -1,3 +1,5 @@
+import {fogVertexDeclarationWGSL, fogVertexWGSL} from './chunks/fog';
+
 export default /* wgsl */ `
 attribute position: vec3f;
 attribute previous: vec3f;
@@ -22,6 +24,7 @@ fn fix(i: vec4f, aspect: f32) -> vec2f {
     return res;
 }
 
+${fogVertexDeclarationWGSL}
 @vertex
 fn main(input: VertexInputs) -> FragmentInputs {
     let aspect = uniforms.resolution.x / uniforms.resolution.y;
@@ -57,6 +60,7 @@ fn main(input: VertexInputs) -> FragmentInputs {
     finalPosition.y += normal.y * vertexInputs.side;
 
     vertexOutputs.position = finalPosition;
+${fogVertexWGSL('(uniforms.view * vec4f(vertexInputs.position, 1.0)).xyz')}
     vertexOutputs.vUV = vertexInputs.uv;
     vertexOutputs.vColor = vertexInputs.color;
 }

@@ -171,6 +171,12 @@ export interface ParticleSystemParameters {
     lighting?: MeshLighting;
     /** Rim (Fresnel) term on mesh particles, see {@link ParticleSystem.rim}. Default none. */
     rim?: Partial<MeshRim>;
+    /** Multiplier on the time the system is advanced by, see {@link ParticleSystem.playbackSpeed}. Default 1. */
+    playbackSpeed?: number;
+    /** Babylon rendering group of the batch, see {@link ParticleSystem.renderingGroupId}. Default 0. */
+    renderingGroupId?: number;
+    /** Whether the scene's fog applies, see {@link ParticleSystem.applyFog}. Default true. */
+    applyFog?: boolean;
     scene?: Scene;
 }
 
@@ -204,6 +210,12 @@ export interface ParticleSystemJSONParameters {
     instancingGeometry?: any;
     renderMode: number;
     renderOrder?: number;
+    /** Written only when not 0. */
+    renderingGroupId?: number;
+    /** Written only when false. */
+    applyFog?: boolean;
+    /** Written only when not 1. */
+    playbackSpeed?: number;
     speedFactor?: number;
     texture?: string;
     material?: string;
@@ -573,6 +585,41 @@ export class ParticleSystem implements IParticleSystem {
         this.neededToUpdateRender = true;
     }
 
+    /**
+     * Babylon rendering group the particles draw in (`mesh.renderingGroupId`),
+     * 0 by default. Use it to draw an effect after the scene's other transparent
+     * meshes, or before an overlay group.
+     */
+    get renderingGroupId(): number {
+        return this.rendererSettings.renderingGroupId;
+    }
+
+    set renderingGroupId(group: number) {
+        this.rendererSettings.renderingGroupId = group;
+        this.neededToUpdateRender = true;
+    }
+
+    /**
+     * Whether the scene's fog applies to the particles, as it does to any other
+     * mesh; true by default. Additive particles fade toward black rather than
+     * the fog colour. Saved in the effect JSON only when switched off.
+     */
+    get applyFog(): boolean {
+        return this.rendererSettings.applyFog;
+    }
+
+    set applyFog(apply: boolean) {
+        this.rendererSettings.applyFog = apply;
+        this.neededToUpdateRender = true;
+    }
+
+    /**
+     * Multiplier on the time this system is advanced by (Unity's Simulation
+     * Speed): 2 runs the effect twice as fast, 0 freezes it without pausing the
+     * renderer. 1 by default; saved in the effect JSON only when it differs.
+     */
+    playbackSpeed = 1;
+
     constructor(parameters: ParticleSystemParameters) {
         this.sceneRef = parameters.scene;
         this.layerMaskProxy = {mask: parameters.layerMask ?? 0x0fffffff};
@@ -641,10 +688,13 @@ export class ParticleSystem implements IParticleSystem {
             reflectionAtlas: null,
             layerMask: parameters.layerMask ?? 0x0fffffff,
             pivot: ParticleSystem.nonZeroPivot(parameters.pivot),
+            renderingGroupId: parameters.renderingGroupId ?? 0,
+            applyFog: parameters.applyFog ?? true,
             lighting: ParticleSystem.validLighting(parameters.lighting),
             rim: normalizeMeshRim(parameters.rim),
         };
         this.flip = ParticleSystem.nonZeroFlip(parameters.flip);
+        this.playbackSpeed = parameters.playbackSpeed ?? 1;
         if (this.rendererSettings.renderMode === RenderMode.Mesh && !this.rendererSettings.instancingNormals) {
             this.rendererSettings.instancingNormals = ParticleSystem.createFallbackNormals(
                 this.rendererSettings.instancingGeometry
@@ -1029,6 +1079,7 @@ export class ParticleSystem implements IParticleSystem {
     /** @internal */
     update(delta: number) {
         if (this.paused) return;
+        delta *= this.playbackSpeed;
 
         if (this.firstTimeUpdate) {
             this.firstTimeUpdate = false;
@@ -1719,6 +1770,9 @@ export class ParticleSystem implements IParticleSystem {
             instancingGeometry: geometryUUID,
             renderMode: this.renderMode,
             renderOrder: this.renderOrder,
+            ...(this.renderingGroupId !== 0 ? {renderingGroupId: this.renderingGroupId} : {}),
+            ...(this.applyFog ? {} : {applyFog: false}),
+            ...(this.playbackSpeed !== 1 ? {playbackSpeed: this.playbackSpeed} : {}),
             rendererEmitterSettings: rendererEmitterSettingsJSON,
             material: materialUUID,
             layers: this.rendererSettings.layerMask,
@@ -1817,6 +1871,9 @@ export class ParticleSystem implements IParticleSystem {
             renderMode: json.renderMode,
             rendererEmitterSettings,
             renderOrder: json.renderOrder,
+            renderingGroupId: typeof json.renderingGroupId === 'number' ? json.renderingGroupId : undefined,
+            applyFog: json.applyFog !== false,
+            playbackSpeed: typeof json.playbackSpeed === 'number' ? json.playbackSpeed : undefined,
             texture,
             material: materialMeta?.sourceMaterial ?? materialMeta,
             blendMode: materialMeta?.alphaMode ?? json.blending ?? Constants.ALPHA_ADD,
@@ -2074,6 +2131,9 @@ export class ParticleSystem implements IParticleSystem {
             instancingNormals: this.rendererSettings.instancingNormals,
             renderMode: this.renderMode,
             renderOrder: this.renderOrder,
+            renderingGroupId: this.renderingGroupId,
+            applyFog: this.applyFog,
+            playbackSpeed: this.playbackSpeed,
             rendererEmitterSettings,
             material: this.materialRef,
             texture: this.rendererSettings.texture,
