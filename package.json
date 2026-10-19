@@ -11,7 +11,7 @@
         "build": "npm run build:core && npm run build --workspace=babylon.quarks",
         "build:editor": "npm run build --workspace=babylon.quarks-editor",
         "build:examples": "npm run build --workspace=examples",
-        "test": "npm run test --workspace=quarks.core && npm run test --workspace=babylon.quarks",
+        "test": "npm run test --workspace=quarks.core && npm run test --workspace=babylon.quarks && npm run test --workspace=babylon.quarks-editor",
         "docs": "npm run docs --workspace=babylon.quarks",
         "capture:previews": "tsx ./scripts/capture-demo-previews.mts",
         "check:pack": "node ./scripts/check-pack-contents.mjs",
@@ -20,6 +20,7 @@
         "examples": "npm run dev --workspace=examples",
         "dev": "npm run examples",
         "validate:wgsl": "node ./scripts/validate-wgsl.mjs",
+        "check:demos": "node ./scripts/demo-smoke.mjs",
         "check:smoothness": "tsx ./scripts/smoothness-sweep.mts",
         "format": "prettier --write .",
         "format:check": "prettier --check ."

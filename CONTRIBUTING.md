@@ -44,10 +44,17 @@ npm run check        # build + tests + examples build + tarball content check
 Individual pieces:
 
 ```bash
-npm run test                                   # jest test suite
+npm run test                                   # jest suites: quarks.core, babylon.quarks, babylon.quarks-editor
 npm run test:coverage --workspace=babylon.quarks   # with coverage report
 npm run docs                                   # TypeDoc API docs
+npm run check:demos                            # every demo in headless Chromium, fails on page/console errors
+npm run validate:wgsl                          # every WGSL shader variant through a real WGSL compiler
 ```
+
+The last two need the examples served on port 3010 (`npm run dev -w examples`, or
+`npm run build:examples && npm run preview -w examples` for what CI runs) and a Chromium: Playwright's
+own (`npx playwright install chromium`) or one named in `CHROMIUM_PATH`. `check:demos --webgpu` also
+opens every demo under WebGPU and needs a real adapter; software adapters crash on texture uploads.
 
 Tests live in `packages/babylon.quarks/test` and coverage thresholds are enforced
 (see `jest.config.json` — 97% statements). New runtime code needs tests.

@@ -24,7 +24,8 @@
     ],
     "scripts": {
         "clean": "rimraf dist",
-        "build": "npm run clean && tsc -p tsconfig.json"
+        "build": "npm run clean && tsc -p tsconfig.json",
+        "test": "jest"
     },
     "repository": {
         "type": "git",
