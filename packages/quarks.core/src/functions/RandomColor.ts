@@ -1,5 +1,6 @@
 import {Vector4} from '../math';
 import {ColorToJSON, JSONToColor} from '../util/JSONUtil';
+import {random} from '../util/random';
 import {ColorGenerator} from './ColorGenerator';
 import {FunctionJSON} from './FunctionJSON';
 import {GeneratorMemory} from './GeneratorMemory';
@@ -15,7 +16,7 @@ export class RandomColor implements ColorGenerator {
     startGen(memory: GeneratorMemory): void {}
 
     genColor(memory: GeneratorMemory, color: Vector4): Vector4 {
-        const rand = Math.random();
+        const rand = random();
         return color.copy(this.a).lerp(this.b, rand);
     }
 

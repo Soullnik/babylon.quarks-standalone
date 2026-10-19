@@ -6,6 +6,8 @@ export * from 'quarks.core';
 export {BatchedParticleRenderer} from './BatchedParticleRenderer';
 export {BatchedRenderer} from './BatchedRenderer';
 export type {AdaptivePerformanceOptions, AdaptivePerformanceState, VFXBatchSettings} from './BatchedRenderer';
+export {EffectPool} from './EffectPool';
+export type {EffectPoolOptions} from './EffectPool';
 export {
     cacheEnvAtlas,
     createEnvAtlasFromFaceUrls,

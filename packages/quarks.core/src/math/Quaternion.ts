@@ -1,3 +1,4 @@
+import {random} from '../util/random';
 import {Euler} from './Euler';
 import * as MathUtils from './MathUtils';
 import {Matrix4} from './Matrix4';
@@ -530,10 +531,10 @@ class Quaternion {
         // Uniform random rotations
         // D. Kirk, editor, Graphics Gems III, pages 124-132. Academic Press, New York, 1992.
 
-        const theta1 = 2 * Math.PI * Math.random();
-        const theta2 = 2 * Math.PI * Math.random();
+        const theta1 = 2 * Math.PI * random();
+        const theta2 = 2 * Math.PI * random();
 
-        const x0 = Math.random();
+        const x0 = random();
         const r1 = Math.sqrt(1 - x0);
         const r2 = Math.sqrt(x0);
 

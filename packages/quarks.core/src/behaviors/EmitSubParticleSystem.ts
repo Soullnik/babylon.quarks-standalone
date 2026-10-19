@@ -2,6 +2,7 @@ import {EmissionState, IEmitter, IParticleSystem} from '../IParticleSystem';
 import {Matrix4, Quaternion, Vector3} from '../math';
 import {Particle} from '../Particle';
 import {ONE_VEC3, Z_VEC3} from '../util/MathUtil';
+import {random} from '../util/random';
 import {Behavior} from './Behavior';
 
 export enum SubParticleEmitMode {
@@ -31,7 +32,7 @@ export class EmitSubParticleSystem implements Behavior {
     private spareEmissions = new Array<SubEmissionState>();
 
     constructor(
-        private particleSystem: IParticleSystem,
+        public particleSystem: IParticleSystem,
         public useVelocityAsBasis: boolean,
         public subParticleSystem: IEmitter | undefined,
         public mode: SubParticleEmitMode = SubParticleEmitMode.Frame,
@@ -79,7 +80,7 @@ export class EmitSubParticleSystem implements Behavior {
 
     private emit(particle: Particle, delta: number) {
         if (!this.target) return;
-        if (Math.random() > this.emitProbability) {
+        if (random() > this.emitProbability) {
             return;
         }
         const spare = this.spareEmissions.pop();

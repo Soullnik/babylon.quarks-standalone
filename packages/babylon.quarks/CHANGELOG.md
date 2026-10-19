@@ -34,13 +34,39 @@ and the project follows the `quarks.core` 0.x version line.
   emitter targets are never culled; `BatchedRenderer.cullingEnabled = false` turns the test off.
   With 400 systems in a ring around the camera and three quarters of them out of view, a frame goes
   from 9.6 ms to 1.6 ms. The Unity exporter writes Pause and Pause And Catch-up.
+- Deterministic randomness. Every roll the simulation makes now goes through quarks.core's
+  `random()`, whose source is replaceable: `setRandomSource(createSeededRandom(seed))` makes a whole
+  scene reproducible, `withRandomSource` scopes it, and `getRandomSource` reads it back. The noise
+  generators are seeded by slot, so a Noise behavior looks the same on every run. UUIDs keep using
+  `Math.random`.
+- `ParticleSystem.seed` (constructor option, JSON `seed`, written only when set): the system rolls
+  on its own generator started from the seed while it steps, and restarts it on `restart()`, so the
+  effect plays out identically every time; systems it emits into roll on it too. The editor has a
+  "Fixed seed" field; the Unity exporter writes Main → Random Seed when Auto Random Seed is off.
+- `EffectPool`: a pool of copies of one effect for things played many times over. `acquire(position,
+  parent)` takes an idle copy (or makes one, up to `maxSize`), places it and plays it; a copy whose
+  systems have all finished returns to the pool by itself; `stop(copy)` ends a looping copy's
+  emission and lets it die out first; `release(copy)` takes it back at once; `prewarm` makes copies
+  up front. Idle copies stay disabled in the renderer's batches, so acquiring allocates nothing.
+- `QuarksUtil.instantiate(root)`: a deep copy of an effect tree, with sub emitter links pointing at
+  the copied emitters.
 - `BatchedRenderer.simulationBudgetMs` (unlimited by default): once a frame's simulation has taken
   this long, the systems still to be advanced run one step instead of catching up on the long
   frame, and the time the skipped steps would have covered is dropped — so a frame that already ran
   long cannot make the next one longer still.
 
+### Changed
+
+- `ParticleSystem.isFinished()` is true for a looping system whose emission was ended with
+  `endEmit()` once its particles are gone, and for a sub emitter target whenever it is empty,
+  looping or not; `finished` fires accordingly. `QuarksUtil.isEffectFinished` follows, so an effect
+  with looping systems is finished after `endEmit` rather than never.
+
 ### Fixed
 
+- `ParticleSystem.clone()` left cloned `EmitSubParticleSystem` behaviors transforming by the
+  original system's emitter; they now follow the clone. `ParticleEmitter.clone()` no longer
+  disables the clone itself when only an ancestor of the original was disabled.
 - `renderOrder` now reaches the batch mesh as `alphaIndex`, so it orders the batch among the
   scene's transparent meshes instead of only keying the batching; it used to have no effect on
   what was drawn first. `layerMask` likewise now reaches the batch mesh — cameras with a

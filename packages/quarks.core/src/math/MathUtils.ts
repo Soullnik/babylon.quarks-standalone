@@ -1,3 +1,4 @@
+import {random} from '../util/random';
 import {EulerOrder} from './Euler';
 import {Quaternion} from './Quaternion';
 
@@ -357,17 +358,17 @@ function smootherstep(x: number, min: number, max: number) {
 
 // Random integer from <low, high> interval
 function randInt(low: number, high: number) {
-    return low + Math.floor(Math.random() * (high - low + 1));
+    return low + Math.floor(random() * (high - low + 1));
 }
 
 // Random float from <low, high> interval
 function randFloat(low: number, high: number) {
-    return low + Math.random() * (high - low);
+    return low + random() * (high - low);
 }
 
 // Random float from <-range/2, range/2> interval
 function randFloatSpread(range: number) {
-    return range * (0.5 - Math.random());
+    return range * (0.5 - random());
 }
 
 // Deterministic pseudo-random float in the interval [ 0, 1 ]

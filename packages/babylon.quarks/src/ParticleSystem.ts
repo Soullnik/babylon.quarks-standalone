@@ -10,7 +10,9 @@ import {
     ColorGeneratorFromJSON,
     ConstantColor,
     ConstantValue,
+    createSeededRandom,
     EmissionState,
+    EmitSubParticleSystem,
     EmitterFromJSON,
     EmitterShape,
     FunctionColorGenerator,
@@ -28,9 +30,12 @@ import {
     ParticleSystemEventType,
     planBehaviorFusion,
     Quaternion,
+    random,
+    RandomSource,
     RendererEmitterSettings,
     RotationGenerator,
     SerializationOptions,
+    setRandomSource,
     SphereEmitter,
     SpriteParticle,
     StretchedBillBoardSettings,
@@ -197,6 +202,8 @@ export interface ParticleSystemParameters {
     playbackSpeed?: number;
     /** What the system does while off screen, see {@link CullingMode}. Default `'always'`. */
     cullingMode?: CullingMode;
+    /** Seed for this system's own random generator, see {@link ParticleSystem.seed}. Default none. */
+    seed?: number;
     /** Babylon rendering group of the batch, see {@link ParticleSystem.renderingGroupId}. Default 0. */
     renderingGroupId?: number;
     /** Whether the scene's fog applies, see {@link ParticleSystem.applyFog}. Default true. */
@@ -242,6 +249,8 @@ export interface ParticleSystemJSONParameters {
     playbackSpeed?: number;
     /** Written only when not `'always'`. */
     cullingMode?: CullingMode;
+    /** Written only when set. */
+    seed?: number;
     speedFactor?: number;
     texture?: string;
     material?: string;
@@ -392,16 +401,22 @@ export class ParticleSystem implements IParticleSystem {
         return this.emissionOverDistance.genValue(this.memory, timeRatio) > 0;
     }
 
-    /** Non-looping system with no particles left and nothing left to emit. */
+    /**
+     * No particles left and nothing left to emit: a non-looping system that
+     * ran its course, or a looping one whose emission was ended with
+     * {@link endEmit} and whose last particle has died.
+     */
     isFinished(): boolean {
-        if (this.looping) {
-            return false;
-        }
         if (this.particleNum > 0) {
             return false;
         }
+        // A sub emitter target emits nothing of its own: empty is finished,
+        // looping or not. Its parent decides when the effect is done.
         if (this.onlyUsedByOther) {
             return true;
+        }
+        if (this.looping) {
+            return this.emitEnded;
         }
         return !this.hasPendingEmission();
     }
@@ -653,6 +668,32 @@ export class ParticleSystem implements IParticleSystem {
     /** What this system does while off screen, see {@link CullingMode}. `'always'` by default. */
     cullingMode: CullingMode = 'always';
 
+    private seedValue?: number;
+    /** The system's own generator while it steps, when seeded; see {@link seed}. */
+    private rng?: RandomSource;
+
+    /**
+     * Seed for this system's own random generator. Set, every roll the system
+     * makes while it steps (spawn positions, interval values, random colours
+     * and rotations, burst probability) comes from a generator started from
+     * this seed, and restarted with it on {@link restart}: the effect plays out
+     * identically every time, on every machine — for replays, lock-step
+     * multiplayer and reproducible tests. Systems this one emits into roll on
+     * its generator too. Unset (the default), rolls come from the global source
+     * (`setRandomSource` in quarks.core). Saved in the effect JSON when set.
+     *
+     * Not covered: randomness outside the step, such as a `TurbulenceField`'s
+     * offsets, which are rolled when the behavior is created.
+     */
+    get seed(): number | undefined {
+        return this.seedValue;
+    }
+
+    set seed(seed: number | undefined) {
+        this.seedValue = seed;
+        this.rng = seed === undefined ? undefined : createSeededRandom(seed);
+    }
+
     /**
      * Set by the renderer each frame: true while no active camera sees the
      * system's bounds and its {@link cullingMode} is not `'always'`.
@@ -766,6 +807,7 @@ export class ParticleSystem implements IParticleSystem {
         this.flip = ParticleSystem.nonZeroFlip(parameters.flip);
         this.playbackSpeed = parameters.playbackSpeed ?? 1;
         this.cullingMode = parameters.cullingMode ?? 'always';
+        this.seed = parameters.seed;
         if (this.rendererSettings.renderMode === RenderMode.Mesh && !this.rendererSettings.instancingNormals) {
             this.rendererSettings.instancingNormals = ParticleSystem.createFallbackNormals(
                 this.rendererSettings.instancingGeometry
@@ -1058,8 +1100,7 @@ export class ParticleSystem implements IParticleSystem {
                     // renderer never carries a recycled particle's old spin.
                     sprite.angularVelocity = 0;
                     const flip = this.flip;
-                    sprite.flip =
-                        flip === undefined ? 0 : (Math.random() < flip.x ? 1 : 0) | (Math.random() < flip.y ? 2 : 0);
+                    sprite.flip = flip === undefined ? 0 : (random() < flip.x ? 1 : 0) | (random() < flip.y ? 2 : 0);
                 }
             } else if (trailSettings) {
                 const trail = particle as TrailParticle;
@@ -1126,6 +1167,10 @@ export class ParticleSystem implements IParticleSystem {
         this.particleNum = 0;
         this.boundsValid = false;
         this.pendingCatchUp = 0;
+        if (this.seedValue !== undefined) {
+            // The same seed again, so a restart replays the same effect.
+            this.rng = createSeededRandom(this.seedValue);
+        }
         this.emissionState.isBursting = false;
         this.emissionState.burstIndex = 0;
         this.emissionState.burstWaveIndex = 0;
@@ -1490,8 +1535,25 @@ export class ParticleSystem implements IParticleSystem {
         return this.fusionSteps;
     }
 
-    /** Advances emission, behaviors, motion and culling by one fixed timestep. */
+    /**
+     * Advances emission, behaviors, motion and culling by one fixed timestep,
+     * on the system's own random generator when it has a {@link seed}.
+     */
     private simulateStep(delta: number): void {
+        const rng = this.rng;
+        if (rng === undefined) {
+            this.stepOnce(delta);
+            return;
+        }
+        const previous = setRandomSource(rng);
+        try {
+            this.stepOnce(delta);
+        } finally {
+            setRandomSource(previous);
+        }
+    }
+
+    private stepOnce(delta: number): void {
         if (!this.onlyUsedByOther) {
             this.emit(delta, this.emissionState, this.emitter.matrixWorld);
         }
@@ -1859,7 +1921,7 @@ export class ParticleSystem implements IParticleSystem {
 
     /** Spawns one wave of `burst`, if its probability roll passes. */
     private fireBurstWave(burst: BurstParameters, emissionState: EmissionState, emitterMatrix: Matrix4): void {
-        if (Math.random() >= burst.probability) {
+        if (random() >= burst.probability) {
             return;
         }
         const rawCount = burst.count.genValue(this.memory, this.time);
@@ -2068,6 +2130,7 @@ export class ParticleSystem implements IParticleSystem {
             ...(this.applyFog ? {} : {applyFog: false}),
             ...(this.playbackSpeed !== 1 ? {playbackSpeed: this.playbackSpeed} : {}),
             ...(this.cullingMode !== 'always' ? {cullingMode: this.cullingMode} : {}),
+            ...(this.seedValue !== undefined ? {seed: this.seedValue} : {}),
             rendererEmitterSettings: rendererEmitterSettingsJSON,
             material: materialUUID,
             layers: this.rendererSettings.layerMask,
@@ -2170,6 +2233,7 @@ export class ParticleSystem implements IParticleSystem {
             applyFog: json.applyFog !== false,
             playbackSpeed: typeof json.playbackSpeed === 'number' ? json.playbackSpeed : undefined,
             cullingMode: ParticleSystem.validCullingMode(json.cullingMode),
+            seed: typeof json.seed === 'number' ? json.seed : undefined,
             texture,
             material: materialMeta?.sourceMaterial ?? materialMeta,
             blendMode: materialMeta?.alphaMode ?? json.blending ?? Constants.ALPHA_ADD,
@@ -2404,7 +2468,7 @@ export class ParticleSystem implements IParticleSystem {
             rendererEmitterSettings = {};
         }
 
-        return new ParticleSystem({
+        const copy = new ParticleSystem({
             autoDestroy: this.autoDestroy,
             looping: this.looping,
             prewarm: this.prewarm,
@@ -2431,6 +2495,7 @@ export class ParticleSystem implements IParticleSystem {
             applyFog: this.applyFog,
             playbackSpeed: this.playbackSpeed,
             cullingMode: this.cullingMode,
+            seed: this.seedValue,
             rendererEmitterSettings,
             material: this.materialRef,
             texture: this.rendererSettings.texture,
@@ -2455,5 +2520,13 @@ export class ParticleSystem implements IParticleSystem {
             rim: this.rim,
             scene: this.emitter.getScene(),
         });
+        // A sub emitter behavior transforms by its parent system's emitter;
+        // the cloned behaviors still pointed at this one.
+        for (const behavior of newBehaviors) {
+            if (behavior instanceof EmitSubParticleSystem) {
+                behavior.particleSystem = copy;
+            }
+        }
+        return copy;
     }
 }

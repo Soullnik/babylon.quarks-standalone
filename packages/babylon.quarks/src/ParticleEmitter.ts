@@ -83,7 +83,8 @@ export class ParticleEmitter extends TransformNode {
         if (this.rotationQuaternion) {
             clonedEmitter.rotationQuaternion = this.rotationQuaternion.clone();
         }
-        clonedEmitter.setEnabled(this.isEnabled());
+        // Its own flag only: a clone of an emitter under a disabled parent is not itself disabled.
+        clonedEmitter.setEnabled(this.isEnabled(false));
         return clonedEmitter;
     }
 

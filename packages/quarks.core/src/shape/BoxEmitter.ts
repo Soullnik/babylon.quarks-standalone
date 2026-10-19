@@ -1,5 +1,6 @@
 import {EmissionState, IParticleSystem} from '../IParticleSystem';
 import {Particle} from '../Particle';
+import {random} from '../util/random';
 import {EmitterShape, ShapeJSON} from './EmitterUtil';
 
 /**
@@ -60,10 +61,10 @@ export class BoxEmitter implements EmitterShape {
     initialize(p: Particle, _emissionState: EmissionState) {
         const point = this._point;
         for (let axis = 0; axis < 3; axis++) {
-            point[axis] = Math.random() * 2 - 1;
+            point[axis] = random() * 2 - 1;
         }
         // Unity picks the face (or the edge direction) evenly per axis rather than by area.
-        const axis = Math.floor(Math.random() * 3) % 3;
+        const axis = Math.floor(random() * 3) % 3;
         if (this.emitFrom === BoxEmitFrom.Shell) {
             point[axis] = this.onSurface(axis);
         } else if (this.emitFrom === BoxEmitFrom.Edge) {
@@ -81,12 +82,12 @@ export class BoxEmitter implements EmitterShape {
      * 2 × thickness of the half-size into the box.
      */
     private onSurface(axis: number): number {
-        const side = Math.random() < 0.5 ? -1 : 1;
+        const side = random() < 0.5 ? -1 : 1;
         const thickness = this.boxThickness[axis];
-        if (thickness <= 0 || Math.random() < 0.5) {
+        if (thickness <= 0 || random() < 0.5) {
             return side;
         }
-        return side * (1 - 2 * thickness * Math.random());
+        return side * (1 - 2 * thickness * random());
     }
 
     toJSON(): ShapeJSON {

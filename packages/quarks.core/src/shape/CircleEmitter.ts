@@ -8,6 +8,7 @@ import {
 import {EmissionState, IParticleSystem} from '../IParticleSystem';
 import {MathUtils} from '../math';
 import {Particle} from '../Particle';
+import {random} from '../util/random';
 import {EmitterMode, EmitterShape, getValueFromEmitterMode, ShapeJSON} from './EmitterUtil';
 import {ShapeTransform} from './ShapeTransform';
 /**
@@ -82,13 +83,13 @@ export class CircleEmitter implements EmitterShape {
 
     initialize(p: Particle, emissionState: EmissionState) {
         const u = getValueFromEmitterMode(this.mode, this.currentValue, this.spread, emissionState);
-        const r = MathUtils.lerp(1 - this.thickness, 1, Math.random());
+        const r = MathUtils.lerp(1 - this.thickness, 1, random());
         const theta = u * this.arc;
         p.position.x = Math.cos(theta);
         p.position.y = Math.sin(theta);
         p.position.z = 0;
         p.velocity.copy(p.position).multiplyScalar(p.startSpeed);
-        //const v = Math.random();
+        //const v = random();
         p.position.multiplyScalar(this.radius * r);
         this.transform?.apply(p);
     }

@@ -1,6 +1,7 @@
 import {Particle} from '../Particle';
 import {ValueGenerator, ValueGeneratorFromJSON} from '../functions/ValueGenerator';
 import {Quaternion, Vector3} from '../math';
+import {random} from '../util/random';
 import {Behavior} from './Behavior';
 /**
  * Change the emit direction of particles.
@@ -26,7 +27,7 @@ export class ChangeEmitDirection implements Behavior {
         this._q.setFromAxisAngle(this._temp.normalize(), this.angle.genValue(this.memory));
         this._temp.copy(particle.velocity);
         particle.velocity.applyQuaternion(this._q);
-        this._q.setFromAxisAngle(this._temp, Math.random() * Math.PI * 2);
+        this._q.setFromAxisAngle(this._temp, random() * Math.PI * 2);
         particle.velocity.applyQuaternion(this._q);
         particle.velocity.setLength(len);
     }

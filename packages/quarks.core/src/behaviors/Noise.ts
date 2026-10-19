@@ -15,7 +15,8 @@ const tempQ = new Quaternion();
 function getGenerator(index: number): SimplexNoise {
     let generator = generators[index];
     if (generator === undefined) {
-        generator = new SimplexNoise();
+        // Seeded by slot, so the same effect looks the same on every run.
+        generator = new SimplexNoise(index);
         generators[index] = generator;
     }
     return generator;

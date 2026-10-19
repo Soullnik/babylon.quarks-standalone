@@ -2,6 +2,7 @@ import {Particle} from '../Particle';
 import {ParticleStore} from '../ParticleStore';
 import {Vector3} from '../math';
 import SimplexNoise from '../util/SimplexNoise';
+import {random} from '../util/random';
 import {Behavior} from './Behavior';
 
 /**
@@ -9,7 +10,7 @@ import {Behavior} from './Behavior';
  */
 export class TurbulenceField implements Behavior {
     type = 'TurbulenceField';
-    generator = new SimplexNoise();
+    generator = new SimplexNoise(random);
     timeOffset = new Vector3();
     temp = new Vector3();
     temp2 = new Vector3();
@@ -20,9 +21,9 @@ export class TurbulenceField implements Behavior {
         public velocityMultiplier: Vector3,
         public timeScale: Vector3
     ) {
-        this.timeOffset.x = (Math.random() / this.scale.x) * this.timeScale.x;
-        this.timeOffset.y = (Math.random() / this.scale.y) * this.timeScale.y;
-        this.timeOffset.z = (Math.random() / this.scale.z) * this.timeScale.z;
+        this.timeOffset.x = (random() / this.scale.x) * this.timeScale.x;
+        this.timeOffset.y = (random() / this.scale.y) * this.timeScale.y;
+        this.timeOffset.z = (random() / this.scale.z) * this.timeScale.z;
     }
 
     initialize(particle: Particle): void {}

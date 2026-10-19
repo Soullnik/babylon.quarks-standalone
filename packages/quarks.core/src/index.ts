@@ -8,5 +8,5 @@ export * from './ParticleStore';
 export * from './Plugin';
 export * from './sequencers/';
 export * from './shape/';
-//export * from './util/';
 export * from './TypeUtil';
+export * from './util/random';

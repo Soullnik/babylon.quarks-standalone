@@ -9,6 +9,7 @@ import {EmissionState, IParticleSystem} from '../IParticleSystem';
 import {Matrix4, Quaternion} from '../math';
 import {Particle} from '../Particle';
 import {UP_VEC3, ZERO_VEC3} from '../util/MathUtil';
+import {random} from '../util/random';
 import {EmitterMode, EmitterShape, getValueFromEmitterMode, ShapeJSON} from './EmitterUtil';
 import {ShapeTransform} from './ShapeTransform';
 
@@ -88,7 +89,7 @@ export class RectangleEmitter implements EmitterShape {
 
     initialize(p: Particle, emissionState: EmissionState) {
         const u = getValueFromEmitterMode(this.mode, this.currentValue, this.spread, emissionState);
-        const v = Math.random();
+        const v = random();
 
         // Calculate perimeter points
         const totalPerimeter = 2 * (this.width + this.height);
@@ -115,7 +116,7 @@ export class RectangleEmitter implements EmitterShape {
         }
 
         // Apply thickness - lerp from edge point toward center
-        const rand = Math.random();
+        const rand = random();
         const thicknessScale = 1 - this.thickness * rand;
         p.position.x = x * thicknessScale;
         p.position.y = y * thicknessScale;

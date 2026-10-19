@@ -7,6 +7,7 @@ All notable changes to the Unity Quarks Exporter are documented here.
 ### Added
 
 - Main → Simulation Speed is exported as `playbackSpeed` (only when not 1).
+- Main → Random Seed is exported as `seed` when Auto Random Seed is off.
 - Main → Culling Mode: Pause and Pause And Catch-up are exported as `cullingMode` (`pause`,
   `pauseAndCatchUp`); Automatic and Always Simulate keep the runtime's default of always
   simulating.

@@ -9,6 +9,7 @@ import {EmissionState, IParticleSystem} from '../IParticleSystem';
 import {MathUtils, Matrix4, Quaternion} from '../math';
 import {Particle} from '../Particle';
 import {UP_VEC3, ZERO_VEC3} from '../util/MathUtil';
+import {random} from '../util/random';
 import {EmitterMode, EmitterShape, getValueFromEmitterMode, ShapeJSON} from './EmitterUtil';
 import {ShapeTransform} from './ShapeTransform';
 /**
@@ -84,8 +85,8 @@ export class HemisphereEmitter implements EmitterShape {
 
     initialize(p: Particle, emissionState: EmissionState) {
         const u = getValueFromEmitterMode(this.mode, this.currentValue, this.spread, emissionState);
-        const v = Math.random();
-        const rand = MathUtils.lerp(1 - this.thickness, 1, Math.random());
+        const v = random();
+        const rand = MathUtils.lerp(1 - this.thickness, 1, random());
         const theta = u * this.arc;
         const phi = Math.acos(v);
         //const r = Math.cbrt(rand);

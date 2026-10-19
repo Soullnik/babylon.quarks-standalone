@@ -203,6 +203,20 @@ export function MainModule({binding}: ModuleProps) {
                     onChange={(v) => binding.apply((s) => (s.playbackSpeed = Math.max(0, v)))}
                 />
             </Row>
+            <Row label="Fixed seed">
+                <CheckboxField
+                    value={system.seed !== undefined}
+                    onChange={(v) => binding.apply((s) => (s.seed = v ? (s.seed ?? 1) : undefined))}
+                />
+                {system.seed !== undefined && (
+                    <NumberField
+                        value={system.seed}
+                        step={1}
+                        min={0}
+                        onChange={(v) => binding.apply((s) => (s.seed = Math.max(0, Math.floor(v))))}
+                    />
+                )}
+            </Row>
             <Row label="Off screen">
                 <SelectField
                     value={system.cullingMode}

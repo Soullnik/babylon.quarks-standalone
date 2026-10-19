@@ -1,6 +1,6 @@
 import {VertexBuffer} from '@babylonjs/core/Buffers/buffer';
 import {Mesh} from '@babylonjs/core/Meshes/mesh';
-import {EmitterShape, IParticleSystem, Particle, Plugin, ShapeJSON, ShapeTransform, Vector3} from 'quarks.core';
+import {EmitterShape, IParticleSystem, Particle, Plugin, random, ShapeJSON, ShapeTransform, Vector3} from 'quarks.core';
 
 export class MeshSurfaceEmitter implements EmitterShape {
     type = 'mesh_surface';
@@ -72,7 +72,7 @@ export class MeshSurfaceEmitter implements EmitterShape {
         const triCount = this._triangleIndexToArea.length - 1;
         let left = 0,
             right = triCount;
-        const target = Math.random() * this._triangleIndexToArea[triCount];
+        const target = random() * this._triangleIndexToArea[triCount];
 
         while (left + 1 < right) {
             const mid = Math.floor((left + right) / 2);
@@ -83,8 +83,8 @@ export class MeshSurfaceEmitter implements EmitterShape {
             }
         }
 
-        let u1 = Math.random();
-        let u2 = Math.random();
+        let u1 = random();
+        let u2 = random();
         if (u1 + u2 > 1) {
             u1 = 1 - u1;
             u2 = 1 - u2;

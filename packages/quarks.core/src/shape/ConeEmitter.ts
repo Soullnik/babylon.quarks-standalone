@@ -8,6 +8,7 @@ import {
 import {EmissionState, IParticleSystem} from '../IParticleSystem';
 import {MathUtils} from '../math';
 import {Particle} from '../Particle';
+import {random} from '../util/random';
 import {EmitterMode, EmitterShape, getValueFromEmitterMode, ShapeJSON} from './EmitterUtil';
 import {ShapeTransform} from './ShapeTransform';
 
@@ -87,7 +88,7 @@ export class ConeEmitter implements EmitterShape {
 
     initialize(p: Particle, emissionState: EmissionState) {
         const u = getValueFromEmitterMode(this.mode, this.currentValue, this.spread, emissionState);
-        const rand = MathUtils.lerp(1 - this.thickness, 1, Math.random());
+        const rand = MathUtils.lerp(1 - this.thickness, 1, random());
         const theta = u * this.arc;
         const r = Math.sqrt(rand);
         const sinTheta = Math.sin(theta);
@@ -98,7 +99,7 @@ export class ConeEmitter implements EmitterShape {
 
         const angle = this.angle * r;
         p.velocity.set(0, 0, Math.cos(angle)).addScaledVector(p.position, Math.sin(angle)).multiplyScalar(p.startSpeed);
-        //const v = Math.random();
+        //const v = random();
         p.position.multiplyScalar(this.radius);
         this.transform?.apply(p);
     }

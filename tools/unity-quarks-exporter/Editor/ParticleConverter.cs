@@ -60,6 +60,10 @@ namespace BabylonQuarks.UnityExporter
             {
                 obj.Set("playbackSpeed", main.simulationSpeed);
             }
+            if (!ps.useAutoRandomSeed)
+            {
+                obj.Set("seed", ps.randomSeed);
+            }
             // Automatic and Always Simulate both keep simulating off screen, the runtime's default.
             switch (main.cullingMode)
             {

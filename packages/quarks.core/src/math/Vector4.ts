@@ -1,3 +1,4 @@
+import {random} from '../util/random';
 import {Matrix3} from './Matrix3';
 import {Matrix4} from './Matrix4';
 import {Quaternion} from './Quaternion';
@@ -518,10 +519,10 @@ class Vector4 {
     }*/
 
     random() {
-        this.x = Math.random();
-        this.y = Math.random();
-        this.z = Math.random();
-        this.w = Math.random();
+        this.x = random();
+        this.y = random();
+        this.z = random();
+        this.w = random();
 
         return this;
     }

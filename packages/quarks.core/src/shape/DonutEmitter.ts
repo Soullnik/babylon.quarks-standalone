@@ -9,6 +9,7 @@ import {EmissionState, IParticleSystem} from '../IParticleSystem';
 import {MathUtils, Matrix4, Quaternion} from '../math';
 import {Particle} from '../Particle';
 import {UP_VEC3, ZERO_VEC3} from '../util/MathUtil';
+import {random} from '../util/random';
 import {EmitterMode, EmitterShape, getValueFromEmitterMode, ShapeJSON} from './EmitterUtil';
 import {ShapeTransform} from './ShapeTransform';
 
@@ -91,8 +92,8 @@ export class DonutEmitter implements EmitterShape {
 
     initialize(p: Particle, emissionState: EmissionState) {
         const u = getValueFromEmitterMode(this.mode, this.currentValue, this.spread, emissionState);
-        const v = Math.random();
-        const rand = MathUtils.lerp(1 - this.thickness, 1, Math.random());
+        const v = random();
+        const rand = MathUtils.lerp(1 - this.thickness, 1, random());
         const theta = u * this.arc;
         const phi = v * Math.PI * 2;
         //const r = Math.sqrt(rand);
@@ -112,7 +113,7 @@ export class DonutEmitter implements EmitterShape {
 
         //const angle = this.angle * r;
         //p.velocity.set(0, 0, Math.cos(angle)).addScaledVector(p.position, Math.sin(angle)).multiplyScalar(p.startSpeed);
-        //const v = Math.random();
+        //const v = random();
 
         //.multiplyScalar(this.radius);
         // Default facing-velocity orientation, but defer to startRotation if set.
