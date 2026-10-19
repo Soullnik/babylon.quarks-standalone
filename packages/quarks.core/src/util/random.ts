@@ -14,16 +14,17 @@
 /** A generator in the shape of `Math.random`: uniform in [0, 1). */
 export type RandomSource = () => number;
 
-let source: RandomSource = Math.random;
+/** Null means `Math.random`, looked up on every roll so a test that replaces it is honoured. */
+let source: RandomSource | null = null;
 
 /** Uniform random number in [0, 1) from the current source. */
 export function random(): number {
-    return source();
+    return source === null ? Math.random() : source();
 }
 
 /** The generator {@link random} currently draws from. */
 export function getRandomSource(): RandomSource {
-    return source;
+    return source ?? Math.random;
 }
 
 /**
@@ -31,8 +32,8 @@ export function getRandomSource(): RandomSource {
  * Returns the previous source, so a caller can put it back.
  */
 export function setRandomSource(next: RandomSource | null): RandomSource {
-    const previous = source;
-    source = next ?? Math.random;
+    const previous = getRandomSource();
+    source = next;
     return previous;
 }
 

@@ -74,6 +74,32 @@ namespace BabylonQuarks.UnityExporter
                     obj.Set("cullingMode", "pauseAndCatchUp");
                     break;
             }
+            switch (renderer.sortMode)
+            {
+                case ParticleSystemSortMode.Distance:
+                case ParticleSystemSortMode.Depth:
+                    obj.Set("sortMode", "distance");
+                    break;
+                case ParticleSystemSortMode.OldestInFront:
+                    obj.Set("sortMode", "oldestInFront");
+                    break;
+                case ParticleSystemSortMode.YoungestInFront:
+                    obj.Set("sortMode", "youngestInFront");
+                    break;
+            }
+            // Unity's screen-size limits (fractions of the viewport) only apply to billboards; the
+            // runtime's default is unlimited, so Unity's default maximum of 0.5 is written out.
+            if (renderMode != 2 && renderMode != 3)
+            {
+                if (renderer.minParticleSize > 0f)
+                {
+                    obj.Set("minParticleSize", renderer.minParticleSize);
+                }
+                if (renderer.maxParticleSize < 1f)
+                {
+                    obj.Set("maxParticleSize", renderer.maxParticleSize);
+                }
+            }
 
             if (geometryUuid != null)
             {

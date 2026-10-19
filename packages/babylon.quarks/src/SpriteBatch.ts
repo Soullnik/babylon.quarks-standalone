@@ -17,6 +17,7 @@ import {
     Vector3,
 } from 'quarks.core';
 import {VFXBatchSettings} from './BatchedRenderer';
+import {gather, sortByKey, SortScratch} from './instanceSort';
 import local_particle_physics_vert from './shaders/local_particle_physics_vert.glsl';
 import local_particle_physics_vert_wgsl from './shaders/local_particle_physics_vert.wgsl';
 import particle_frag from './shaders/particle_frag.glsl';
@@ -153,6 +154,113 @@ export class SpriteBatch extends VFXBatch {
         }
         this.disposeExpandableBuffers();
         this.buildExpandableBuffers();
+        this.sortScratch = undefined;
+        this.gatherScratch.length = 0;
+    }
+
+    /** The screen-size limits as a uniform value, or null when the batch has none that apply. */
+    private sizeLimits(): BVector2 | null {
+        const {minParticleSize, maxParticleSize} = this.settings;
+        if (!SpriteBatch.takesPivotAndFlip(this.settings.renderMode)) {
+            return null;
+        }
+        if (minParticleSize <= 0 && maxParticleSize === Infinity) {
+            return null;
+        }
+        // The shader clamps; an unlimited maximum is just a very large one.
+        return new BVector2(Math.max(0, minParticleSize), Math.min(maxParticleSize, 1e9));
+    }
+
+    private sortScratch?: SortScratch;
+    /** One spare array per attribute buffer, gathered into and swapped in; indexed by buffer slot. */
+    private readonly gatherScratch: Float32Array[] = [];
+
+    /**
+     * Reorders the `count` filled instances by the batch's sort mode, so that
+     * the later (covering) draws are the nearer or the chosen-age particles.
+     * The order is computed once as a permutation and every attribute buffer
+     * is gathered through it into a spare array that then takes its place.
+     */
+    private sortInstances(count: number, isMeshRender: boolean, isStretchedRender: boolean): void {
+        if (count < 2) {
+            return;
+        }
+        const scratch = (this.sortScratch ??= new SortScratch(this.maxParticles));
+        scratch.ensure(count);
+        const keys = scratch.keys;
+        const mode = this.settings.sortMode;
+        if (mode === 'distance') {
+            const camera = this.scene.activeCameras?.[0] ?? this.scene.activeCamera;
+            if (!camera) {
+                return;
+            }
+            const eye = camera.globalPosition;
+            const ex = eye.x;
+            const ey = eye.y;
+            const ez = eye.z;
+            const offsets = this.offsetBuffer;
+            // Farthest first: the nearer particle is drawn last and covers.
+            for (let i = 0, o = 0; i < count; i++, o += 3) {
+                const dx = offsets[o] - ex;
+                const dy = offsets[o + 1] - ey;
+                const dz = offsets[o + 2] - ez;
+                keys[i] = scratch.floatKey(dx * dx + dy * dy + dz * dz, true);
+            }
+        } else {
+            // Ages in the order the systems were filled, which is the instance order.
+            const youngestInFront = mode === 'youngestInFront';
+            const systems = this.visibleSystems;
+            let i = 0;
+            for (let s = 0; s < systems.length; s++) {
+                const system = systems[s];
+                const particleNum = system.particleNum;
+                const store = system.store;
+                if (particleNum === 0) {
+                    continue;
+                }
+                if (store === undefined) {
+                    const particles = system.particles;
+                    for (let j = 0; j < particleNum; j++) {
+                        keys[i++] = scratch.floatKey(particles[j].age, youngestInFront);
+                    }
+                    continue;
+                }
+                const scalars = store.scalars;
+                const stride = ParticleStore.SCALAR_STRIDE;
+                for (let j = 0, a = ParticleStore.AGE; j < particleNum; j++, a += stride) {
+                    keys[i++] = scratch.floatKey(scalars[a], youngestInFront);
+                }
+            }
+            if (i !== count) {
+                return;
+            }
+        }
+        const order = sortByKey(scratch, count);
+        this.offsetBuffer = this.gatherInto(0, this.offsetBuffer, order, count, 3);
+        this.sizeBuffer = this.gatherInto(1, this.sizeBuffer, order, count, 3);
+        this.colorBuffer = this.gatherInto(2, this.colorBuffer, order, count, 4);
+        this.uvTileBuffer = this.gatherInto(3, this.uvTileBuffer, order, count, 1);
+        this.rotationBuffer = this.gatherInto(4, this.rotationBuffer, order, count, isMeshRender ? 4 : 1);
+        if (isStretchedRender && this.velocityBuffer) {
+            this.velocityBuffer = this.gatherInto(5, this.velocityBuffer, order, count, 4);
+        }
+    }
+
+    /** Gathers `source` in `order` into the spare array of `slot` and returns it; the source becomes the spare. */
+    private gatherInto(
+        slot: number,
+        source: Float32Array,
+        order: Uint32Array,
+        count: number,
+        stride: number
+    ): Float32Array {
+        let spare = this.gatherScratch[slot];
+        if (spare === undefined || spare.length !== source.length) {
+            spare = new Float32Array(source.length);
+        }
+        gather(source, spare, order, count, stride);
+        this.gatherScratch[slot] = source;
+        return spare;
     }
 
     rebuildMaterial(): void {
@@ -218,6 +326,10 @@ export class SpriteBatch extends VFXBatch {
         if (pivot) {
             defines.push('PIVOT');
         }
+        const sizeLimits = this.sizeLimits();
+        if (sizeLimits) {
+            defines.push('SIZE_LIMITS');
+        }
         const isMesh = this.settings.renderMode === RenderMode.Mesh;
         const lighting = this.settings.lighting ?? 'fixed';
         const lit = isMesh && lighting !== 'unlit';
@@ -278,6 +390,9 @@ export class SpriteBatch extends VFXBatch {
         }
         if (pivot) {
             uniforms.push('pivot');
+        }
+        if (sizeLimits) {
+            uniforms.push('sizeLimits');
         }
         if (lit) {
             uniforms.push('lightDirection');
@@ -353,6 +468,9 @@ export class SpriteBatch extends VFXBatch {
         }
         if (pivot) {
             mat.setVector3('pivot', new BVector3(pivot.x, pivot.y, pivot.z));
+        }
+        if (sizeLimits) {
+            mat.setVector2('sizeLimits', sizeLimits);
         }
         if (lit) {
             this.writeFixedLighting(mat);
@@ -814,6 +932,10 @@ export class SpriteBatch extends VFXBatch {
             return;
         }
         this.clearedInstanceUploaded = false;
+
+        if (this.settings.sortMode !== 'none') {
+            this.sortInstances(index, isMeshRender, isStretchedRender);
+        }
 
         // Upload only the slots actually filled this frame: the buffers are sized
         // for the high-water mark and are usually far larger than the live count.

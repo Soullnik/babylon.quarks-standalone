@@ -52,7 +52,7 @@ import {BatchedRenderer, VFXBatchSettings} from './BatchedRenderer';
 import {ensureEnvAtlasFromCube, getCachedEnvAtlas} from './envAtlas';
 import {ensureTriangleIndices} from './geometryUtil';
 import {ParticleEmitter} from './ParticleEmitter';
-import {MeshLighting, MeshRim, normalizeMeshRim, RenderMode} from './VFXBatch';
+import {MeshLighting, MeshRim, normalizeMeshRim, RenderMode, SortMode} from './VFXBatch';
 
 export interface BurstParameters {
     time: number;
@@ -204,6 +204,12 @@ export interface ParticleSystemParameters {
     cullingMode?: CullingMode;
     /** Seed for this system's own random generator, see {@link ParticleSystem.seed}. Default none. */
     seed?: number;
+    /** Draw order within the batch, see {@link ParticleSystem.sortMode}. Default `'none'`. */
+    sortMode?: SortMode;
+    /** Smallest on-screen size, as a fraction of the viewport height, see {@link ParticleSystem.minParticleSize}. Default 0. */
+    minParticleSize?: number;
+    /** Largest on-screen size, as a fraction of the viewport height, see {@link ParticleSystem.maxParticleSize}. Default unlimited. */
+    maxParticleSize?: number;
     /** Babylon rendering group of the batch, see {@link ParticleSystem.renderingGroupId}. Default 0. */
     renderingGroupId?: number;
     /** Whether the scene's fog applies, see {@link ParticleSystem.applyFog}. Default true. */
@@ -251,6 +257,12 @@ export interface ParticleSystemJSONParameters {
     cullingMode?: CullingMode;
     /** Written only when set. */
     seed?: number;
+    /** Written only when not `'none'`. */
+    sortMode?: SortMode;
+    /** Written only when not 0. */
+    minParticleSize?: number;
+    /** Written only when limited. */
+    maxParticleSize?: number;
     speedFactor?: number;
     texture?: string;
     material?: string;
@@ -484,6 +496,50 @@ export class ParticleSystem implements IParticleSystem {
      * {@link VFXBatchSettings.pivot}. Assign a new vector to change it: editing
      * the returned one in place does not reach the renderer.
      */
+    /**
+     * The order this system's batch draws its particles in (Unity's Sort
+     * Mode), `'none'` by default. Alpha blended smoke wants `'distance'`;
+     * additive effects need nothing. Sorting covers the whole batch, so systems
+     * with different modes are batched apart. See {@link SortMode}.
+     */
+    get sortMode(): SortMode {
+        return this.rendererSettings.sortMode;
+    }
+
+    set sortMode(mode: SortMode) {
+        this.rendererSettings.sortMode = ParticleSystem.validSortMode(mode);
+        this.neededToUpdateRender = true;
+    }
+
+    /**
+     * Smallest size a billboard or stretched particle is drawn at, as a
+     * fraction of the viewport height (Unity's Min Particle Size); 0 by
+     * default. Keeps distant sparks from vanishing. Meshes and trails ignore it.
+     */
+    get minParticleSize(): number {
+        return this.rendererSettings.minParticleSize;
+    }
+
+    set minParticleSize(size: number) {
+        this.rendererSettings.minParticleSize = Math.max(0, size);
+        this.neededToUpdateRender = true;
+    }
+
+    /**
+     * Largest size a billboard or stretched particle is drawn at, as a fraction
+     * of the viewport height (Unity's Max Particle Size, 0.5 there); unlimited
+     * by default. Keeps a close particle from filling the screen. Meshes and
+     * trails ignore it.
+     */
+    get maxParticleSize(): number {
+        return this.rendererSettings.maxParticleSize;
+    }
+
+    set maxParticleSize(size: number) {
+        this.rendererSettings.maxParticleSize = size > 0 ? size : Infinity;
+        this.neededToUpdateRender = true;
+    }
+
     get pivot(): Vector3 | undefined {
         return this.rendererSettings.pivot;
     }
@@ -529,6 +585,10 @@ export class ParticleSystem implements IParticleSystem {
     /** `lighting` if it is one of the modes, else the default. */
     private static validLighting(lighting: unknown): MeshLighting {
         return lighting === 'unlit' || lighting === 'scene' ? lighting : 'fixed';
+    }
+
+    private static validSortMode(mode: unknown): SortMode {
+        return mode === 'distance' || mode === 'oldestInFront' || mode === 'youngestInFront' ? mode : 'none';
     }
 
     private static validCullingMode(mode: unknown): CullingMode {
@@ -799,6 +859,9 @@ export class ParticleSystem implements IParticleSystem {
             reflectionAtlas: null,
             layerMask: parameters.layerMask ?? 0x0fffffff,
             pivot: ParticleSystem.nonZeroPivot(parameters.pivot),
+            sortMode: ParticleSystem.validSortMode(parameters.sortMode),
+            minParticleSize: Math.max(0, parameters.minParticleSize ?? 0),
+            maxParticleSize: parameters.maxParticleSize ?? Infinity,
             renderingGroupId: parameters.renderingGroupId ?? 0,
             applyFog: parameters.applyFog ?? true,
             lighting: ParticleSystem.validLighting(parameters.lighting),
@@ -2131,6 +2194,9 @@ export class ParticleSystem implements IParticleSystem {
             ...(this.playbackSpeed !== 1 ? {playbackSpeed: this.playbackSpeed} : {}),
             ...(this.cullingMode !== 'always' ? {cullingMode: this.cullingMode} : {}),
             ...(this.seedValue !== undefined ? {seed: this.seedValue} : {}),
+            ...(this.sortMode !== 'none' ? {sortMode: this.sortMode} : {}),
+            ...(this.minParticleSize > 0 ? {minParticleSize: this.minParticleSize} : {}),
+            ...(this.maxParticleSize !== Infinity ? {maxParticleSize: this.maxParticleSize} : {}),
             rendererEmitterSettings: rendererEmitterSettingsJSON,
             material: materialUUID,
             layers: this.rendererSettings.layerMask,
@@ -2234,6 +2300,9 @@ export class ParticleSystem implements IParticleSystem {
             playbackSpeed: typeof json.playbackSpeed === 'number' ? json.playbackSpeed : undefined,
             cullingMode: ParticleSystem.validCullingMode(json.cullingMode),
             seed: typeof json.seed === 'number' ? json.seed : undefined,
+            sortMode: ParticleSystem.validSortMode(json.sortMode),
+            minParticleSize: typeof json.minParticleSize === 'number' ? json.minParticleSize : undefined,
+            maxParticleSize: typeof json.maxParticleSize === 'number' ? json.maxParticleSize : undefined,
             texture,
             material: materialMeta?.sourceMaterial ?? materialMeta,
             blendMode: materialMeta?.alphaMode ?? json.blending ?? Constants.ALPHA_ADD,
@@ -2496,6 +2565,9 @@ export class ParticleSystem implements IParticleSystem {
             playbackSpeed: this.playbackSpeed,
             cullingMode: this.cullingMode,
             seed: this.seedValue,
+            sortMode: this.sortMode,
+            minParticleSize: this.minParticleSize,
+            maxParticleSize: this.maxParticleSize,
             rendererEmitterSettings,
             material: this.materialRef,
             texture: this.rendererSettings.texture,

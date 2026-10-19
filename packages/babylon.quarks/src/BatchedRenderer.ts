@@ -16,6 +16,7 @@ import {
     MeshRim,
     meshRimEqual,
     RenderMode,
+    SortMode,
     StoredBatchSettings,
     VFXBatch,
 } from './VFXBatch';
@@ -78,6 +79,20 @@ export interface VFXBatchSettings {
      * y across, and z is unused. Absent or zero: no offset. Meshes ignore it.
      */
     pivot?: Vector3;
+    /** Draw order within the batch, see {@link SortMode}. Unset is `'none'`. Systems that differ are batched apart. */
+    sortMode?: SortMode;
+    /**
+     * Smallest size a billboard or stretched particle may have on screen, as a
+     * fraction of the viewport height (Unity's Min Particle Size); 0 by default.
+     * Meshes and trails ignore it. Systems that differ are batched apart.
+     */
+    minParticleSize?: number;
+    /**
+     * Largest size a billboard or stretched particle may have on screen, as a
+     * fraction of the viewport height (Unity's Max Particle Size); unlimited by
+     * default. Meshes and trails ignore it. Systems that differ are batched apart.
+     */
+    maxParticleSize?: number;
     /**
      * How mesh particles are lit (`'unlit'`, `'fixed'` or `'scene'`); unset is
      * `'fixed'`. See {@link MeshLighting}. Other render modes ignore it.
@@ -292,6 +307,9 @@ export class BatchedRenderer extends TransformNode {
             a.renderingGroupId === b.renderingGroupId &&
             a.applyFog === b.applyFog &&
             pivotEqual(a.pivot, b.pivot) &&
+            a.sortMode === (b.sortMode ?? 'none') &&
+            a.minParticleSize === (b.minParticleSize ?? 0) &&
+            a.maxParticleSize === (b.maxParticleSize ?? Infinity) &&
             (a.lighting ?? 'fixed') === (b.lighting ?? 'fixed') &&
             meshRimEqual(a.rim, b.rim)
         );

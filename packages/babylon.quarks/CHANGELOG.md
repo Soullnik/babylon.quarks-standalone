@@ -50,6 +50,18 @@ and the project follows the `quarks.core` 0.x version line.
   up front. Idle copies stay disabled in the renderer's batches, so acquiring allocates nothing.
 - `QuarksUtil.instantiate(root)`: a deep copy of an effect tree, with sub emitter links pointing at
   the copied emitters.
+- `ParticleSystem.sortMode` (constructor option, JSON `sortMode`, written only when not `'none'`):
+  Unity's Sort Mode. `'distance'` draws the particles of the batch farthest from the active camera
+  first, so nearer alpha-blended particles cover farther ones; `'oldestInFront'` and
+  `'youngestInFront'` order by age. The order is a radix sort over the whole batch after each fill
+  (about 2.5 ms per 50k particles), so systems with different modes are batched apart; trails are
+  not sorted. The editor's Renderer module and the Unity exporter carry it (Distance and Depth both
+  map to `'distance'`).
+- `ParticleSystem.minParticleSize` / `maxParticleSize` (constructor options, JSON, written only when
+  set): Unity's Min / Max Particle Size, the smallest and largest size a billboard or stretched
+  particle is drawn at as a fraction of the viewport height, clamped in the vertex shader (GLSL and
+  WGSL). Meshes and trails ignore them. The editor's Renderer module has them under "Limit screen
+  size"; the exporter writes Unity's values, its default maximum of 0.5 included.
 - `BatchedRenderer.simulationBudgetMs` (unlimited by default): once a frame's simulation has taken
   this long, the systems still to be advanced run one step instead of catching up on the long
   frame, and the time the skipped steps would have covered is dropped — so a frame that already ran

@@ -10,6 +10,19 @@ import {IParticleSystem, Vector3} from 'quarks.core';
 import {VFXBatchSettings} from './BatchedRenderer';
 import type {ParticleSystem} from './ParticleSystem';
 
+/**
+ * The order the particles of a batch are drawn in (Unity's Sort Mode). Alpha
+ * blended particles cover what was drawn before them, so the order shows.
+ *
+ * - `'none'`: as they are, system by system. Right for additive blending.
+ * - `'distance'`: farthest from the active camera first, so nearer particles
+ *   cover farther ones.
+ * - `'oldestInFront'` / `'youngestInFront'`: by age.
+ *
+ * Sorting runs over the whole batch after each fill. Trails are not sorted.
+ */
+export type SortMode = 'none' | 'distance' | 'oldestInFront' | 'youngestInFront';
+
 export enum RenderMode {
     BillBoard = 0,
     StretchedBillBoard = 1,
@@ -139,6 +152,12 @@ export interface StoredBatchSettings {
     applyFog: boolean;
     /** Billboard pivot in particle-size units, see {@link VFXBatchSettings.pivot}. */
     pivot?: Vector3;
+    /** Draw order within the batch, see {@link SortMode}. */
+    sortMode: SortMode;
+    /** Smallest size a particle may have on screen, see {@link VFXBatchSettings.minParticleSize}. */
+    minParticleSize: number;
+    /** Largest size a particle may have on screen, see {@link VFXBatchSettings.maxParticleSize}. */
+    maxParticleSize: number;
     /** Mesh particle lighting, see {@link VFXBatchSettings.lighting}. */
     lighting?: MeshLighting;
     /** Mesh particle rim, see {@link VFXBatchSettings.rim}. */
@@ -151,7 +170,7 @@ export abstract class VFXBatch {
     settings: StoredBatchSettings;
     protected maxParticles: number;
     protected scene: Scene;
-    private readonly visibleSystems: IParticleSystem[] = [];
+    protected readonly visibleSystems: IParticleSystem[] = [];
 
     protected constructor(settings: VFXBatchSettings, scene: Scene) {
         this.scene = scene;
@@ -181,6 +200,9 @@ export abstract class VFXBatch {
             reflectionFaces: settings.reflectionFaces ?? null,
             reflectionAtlas: settings.reflectionAtlas ?? null,
             pivot: settings.pivot?.clone(),
+            sortMode: settings.sortMode ?? 'none',
+            minParticleSize: settings.minParticleSize ?? 0,
+            maxParticleSize: settings.maxParticleSize ?? Infinity,
             layerMask: settings.layerMask,
             renderingGroupId: settings.renderingGroupId ?? 0,
             applyFog: settings.applyFog ?? true,

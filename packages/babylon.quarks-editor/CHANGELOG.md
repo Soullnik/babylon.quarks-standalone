@@ -10,7 +10,8 @@ and the project follows the `quarks.core` 0.x version line.
 
 - Main module: "Playback speed", "Fixed seed" (the system's random seed, for an effect that plays
   out identically every time) and "Off screen" (the system's culling mode: always simulate, pause,
-  pause and catch up). Renderer module: "Rendering group" and "Apply fog".
+  pause and catch up). Renderer module: "Rendering group", "Apply fog", "Sort mode" and "Limit
+  screen size" (min / max particle size as fractions of the viewport).
 
 ## [0.23.0] — 2026-10-18
 

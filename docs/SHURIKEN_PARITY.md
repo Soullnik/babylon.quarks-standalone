@@ -63,7 +63,8 @@ Three tiers: ✅ shipped · 🟡 runtime supports it, editor UI missing · 🔴 
 - ✅ texture thumbnail + mesh wireframe previews in the inspector
 - ✅ soft particles (+near/far fade), alpha test, depth write/test
 - 🟡 layer mask
-- 🔴 sort mode, min/max particle size, pivot, shadows
+- ✅ sort mode (`sortMode`: distance / oldest in front / youngest in front), min/max particle size (`minParticleSize` / `maxParticleSize`, billboards and stretched), pivot (`pivot`)
+- 🔴 shadows
 
 ## Editor UX (Particle Effect panel)
 - ✅ restart, undo/redo, import/export, example presets, hierarchy panel

@@ -1,7 +1,7 @@
 import {Texture} from '@babylonjs/core/Materials/Textures/texture';
 import {Mesh} from '@babylonjs/core/Meshes/mesh';
 import {PlusIcon, XMarkIcon} from '@heroicons/react/24/solid';
-import type {Behavior, CullingMode, MeshLighting, MeshRim, ParticleSystem} from 'babylon.quarks';
+import type {Behavior, CullingMode, MeshLighting, MeshRim, ParticleSystem, SortMode} from 'babylon.quarks';
 import {
     ColorOverLife,
     ConstantColor,
@@ -1245,6 +1245,49 @@ export function RendererModule({
                     onChange={(v) => binding.apply((s) => (s.renderingGroupId = Math.max(0, Math.round(v))))}
                 />
             </Row>
+            <Row label="Sort mode">
+                <SelectField
+                    value={system.sortMode}
+                    options={[
+                        {value: 'none', label: 'None'},
+                        {value: 'distance', label: 'By distance'},
+                        {value: 'oldestInFront', label: 'Oldest in front'},
+                        {value: 'youngestInFront', label: 'Youngest in front'},
+                    ]}
+                    onChange={(mode) => binding.apply((s) => (s.sortMode = mode as SortMode))}
+                />
+            </Row>
+            <Row label="Limit screen size">
+                <CheckboxField
+                    value={system.minParticleSize > 0 || system.maxParticleSize !== Infinity}
+                    onChange={(v) =>
+                        binding.apply((s) => {
+                            s.minParticleSize = 0;
+                            s.maxParticleSize = v ? 0.5 : Infinity;
+                        })
+                    }
+                />
+            </Row>
+            {(system.minParticleSize > 0 || system.maxParticleSize !== Infinity) && (
+                <>
+                    <Row label="Min size (viewport)">
+                        <NumberField
+                            value={system.minParticleSize}
+                            step={0.01}
+                            min={0}
+                            onChange={(v) => binding.apply((s) => (s.minParticleSize = Math.max(0, v)))}
+                        />
+                    </Row>
+                    <Row label="Max size (viewport)">
+                        <NumberField
+                            value={system.maxParticleSize === Infinity ? 0 : system.maxParticleSize}
+                            step={0.05}
+                            min={0}
+                            onChange={(v) => binding.apply((s) => (s.maxParticleSize = v > 0 ? v : Infinity))}
+                        />
+                    </Row>
+                </>
+            )}
             <Row label="Apply fog">
                 <CheckboxField value={system.applyFog} onChange={(v) => binding.apply((s) => (s.applyFog = v))} />
             </Row>
