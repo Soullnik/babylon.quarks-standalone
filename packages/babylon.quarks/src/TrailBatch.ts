@@ -1,12 +1,12 @@
 import {VertexBuffer} from '@babylonjs/core/Buffers/buffer';
-import {BoundingInfo} from '@babylonjs/core/Culling/boundingInfo';
 import {Constants} from '@babylonjs/core/Engines/constants';
 import {ShaderMaterial} from '@babylonjs/core/Materials/shaderMaterial';
-import {Vector2 as BVector2, Vector3 as BVector3} from '@babylonjs/core/Maths/math.vector';
+import {Vector2 as BVector2} from '@babylonjs/core/Maths/math.vector';
 import {Mesh} from '@babylonjs/core/Meshes/mesh';
 import {Scene} from '@babylonjs/core/scene';
 import {IParticleSystem, Matrix4, Quaternion, TrailParticle, TrailSettings, Vector3} from 'quarks.core';
 import {VFXBatchSettings} from './BatchedRenderer';
+import type {ParticleSystem} from './ParticleSystem';
 import {registerShaders, shaderLanguageFor} from './shaders/shaderLanguageSupport';
 import trail_frag from './shaders/trail_frag.glsl';
 import trail_frag_wgsl from './shaders/trail_frag.wgsl';
@@ -110,15 +110,10 @@ export class TrailBatch extends VFXBatch {
         this.mesh.setVerticesBuffer(this.sideVB);
         this.mesh.setVerticesBuffer(this.widthVB);
 
-        // Disable bounding info recomputation
-        this.mesh.doNotSyncBoundingInfo = true;
-        const min = new BVector3(-10000, -10000, -10000);
-        const max = new BVector3(10000, 10000, 10000);
-        this.mesh.setBoundingInfo(new BoundingInfo(min, max));
+        // The bounds come from the ribbons each fill writes (configureMesh set
+        // the placeholder); the sub meshes have to share them.
         if (this.mesh.subMeshes) {
-            for (const sub of this.mesh.subMeshes) {
-                (sub as any)._boundingInfo = this.mesh.getBoundingInfo();
-            }
+            this.adoptMeshBounds();
         }
     }
 
@@ -268,6 +263,7 @@ export class TrailBatch extends VFXBatch {
 
         for (let s = 0; s < visibleSystems.length; s++) {
             const system = visibleSystems[s];
+            const firstVertex = index;
             TrailBatch.ensureWorldMatrix(system);
             const rotation = this.quaternion_;
             const translation = this.vector2_;
@@ -556,9 +552,48 @@ export class TrailBatch extends VFXBatch {
                     index += 2;
                 }
             }
+            this.measureSystemBounds(system as ParticleSystem, firstVertex, index);
         }
 
+        this.refreshBoundingInfo();
         this.uploadGeometry(index, triangles);
+    }
+
+    /**
+     * Records a system's world bounds from the ribbon vertices just written for
+     * it, padded by the widest ribbon. The store only holds each trail's head,
+     * so this is where a trail's extent is known.
+     */
+    private measureSystemBounds(system: ParticleSystem, fromVertex: number, toVertex: number): void {
+        if (toVertex <= fromVertex || typeof system.setWorldBounds !== 'function') {
+            return;
+        }
+        const positions = this.positionBuffer;
+        let minX = Infinity;
+        let minY = Infinity;
+        let minZ = Infinity;
+        let maxX = -Infinity;
+        let maxY = -Infinity;
+        let maxZ = -Infinity;
+        // Each sample writes its position twice (both ribbon edges); one of the pair is enough.
+        for (let o = fromVertex * 3, end = toVertex * 3; o < end; o += 6) {
+            const x = positions[o];
+            const y = positions[o + 1];
+            const z = positions[o + 2];
+            if (x < minX) minX = x;
+            if (x > maxX) maxX = x;
+            if (y < minY) minY = y;
+            if (y > maxY) maxY = y;
+            if (z < minZ) minZ = z;
+            if (z > maxZ) maxZ = z;
+        }
+        const widths = this.widthBuffer;
+        let maxWidth = 0;
+        for (let v = fromVertex; v < toVertex; v += 2) {
+            const w = widths[v];
+            if (w > maxWidth) maxWidth = w;
+        }
+        system.setWorldBounds(minX, minY, minZ, maxX, maxY, maxZ, maxWidth);
     }
 
     /**

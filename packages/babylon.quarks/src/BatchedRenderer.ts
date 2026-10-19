@@ -1,5 +1,8 @@
+import {Camera} from '@babylonjs/core/Cameras/camera';
 import {BaseTexture} from '@babylonjs/core/Materials/Textures/baseTexture';
 import {Texture} from '@babylonjs/core/Materials/Textures/texture';
+import {Frustum} from '@babylonjs/core/Maths/math.frustum';
+import {Plane} from '@babylonjs/core/Maths/math.plane';
 import {TransformNode} from '@babylonjs/core/Meshes/transformNode';
 import {Scene} from '@babylonjs/core/scene';
 import {EmitSubParticleSystem, IParticleSystem, Vector3} from 'quarks.core';
@@ -159,8 +162,105 @@ export class BatchedRenderer extends TransformNode {
     private lastAppliedQuality = Number.NaN;
     private meshLighting: MeshLightingSettings = defaultMeshLighting();
 
+    /**
+     * Whether systems whose {@link ParticleSystem.cullingMode} is not
+     * `'always'` are tested against the active cameras each frame and paused
+     * while unseen. Off, every system simulates every frame; the batches' own
+     * frustum culling of the draw stays on either way.
+     */
+    cullingEnabled = true;
+
+    /**
+     * Time per frame, in milliseconds, that systems coming back into view may
+     * spend together on the steps they missed while culled (`'pauseAndCatchUp'`).
+     * Steps that do not fit are dropped, not deferred, so a crowd of effects
+     * reappearing at once costs at most this. 2 by default.
+     */
+    catchUpBudgetMs = 2;
+
+    /**
+     * Time per frame, in milliseconds, after which the systems still to be
+     * advanced run one step instead of catching up on a long frame. The time
+     * the skipped steps would have covered is dropped, so a frame that already
+     * ran long cannot make the next one longer still. Unlimited by default;
+     * {@link configureAdaptivePerformance} does not set it.
+     */
+    simulationBudgetMs = Infinity;
+
+    /** Frustum planes of the active cameras, six per camera, rebuilt each update. */
+    private frustumPlanes: Plane[] = [];
+    private readonly boundsMin = new Vector3();
+    private readonly boundsMax = new Vector3();
+
     constructor(name: string, scene: Scene) {
         super(name, scene);
+    }
+
+    /**
+     * Gathers the frustum planes of the cameras the scene renders with, six per
+     * camera. Empty when there is no camera yet; systems are then never culled.
+     */
+    private collectFrustumPlanes(): Plane[] {
+        const scene = this.getScene();
+        const planes = this.frustumPlanes;
+        const activeCameras = scene.activeCameras;
+        const activeCamera = scene.activeCamera;
+        const cameras: Camera[] =
+            activeCameras && activeCameras.length > 0 ? activeCameras : activeCamera ? [activeCamera] : [];
+        const needed = cameras.length * 6;
+        while (planes.length < needed) {
+            planes.push(new Plane(0, 0, 0, 0));
+        }
+        planes.length = needed;
+        for (let c = 0; c < cameras.length; c++) {
+            const camera = cameras[c];
+            // Both matrices are recomputed only on demand: a camera moved since
+            // the last render would otherwise be tested where it was, and one
+            // that has not rendered yet has no projection at all.
+            camera.getViewMatrix();
+            camera.getProjectionMatrix();
+            const transform = camera.getTransformationMatrix();
+            const slice = c === 0 ? planes : planes.slice(c * 6, c * 6 + 6);
+            Frustum.GetPlanesToRef(transform, slice);
+            if (c !== 0) {
+                for (let p = 0; p < 6; p++) {
+                    planes[c * 6 + p] = slice[p];
+                }
+            }
+        }
+        return planes;
+    }
+
+    /**
+     * True when `system`'s world bounds reach into at least one camera's
+     * frustum, or when it has no bounds to test (empty, or not yet measured).
+     */
+    private isSystemInView(system: ParticleSystem, planes: Plane[]): boolean {
+        const min = this.boundsMin;
+        const max = this.boundsMax;
+        if (!system.getWorldBounds(min, max)) {
+            return true;
+        }
+        for (let c = 0; c < planes.length; c += 6) {
+            let inside = true;
+            for (let p = c; p < c + 6; p++) {
+                const plane = planes[p];
+                const n = plane.normal;
+                // The box corner farthest along the plane's normal: if even it
+                // is behind the plane, the whole box is.
+                const x = n.x >= 0 ? max.x : min.x;
+                const y = n.y >= 0 ? max.y : min.y;
+                const z = n.z >= 0 ? max.z : min.z;
+                if (n.x * x + n.y * y + n.z * z + plane.d < 0) {
+                    inside = false;
+                    break;
+                }
+            }
+            if (inside) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static clamp(value: number, min: number, max: number): number {
@@ -431,13 +531,26 @@ export class BatchedRenderer extends TransformNode {
             this.applyAdaptiveQuality();
         }
         const systems = this.orderSystems();
+        const planes = this.cullingEnabled ? this.collectFrustumPlanes() : null;
+        const budgetStart =
+            this.simulationBudgetMs !== Infinity || this.catchUpBudgetMs !== Infinity ? performance.now() : 0;
+        const stepDeadline = this.simulationBudgetMs === Infinity ? Infinity : budgetStart + this.simulationBudgetMs;
+        const catchUpDeadline = this.catchUpBudgetMs === Infinity ? Infinity : budgetStart + this.catchUpBudgetMs;
         for (let i = 0; i < systems.length; i++) {
-            const system = systems[i];
+            const system = systems[i] as ParticleSystem;
             // A disabled emitter holds its particles frozen instead of simulating
             // them unseen, matching how Unity treats a disabled ParticleSystem.
             // Pooled effects parked with setEnabled(false) then cost nothing.
             if (system.emitter.visible) {
-                (system as ParticleSystem).update(delta);
+                // A system no camera sees pauses, by its own choice. One that
+                // only serves as a sub emitter target follows its parent.
+                system.culled =
+                    planes !== null &&
+                    planes.length > 0 &&
+                    system.cullingMode !== 'always' &&
+                    system.onlyUsedByOther !== true &&
+                    !this.isSystemInView(system, planes);
+                system.update(delta, stepDeadline, catchUpDeadline);
             }
             // An autoDestroy system disposes itself from inside update and drops
             // out of the list; stay on the slot it vacated.

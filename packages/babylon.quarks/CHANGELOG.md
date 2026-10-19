@@ -20,6 +20,24 @@ and the project follows the `quarks.core` 0.x version line.
   Unity exporter writes it from Main → Simulation Speed.
 - quarks.core `ApplySequences` is registered in `BehaviorTypes`, so an effect using it serialises
   and loads like any other behavior.
+- Bounds and culling. Every system measures the world bounds of what it draws
+  (`ParticleSystem.getWorldBounds`), from the store columns for sprites and meshes and from the
+  ribbons for trails; batch meshes carry the union, so Babylon's frustum culling skips the draw of
+  a batch no camera sees and transparent sorting has real bounds to work with. Measured in full
+  every few steps and carried, padded for the motion since, in between: no measurable cost on the
+  profiling scenarios.
+- `ParticleSystem.cullingMode` (constructor option, JSON `cullingMode`, written only when not
+  `'always'`): Unity's Culling Mode. `'pause'` freezes a system while no active camera sees its
+  bounds; `'pauseAndCatchUp'` also replays the missed time (up to 2 s) when it comes back, within
+  `BatchedRenderer.catchUpBudgetMs` (2 ms per frame, shared by all systems; what does not fit is
+  dropped). Culled systems are neither simulated nor filled into their batch. Empty systems and sub
+  emitter targets are never culled; `BatchedRenderer.cullingEnabled = false` turns the test off.
+  With 400 systems in a ring around the camera and three quarters of them out of view, a frame goes
+  from 9.6 ms to 1.6 ms. The Unity exporter writes Pause and Pause And Catch-up.
+- `BatchedRenderer.simulationBudgetMs` (unlimited by default): once a frame's simulation has taken
+  this long, the systems still to be advanced run one step instead of catching up on the long
+  frame, and the time the skipped steps would have covered is dropped — so a frame that already ran
+  long cannot make the next one longer still.
 
 ### Fixed
 

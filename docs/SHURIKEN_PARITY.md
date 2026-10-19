@@ -8,7 +8,8 @@ Three tiers: ✅ shipped · 🟡 runtime supports it, editor UI missing · 🔴 
 - ✅ prewarm, start rotation (constant/random angle, 3D random), start color random-between-two
 - ✅ start delay (constant/random, ignored with prewarm, re-armed by restart)
 - ✅ 3D start size (uniform / per-axis `Vector3Function`), gradient start color (single `Gradient` and random-between-two-gradients `RandomColorBetweenGradient`)
-- 🔴 simulation speed persistence, max particles, stop action, culling, ring buffer
+- ✅ max particles (`maxParticles`), simulation speed (`playbackSpeed`), culling mode (`cullingMode`: always / pause / pause and catch up)
+- 🔴 stop action, ring buffer
 
 ## Emission
 - ✅ rate over time (constant/random/curve), bursts (time/count)

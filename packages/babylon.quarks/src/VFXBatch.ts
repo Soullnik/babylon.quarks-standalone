@@ -1,3 +1,4 @@
+import {BoundingInfo} from '@babylonjs/core/Culling/boundingInfo';
 import {Constants} from '@babylonjs/core/Engines/constants';
 import {BaseTexture} from '@babylonjs/core/Materials/Textures/baseTexture';
 import {ShaderMaterial} from '@babylonjs/core/Materials/shaderMaterial';
@@ -7,6 +8,7 @@ import {Mesh} from '@babylonjs/core/Meshes/mesh';
 import {Scene} from '@babylonjs/core/scene';
 import {IParticleSystem, Vector3} from 'quarks.core';
 import {VFXBatchSettings} from './BatchedRenderer';
+import type {ParticleSystem} from './ParticleSystem';
 
 export enum RenderMode {
     BillBoard = 0,
@@ -201,12 +203,76 @@ export abstract class VFXBatch {
      */
     protected configureMesh(): void {
         const mesh = this.mesh;
+        // Until the first fill measures the particles, the batch has no bounds
+        // to cull by and is drawn regardless. The instance data is already in
+        // world space, so the bounds never need the mesh's own matrix.
         mesh.alwaysSelectAsActiveMesh = true;
+        mesh.doNotSyncBoundingInfo = true;
+        mesh.setBoundingInfo(new BoundingInfo(BVector3.Zero(), BVector3.Zero()));
         mesh.layerMask = this.settings.layerMask;
         mesh.renderingGroupId = this.settings.renderingGroupId;
         mesh.alphaIndex = this.settings.renderOrder;
         // The shaders fog themselves; Babylon's own fog pass does not apply to a ShaderMaterial.
         mesh.applyFog = false;
+    }
+
+    private readonly boundsMin_ = new Vector3();
+    private readonly boundsMax_ = new Vector3();
+
+    /**
+     * Sets the batch mesh's bounds to the union of its filled systems' world
+     * bounds, so Babylon skips the draw when none of them is in view. Called
+     * after each fill, over the systems {@link getVisibleSystems} last returned.
+     * A batch whose systems have no measured bounds stays always drawn.
+     */
+    protected refreshBoundingInfo(): void {
+        const min = this.boundsMin_;
+        const max = this.boundsMax_;
+        let minX = Infinity;
+        let minY = Infinity;
+        let minZ = Infinity;
+        let maxX = -Infinity;
+        let maxY = -Infinity;
+        let maxZ = -Infinity;
+        let any = false;
+        const systems = this.visibleSystems;
+        for (let i = 0; i < systems.length; i++) {
+            const system = systems[i] as ParticleSystem;
+            if (system.particleNum === 0 || typeof system.getWorldBounds !== 'function') {
+                continue;
+            }
+            if (!system.getWorldBounds(min, max)) {
+                // Drawn but not measured: the batch cannot be culled this frame.
+                this.mesh.alwaysSelectAsActiveMesh = true;
+                return;
+            }
+            any = true;
+            if (min.x < minX) minX = min.x;
+            if (min.y < minY) minY = min.y;
+            if (min.z < minZ) minZ = min.z;
+            if (max.x > maxX) maxX = max.x;
+            if (max.y > maxY) maxY = max.y;
+            if (max.z > maxZ) maxZ = max.z;
+        }
+        if (!any) {
+            return;
+        }
+        const info = this.mesh.getBoundingInfo();
+        const bmin = info.minimum;
+        const bmax = info.maximum;
+        if (
+            bmin.x !== minX ||
+            bmin.y !== minY ||
+            bmin.z !== minZ ||
+            bmax.x !== maxX ||
+            bmax.y !== maxY ||
+            bmax.z !== maxZ
+        ) {
+            bmin.set(minX, minY, minZ);
+            bmax.set(maxX, maxY, maxZ);
+            info.reConstruct(bmin, bmax);
+        }
+        this.mesh.alwaysSelectAsActiveMesh = false;
     }
 
     /**
@@ -260,7 +326,9 @@ export abstract class VFXBatch {
         const visibleSystems = this.visibleSystems;
         let count = 0;
         for (const system of this.systems) {
-            if (system.emitter.visible) {
+            // A culled system's particles are off every camera's screen; filling
+            // them in would only cost the copy and widen the batch's bounds.
+            if (system.emitter.visible && (system as ParticleSystem).culled !== true) {
                 visibleSystems[count++] = system;
             }
         }

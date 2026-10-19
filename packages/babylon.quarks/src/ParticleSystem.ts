@@ -57,6 +57,24 @@ export interface BurstParameters {
     probability: number;
 }
 
+/**
+ * What a system does while no camera can see its particles (Unity's Culling
+ * Mode). The {@link BatchedRenderer} tests each system's bounds against the
+ * active cameras' frusta every frame.
+ *
+ * - `'always'` keeps simulating off screen, so an effect is exactly where it
+ *   would have been when it comes back into view. The default, and the only
+ *   safe choice for an emitter whose particles reach the screen from off it.
+ * - `'pause'` freezes the system off screen and resumes it where it left off.
+ * - `'pauseAndCatchUp'` freezes it too, then runs the missed time (up to a few
+ *   seconds) within the renderer's catch-up budget when it is seen again.
+ *
+ * An empty system is never culled, so it can start emitting and grow the
+ * bounds that decide its visibility. A system another one emits into is never
+ * culled either; its parent decides.
+ */
+export type CullingMode = 'always' | 'pause' | 'pauseAndCatchUp';
+
 /** Particle backed by a {@link ParticleStore} row, as this system always creates. */
 type StoreBackedParticle = Particle & {storeIndex: number; setStoreIndex(index: number): void};
 
@@ -68,6 +86,10 @@ const tempV2 = new Vector3();
 const PREWARM_FPS = 60;
 const SIMULATION_STEP = 1 / PREWARM_FPS;
 const MAX_SIMULATION_STEPS_PER_FRAME = 8;
+/** Most off-screen time a `'pauseAndCatchUp'` system replays on coming back into view. */
+const MAX_CATCH_UP_SECONDS = 2;
+/** Steps between full measurements of a system's bounds; see simulateStep. */
+const BOUNDS_REFRESH_STEPS = 4;
 // Math.round() breaks an exact tie (accumulator sitting at precisely half a
 // step) by rounding up. At exactly 120Hz that tie is not a corner case — it is
 // every single frame — and rounding it up would run a step on every one of
@@ -173,6 +195,8 @@ export interface ParticleSystemParameters {
     rim?: Partial<MeshRim>;
     /** Multiplier on the time the system is advanced by, see {@link ParticleSystem.playbackSpeed}. Default 1. */
     playbackSpeed?: number;
+    /** What the system does while off screen, see {@link CullingMode}. Default `'always'`. */
+    cullingMode?: CullingMode;
     /** Babylon rendering group of the batch, see {@link ParticleSystem.renderingGroupId}. Default 0. */
     renderingGroupId?: number;
     /** Whether the scene's fog applies, see {@link ParticleSystem.applyFog}. Default true. */
@@ -216,6 +240,8 @@ export interface ParticleSystemJSONParameters {
     applyFog?: boolean;
     /** Written only when not 1. */
     playbackSpeed?: number;
+    /** Written only when not `'always'`. */
+    cullingMode?: CullingMode;
     speedFactor?: number;
     texture?: string;
     material?: string;
@@ -490,6 +516,10 @@ export class ParticleSystem implements IParticleSystem {
         return lighting === 'unlit' || lighting === 'scene' ? lighting : 'fixed';
     }
 
+    private static validCullingMode(mode: unknown): CullingMode {
+        return mode === 'pause' || mode === 'pauseAndCatchUp' ? mode : 'always';
+    }
+
     private static nonZeroPivot(v: Vector3 | undefined): Vector3 | undefined {
         return v && (v.x !== 0 || v.y !== 0 || v.z !== 0) ? v.clone() : undefined;
     }
@@ -620,6 +650,46 @@ export class ParticleSystem implements IParticleSystem {
      */
     playbackSpeed = 1;
 
+    /** What this system does while off screen, see {@link CullingMode}. `'always'` by default. */
+    cullingMode: CullingMode = 'always';
+
+    /**
+     * Set by the renderer each frame: true while no active camera sees the
+     * system's bounds and its {@link cullingMode} is not `'always'`.
+     * @internal
+     */
+    culled = false;
+
+    /**
+     * Time a `'pauseAndCatchUp'` system has spent off screen and not yet
+     * simulated, in seconds. Capped, so an effect hidden for a minute does not
+     * replay the minute.
+     */
+    private pendingCatchUp = 0;
+
+    /**
+     * Time per frame a system coming back into view may spend on the steps it
+     * missed, in milliseconds, when it is advanced without a renderer. The
+     * {@link BatchedRenderer} shares its own budget among all its systems
+     * instead. Steps that do not fit are dropped, not deferred.
+     */
+    static catchUpBudgetMs = 2;
+
+    /** Axis-aligned bounds of the live particles, in simulation space. See {@link getWorldBounds}. */
+    private readonly boundsMin = new Vector3();
+    private readonly boundsMax = new Vector3();
+    /** How far a particle's quad, mesh or stretch can reach past its position, in simulation units. */
+    private boundsPadding = 0;
+    private boundsValid = false;
+    /** Steps since the last full measurement; between them the bounds are carried and padded. */
+    private stepsSinceBounds = 0;
+    private boundsMaxSize = 0;
+    private boundsMaxSpeedSq = 0;
+    /** True when the bounds are already in world space (a world-space system, or bounds the renderer measured). */
+    private boundsInWorld = false;
+    private geometryRadiusFor?: Float32Array;
+    private geometryRadius = 1;
+
     constructor(parameters: ParticleSystemParameters) {
         this.sceneRef = parameters.scene;
         this.layerMaskProxy = {mask: parameters.layerMask ?? 0x0fffffff};
@@ -695,6 +765,7 @@ export class ParticleSystem implements IParticleSystem {
         };
         this.flip = ParticleSystem.nonZeroFlip(parameters.flip);
         this.playbackSpeed = parameters.playbackSpeed ?? 1;
+        this.cullingMode = parameters.cullingMode ?? 'always';
         if (this.rendererSettings.renderMode === RenderMode.Mesh && !this.rendererSettings.instancingNormals) {
             this.rendererSettings.instancingNormals = ParticleSystem.createFallbackNormals(
                 this.rendererSettings.instancingGeometry
@@ -1053,6 +1124,8 @@ export class ParticleSystem implements IParticleSystem {
         this.memory.length = 0;
         this.paused = false;
         this.particleNum = 0;
+        this.boundsValid = false;
+        this.pendingCatchUp = 0;
         this.emissionState.isBursting = false;
         this.emissionState.burstIndex = 0;
         this.emissionState.burstWaveIndex = 0;
@@ -1076,10 +1149,33 @@ export class ParticleSystem implements IParticleSystem {
 
     private firstTimeUpdate = true;
 
-    /** @internal */
-    update(delta: number) {
+    /**
+     * Advances the system by `delta` seconds of host time.
+     *
+     * `stepDeadline` is a `performance.now()` time after which no further
+     * catch-up step of this frame is run: a frame long enough to need several
+     * steps gets at least one, and the time the rest would have covered is
+     * dropped rather than carried, so one slow frame does not grow the next.
+     * `catchUpDeadline` bounds the steps a `'pauseAndCatchUp'` system runs on
+     * coming back into view; unset, the system allows itself
+     * {@link catchUpBudgetMs}. The renderer supplies both from its budgets.
+     * @internal
+     */
+    update(delta: number, stepDeadline = Infinity, catchUpDeadline?: number) {
         if (this.paused) return;
         delta *= this.playbackSpeed;
+
+        if (this.culled) {
+            // Out of every camera's view. A paused system holds its particles
+            // where they are; a catching-up one also remembers the time it missed.
+            if (this.cullingMode === 'pauseAndCatchUp') {
+                this.pendingCatchUp = Math.min(MAX_CATCH_UP_SECONDS, this.pendingCatchUp + delta);
+            }
+            return;
+        }
+        if (this.pendingCatchUp > 0) {
+            this.catchUp(catchUpDeadline ?? performance.now() + ParticleSystem.catchUpBudgetMs);
+        }
 
         if (this.firstTimeUpdate) {
             this.firstTimeUpdate = false;
@@ -1144,8 +1240,167 @@ export class ParticleSystem implements IParticleSystem {
         );
         for (let i = 0; i < stepsToRun; i++) {
             this.simulateStep(SIMULATION_STEP);
+            if (stepDeadline !== Infinity && i + 1 < stepsToRun && performance.now() >= stepDeadline) {
+                // Over the frame's simulation budget: the remaining steps' time
+                // is consumed below without being simulated.
+                break;
+            }
         }
         this.simulationAccumulator -= stepsToRun * SIMULATION_STEP;
+    }
+
+    /** Runs the steps a system missed while culled, as many as fit before `deadline`. */
+    private catchUp(deadline: number): void {
+        let steps = Math.floor(this.pendingCatchUp / SIMULATION_STEP);
+        this.pendingCatchUp = 0;
+        while (steps-- > 0) {
+            this.simulateStep(SIMULATION_STEP);
+            if (steps > 0 && performance.now() >= deadline) {
+                break;
+            }
+        }
+    }
+
+    /**
+     * Records the bounds the sprite step measured over the live particles.
+     * Trails are measured by their renderer instead, since their ribbons live
+     * outside the store.
+     */
+    private storeBounds(
+        count: number,
+        measured: boolean,
+        minX: number,
+        minY: number,
+        minZ: number,
+        maxX: number,
+        maxY: number,
+        maxZ: number,
+        maxSize: number,
+        maxSpeedSq: number
+    ): void {
+        if (count === 0) {
+            this.boundsValid = false;
+            return;
+        }
+        this.stepsSinceBounds = measured ? 0 : this.stepsSinceBounds + 1;
+        this.boundsMaxSize = maxSize;
+        this.boundsMaxSpeedSq = maxSpeedSq;
+        const maxSpeed = Math.sqrt(maxSpeedSq);
+        const renderMode = this.rendererSettings.renderMode;
+        // How far past its position a particle can be drawn: half a quad's
+        // diagonal plus its pivot, a mesh's radius, or a stretched quad's tail.
+        // Plus the motion since the last measurement, and the step the renderer
+        // moves particles on along their velocity.
+        let padding = maxSpeed * SIMULATION_STEP * (this.stepsSinceBounds + 1);
+        if (renderMode === RenderMode.Mesh) {
+            padding += maxSize * this.meshGeometryRadius();
+        } else if (renderMode === RenderMode.StretchedBillBoard) {
+            const settings = this.rendererEmitterSettings as StretchedBillBoardSettings;
+            padding += maxSize * (1 + (settings.lengthFactor ?? 0) + maxSpeed * (settings.speedFactor ?? 0));
+        } else {
+            const pivot = this.rendererSettings.pivot;
+            const pivotReach = pivot === undefined ? 0 : Math.abs(pivot.x) + Math.abs(pivot.y) + Math.abs(pivot.z);
+            padding += maxSize * (0.75 + pivotReach);
+        }
+        this.boundsMin.set(minX, minY, minZ);
+        this.boundsMax.set(maxX, maxY, maxZ);
+        this.boundsPadding = padding;
+        this.boundsInWorld = this.worldSpace;
+        this.boundsValid = true;
+    }
+
+    /** Distance of the farthest vertex of the mesh particles' geometry from its origin. */
+    private meshGeometryRadius(): number {
+        const geometry = this.rendererSettings.instancingGeometry;
+        if (geometry !== this.geometryRadiusFor) {
+            let radiusSq = 0;
+            for (let o = 0; o + 2 < geometry.length; o += 3) {
+                const d =
+                    geometry[o] * geometry[o] + geometry[o + 1] * geometry[o + 1] + geometry[o + 2] * geometry[o + 2];
+                if (d > radiusSq) radiusSq = d;
+            }
+            this.geometryRadius = Math.sqrt(radiusSq);
+            this.geometryRadiusFor = geometry;
+        }
+        return this.geometryRadius;
+    }
+
+    /**
+     * World-space axis-aligned bounds of everything this system draws, padded
+     * for particle size, into `min` and `max`. False when the system has no
+     * particles, or none have been measured yet; the caller should then treat
+     * it as visible. Measured in full every few simulated steps and carried,
+     * padded for the motion since, in between: conservative, and at most a
+     * frame behind the display.
+     */
+    getWorldBounds(min: Vector3, max: Vector3): boolean {
+        if (!this.boundsValid) {
+            return false;
+        }
+        const bmin = this.boundsMin;
+        const bmax = this.boundsMax;
+        if (this.boundsInWorld) {
+            const pad = this.boundsPadding;
+            min.set(bmin.x - pad, bmin.y - pad, bmin.z - pad);
+            max.set(bmax.x + pad, bmax.y + pad, bmax.z + pad);
+            return true;
+        }
+        // Local bounds: the box of the eight transformed corners, padded by the
+        // reach scaled by the emitter's largest axis.
+        const e = this.emitter.matrixWorld.elements;
+        const scale = Math.sqrt(
+            Math.max(
+                e[0] * e[0] + e[1] * e[1] + e[2] * e[2],
+                e[4] * e[4] + e[5] * e[5] + e[6] * e[6],
+                e[8] * e[8] + e[9] * e[9] + e[10] * e[10]
+            )
+        );
+        const pad = this.boundsPadding * scale;
+        let minX = Infinity;
+        let minY = Infinity;
+        let minZ = Infinity;
+        let maxX = -Infinity;
+        let maxY = -Infinity;
+        let maxZ = -Infinity;
+        for (let corner = 0; corner < 8; corner++) {
+            const x = corner & 1 ? bmax.x : bmin.x;
+            const y = corner & 2 ? bmax.y : bmin.y;
+            const z = corner & 4 ? bmax.z : bmin.z;
+            const w = 1 / (e[3] * x + e[7] * y + e[11] * z + e[15]);
+            const wx = (e[0] * x + e[4] * y + e[8] * z + e[12]) * w;
+            const wy = (e[1] * x + e[5] * y + e[9] * z + e[13]) * w;
+            const wz = (e[2] * x + e[6] * y + e[10] * z + e[14]) * w;
+            if (wx < minX) minX = wx;
+            if (wx > maxX) maxX = wx;
+            if (wy < minY) minY = wy;
+            if (wy > maxY) maxY = wy;
+            if (wz < minZ) minZ = wz;
+            if (wz > maxZ) maxZ = wz;
+        }
+        min.set(minX - pad, minY - pad, minZ - pad);
+        max.set(maxX + pad, maxY + pad, maxZ + pad);
+        return true;
+    }
+
+    /**
+     * Records bounds a renderer measured in world space, for systems whose
+     * drawn extent the store does not hold (trail ribbons).
+     * @internal
+     */
+    setWorldBounds(
+        minX: number,
+        minY: number,
+        minZ: number,
+        maxX: number,
+        maxY: number,
+        maxZ: number,
+        padding: number
+    ) {
+        this.boundsMin.set(minX, minY, minZ);
+        this.boundsMax.set(maxX, maxY, maxZ);
+        this.boundsPadding = padding;
+        this.boundsInWorld = true;
+        this.boundsValid = true;
     }
 
     /**
@@ -1342,10 +1597,27 @@ export class ParticleSystem implements IParticleSystem {
             const curColor = store.color;
             const collapseSize = snapshotSize;
             const collapseColor = snapshotColor;
+            // The bounds fall out of the same pass. Measuring every particle on
+            // every step costs about as much as the integration itself, so the
+            // full measurement runs every few steps; in between, newborns extend
+            // the last bounds and the fastest particle seen since pads them for
+            // the motion, which keeps them conservative.
+            const measure = this.stepsSinceBounds >= BOUNDS_REFRESH_STEPS || !this.boundsValid;
+            const carriedMin = this.boundsMin;
+            const carriedMax = this.boundsMax;
+            let minX = measure ? Infinity : carriedMin.x;
+            let minY = measure ? Infinity : carriedMin.y;
+            let minZ = measure ? Infinity : carriedMin.z;
+            let maxX = measure ? -Infinity : carriedMax.x;
+            let maxY = measure ? -Infinity : carriedMax.y;
+            let maxZ = measure ? -Infinity : carriedMax.z;
+            let maxSize = measure ? 0 : this.boundsMaxSize;
+            let maxSpeedSq = measure ? 0 : this.boundsMaxSpeedSq;
             for (let i = 0; i < liveParticleCount; i++) {
                 const scalar = i * stride;
                 let age = scalars[scalar + ParticleStore.AGE];
                 const offset = i * 3;
+                const track = measure || age === 0;
                 if (age === 0) {
                     if (collapseSize) {
                         prevSize[offset] = curSize[offset];
@@ -1361,9 +1633,30 @@ export class ParticleSystem implements IParticleSystem {
                     }
                 }
                 const step = delta * scalars[scalar + ParticleStore.SPEED_MODIFIER];
-                positions[offset] += velocities[offset] * step;
-                positions[offset + 1] += velocities[offset + 1] * step;
-                positions[offset + 2] += velocities[offset + 2] * step;
+                const vx = velocities[offset];
+                const vy = velocities[offset + 1];
+                const vz = velocities[offset + 2];
+                const x = positions[offset] + vx * step;
+                const y = positions[offset + 1] + vy * step;
+                const z = positions[offset + 2] + vz * step;
+                positions[offset] = x;
+                positions[offset + 1] = y;
+                positions[offset + 2] = z;
+                if (track) {
+                    minX = Math.min(minX, x);
+                    maxX = Math.max(maxX, x);
+                    minY = Math.min(minY, y);
+                    maxY = Math.max(maxY, y);
+                    minZ = Math.min(minZ, z);
+                    maxZ = Math.max(maxZ, z);
+                    maxSize = Math.max(
+                        maxSize,
+                        Math.max(curSize[offset], Math.max(curSize[offset + 1], curSize[offset + 2]))
+                    );
+                }
+                // Speed is tracked every step: it bounds how far the particles
+                // can have moved since the last measurement.
+                maxSpeedSq = Math.max(maxSpeedSq, vx * vx + vy * vy + vz * vz);
                 age += delta;
                 scalars[scalar + ParticleStore.AGE] = age;
                 if (age >= scalars[scalar + ParticleStore.LIFE]) {
@@ -1385,6 +1678,7 @@ export class ParticleSystem implements IParticleSystem {
                 }
             }
             this.particleNum = liveParticleCount;
+            this.storeBounds(liveParticleCount, measure, minX, minY, minZ, maxX, maxY, maxZ, maxSize, maxSpeedSq);
             this.notifyFinished();
             return;
         }
@@ -1773,6 +2067,7 @@ export class ParticleSystem implements IParticleSystem {
             ...(this.renderingGroupId !== 0 ? {renderingGroupId: this.renderingGroupId} : {}),
             ...(this.applyFog ? {} : {applyFog: false}),
             ...(this.playbackSpeed !== 1 ? {playbackSpeed: this.playbackSpeed} : {}),
+            ...(this.cullingMode !== 'always' ? {cullingMode: this.cullingMode} : {}),
             rendererEmitterSettings: rendererEmitterSettingsJSON,
             material: materialUUID,
             layers: this.rendererSettings.layerMask,
@@ -1874,6 +2169,7 @@ export class ParticleSystem implements IParticleSystem {
             renderingGroupId: typeof json.renderingGroupId === 'number' ? json.renderingGroupId : undefined,
             applyFog: json.applyFog !== false,
             playbackSpeed: typeof json.playbackSpeed === 'number' ? json.playbackSpeed : undefined,
+            cullingMode: ParticleSystem.validCullingMode(json.cullingMode),
             texture,
             material: materialMeta?.sourceMaterial ?? materialMeta,
             blendMode: materialMeta?.alphaMode ?? json.blending ?? Constants.ALPHA_ADD,
@@ -2134,6 +2430,7 @@ export class ParticleSystem implements IParticleSystem {
             renderingGroupId: this.renderingGroupId,
             applyFog: this.applyFog,
             playbackSpeed: this.playbackSpeed,
+            cullingMode: this.cullingMode,
             rendererEmitterSettings,
             material: this.materialRef,
             texture: this.rendererSettings.texture,

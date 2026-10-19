@@ -8,7 +8,8 @@ and the project follows the `quarks.core` 0.x version line.
 
 ### Added
 
-- Main module: "Playback speed". Renderer module: "Rendering group" and "Apply fog".
+- Main module: "Playback speed" and "Off screen" (the system's culling mode: always simulate,
+  pause, pause and catch up). Renderer module: "Rendering group" and "Apply fog".
 
 ## [0.23.0] — 2026-10-18
 
