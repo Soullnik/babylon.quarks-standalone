@@ -11,7 +11,9 @@ and the project follows the `quarks.core` 0.x version line.
 - Main module: "Playback speed", "Fixed seed" (the system's random seed, for an effect that plays
   out identically every time) and "Off screen" (the system's culling mode: always simulate, pause,
   pause and catch up). Renderer module: "Rendering group", "Apply fog", "Sort mode" and "Limit
-  screen size" (min / max particle size as fractions of the viewport).
+  screen size" (min / max particle size as fractions of the viewport). Shape module: "Align to
+  direction". Noise module: "Scroll speed" and "Remap" (with its curve). Velocity module: "Orbital
+  offset" and "Radial". Sub Emitters module: "Inherit color / size / rotation / lifetime".
 
 ## [0.23.0] — 2026-10-18
 

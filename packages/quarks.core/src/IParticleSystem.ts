@@ -1,5 +1,6 @@
 import {FunctionValueGenerator, ValueGenerator} from './functions';
 import {Matrix4, Vector2, Vector3} from './math';
+import type {Particle} from './Particle';
 import {IParticle} from './Particle';
 import {ParticleStore} from './ParticleStore';
 export interface EmissionState {
@@ -19,6 +20,10 @@ export interface EmissionState {
     waitEmiting: number;
     travelDistance: number;
     previousWorldPos?: Vector3;
+    /** The particle a sub emission comes from, when it does; see `EmitSubParticleSystem.inherit`. */
+    particle?: Particle;
+    /** Bit mask of the parent's properties the spawned particles take, see `SubEmitterInheritMask`. */
+    inherit?: number;
 }
 
 export interface Resource {}

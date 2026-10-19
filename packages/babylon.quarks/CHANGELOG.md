@@ -62,6 +62,23 @@ and the project follows the `quarks.core` 0.x version line.
   particle is drawn at as a fraction of the viewport height, clamped in the vertex shader (GLSL and
   WGSL). Meshes and trails ignore them. The editor's Renderer module has them under "Limit screen
   size"; the exporter writes Unity's values, its default maximum of 0.5 included.
+- `ParticleSystem.alignToDirection` (constructor option, JSON `alignToDirection`, written only when
+  true): Unity's Align To Direction. A mesh particle's +Z is turned along the direction its shape
+  sends it; a billboard's top is turned toward it in the emitter's XY plane. The start rotation is
+  applied on top; a particle with no speed is left alone. Shape module checkbox in the editor; the
+  exporter writes Shape → Align To Direction.
+- quarks.core `Noise` gains `scrollSpeed` (Unity's Scroll Speed: the field moves past the particles,
+  sampled once per frame, reset with the behavior) and `remap` (Unity's Remap: a curve read at the
+  raw noise mapped from [-1, 1] to [0, 1], whose value replaces it). Both in JSON, the editor's Noise
+  module and the exporter.
+- quarks.core `VelocityOverLife` gains `radial` (Unity's Radial: speed away from the orbit centre)
+  and `orbitalOffset` (Unity's Orbital Offset: where the orbital speeds turn around, relative to
+  the emitter). In JSON, the editor's Velocity module and the exporter.
+- quarks.core `EmitSubParticleSystem` gains `inherit` (Unity's sub emitter Inherit): `'color'` and
+  `'size'` multiply the sub particles' start values by the parent's current ones, `'rotation'` adds
+  the parent's, `'lifetime'` scales theirs by the parent's remaining lifetime fraction. The mask
+  travels in the emission state, so a host that emits into a system by hand can set it too. In
+  JSON, the editor's Sub Emitters module (four checkboxes) and the exporter.
 - `BatchedRenderer.simulationBudgetMs` (unlimited by default): once a frame's simulation has taken
   this long, the systems still to be advanced run one step instead of catching up on the long
   frame, and the time the skipped steps would have covered is dropped — so a frame that already ran

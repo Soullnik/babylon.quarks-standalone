@@ -650,6 +650,12 @@ export function ShapeModule({binding}: ModuleProps) {
                     </Row>
                 </>
             )}
+            <Row label="Align to direction">
+                <CheckboxField
+                    value={binding.system.alignToDirection}
+                    onChange={(v) => binding.apply((s) => (s.alignToDirection = v))}
+                />
+            </Row>
         </ModuleSection>
     );
 }

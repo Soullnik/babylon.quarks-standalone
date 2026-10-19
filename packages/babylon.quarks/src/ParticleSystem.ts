@@ -39,6 +39,7 @@ import {
     SphereEmitter,
     SpriteParticle,
     StretchedBillBoardSettings,
+    SubEmitterInheritMask,
     TrailParticle,
     TrailSettings,
     ValueGenerator,
@@ -206,6 +207,8 @@ export interface ParticleSystemParameters {
     seed?: number;
     /** Draw order within the batch, see {@link ParticleSystem.sortMode}. Default `'none'`. */
     sortMode?: SortMode;
+    /** Whether particles start turned along their direction of travel, see {@link ParticleSystem.alignToDirection}. Default false. */
+    alignToDirection?: boolean;
     /** Smallest on-screen size, as a fraction of the viewport height, see {@link ParticleSystem.minParticleSize}. Default 0. */
     minParticleSize?: number;
     /** Largest on-screen size, as a fraction of the viewport height, see {@link ParticleSystem.maxParticleSize}. Default unlimited. */
@@ -259,6 +262,8 @@ export interface ParticleSystemJSONParameters {
     seed?: number;
     /** Written only when not `'none'`. */
     sortMode?: SortMode;
+    /** Written only when true. */
+    alignToDirection?: boolean;
     /** Written only when not 0. */
     minParticleSize?: number;
     /** Written only when limited. */
@@ -728,6 +733,15 @@ export class ParticleSystem implements IParticleSystem {
     /** What this system does while off screen, see {@link CullingMode}. `'always'` by default. */
     cullingMode: CullingMode = 'always';
 
+    /**
+     * Whether each particle starts turned along the direction its shape sends
+     * it (Unity's Align To Direction): a mesh particle's +Z is pointed along
+     * the velocity, a billboard's top is turned toward it in the emitter's XY
+     * plane. The start rotation is applied on top. A particle with no speed is
+     * left as it is. False by default.
+     */
+    alignToDirection = false;
+
     private seedValue?: number;
     /** The system's own generator while it steps, when seeded; see {@link seed}. */
     private rng?: RandomSource;
@@ -870,6 +884,7 @@ export class ParticleSystem implements IParticleSystem {
         this.flip = ParticleSystem.nonZeroFlip(parameters.flip);
         this.playbackSpeed = parameters.playbackSpeed ?? 1;
         this.cullingMode = parameters.cullingMode ?? 'always';
+        this.alignToDirection = parameters.alignToDirection === true;
         this.seed = parameters.seed;
         if (this.rendererSettings.renderMode === RenderMode.Mesh && !this.rendererSettings.instancingNormals) {
             this.rendererSettings.instancingNormals = ParticleSystem.createFallbackNormals(
@@ -1175,6 +1190,16 @@ export class ParticleSystem implements IParticleSystem {
 
             this.emitterShape.initialize(particle, emissionState);
 
+            if (this.alignToDirection && isSpriteMode) {
+                this.alignParticleToDirection(particle as SpriteParticle, isMeshMode);
+            }
+
+            const parent = emissionState.particle;
+            const inherit = emissionState.inherit;
+            if (parent !== undefined && inherit !== undefined && inherit !== 0) {
+                this.inheritFromParent(particle, parent, inherit, isSpriteMode);
+            }
+
             if (isTrailMode && followLocalOrigin) {
                 const trail = particle as TrailParticle;
                 if (!trail.localPosition) {
@@ -1203,6 +1228,53 @@ export class ParticleSystem implements IParticleSystem {
             // Every generator has claimed its slot by now; give the compiled
             // behavior passes a column copy of the samples.
             this.store.recordMemory((particle as StoreBackedParticle).storeIndex, particle.memory);
+        }
+    }
+
+    /** Turns a newborn so that it faces the way its shape sent it; see {@link alignToDirection}. */
+    private alignParticleToDirection(sprite: SpriteParticle, isMeshMode: boolean): void {
+        const velocity = sprite.velocity;
+        const speedSq = velocity.x * velocity.x + velocity.y * velocity.y + velocity.z * velocity.z;
+        if (speedSq === 0) {
+            return;
+        }
+        if (isMeshMode) {
+            // +Z along the velocity, with the start rotation applied first.
+            const rotation = sprite.rotation as Quaternion;
+            tempV.copy(velocity).divideScalar(Math.sqrt(speedSq));
+            tempQ.setFromUnitVectors(UP, tempV);
+            rotation.multiplyQuaternions(tempQ, rotation);
+        } else {
+            // The quad's top (its +Y) toward the velocity in the emitter's XY plane.
+            if (velocity.x !== 0 || velocity.y !== 0) {
+                sprite.rotation = (sprite.rotation as number) + Math.atan2(-velocity.x, velocity.y);
+            }
+        }
+    }
+
+    /** Applies the parent particle's inherited properties to a sub emitted newborn; see `EmitSubParticleSystem.inherit`. */
+    private inheritFromParent(particle: Particle, parent: Particle, inherit: number, isSpriteMode: boolean): void {
+        if (inherit & SubEmitterInheritMask.color) {
+            particle.startColor.multiply(parent.color);
+            particle.color.copy(particle.startColor);
+        }
+        if (inherit & SubEmitterInheritMask.size) {
+            particle.startSize.multiply(parent.size);
+            particle.size.copy(particle.startSize);
+        }
+        if (inherit & SubEmitterInheritMask.rotation && isSpriteMode) {
+            const sprite = particle as SpriteParticle;
+            const parentRotation = parent.rotation;
+            if (typeof sprite.rotation === 'number') {
+                if (typeof parentRotation === 'number') {
+                    sprite.rotation += parentRotation;
+                }
+            } else if (parentRotation instanceof Quaternion) {
+                (sprite.rotation as Quaternion).multiplyQuaternions(parentRotation, sprite.rotation as Quaternion);
+            }
+        }
+        if (inherit & SubEmitterInheritMask.lifetime && parent.life > 0) {
+            particle.life *= Math.max(0, 1 - parent.age / parent.life);
         }
     }
 
@@ -2195,6 +2267,7 @@ export class ParticleSystem implements IParticleSystem {
             ...(this.cullingMode !== 'always' ? {cullingMode: this.cullingMode} : {}),
             ...(this.seedValue !== undefined ? {seed: this.seedValue} : {}),
             ...(this.sortMode !== 'none' ? {sortMode: this.sortMode} : {}),
+            ...(this.alignToDirection ? {alignToDirection: true} : {}),
             ...(this.minParticleSize > 0 ? {minParticleSize: this.minParticleSize} : {}),
             ...(this.maxParticleSize !== Infinity ? {maxParticleSize: this.maxParticleSize} : {}),
             rendererEmitterSettings: rendererEmitterSettingsJSON,
@@ -2301,6 +2374,7 @@ export class ParticleSystem implements IParticleSystem {
             cullingMode: ParticleSystem.validCullingMode(json.cullingMode),
             seed: typeof json.seed === 'number' ? json.seed : undefined,
             sortMode: ParticleSystem.validSortMode(json.sortMode),
+            alignToDirection: json.alignToDirection === true,
             minParticleSize: typeof json.minParticleSize === 'number' ? json.minParticleSize : undefined,
             maxParticleSize: typeof json.maxParticleSize === 'number' ? json.maxParticleSize : undefined,
             texture,
@@ -2566,6 +2640,7 @@ export class ParticleSystem implements IParticleSystem {
             cullingMode: this.cullingMode,
             seed: this.seedValue,
             sortMode: this.sortMode,
+            alignToDirection: this.alignToDirection,
             minParticleSize: this.minParticleSize,
             maxParticleSize: this.maxParticleSize,
             rendererEmitterSettings,

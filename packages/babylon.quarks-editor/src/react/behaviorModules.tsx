@@ -2,6 +2,7 @@ import type {Behavior} from 'babylon.quarks';
 import {
     ApplyCollision,
     ApplyForce,
+    Bezier,
     ChangeEmitDirection,
     ColorBySpeed,
     ConstantValue,
@@ -14,6 +15,7 @@ import {
     LimitSpeedOverLife,
     Noise,
     OrbitOverLife,
+    PiecewiseBezier,
     RotationBySpeed,
     RotationOverLife,
     SizeBySpeed,
@@ -227,6 +229,17 @@ export function VelocityOverLifeModule({binding}: ModuleProps) {
                         curveMax={Math.PI * 4}
                         onChange={(g) => binding.apply(() => (behavior.orbitalZ = g))}
                     />
+                    <Vector3Row
+                        label="Orbital offset"
+                        value={behavior.orbitalOffset}
+                        onChange={(v) => binding.apply(() => (behavior.orbitalOffset = v))}
+                    />
+                    <ValueField
+                        label="Radial"
+                        generator={behavior.radial}
+                        curveMax={10}
+                        onChange={(g) => binding.apply(() => (behavior.radial = g))}
+                    />
                 </>
             )}
         </BehaviorModule>
@@ -349,6 +362,33 @@ export function NoiseModule({binding}: ModuleProps) {
                         curveMax={Math.PI}
                         onChange={(g) => binding.apply(() => (behavior.rotationAmount = g))}
                     />
+                    <ValueField
+                        label="Scroll speed"
+                        generator={behavior.scrollSpeed}
+                        curveMax={5}
+                        onChange={(g) => binding.apply(() => (behavior.scrollSpeed = g))}
+                    />
+                    <Row label="Remap">
+                        <CheckboxField
+                            value={behavior.remap !== undefined}
+                            onChange={(v) =>
+                                binding.apply(
+                                    () =>
+                                        (behavior.remap = v
+                                            ? new PiecewiseBezier([[new Bezier(-1, -1 / 3, 1 / 3, 1), 0]])
+                                            : undefined)
+                                )
+                            }
+                        />
+                    </Row>
+                    {behavior.remap !== undefined && (
+                        <ValueField
+                            label="Remap curve"
+                            generator={behavior.remap}
+                            curveMax={1}
+                            onChange={(g) => binding.apply(() => (behavior.remap = g as PiecewiseBezier))}
+                        />
+                    )}
                 </>
             )}
         </BehaviorModule>
