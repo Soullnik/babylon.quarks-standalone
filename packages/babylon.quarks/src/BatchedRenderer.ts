@@ -374,6 +374,7 @@ export class BatchedRenderer extends TransformNode {
             case RenderMode.VerticalBillBoard:
             case RenderMode.HorizontalBillBoard:
             case RenderMode.StretchedBillBoard:
+            case RenderMode.Beam:
                 batch = new SpriteBatch(settings, scene);
                 break;
             default:

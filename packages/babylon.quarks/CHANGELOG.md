@@ -27,7 +27,11 @@ and the project follows the `quarks.core` 0.x version line.
       alpha erosion. The particle's alpha decides how much of the shape is left instead of how
       transparent it is, so a `ColorOverLife` alpha curve dissolves it through a noise mask or wipes
       it through a gradient one, with an optional glowing edge.
-- Example "Texture Effects" showing the three.
+- `RenderMode.Beam` (6) with `ParticleSystem.beamEnd` (a point or anything with a world position,
+  such as a `TransformNode`, read every frame; runtime only): a quad laid from each particle to
+  the end and turned about its length to face the camera, U along it, the size as its width. With
+  a sheet and `FrameOverLife` `fps` it flickers like lightning; bounds reach the end.
+- Example "Texture Effects" showing the texture effects and a beam.
 
 ### Fixed
 

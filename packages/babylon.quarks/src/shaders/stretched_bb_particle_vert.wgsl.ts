@@ -77,8 +77,14 @@ fn main(input: VertexInputs) -> FragmentInputs {
     let widthOffset = vertexInputs.position.y * side * avgSize;
     // Equivalent to viewVelocity * (1.0 + lengthFactor / vlength) for moving particles, but the
     // size-based term (vdir * lengthFactor) survives when the velocity contribution vanishes.
+#ifdef BEAM
+    // The vector runs from the particle to the beam's end: the quad spans it
+    // exactly, U from the particle (0) to the end (1), as wide as the size.
+    var stretched = mvPosition.xyz + widthOffset + (vertexInputs.position.x + 0.5) * viewVelocity;
+#else
     let lengthOffset = (vertexInputs.position.x + 0.5) * (viewVelocity + vdir * lengthFactor) * avgSize;
     var stretched = mvPosition.xyz + widthOffset - lengthOffset;
+#endif
 #ifdef PIVOT
     // In particle-size units along the quad's own axes: x from head to tail, y across.
     stretched += (uniforms.pivot.y * side - uniforms.pivot.x * vdir) * avgSize;

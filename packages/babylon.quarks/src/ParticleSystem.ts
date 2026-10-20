@@ -90,6 +90,13 @@ export interface BurstParameters {
  */
 export type CullingMode = 'always' | 'pause' | 'pauseAndCatchUp';
 
+/**
+ * Where a {@link RenderMode.Beam} system's quads end: a point in world space,
+ * or anything with a world position, such as a Babylon `TransformNode`, read
+ * every frame.
+ */
+export type BeamEnd = Vector3 | {getAbsolutePosition(): {x: number; y: number; z: number}};
+
 /** Particle backed by a {@link ParticleStore} row, as this system always creates. */
 type StoreBackedParticle = Particle & {storeIndex: number; setStoreIndex(index: number): void};
 
@@ -738,6 +745,7 @@ export class ParticleSystem implements IParticleSystem {
                 case RenderMode.BillBoard:
                 case RenderMode.VerticalBillBoard:
                 case RenderMode.HorizontalBillBoard:
+                case RenderMode.Beam:
                     this.rendererEmitterSettings = {};
                     break;
             }
@@ -1596,6 +1604,47 @@ export class ParticleSystem implements IParticleSystem {
      * frame behind the display.
      */
     getWorldBounds(min: Vector3, max: Vector3): boolean {
+        if (!this.measureWorldBounds(min, max)) {
+            return false;
+        }
+        if (this.rendererSettings.renderMode === RenderMode.Beam) {
+            // The quads reach the beam's end, which moves on its own.
+            const end = this.beamEndScratch;
+            if (!this.getBeamEnd(end)) {
+                return false;
+            }
+            const pad = this.boundsPadding;
+            min.set(Math.min(min.x, end.x - pad), Math.min(min.y, end.y - pad), Math.min(min.z, end.z - pad));
+            max.set(Math.max(max.x, end.x + pad), Math.max(max.y, end.y + pad), Math.max(max.z, end.z + pad));
+        }
+        return true;
+    }
+
+    /**
+     * Where a {@link RenderMode.Beam} system's quads end, see {@link BeamEnd}.
+     * Unset (the default), a beam has no length and draws nothing. Not saved
+     * in the effect JSON: it is where this instance is aimed at runtime.
+     */
+    beamEnd?: BeamEnd;
+
+    private readonly beamEndScratch = new Vector3();
+
+    /** The world position of {@link beamEnd} into `out`; false when it is unset. */
+    getBeamEnd(out: Vector3): boolean {
+        const end = this.beamEnd;
+        if (end === undefined) {
+            return false;
+        }
+        if (end instanceof Vector3) {
+            out.copy(end);
+        } else {
+            const position = end.getAbsolutePosition();
+            out.set(position.x, position.y, position.z);
+        }
+        return true;
+    }
+
+    private measureWorldBounds(min: Vector3, max: Vector3): boolean {
         if (!this.boundsValid) {
             return false;
         }

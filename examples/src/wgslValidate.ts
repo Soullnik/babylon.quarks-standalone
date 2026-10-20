@@ -128,6 +128,14 @@ function cases(): Case[] {
         []
     );
     push(
+        'beam',
+        stretchedVert,
+        particleFrag,
+        [...SPRITE_ATTRS, 'velocity'],
+        [...SPRITE_UNIFORMS, 'speedFactor'],
+        ['BEAM']
+    );
+    push(
         'mesh',
         meshVert,
         physicsFrag,

@@ -2,11 +2,13 @@ import {Constants} from '@babylonjs/core/Engines/constants';
 import {DynamicTexture} from '@babylonjs/core/Materials/Textures/dynamicTexture';
 import {Texture} from '@babylonjs/core/Materials/Textures/texture';
 import {Vector3 as BVector3} from '@babylonjs/core/Maths/math.vector';
+import {TransformNode} from '@babylonjs/core/Meshes/transformNode';
 import type {Scene} from '@babylonjs/core/scene';
 import {
     ConeEmitter,
     ConstantColor,
     ConstantValue,
+    FrameOverLife,
     IntervalValue,
     ParticleSystem,
     PointEmitter,
@@ -76,6 +78,35 @@ function fireRamp(ctx: CanvasRenderingContext2D, size: number): void {
     gradient.addColorStop(1, 'rgba(255, 255, 255, 1)');
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, size, size);
+}
+
+/** Four jagged bolts stacked in rows, each running along U: a 1×4 sheet for a flickering beam. */
+function bolts(ctx: CanvasRenderingContext2D, size: number): void {
+    ctx.clearRect(0, 0, size, size);
+    let seed = 3;
+    const random = () => {
+        seed = (seed * 16807) % 2147483647;
+        return seed / 2147483647;
+    };
+    const rows = 4;
+    const rowHeight = size / rows;
+    for (let r = 0; r < rows; r++) {
+        const mid = rowHeight * (r + 0.5);
+        for (const [width, alpha] of [
+            [6, 0.25],
+            [2, 1],
+        ]) {
+            seed = 3 + r * 101;
+            ctx.strokeStyle = `rgba(255, 255, 255, ${alpha})`;
+            ctx.lineWidth = width;
+            ctx.beginPath();
+            ctx.moveTo(0, mid);
+            for (let x = 8; x <= size; x += 8) {
+                ctx.lineTo(x, mid + (random() - 0.5) * rowHeight * 0.7 * Math.sin((x / size) * Math.PI));
+            }
+            ctx.stroke();
+        }
+    }
 }
 
 /** Smooth value noise in the red channel, for a dissolve mask. */
@@ -177,7 +208,35 @@ export function init({scene, camera, batchRenderer, systems}: DemoContext) {
     smoke.addBehavior(createColorOverLifeGradient(new Vector4(1, 1, 1, 1), new Vector4(1, 1, 1, 0)));
     smoke.emitter.position = new BVector3(5, 1.5, 0);
 
-    for (const system of [flow, embers, smoke]) {
+    // Beam: a bolt laid from the emitter to a moving node, flickering between the sheet's rows.
+    const target = new TransformNode('beamTarget', scene);
+    const bolt = new ParticleSystem({
+        scene,
+        duration: 1,
+        looping: true,
+        startLife: new ConstantValue(1000),
+        startSpeed: new ConstantValue(0),
+        startSize: new ConstantValue(0.8),
+        startColor: new ConstantColor(new Vector4(0.6, 0.8, 1, 1)),
+        emissionOverTime: new ConstantValue(0),
+        emissionBursts: [{time: 0, count: new ConstantValue(1), cycle: 1, interval: 0, probability: 1}],
+        shape: new PointEmitter(),
+        renderMode: RenderMode.Beam,
+        texture: canvasTexture(scene, 'bolts', 256, false, bolts),
+        uTileCount: 1,
+        vTileCount: 4,
+        blendMode: Constants.ALPHA_ADD,
+    });
+    bolt.addBehavior(new FrameOverLife(new ConstantValue(0), {fps: 14, frameCount: 4}));
+    bolt.emitter.position = new BVector3(-3, -1.5, 0);
+    bolt.beamEnd = target;
+    let t = 0;
+    scene.onBeforeRenderObservable.add(() => {
+        t += scene.getEngine().getDeltaTime() / 1000;
+        target.position.set(3 + Math.cos(t) * 0.8, -1.5 + Math.sin(t * 1.3) * 0.8, Math.sin(t) * 0.5);
+    });
+
+    for (const system of [flow, embers, smoke, bolt]) {
         batchRenderer.addSystem(system);
         systems.push(system);
     }

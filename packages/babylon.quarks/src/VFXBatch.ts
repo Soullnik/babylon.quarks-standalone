@@ -30,6 +30,13 @@ export enum RenderMode {
     Trail = 3,
     HorizontalBillBoard = 4,
     VerticalBillBoard = 5,
+    /**
+     * A quad laid from each particle to the system's {@link ParticleSystem.beamEnd}
+     * and turned about its length to face the camera (a line renderer): U runs
+     * from the particle (0) to the end (1), V across, the particle's size is
+     * the width. Lightning, tethers, lasers.
+     */
+    Beam = 6,
 }
 
 /**
