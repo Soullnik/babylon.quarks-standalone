@@ -293,9 +293,14 @@ function fragmentFor(behavior: Behavior, k: number): Fragment | null {
                     }`,
             };
         case 'FrameOverLife':
+            // Frame rate, cycles and start frame go through the behavior's own
+            // frameAt; the plain life-fraction curve stays inline.
             return {
-                setup: scalarSetup(`g${k}`, `behaviors[${k}].frame`),
-                body: `{${scalarValue(`g${k}`, 'v', 't')} uvTile[row] = v;}`,
+                setup: `${scalarSetup(`g${k}`, `behaviors[${k}].frame`)}
+                    const b${k} = behaviors[${k}];
+                    const plain${k} = typeof b${k}.isPlain !== 'function' || b${k}.isPlain();`,
+                body: `if (plain${k}) {${scalarValue(`g${k}`, 'v', 't')} uvTile[row] = v;}
+                    else uvTile[row] = b${k}.frameAt(p, age, t);`,
             };
         case 'SpeedOverLife':
             return {

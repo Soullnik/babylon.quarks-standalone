@@ -730,6 +730,15 @@ export class ParticleSystem implements IParticleSystem {
      */
     playbackSpeed = 1;
 
+    /**
+     * Runtime multiplier on how many particles the system emits: bursts,
+     * emission over time and over distance alike. Unlike
+     * {@link setQualityFactor}, which only ever thins an effect, it may go
+     * above 1 to make a stronger version of the same effect. The two multiply.
+     * 1 by default; not saved in the effect JSON.
+     */
+    emissionMultiplier = 1;
+
     /** What this system does while off screen, see {@link CullingMode}. `'always'` by default. */
     cullingMode: CullingMode = 'always';
 
@@ -1060,6 +1069,12 @@ export class ParticleSystem implements IParticleSystem {
 
     setQualityFactor(qualityFactor: number) {
         this.qualityFactor = Math.max(0.1, Math.min(1, qualityFactor));
+    }
+
+    /** Quality factor times {@link emissionMultiplier}: what emission counts are scaled by. */
+    private emissionFactor(): number {
+        const multiplier = this.emissionMultiplier;
+        return multiplier >= 0 ? this.qualityFactor * multiplier : this.qualityFactor;
     }
 
     /**
@@ -2060,8 +2075,8 @@ export class ParticleSystem implements IParticleSystem {
             return;
         }
         const rawCount = burst.count.genValue(this.memory, this.time);
-        const qualityFactor = this.qualityFactor;
-        const count = qualityFactor >= 0.999 ? rawCount : Math.floor(rawCount * qualityFactor);
+        const factor = this.emissionFactor();
+        const count = Math.abs(factor - 1) < 0.001 ? rawCount : Math.floor(rawCount * factor);
         emissionState.isBursting = true;
         emissionState.burstParticleCount = count;
         this.spawn(count, emissionState, emitterMatrix);
@@ -2126,6 +2141,10 @@ export class ParticleSystem implements IParticleSystem {
     }
 
     emit(delta: number, emissionState: EmissionState, emitterMatrix: Matrix4) {
+        // Ended before this step (endEmit, or a past step's end of duration):
+        // no more bursts either. A looping system would otherwise keep firing
+        // them every loop after endEmit and never finish.
+        const endedBefore = this.emitEnded;
         if (emissionState.time > this.duration) {
             if (this.looping) {
                 emissionState.time -= this.duration;
@@ -2149,9 +2168,9 @@ export class ParticleSystem implements IParticleSystem {
             this.normalMatrix.getNormalMatrix(emitterMatrix);
         }
         const emissionBurstCount = this.emissionBursts.length;
-        const qualityFactor = this.qualityFactor;
+        const qualityFactor = this.emissionFactor();
 
-        if (emissionBurstCount > 0) {
+        if (emissionBurstCount > 0 && !endedBefore) {
             this.emitBursts(emissionState, emitterMatrix);
         }
 

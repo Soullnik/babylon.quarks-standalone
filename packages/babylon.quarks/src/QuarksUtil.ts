@@ -1,6 +1,6 @@
 import {TransformNode} from '@babylonjs/core/Meshes/transformNode';
 import {Node} from '@babylonjs/core/node';
-import {EmitSubParticleSystem} from 'quarks.core';
+import {ConstantValue, EmitSubParticleSystem, FunctionValueGenerator, IntervalValue, ValueGenerator} from 'quarks.core';
 import {BatchedRenderer} from './BatchedRenderer';
 import {ParticleEmitter} from './ParticleEmitter';
 import {ParticleSystem} from './ParticleSystem';
@@ -118,6 +118,90 @@ export class QuarksUtil {
             }
         }
         return copy;
+    }
+
+    /**
+     * Seconds until the effect under `root` is over when it plays from the
+     * start: for each system its longest start delay, its duration and its
+     * longest particle life, divided by its playback speed; a sub emitter
+     * target ends a particle life after the last of its parents. Infinity when
+     * a system loops, since such an effect only ends on {@link endEmit}.
+     *
+     * Random values count at their maximum, so this is an upper bound; curves
+     * are sampled. Particles cut short by collisions or culling only make the
+     * real effect shorter.
+     */
+    static getDuration(root: Node): number {
+        const systems: ParticleSystem[] = [];
+        QuarksUtil.runOnAllParticleEmitters(root, (emitter) => {
+            systems.push(emitter.system as unknown as ParticleSystem);
+        });
+        const parents = new Map<ParticleSystem, ParticleSystem[]>();
+        for (const system of systems) {
+            for (const behavior of system.behaviors) {
+                if (!(behavior instanceof EmitSubParticleSystem)) {
+                    continue;
+                }
+                const target = (behavior.subParticleSystem as unknown as ParticleEmitter | undefined)?.system as
+                    | ParticleSystem
+                    | undefined;
+                if (target !== undefined && typeof target === 'object') {
+                    const list = parents.get(target) ?? [];
+                    list.push(system);
+                    parents.set(target, list);
+                }
+            }
+        }
+        const ends = new Map<ParticleSystem, number>();
+        const endOf = (system: ParticleSystem): number => {
+            const known = ends.get(system);
+            if (known !== undefined) {
+                return known;
+            }
+            // Marks the system while it is resolved, so a sub emitter cycle loops forever rather than the stack.
+            ends.set(system, Infinity);
+            const speed = system.playbackSpeed > 0 ? system.playbackSpeed : 1;
+            const life = QuarksUtil.maxOf(system.startLife) / speed;
+            let end: number;
+            if (system.onlyUsedByOther) {
+                end = 0;
+                for (const parent of parents.get(system) ?? []) {
+                    end = Math.max(end, endOf(parent));
+                }
+                end += life;
+            } else if (system.looping) {
+                end = Infinity;
+            } else {
+                end = (QuarksUtil.maxOf(system.startDelay) + system.duration) / speed + life;
+            }
+            ends.set(system, end);
+            return end;
+        };
+        let duration = 0;
+        for (const system of systems) {
+            duration = Math.max(duration, endOf(system));
+        }
+        return duration;
+    }
+
+    /** The largest value `generator` gives: exact for constants and intervals, sampled otherwise. */
+    private static maxOf(generator: ValueGenerator | FunctionValueGenerator): number {
+        if (generator instanceof ConstantValue) {
+            return generator.value;
+        }
+        if (generator instanceof IntervalValue) {
+            return Math.max(generator.a, generator.b);
+        }
+        let max = -Infinity;
+        const samples = 32;
+        for (let i = 0; i <= samples; i++) {
+            const memory: number[] = [];
+            generator.startGen(memory);
+            const value =
+                generator.type === 'function' ? generator.genValue(memory, i / samples) : generator.genValue(memory);
+            max = Math.max(max, value);
+        }
+        return max;
     }
 
     private static traverseNode(node: Node, callback: (node: Node) => void): void {

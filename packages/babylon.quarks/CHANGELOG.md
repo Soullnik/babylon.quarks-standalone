@@ -4,6 +4,25 @@ All notable changes to the `babylon.quarks` package are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project follows the `quarks.core` 0.x version line.
 
+## [Unreleased]
+
+### Added
+
+- `ParticleSystem.emissionMultiplier` (runtime only, default 1): scales bursts, emission over time
+  and over distance, and may go above 1, unlike `setQualityFactor`. The two multiply.
+- `QuarksUtil.getDuration(root)`: seconds until an effect played from the start is over (start
+  delay, duration and longest life over playback speed; sub emitter targets a life after their
+  parents), or `Infinity` when a system loops.
+- quarks.core `FrameOverLife` options (`fps`, `cycles`, `frameCount`, `loop`, `startFrame`, all
+  saved in JSON only when set): Unity's texture sheet FPS mode, several cycles per life, a looping
+  or holding frame segment and a per-particle random start frame. Without them the behaviour is
+  unchanged and stays in the fused pass.
+
+### Fixed
+
+- A looping system kept firing its bursts on every loop after `endEmit()`, so it never finished.
+  Bursts now stop with the rest of the emission once it has ended.
+
 ## [0.24.1] — 2026-10-20
 
 ### Changed
