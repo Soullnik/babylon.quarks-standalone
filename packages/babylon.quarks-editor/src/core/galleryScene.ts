@@ -1,3 +1,4 @@
+import '@babylonjs/core/Culling/ray';
 import {Vector3} from '@babylonjs/core/Maths/math.vector';
 import type {Scene} from '@babylonjs/core/scene';
 import type {BatchedRenderer} from 'babylon.quarks';

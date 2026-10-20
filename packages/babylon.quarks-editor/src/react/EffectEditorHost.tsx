@@ -1,4 +1,6 @@
 import {ArcRotateCamera} from '@babylonjs/core/Cameras/arcRotateCamera';
+// scene.pick lives in Ray's side effect (Babylon 9.31 no longer pulls it in); gizmos pick through it.
+import '@babylonjs/core/Culling/ray';
 import {Engine} from '@babylonjs/core/Engines/engine';
 import {PointerEventTypes} from '@babylonjs/core/Events/pointerEvents';
 import {GizmoManager} from '@babylonjs/core/Gizmos/gizmoManager';
@@ -411,6 +413,9 @@ export function EffectEditorHost(props: EffectEditorHostProps) {
         groundMaterial.mainColor = new Color3(1, 1, 1);
         groundMaterial.lineColor = new Color3(1, 1, 1);
         groundMaterial.opacity = 0.5;
+        // Draw only the lines. Babylon < 9.31 did this by itself for opacity < 1; 9.31 needs the flag,
+        // or the whole plane is filled with the main color.
+        groundMaterial.linesOnly = true;
         const ground = MeshBuilder.CreateGround('ground', {width: 100, height: 100}, scene);
         ground.material = groundMaterial;
 
