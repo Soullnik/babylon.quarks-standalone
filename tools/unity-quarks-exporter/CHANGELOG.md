@@ -2,6 +2,16 @@
 
 All notable changes to the Unity Quarks Exporter are documented here.
 
+## [0.24.1] — 2026-10-20
+
+### Fixed
+
+- 0.24.0 did not compile in Unity (`JArray` has no `Count` and no three-argument constructor):
+  Velocity over Lifetime → Orbital Offset and Sub Emitters → Inherit are now built with the
+  exporter's own JSON API.
+- Main → Random Seed above 16,777,216 lost its low bits on export (it went through a `float`); it
+  is now written exactly.
+
 ## [0.24.0] — 2026-10-20
 
 ### Added

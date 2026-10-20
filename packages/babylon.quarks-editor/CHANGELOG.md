@@ -4,6 +4,15 @@ All notable changes to the `babylon.quarks-editor` package are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project follows the `quarks.core` 0.x version line.
 
+## [0.24.1] — 2026-10-20
+
+### Fixed
+
+- With Babylon 9.31 the viewport lost its ground grid (the whole plane drew in flat grey) and the
+  gizmos, viewport selection and drop-to-place stopped responding: 9.31's grid needs `linesOnly`
+  for what opacity below 1 used to do, and `scene.pick` now needs `@babylonjs/core/Culling/ray`
+  imported for its side effect, which the editor now does.
+
 ## [0.24.0] — 2026-10-20
 
 ### Added
@@ -25,13 +34,6 @@ and the project follows the `quarks.core` 0.x version line.
   reflection level.
 - "Random between two" fields label their min and max inputs. Export and Save warn when the
   effect references `blob:` textures, which do not survive a reload.
-
-### Fixed
-
-- With Babylon 9.31 the viewport lost its ground grid (the whole plane drew in flat grey) and the
-  gizmos, viewport selection and drop-to-place stopped responding: 9.31's grid needs `linesOnly`
-  for what opacity below 1 used to do, and `scene.pick` now needs `@babylonjs/core/Culling/ray`
-  imported for its side effect, which the editor now does.
 
 ## [0.23.0] — 2026-10-18
 

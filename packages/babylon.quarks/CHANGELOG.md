@@ -4,6 +4,13 @@ All notable changes to the `babylon.quarks` package are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project follows the `quarks.core` 0.x version line.
 
+## [0.24.1] — 2026-10-20
+
+### Changed
+
+- Version aligned with babylon.quarks-editor 0.24.1 and the Unity exporter 0.24.1, which fix
+  issues in 0.24.0 (no runtime changes).
+
 ## [0.24.0] — 2026-10-20
 
 ### Added
@@ -43,11 +50,12 @@ and the project follows the `quarks.core` 0.x version line.
   on its own generator started from the seed while it steps, and restarts it on `restart()`, so the
   effect plays out identically every time; systems it emits into roll on it too. The editor has a
   "Fixed seed" field; the Unity exporter writes Main → Random Seed when Auto Random Seed is off.
-- `EffectPool`: a pool of copies of one effect for things played many times over. `acquire(position,
-  parent)` takes an idle copy (or makes one, up to `maxSize`), places it and plays it; a copy whose
-  systems have all finished returns to the pool by itself; `stop(copy)` ends a looping copy's
-  emission and lets it die out first; `release(copy)` takes it back at once; `prewarm` makes copies
-  up front. Idle copies stay disabled in the renderer's batches, so acquiring allocates nothing.
+- `EffectPool`: a pool of copies of one effect for things played many times over.
+  `acquire(position, parent)` takes an idle copy (or makes one, up to `maxSize`), places it and
+  plays it; a copy whose systems have all finished returns to the pool by itself; `stop(copy)` ends
+  a looping copy's emission and lets it die out first; `release(copy)` takes it back at once;
+  `prewarm` makes copies up front. Idle copies stay disabled in the renderer's batches, so acquiring
+  allocates nothing.
 - `QuarksUtil.instantiate(root)`: a deep copy of an effect tree, with sub emitter links pointing at
   the copied emitters.
 - `ParticleSystem.sortMode` (constructor option, JSON `sortMode`, written only when not `'none'`):
