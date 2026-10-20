@@ -326,10 +326,7 @@ export class SpriteBatch extends VFXBatch {
         if (this.settings.renderMode === RenderMode.Beam) {
             defines.push('BEAM');
         }
-        const pivot =
-            SpriteBatch.takesPivotAndFlip(this.settings.renderMode) && this.settings.renderMode !== RenderMode.Beam
-                ? this.settings.pivot
-                : undefined;
+        const pivot = SpriteBatch.takesPivotAndFlip(this.settings.renderMode) ? this.settings.pivot : undefined;
         if (pivot) {
             defines.push('PIVOT');
         }
@@ -1013,10 +1010,9 @@ export class SpriteBatch extends VFXBatch {
         }
     }
 
-    /** The quads that take a pivot and flip: every billboard kind, stretched included, but not meshes. */
+    /** The quads that take a pivot and flip: every billboard kind, stretched included, but not meshes or beams. */
     private static takesPivotAndFlip(renderMode: RenderMode): boolean {
         return (
-            renderMode === RenderMode.Beam ||
             renderMode === RenderMode.BillBoard ||
             renderMode === RenderMode.StretchedBillBoard ||
             renderMode === RenderMode.VerticalBillBoard ||

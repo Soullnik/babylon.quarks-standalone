@@ -109,7 +109,7 @@ export type ScalingMode = 'shape' | 'hierarchy';
  * or anything with a world position, such as a Babylon `TransformNode`, read
  * every frame.
  */
-export type BeamEnd = Vector3 | {getAbsolutePosition(): {x: number; y: number; z: number}};
+export type BeamEnd = {x: number; y: number; z: number} | {getAbsolutePosition(): {x: number; y: number; z: number}};
 
 /** Particle backed by a {@link ParticleStore} row, as this system always creates. */
 type StoreBackedParticle = Particle & {storeIndex: number; setStoreIndex(index: number): void};
@@ -676,18 +676,26 @@ export class ParticleSystem implements IParticleSystem {
         this.neededToUpdateRender = true;
     }
 
+    /**
+     * The emitter's world scale per axis, measured with {@link motionScale}
+     * before every step; what `'hierarchy'` multiplies start speeds by. Taken
+     * from the system's own emitter rather than the emission matrix, whose
+     * columns carry a parent particle's velocity for a sub emitter.
+     */
+    private readonly hierarchyScale = new Vector3(1, 1, 1);
+
     /** The mean world scale of the emitter for a world-space `'hierarchy'` system, else 1. */
     private measureMotionScale(): number {
         if (this.scalingMode !== 'hierarchy' || !this.worldSpace) {
+            this.hierarchyScale.set(1, 1, 1);
             return 1;
         }
         const e = this.emitter.matrixWorld.elements;
-        return (
-            (Math.sqrt(e[0] * e[0] + e[1] * e[1] + e[2] * e[2]) +
-                Math.sqrt(e[4] * e[4] + e[5] * e[5] + e[6] * e[6]) +
-                Math.sqrt(e[8] * e[8] + e[9] * e[9] + e[10] * e[10])) /
-            3
-        );
+        const sx = Math.sqrt(e[0] * e[0] + e[1] * e[1] + e[2] * e[2]);
+        const sy = Math.sqrt(e[4] * e[4] + e[5] * e[5] + e[6] * e[6]);
+        const sz = Math.sqrt(e[8] * e[8] + e[9] * e[9] + e[10] * e[10]);
+        this.hierarchyScale.set(sx, sy, sz);
+        return (sx + sy + sz) / 3;
     }
 
     /** `lighting` if it is one of the modes, else the default. */
@@ -1346,8 +1354,8 @@ export class ParticleSystem implements IParticleSystem {
                 particle.startSize.multiply(scale).abs();
                 particle.size.copy(particle.startSize);
                 if (this.scalingMode === 'hierarchy') {
-                    // Scaled per axis in the emitter's frame, then turned: the speed scales with it.
-                    particle.velocity.multiply(scale).applyQuaternion(tempQ);
+                    // Scaled per axis by the emitter's world scale, then turned: the speed scales with it.
+                    particle.velocity.multiply(this.hierarchyScale).applyQuaternion(tempQ);
                 } else {
                     particle.velocity.multiply(scale).applyMatrix3(this.normalMatrix);
                 }
@@ -1656,12 +1664,13 @@ export class ParticleSystem implements IParticleSystem {
             return false;
         }
         if (this.rendererSettings.renderMode === RenderMode.Beam) {
-            // The quads reach the beam's end, which moves on its own.
+            // The quads reach the beam's end, which moves on its own. Without
+            // one a beam draws nothing beyond its particles.
             const end = this.beamEndScratch;
             if (!this.getBeamEnd(end)) {
-                return false;
+                return true;
             }
-            const pad = this.boundsPadding;
+            const pad = this.boundsInWorld ? this.boundsPadding : this.boundsPadding * this.emitterMaxScale();
             min.set(Math.min(min.x, end.x - pad), Math.min(min.y, end.y - pad), Math.min(min.z, end.z - pad));
             max.set(Math.max(max.x, end.x + pad), Math.max(max.y, end.y + pad), Math.max(max.z, end.z + pad));
         }
@@ -1683,13 +1692,28 @@ export class ParticleSystem implements IParticleSystem {
         if (end === undefined) {
             return false;
         }
-        if (end instanceof Vector3) {
-            out.copy(end);
-        } else {
-            const position = end.getAbsolutePosition();
+        const node = end as {getAbsolutePosition?: () => {x: number; y: number; z: number}};
+        if (typeof node.getAbsolutePosition === 'function') {
+            const position = node.getAbsolutePosition();
             out.set(position.x, position.y, position.z);
+        } else {
+            // Any point: quarks' Vector3, or a Babylon one passed from plain JavaScript.
+            const point = end as {x: number; y: number; z: number};
+            out.set(point.x, point.y, point.z);
         }
         return true;
+    }
+
+    /** The largest axis of the emitter's world scale. */
+    private emitterMaxScale(): number {
+        const e = this.emitter.matrixWorld.elements;
+        return Math.sqrt(
+            Math.max(
+                e[0] * e[0] + e[1] * e[1] + e[2] * e[2],
+                e[4] * e[4] + e[5] * e[5] + e[6] * e[6],
+                e[8] * e[8] + e[9] * e[9] + e[10] * e[10]
+            )
+        );
     }
 
     private measureWorldBounds(min: Vector3, max: Vector3): boolean {
@@ -2241,7 +2265,8 @@ export class ParticleSystem implements IParticleSystem {
         }
         const rawCount = burst.count.genValue(this.memory, this.time);
         const factor = this.emissionFactor();
-        const count = Math.abs(factor - 1) < 0.001 ? rawCount : Math.floor(rawCount * factor);
+        // Rounded at random, so a fraction is not always lost: three at 1.5 is four or five, on average 4.5.
+        const count = Math.abs(factor - 1) < 0.001 ? rawCount : Math.floor(rawCount * factor + random());
         emissionState.isBursting = true;
         emissionState.burstParticleCount = count;
         this.spawn(count, emissionState, emitterMatrix);
@@ -2308,8 +2333,10 @@ export class ParticleSystem implements IParticleSystem {
     emit(delta: number, emissionState: EmissionState, emitterMatrix: Matrix4) {
         // Ended before this step (endEmit, or a past step's end of duration):
         // no more bursts either. A looping system would otherwise keep firing
-        // them every loop after endEmit and never finish.
-        const endedBefore = this.emitEnded;
+        // them every loop after endEmit and never finish. Only the system's
+        // own emission: a sub emitter's bursts belong to its parent particles,
+        // which still go off as they die after the effect was told to end.
+        const endedBefore = this.emitEnded && emissionState === this.emissionState;
         if (emissionState.time > this.duration) {
             if (this.looping) {
                 emissionState.time -= this.duration;

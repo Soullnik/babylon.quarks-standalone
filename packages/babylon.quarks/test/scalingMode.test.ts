@@ -1,7 +1,16 @@
 import {NullEngine} from '@babylonjs/core/Engines/nullEngine';
 import {Vector3 as BVector3} from '@babylonjs/core/Maths/math.vector';
 import {Scene} from '@babylonjs/core/scene';
-import {ConeEmitter, ConstantColor, ConstantValue, ForceOverLife, LimitSpeedOverLife, Vector4} from 'quarks.core';
+import {
+    ConeEmitter,
+    ConstantColor,
+    ConstantValue,
+    EmitSubParticleSystem,
+    ForceOverLife,
+    LimitSpeedOverLife,
+    SubParticleEmitMode,
+    Vector4,
+} from 'quarks.core';
 import {ParticleSystem, ScalingMode} from '../src/ParticleSystem';
 
 let engine: NullEngine;
@@ -86,5 +95,26 @@ describe('scaling mode', () => {
         expect(ParticleSystem.fromJSON(json, meta, {}, scene).scalingMode).toBe('hierarchy');
         expect(ps.clone().scalingMode).toBe('hierarchy');
         expect('scalingMode' in system(undefined, 1).toJSON(meta)).toBe(false);
+    });
+});
+
+describe('scaling mode with sub emitters', () => {
+    it("'hierarchy' takes the scale from the emitter, not a parent particle's velocity", () => {
+        const parent = system('shape', 1);
+        parent.looping = true;
+        parent.startSpeed = new ConstantValue(20);
+        const child = system('hierarchy', 1);
+        child.onlyUsedByOther = true;
+        child.startSpeed = new ConstantValue(2);
+        // Turned off the emission axis, so the velocity basis is well defined.
+        parent.addBehavior(new ForceOverLife(new ConstantValue(600), new ConstantValue(0), new ConstantValue(0)));
+        parent.addBehavior(new EmitSubParticleSystem(parent, true, child.emitter, SubParticleEmitMode.Frame));
+        for (let i = 0; i < 10; i++) {
+            parent.update(1 / 60);
+            child.update(1 / 60);
+        }
+        expect(child.particleNum).toBeGreaterThan(0);
+        // Before, the parent particle's speed scaled it, to tens.
+        expect(speedOf(child)).toBeCloseTo(2, 1);
     });
 });

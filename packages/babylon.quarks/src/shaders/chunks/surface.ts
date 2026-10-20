@@ -8,6 +8,9 @@
  * - `GRADIENT_MAP`: the map's red channel picks a colour along U of
  *   `gradientMap`, whose alpha multiplies the map's. A greyscale texture is
  *   then recoloured by a ramp, and the particle colour still tints it.
+ *   `gradientMapRange` keeps the lookup between the first and last texel
+ *   centres. Make the ramp without mipmaps: the lookup's UV jumps with the
+ *   map's detail, and the hardware would pick a blurred mip for it.
  * - `EROSION`: the particle's alpha stops being a transparency and becomes how
  *   much of the shape is left. A fragment shows where the mask (the red
  *   channel of `erosionMask` under `EROSION_MASK`, the map's alpha otherwise)
@@ -15,7 +18,10 @@
  *   alpha 0 nothing, and on the way down the shape eats away from its lowest
  *   mask values first — a noise mask dissolves it, a gradient mask wipes it.
  *   `erosionParams` is (softness, edge width, mask offset u, mask offset v),
- *   the edge band just above the cut glows in `erosionEdgeColor`.
+ *   the edge band just above the cut glows in `erosionEdgeColor`. The mask is
+ *   sampled with the particle's UV as drawn, which on a sprite sheet is the
+ *   current tile's. Erosion only changes alpha, so blend modes that ignore
+ *   alpha (one-one, premultiplied) show a hard cut.
  */
 
 /** Fragment-side declarations, GLSL. */
@@ -25,6 +31,7 @@ uniform vec2 uvScrollOffset;
 #endif
 #ifdef GRADIENT_MAP
 uniform sampler2D gradientMap;
+uniform vec2 gradientMapRange;
 #endif
 #ifdef EROSION
 uniform vec4 erosionParams;
@@ -35,10 +42,14 @@ uniform sampler2D erosionMask;
 
 vec4 quarksErode(vec4 color, float level, float mask) {
     float softness = erosionParams.x;
-    float cut = mix(-softness, 1.0, 1.0 - level);
+    float edgeWidth = erosionParams.y;
+    // At level 1 the cut sits below the lowest mask value by the soft band
+    // and the edge band, so nothing is cut and no edge shows; at level 0 above
+    // the highest. The edge then grows in as the cut rises, rather than popping.
+    float cut = mix(-(softness + edgeWidth), 1.0, 1.0 - level);
     float visible = smoothstep(cut, cut + softness, mask);
-    if (erosionParams.y > 0.0 && level < 1.0) {
-        float edge = 1.0 - smoothstep(cut + softness, cut + softness + erosionParams.y, mask);
+    if (edgeWidth > 0.0) {
+        float edge = 1.0 - smoothstep(cut + softness, cut + softness + edgeWidth, mask);
         color.rgb += erosionEdgeColor * edge;
     }
     color.a *= visible;
@@ -79,7 +90,7 @@ export function surfaceColorGLSL(tileBlend: boolean): string {
             : ''
     }
     #ifdef GRADIENT_MAP
-        vec4 ramp = texture2D(gradientMap, vec2(clamp(texColor.r, 0.0, 1.0), 0.5));
+        vec4 ramp = texture2D(gradientMap, vec2(mix(gradientMapRange.x, gradientMapRange.y, clamp(texColor.r, 0.0, 1.0)), 0.5));
         texColor = vec4(ramp.rgb, ramp.a * texColor.a);
     #endif
     #ifdef EROSION
@@ -104,6 +115,7 @@ uniform uvScrollOffset: vec2f;
 #ifdef GRADIENT_MAP
 var gradientMapSampler: sampler;
 var gradientMap: texture_2d<f32>;
+uniform gradientMapRange: vec2f;
 #endif
 #ifdef EROSION
 uniform erosionParams: vec4f;
@@ -116,10 +128,11 @@ var erosionMask: texture_2d<f32>;
 fn quarksErode(colorIn: vec4f, level: f32, mask: f32) -> vec4f {
     var color = colorIn;
     let softness = uniforms.erosionParams.x;
-    let cut = mix(-softness, 1.0, 1.0 - level);
+    let edgeWidth = uniforms.erosionParams.y;
+    let cut = mix(-(softness + edgeWidth), 1.0, 1.0 - level);
     let visible = smoothstep(cut, cut + softness, mask);
-    if (uniforms.erosionParams.y > 0.0 && level < 1.0) {
-        let edge = 1.0 - smoothstep(cut + softness, cut + softness + uniforms.erosionParams.y, mask);
+    if (edgeWidth > 0.0) {
+        let edge = 1.0 - smoothstep(cut + softness, cut + softness + edgeWidth, mask);
         color = vec4f(color.rgb + uniforms.erosionEdgeColor * edge, color.a);
     }
     color.a *= visible;
@@ -157,7 +170,7 @@ export function surfaceColorWGSL(tileBlend: boolean): string {
             : ''
     }
     #ifdef GRADIENT_MAP
-        let ramp = textureSample(gradientMap, gradientMapSampler, vec2f(clamp(texColor.r, 0.0, 1.0), 0.5));
+        let ramp = textureSample(gradientMap, gradientMapSampler, vec2f(mix(uniforms.gradientMapRange.x, uniforms.gradientMapRange.y, clamp(texColor.r, 0.0, 1.0)), 0.5));
         texColor = vec4f(ramp.rgb, ramp.a * texColor.a);
     #endif
     #ifdef EROSION

@@ -109,3 +109,33 @@ describe('beam render mode', () => {
         expect(ParticleSystem.fromJSON(json, meta, {}, scene).renderMode).toBe(RenderMode.Beam);
     });
 });
+
+describe('beam review fixes', () => {
+    it('without an end, keeps its particle bounds rather than none', () => {
+        const renderer = new BatchedRenderer('noEnd', scene);
+        const system = beam();
+        renderer.addSystem(system);
+        for (let i = 0; i < 5; i++) renderer.update(1 / 60);
+        expect(system.getWorldBounds(new Vector3(), new Vector3())).toBe(true);
+    });
+
+    it('takes a Babylon Vector3 as its end', () => {
+        const renderer = new BatchedRenderer('babylonEnd', scene);
+        const system = beam();
+        system.beamEnd = new BVector3(0, 0, 3);
+        renderer.addSystem(system);
+        renderer.update(1 / 60);
+        expect(velocities(renderer)[2]).toBeCloseTo(3);
+    });
+
+    it('ignores flip, so U always runs from the particle to the end', () => {
+        const renderer = new BatchedRenderer('flip', scene);
+        const system = beam();
+        (system as any).flip = {x: 1, y: 0};
+        system.beamEnd = new Vector3(1, 0, 0);
+        renderer.addSystem(system);
+        renderer.update(1 / 60);
+        const size = (renderer.batches[0] as any).sizeBuffer as Float32Array;
+        expect(size[0]).toBeGreaterThan(0);
+    });
+});

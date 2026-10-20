@@ -151,6 +151,11 @@ export interface ParticleErosion {
     /** Mask UV scroll, UV units per second. Default `[0, 0]`. */
     maskScroll: [number, number];
 }
+// Limits worth knowing: the mask is sampled with the UV as drawn (on a sheet,
+// the current tile's), erosion only changes alpha (one-one and premultiplied
+// blending show a hard cut), and with neither a mask nor a map there is
+// nothing to order the cut by, so the shape goes all at once near alpha 0.
+// Scrolling runs on the renderer's clock, not a system's playback speed.
 
 /** A complete erosion from a partial one, every field defaulted, or undefined when `erosion` is unset. */
 export function normalizeErosion(erosion: Partial<ParticleErosion> | null | undefined): ParticleErosion | undefined {
@@ -455,6 +460,7 @@ export abstract class VFXBatch {
         }
         if (this.settings.gradientMap) {
             samplers.push('gradientMap');
+            uniforms.push('gradientMapRange');
         }
         const erosion = this.settings.erosion;
         if (erosion) {
@@ -480,18 +486,23 @@ export abstract class VFXBatch {
                 new BVector3(erosion.edgeColor[0], erosion.edgeColor[1], erosion.edgeColor[2])
             );
         }
-        if (!uvScroll && !erosion) {
+        if (!uvScroll && !erosion && !gradientMap) {
             return;
         }
         // Wrapped on the CPU: a raw speed × time grows until float32 UVs lose their fraction.
         const wrap = (value: number) => value - Math.floor(value);
         const scrollOffset = new BVector2();
         const erosionParams = new BVector4();
+        const gradientRange = new BVector2(0, 1);
+        // Written to the material for the next bind and to the bound effect for
+        // this one: ShaderMaterial uploads its values before the bind observers run.
         const write = () => {
             const time = this.time;
+            const effect = material.getEffect();
             if (uvScroll) {
                 scrollOffset.set(wrap(uvScroll[0] * time), wrap(uvScroll[1] * time));
                 material.setVector2('uvScrollOffset', scrollOffset);
+                effect?.setVector2('uvScrollOffset', scrollOffset);
             }
             if (erosion) {
                 erosionParams.set(
@@ -501,6 +512,16 @@ export abstract class VFXBatch {
                     wrap(erosion.maskScroll[1] * time)
                 );
                 material.setVector4('erosionParams', erosionParams);
+                effect?.setVector4('erosionParams', erosionParams);
+            }
+            if (gradientMap) {
+                // Texel centres of the first and last texel, so a repeating
+                // ramp does not blend its two ends at black and white.
+                const width = gradientMap.getSize().width;
+                const half = width > 0 ? 0.5 / width : 0;
+                gradientRange.set(half, 1 - half);
+                material.setVector2('gradientMapRange', gradientRange);
+                effect?.setVector2('gradientMapRange', gradientRange);
             }
         };
         write();

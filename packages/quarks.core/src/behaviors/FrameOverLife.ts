@@ -22,9 +22,10 @@ export interface FrameOverLifeOptions {
     cycles?: number;
     /**
      * Frames in the segment that plays, from the first frame. In FPS mode the
-     * frame wraps (or holds, see {@link loop}) at it; in life mode a
-     * {@link startFrame} offset wraps within it. 0, the default, means no
-     * segment.
+     * frame wraps (or holds, see {@link loop}) at it, counted from `frame`;
+     * in life mode the curve plus a {@link startFrame} offset wraps into
+     * `[0, frameCount)`, so the curve should start at frame 0. 0, the default,
+     * means no segment.
      */
     frameCount?: number;
     /** FPS mode: wrap back to the first frame of the segment (default) or hold its last. */

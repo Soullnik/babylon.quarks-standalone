@@ -67,7 +67,13 @@ void main() {
     // Deriving it via normalize keeps the stretch aligned even when the speed contribution is ~0
     // (e.g. speedFactor 0), instead of collapsing the whole burst onto a fixed screen axis.
     vec3 vdir = vlength > 0.000001 ? viewVelocity / vlength : vec3(0.0, 0.0, 1.0);
+#ifdef BEAM
+    // Seen straight along its length a beam has no side to face; any will do.
+    vec3 sideRaw = cross(mvPosition.xyz, vdir);
+    vec3 side = dot(sideRaw, sideRaw) > 1e-12 ? normalize(sideRaw) : vec3(1.0, 0.0, 0.0);
+#else
     vec3 side = normalize(cross(mvPosition.xyz, vdir));
+#endif
     mvPosition.xyz += position.y * side * avgSize;
 #ifdef BEAM
     // The vector runs from the particle to the beam's end: the quad spans it

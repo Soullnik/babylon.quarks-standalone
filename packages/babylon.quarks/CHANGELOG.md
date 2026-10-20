@@ -41,7 +41,8 @@ and the project follows the `quarks.core` 0.x version line.
 ### Fixed
 
 - A looping system kept firing its bursts on every loop after `endEmit()`, so it never finished.
-  Bursts now stop with the rest of the emission once it has ended.
+  Bursts now stop with the rest of the system's own emission; a sub emitter's bursts, which belong
+  to parent particles still dying, keep firing.
 
 ## [0.24.1] — 2026-10-20
 

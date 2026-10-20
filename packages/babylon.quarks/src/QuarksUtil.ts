@@ -122,10 +122,12 @@ export class QuarksUtil {
 
     /**
      * Seconds until the effect under `root` is over when it plays from the
-     * start: for each system its longest start delay, its duration and its
-     * longest particle life, divided by its playback speed; a sub emitter
-     * target ends a particle life after the last of its parents. Infinity when
-     * a system loops, since such an effect only ends on {@link endEmit}.
+     * start: for each system its start delay, its duration and its longest
+     * particle life, divided by its playback speed; a sub emitter target goes
+     * on emitting for its own duration after the last of its parents' particles
+     * and ends a particle life after that, wherever it sits in the scene.
+     * Infinity when a system loops, since such an effect only ends on
+     * {@link endEmit}, or when one is frozen at playback speed 0.
      *
      * Random values count at their maximum, so this is an upper bound; curves
      * are sampled. Particles cut short by collisions or culling only make the
@@ -137,7 +139,9 @@ export class QuarksUtil {
             systems.push(emitter.system as unknown as ParticleSystem);
         });
         const parents = new Map<ParticleSystem, ParticleSystem[]>();
-        for (const system of systems) {
+        // Grows while it is walked: a target outside `root` is part of the effect too.
+        for (let i = 0; i < systems.length; i++) {
+            const system = systems[i];
             for (const behavior of system.behaviors) {
                 if (!(behavior instanceof EmitSubParticleSystem)) {
                     continue;
@@ -146,6 +150,9 @@ export class QuarksUtil {
                     | ParticleSystem
                     | undefined;
                 if (target !== undefined && typeof target === 'object') {
+                    if (!systems.includes(target)) {
+                        systems.push(target);
+                    }
                     const list = parents.get(target) ?? [];
                     list.push(system);
                     parents.set(target, list);
@@ -160,19 +167,22 @@ export class QuarksUtil {
             }
             // Marks the system while it is resolved, so a sub emitter cycle loops forever rather than the stack.
             ends.set(system, Infinity);
-            const speed = system.playbackSpeed > 0 ? system.playbackSpeed : 1;
+            const speed = system.playbackSpeed;
             const life = QuarksUtil.maxOf(system.startLife) / speed;
             let end: number;
-            if (system.onlyUsedByOther) {
+            if (!(speed > 0)) {
+                end = Infinity;
+            } else if (system.onlyUsedByOther) {
                 end = 0;
                 for (const parent of parents.get(system) ?? []) {
                     end = Math.max(end, endOf(parent));
                 }
-                end += life;
+                end += system.duration / speed + life;
             } else if (system.looping) {
                 end = Infinity;
             } else {
-                end = (QuarksUtil.maxOf(system.startDelay) + system.duration) / speed + life;
+                // The delay is drawn once, at the start.
+                end = (QuarksUtil.maxOf(system.startDelay, 0) + system.duration) / speed + life;
             }
             ends.set(system, end);
             return end;
@@ -185,7 +195,7 @@ export class QuarksUtil {
     }
 
     /** The largest value `generator` gives: exact for constants and intervals, sampled otherwise. */
-    private static maxOf(generator: ValueGenerator | FunctionValueGenerator): number {
+    private static maxOf(generator: ValueGenerator | FunctionValueGenerator, at?: number): number {
         if (generator instanceof ConstantValue) {
             return generator.value;
         }
@@ -198,7 +208,9 @@ export class QuarksUtil {
             const memory: number[] = [];
             generator.startGen(memory);
             const value =
-                generator.type === 'function' ? generator.genValue(memory, i / samples) : generator.genValue(memory);
+                generator.type === 'function'
+                    ? generator.genValue(memory, at ?? i / samples)
+                    : generator.genValue(memory);
             max = Math.max(max, value);
         }
         return max;

@@ -127,7 +127,7 @@ describe('QuarksUtil.getDuration', () => {
         expect(QuarksUtil.getDuration(root)).toBe(Infinity);
     });
 
-    it('a sub emitter target ends a life after its parent', () => {
+    it('a sub emitter target runs its duration and a life after its parent', () => {
         const root = new TransformNode('sub', scene);
         const parent = burstSystem({looping: false});
         const child = burstSystem({looping: false});
@@ -136,6 +136,43 @@ describe('QuarksUtil.getDuration', () => {
         parent.emitter.parent = root;
         child.emitter.parent = root;
         parent.addBehavior(new EmitSubParticleSystem(parent, false, child.emitter, SubParticleEmitMode.Death));
-        expect(QuarksUtil.getDuration(root)).toBeCloseTo(0.5 + 0.2 + 2);
+        expect(QuarksUtil.getDuration(root)).toBeCloseTo(0.5 + 0.2 + 0.5 + 2);
+    });
+});
+
+describe('review fixes', () => {
+    function parentWithSub(looping: boolean) {
+        const root = new TransformNode('fw', scene);
+        const parent = burstSystem({looping, count: 3});
+        parent.startLife = new ConstantValue(0.2);
+        const child = burstSystem({looping: false, count: 5});
+        child.onlyUsedByOther = true;
+        parent.emitter.parent = root;
+        child.emitter.parent = root;
+        parent.addBehavior(new EmitSubParticleSystem(parent, false, child.emitter, SubParticleEmitMode.Death));
+        return {root, parent, child};
+    }
+
+    it('sub emitter bursts still go off for particles dying after endEmit', () => {
+        const {root, parent, child} = parentWithSub(true);
+        parent.update(1 / 60);
+        expect(parent.particleNum).toBe(3);
+        QuarksUtil.endEmit(root);
+        let peak = 0;
+        for (let i = 0; i < 40; i++) {
+            parent.update(1 / 60);
+            child.update(1 / 60);
+            peak = Math.max(peak, child.particleNum);
+        }
+        expect(peak).toBe(15);
+    });
+
+    it('getDuration follows a sub emitter target outside the root, and a frozen system never ends', () => {
+        const {root, parent, child} = parentWithSub(false);
+        child.emitter.parent = null;
+        child.startLife = new ConstantValue(5);
+        expect(QuarksUtil.getDuration(root)).toBeCloseTo(0.5 + 0.2 + 0.5 + 5);
+        parent.playbackSpeed = 0;
+        expect(QuarksUtil.getDuration(root)).toBe(Infinity);
     });
 });

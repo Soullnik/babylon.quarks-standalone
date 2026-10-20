@@ -73,7 +73,16 @@ fn main(input: VertexInputs) -> FragmentInputs {
     if (vlength > 0.000001) {
         vdir = viewVelocity / vlength;
     }
+#ifdef BEAM
+    // Seen straight along its length a beam has no side to face; any will do.
+    let sideRaw = cross(mvPosition.xyz, vdir);
+    var side = vec3f(1.0, 0.0, 0.0);
+    if (dot(sideRaw, sideRaw) > 1e-12) {
+        side = normalize(sideRaw);
+    }
+#else
     let side = normalize(cross(mvPosition.xyz, vdir));
+#endif
     let widthOffset = vertexInputs.position.y * side * avgSize;
     // Equivalent to viewVelocity * (1.0 + lengthFactor / vlength) for moving particles, but the
     // size-based term (vdir * lengthFactor) survives when the velocity contribution vanishes.
