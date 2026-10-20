@@ -63,7 +63,7 @@
         "@babylonjs/core": ">=9.0.0"
     },
     "devDependencies": {
-        "@babylonjs/core": "^9.0.0",
+        "@babylonjs/core": "^9.31.0",
         "@types/jest": "^30.0.0",
         "quarks.core": "*"
     }

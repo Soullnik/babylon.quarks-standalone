@@ -86,6 +86,8 @@ and the project follows the `quarks.core` 0.x version line.
 
 ### Changed
 
+- Developed and tested against `@babylonjs/core` 9.31.0 (was 9.6.2); the peer range stays
+  `>=9.0.0`. The examples and the editor's dev dependencies follow.
 - `ParticleSystem.isFinished()` is true for a looping system whose emission was ended with
   `endEmit()` once its particles are gone, and for a sub emitter target whenever it is empty,
   looping or not; `finished` fires accordingly. `QuarksUtil.isEffectFinished` follows, so an effect
