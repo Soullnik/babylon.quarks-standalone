@@ -31,6 +31,11 @@ and the project follows the `quarks.core` 0.x version line.
   such as a `TransformNode`, read every frame; runtime only): a quad laid from each particle to
   the end and turned about its length to face the camera, U along it, the size as its width. With
   a sheet and `FrameOverLife` `fps` it flickers like lightning; bounds reach the end.
+- `ParticleSystem.scalingMode` (`'shape'` default | `'hierarchy'`, constructor option, JSON written
+  only when `'hierarchy'`): in `'hierarchy'` a world-space system's start speeds scale with the
+  emitter's world scale, and `ForceOverLife` and `LimitSpeedOverLife` by its mean, so a scaled
+  effect moves in proportion. quarks.core `IParticleSystem.motionScale` carries the factor to
+  behaviors; `LimitSpeedOverLife` now learns its system in `initialize`.
 - Example "Texture Effects" showing the texture effects and a beam.
 
 ### Fixed

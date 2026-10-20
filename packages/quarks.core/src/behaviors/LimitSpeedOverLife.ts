@@ -1,3 +1,4 @@
+import {IParticleSystem} from '../IParticleSystem';
 import {Particle} from '../Particle';
 import {FunctionValueGenerator, ValueGeneratorFromJSON} from '../functions';
 import {Behavior} from './Behavior';
@@ -7,9 +8,20 @@ import {Behavior} from './Behavior';
  */
 export class LimitSpeedOverLife implements Behavior {
     type = 'LimitSpeedOverLife';
+    /** Learned in {@link initialize}; its motion scale multiplies the limit of a world-space system. */
+    ps?: IParticleSystem;
 
-    initialize(particle: Particle): void {
+    initialize(particle: Particle, particleSystem?: IParticleSystem): void {
+        if (particleSystem !== undefined) {
+            this.ps = particleSystem;
+        }
         this.speed.startGen(particle.memory);
+    }
+
+    /** What the limit is multiplied by: the system's motion scale in world space, else 1. */
+    motionScale(): number {
+        const system = this.ps;
+        return system !== undefined && system.worldSpace ? (system.motionScale ?? 1) : 1;
     }
 
     constructor(
@@ -19,7 +31,7 @@ export class LimitSpeedOverLife implements Behavior {
 
     update(particle: Particle, delta: number): void {
         let speed = particle.velocity.length();
-        let limit = this.speed.genValue(particle.memory, particle.age / particle.life);
+        let limit = this.speed.genValue(particle.memory, particle.age / particle.life) * this.motionScale();
         if (speed > limit) {
             const percent = (speed - limit) / speed;
             particle.velocity.multiplyScalar(1 - percent * this.dampen * delta * 20);
@@ -29,6 +41,7 @@ export class LimitSpeedOverLife implements Behavior {
     updateAll(particles: Array<Particle>, count: number, delta: number): void {
         const generator = this.speed;
         const dampenStep = this.dampen * delta * 20;
+        const motionScale = this.motionScale();
         for (let i = 0; i < count; i++) {
             const particle = particles[i];
             if (particle.age >= particle.life) {
@@ -36,7 +49,7 @@ export class LimitSpeedOverLife implements Behavior {
             }
             const velocity = particle.velocity;
             const speed = velocity.length();
-            const limit = generator.genValue(particle.memory, particle.age / particle.life);
+            const limit = generator.genValue(particle.memory, particle.age / particle.life) * motionScale;
             if (speed > limit) {
                 velocity.multiplyScalar(1 - ((speed - limit) / speed) * dampenStep);
             }

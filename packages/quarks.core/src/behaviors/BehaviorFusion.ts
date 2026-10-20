@@ -314,6 +314,7 @@ function fragmentFor(behavior: Behavior, k: number): Fragment | null {
                     ${scalarSetup(`gy${k}`, `b${k}.y`)}
                     ${scalarSetup(`gz${k}`, `b${k}.z`)}
                     const local${k} = b${k}.ps !== undefined && !b${k}.ps.worldSpace;
+                    const ms${k} = !local${k} && b${k}.ps !== undefined ? (b${k}.ps.motionScale ?? 1) : 1;
                     ${vectorSetup(`sc${k}`, `b${k}._tempScale`)}
                     ${quaternionSetup(`q${k}`, `b${k}._tempQ`)}`,
                 body: `{
@@ -323,6 +324,8 @@ function fragmentFor(behavior: Behavior, k: number): Fragment | null {
                     if (local${k}) {
                         fx *= sc${k}x; fy *= sc${k}y; fz *= sc${k}z;
                         ${rotateInPlace('fx', 'fy', 'fz', `q${k}x`, `q${k}y`, `q${k}z`, `q${k}w`)}
+                    } else if (ms${k} !== 1) {
+                        fx *= ms${k}; fy *= ms${k}; fz *= ms${k};
                     }
                     vel[o3] += fx * delta; vel[o3 + 1] += fy * delta; vel[o3 + 2] += fz * delta;}`,
             };
@@ -330,10 +333,12 @@ function fragmentFor(behavior: Behavior, k: number): Fragment | null {
             return {
                 setup: `const b${k} = behaviors[${k}];
                     ${scalarSetup(`g${k}`, `b${k}.speed`)}
-                    const dampen${k} = b${k}.dampen * delta * 20;`,
+                    const dampen${k} = b${k}.dampen * delta * 20;
+                    const ms${k} = typeof b${k}.motionScale === 'function' ? b${k}.motionScale() : 1;`,
                 body: `{const vx = vel[o3], vy = vel[o3 + 1], vz = vel[o3 + 2];
                     const speed = Math.sqrt(vx * vx + vy * vy + vz * vz);
-                    ${scalarValue(`g${k}`, 'limit', 't')}
+                    ${scalarValue(`g${k}`, 'limitBase', 't')}
+                    const limit = limitBase * ms${k};
                     if (speed > limit) {
                         const f = 1 - ((speed - limit) / speed) * dampen${k};
                         vel[o3] = vx * f; vel[o3 + 1] = vy * f; vel[o3 + 2] = vz * f;

@@ -21,11 +21,13 @@ export {ParticleEmitter} from './ParticleEmitter';
 export {ParticleSystem} from './ParticleSystem';
 export type {
     BabylonMetaData,
+    BeamEnd,
     BurstParameters,
     BurstParametersJSON,
     CullingMode,
     ParticleSystemJSONParameters,
     ParticleSystemParameters,
+    ScalingMode,
 } from './ParticleSystem';
 export {QuarksLoader} from './QuarksLoader';
 export type {

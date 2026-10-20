@@ -91,6 +91,20 @@ export interface BurstParameters {
 export type CullingMode = 'always' | 'pause' | 'pauseAndCatchUp';
 
 /**
+ * What the emitter's world scale does to a world-space system (Unity's
+ * Scaling Mode, as far as it differs here). A local-space system lives in its
+ * emitter's space, so its scale reaches everything either way.
+ *
+ * - `'shape'` (default): the scale sizes the emission shape and the
+ *   particles; speeds, forces and speed limits stay in world units, so a
+ *   scaled-down effect moves as far as the full-size one.
+ * - `'hierarchy'`: the scale also multiplies start speeds (per axis),
+ *   `ForceOverLife` and `LimitSpeedOverLife` (by the mean of the axes), so the
+ *   whole effect, motion included, scales like a model would.
+ */
+export type ScalingMode = 'shape' | 'hierarchy';
+
+/**
  * Where a {@link RenderMode.Beam} system's quads end: a point in world space,
  * or anything with a world position, such as a Babylon `TransformNode`, read
  * every frame.
@@ -225,6 +239,8 @@ export interface ParticleSystemParameters {
     playbackSpeed?: number;
     /** What the system does while off screen, see {@link CullingMode}. Default `'always'`. */
     cullingMode?: CullingMode;
+    /** What the emitter's scale does to a world-space system, see {@link ScalingMode}. Default `'shape'`. */
+    scalingMode?: ScalingMode;
     /** Seed for this system's own random generator, see {@link ParticleSystem.seed}. Default none. */
     seed?: number;
     /** Draw order within the batch, see {@link ParticleSystem.sortMode}. Default `'none'`. */
@@ -280,6 +296,8 @@ export interface ParticleSystemJSONParameters {
     playbackSpeed?: number;
     /** Written only when not `'always'`. */
     cullingMode?: CullingMode;
+    /** Written only when not `'shape'`. */
+    scalingMode?: ScalingMode;
     /** Written only when set. */
     seed?: number;
     /** Written only when not `'none'`. */
@@ -658,6 +676,20 @@ export class ParticleSystem implements IParticleSystem {
         this.neededToUpdateRender = true;
     }
 
+    /** The mean world scale of the emitter for a world-space `'hierarchy'` system, else 1. */
+    private measureMotionScale(): number {
+        if (this.scalingMode !== 'hierarchy' || !this.worldSpace) {
+            return 1;
+        }
+        const e = this.emitter.matrixWorld.elements;
+        return (
+            (Math.sqrt(e[0] * e[0] + e[1] * e[1] + e[2] * e[2]) +
+                Math.sqrt(e[4] * e[4] + e[5] * e[5] + e[6] * e[6]) +
+                Math.sqrt(e[8] * e[8] + e[9] * e[9] + e[10] * e[10])) /
+            3
+        );
+    }
+
     /** `lighting` if it is one of the modes, else the default. */
     private static validLighting(lighting: unknown): MeshLighting {
         return lighting === 'unlit' || lighting === 'scene' ? lighting : 'fixed';
@@ -814,6 +846,16 @@ export class ParticleSystem implements IParticleSystem {
     /** What this system does while off screen, see {@link CullingMode}. `'always'` by default. */
     cullingMode: CullingMode = 'always';
 
+    /** What the emitter's world scale does to a world-space system, see {@link ScalingMode}. `'shape'` by default. */
+    scalingMode: ScalingMode = 'shape';
+
+    /**
+     * What world-space forces and speed limits are multiplied by this step:
+     * the mean of the emitter's world scale axes in `'hierarchy'` mode, 1
+     * otherwise. Updated before every simulation step.
+     */
+    motionScale = 1;
+
     /**
      * Whether each particle starts turned along the direction its shape sends
      * it (Unity's Align To Direction): a mesh particle's +Z is pointed along
@@ -968,6 +1010,7 @@ export class ParticleSystem implements IParticleSystem {
         this.flip = ParticleSystem.nonZeroFlip(parameters.flip);
         this.playbackSpeed = parameters.playbackSpeed ?? 1;
         this.cullingMode = parameters.cullingMode ?? 'always';
+        this.scalingMode = parameters.scalingMode === 'hierarchy' ? 'hierarchy' : 'shape';
         this.alignToDirection = parameters.alignToDirection === true;
         this.seed = parameters.seed;
         if (this.rendererSettings.renderMode === RenderMode.Mesh && !this.rendererSettings.instancingNormals) {
@@ -1302,7 +1345,12 @@ export class ParticleSystem implements IParticleSystem {
                 particle.position.applyMatrix4(matrix);
                 particle.startSize.multiply(scale).abs();
                 particle.size.copy(particle.startSize);
-                particle.velocity.multiply(scale).applyMatrix3(this.normalMatrix);
+                if (this.scalingMode === 'hierarchy') {
+                    // Scaled per axis in the emitter's frame, then turned: the speed scales with it.
+                    particle.velocity.multiply(scale).applyQuaternion(tempQ);
+                } else {
+                    particle.velocity.multiply(scale).applyMatrix3(this.normalMatrix);
+                }
                 if (particle.rotation && particle.rotation instanceof Quaternion) {
                     particle.rotation.multiplyQuaternions(tempQ, particle.rotation);
                 }
@@ -1820,6 +1868,7 @@ export class ParticleSystem implements IParticleSystem {
     }
 
     private stepOnce(delta: number): void {
+        this.motionScale = this.measureMotionScale();
         if (!this.onlyUsedByOther) {
             this.emit(delta, this.emissionState, this.emitter.matrixWorld);
         }
@@ -2400,6 +2449,7 @@ export class ParticleSystem implements IParticleSystem {
             ...(this.applyFog ? {} : {applyFog: false}),
             ...(this.playbackSpeed !== 1 ? {playbackSpeed: this.playbackSpeed} : {}),
             ...(this.cullingMode !== 'always' ? {cullingMode: this.cullingMode} : {}),
+            ...(this.scalingMode !== 'shape' ? {scalingMode: this.scalingMode} : {}),
             ...(this.seedValue !== undefined ? {seed: this.seedValue} : {}),
             ...(this.sortMode !== 'none' ? {sortMode: this.sortMode} : {}),
             ...(this.alignToDirection ? {alignToDirection: true} : {}),
@@ -2511,6 +2561,7 @@ export class ParticleSystem implements IParticleSystem {
             applyFog: json.applyFog !== false,
             playbackSpeed: typeof json.playbackSpeed === 'number' ? json.playbackSpeed : undefined,
             cullingMode: ParticleSystem.validCullingMode(json.cullingMode),
+            scalingMode: json.scalingMode === 'hierarchy' ? 'hierarchy' : 'shape',
             seed: typeof json.seed === 'number' ? json.seed : undefined,
             sortMode: ParticleSystem.validSortMode(json.sortMode),
             alignToDirection: json.alignToDirection === true,
@@ -2806,6 +2857,7 @@ export class ParticleSystem implements IParticleSystem {
             applyFog: this.applyFog,
             playbackSpeed: this.playbackSpeed,
             cullingMode: this.cullingMode,
+            scalingMode: this.scalingMode,
             seed: this.seedValue,
             sortMode: this.sortMode,
             alignToDirection: this.alignToDirection,
