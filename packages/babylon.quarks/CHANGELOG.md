@@ -18,6 +18,17 @@ and the project follows the `quarks.core` 0.x version line.
   or holding frame segment and a per-particle random start frame. Without them the behaviour is
   unchanged and stays in the fused pass.
 
+- Texture effects on sprites, meshes and trails, GLSL and WGSL, each saved with the material in the
+  effect JSON only when set and batched apart when they differ:
+    - `ParticleSystem.uvScroll` `[u, v]`: scrolls the map in UV units per second on the renderer's clock.
+    - `ParticleSystem.gradientMap`: recolours the map through a ramp texture picked by its red
+      channel; the particle colour still tints it.
+    - `ParticleSystem.erosion` (`ParticleErosion`: mask, softness, edgeWidth, edgeColor, maskScroll):
+      alpha erosion. The particle's alpha decides how much of the shape is left instead of how
+      transparent it is, so a `ColorOverLife` alpha curve dissolves it through a noise mask or wipes
+      it through a gradient one, with an optional glowing edge.
+- Example "Texture Effects" showing the three.
+
 ### Fixed
 
 - A looping system kept firing its bursts on every loop after `endEmit()`, so it never finished.

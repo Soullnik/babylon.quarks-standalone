@@ -139,6 +139,7 @@ export class TrailBatch extends VFXBatch {
         if (this.settings.texture) {
             defines.push('USE_MAP');
         }
+        defines.push(...this.surfaceDefines());
 
         const shaderLanguage = shaderLanguageFor(this.scene.getEngine());
         registerShaders(
@@ -164,6 +165,7 @@ export class TrailBatch extends VFXBatch {
         if (this.settings.texture) {
             samplers.push('map');
         }
+        this.surfaceUniforms(uniforms, samplers);
 
         const mat = new ShaderMaterial(
             shaderName,
@@ -200,6 +202,7 @@ export class TrailBatch extends VFXBatch {
         });
 
         this.bindFog(mat);
+        this.bindSurface(mat);
         mat.backFaceCulling = false;
 
         if (this.settings.materialTransparent) {

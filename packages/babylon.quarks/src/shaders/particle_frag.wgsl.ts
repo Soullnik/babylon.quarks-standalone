@@ -1,4 +1,5 @@
 import {fogFragmentDeclarationWGSL, fogFragmentWGSL} from './chunks/fog';
+import {surfaceColorWGSL, surfaceFragmentDeclarationWGSL} from './chunks/surface';
 
 export default /* wgsl */ `
 varying vUV: vec2f;
@@ -28,19 +29,10 @@ uniform alphaTest: f32;
 #endif
 
 ${fogFragmentDeclarationWGSL}
+${surfaceFragmentDeclarationWGSL}
 @fragment
 fn main(input: FragmentInputs) -> FragmentOutputs {
-    var baseColor = fragmentInputs.vColor;
-
-#ifdef USE_MAP
-    var texColor = textureSample(map, mapSampler, fragmentInputs.vUV);
-    #ifdef TILE_BLEND
-        let texColor2 = textureSample(map, mapSampler, fragmentInputs.vUV2);
-        texColor = mix(texColor, texColor2, fragmentInputs.vTileBlend);
-    #endif
-    baseColor *= texColor;
-#endif
-
+${surfaceColorWGSL(true)}
 #ifdef USE_COLOR_AS_ALPHA
     baseColor.a *= (baseColor.r + baseColor.g + baseColor.b) / 3.0;
 #endif

@@ -165,6 +165,16 @@ export const demoManifest: DemoManifestEntry[] = [
         preview: {icon: 'BH', gradient: 'linear-gradient(135deg, #2a1a3d 0%, #6b3d9a 100%)'},
     },
     {
+        key: 'TextureEffectsDemo',
+        name: 'Texture Effects',
+        module: 'textureEffects',
+        sourcePath: 'examples/src/demos/textureEffects.ts',
+        description:
+            'UV scrolling, a gradient map recolouring a greyscale texture, and alpha erosion dissolving smoke.',
+        tags: ['material', 'dissolve'],
+        preview: {icon: 'TX', gradient: 'linear-gradient(135deg, #ff9a3c 0%, #3a1c5c 100%)'},
+    },
+    {
         key: 'MagicZoneUnityExample',
         name: 'MagicZone: Unity exported by unity-quarks-exporter example',
         module: 'MagicZoneUnityExample',

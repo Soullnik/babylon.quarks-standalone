@@ -1,4 +1,5 @@
 import {fogFragmentDeclarationGLSL, fogFragmentGLSL} from './chunks/fog';
+import {surfaceColorGLSL, surfaceFragmentDeclarationGLSL} from './chunks/surface';
 
 export default /* glsl */ `
 varying vec2 vUV;
@@ -9,14 +10,9 @@ uniform sampler2D map;
 #endif
 
 ${fogFragmentDeclarationGLSL}
+${surfaceFragmentDeclarationGLSL}
 void main() {
-    vec4 baseColor = vColor;
-
-#ifdef USE_MAP
-    vec4 texColor = texture2D(map, vUV);
-    baseColor *= texColor;
-#endif
-
+${surfaceColorGLSL(false)}
     if (baseColor.a < 0.01) discard;
 
 ${fogFragmentGLSL('baseColor.rgb')}

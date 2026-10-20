@@ -3,7 +3,7 @@ import {Constants} from '@babylonjs/core/Engines/constants';
 import {BaseTexture} from '@babylonjs/core/Materials/Textures/baseTexture';
 import {ShaderMaterial} from '@babylonjs/core/Materials/shaderMaterial';
 import {Color3} from '@babylonjs/core/Maths/math.color';
-import {Vector3 as BVector3} from '@babylonjs/core/Maths/math.vector';
+import {Vector2 as BVector2, Vector3 as BVector3, Vector4 as BVector4} from '@babylonjs/core/Maths/math.vector';
 import {Mesh} from '@babylonjs/core/Meshes/mesh';
 import {Scene} from '@babylonjs/core/scene';
 import {IParticleSystem, Vector3} from 'quarks.core';
@@ -122,6 +122,82 @@ export function meshRimEqual(a: MeshRim | undefined, b: MeshRim | undefined): bo
     );
 }
 
+/**
+ * Alpha erosion: the particle's alpha decides how much of its shape is left
+ * instead of how transparent it is, so `ColorOverLife` fading alpha out
+ * dissolves (noise mask) or wipes (gradient mask) the shape away. See
+ * {@link VFXBatchSettings.erosion}.
+ */
+export interface ParticleErosion {
+    /**
+     * Mask whose red channel orders what goes first, sampled with the
+     * particle's UV (the quad, mesh or trail UV, unscrolled). Null: the map's
+     * own alpha, so a soft shape shrinks from its edges.
+     */
+    mask: BaseTexture | null;
+    /** Width of the soft transition at the cut, in mask units. Default 0.05. */
+    softness: number;
+    /** Width of the glowing band above the cut, in mask units; 0 (default) draws none. */
+    edgeWidth: number;
+    /** Colour added in the edge band, linear RGB, may exceed 1. Default `[1, 1, 1]`. */
+    edgeColor: [number, number, number];
+    /** Mask UV scroll, UV units per second. Default `[0, 0]`. */
+    maskScroll: [number, number];
+}
+
+/** A complete erosion from a partial one, every field defaulted, or undefined when `erosion` is unset. */
+export function normalizeErosion(erosion: Partial<ParticleErosion> | null | undefined): ParticleErosion | undefined {
+    if (!erosion || typeof erosion !== 'object') {
+        return undefined;
+    }
+    const num = (value: unknown, fallback: number) =>
+        typeof value === 'number' && Number.isFinite(value) ? value : fallback;
+    const color = Array.isArray(erosion.edgeColor) ? erosion.edgeColor : [1, 1, 1];
+    const scroll = Array.isArray(erosion.maskScroll) ? erosion.maskScroll : [0, 0];
+    return {
+        mask: erosion.mask ?? null,
+        softness: Math.max(0.0001, num(erosion.softness, 0.05)),
+        edgeWidth: Math.max(0, num(erosion.edgeWidth, 0)),
+        edgeColor: [num(color[0], 1), num(color[1], 1), num(color[2], 1)],
+        maskScroll: [num(scroll[0], 0), num(scroll[1], 0)],
+    };
+}
+
+/** True when both describe the same erosion (or both none). */
+export function erosionEqual(a: ParticleErosion | undefined, b: ParticleErosion | undefined): boolean {
+    if (a === b) {
+        return true;
+    }
+    if (!a || !b) {
+        return false;
+    }
+    return (
+        a.mask === b.mask &&
+        a.softness === b.softness &&
+        a.edgeWidth === b.edgeWidth &&
+        a.edgeColor[0] === b.edgeColor[0] &&
+        a.edgeColor[1] === b.edgeColor[1] &&
+        a.edgeColor[2] === b.edgeColor[2] &&
+        a.maskScroll[0] === b.maskScroll[0] &&
+        a.maskScroll[1] === b.maskScroll[1]
+    );
+}
+
+/** A UV scroll speed, or undefined when unset or zero. */
+export function normalizeUVScroll(scroll: ArrayLike<number> | null | undefined): [number, number] | undefined {
+    if (!scroll || typeof scroll !== 'object') {
+        return undefined;
+    }
+    const u = Number.isFinite(scroll[0]) ? scroll[0] : 0;
+    const v = Number.isFinite(scroll[1]) ? scroll[1] : 0;
+    return u === 0 && v === 0 ? undefined : [u, v];
+}
+
+/** True when both scroll the same way (or both not at all). */
+export function uvScrollEqual(a: [number, number] | undefined, b: [number, number] | undefined): boolean {
+    return a === b || (!!a && !!b && a[0] === b[0] && a[1] === b[1]);
+}
+
 export interface StoredBatchSettings {
     instancingGeometry: Float32Array;
     instancingIndices: Uint32Array | Uint16Array;
@@ -162,6 +238,12 @@ export interface StoredBatchSettings {
     lighting?: MeshLighting;
     /** Mesh particle rim, see {@link VFXBatchSettings.rim}. */
     rim?: MeshRim;
+    /** Map UV scroll, see {@link VFXBatchSettings.uvScroll}. */
+    uvScroll?: [number, number];
+    /** Colour ramp for the map, see {@link VFXBatchSettings.gradientMap}. */
+    gradientMap: BaseTexture | null;
+    /** Alpha erosion, see {@link VFXBatchSettings.erosion}. */
+    erosion?: ParticleErosion;
 }
 
 export abstract class VFXBatch {
@@ -208,6 +290,9 @@ export abstract class VFXBatch {
             applyFog: settings.applyFog ?? true,
             lighting: settings.lighting,
             rim: normalizeMeshRim(settings.rim),
+            uvScroll: normalizeUVScroll(settings.uvScroll),
+            gradientMap: settings.gradientMap ?? null,
+            erosion: normalizeErosion(settings.erosion),
         };
         this.mesh = new Mesh('vfxBatch', scene);
         this.configureMesh();
@@ -329,6 +414,90 @@ export abstract class VFXBatch {
             effect.setFloat4('vFogInfos', mode, scene.fogStart, scene.fogEnd, scene.fogDensity);
             effect.setColor3('vFogColor', scene.fogColor);
         });
+    }
+
+    /**
+     * Seconds of renderer time, set by the renderer before each fill; what UV
+     * and erosion mask scrolling advance by.
+     */
+    time = 0;
+
+    /** Defines of the texture effects (see `shaders/chunks/surface.ts`) this batch uses. */
+    protected surfaceDefines(): string[] {
+        const defines: string[] = [];
+        if (this.settings.uvScroll) {
+            defines.push('UV_SCROLL');
+        }
+        if (this.settings.gradientMap) {
+            defines.push('GRADIENT_MAP');
+        }
+        const erosion = this.settings.erosion;
+        if (erosion) {
+            defines.push('EROSION');
+            if (erosion.mask) {
+                defines.push('EROSION_MASK');
+            }
+        }
+        return defines;
+    }
+
+    /** Adds the uniforms and samplers of the texture effects this batch uses. */
+    protected surfaceUniforms(uniforms: string[], samplers: string[]): void {
+        if (this.settings.uvScroll) {
+            uniforms.push('uvScrollOffset');
+        }
+        if (this.settings.gradientMap) {
+            samplers.push('gradientMap');
+        }
+        const erosion = this.settings.erosion;
+        if (erosion) {
+            uniforms.push('erosionParams', 'erosionEdgeColor');
+            if (erosion.mask) {
+                samplers.push('erosionMask');
+            }
+        }
+    }
+
+    /** Sets the texture effects' textures and constants, and advances their scrolling on every bind. */
+    protected bindSurface(material: ShaderMaterial): void {
+        const {uvScroll, gradientMap, erosion} = this.settings;
+        if (gradientMap) {
+            material.setTexture('gradientMap', gradientMap);
+        }
+        if (erosion) {
+            if (erosion.mask) {
+                material.setTexture('erosionMask', erosion.mask);
+            }
+            material.setVector3(
+                'erosionEdgeColor',
+                new BVector3(erosion.edgeColor[0], erosion.edgeColor[1], erosion.edgeColor[2])
+            );
+        }
+        if (!uvScroll && !erosion) {
+            return;
+        }
+        // Wrapped on the CPU: a raw speed × time grows until float32 UVs lose their fraction.
+        const wrap = (value: number) => value - Math.floor(value);
+        const scrollOffset = new BVector2();
+        const erosionParams = new BVector4();
+        const write = () => {
+            const time = this.time;
+            if (uvScroll) {
+                scrollOffset.set(wrap(uvScroll[0] * time), wrap(uvScroll[1] * time));
+                material.setVector2('uvScrollOffset', scrollOffset);
+            }
+            if (erosion) {
+                erosionParams.set(
+                    erosion.softness,
+                    erosion.edgeWidth,
+                    wrap(erosion.maskScroll[0] * time),
+                    wrap(erosion.maskScroll[1] * time)
+                );
+                material.setVector4('erosionParams', erosionParams);
+            }
+        };
+        write();
+        material.onBindObservable.add(write);
     }
 
     addSystem(system: IParticleSystem) {

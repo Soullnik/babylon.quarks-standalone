@@ -344,6 +344,7 @@ export class SpriteBatch extends VFXBatch {
             }
         }
         const needsEyePosition = useEnvAtlas || !!rim;
+        defines.push(...this.surfaceDefines());
 
         const shaderLanguage = shaderLanguageFor(this.scene.getEngine());
         registerShaders(shaderName, vertexShader, fragmentShader, shaderLanguage);
@@ -377,6 +378,7 @@ export class SpriteBatch extends VFXBatch {
             uniforms.push('rimColor');
             uniforms.push('rimParams');
         }
+        this.surfaceUniforms(uniforms, samplers);
         if (this.settings.renderMode === RenderMode.StretchedBillBoard) {
             uniforms.push('speedFactor');
         }
@@ -491,6 +493,7 @@ export class SpriteBatch extends VFXBatch {
         }
 
         this.bindFog(mat);
+        this.bindSurface(mat);
         mat.backFaceCulling = false;
 
         if (this.settings.materialTransparent) {

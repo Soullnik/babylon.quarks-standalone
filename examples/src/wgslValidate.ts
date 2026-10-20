@@ -154,6 +154,57 @@ function cases(): Case[] {
         ['MESH_UNLIT', 'MESH_RIM', 'MESH_RIM_MIX']
     );
 
+    // Texture effects (chunks/surface.ts), with and without a map and a blended second tile.
+    const surfaceOptions = [
+        ['UV_SCROLL'],
+        ['GRADIENT_MAP'],
+        ['EROSION'],
+        ['EROSION', 'EROSION_MASK'],
+        ['UV_SCROLL', 'GRADIENT_MAP', 'EROSION', 'EROSION_MASK'],
+    ];
+    const surfaceTargets = [
+        {name: 'billboard', vertex: particleVert, fragment: particleFrag, attributes: SPRITE_ATTRS, extra: []},
+        {
+            name: 'mesh unlit',
+            vertex: meshVert,
+            fragment: physicsFrag,
+            attributes: [...SPRITE_ATTRS, 'normal'],
+            extra: ['MESH_UNLIT'],
+        },
+        {
+            name: 'trail',
+            vertex: trailVert,
+            fragment: trailFrag,
+            attributes: ['position', 'previous', 'next', 'side', 'width', 'uv', 'color'],
+            extra: [],
+        },
+    ];
+    for (const target of surfaceTargets)
+        for (const surface of surfaceOptions)
+            for (const map of mapOptions)
+                for (const tile of target.name === 'trail' ? [[]] : [[], ['UV_TILE', 'TILE_BLEND']]) {
+                    const defines = [...target.extra, ...surface, ...map, ...tile];
+                    const uniforms =
+                        target.name === 'trail'
+                            ? ['world', 'view', 'projection', 'lineWidth', 'resolution', 'sizeAttenuation']
+                            : [...SPRITE_UNIFORMS];
+                    const samplers: string[] = [...map.map(() => 'map')];
+                    if (tile.length) uniforms.push('tileCountX', 'tileCountY');
+                    if (surface.includes('UV_SCROLL')) uniforms.push('uvScrollOffset');
+                    if (surface.includes('GRADIENT_MAP')) samplers.push('gradientMap');
+                    if (surface.includes('EROSION')) uniforms.push('erosionParams', 'erosionEdgeColor');
+                    if (surface.includes('EROSION_MASK')) samplers.push('erosionMask');
+                    out.push({
+                        name: `${target.name} surface [${defines.join(',')}]`,
+                        vertex: target.vertex,
+                        fragment: target.fragment,
+                        attributes: target.attributes,
+                        uniforms,
+                        samplers,
+                        defines,
+                    });
+                }
+
     for (const map of mapOptions) {
         out.push({
             name: `trail ${map.length ? '[USE_MAP]' : '[none]'}`,

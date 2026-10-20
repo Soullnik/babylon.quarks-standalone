@@ -1,4 +1,5 @@
 import {fogFragmentDeclarationWGSL, fogFragmentWGSL} from './chunks/fog';
+import {surfaceColorWGSL, surfaceFragmentDeclarationWGSL} from './chunks/surface';
 
 export default /* wgsl */ `
 varying vUV: vec2f;
@@ -10,15 +11,10 @@ var map: texture_2d<f32>;
 #endif
 
 ${fogFragmentDeclarationWGSL}
+${surfaceFragmentDeclarationWGSL}
 @fragment
 fn main(input: FragmentInputs) -> FragmentOutputs {
-    var baseColor = fragmentInputs.vColor;
-
-#ifdef USE_MAP
-    let texColor = textureSample(map, mapSampler, fragmentInputs.vUV);
-    baseColor *= texColor;
-#endif
-
+${surfaceColorWGSL(false)}
     if (baseColor.a < 0.01) { discard; }
 
 ${fogFragmentWGSL('baseColor')}

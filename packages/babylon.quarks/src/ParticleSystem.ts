@@ -53,7 +53,16 @@ import {BatchedRenderer, VFXBatchSettings} from './BatchedRenderer';
 import {ensureEnvAtlasFromCube, getCachedEnvAtlas} from './envAtlas';
 import {ensureTriangleIndices} from './geometryUtil';
 import {ParticleEmitter} from './ParticleEmitter';
-import {MeshLighting, MeshRim, normalizeMeshRim, RenderMode, SortMode} from './VFXBatch';
+import {
+    MeshLighting,
+    MeshRim,
+    normalizeErosion,
+    normalizeMeshRim,
+    normalizeUVScroll,
+    ParticleErosion,
+    RenderMode,
+    SortMode,
+} from './VFXBatch';
 
 export interface BurstParameters {
     time: number;
@@ -199,6 +208,12 @@ export interface ParticleSystemParameters {
     lighting?: MeshLighting;
     /** Rim (Fresnel) term on mesh particles, see {@link ParticleSystem.rim}. Default none. */
     rim?: Partial<MeshRim>;
+    /** Map UV scroll in UV units per second, see {@link ParticleSystem.uvScroll}. Default none. */
+    uvScroll?: [number, number];
+    /** Colour ramp for the map, see {@link ParticleSystem.gradientMap}. Default none. */
+    gradientMap?: BaseTexture | null;
+    /** Alpha erosion, see {@link ParticleSystem.erosion}. Default none. */
+    erosion?: Partial<ParticleErosion>;
     /** Multiplier on the time the system is advanced by, see {@link ParticleSystem.playbackSpeed}. Default 1. */
     playbackSpeed?: number;
     /** What the system does while off screen, see {@link CullingMode}. Default `'always'`. */
@@ -587,6 +602,55 @@ export class ParticleSystem implements IParticleSystem {
         this.neededToUpdateRender = true;
     }
 
+    /**
+     * Scrolls the map's UV by `[u, v]` UV units per second on the renderer's
+     * clock: flowing energy, lava, a smear running along a mesh. The texture
+     * should wrap. Undefined (the default) or zero does not scroll. Assign a
+     * new array to change it. Saved with the material in the effect JSON.
+     */
+    get uvScroll(): [number, number] | undefined {
+        return this.rendererSettings.uvScroll;
+    }
+
+    set uvScroll(scroll: [number, number] | undefined) {
+        this.rendererSettings.uvScroll = normalizeUVScroll(scroll);
+        this.neededToUpdateRender = true;
+    }
+
+    /**
+     * Colour ramp the map is recoloured through (a gradient map): the map's
+     * red channel picks a colour along U of this texture, whose alpha
+     * multiplies the map's; the particle colour still tints the result. One
+     * greyscale texture then serves every palette. Null (the default): none.
+     * Saved with the material in the effect JSON.
+     */
+    get gradientMap(): BaseTexture | null {
+        return this.rendererSettings.gradientMap ?? null;
+    }
+
+    set gradientMap(texture: BaseTexture | null) {
+        this.rendererSettings.gradientMap = texture ?? null;
+        this.neededToUpdateRender = true;
+    }
+
+    /**
+     * Alpha erosion, see {@link ParticleErosion}: the particle's alpha decides
+     * how much of the shape is left rather than how transparent it is, so a
+     * `ColorOverLife` alpha curve dissolves the shape through a noise mask or
+     * wipes it through a gradient one — and an effect told to stop can fade
+     * out that way. Undefined (the default): alpha is plain transparency.
+     * Fields left out take their defaults; assign a new object to change it.
+     * Saved with the material in the effect JSON.
+     */
+    get erosion(): ParticleErosion | undefined {
+        return this.rendererSettings.erosion;
+    }
+
+    set erosion(erosion: Partial<ParticleErosion> | undefined) {
+        this.rendererSettings.erosion = normalizeErosion(erosion);
+        this.neededToUpdateRender = true;
+    }
+
     /** `lighting` if it is one of the modes, else the default. */
     private static validLighting(lighting: unknown): MeshLighting {
         return lighting === 'unlit' || lighting === 'scene' ? lighting : 'fixed';
@@ -889,6 +953,9 @@ export class ParticleSystem implements IParticleSystem {
             applyFog: parameters.applyFog ?? true,
             lighting: ParticleSystem.validLighting(parameters.lighting),
             rim: normalizeMeshRim(parameters.rim),
+            uvScroll: normalizeUVScroll(parameters.uvScroll),
+            gradientMap: parameters.gradientMap ?? null,
+            erosion: normalizeErosion(parameters.erosion),
         };
         this.flip = ParticleSystem.nonZeroFlip(parameters.flip);
         this.playbackSpeed = parameters.playbackSpeed ?? 1;
@@ -2344,6 +2411,10 @@ export class ParticleSystem implements IParticleSystem {
             typeof materialTextureRef === 'string'
                 ? (meta.textures?.[materialTextureRef] ?? null)
                 : (materialTextureRef ?? null);
+        // Texture effects reference textures by uuid in a serialised meta, or hold them once a loader resolved them.
+        const resolveTexture = (ref: unknown): BaseTexture | null =>
+            typeof ref === 'string' ? (meta.textures?.[ref] ?? null) : ((ref as BaseTexture | null) ?? null);
+        const erosionMeta = materialMeta?.erosion;
         const resolvedGeometryEntry =
             typeof json.instancingGeometry === 'string'
                 ? meta.geometries?.[json.instancingGeometry]
@@ -2420,6 +2491,12 @@ export class ParticleSystem implements IParticleSystem {
             flip: json.flip ? new Vector2(json.flip[0] ?? 0, json.flip[1] ?? 0) : undefined,
             lighting: materialMeta?.lighting,
             rim: materialMeta?.rim,
+            uvScroll: materialMeta?.uvScroll,
+            gradientMap: resolveTexture(materialMeta?.gradientMap),
+            erosion:
+                erosionMeta && typeof erosionMeta === 'object'
+                    ? {...erosionMeta, mask: resolveTexture(erosionMeta.mask)}
+                    : undefined,
         });
         ps.behaviors = (json.behaviors ?? [])
             .map((behaviorJson) => {
@@ -2495,6 +2572,16 @@ export class ParticleSystem implements IParticleSystem {
             meta.textures[reflectionAtlasUUID] = reflectionAtlas;
         }
 
+        const textureRef = (value: BaseTexture | null | undefined): string | undefined => {
+            if (!(value instanceof Texture)) {
+                return undefined;
+            }
+            const uuid = ParticleSystem.nextSerializationId('quarks_texture');
+            meta.textures[uuid] = value;
+            return uuid;
+        };
+        const erosion = this.erosion;
+
         const materialUUID = ParticleSystem.nextSerializationId('quarks_material');
         meta.materials[materialUUID] = {
             uuid: materialUUID,
@@ -2510,6 +2597,19 @@ export class ParticleSystem implements IParticleSystem {
             // Written only when not the default, so existing effects serialise as before.
             ...(this.lighting !== 'fixed' ? {lighting: this.lighting} : {}),
             ...(this.rim ? {rim: {...this.rim, color: [...this.rim.color]}} : {}),
+            ...(this.uvScroll ? {uvScroll: [...this.uvScroll]} : {}),
+            ...(this.gradientMap ? {gradientMap: textureRef(this.gradientMap)} : {}),
+            ...(erosion
+                ? {
+                      erosion: {
+                          mask: textureRef(erosion.mask),
+                          softness: erosion.softness,
+                          edgeWidth: erosion.edgeWidth,
+                          edgeColor: [...erosion.edgeColor],
+                          maskScroll: [...erosion.maskScroll],
+                      },
+                  }
+                : {}),
             sourceMaterial: this.materialRef ?? undefined,
         };
         return materialUUID;
@@ -2684,6 +2784,9 @@ export class ParticleSystem implements IParticleSystem {
             flip: this.flip,
             lighting: this.lighting,
             rim: this.rim,
+            uvScroll: this.uvScroll,
+            gradientMap: this.gradientMap,
+            erosion: this.erosion,
             scene: this.emitter.getScene(),
         });
         // A sub emitter behavior transforms by its parent system's emitter;

@@ -824,6 +824,20 @@ export class QuarksLoader {
             if (matDef.rim && typeof matDef.rim === 'object') {
                 matInfo.rim = matDef.rim;
             }
+            // Texture effects (QuarksMaterial): uvScroll [u, v], gradientMap texture uuid,
+            // erosion {mask (texture uuid), softness, edgeWidth, edgeColor, maskScroll}.
+            if (Array.isArray(matDef.uvScroll)) {
+                matInfo.uvScroll = matDef.uvScroll;
+            }
+            if (matDef.gradientMap) {
+                matInfo.gradientMap = meta.textures[matDef.gradientMap] || null;
+            }
+            if (matDef.erosion && typeof matDef.erosion === 'object') {
+                matInfo.erosion = {
+                    ...matDef.erosion,
+                    mask: matDef.erosion.mask ? meta.textures[matDef.erosion.mask] || null : null,
+                };
+            }
 
             // QuarksMaterial (what ParticleSystem.ensureMaterialMeta emits) writes `alphaMode`
             // directly as a Babylon alpha-mode constant; three.js materials (MeshBasicMaterial
