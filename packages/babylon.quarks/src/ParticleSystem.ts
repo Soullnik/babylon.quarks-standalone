@@ -53,7 +53,16 @@ import {BatchedRenderer, VFXBatchSettings} from './BatchedRenderer';
 import {ensureEnvAtlasFromCube, getCachedEnvAtlas} from './envAtlas';
 import {ensureTriangleIndices} from './geometryUtil';
 import {ParticleEmitter} from './ParticleEmitter';
-import {MeshLighting, MeshRim, normalizeMeshRim, RenderMode, SortMode} from './VFXBatch';
+import {
+    MeshLighting,
+    MeshRim,
+    normalizeErosion,
+    normalizeMeshRim,
+    normalizeUVScroll,
+    ParticleErosion,
+    RenderMode,
+    SortMode,
+} from './VFXBatch';
 
 export interface BurstParameters {
     time: number;
@@ -80,6 +89,27 @@ export interface BurstParameters {
  * culled either; its parent decides.
  */
 export type CullingMode = 'always' | 'pause' | 'pauseAndCatchUp';
+
+/**
+ * What the emitter's world scale does to a world-space system (Unity's
+ * Scaling Mode, as far as it differs here). A local-space system lives in its
+ * emitter's space, so its scale reaches everything either way.
+ *
+ * - `'shape'` (default): the scale sizes the emission shape and the
+ *   particles; speeds, forces and speed limits stay in world units, so a
+ *   scaled-down effect moves as far as the full-size one.
+ * - `'hierarchy'`: the scale also multiplies start speeds (per axis),
+ *   `ForceOverLife` and `LimitSpeedOverLife` (by the mean of the axes), so the
+ *   whole effect, motion included, scales like a model would.
+ */
+export type ScalingMode = 'shape' | 'hierarchy';
+
+/**
+ * Where a {@link RenderMode.Beam} system's quads end: a point in world space,
+ * or anything with a world position, such as a Babylon `TransformNode`, read
+ * every frame.
+ */
+export type BeamEnd = {x: number; y: number; z: number} | {getAbsolutePosition(): {x: number; y: number; z: number}};
 
 /** Particle backed by a {@link ParticleStore} row, as this system always creates. */
 type StoreBackedParticle = Particle & {storeIndex: number; setStoreIndex(index: number): void};
@@ -199,10 +229,18 @@ export interface ParticleSystemParameters {
     lighting?: MeshLighting;
     /** Rim (Fresnel) term on mesh particles, see {@link ParticleSystem.rim}. Default none. */
     rim?: Partial<MeshRim>;
+    /** Map UV scroll in UV units per second, see {@link ParticleSystem.uvScroll}. Default none. */
+    uvScroll?: [number, number];
+    /** Colour ramp for the map, see {@link ParticleSystem.gradientMap}. Default none. */
+    gradientMap?: BaseTexture | null;
+    /** Alpha erosion, see {@link ParticleSystem.erosion}. Default none. */
+    erosion?: Partial<ParticleErosion>;
     /** Multiplier on the time the system is advanced by, see {@link ParticleSystem.playbackSpeed}. Default 1. */
     playbackSpeed?: number;
     /** What the system does while off screen, see {@link CullingMode}. Default `'always'`. */
     cullingMode?: CullingMode;
+    /** What the emitter's scale does to a world-space system, see {@link ScalingMode}. Default `'shape'`. */
+    scalingMode?: ScalingMode;
     /** Seed for this system's own random generator, see {@link ParticleSystem.seed}. Default none. */
     seed?: number;
     /** Draw order within the batch, see {@link ParticleSystem.sortMode}. Default `'none'`. */
@@ -258,6 +296,8 @@ export interface ParticleSystemJSONParameters {
     playbackSpeed?: number;
     /** Written only when not `'always'`. */
     cullingMode?: CullingMode;
+    /** Written only when not `'shape'`. */
+    scalingMode?: ScalingMode;
     /** Written only when set. */
     seed?: number;
     /** Written only when not `'none'`. */
@@ -587,6 +627,77 @@ export class ParticleSystem implements IParticleSystem {
         this.neededToUpdateRender = true;
     }
 
+    /**
+     * Scrolls the map's UV by `[u, v]` UV units per second on the renderer's
+     * clock: flowing energy, lava, a smear running along a mesh. The texture
+     * should wrap. Undefined (the default) or zero does not scroll. Assign a
+     * new array to change it. Saved with the material in the effect JSON.
+     */
+    get uvScroll(): [number, number] | undefined {
+        return this.rendererSettings.uvScroll;
+    }
+
+    set uvScroll(scroll: [number, number] | undefined) {
+        this.rendererSettings.uvScroll = normalizeUVScroll(scroll);
+        this.neededToUpdateRender = true;
+    }
+
+    /**
+     * Colour ramp the map is recoloured through (a gradient map): the map's
+     * red channel picks a colour along U of this texture, whose alpha
+     * multiplies the map's; the particle colour still tints the result. One
+     * greyscale texture then serves every palette. Null (the default): none.
+     * Saved with the material in the effect JSON.
+     */
+    get gradientMap(): BaseTexture | null {
+        return this.rendererSettings.gradientMap ?? null;
+    }
+
+    set gradientMap(texture: BaseTexture | null) {
+        this.rendererSettings.gradientMap = texture ?? null;
+        this.neededToUpdateRender = true;
+    }
+
+    /**
+     * Alpha erosion, see {@link ParticleErosion}: the particle's alpha decides
+     * how much of the shape is left rather than how transparent it is, so a
+     * `ColorOverLife` alpha curve dissolves the shape through a noise mask or
+     * wipes it through a gradient one — and an effect told to stop can fade
+     * out that way. Undefined (the default): alpha is plain transparency.
+     * Fields left out take their defaults; assign a new object to change it.
+     * Saved with the material in the effect JSON.
+     */
+    get erosion(): ParticleErosion | undefined {
+        return this.rendererSettings.erosion;
+    }
+
+    set erosion(erosion: Partial<ParticleErosion> | undefined) {
+        this.rendererSettings.erosion = normalizeErosion(erosion);
+        this.neededToUpdateRender = true;
+    }
+
+    /**
+     * The emitter's world scale per axis, measured with {@link motionScale}
+     * before every step; what `'hierarchy'` multiplies start speeds by. Taken
+     * from the system's own emitter rather than the emission matrix, whose
+     * columns carry a parent particle's velocity for a sub emitter.
+     */
+    private readonly hierarchyScale = new Vector3(1, 1, 1);
+
+    /** The mean world scale of the emitter for a world-space `'hierarchy'` system, else 1. */
+    private measureMotionScale(): number {
+        if (this.scalingMode !== 'hierarchy' || !this.worldSpace) {
+            this.hierarchyScale.set(1, 1, 1);
+            return 1;
+        }
+        const e = this.emitter.matrixWorld.elements;
+        const sx = Math.sqrt(e[0] * e[0] + e[1] * e[1] + e[2] * e[2]);
+        const sy = Math.sqrt(e[4] * e[4] + e[5] * e[5] + e[6] * e[6]);
+        const sz = Math.sqrt(e[8] * e[8] + e[9] * e[9] + e[10] * e[10]);
+        this.hierarchyScale.set(sx, sy, sz);
+        return (sx + sy + sz) / 3;
+    }
+
     /** `lighting` if it is one of the modes, else the default. */
     private static validLighting(lighting: unknown): MeshLighting {
         return lighting === 'unlit' || lighting === 'scene' ? lighting : 'fixed';
@@ -674,6 +785,7 @@ export class ParticleSystem implements IParticleSystem {
                 case RenderMode.BillBoard:
                 case RenderMode.VerticalBillBoard:
                 case RenderMode.HorizontalBillBoard:
+                case RenderMode.Beam:
                     this.rendererEmitterSettings = {};
                     break;
             }
@@ -730,8 +842,27 @@ export class ParticleSystem implements IParticleSystem {
      */
     playbackSpeed = 1;
 
+    /**
+     * Runtime multiplier on how many particles the system emits: bursts,
+     * emission over time and over distance alike. Unlike
+     * {@link setQualityFactor}, which only ever thins an effect, it may go
+     * above 1 to make a stronger version of the same effect. The two multiply.
+     * 1 by default; not saved in the effect JSON.
+     */
+    emissionMultiplier = 1;
+
     /** What this system does while off screen, see {@link CullingMode}. `'always'` by default. */
     cullingMode: CullingMode = 'always';
+
+    /** What the emitter's world scale does to a world-space system, see {@link ScalingMode}. `'shape'` by default. */
+    scalingMode: ScalingMode = 'shape';
+
+    /**
+     * What world-space forces and speed limits are multiplied by this step:
+     * the mean of the emitter's world scale axes in `'hierarchy'` mode, 1
+     * otherwise. Updated before every simulation step.
+     */
+    motionScale = 1;
 
     /**
      * Whether each particle starts turned along the direction its shape sends
@@ -880,10 +1011,14 @@ export class ParticleSystem implements IParticleSystem {
             applyFog: parameters.applyFog ?? true,
             lighting: ParticleSystem.validLighting(parameters.lighting),
             rim: normalizeMeshRim(parameters.rim),
+            uvScroll: normalizeUVScroll(parameters.uvScroll),
+            gradientMap: parameters.gradientMap ?? null,
+            erosion: normalizeErosion(parameters.erosion),
         };
         this.flip = ParticleSystem.nonZeroFlip(parameters.flip);
         this.playbackSpeed = parameters.playbackSpeed ?? 1;
         this.cullingMode = parameters.cullingMode ?? 'always';
+        this.scalingMode = parameters.scalingMode === 'hierarchy' ? 'hierarchy' : 'shape';
         this.alignToDirection = parameters.alignToDirection === true;
         this.seed = parameters.seed;
         if (this.rendererSettings.renderMode === RenderMode.Mesh && !this.rendererSettings.instancingNormals) {
@@ -1062,6 +1197,12 @@ export class ParticleSystem implements IParticleSystem {
         this.qualityFactor = Math.max(0.1, Math.min(1, qualityFactor));
     }
 
+    /** Quality factor times {@link emissionMultiplier}: what emission counts are scaled by. */
+    private emissionFactor(): number {
+        const multiplier = this.emissionMultiplier;
+        return multiplier >= 0 ? this.qualityFactor * multiplier : this.qualityFactor;
+    }
+
     /**
      * Appends one particle to the pool, giving it the next row of the store.
      *
@@ -1212,7 +1353,12 @@ export class ParticleSystem implements IParticleSystem {
                 particle.position.applyMatrix4(matrix);
                 particle.startSize.multiply(scale).abs();
                 particle.size.copy(particle.startSize);
-                particle.velocity.multiply(scale).applyMatrix3(this.normalMatrix);
+                if (this.scalingMode === 'hierarchy') {
+                    // Scaled per axis by the emitter's world scale, then turned: the speed scales with it.
+                    particle.velocity.multiply(this.hierarchyScale).applyQuaternion(tempQ);
+                } else {
+                    particle.velocity.multiply(scale).applyMatrix3(this.normalMatrix);
+                }
                 if (particle.rotation && particle.rotation instanceof Quaternion) {
                     particle.rotation.multiplyQuaternions(tempQ, particle.rotation);
                 }
@@ -1514,6 +1660,63 @@ export class ParticleSystem implements IParticleSystem {
      * frame behind the display.
      */
     getWorldBounds(min: Vector3, max: Vector3): boolean {
+        if (!this.measureWorldBounds(min, max)) {
+            return false;
+        }
+        if (this.rendererSettings.renderMode === RenderMode.Beam) {
+            // The quads reach the beam's end, which moves on its own. Without
+            // one a beam draws nothing beyond its particles.
+            const end = this.beamEndScratch;
+            if (!this.getBeamEnd(end)) {
+                return true;
+            }
+            const pad = this.boundsInWorld ? this.boundsPadding : this.boundsPadding * this.emitterMaxScale();
+            min.set(Math.min(min.x, end.x - pad), Math.min(min.y, end.y - pad), Math.min(min.z, end.z - pad));
+            max.set(Math.max(max.x, end.x + pad), Math.max(max.y, end.y + pad), Math.max(max.z, end.z + pad));
+        }
+        return true;
+    }
+
+    /**
+     * Where a {@link RenderMode.Beam} system's quads end, see {@link BeamEnd}.
+     * Unset (the default), a beam has no length and draws nothing. Not saved
+     * in the effect JSON: it is where this instance is aimed at runtime.
+     */
+    beamEnd?: BeamEnd;
+
+    private readonly beamEndScratch = new Vector3();
+
+    /** The world position of {@link beamEnd} into `out`; false when it is unset. */
+    getBeamEnd(out: Vector3): boolean {
+        const end = this.beamEnd;
+        if (end === undefined) {
+            return false;
+        }
+        const node = end as {getAbsolutePosition?: () => {x: number; y: number; z: number}};
+        if (typeof node.getAbsolutePosition === 'function') {
+            const position = node.getAbsolutePosition();
+            out.set(position.x, position.y, position.z);
+        } else {
+            // Any point: quarks' Vector3, or a Babylon one passed from plain JavaScript.
+            const point = end as {x: number; y: number; z: number};
+            out.set(point.x, point.y, point.z);
+        }
+        return true;
+    }
+
+    /** The largest axis of the emitter's world scale. */
+    private emitterMaxScale(): number {
+        const e = this.emitter.matrixWorld.elements;
+        return Math.sqrt(
+            Math.max(
+                e[0] * e[0] + e[1] * e[1] + e[2] * e[2],
+                e[4] * e[4] + e[5] * e[5] + e[6] * e[6],
+                e[8] * e[8] + e[9] * e[9] + e[10] * e[10]
+            )
+        );
+    }
+
+    private measureWorldBounds(min: Vector3, max: Vector3): boolean {
         if (!this.boundsValid) {
             return false;
         }
@@ -1689,6 +1892,7 @@ export class ParticleSystem implements IParticleSystem {
     }
 
     private stepOnce(delta: number): void {
+        this.motionScale = this.measureMotionScale();
         if (!this.onlyUsedByOther) {
             this.emit(delta, this.emissionState, this.emitter.matrixWorld);
         }
@@ -2060,8 +2264,9 @@ export class ParticleSystem implements IParticleSystem {
             return;
         }
         const rawCount = burst.count.genValue(this.memory, this.time);
-        const qualityFactor = this.qualityFactor;
-        const count = qualityFactor >= 0.999 ? rawCount : Math.floor(rawCount * qualityFactor);
+        const factor = this.emissionFactor();
+        // Rounded at random, so a fraction is not always lost: three at 1.5 is four or five, on average 4.5.
+        const count = Math.abs(factor - 1) < 0.001 ? rawCount : Math.floor(rawCount * factor + random());
         emissionState.isBursting = true;
         emissionState.burstParticleCount = count;
         this.spawn(count, emissionState, emitterMatrix);
@@ -2126,6 +2331,12 @@ export class ParticleSystem implements IParticleSystem {
     }
 
     emit(delta: number, emissionState: EmissionState, emitterMatrix: Matrix4) {
+        // Ended before this step (endEmit, or a past step's end of duration):
+        // no more bursts either. A looping system would otherwise keep firing
+        // them every loop after endEmit and never finish. Only the system's
+        // own emission: a sub emitter's bursts belong to its parent particles,
+        // which still go off as they die after the effect was told to end.
+        const endedBefore = this.emitEnded && emissionState === this.emissionState;
         if (emissionState.time > this.duration) {
             if (this.looping) {
                 emissionState.time -= this.duration;
@@ -2149,9 +2360,9 @@ export class ParticleSystem implements IParticleSystem {
             this.normalMatrix.getNormalMatrix(emitterMatrix);
         }
         const emissionBurstCount = this.emissionBursts.length;
-        const qualityFactor = this.qualityFactor;
+        const qualityFactor = this.emissionFactor();
 
-        if (emissionBurstCount > 0) {
+        if (emissionBurstCount > 0 && !endedBefore) {
             this.emitBursts(emissionState, emitterMatrix);
         }
 
@@ -2265,6 +2476,7 @@ export class ParticleSystem implements IParticleSystem {
             ...(this.applyFog ? {} : {applyFog: false}),
             ...(this.playbackSpeed !== 1 ? {playbackSpeed: this.playbackSpeed} : {}),
             ...(this.cullingMode !== 'always' ? {cullingMode: this.cullingMode} : {}),
+            ...(this.scalingMode !== 'shape' ? {scalingMode: this.scalingMode} : {}),
             ...(this.seedValue !== undefined ? {seed: this.seedValue} : {}),
             ...(this.sortMode !== 'none' ? {sortMode: this.sortMode} : {}),
             ...(this.alignToDirection ? {alignToDirection: true} : {}),
@@ -2325,6 +2537,10 @@ export class ParticleSystem implements IParticleSystem {
             typeof materialTextureRef === 'string'
                 ? (meta.textures?.[materialTextureRef] ?? null)
                 : (materialTextureRef ?? null);
+        // Texture effects reference textures by uuid in a serialised meta, or hold them once a loader resolved them.
+        const resolveTexture = (ref: unknown): BaseTexture | null =>
+            typeof ref === 'string' ? (meta.textures?.[ref] ?? null) : ((ref as BaseTexture | null) ?? null);
+        const erosionMeta = materialMeta?.erosion;
         const resolvedGeometryEntry =
             typeof json.instancingGeometry === 'string'
                 ? meta.geometries?.[json.instancingGeometry]
@@ -2372,6 +2588,7 @@ export class ParticleSystem implements IParticleSystem {
             applyFog: json.applyFog !== false,
             playbackSpeed: typeof json.playbackSpeed === 'number' ? json.playbackSpeed : undefined,
             cullingMode: ParticleSystem.validCullingMode(json.cullingMode),
+            scalingMode: json.scalingMode === 'hierarchy' ? 'hierarchy' : 'shape',
             seed: typeof json.seed === 'number' ? json.seed : undefined,
             sortMode: ParticleSystem.validSortMode(json.sortMode),
             alignToDirection: json.alignToDirection === true,
@@ -2401,6 +2618,12 @@ export class ParticleSystem implements IParticleSystem {
             flip: json.flip ? new Vector2(json.flip[0] ?? 0, json.flip[1] ?? 0) : undefined,
             lighting: materialMeta?.lighting,
             rim: materialMeta?.rim,
+            uvScroll: materialMeta?.uvScroll,
+            gradientMap: resolveTexture(materialMeta?.gradientMap),
+            erosion:
+                erosionMeta && typeof erosionMeta === 'object'
+                    ? {...erosionMeta, mask: resolveTexture(erosionMeta.mask)}
+                    : undefined,
         });
         ps.behaviors = (json.behaviors ?? [])
             .map((behaviorJson) => {
@@ -2476,6 +2699,16 @@ export class ParticleSystem implements IParticleSystem {
             meta.textures[reflectionAtlasUUID] = reflectionAtlas;
         }
 
+        const textureRef = (value: BaseTexture | null | undefined): string | undefined => {
+            if (!(value instanceof Texture)) {
+                return undefined;
+            }
+            const uuid = ParticleSystem.nextSerializationId('quarks_texture');
+            meta.textures[uuid] = value;
+            return uuid;
+        };
+        const erosion = this.erosion;
+
         const materialUUID = ParticleSystem.nextSerializationId('quarks_material');
         meta.materials[materialUUID] = {
             uuid: materialUUID,
@@ -2491,6 +2724,19 @@ export class ParticleSystem implements IParticleSystem {
             // Written only when not the default, so existing effects serialise as before.
             ...(this.lighting !== 'fixed' ? {lighting: this.lighting} : {}),
             ...(this.rim ? {rim: {...this.rim, color: [...this.rim.color]}} : {}),
+            ...(this.uvScroll ? {uvScroll: [...this.uvScroll]} : {}),
+            ...(this.gradientMap ? {gradientMap: textureRef(this.gradientMap)} : {}),
+            ...(erosion
+                ? {
+                      erosion: {
+                          mask: textureRef(erosion.mask),
+                          softness: erosion.softness,
+                          edgeWidth: erosion.edgeWidth,
+                          edgeColor: [...erosion.edgeColor],
+                          maskScroll: [...erosion.maskScroll],
+                      },
+                  }
+                : {}),
             sourceMaterial: this.materialRef ?? undefined,
         };
         return materialUUID;
@@ -2638,6 +2884,7 @@ export class ParticleSystem implements IParticleSystem {
             applyFog: this.applyFog,
             playbackSpeed: this.playbackSpeed,
             cullingMode: this.cullingMode,
+            scalingMode: this.scalingMode,
             seed: this.seedValue,
             sortMode: this.sortMode,
             alignToDirection: this.alignToDirection,
@@ -2665,6 +2912,9 @@ export class ParticleSystem implements IParticleSystem {
             flip: this.flip,
             lighting: this.lighting,
             rim: this.rim,
+            uvScroll: this.uvScroll,
+            gradientMap: this.gradientMap,
+            erosion: this.erosion,
             scene: this.emitter.getScene(),
         });
         // A sub emitter behavior transforms by its parent system's emitter;

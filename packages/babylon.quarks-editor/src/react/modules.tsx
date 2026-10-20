@@ -940,6 +940,7 @@ export function RendererModule({
                         {value: RenderMode.VerticalBillBoard, label: 'Vertical billboard'},
                         {value: RenderMode.Trail, label: 'Trail'},
                         {value: RenderMode.Mesh, label: 'Mesh'},
+                        {value: RenderMode.Beam, label: 'Beam (end set in code)'},
                     ]}
                     onChange={(mode) => binding.apply((s) => (s.renderMode = mode))}
                 />

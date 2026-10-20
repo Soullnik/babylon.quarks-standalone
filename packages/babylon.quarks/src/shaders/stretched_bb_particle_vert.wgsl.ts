@@ -73,12 +73,27 @@ fn main(input: VertexInputs) -> FragmentInputs {
     if (vlength > 0.000001) {
         vdir = viewVelocity / vlength;
     }
+#ifdef BEAM
+    // Seen straight along its length a beam has no side to face; any will do.
+    let sideRaw = cross(mvPosition.xyz, vdir);
+    var side = vec3f(1.0, 0.0, 0.0);
+    if (dot(sideRaw, sideRaw) > 1e-12) {
+        side = normalize(sideRaw);
+    }
+#else
     let side = normalize(cross(mvPosition.xyz, vdir));
+#endif
     let widthOffset = vertexInputs.position.y * side * avgSize;
     // Equivalent to viewVelocity * (1.0 + lengthFactor / vlength) for moving particles, but the
     // size-based term (vdir * lengthFactor) survives when the velocity contribution vanishes.
+#ifdef BEAM
+    // The vector runs from the particle to the beam's end: the quad spans it
+    // exactly, U from the particle (0) to the end (1), as wide as the size.
+    var stretched = mvPosition.xyz + widthOffset + (vertexInputs.position.x + 0.5) * viewVelocity;
+#else
     let lengthOffset = (vertexInputs.position.x + 0.5) * (viewVelocity + vdir * lengthFactor) * avgSize;
     var stretched = mvPosition.xyz + widthOffset - lengthOffset;
+#endif
 #ifdef PIVOT
     // In particle-size units along the quad's own axes: x from head to tail, y across.
     stretched += (uniforms.pivot.y * side - uniforms.pivot.x * vdir) * avgSize;

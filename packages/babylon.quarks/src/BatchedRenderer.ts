@@ -11,13 +11,16 @@ import {SpriteBatch} from './SpriteBatch';
 import {TrailBatch} from './TrailBatch';
 import {
     defaultMeshLighting,
+    erosionEqual,
     MeshLighting,
     MeshLightingSettings,
     MeshRim,
     meshRimEqual,
+    ParticleErosion,
     RenderMode,
     SortMode,
     StoredBatchSettings,
+    uvScrollEqual,
     VFXBatch,
 } from './VFXBatch';
 
@@ -100,6 +103,22 @@ export interface VFXBatchSettings {
     lighting?: MeshLighting;
     /** Rim (Fresnel) term on mesh particles; unset draws none. See {@link MeshRim}. */
     rim?: MeshRim;
+    /**
+     * Scrolls the map's UV by this many UV units per second, `[u, v]`, on the
+     * renderer's clock. The texture should wrap; scrolling one tile of a sheet
+     * runs into its neighbours. Unset or zero: no scroll. Systems that differ
+     * are batched apart.
+     */
+    uvScroll?: [number, number];
+    /**
+     * Colour ramp the map is recoloured through: the map's red channel picks
+     * a colour along U of this texture, and its alpha multiplies the map's. The
+     * particle colour still tints the result. Unset: none. Systems that differ
+     * are batched apart.
+     */
+    gradientMap?: BaseTexture | null;
+    /** Alpha erosion (dissolve / wipe), see {@link ParticleErosion}. Unset: none. Systems that differ are batched apart. */
+    erosion?: ParticleErosion;
 }
 
 export interface AdaptivePerformanceOptions {
@@ -139,6 +158,8 @@ export interface AdaptivePerformanceState extends AdaptivePerformanceOptions {
 
 export class BatchedRenderer extends TransformNode {
     batches: Array<VFXBatch> = [];
+    /** Seconds this renderer has been updated for; the clock UV and erosion scrolling run on. */
+    private elapsed = 0;
     systemToBatchIndex: Map<IParticleSystem, number> = new Map<IParticleSystem, number>();
     depthTexture: BaseTexture | null = null;
     /** Systems in insertion order — iterated every frame, unlike the map. */
@@ -311,7 +332,10 @@ export class BatchedRenderer extends TransformNode {
             a.minParticleSize === (b.minParticleSize ?? 0) &&
             a.maxParticleSize === (b.maxParticleSize ?? Infinity) &&
             (a.lighting ?? 'fixed') === (b.lighting ?? 'fixed') &&
-            meshRimEqual(a.rim, b.rim)
+            meshRimEqual(a.rim, b.rim) &&
+            uvScrollEqual(a.uvScroll, b.uvScroll) &&
+            a.gradientMap === (b.gradientMap ?? null) &&
+            erosionEqual(a.erosion, b.erosion)
         );
     }
 
@@ -350,6 +374,7 @@ export class BatchedRenderer extends TransformNode {
             case RenderMode.VerticalBillBoard:
             case RenderMode.HorizontalBillBoard:
             case RenderMode.StretchedBillBoard:
+            case RenderMode.Beam:
                 batch = new SpriteBatch(settings, scene);
                 break;
             default:
@@ -543,6 +568,7 @@ export class BatchedRenderer extends TransformNode {
     }
 
     update(delta: number) {
+        this.elapsed += delta;
         const adaptiveState = this.adaptivePerformanceState;
         const frameStart = adaptiveState.enabled ? performance.now() : 0;
         if (adaptiveState.enabled) {
@@ -602,6 +628,7 @@ export class BatchedRenderer extends TransformNode {
         const emptyFrames = this.batchEmptyFrames;
         for (let i = 0; i < this.batches.length; i++) {
             const batch = this.batches[i];
+            batch.time = this.elapsed;
             if (batch.systems.size > 0) {
                 emptyFrames[i] = 0;
                 batch.update();

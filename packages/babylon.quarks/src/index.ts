@@ -21,11 +21,13 @@ export {ParticleEmitter} from './ParticleEmitter';
 export {ParticleSystem} from './ParticleSystem';
 export type {
     BabylonMetaData,
+    BeamEnd,
     BurstParameters,
     BurstParametersJSON,
     CullingMode,
     ParticleSystemJSONParameters,
     ParticleSystemParameters,
+    ScalingMode,
 } from './ParticleSystem';
 export {QuarksLoader} from './QuarksLoader';
 export type {
@@ -41,8 +43,25 @@ export {QuarksUtil} from './QuarksUtil';
 export * from './shaders/';
 export {SpriteBatch} from './SpriteBatch';
 export {TrailBatch} from './TrailBatch';
-export {defaultMeshLighting, meshRimEqual, normalizeMeshRim, RenderMode, VFXBatch} from './VFXBatch';
-export type {MeshLighting, MeshLightingSettings, MeshRim, SortMode, StoredBatchSettings} from './VFXBatch';
+export {
+    defaultMeshLighting,
+    erosionEqual,
+    meshRimEqual,
+    normalizeErosion,
+    normalizeMeshRim,
+    normalizeUVScroll,
+    RenderMode,
+    uvScrollEqual,
+    VFXBatch,
+} from './VFXBatch';
+export type {
+    MeshLighting,
+    MeshLightingSettings,
+    MeshRim,
+    ParticleErosion,
+    SortMode,
+    StoredBatchSettings,
+} from './VFXBatch';
 
 // Re-export quarks.core types (interfaces - type-only)
 export type {

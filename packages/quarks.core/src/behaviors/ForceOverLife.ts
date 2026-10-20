@@ -35,7 +35,7 @@ export class ForceOverLife implements Behavior {
         // Undefined until initialize() has run for this behavior; treat an
         // unknown system as world space rather than throwing.
         if (this.ps === undefined || this.ps.worldSpace) {
-            particle.velocity.addScaledVector(this._temp, delta);
+            particle.velocity.addScaledVector(this._temp, delta * (this.ps?.motionScale ?? 1));
         } else {
             this._temp.multiply(this._tempScale).applyQuaternion(this._tempQ);
             particle.velocity.addScaledVector(this._temp, delta);
@@ -56,6 +56,7 @@ export class ForceOverLife implements Behavior {
         const generatorZ = this.z;
         // The space test is per system, not per particle.
         const worldSpace = system.worldSpace;
+        const step = worldSpace ? delta * (system.motionScale ?? 1) : delta;
         for (let i = 0; i < count; i++) {
             const particle = particles[i];
             if (particle.age >= particle.life) {
@@ -67,7 +68,7 @@ export class ForceOverLife implements Behavior {
             if (!worldSpace) {
                 temp.multiply(this._tempScale).applyQuaternion(this._tempQ);
             }
-            particle.velocity.addScaledVector(temp, delta);
+            particle.velocity.addScaledVector(temp, step);
         }
     }
 

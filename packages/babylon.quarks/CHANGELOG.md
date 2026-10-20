@@ -4,6 +4,45 @@ All notable changes to the `babylon.quarks` package are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project follows the `quarks.core` 0.x version line.
 
+## [0.25.0] — 2026-10-20
+
+### Added
+
+- `ParticleSystem.emissionMultiplier` (runtime only, default 1): scales bursts, emission over time
+  and over distance, and may go above 1, unlike `setQualityFactor`. The two multiply.
+- `QuarksUtil.getDuration(root)`: seconds until an effect played from the start is over (start
+  delay, duration and longest life over playback speed; sub emitter targets a life after their
+  parents), or `Infinity` when a system loops.
+- quarks.core `FrameOverLife` options (`fps`, `cycles`, `frameCount`, `loop`, `startFrame`, all
+  saved in JSON only when set): Unity's texture sheet FPS mode, several cycles per life, a looping
+  or holding frame segment and a per-particle random start frame. Without them the behaviour is
+  unchanged and stays in the fused pass.
+- Texture effects on sprites, meshes and trails, GLSL and WGSL, each saved with the material in the
+  effect JSON only when set and batched apart when they differ:
+    - `ParticleSystem.uvScroll` `[u, v]`: scrolls the map in UV units per second on the renderer's clock.
+    - `ParticleSystem.gradientMap`: recolours the map through a ramp texture picked by its red
+      channel; the particle colour still tints it.
+    - `ParticleSystem.erosion` (`ParticleErosion`: mask, softness, edgeWidth, edgeColor, maskScroll):
+      alpha erosion. The particle's alpha decides how much of the shape is left instead of how
+      transparent it is, so a `ColorOverLife` alpha curve dissolves it through a noise mask or wipes
+      it through a gradient one, with an optional glowing edge.
+- `RenderMode.Beam` (6) with `ParticleSystem.beamEnd` (a point or anything with a world position,
+  such as a `TransformNode`, read every frame; runtime only): a quad laid from each particle to
+  the end and turned about its length to face the camera, U along it, the size as its width. With
+  a sheet and `FrameOverLife` `fps` it flickers like lightning; bounds reach the end.
+- `ParticleSystem.scalingMode` (`'shape'` default | `'hierarchy'`, constructor option, JSON written
+  only when `'hierarchy'`): in `'hierarchy'` a world-space system's start speeds scale with the
+  emitter's world scale, and `ForceOverLife` and `LimitSpeedOverLife` by its mean, so a scaled
+  effect moves in proportion. quarks.core `IParticleSystem.motionScale` carries the factor to
+  behaviors; `LimitSpeedOverLife` now learns its system in `initialize`.
+- Example "Texture Effects" showing the texture effects and a beam.
+
+### Fixed
+
+- A looping system kept firing its bursts on every loop after `endEmit()`, so it never finished.
+  Bursts now stop with the rest of the system's own emission; a sub emitter's bursts, which belong
+  to parent particles still dying, keep firing.
+
 ## [0.24.1] — 2026-10-20
 
 ### Changed

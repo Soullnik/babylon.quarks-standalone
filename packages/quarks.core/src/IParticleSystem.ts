@@ -160,6 +160,14 @@ export interface IParticleSystem {
      */
     simulationStep?: number;
     /**
+     * What world-space forces and speed limits are multiplied by: the
+     * emitter's world scale when the system scales its motion with it (a
+     * world-space system in `'hierarchy'` scaling mode), 1 or undefined
+     * otherwise.
+     * @type {number}
+     */
+    motionScale?: number;
+    /**
      * Whether this system only emits through another system, which is when its
      * particles carry their own parent transform.
      * @type {boolean}

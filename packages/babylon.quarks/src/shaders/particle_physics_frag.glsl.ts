@@ -1,4 +1,5 @@
 import {fogFragmentDeclarationGLSL, fogFragmentGLSL} from './chunks/fog';
+import {surfaceColorGLSL, surfaceFragmentDeclarationGLSL} from './chunks/surface';
 
 export default /* glsl */ `
 varying vec2 vUV;
@@ -88,18 +89,9 @@ uniform float alphaTest;
 #endif
 
 ${fogFragmentDeclarationGLSL}
+${surfaceFragmentDeclarationGLSL}
 void main() {
-    vec4 baseColor = vColor;
-
-#ifdef USE_MAP
-    vec4 texColor = texture2D(map, vUV);
-    #ifdef TILE_BLEND
-        vec4 texColor2 = texture2D(map, vUV2);
-        texColor = mix(texColor, texColor2, vTileBlend);
-    #endif
-    baseColor *= texColor;
-#endif
-
+${surfaceColorGLSL(true)}
 #ifdef USE_ALPHATEST
     if (baseColor.a < alphaTest) discard;
 #else

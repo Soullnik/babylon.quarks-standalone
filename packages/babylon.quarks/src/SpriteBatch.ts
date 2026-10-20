@@ -18,6 +18,7 @@ import {
 } from 'quarks.core';
 import {VFXBatchSettings} from './BatchedRenderer';
 import {gather, sortByKey, SortScratch} from './instanceSort';
+import type {ParticleSystem} from './ParticleSystem';
 import local_particle_physics_vert from './shaders/local_particle_physics_vert.glsl';
 import local_particle_physics_vert_wgsl from './shaders/local_particle_physics_vert.wgsl';
 import particle_frag from './shaders/particle_frag.glsl';
@@ -138,7 +139,7 @@ export class SpriteBatch extends VFXBatch {
         }
         this.mesh.setVerticesBuffer(this.rotationVB);
 
-        if (this.settings.renderMode === RenderMode.StretchedBillBoard) {
+        if (SpriteBatch.drawsAlongVelocity(this.settings.renderMode)) {
             this.velocityBuffer = new Float32Array(this.maxParticles * 4);
             this.velocityVB = new VertexBuffer(engine, this.velocityBuffer, 'velocity', true, false, 4, true);
             this.mesh.setVerticesBuffer(this.velocityVB);
@@ -276,7 +277,7 @@ export class SpriteBatch extends VFXBatch {
         if (this.settings.renderMode === RenderMode.Mesh) {
             vertexShader = {glsl: local_particle_physics_vert, wgsl: local_particle_physics_vert_wgsl};
             fragmentShader = {glsl: particle_physics_frag, wgsl: particle_physics_frag_wgsl};
-        } else if (this.settings.renderMode === RenderMode.StretchedBillBoard) {
+        } else if (SpriteBatch.drawsAlongVelocity(this.settings.renderMode)) {
             vertexShader = {glsl: stretched_bb_particle_vert, wgsl: stretched_bb_particle_vert_wgsl};
             fragmentShader = {glsl: particle_frag, wgsl: particle_frag_wgsl};
         } else {
@@ -322,6 +323,9 @@ export class SpriteBatch extends VFXBatch {
         if (this.settings.renderMode === RenderMode.HorizontalBillBoard) {
             defines.push('HORIZONTAL');
         }
+        if (this.settings.renderMode === RenderMode.Beam) {
+            defines.push('BEAM');
+        }
         const pivot = SpriteBatch.takesPivotAndFlip(this.settings.renderMode) ? this.settings.pivot : undefined;
         if (pivot) {
             defines.push('PIVOT');
@@ -344,6 +348,7 @@ export class SpriteBatch extends VFXBatch {
             }
         }
         const needsEyePosition = useEnvAtlas || !!rim;
+        defines.push(...this.surfaceDefines());
 
         const shaderLanguage = shaderLanguageFor(this.scene.getEngine());
         registerShaders(shaderName, vertexShader, fragmentShader, shaderLanguage);
@@ -352,7 +357,7 @@ export class SpriteBatch extends VFXBatch {
         if (this.settings.renderMode === RenderMode.Mesh) {
             attributes.push('normal');
         }
-        if (this.settings.renderMode === RenderMode.StretchedBillBoard) {
+        if (SpriteBatch.drawsAlongVelocity(this.settings.renderMode)) {
             attributes.push('velocity');
         }
 
@@ -377,7 +382,8 @@ export class SpriteBatch extends VFXBatch {
             uniforms.push('rimColor');
             uniforms.push('rimParams');
         }
-        if (this.settings.renderMode === RenderMode.StretchedBillBoard) {
+        this.surfaceUniforms(uniforms, samplers);
+        if (SpriteBatch.drawsAlongVelocity(this.settings.renderMode)) {
             uniforms.push('speedFactor');
         }
         if (this.settings.softParticles) {
@@ -441,7 +447,7 @@ export class SpriteBatch extends VFXBatch {
             mat.setFloat('tileCountX', this.settings.uTileCount);
             mat.setFloat('tileCountY', this.settings.vTileCount);
         }
-        if (this.settings.renderMode === RenderMode.StretchedBillBoard) {
+        if (SpriteBatch.drawsAlongVelocity(this.settings.renderMode)) {
             mat.setFloat('speedFactor', this.settings.softNearFade > 0 ? this.settings.softNearFade : 1.0);
         }
         if (this.settings.softParticles) {
@@ -491,6 +497,7 @@ export class SpriteBatch extends VFXBatch {
         }
 
         this.bindFog(mat);
+        this.bindSurface(mat);
         mat.backFaceCulling = false;
 
         if (this.settings.materialTransparent) {
@@ -584,6 +591,8 @@ export class SpriteBatch extends VFXBatch {
         const renderMode = this.settings.renderMode;
         const isMeshRender = renderMode === RenderMode.Mesh;
         const isStretchedRender = renderMode === RenderMode.StretchedBillBoard;
+        const isBeamRender = renderMode === RenderMode.Beam;
+        const usesVelocity = isStretchedRender || isBeamRender;
         const flipsSprites = SpriteBatch.takesPivotAndFlip(renderMode);
 
         const visibleSystems = this.getVisibleSystems();
@@ -911,6 +920,9 @@ export class SpriteBatch extends VFXBatch {
                     SpriteBatch.applyFlipFromParticles(this.sizeBuffer, firstIndex * 3, particles, particleNum);
                 }
             }
+            if (isBeamRender && this.velocityBuffer) {
+                this.writeBeams(system as ParticleSystem, firstIndex, index - firstIndex);
+            }
         }
 
         if (isStretchedRender && visibleSystems.length > 0) {
@@ -926,7 +938,7 @@ export class SpriteBatch extends VFXBatch {
             // Slot 0 only needs clearing once per stretch of empty frames; re-uploading it every
             // frame cost five buffer uploads per idle batch per frame.
             if (!this.clearedInstanceUploaded) {
-                this.uploadClearedInstance(isMeshRender, isStretchedRender);
+                this.uploadClearedInstance(isMeshRender, usesVelocity);
                 this.clearedInstanceUploaded = true;
             }
             return;
@@ -934,7 +946,7 @@ export class SpriteBatch extends VFXBatch {
         this.clearedInstanceUploaded = false;
 
         if (this.settings.sortMode !== 'none') {
-            this.sortInstances(index, isMeshRender, isStretchedRender);
+            this.sortInstances(index, isMeshRender, usesVelocity);
         }
 
         // Upload only the slots actually filled this frame: the buffers are sized
@@ -944,7 +956,7 @@ export class SpriteBatch extends VFXBatch {
         this.colorVB.update(this.colorBuffer.subarray(0, index * 4));
         this.uvTileVB.update(this.uvTileBuffer.subarray(0, index));
         this.rotationVB.update(this.rotationBuffer.subarray(0, isMeshRender ? index * 4 : index));
-        if (isStretchedRender && this.velocityVB && this.velocityBuffer) {
+        if (usesVelocity && this.velocityVB && this.velocityBuffer) {
             this.velocityVB.update(this.velocityBuffer.subarray(0, index * 4));
         }
     }
@@ -970,7 +982,35 @@ export class SpriteBatch extends VFXBatch {
         }
     }
 
-    /** The quads that take a pivot and flip: every billboard kind, stretched included, but not meshes. */
+    /** Stretched billboards and beams: drawn along a per-instance vector, by the stretched shader. */
+    private static drawsAlongVelocity(renderMode: RenderMode): boolean {
+        return renderMode === RenderMode.StretchedBillBoard || renderMode === RenderMode.Beam;
+    }
+
+    private readonly beamEnd_ = new Vector3();
+
+    /**
+     * Writes, for the `count` instances from `first`, the world vector from
+     * each one's drawn position to the system's beam end into the velocity
+     * buffer, which the stretched shader under `BEAM` lays the quad along. A
+     * beam without an end gets no length.
+     */
+    private writeBeams(system: ParticleSystem, first: number, count: number): void {
+        const velocities = this.velocityBuffer!;
+        const offsets = this.offsetBuffer;
+        const end = this.beamEnd_;
+        const hasEnd = typeof system.getBeamEnd === 'function' && system.getBeamEnd(end);
+        for (let i = first; i < first + count; i++) {
+            const o = i * 3;
+            const v = i * 4;
+            velocities[v] = hasEnd ? end.x - offsets[o] : 0;
+            velocities[v + 1] = hasEnd ? end.y - offsets[o + 1] : 0;
+            velocities[v + 2] = hasEnd ? end.z - offsets[o + 2] : 0;
+            velocities[v + 3] = 0;
+        }
+    }
+
+    /** The quads that take a pivot and flip: every billboard kind, stretched included, but not meshes or beams. */
     private static takesPivotAndFlip(renderMode: RenderMode): boolean {
         return (
             renderMode === RenderMode.BillBoard ||
