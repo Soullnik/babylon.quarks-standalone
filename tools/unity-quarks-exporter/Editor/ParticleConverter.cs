@@ -62,7 +62,8 @@ namespace BabylonQuarks.UnityExporter
             }
             if (!ps.useAutoRandomSeed)
             {
-                obj.Set("seed", ps.randomSeed);
+                // Cast: a uint would bind to the float conversion and lose the low bits of large seeds.
+                obj.Set("seed", (double)ps.randomSeed);
             }
             // Automatic and Always Simulate both keep simulating off screen, the runtime's default.
             switch (main.cullingMode)
@@ -703,7 +704,7 @@ namespace BabylonQuarks.UnityExporter
                 .Set("orbitalZ", ValueConverter.Curve(m.orbitalZ))
                 .Set("space", m.space == ParticleSystemSimulationSpace.World ? "world" : "local")
                 .Set("radial", ValueConverter.Curve(m.radial))
-                .Set("orbitalOffset", new JArray(ConstantOf(m.orbitalOffsetX), ConstantOf(m.orbitalOffsetY), ConstantOf(m.orbitalOffsetZ))));
+                .Set("orbitalOffset", new JArray().Add(ConstantOf(m.orbitalOffsetX)).Add(ConstantOf(m.orbitalOffsetY)).Add(ConstantOf(m.orbitalOffsetZ))));
         }
 
         private static void AddLimitVelocity(ParticleSystem ps, JArray behaviors)
@@ -843,7 +844,7 @@ namespace BabylonQuarks.UnityExporter
                 if ((properties & ParticleSystemSubEmitterProperties.InheritSize) != 0) inherit.Add("size");
                 if ((properties & ParticleSystemSubEmitterProperties.InheritRotation) != 0) inherit.Add("rotation");
                 if ((properties & ParticleSystemSubEmitterProperties.InheritLifetime) != 0) inherit.Add("lifetime");
-                if (inherit.Count > 0) behavior.Set("inherit", inherit);
+                if (inherit.Items.Count > 0) behavior.Set("inherit", inherit);
                 behaviors.Add(behavior);
             }
         }
