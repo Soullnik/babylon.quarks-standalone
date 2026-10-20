@@ -4,7 +4,7 @@ All notable changes to the `babylon.quarks` package are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project follows the `quarks.core` 0.x version line.
 
-## [Unreleased]
+## [0.25.0] — 2026-10-20
 
 ### Added
 
@@ -17,7 +17,6 @@ and the project follows the `quarks.core` 0.x version line.
   saved in JSON only when set): Unity's texture sheet FPS mode, several cycles per life, a looping
   or holding frame segment and a per-particle random start frame. Without them the behaviour is
   unchanged and stays in the fused pass.
-
 - Texture effects on sprites, meshes and trails, GLSL and WGSL, each saved with the material in the
   effect JSON only when set and batched apart when they differ:
     - `ParticleSystem.uvScroll` `[u, v]`: scrolls the map in UV units per second on the renderer's clock.

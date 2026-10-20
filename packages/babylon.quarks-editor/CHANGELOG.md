@@ -4,6 +4,13 @@ All notable changes to the `babylon.quarks-editor` package are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project follows the `quarks.core` 0.x version line.
 
+## [0.25.0] — 2026-10-20
+
+### Added
+
+- Renderer module: "Beam (end set in code)" render mode. The beam's end is a runtime property
+  (`ParticleSystem.beamEnd`), so in the editor a beam has no length and draws nothing.
+
 ## [0.24.1] — 2026-10-20
 
 ### Fixed
