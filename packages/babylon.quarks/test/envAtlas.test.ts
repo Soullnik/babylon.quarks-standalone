@@ -128,6 +128,56 @@ describe('env atlas cache', () => {
         expect(getCachedEnvAtlas(source, scenes[0])).toBeNull();
     });
 
+    test('a build lets go of its cube once it settles', async () => {
+        const source = cube(scenes[0]);
+        const before = source.onDisposeObservable.observers.length;
+        await atlasFor(source, scenes[0]);
+        // Babylon removes an observer on the next tick.
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        // Only the cache's own listener, which disposes the atlas with the cube, stays.
+        expect(source.onDisposeObservable.observers.length).toBe(before + 1);
+    });
+
+    test('a system rebuilds an atlas disposed under it, with the cube kept', async () => {
+        const scene = scenes[0];
+        const source = cube(scene);
+        const material = new StandardMaterial('env', scene);
+        material.reflectionTexture = source;
+        const system = new ParticleSystem({
+            scene,
+            emissionOverTime: new ConstantValue(0),
+            renderMode: RenderMode.Mesh,
+            material,
+        });
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        const first = system.getRendererSettings().reflectionAtlas as Texture;
+        expect(first.getScene()).toBe(scene);
+
+        disposeEnvAtlas(source);
+        expect(system.getRendererSettings().reflectionAtlas).toBeNull();
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        const second = system.getRendererSettings().reflectionAtlas as Texture;
+        expect(second).not.toBe(first);
+        expect(second.getScene()).toBe(scene);
+        expect((material as any).reflectionAtlas).toBe(second);
+
+        // Disposed with the cube, the atlas is not rebuilt.
+        source.dispose();
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        expect(system.getRendererSettings().reflectionAtlas).toBeNull();
+        system.dispose();
+    });
+
+    test('cacheEnvAtlas warns and stores nothing without a scene', () => {
+        const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+        const loose = {isCube: true, onDisposeObservable: undefined} as never;
+        const atlas = new Texture('data:loose', scenes[0]);
+        atlas.dispose();
+        cacheEnvAtlas(loose, atlas);
+        expect(warn).toHaveBeenCalled();
+        warn.mockRestore();
+    });
+
     test('a system whose atlas was disposed builds a new one', async () => {
         const scene = scenes[0];
         const source = cube(scene);

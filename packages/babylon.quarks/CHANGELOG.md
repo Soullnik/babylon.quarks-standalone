@@ -6,6 +6,13 @@ and the project follows the `quarks.core` 0.x version line.
 
 ## [Unreleased]
 
+### Added
+
+- **Soft-particle depth encodings:** `SoftDepthEncoding`, `DepthTextureOptions`,
+  `BatchedRenderer.depthEncoding`, and the decode helpers `softDepthParams` and `decodeSoftDepth`
+  (see Changed).
+- **`disposeEnvAtlas(cube, scene?)`** drops the env atlases built for a cube.
+
 ### Changed
 
 - **Box and edge shapes now apply their shape transform.** `BoxEmitter` and `EdgeEmitter` take a
@@ -59,7 +66,9 @@ and the project follows the `quarks.core` 0.x version line.
 - **Env atlases are cached per scene**, so a second scene or engine (an editor preview) gets its
   own instead of a texture of the first scene. `getCachedEnvAtlas(cube, scene?)` takes the scene.
   An atlas quarks built is disposed with its cube; `disposeEnvAtlas(cube, scene?)` drops one
-  sooner. A system whose atlas was disposed builds a new one the next time its material is set.
+  sooner. A system whose atlas is disposed while its cube is kept builds a new one.
+- **`BatchedRenderer.depthTexture` is an accessor**, and setting it calls `setDepthTexture`.
+  `VFXBatch.applyDepthTexture` takes a depth binding as well as a texture.
 
 ### Fixed
 
@@ -73,7 +82,6 @@ and the project follows the `quarks.core` 0.x version line.
 - **GLSL and WGSL applied fog and the soft fade in different orders**, so WebGPU kept a fog-coloured
   fringe where a fogged soft particle met geometry. Both now fade last, after fog.
 - **A mesh batch rebuilt for its env atlas lost the soft-particle depth texture.**
-
 - **A non-looping system whose rate curve starts at 0 never emitted.** It reported nothing
   pending on its first step and finished at once. A rate that rises later in the cycle now counts
   as pending.

@@ -10,6 +10,8 @@ const atlasesByCube = new WeakMap<BaseTexture, Map<Scene, Texture>>();
 const pendingByCube = new WeakMap<BaseTexture, Map<Scene, Promise<Texture | null>>>();
 /** Atlases this module built, which it disposes; an atlas given to {@link cacheEnvAtlas} stays the caller's. */
 const builtAtlases = new WeakSet<Texture>();
+/** Atlases whose dispose this module already listens to. */
+const watchedAtlases = new WeakSet<Texture>();
 /** Cubes whose dispose this module already listens to. */
 const watchedCubes = new WeakSet<BaseTexture>();
 
@@ -50,6 +52,8 @@ export function cacheEnvAtlas(cube: BaseTexture, atlas: Texture): void {
     const scene = sceneOf(atlas) ?? sceneOf(cube);
     if (scene) {
         store(cube, scene, atlas);
+    } else {
+        console.warn('[babylon.quarks] cacheEnvAtlas: neither the atlas nor the cube has a scene; not cached');
     }
 }
 
@@ -85,11 +89,14 @@ function store(cube: BaseTexture, scene: Scene, atlas: Texture): void {
     }
     atlases.set(scene, atlas);
     // A scene disposes its textures, so this also lets go of a disposed scene.
-    atlas.onDisposeObservable?.addOnce(() => {
-        if (atlasesByCube.get(cube)?.get(scene) === atlas) {
-            atlasesByCube.get(cube)!.delete(scene);
-        }
-    });
+    if (!watchedAtlases.has(atlas) && atlas.onDisposeObservable) {
+        watchedAtlases.add(atlas);
+        atlas.onDisposeObservable.addOnce(() => {
+            if (atlasesByCube.get(cube)?.get(scene) === atlas) {
+                atlasesByCube.get(cube)!.delete(scene);
+            }
+        });
+    }
     if (!watchedCubes.has(cube) && cube.onDisposeObservable) {
         watchedCubes.add(cube);
         cube.onDisposeObservable.addOnce(() => {
@@ -176,11 +183,18 @@ export function ensureEnvAtlasFromCube(
         }
 
         let cubeDisposed = false;
-        cube.onDisposeObservable?.addOnce(() => (cubeDisposed = true));
+        // Removed once the build settles, so it does not keep the scene and onReady alive.
+        const cubeObserver = cube.onDisposeObservable?.addOnce(() => (cubeDisposed = true));
+        const settle = () => {
+            pendings.delete(scene);
+            if (cubeObserver) {
+                cube.onDisposeObservable.remove(cubeObserver);
+            }
+        };
         const pending = envAtlasBuilder
             .createFromFaceUrls(urls, scene)
             .then((atlas) => {
-                pendings.delete(scene);
+                settle();
                 if (cubeDisposed || scene.isDisposed) {
                     atlas.dispose();
                     return null;
@@ -191,7 +205,7 @@ export function ensureEnvAtlasFromCube(
                 return atlas;
             })
             .catch((err) => {
-                pendings.delete(scene);
+                settle();
                 console.warn('[babylon.quarks] Failed to build env atlas from cubemap faces', err);
                 return null;
             });

@@ -1,4 +1,4 @@
-import type {Camera} from '@babylonjs/core/Cameras/camera';
+import {Camera} from '@babylonjs/core/Cameras/camera';
 import type {BaseTexture} from '@babylonjs/core/Materials/Textures/baseTexture';
 import type {Vector4} from '@babylonjs/core/Maths/math.vector';
 
@@ -15,7 +15,10 @@ import type {Vector4} from '@babylonjs/core/Maths/math.vector';
  *   cannot represent; this is the closest match to Unreal's SceneDepth.
  *
  * Perspective and orthographic cameras, both NDC depth ranges (WebGL, WebGPU) and a reverse
- * depth buffer are all handled, from the camera drawing the particles.
+ * depth buffer are all handled, from the camera drawing the particles. With a reverse depth buffer
+ * and `'nonLinear'`, clear the depth renderer to 0 (`depthRenderer.clearColor.r = 0`): it clears
+ * to 1 by default, which a reverse buffer reads as the near plane, so empty sky would fade every
+ * particle in front of it. A packed `'viewZ'` cannot be decoded.
  */
 export type SoftDepthEncoding = 'linear' | 'nonLinear' | 'viewZ';
 
@@ -50,6 +53,15 @@ export function isDepthRenderer(value: unknown): value is DepthRendererLike {
 
 /** The binding for a depth texture or `DepthRenderer`, with its encoding read off the renderer. */
 export function depthBinding(depth: BaseTexture | DepthRendererLike, options: DepthTextureOptions = {}): DepthBinding {
+    const binding = readBinding(depth, options);
+    if (binding.packed && binding.encoding === 'viewZ') {
+        // Packing keeps only the fraction of the value, which loses a view Z past 1 unit.
+        throw new Error('[babylon.quarks] A packed view-Z depth cannot be decoded; use a float depth texture');
+    }
+    return binding;
+}
+
+function readBinding(depth: BaseTexture | DepthRendererLike, options: DepthTextureOptions): DepthBinding {
     if (isDepthRenderer(depth)) {
         // DepthRenderer keeps its encoding private; these are its constructor's own fields.
         const stored = depth as unknown as {_storeCameraSpaceZ?: boolean; _storeNonLinearDepth?: boolean};
@@ -91,7 +103,7 @@ export function softDepthParams(camera: Camera, encoding: SoftDepthEncoding, out
     const m15 = m[15];
     if (encoding === 'linear') {
         // Babylon's depth metric, (±clip z + depthValues.x) / depthValues.y, solved for z.
-        const ortho = camera.mode === 1;
+        const ortho = camera.mode === Camera.ORTHOGRAPHIC_CAMERA;
         let near: number;
         let far: number;
         if (ortho) {

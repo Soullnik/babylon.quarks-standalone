@@ -1,6 +1,7 @@
 import {VertexBuffer} from '@babylonjs/core/Buffers/buffer';
 import {Constants} from '@babylonjs/core/Engines/constants';
 import {ShaderMaterial} from '@babylonjs/core/Materials/shaderMaterial';
+import {BaseTexture} from '@babylonjs/core/Materials/Textures/baseTexture';
 import {Vector2 as BVector2} from '@babylonjs/core/Maths/math.vector';
 import {Mesh} from '@babylonjs/core/Meshes/mesh';
 import {Scene} from '@babylonjs/core/scene';
@@ -196,6 +197,11 @@ export class TrailBatch extends VFXBatch {
         this.sideVB?.dispose();
         this.widthVB?.dispose();
         this.buildGeometryBuffers();
+    }
+
+    /** Trails draw hard, so the depth texture is only kept: nothing to rebuild. */
+    override applyDepthTexture(depth: DepthBinding | BaseTexture | null): void {
+        this.depth = depth instanceof BaseTexture ? {texture: depth, encoding: 'linear', packed: false} : depth;
     }
 
     rebuildMaterial(): void {

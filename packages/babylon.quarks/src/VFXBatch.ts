@@ -651,8 +651,10 @@ export abstract class VFXBatch {
      */
     protected static writeBound(material: ShaderMaterial, write: (target: ShaderMaterial | Effect) => void): void {
         write(material);
+        // An effect still compiling has no pipeline context to write to; it gets the stored value
+        // when it is first bound. A sub mesh's effect override is not reached here.
         const effect = material.getEffect();
-        if (effect) {
+        if (effect?.isReady()) {
             write(effect);
         }
     }

@@ -268,6 +268,12 @@ export interface ParticleSystemParameters {
     uTileCount?: number;
     vTileCount?: number;
     blendTiles?: boolean;
+    /**
+     * Fade particles out as they near the scene behind them, like Unity's Soft Particles and
+     * Unreal's Depth Fade, between `softNearFade` and `softFarFade` world units. Needs a depth
+     * texture, see `BatchedRenderer.setDepthTexture`; without one particles draw hard. Applies to
+     * billboard, stretched, mesh and beam particles; trails draw hard.
+     */
     softParticles?: boolean;
     softFarFade?: number;
     softNearFade?: number;
@@ -1227,6 +1233,38 @@ export class ParticleSystem implements IParticleSystem {
         this.prewarmed = false;
     }
 
+    /**
+     * When the env atlas this system draws with is disposed (its cube was, or `disposeEnvAtlas`
+     * ran) while the system still uses it, drops it and builds a new one if the cube is still alive,
+     * so the batch never samples a disposed texture.
+     */
+    private watchEnvAtlas(atlas: BaseTexture | null, material: any): void {
+        atlas?.onDisposeObservable.addOnce(() => {
+            if (this.destroyed || this.rendererSettings.reflectionAtlas !== atlas) {
+                return;
+            }
+            this.rendererSettings.reflectionAtlas = null;
+            if (material?.reflectionAtlas === atlas) {
+                material.reflectionAtlas = null;
+            }
+            this.neededToUpdateRender = true;
+            const cube = this.rendererSettings.reflectionTexture;
+            if (cube?.isCube && cube.getScene() && this.sceneRef) {
+                ensureEnvAtlasFromCube(cube, this.sceneRef, (rebuilt) => {
+                    if (this.destroyed || this.rendererSettings.reflectionTexture !== cube) {
+                        return;
+                    }
+                    this.rendererSettings.reflectionAtlas = rebuilt;
+                    if (material && material.reflectionAtlas == null) {
+                        material.reflectionAtlas = rebuilt;
+                    }
+                    this.watchEnvAtlas(rebuilt, material);
+                    this.neededToUpdateRender = true;
+                });
+            }
+        });
+    }
+
     private applyMaterialSettings(
         material: any,
         overrides: {
@@ -1327,12 +1365,14 @@ export class ParticleSystem implements IParticleSystem {
                     if (material && !live(material.reflectionAtlas)) {
                         material.reflectionAtlas = atlas;
                     }
+                    this.watchEnvAtlas(atlas, material);
                     this.neededToUpdateRender = true;
                 });
                 resolvedAtlas = getCachedEnvAtlas(resolvedReflection, this.sceneRef);
             }
         }
         this.rendererSettings.reflectionAtlas = resolvedAtlas;
+        this.watchEnvAtlas(resolvedAtlas, material);
         // Do not expand cube files into six face textures anymore — that path
         // still trips GL_INVALID_OPERATION on iOS. Prefer a single atlas.
         this.rendererSettings.reflectionFaces =

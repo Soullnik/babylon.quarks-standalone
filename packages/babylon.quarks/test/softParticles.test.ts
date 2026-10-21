@@ -121,6 +121,17 @@ describe('the soft-particle depth decode', () => {
         expect(decodeSoftDepth(1, softDepthParams(camera, 'nonLinear', new BVector4()))).toBeGreaterThan(1e20);
     });
 
+    test('with a reverse depth buffer, a depth renderer cleared to 0 reads as far', () => {
+        (engine as any).isNDCHalfZRange = true;
+        engine.useReverseDepthBuffer = true;
+        const camera = new FreeCamera('camera', new Vector3(0, 0, 0), scene);
+        camera.minZ = 0.5;
+        camera.maxZ = 0;
+        expect(decodeSoftDepth(0, softDepthParams(camera, 'nonLinear', new BVector4()))).toBeGreaterThan(1e20);
+        camera.maxZ = 200;
+        expect(decodeSoftDepth(0, softDepthParams(camera, 'nonLinear', new BVector4()))).toBeCloseTo(200, 2);
+    });
+
     test('the shaders decode with the same formula, in both languages', () => {
         for (const source of [particleFragGLSL, physicsFragGLSL]) {
             expect(source).toContain('float denominator = projParams.z * d + projParams.w;');
@@ -222,6 +233,32 @@ describe('soft particles and the depth texture', () => {
         renderer.dispose();
     });
 
+    test('a trail keeps the depth texture but draws hard, with no rebuild', () => {
+        const renderer = new BatchedRenderer('trail', scene);
+        renderer.addSystem(
+            softSystem({
+                renderMode: RenderMode.Trail,
+                rendererEmitterSettings: {startLength: new ConstantValue(4), followLocalOrigin: false},
+            })
+        );
+        const material = materialOf(renderer);
+        renderer.setDepthTexture(RawTexture.CreateLuminanceTexture(new Uint8Array([200]), 1, 1, scene));
+        expect(materialOf(renderer)).toBe(material);
+        expect(definesOf(renderer)).not.toContain('SOFT_PARTICLES');
+        renderer.dispose();
+    });
+
+    test('a batch given a bare texture reads it as linear and unpacked', () => {
+        const renderer = new BatchedRenderer('bare', scene);
+        renderer.addSystem(softSystem());
+        const depth = RawTexture.CreateLuminanceTexture(new Uint8Array([200]), 1, 1, scene);
+        renderer.batches[0].applyDepthTexture(depth);
+        expect(definesOf(renderer)).toContain('SOFT_PARTICLES');
+        expect(definesOf(renderer)).not.toContain('SOFT_DEPTH_PACKED');
+        expect(depthTextureOf(renderer)).toBe(depth);
+        renderer.dispose();
+    });
+
     test('a system without soft particles never compiles them', () => {
         const renderer = new BatchedRenderer('hard', scene);
         renderer.setDepthTexture(RawTexture.CreateLuminanceTexture(new Uint8Array([200]), 1, 1, scene));
@@ -257,10 +294,12 @@ describe('soft particles and the depth texture', () => {
             expect(depthBinding(renderer)).toEqual({texture: renderer.getDepthMap(), encoding, packed});
         }
         // Options win over what is read off the renderer.
-        expect(depthBinding(depthRenderer(), {encoding: 'viewZ', packed: true})).toMatchObject({
-            encoding: 'viewZ',
+        expect(depthBinding(depthRenderer(), {encoding: 'nonLinear', packed: true})).toMatchObject({
+            encoding: 'nonLinear',
             packed: true,
         });
+        // Packing keeps only the fraction, so a packed view Z is refused.
+        expect(() => depthBinding(depthRenderer({viewZ: true, packed: true}))).toThrow(/packed view-Z/);
     });
 
     test('a packed depth compiles the unpack, and switching packing rebuilds', () => {

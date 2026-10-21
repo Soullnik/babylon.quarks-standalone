@@ -56,6 +56,7 @@ function boundEffect(material: ShaderMaterial): Record<string, number[]> {
         setVector4: record(4),
         setFloat4: () => effect,
         setColor3: () => effect,
+        isReady: () => true,
     };
     jest.spyOn(material, 'getEffect').mockReturnValue(effect as never);
     return written;
@@ -74,6 +75,26 @@ function camera(name: string, position: Vector3, minZ: number, maxZ: number): Fr
 }
 
 describe('per-camera uniforms reach the effect of the draw they are for', () => {
+    test('an effect still compiling is left alone, and gets the stored value later', () => {
+        const a = camera('a', new Vector3(1, 2, 3), 0.1, 100);
+        scene.activeCamera = a;
+        const renderer = new BatchedRenderer('compiling', scene);
+        renderer.addSystem(system({renderMode: RenderMode.Mesh, rim: {}}));
+        const material = renderer.batches[0].mesh.material as ShaderMaterial;
+        const setVector3 = jest.fn();
+        jest.spyOn(material, 'getEffect').mockReturnValue({
+            isReady: () => false,
+            setVector3,
+            setFloat4: jest.fn(),
+            setColor3: jest.fn(),
+            setVector4: jest.fn(),
+            setVector2: jest.fn(),
+        } as never);
+        expect(() => bind(material)).not.toThrow();
+        expect(setVector3).not.toHaveBeenCalled();
+        expect((material as any)._vectors3.eyePosition.asArray()).toEqual([1, 2, 3]);
+    });
+
     test('the eye position of each camera, in its own draw', () => {
         const a = camera('a', new Vector3(1, 2, 3), 0.1, 100);
         const b = camera('b', new Vector3(-4, 5, -6), 0.5, 50);
