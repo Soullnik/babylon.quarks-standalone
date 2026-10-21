@@ -1,5 +1,5 @@
 import {Particle} from '../Particle';
-import {ValueGenerator, ValueGeneratorFromJSON} from '../functions';
+import {GeneratorMemory, ValueGenerator, ValueGeneratorFromJSON} from '../functions';
 import {Vector3} from '../math';
 import {Behavior} from './Behavior';
 
@@ -9,10 +9,7 @@ import {Behavior} from './Behavior';
 export class ApplyForce implements Behavior {
     type = 'ApplyForce';
     magnitudeValue: number;
-    memory = {
-        data: [],
-        dataCount: 0,
-    };
+    memory: GeneratorMemory = [];
 
     constructor(
         public direction: Vector3,

@@ -4,6 +4,45 @@ All notable changes to the `babylon.quarks` package are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project follows the `quarks.core` 0.x version line.
 
+## [Unreleased]
+
+### Changed
+
+- **Box and edge shapes now apply their shape transform.** `BoxEmitter` and `EdgeEmitter` take a
+  `transform` (offset, rotation and scale within the system) like the other shapes, and write and
+  read it in JSON. Before, a Unity export that moved, turned or scaled a Box, Rectangle or Edge
+  shape lost that transform, and its particles started from the system's origin. Effects with such
+  a shape now emit where they were authored.
+- **Texture sequencer JSON names its type and writes `position` as `[x, y, z]`.** Files written
+  before this release, with no type and an `{x, y, z}` position, still load.
+
+### Fixed
+
+- **`clone()` shared state with the original**, so editing one changed the other:
+  - `ChangeEmitDirection`, the `Euler` rotation generator and `Vector3Function` (and with it
+    `SizeOverLife` with separate axes) reused their child generators.
+  - A system's emission bursts shared their `count` generator, and `startTileIndex` was shared.
+  - `emissionMultiplier` and a fixed `beamEnd` point were not copied. A `beamEnd` node is still
+    shared, since the clone follows the same node.
+- **`ApplyForce` with a random magnitude threw** on the first update. Its generator memory was the
+  wrong shape for `IntervalValue` and curves.
+- **`ApplySequences` lost its sequences in JSON.** A texture sequencer wrote no type, so loading
+  the file could not tell which sequencer to build.
+
+### Tests
+
+- **Coverage is enforced.** The package thresholds were never checked, because `npm test` ran
+  without coverage. `npm run test:coverage` (in CI and `npm run check`) now fails under a floor per
+  package, set in the root `jest.config.json` one point under today's coverage and raised as tests
+  are added.
+- **Serialisation contract.** Every behavior, emitter shape, value and colour generator, and every
+  `ParticleSystem` setting in each render mode, must survive `toJSON` → `fromJSON`, `clone()` and
+  `QuarksLoader` unchanged, and a clone must share no mutable state with its original. A new
+  behavior or shape type fails the test until it is added to it.
+- **Frame-rate independence.** quarks.core behaviors reach the same state after a second at 30,
+  60, 120 and 144 Hz. A seeded `ParticleSystem` gives the same particles, finishes at the same time
+  and pauses the same way at 20 to 240 Hz.
+
 ## [0.27.0] — 2026-10-21
 
 ### Added

@@ -16,12 +16,13 @@ export class TextureSequencer implements Sequencer {
     }
 
     static fromJSON(json: any): Sequencer {
-        const textureSequencer = new TextureSequencer(
-            json.scaleX,
-            json.scaleY,
-            new Vector3(json.position[0], json.position[1], json.position[2])
-        );
-        textureSequencer.locations = json.locations.map((loc: any) => new Vector2(loc.x, loc.y));
+        // Before 0.27 the position was written as a Vector3 object ({x, y, z}) instead of an array.
+        const p = json.position;
+        const position = Array.isArray(p)
+            ? new Vector3(p[0], p[1], p[2])
+            : new Vector3(p?.x ?? 0, p?.y ?? 0, p?.z ?? 0);
+        const textureSequencer = new TextureSequencer(json.scaleX ?? 0, json.scaleY ?? 0, position);
+        textureSequencer.locations = (json.locations ?? []).map((loc: any) => new Vector2(loc.x, loc.y));
         return textureSequencer;
     }
 
@@ -33,9 +34,10 @@ export class TextureSequencer implements Sequencer {
 
     toJSON(): any {
         return {
+            type: 'TextureSequencer',
             scaleX: this.scaleX,
             scaleY: this.scaleY,
-            position: this.position,
+            position: [this.position.x, this.position.y, this.position.z],
             locations: this.locations.map((loc) => ({
                 x: loc.x,
                 y: loc.y,

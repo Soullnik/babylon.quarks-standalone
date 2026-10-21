@@ -1,7 +1,9 @@
 import {
+    BoxEmitter,
     CircleEmitter,
     ConeEmitter,
     DonutEmitter,
+    EdgeEmitter,
     EmissionState,
     EmitterFromJSON,
     EmitterShape,
@@ -123,6 +125,8 @@ describe('ShapeTransform', () => {
         ['rectangle', () => new RectangleEmitter({width: 1, height: 1})],
         ['grid', () => new GridEmitter({width: 1, height: 1})],
         ['point', () => new PointEmitter()],
+        ['box', () => new BoxEmitter({width: 1, height: 1, depth: 1})],
+        ['edge', () => new EdgeEmitter({radius: 1})],
     ];
 
     test.each(shapes)('%s serializes without a transform unless it has one', (_name, make) => {

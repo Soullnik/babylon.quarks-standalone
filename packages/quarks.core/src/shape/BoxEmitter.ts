@@ -2,6 +2,7 @@ import {EmissionState, IParticleSystem} from '../IParticleSystem';
 import {Particle} from '../Particle';
 import {random} from '../util/random';
 import {EmitterShape, ShapeJSON} from './EmitterUtil';
+import {ShapeTransform} from './ShapeTransform';
 
 /**
  * Which part of the box particles start from.
@@ -32,6 +33,11 @@ export interface BoxEmitterParameters {
      * box size: 0 keeps them on the surface, 0.5 reaches the center.
      */
     boxThickness?: [number, number, number];
+    /**
+     * Offset, rotation and scale of the shape within the particle system.
+     * {@link ShapeTransform}
+     */
+    transform?: ShapeTransform;
 }
 
 /**
@@ -45,6 +51,7 @@ export class BoxEmitter implements EmitterShape {
     depth: number;
     emitFrom: BoxEmitFrom;
     boxThickness: [number, number, number];
+    transform?: ShapeTransform;
 
     private readonly _point: [number, number, number] = [0, 0, 0];
 
@@ -54,6 +61,7 @@ export class BoxEmitter implements EmitterShape {
         this.depth = parameters.depth ?? 1;
         this.emitFrom = parameters.emitFrom ?? BoxEmitFrom.Volume;
         this.boxThickness = parameters.boxThickness ? [...parameters.boxThickness] : [0, 0, 0];
+        this.transform = parameters.transform;
     }
 
     update(_system: IParticleSystem, _delta: number): void {}
@@ -74,6 +82,7 @@ export class BoxEmitter implements EmitterShape {
 
         p.position.set((point[0] * this.width) / 2, (point[1] * this.height) / 2, (point[2] * this.depth) / 2);
         p.velocity.set(0, 0, p.startSpeed);
+        this.transform?.apply(p);
     }
 
     /**
@@ -98,6 +107,7 @@ export class BoxEmitter implements EmitterShape {
             depth: this.depth,
             emitFrom: this.emitFrom,
             boxThickness: [...this.boxThickness],
+            ...ShapeTransform.toShapeJSON(this.transform),
         };
     }
 
@@ -108,6 +118,7 @@ export class BoxEmitter implements EmitterShape {
             depth: json.depth,
             emitFrom: json.emitFrom,
             boxThickness: Array.isArray(json.boxThickness) ? json.boxThickness : undefined,
+            transform: ShapeTransform.fromJSON(json.transform),
         });
     }
 
@@ -118,6 +129,7 @@ export class BoxEmitter implements EmitterShape {
             depth: this.depth,
             emitFrom: this.emitFrom,
             boxThickness: this.boxThickness,
+            transform: this.transform?.clone(),
         });
     }
 }
