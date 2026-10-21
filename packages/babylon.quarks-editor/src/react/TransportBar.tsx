@@ -1,12 +1,12 @@
-import type {Scene} from '@babylonjs/core/scene';
+import type {Scene} from '@babylonjs/core/scene.js';
 import {ArrowPathIcon, ForwardIcon, PauseIcon, PlayIcon} from '@heroicons/react/24/solid';
 import type {BatchedRenderer} from 'babylon.quarks';
 import React from 'react';
-import type {EffectBinding} from '../core/binding';
-import type {PlaybackState} from '../core/playback';
-import {PLAYBACK_SPEEDS, restartFocusPlayback, toggleStagePlayback} from '../core/transport';
-import {iconStyle} from './icons';
-import {buttonStyle, theme} from './theme';
+import type {EffectBinding} from '../core/binding.js';
+import type {PlaybackState} from '../core/playback.js';
+import {PLAYBACK_SPEEDS, restartFocusPlayback, toggleStagePlayback} from '../core/transport.js';
+import {iconStyle} from './icons.js';
+import {buttonStyle, theme} from './theme.js';
 
 export interface TransportBarProps {
     binding: EffectBinding | null;

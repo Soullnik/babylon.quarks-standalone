@@ -1,7 +1,7 @@
-import type {ArcRotateCamera} from '@babylonjs/core/Cameras/arcRotateCamera';
-import {Vector3} from '@babylonjs/core/Maths/math.vector';
-import type {Mesh} from '@babylonjs/core/Meshes/mesh';
-import type {TransformNode} from '@babylonjs/core/Meshes/transformNode';
+import type {ArcRotateCamera} from '@babylonjs/core/Cameras/arcRotateCamera.js';
+import {Vector3} from '@babylonjs/core/Maths/math.vector.js';
+import type {Mesh} from '@babylonjs/core/Meshes/mesh.js';
+import type {TransformNode} from '@babylonjs/core/Meshes/transformNode.js';
 
 /** Default gap between neighbouring effects in a folder gallery import. */
 export const DEFAULT_GALLERY_SPACING = 4;

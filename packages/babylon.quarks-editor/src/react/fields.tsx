@@ -1,6 +1,6 @@
 import React, {useEffect, useState} from 'react';
-import {InspectorLabel} from './InspectorLabel';
-import {inputStyle, rowStyle} from './theme';
+import {InspectorLabel} from './InspectorLabel.js';
+import {inputStyle, rowStyle} from './theme.js';
 
 export function Row(props: {label: string; hint?: string; hintKey?: string; children: React.ReactNode}) {
     return (

@@ -3,5 +3,5 @@
 // Babylon never looks, it falls back to fetching `src/Shaders/color.fragment.fx`, gets the
 // page's HTML back and the selection rings never render. Registering the shader up front, from
 // the same module graph as the rest of the editor, makes the lookup succeed either way.
-import '@babylonjs/core/Shaders/color.fragment';
-import '@babylonjs/core/Shaders/color.vertex';
+import '@babylonjs/core/Shaders/color.fragment.js';
+import '@babylonjs/core/Shaders/color.vertex.js';

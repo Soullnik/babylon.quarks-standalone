@@ -1,5 +1,5 @@
-import {TransformNode} from '@babylonjs/core/Meshes/transformNode';
-import type {Scene} from '@babylonjs/core/scene';
+import {TransformNode} from '@babylonjs/core/Meshes/transformNode.js';
+import type {Scene} from '@babylonjs/core/scene.js';
 import {
     ColorOverLife,
     ConeEmitter,
@@ -10,8 +10,8 @@ import {
     RenderMode,
     Vector4,
 } from 'babylon.quarks';
-import {DEFAULT_GRADIENT_STOPS, buildGradient} from './colors';
-import {uniqueEntryName, type SceneEntry} from './sceneEntries';
+import {DEFAULT_GRADIENT_STOPS, buildGradient} from './colors.js';
+import {uniqueEntryName, type SceneEntry} from './sceneEntries.js';
 
 export interface CreateSceneDefaultOptions {
     resolveTexture?: (url: string, scene: Scene) => unknown;

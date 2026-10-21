@@ -1,5 +1,5 @@
 import {QuarksUtil} from 'babylon.quarks';
-import type {SceneEntry} from './sceneEntries';
+import type {SceneEntry} from './sceneEntries.js';
 
 function isPreviewEntry(entry: SceneEntry, previewRootIds: ReadonlySet<number>): boolean {
     return previewRootIds.has(entry.root.uniqueId);

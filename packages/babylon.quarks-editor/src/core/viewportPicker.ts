@@ -1,11 +1,11 @@
-import '@babylonjs/core/Culling/ray';
-import {Mesh} from '@babylonjs/core/Meshes/mesh';
-import {MeshBuilder} from '@babylonjs/core/Meshes/meshBuilder';
-import {TransformNode} from '@babylonjs/core/Meshes/transformNode';
-import type {Scene} from '@babylonjs/core/scene';
-import {EDITOR_SCENE_NODE_METADATA} from './editorScene';
-import {GROUND_RING_RADIUS, GalleryHoverMarker} from './gallerySelectionMarker';
-import type {SceneEntry} from './sceneEntries';
+import '@babylonjs/core/Culling/ray.js';
+import {Mesh} from '@babylonjs/core/Meshes/mesh.js';
+import {MeshBuilder} from '@babylonjs/core/Meshes/meshBuilder.js';
+import {TransformNode} from '@babylonjs/core/Meshes/transformNode.js';
+import type {Scene} from '@babylonjs/core/scene.js';
+import {EDITOR_SCENE_NODE_METADATA} from './editorScene.js';
+import {GROUND_RING_RADIUS, GalleryHoverMarker} from './gallerySelectionMarker.js';
+import type {SceneEntry} from './sceneEntries.js';
 
 interface PickMetadata {
     quarksEditorPick: true;

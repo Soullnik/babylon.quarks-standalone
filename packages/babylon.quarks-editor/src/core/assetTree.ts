@@ -1,4 +1,4 @@
-import type {EffectAsset} from './assets';
+import type {EffectAsset} from './assets.js';
 
 export interface AssetTreeFolder {
     kind: 'folder';

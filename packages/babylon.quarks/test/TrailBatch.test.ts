@@ -178,6 +178,35 @@ describe('TrailBatch', () => {
         expect(firstU(true)).toBe(1);
     });
 
+    it('picks the sprite-sheet cell like billboards do: columns by uTileCount, whole frames only', () => {
+        const cellUVs = (tile: number) => {
+            const renderer = new BatchedRenderer('trail-tile', scene);
+            const system = createTrailSystem({uTileCount: 4, vTileCount: 2, startTileIndex: new ConstantValue(tile)});
+            renderer.addSystem(system);
+            for (let i = 0; i < 30; i++) {
+                renderer.update(1 / 60);
+            }
+            const uv = (getTrailBatch(renderer) as any).uvBuffer as Float32Array;
+            const n = (system.particles[0] as any).historyCount as number;
+            const us: number[] = [];
+            for (let i = 0; i < n; i++) us.push(uv[i * 4], uv[i * 4 + 2]);
+            const vs = [uv[1], uv[3]];
+            renderer.dispose();
+            system.dispose();
+            return {us, vs};
+        };
+        // Frame 5 of a 4×2 sheet is column 1 of row 1: U in [0.25, 0.5], V in [0, 0.5].
+        const cell = cellUVs(5);
+        for (const u of cell.us) {
+            expect(u).toBeGreaterThanOrEqual(0.25 - 1e-6);
+            expect(u).toBeLessThanOrEqual(0.5 + 1e-6);
+        }
+        expect(cell.vs[0]).toBeCloseTo(0);
+        expect(cell.vs[1]).toBeCloseTo(0.5);
+        // A fractional frame shows that whole frame, not a slice across two cells.
+        expect(cellUVs(5.6)).toEqual(cell);
+    });
+
     it('anchors U = 0 on the newest sample when no live tip is drawn', () => {
         const renderer = new BatchedRenderer('trail-uv-head', scene);
         // followLocalOrigin draws no live tip, so the recorded head is the ribbon's end.

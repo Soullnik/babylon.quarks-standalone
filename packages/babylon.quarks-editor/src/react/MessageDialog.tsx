@@ -1,5 +1,5 @@
 import React from 'react';
-import {buttonStyle, theme} from './theme';
+import {buttonStyle, theme} from './theme.js';
 
 export interface MessageDialogProps {
     title: string;

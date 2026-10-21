@@ -1,8 +1,8 @@
-import type {Scene} from '@babylonjs/core/scene';
+import type {Scene} from '@babylonjs/core/scene.js';
 import type {BatchedRenderer} from 'babylon.quarks';
-import type {EffectBinding} from './binding';
-import {clearFocusFinished, isFocusFinished, setFocusElapsed, type PlaybackState} from './playback';
-import {playFocus, scrubFocusTo} from './scrub';
+import type {EffectBinding} from './binding.js';
+import {clearFocusFinished, isFocusFinished, setFocusElapsed, type PlaybackState} from './playback.js';
+import {playFocus, scrubFocusTo} from './scrub.js';
 
 /**
  * Stage Play/Pause shared by the viewport transport bar and the timeline. Pressing Play on a

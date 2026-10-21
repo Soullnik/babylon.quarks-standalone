@@ -1,4 +1,4 @@
-import type {TransformNode} from '@babylonjs/core/Meshes/transformNode';
+import type {TransformNode} from '@babylonjs/core/Meshes/transformNode.js';
 
 /** Marks meshes/nodes created only for editor interaction or overlays (not part of the effect). */
 export const EDITOR_SCENE_NODE_METADATA = {quarksEditorSceneNode: true as const};

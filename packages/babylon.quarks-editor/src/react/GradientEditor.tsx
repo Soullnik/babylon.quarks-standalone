@@ -1,7 +1,7 @@
 import {useRef, useState} from 'react';
-import {GradientStop, hexToRgb, rgbToHex, stopsToCssGradient} from '../core/colors';
-import {NumberField, Row} from './fields';
-import {buttonStyle, theme} from './theme';
+import {GradientStop, hexToRgb, rgbToHex, stopsToCssGradient} from '../core/colors.js';
+import {NumberField, Row} from './fields.js';
+import {buttonStyle, theme} from './theme.js';
 
 const BAR_WIDTH = 218;
 

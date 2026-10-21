@@ -476,6 +476,50 @@ describe('QuarksLoader matrix decomposition', () => {
         engine.dispose();
     });
 
+    describe('relative base urls', () => {
+        const effect = () => ({
+            images: [{uuid: 'img', url: 'tex/a.png'}],
+            textures: [{uuid: 'tex', image: 'img'}],
+            object: {uuid: 'root', type: 'Group'},
+        });
+        const textureUrls = (scene: Scene) =>
+            scene.textures.map((texture) => (texture as Texture).url).filter((url) => url?.endsWith('a.png'));
+
+        it.each(['fx/', '/fx/', 'https://cdn.example.com/fx/'])(
+            'joins base %s with a texture url once, however often the same document loads',
+            async (base) => {
+                const engine = new NullEngine();
+                const scene = new Scene(engine);
+                const loader = new QuarksLoader(scene, {shareResources: false});
+                const json = effect();
+                await loader.loadFromJSON(json, base);
+                await loader.loadFromJSON(json, base);
+                await loader.loadFromJSONAll([
+                    {json, baseUrl: base},
+                    {json, baseUrl: base},
+                ]);
+                expect(textureUrls(scene)).toEqual(new Array(4).fill(`${base}tex/a.png`));
+                scene.dispose();
+                engine.dispose();
+            }
+        );
+
+        it('resolves textures against a relative effect url once', async () => {
+            const engine = new NullEngine();
+            const scene = new Scene(engine);
+            const loader = new QuarksLoader(scene, {shareResources: false});
+            const fetchSpy = jest
+                .spyOn(global, 'fetch')
+                .mockImplementation(async () => ({ok: true, status: 200, json: async () => effect()}) as any);
+            await loader.load('fx/hit.json');
+            await loader.loadAll(['fx/hit.json', 'fx/hit.json']);
+            expect(textureUrls(scene)).toEqual(new Array(3).fill('fx/tex/a.png'));
+            fetchSpy.mockRestore();
+            scene.dispose();
+            engine.dispose();
+        });
+    });
+
     it('dedupes geometry JSON fetches for the same resolved url across parallel loads', async () => {
         const engine = new NullEngine();
         const scene = new Scene(engine);

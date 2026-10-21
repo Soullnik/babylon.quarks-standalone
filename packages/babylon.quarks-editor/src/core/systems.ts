@@ -1,4 +1,4 @@
-import type {TransformNode} from '@babylonjs/core/Meshes/transformNode';
+import type {TransformNode} from '@babylonjs/core/Meshes/transformNode.js';
 import {
     ConeEmitter,
     ConstantColor,
@@ -8,7 +8,7 @@ import {
     RenderMode,
     Vector4,
 } from 'babylon.quarks';
-import type {EffectBinding} from './binding';
+import type {EffectBinding} from './binding.js';
 
 export interface ChildSystemOptions {
     name?: string;

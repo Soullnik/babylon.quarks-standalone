@@ -2,6 +2,24 @@ import {TransformNode} from '@babylonjs/core/Meshes/transformNode';
 import {Scene} from '@babylonjs/core/scene';
 import {IParticleSystem, Matrix4, SerializationOptions} from 'quarks.core';
 
+/**
+ * Above 0 while a particle system disposes its own emitter (`ParticleSystem.dispose()`, which
+ * `autoDestroy` calls when the system finishes). Babylon then disposes the child nodes too, and
+ * child emitters keep their systems playing, so an effect's longer-lived children are not cut off
+ * when a short parent finishes. Disposing a node directly (`root.dispose()`) disposes its systems.
+ */
+let systemDisposeDepth = 0;
+
+/** Disposes `emitter` for its own system without disposing the systems of child emitters. */
+export function disposeEmitterForSystem(emitter: TransformNode): void {
+    systemDisposeDepth++;
+    try {
+        emitter.dispose();
+    } finally {
+        systemDisposeDepth--;
+    }
+}
+
 export class ParticleEmitter extends TransformNode {
     system: IParticleSystem;
     private _matrixWorld: Matrix4 = new Matrix4();
@@ -57,8 +75,22 @@ export class ParticleEmitter extends TransformNode {
         this.system = system;
     }
 
-    dispose(): void {
-        super.dispose();
+    /**
+     * Disposes the node and the particle system it carries, so `root.dispose()` on an effect tree
+     * also removes its systems from their renderer. Safe to call more than once. When a system
+     * disposes its own emitter (`ParticleSystem.dispose()`, `autoDestroy`), the systems of child
+     * emitters keep playing until they finish or are disposed themselves.
+     */
+    dispose(doNotRecurse?: boolean, disposeMaterialAndTextures = false): void {
+        if (this.isDisposed()) {
+            return;
+        }
+        super.dispose(doNotRecurse, disposeMaterialAndTextures);
+        if (systemDisposeDepth > 0) {
+            return;
+        }
+        // IParticleSystem (quarks.core) has no dispose(); ParticleSystem does.
+        (this.system as IParticleSystem & {dispose?: () => void}).dispose?.();
     }
 
     extractFromCache(cache: any): any[] {

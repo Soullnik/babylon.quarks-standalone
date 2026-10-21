@@ -1,7 +1,7 @@
 import React from 'react';
-import {ScalarGenerator, ScalarValueState, buildCurve, buildScalar, readPieces, readScalar} from '../core/values';
-import {CurveEditor} from './CurveEditor';
-import {NumberField, Row, SelectField} from './fields';
+import {ScalarGenerator, ScalarValueState, buildCurve, buildScalar, readPieces, readScalar} from '../core/values.js';
+import {CurveEditor} from './CurveEditor.js';
+import {NumberField, Row, SelectField} from './fields.js';
 
 /**
  * Unity-like value field: Constant | Random Between Two Constants | Curve,

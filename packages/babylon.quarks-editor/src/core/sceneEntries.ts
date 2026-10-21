@@ -1,10 +1,10 @@
-import type {TransformNode} from '@babylonjs/core/Meshes/transformNode';
-import type {Scene} from '@babylonjs/core/scene';
+import type {TransformNode} from '@babylonjs/core/Meshes/transformNode.js';
+import type {Scene} from '@babylonjs/core/scene.js';
 import type {BatchedRenderer, ParticleEmitter, ParticleSystem} from 'babylon.quarks';
 import {QuarksUtil} from 'babylon.quarks';
-import type {EffectAsset} from './assets';
-import {EffectBinding} from './binding';
-import {disposeLoadedEffect, parseEffectFromJson} from './loadEffect';
+import type {EffectAsset} from './assets.js';
+import {EffectBinding} from './binding.js';
+import {disposeLoadedEffect, parseEffectFromJson} from './loadEffect.js';
 
 /**
  * One effect instance placed in the scene. Every instance is live (its systems are registered

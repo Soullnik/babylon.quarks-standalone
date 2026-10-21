@@ -1,8 +1,8 @@
 import {InformationCircleIcon} from '@heroicons/react/24/solid';
 import React from 'react';
-import {iconStyle} from './icons';
-import {theme} from './theme';
-import {Tooltip} from './Tooltip';
+import {iconStyle} from './icons.js';
+import {theme} from './theme.js';
+import {Tooltip} from './Tooltip.js';
 
 /** Small info icon with a themed inspector tooltip. */
 export function InspectorInfoIcon(props: {

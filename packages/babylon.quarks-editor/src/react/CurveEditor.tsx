@@ -1,6 +1,6 @@
 import {useRef, useState} from 'react';
-import {CurvePiece, mergePieces, sampleCurve, splitPieces} from '../core/values';
-import {inputStyle, theme} from './theme';
+import {CurvePiece, mergePieces, sampleCurve, splitPieces} from '../core/values.js';
+import {inputStyle, theme} from './theme.js';
 
 const WIDTH = 218;
 const HEIGHT = 84;

@@ -1,5 +1,5 @@
 import React, {useEffect, useRef, useState} from 'react';
-import {buttonStyle, inputStyle, theme} from './theme';
+import {buttonStyle, inputStyle, theme} from './theme.js';
 
 export interface PromptDialogProps {
     title: string;

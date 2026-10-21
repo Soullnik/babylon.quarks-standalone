@@ -1,4 +1,4 @@
-import type {TransformNode} from '@babylonjs/core/Meshes/transformNode';
+import type {TransformNode} from '@babylonjs/core/Meshes/transformNode.js';
 import {
     CheckIcon,
     ChevronDownIcon,
@@ -13,14 +13,14 @@ import {
 } from '@heroicons/react/24/solid';
 import type {ParticleSystem} from 'babylon.quarks';
 import React, {useState} from 'react';
-import type {EffectBinding} from '../core/binding';
-import {buildEffectTree, collectSystems} from '../core/effectTree';
-import {ungroupNode} from '../core/groups';
-import {createChildSystem, removeSystems} from '../core/systems';
-import type {TimelineRow} from '../core/timeline';
-import {PromptDialog} from './PromptDialog';
-import {iconStyle} from './icons';
-import {theme} from './theme';
+import type {EffectBinding} from '../core/binding.js';
+import {buildEffectTree, collectSystems} from '../core/effectTree.js';
+import {ungroupNode} from '../core/groups.js';
+import {createChildSystem, removeSystems} from '../core/systems.js';
+import type {TimelineRow} from '../core/timeline.js';
+import {PromptDialog} from './PromptDialog.js';
+import {iconStyle} from './icons.js';
+import {theme} from './theme.js';
 
 const iconButton: React.CSSProperties = {
     background: 'none',

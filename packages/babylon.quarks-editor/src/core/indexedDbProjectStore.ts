@@ -5,7 +5,7 @@ import type {
     StoredAsset,
     StoredScene,
     StoredSceneEntry,
-} from './projectStore';
+} from './projectStore.js';
 
 const DB_NAME = 'babylon-quarks-editor';
 const DB_VERSION = 1;

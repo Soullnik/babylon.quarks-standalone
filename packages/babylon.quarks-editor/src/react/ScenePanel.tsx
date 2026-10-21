@@ -1,4 +1,4 @@
-import type {TransformNode} from '@babylonjs/core/Meshes/transformNode';
+import type {TransformNode} from '@babylonjs/core/Meshes/transformNode.js';
 import {
     ChevronDownIcon,
     ChevronRightIcon,
@@ -9,12 +9,12 @@ import {
     ViewfinderCircleIcon,
 } from '@heroicons/react/24/solid';
 import React, {useEffect, useState} from 'react';
-import {buildEffectTree} from '../core/effectTree';
-import type {SceneEntry} from '../core/sceneEntries';
-import {ContextMenu, type ContextMenuItem} from './ContextMenu';
-import {EffectTreeView} from './EffectTreeView';
-import {iconStyle} from './icons';
-import {buttonStyle, theme} from './theme';
+import {buildEffectTree} from '../core/effectTree.js';
+import type {SceneEntry} from '../core/sceneEntries.js';
+import {ContextMenu, type ContextMenuItem} from './ContextMenu.js';
+import {EffectTreeView} from './EffectTreeView.js';
+import {iconStyle} from './icons.js';
+import {buttonStyle, theme} from './theme.js';
 
 const ROW_HEIGHT = 34;
 

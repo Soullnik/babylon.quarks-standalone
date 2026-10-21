@@ -1,11 +1,11 @@
-import {StandardMaterial} from '@babylonjs/core/Materials/standardMaterial';
-import {Color3} from '@babylonjs/core/Maths/math.color';
-import {Vector3} from '@babylonjs/core/Maths/math.vector';
-import {Mesh} from '@babylonjs/core/Meshes/mesh';
-import {MeshBuilder} from '@babylonjs/core/Meshes/meshBuilder';
-import {TransformNode} from '@babylonjs/core/Meshes/transformNode';
-import type {Scene} from '@babylonjs/core/scene';
-import {DEFAULT_GALLERY_SPACING, gallerySpan} from './galleryLayout';
+import {StandardMaterial} from '@babylonjs/core/Materials/standardMaterial.js';
+import {Color3} from '@babylonjs/core/Maths/math.color.js';
+import {Vector3} from '@babylonjs/core/Maths/math.vector.js';
+import {Mesh} from '@babylonjs/core/Meshes/mesh.js';
+import {MeshBuilder} from '@babylonjs/core/Meshes/meshBuilder.js';
+import {TransformNode} from '@babylonjs/core/Meshes/transformNode.js';
+import type {Scene} from '@babylonjs/core/scene.js';
+import {DEFAULT_GALLERY_SPACING, gallerySpan} from './galleryLayout.js';
 
 /** Ground decal shown while dragging gallery items over the viewport. */
 export class GalleryDropMarker {

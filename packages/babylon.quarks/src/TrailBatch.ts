@@ -283,6 +283,8 @@ export class TrailBatch extends VFXBatch {
         mat.needDepthPrePass = this.settings.materialDepthWrite;
         mat.forceDepthWrite = this.settings.materialDepthWrite;
         mat.disableDepthWrite = !this.settings.materialDepthWrite;
+        // 0 keeps the engine's depth function (LEQUAL); ALWAYS draws over everything, like ZTest Always.
+        mat.depthFunction = this.settings.materialDepthTest ? 0 : Constants.ALWAYS;
 
         this.mesh.material = mat;
     }
@@ -566,8 +568,11 @@ export class TrailBatch extends VFXBatch {
                 // the particle's current row in the store.
                 const colors = colorFromParticle ? particle.store.color : particle.historyColors;
                 const particleColorIndex = particle.storeIndex * 4;
-                const col = particle.uvTile % vTileCount;
-                const row = Math.floor(particle.uvTile / vTileCount + 0.001);
+                // The same cell as the sprite shader: frames run along the rows, uTileCount per row,
+                // with floor and a positive modulo, as the shader's floor() and mod().
+                const tile = Math.floor(particle.uvTile);
+                const col = ((tile % uTileCount) + uTileCount) % uTileCount;
+                const row = Math.floor(tile / uTileCount);
                 const particleMatrix = particle.parentMatrix as unknown as Matrix4 | undefined;
                 const me = (particleMatrix ?? emitterMatrix).elements;
                 const widthScale = systemWorldSpace || particle.parentMatrix ? 1 : objectScale;

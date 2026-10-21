@@ -1,9 +1,9 @@
-import {Quaternion} from '@babylonjs/core/Maths/math.vector';
-import type {TransformNode} from '@babylonjs/core/Meshes/transformNode';
+import {Quaternion} from '@babylonjs/core/Maths/math.vector.js';
+import type {TransformNode} from '@babylonjs/core/Meshes/transformNode.js';
 import {useSyncExternalStore} from 'react';
-import {getTransformRevision, notifyTransformChanged, subscribeTransform} from '../core/transformStore';
-import {ModuleSection} from './ModuleSection';
-import {NumberField, Row} from './fields';
+import {getTransformRevision, notifyTransformChanged, subscribeTransform} from '../core/transformStore.js';
+import {ModuleSection} from './ModuleSection.js';
+import {NumberField, Row} from './fields.js';
 
 const RAD_TO_DEG = 180 / Math.PI;
 const DEG_TO_RAD = Math.PI / 180;

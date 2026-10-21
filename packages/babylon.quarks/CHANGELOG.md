@@ -4,7 +4,7 @@ All notable changes to the `babylon.quarks` package are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project follows the `quarks.core` 0.x version line.
 
-## [Unreleased]
+## [0.27.0] — 2026-10-21
 
 ### Added
 
@@ -24,6 +24,44 @@ and the project follows the `quarks.core` 0.x version line.
   - `tessellation` is a whole number from 0 (the default: off, no cost) to 16
     (`MAX_TRAIL_TESSELLATION`). JSON writes both settings only when set. Helpers:
     `trailTessellation`, `trailCurveTension`.
+
+### Changed
+
+- **Seeded systems roll differently from 0.26.** A seeded system now rolls its emission rates,
+  burst counts and start delay on its own generator when it is created and on every restart, so
+  a restart replays them too. A seed saved with 0.26 gives a different, still repeatable, effect,
+  and lock-step sessions must not mix 0.26 and 0.27 clients.
+
+### Fixed
+
+- **Node ESM, webpack 5 and SSR could not import the package.** The ESM and CJS builds imported
+  `@babylonjs/core` deep paths without `.js`, which only lenient bundlers such as Vite resolve.
+  Every deep import now ends in `.js`. The `exports` map now gives `require` its own declaration
+  file (`dist/types/index.d.cts`) and lists `./package.json`, so TypeScript with
+  `node16`/`nodenext` resolution types both module kinds. `npm run check:pack` now installs the
+  packed tarballs into a scratch project and imports them with Node ESM, Node CJS and TypeScript
+  `nodenext`.
+- **`restart()` broke random emission.** It emptied the system's generator memory without
+  rolling `emissionOverTime` again, so an `IntervalValue` rate became NaN and the system emitted
+  nothing. Every pooled effect with a random emission rate was empty from its second play.
+- **`restart()` kept the emission-over-distance history.** A pooled effect placed somewhere new
+  and restarted spawned a line of particles along the jump from where it last played.
+- **Disposing an emitter node left its system running.** `root.dispose()` on an effect tree now
+  disposes every `ParticleSystem` in it and removes it from its renderer. A system that disposes
+  itself (`dispose()`, or `autoDestroy` when it finishes) still leaves the systems of its child
+  emitters playing until they finish.
+- **`depthTest: false` had no effect.** It was stored, batched and saved, but never reached the
+  material. It now draws particles over all geometry (Unity's `ZTest Always`) in every render mode.
+- **A mesh batch leaked a material when its env atlas finished loading.** The rebuild now disposes
+  the material it replaces, and does nothing when the batch was disposed before the atlas loaded.
+- **`QuarksLoader` joined a relative base url twice.** `load('fx/hit.json')` and
+  `loadFromJSON(json, 'fx/')` loaded textures from `fx/fx/...`, and from `fx/fx/fx/...` when the
+  same document was loaded again.
+- **Trails picked the wrong sprite-sheet cell.** The cell column was counted with `vTileCount`
+  and fractional frames were not rounded down, so a sheet with more columns than rows, or a
+  `FrameOverLife` curve, showed the wrong cell or a slice across two. Trails now pick the same cell
+  as billboards.
+- **`OrbitOverLife.clone()` dropped the axis**, so a cloned system orbited about Y.
 
 ## [0.26.0] — 2026-10-21
 
