@@ -23,7 +23,7 @@ afterEach(() => {
 const RADIUS = 2;
 
 /** A trail riding the emitter round a circle, a few big steps apart: the corners a fast swing shows. */
-function circling(settings: Partial<TrailSettings> = {}) {
+function circling(settings: Partial<TrailSettings> = {}, worldSpace = true) {
     const system = new ParticleSystem({
         scene,
         duration: 10,
@@ -36,7 +36,7 @@ function circling(settings: Partial<TrailSettings> = {}) {
         emissionBursts: [{time: 0, count: new ConstantValue(1), probability: 1, interval: 0, cycle: 1}],
         shape: new PointEmitter(),
         renderMode: RenderMode.Trail,
-        worldSpace: true,
+        worldSpace,
         rendererEmitterSettings: {startLength: new ConstantValue(20), followLocalOrigin: true, ...settings},
     });
     const renderer = new BatchedRenderer('tessellation', scene);
@@ -101,6 +101,70 @@ describe('trail tessellation', () => {
         const chordMid = samples[1].map((v, c) => (v + samples[2][c]) / 2);
         const curveMid = points[steps + 1 + 2];
         expect(Math.abs(radiusOf(curveMid) - RADIUS)).toBeLessThan(Math.abs(radiusOf(chordMid) - RADIUS) / 4);
+    });
+
+    it('curves a local-space trail through its samples the same way', () => {
+        const plain = circling({}, false);
+        const samples = centres(plain.batch, plain.trail.historyCount);
+        const curved = circling({tessellation: 2}, false);
+        const points = centres(curved.batch, (samples.length - 1) * 3 + 1);
+        samples.forEach((sample, i) => sample.forEach((v, c) => expect(points[i * 3][c]).toBeCloseTo(v, 5)));
+    });
+
+    it('runs U along the curve, from the head under uvFromHead, on both UV channels', () => {
+        const {batch, trail} = circling({tessellation: 3, uvFromHead: true});
+        const drawn = (trail.historyCount - 1) * 4 + 1;
+        const uv = batch.uvBuffer as Float32Array;
+        expect(uv[0]).toBeCloseTo(1, 6);
+        expect(uv[(drawn - 1) * 4]).toBeCloseTo(0, 6);
+        for (let i = 1; i < drawn; i++) expect(uv[i * 4]).toBeLessThan(uv[(i - 1) * 4]);
+    });
+
+    describe('the curve itself', () => {
+        /** The batch's tessellate on hand-placed samples: points along X, sizes and colors given. */
+        function curve(xs: number[], curved: number, steps: number, tension = 0) {
+            const {batch} = circling();
+            const samples = batch.trailSamples(xs.length);
+            xs.forEach((x, i) => {
+                samples.writePoint(i, x, 0, 0, null);
+                samples.size[i] = i;
+                samples.writeColor(i, i, 0, 0, 1);
+            });
+            const out = batch.tessellate(samples, curved, xs.length, steps, tension, false);
+            const n = (xs.length - 1) * (steps + 1) + 1;
+            return {
+                xs: Array.from({length: n}, (_, k) => out.position[k * 3]),
+                sizes: Array.from(out.size.subarray(0, n)),
+                reds: Array.from({length: n}, (_, k) => out.color[k * 4]),
+            };
+        }
+
+        it('never runs past a live tip a fraction of a step ahead, or doubles back', () => {
+            for (const fraction of [0.02, 0.1, 0.5]) {
+                const {xs} = curve([0, 1, 2, 2 + fraction], 3, 8);
+                for (let k = 1; k < xs.length; k++) expect(xs[k]).toBeGreaterThanOrEqual(xs[k - 1] - 1e-9);
+                expect(Math.max(...xs)).toBeCloseTo(2 + fraction, 6);
+            }
+        });
+
+        it('keeps the recorded part still however the live tip moves', () => {
+            const steps = 4;
+            const a = curve([0, 1, 2, 2.1], 3, steps).xs;
+            const b = curve([0, 1, 2, 2.7], 3, steps).xs;
+            const recorded = 2 * (steps + 1) + 1;
+            expect(b.slice(0, recorded)).toEqual(a.slice(0, recorded));
+        });
+
+        it('does not overshoot samples spaced unevenly', () => {
+            const {xs} = curve([0, 0.05, 1, 1.05, 3], 5, 8);
+            for (let k = 1; k < xs.length; k++) expect(xs[k]).toBeGreaterThanOrEqual(xs[k - 1] - 1e-9);
+        });
+
+        it('eases widths and colors along each segment', () => {
+            const {sizes, reds} = curve([0, 1, 2], 3, 3);
+            expect(sizes).toEqual([0, 0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2]);
+            expect(reds).toEqual(sizes);
+        });
     });
 
     it('draws straight segments at full tension', () => {

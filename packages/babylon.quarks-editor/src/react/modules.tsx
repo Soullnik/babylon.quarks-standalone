@@ -997,6 +997,7 @@ export function RendererModule({
                         <NumberField
                             value={(system.rendererEmitterSettings as {tessellation?: number}).tessellation ?? 0}
                             min={0}
+                            max={16}
                             step={1}
                             onChange={(v) =>
                                 binding.apply((s) => {
@@ -1009,6 +1010,7 @@ export function RendererModule({
                         <NumberField
                             value={(system.rendererEmitterSettings as {curveTension?: number}).curveTension ?? 0}
                             min={0}
+                            max={1}
                             step={0.05}
                             onChange={(v) =>
                                 binding.apply((s) => {

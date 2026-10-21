@@ -311,14 +311,18 @@ export class TrailBatch extends VFXBatch {
 
     /**
      * The curve through a trail's `count` samples, each segment drawn as
-     * `steps + 1`: a cardinal spline (Catmull-Rom at tension 0, straight at
-     * 1) through the points, and through the sides of a swept trail with each
-     * side's length eased between its ends'; widths and colors eased along.
-     * The curve passes through every sample, so the trail keeps its shape
-     * and only loses its corners.
+     * `steps + 1`: through the first `curved` (the recorded samples) a
+     * centripetal cardinal spline (Catmull-Rom at tension 0, straight at 1),
+     * the same through the sides of a swept trail with each side's length
+     * eased between its ends'; past them (the live tip) a straight segment,
+     * so the recorded part does not move as the tip does. Widths and colors
+     * are eased along. The curve passes through every sample, so the trail
+     * keeps its shape and only loses its corners; centripetal spacing keeps
+     * it from overshooting where samples lie unevenly apart.
      */
     private tessellate(
         samples: TrailSamples,
+        curved: number,
         count: number,
         steps: number,
         tension: number,
@@ -329,48 +333,91 @@ export class TrailBatch extends VFXBatch {
         const sd = samples.side;
         const op = out.position;
         const os = out.side;
-        const scale = (1 - tension) * 0.5;
+        const tangent = 1 - tension;
+        // Knot spacing: the square root of a segment's length.
+        const knot = (from: number, to: number) =>
+            Math.sqrt(
+                Math.sqrt((p[to] - p[from]) ** 2 + (p[to + 1] - p[from + 1]) ** 2 + (p[to + 2] - p[from + 2]) ** 2)
+            );
         let k = 0;
         for (let i = 0; i + 1 < count; i++) {
             const a = i * 3;
             const b = a + 3;
-            const before = (i > 0 ? i - 1 : i) * 3;
-            const after = (i + 2 < count ? i + 2 : i + 1) * 3;
+            // Each end's tangent, as weights of the neighbouring differences
+            // (Yuksel et al., parameterization of Catmull-Rom curves).
+            let w1a = 0;
+            let w1b = 0;
+            let w1c = 0;
+            let w2a = 0;
+            let w2b = 0;
+            let w2c = 0;
+            let before = a;
+            let after = b;
+            if (i + 1 < curved) {
+                before = (i > 0 ? i - 1 : i) * 3;
+                after = (i + 2 < curved ? i + 2 : i + 1) * 3;
+                const t12 = knot(a, b);
+                if (t12 > 1e-6) {
+                    const t01 = knot(before, a);
+                    const t23 = knot(b, after);
+                    w1c = tangent;
+                    w2a = tangent;
+                    if (t01 > 1e-6) {
+                        w1a = (tangent * t12) / t01;
+                        w1b = (-tangent * t12) / (t01 + t12);
+                    }
+                    if (t23 > 1e-6) {
+                        w2b = (-tangent * t12) / (t12 + t23);
+                        w2c = (tangent * t12) / t23;
+                    }
+                }
+            }
+            // m1 = w1a (A - Before) + w1b (B - Before) + w1c (B - A);
+            // m2 = w2a (B - A) + w2b (After - A) + w2c (After - B).
+            const la = swept ? Math.sqrt(sd[a] * sd[a] + sd[a + 1] * sd[a + 1] + sd[a + 2] * sd[a + 2]) : 0;
+            const lb = swept ? Math.sqrt(sd[b] * sd[b] + sd[b + 1] * sd[b + 1] + sd[b + 2] * sd[b + 2]) : 0;
             for (let step = 0; step <= steps; step++, k++) {
                 const t = step / (steps + 1);
                 const t2 = t * t;
                 const t3 = t2 * t;
                 const h00 = 2 * t3 - 3 * t2 + 1;
-                const h10 = (t3 - 2 * t2 + t) * scale;
+                const h10 = t3 - 2 * t2 + t;
                 const h01 = -2 * t3 + 3 * t2;
-                const h11 = (t3 - t2) * scale;
+                const h11 = t3 - t2;
                 const o = k * 3;
                 for (let c = 0; c < 3; c++) {
-                    op[o + c] =
-                        h00 * p[a + c] +
-                        h10 * (p[b + c] - p[before + c]) +
-                        h01 * p[b + c] +
-                        h11 * (p[after + c] - p[a + c]);
+                    const A = p[a + c];
+                    const B = p[b + c];
+                    const m1 = w1a * (A - p[before + c]) + w1b * (B - p[before + c]) + w1c * (B - A);
+                    const m2 = w2a * (B - A) + w2b * (p[after + c] - A) + w2c * (p[after + c] - B);
+                    op[o + c] = h00 * A + h10 * m1 + h01 * B + h11 * m2;
                 }
                 if (swept) {
                     let x = 0;
                     let y = 0;
                     let z = 0;
                     for (let c = 0; c < 3; c++) {
-                        const v =
-                            h00 * sd[a + c] +
-                            h10 * (sd[b + c] - sd[before + c]) +
-                            h01 * sd[b + c] +
-                            h11 * (sd[after + c] - sd[a + c]);
+                        const A = sd[a + c];
+                        const B = sd[b + c];
+                        const m1 = w1a * (A - sd[before + c]) + w1b * (B - sd[before + c]) + w1c * (B - A);
+                        const m2 = w2a * (B - A) + w2b * (sd[after + c] - A) + w2c * (sd[after + c] - B);
+                        const v = h00 * A + h10 * m1 + h01 * B + h11 * m2;
                         if (c === 0) x = v;
                         else if (c === 1) y = v;
                         else z = v;
                     }
                     // A side turning with the blade keeps its length on the way round.
-                    const la = Math.hypot(sd[a], sd[a + 1], sd[a + 2]);
-                    const lb = Math.hypot(sd[b], sd[b + 1], sd[b + 2]);
-                    const length = Math.hypot(x, y, z);
-                    const fit = length > 1e-8 ? (la + (lb - la) * t) / length : 0;
+                    let length = Math.sqrt(x * x + y * y + z * z);
+                    if (length <= 1e-6 * Math.max(la, lb, 1e-6)) {
+                        // Turned half round in one step: no way round to follow, so
+                        // hold the nearer end's side rather than pinch to nothing.
+                        const from = t < 0.5 ? a : b;
+                        x = sd[from];
+                        y = sd[from + 1];
+                        z = sd[from + 2];
+                        length = t < 0.5 ? la : lb;
+                    }
+                    const fit = length > 0 ? (la + (lb - la) * t) / length : 0;
                     os[o] = x * fit;
                     os[o + 1] = y * fit;
                     os[o + 2] = z * fit;
@@ -568,7 +615,14 @@ export class TrailBatch extends VFXBatch {
                 // or drawn through them as they are.
                 const drawn =
                     tessellation > 0
-                        ? this.tessellate(samples, sampleCount, tessellation, curveTension, swept)
+                        ? this.tessellate(
+                              samples,
+                              particleHistoryLength,
+                              sampleCount,
+                              tessellation,
+                              curveTension,
+                              swept
+                          )
                         : samples;
                 const drawnCount = tessellation > 0 ? (sampleCount - 1) * (tessellation + 1) + 1 : sampleCount;
                 // The texture spans the ribbon end to end.
