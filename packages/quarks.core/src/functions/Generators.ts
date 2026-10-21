@@ -1,4 +1,4 @@
-import {describeType, warnFormat} from '../util/JSONUtil';
+import {describePart, warnFormat} from '../util/JSONUtil';
 import {ConstantValue} from './ConstantValue';
 import {FunctionJSON} from './FunctionJSON';
 import {RotationGenerator, RotationGeneratorFromJSON} from './RotationGenerator';
@@ -21,7 +21,7 @@ export function GeneratorFromJSON(
         case 'Vector3Function':
             return Vector3GeneratorFromJSON(json);
         default:
-            warnFormat(`Unknown generator ${describeType(json)}; using 0.`);
+            warnFormat(`${describePart('generator', json)}; using 0.`);
             return new ConstantValue(0);
     }
 }

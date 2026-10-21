@@ -1,5 +1,5 @@
 import {Vector4} from '../math';
-import {ColorToJSON, describeType, JSONToColor, warnFormat} from '../util/JSONUtil';
+import {ColorToJSON, describePart, JSONToColor, warnFormat} from '../util/JSONUtil';
 import {ColorRange} from './ColorRange';
 import {FunctionJSON} from './FunctionJSON';
 import {GeneratorMemory} from './GeneratorMemory';
@@ -66,7 +66,7 @@ export function ColorGeneratorFromJSON(json: FunctionJSON) {
         case 'RandomColorBetweenGradient':
             return RandomColorBetweenGradient.fromJSON(json);
         default:
-            warnFormat(`Unknown colour generator ${describeType(json)}; using white.`);
+            warnFormat(`${describePart('colour generator', json)}; using white.`);
             return new ConstantColor(new Vector4(1, 1, 1, 1));
     }
 }

@@ -1,5 +1,5 @@
 import {Vector3} from '../math';
-import {describeType, warnFormat} from '../util/JSONUtil';
+import {describePart, warnFormat} from '../util/JSONUtil';
 import {ConstantValue} from './ConstantValue';
 import {FunctionJSON} from './FunctionJSON';
 import {GeneratorMemory} from './GeneratorMemory';
@@ -21,7 +21,7 @@ export function Vector3GeneratorFromJSON(json: FunctionJSON): Vector3Generator {
         case 'Vector3Function':
             return Vector3Function.fromJSON(json);
         default:
-            warnFormat(`Unknown vector generator ${describeType(json)}; using a zero vector.`);
+            warnFormat(`${describePart('vector generator', json)}; using a zero vector.`);
             return new Vector3Function(new ConstantValue(0), new ConstantValue(0), new ConstantValue(0));
     }
 }

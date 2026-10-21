@@ -1,6 +1,6 @@
 import {JsonMetaData} from '../IParticleSystem';
 import {Constructable, ParameterPair} from '../TypeUtil';
-import {describeType, warnFormat} from '../util/JSONUtil';
+import {describePart, warnFormat} from '../util/JSONUtil';
 import {BoxEmitter} from './BoxEmitter';
 import {CircleEmitter} from './CircleEmitter';
 import {ConeEmitter} from './ConeEmitter';
@@ -148,7 +148,7 @@ export const EmitterShapes: {[key: string]: EmitterShapePlugin} = {
 export function EmitterFromJSON(json: ShapeJSON, meta: JsonMetaData): EmitterShape {
     const shape = json ? EmitterShapes[json.type] : undefined;
     if (!shape) {
-        warnFormat(`Unknown emitter shape ${describeType(json)}; using a point emitter.`);
+        warnFormat(`${describePart('emitter shape', json)}; using a point emitter.`);
         return new PointEmitter();
     }
     return shape.loadJSON(json, meta);

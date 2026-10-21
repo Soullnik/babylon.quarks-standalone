@@ -1,5 +1,5 @@
 import {Quaternion} from '../math';
-import {describeType, warnFormat} from '../util/JSONUtil';
+import {describePart, warnFormat} from '../util/JSONUtil';
 import {AxisAngleGenerator} from './AxisAngleGenerator';
 import {EulerGenerator} from './EulerGenerator';
 import {FunctionJSON} from './FunctionJSON';
@@ -24,7 +24,7 @@ export function RotationGeneratorFromJSON(json: FunctionJSON): RotationGenerator
         case 'RandomQuat':
             return RandomQuatGenerator.fromJSON(json);
         default:
-            warnFormat(`Unknown rotation generator ${describeType(json)}; using a random rotation.`);
+            warnFormat(`${describePart('rotation generator', json)}; using a random rotation.`);
             return new RandomQuatGenerator();
     }
 }

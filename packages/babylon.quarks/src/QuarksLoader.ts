@@ -1087,6 +1087,7 @@ export class QuarksLoader {
         }
 
         if (data.visible !== undefined) node.setEnabled(data.visible);
+        if (data.isVisible === false && node instanceof Mesh) node.isVisible = false;
 
         if (data.children) {
             for (const childData of data.children) {

@@ -49,7 +49,7 @@ describe('reading an unknown or missing part', () => {
                 expect(read(json as never)).toBeInstanceOf(fallback);
             }
             expect(warn).toHaveBeenCalledWith(expect.stringContaining('"Bogus"'));
-            expect(warn).toHaveBeenCalledWith(expect.stringContaining('nothing'));
+            expect(warn).toHaveBeenCalledWith(expect.stringContaining('Missing'));
         }
     );
 

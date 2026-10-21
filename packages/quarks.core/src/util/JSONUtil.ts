@@ -50,8 +50,12 @@ export const warnFormat = (message: string): void => {
 export const readVector3 = (json: unknown, fallback: Vector3): Vector3 =>
     Array.isArray(json) ? new Vector3(json[0] ?? fallback.x, json[1] ?? fallback.y, json[2] ?? fallback.z) : fallback;
 
-/** The `type` of a JSON part, for a message: `"Foo"`, or `nothing` when it has none. */
-export const describeType = (json: unknown): string => {
+/** What is wrong with a JSON part, for a message: `Unknown behavior "Foo"`, or `Missing behavior`. */
+export const describePart = (kind: string, json: unknown): string => {
     const type = (json as {type?: unknown} | null | undefined)?.type;
-    return type === undefined ? 'nothing' : JSON.stringify(type);
+    return json === undefined || json === null
+        ? `Missing ${kind}`
+        : type === undefined
+          ? `${kind[0].toUpperCase()}${kind.slice(1)} without a type`
+          : `Unknown ${kind} ${JSON.stringify(type)}`;
 };

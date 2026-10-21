@@ -13,8 +13,10 @@ and the project follows the `quarks.core` 0.x version line.
   nodes with their geometry, prefabs with `timeScale`), each texture with its sampler state, and a
   format version. The result is plain data, so `JSON.stringify` takes it; a loaded effect saved
   again writes the same file. A texture with no url a file can point at is reported through
-  `onWarning`. Options: `filter` to leave out helper nodes, `generator`, and `name` for several
-  roots. The document types are exported (`QuarksEffectJSON` and the rest), and the format is
+  `onWarning`, as are links to nodes it does not write and mesh settings it cannot hold. Options:
+  `filter` to leave out helper nodes, `imageUrl` to write image urls relative to where the file is
+  saved, `generator`, and `name` for several roots. A mesh node that is not drawn keeps its
+  children drawn (`isVisible: false`, which the loader now reads). The document types are exported (`QuarksEffectJSON` and the rest), and the format is
   described in `docs/FORMAT.md`. Before, `ParticleSystem.toJSON` left live textures and materials
   in its meta, and every caller wrote its own envelope.
 - **Effect files carry a format version**, `metadata.quarksFormat` (`QUARKS_FORMAT_VERSION`). The
@@ -38,11 +40,13 @@ and the project follows the `quarks.core` 0.x version line.
 - **Unreadable parts of an effect warn and take their default** instead of throwing a `TypeError`
   or going silent: an unknown shape gives a point emitter, an unknown behavior is skipped with a
   warning, an unknown curve or colour type warns, and a setting the file leaves out (a system's
-  `startLife`, a behavior's `bounce`, `dampen`, vectors or speed range) takes the constructor's
-  default. A mesh surface shape whose mesh is not in the effect warns, as a sub emitter does.
+  `startLife`) takes the constructor's default. A behavior's missing number, vector or speed
+  range takes a fixed default where the constructor has none (see `docs/FORMAT.md`). A mesh surface shape whose mesh is not in the effect warns, as a sub emitter does.
 - **Systems of one document share geometry and texture entries.** `ParticleSystem.toJSON(meta)`
   writes a geometry or texture once per `meta`, however many systems or slots use it, and numbers
-  its ids per document, so the same effect serializes to the same file.
+  its ids per document, so the same effect serializes to the same file. Ids are no longer unique across
+  calls: two separate `toJSON()` calls both write `quarks_geometry_1`, so merge their outputs
+  through one `meta`, or use `serializeEffect`.
 
 - **Trails face the camera in view space (breaking for custom trail shaders)**, across their
   tangent and the line of sight, like Unity's View alignment and Niagara's ribbons. The width is

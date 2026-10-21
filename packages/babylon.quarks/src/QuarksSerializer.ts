@@ -4,8 +4,11 @@ import {StandardMaterial} from '@babylonjs/core/Materials/standardMaterial';
 import {BaseTexture} from '@babylonjs/core/Materials/Textures/baseTexture';
 import {Texture} from '@babylonjs/core/Materials/Textures/texture';
 import {Matrix, Quaternion} from '@babylonjs/core/Maths/math.vector';
+import {Geometry} from '@babylonjs/core/Meshes/geometry';
+import {InstancedMesh} from '@babylonjs/core/Meshes/instancedMesh';
 import {Mesh} from '@babylonjs/core/Meshes/mesh';
 import {TransformNode} from '@babylonjs/core/Meshes/transformNode';
+import {ensureTriangleIndices} from './geometryUtil';
 import {quarksNodeId} from './nodeId';
 import {ParticleEmitter} from './ParticleEmitter';
 import type {BabylonMetaData, ParticleSystem, ParticleSystemJSONParameters} from './ParticleSystem';
@@ -68,8 +71,10 @@ export interface QuarksNodeJSON {
     name?: string;
     /** Local transform, column-major, as Babylon's `Matrix.asArray()`. */
     matrix: number[];
-    /** Written only when the node is disabled, or is a mesh that is not visible. */
+    /** Written only when the node is disabled; loads it disabled, with everything under it. */
     visible?: false;
+    /** `Mesh`: written only when the mesh is not drawn (`isVisible`), which leaves its children drawn. */
+    isVisible?: false;
     children?: QuarksNodeJSON[];
     /** `ParticleEmitter`: the system. */
     ps?: ParticleSystemJSONParameters;
@@ -113,6 +118,13 @@ export interface SerializeEffectOptions {
     onWarning?: (message: string) => void;
     /** Several roots are written as children of one group; its name. Default `'effect'`. */
     name?: string;
+    /**
+     * The url written for a texture's image. Default: the texture's `url`. Return a path relative
+     * to where the file will be saved, since a texture loaded with a base url holds the joined url
+     * and the loader joins the base again; or give a texture made in code a url or a `data:` URI.
+     * Return `null` to write the texture without an image.
+     */
+    imageUrl?: (texture: Texture) => string | null | undefined;
 }
 
 /** three.js wrap codes, as the loader reads them. */
@@ -145,12 +157,35 @@ function localMatrix(node: TransformNode): number[] {
 class EffectWriter {
     readonly meta: BabylonMetaData = {geometries: {}, materials: {}, textures: {}};
     private readonly meshGeometries = new Map<string, QuarksGeometryJSON>();
-    private readonly meshMaterials: Array<Record<string, unknown>> = [];
+    private readonly geometryIds = new Map<Geometry, string>();
+    private readonly meshMaterials: Array<{json: Record<string, unknown>; map: BaseTexture | null}> = [];
     private readonly meshMaterialIds = new Map<StandardMaterial, string>();
     private readonly extraTextures = new Map<BaseTexture, string>();
     private nextId = 0;
 
     constructor(private readonly options: SerializeEffectOptions) {}
+
+    /** Reports links to nodes the file does not hold: they load unresolved. */
+    private warnDanglingLinks(object: QuarksNodeJSON): void {
+        const written = new Set<string>();
+        const nodes: QuarksNodeJSON[] = [];
+        const walk = (node: QuarksNodeJSON) => {
+            written.add(node.uuid);
+            nodes.push(node);
+            node.children?.forEach(walk);
+        };
+        walk(object);
+        for (const node of nodes) {
+            for (const [kind, target] of links(node)) {
+                if (target !== '' && !written.has(target)) {
+                    this.warn(
+                        `"${node.name}" has ${kind} on node "${target}", which is not in what is written; ` +
+                            'it loads without that link.'
+                    );
+                }
+            }
+        }
+    }
 
     warn(message: string): void {
         (this.options.onWarning ?? ((m: string) => console.warn(`[quarks] ${m}`)))(message);
@@ -167,9 +202,12 @@ class EffectWriter {
             name: node.name,
             matrix: localMatrix(node),
         };
-        // A mesh hidden with isVisible (a mesh surface shape's source) loads disabled, which hides it too.
-        if (!node.isEnabled(false) || (node instanceof Mesh && !node.isVisible)) {
+        if (!node.isEnabled(false)) {
             json.visible = false;
+        }
+        // A mesh that is not drawn, such as a mesh surface shape's source, may still parent emitters.
+        if (node instanceof Mesh && !node.isVisible) {
+            json.isVisible = false;
         }
 
         if (node instanceof ParticleEmitter) {
@@ -186,6 +224,8 @@ class EffectWriter {
             json.type = 'Mesh';
             json.geometry = this.meshGeometry(node);
             json.material = this.meshMaterial(node);
+        } else if (node instanceof InstancedMesh) {
+            this.warn(`"${node.name}" is an instance of "${node.sourceMesh.name}"; it is written as a group.`);
         }
         if (children.length > 0) {
             json.children = children;
@@ -199,11 +239,22 @@ class EffectWriter {
     }
 
     private meshGeometry(mesh: Mesh): string | undefined {
+        // Meshes sharing one Geometry (clones) share one entry.
+        const shared = mesh.geometry ? this.geometryIds.get(mesh.geometry) : undefined;
+        if (shared !== undefined) {
+            return shared;
+        }
         const positions = mesh.getVerticesData(VertexBuffer.PositionKind);
-        const indices = mesh.getIndices();
-        if (!positions || !indices) {
+        if (!positions || positions.length === 0) {
+            this.warn(`Mesh "${mesh.name}" has no vertices; it is written without geometry.`);
             return undefined;
         }
+        // An unindexed mesh draws its vertices in order, as the loader does for a file without indices.
+        const indexed = mesh.getIndices();
+        const indices = ensureTriangleIndices(
+            positions instanceof Float32Array ? positions : new Float32Array(positions),
+            indexed && indexed.length > 0 ? Uint32Array.from(indexed) : undefined
+        );
         const read = (kind: string) => {
             const data = mesh.getVerticesData(kind);
             return data ? Array.from(data) : undefined;
@@ -221,6 +272,9 @@ class EffectWriter {
         if (uvs2) geometry.uvs2 = uvs2;
         if (normals) geometry.normals = normals;
         this.meshGeometries.set(geometry.uuid, geometry);
+        if (mesh.geometry) {
+            this.geometryIds.set(mesh.geometry, geometry.uuid);
+        }
         return geometry.uuid;
     }
 
@@ -247,20 +301,24 @@ class EffectWriter {
         }
         uuid = this.id('quarks_mesh_material');
         this.meshMaterialIds.set(material, uuid);
-        const map = material.diffuseTexture ? this.texture(material.diffuseTexture) : undefined;
-        this.meshMaterials.push({
-            uuid,
-            type: 'MeshBasicMaterial',
-            alphaMode: material.alphaMode,
-            side: material.backFaceCulling ? 0 : 2,
-            alphaTest: material.alphaCutOff,
-            depthWrite: !material.disableDepthWrite,
-            ...(map ? {map} : {}),
-        });
+        const white = material.diffuseColor.r === 1 && material.diffuseColor.g === 1 && material.diffuseColor.b === 1;
+        const black =
+            material.emissiveColor.r === 0 && material.emissiveColor.g === 0 && material.emissiveColor.b === 0;
+        if (material.alpha !== 1 || !white || !black) {
+            this.warn(`Mesh "${mesh.name}": its material's alpha and colours are not written; it loads opaque white.`);
+        }
+        // Each field only when it differs from what the loader gives a material without it.
+        const json: Record<string, unknown> = {uuid, type: 'MeshBasicMaterial'};
+        if (material.alphaMode !== Constants.ALPHA_COMBINE) json.alphaMode = material.alphaMode;
+        if (material.backFaceCulling) json.side = 0;
+        if (material.alphaCutOff !== 0) json.alphaTest = material.alphaCutOff;
+        if (!material.disableDepthWrite) json.depthWrite = true;
+        // The texture's uuid is settled in finish(), once the systems have written theirs.
+        this.meshMaterials.push({json, map: material.diffuseTexture});
         return uuid;
     }
 
-    /** A texture referenced outside a particle system's meta (a mesh node's diffuse). */
+    /** The uuid of a texture a mesh node uses: the systems' entry for it, or one of its own. */
     private texture(texture: BaseTexture): string {
         for (const [uuid, known] of Object.entries(this.meta.textures)) {
             if (known === texture) {
@@ -276,6 +334,8 @@ class EffectWriter {
     }
 
     finish(object: QuarksNodeJSON): QuarksEffectJSON {
+        const meshMaterials = this.meshMaterials.map(({json, map}) => (map ? {...json, map: this.texture(map)} : json));
+        this.warnDanglingLinks(object);
         const images: QuarksImageJSON[] = [];
         const imageIds = new Map<string, string>();
         const textures: QuarksTextureJSON[] = [];
@@ -288,7 +348,12 @@ class EffectWriter {
                 continue;
             }
             const json: QuarksTextureJSON = {uuid};
-            const url = texture instanceof Texture ? texture.url : null;
+            const url =
+                texture instanceof Texture
+                    ? this.options.imageUrl
+                        ? this.options.imageUrl(texture)
+                        : texture.url
+                    : null;
             if (isPortableUrl(url)) {
                 let image = imageIds.get(url);
                 if (image === undefined) {
@@ -324,11 +389,29 @@ class EffectWriter {
                 quarksFormat: QUARKS_FORMAT_VERSION,
             },
             geometries: [...Object.values(this.meta.geometries), ...this.meshGeometries.values()],
-            materials: [...materials, ...this.meshMaterials],
+            materials: [...materials, ...meshMaterials],
             textures,
             images,
             object,
         };
+    }
+}
+
+/** Ids a written document links to by uuid, by the kind of link. */
+function* links(node: QuarksNodeJSON): Generator<[string, string]> {
+    const ps = node.ps as {behaviors?: Array<{type?: string; subParticleSystem?: unknown}>; shape?: any} | undefined;
+    for (const behavior of ps?.behaviors ?? []) {
+        if (behavior.type === 'EmitSubParticleSystem' && typeof behavior.subParticleSystem === 'string') {
+            yield ['a sub emitter', behavior.subParticleSystem];
+        }
+    }
+    if (ps?.shape?.type === 'mesh_surface' && typeof ps.shape.mesh === 'string') {
+        yield ['a mesh surface shape', ps.shape.mesh];
+    }
+    for (const animation of (node.animationData as Array<{targetUUID?: unknown}> | undefined) ?? []) {
+        if (typeof animation.targetUUID === 'string') {
+            yield ['a prefab animation', animation.targetUUID];
+        }
     }
 }
 

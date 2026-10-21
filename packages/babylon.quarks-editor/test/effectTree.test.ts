@@ -1,8 +1,9 @@
 import {NullEngine} from '@babylonjs/core/Engines/nullEngine';
+import {Texture} from '@babylonjs/core/Materials/Textures/texture';
 import {MeshBuilder} from '@babylonjs/core/Meshes/meshBuilder';
 import {TransformNode} from '@babylonjs/core/Meshes/transformNode';
 import {Scene} from '@babylonjs/core/scene';
-import {ConstantValue, ParticleSystem, QuarksLoader} from 'babylon.quarks';
+import {ConstantValue, ParticleEmitter, ParticleSystem, QuarksLoader} from 'babylon.quarks';
 import {EDITOR_SCENE_NODE_METADATA} from '../src/core/editorScene';
 import {serializeEffectForest, serializeEffectTree} from '../src/core/effectTree';
 
@@ -45,6 +46,34 @@ describe('effect tree serialization', () => {
         const loaded = new QuarksLoader(scene).parse(json);
         const mesh = loaded.getChildren((node) => node.name === 'source', true)[0] as typeof source;
         expect(mesh.getTotalVertices()).toBe(source.getTotalVertices());
+    });
+
+    test('keeps texture sampler state through a save', () => {
+        const root = new TransformNode('fx', scene);
+        const texture = new Texture('https://example.com/a.png', scene, {invertY: false, noMipmap: true});
+        texture.wrapU = Texture.CLAMP_ADDRESSMODE;
+        texture.uScale = 2;
+        const system = emitter('sparks', root);
+        system.texture = texture;
+        const json = JSON.parse(serializeEffectTree(root, 'fx'));
+        expect(json.textures).toEqual([
+            {
+                uuid: expect.any(String),
+                image: expect.any(String),
+                invertY: false,
+                noMipmap: true,
+                wrap: [1001, 1000],
+                repeat: [2, 1],
+            },
+        ]);
+        const loaded = new QuarksLoader(scene, {shareResources: false}).parse(json);
+        const copy = ((loaded.getChildren()[0] as ParticleEmitter).system as ParticleSystem).texture as Texture;
+        expect([copy.invertY, copy.noMipmap, copy.wrapU, copy.uScale]).toEqual([
+            false,
+            true,
+            Texture.CLAMP_ADDRESSMODE,
+            2,
+        ]);
     });
 
     test('writes several roots under one group, and one root as itself', () => {

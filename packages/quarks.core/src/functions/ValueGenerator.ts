@@ -1,4 +1,4 @@
-import {describeType, warnFormat} from '../util/JSONUtil';
+import {describePart, warnFormat} from '../util/JSONUtil';
 import {ConstantValue} from './ConstantValue';
 import {FunctionJSON} from './FunctionJSON';
 import {GeneratorMemory} from './GeneratorMemory';
@@ -45,7 +45,7 @@ export function ValueGeneratorFromJSON(json: FunctionJSON): FunctionValueGenerat
         case 'PiecewiseBezier':
             return PiecewiseBezier.fromJSON(json);
         default:
-            warnFormat(`Unknown value generator ${describeType(json)}; using 0.`);
+            warnFormat(`${describePart('value generator', json)}; using 0.`);
             return new ConstantValue(0);
     }
 }

@@ -1,7 +1,7 @@
 import {IParticleSystem} from '../IParticleSystem';
 import {Particle} from '../Particle';
 import {Constructable, ParameterPair} from '../TypeUtil';
-import {describeType, warnFormat} from '../util/JSONUtil';
+import {describePart, warnFormat} from '../util/JSONUtil';
 import {ApplyCollision} from './ApplyCollision';
 import {ApplyForce} from './ApplyForce';
 import {ApplySequences} from './ApplySequences';
@@ -264,6 +264,6 @@ export function BehaviorFromJSON(json: any, particleSystem: IParticleSystem): Be
     if (behavior) {
         return behavior.loadJSON(json, particleSystem);
     }
-    warnFormat(`Unknown behavior ${describeType(json)}; it is skipped.`);
+    warnFormat(`${describePart('behavior', json)}; it is skipped.`);
     return null;
 }

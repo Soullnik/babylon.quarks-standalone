@@ -36,23 +36,29 @@ changelog.
 
 Every node has a `uuid`, a `type`, a `name` and a local `matrix` (column-major, as Babylon's
 `Matrix.asArray()`; `position`, `quaternion`/`rotation` and `scale` are read too). `visible: false`
-loads the node disabled. `children` holds its child nodes.
+loads the node disabled, with everything under it. `isVisible: false` on a mesh loads it undrawn,
+and leaves its children drawn, as a mesh surface shape's source that also parents emitters needs.
+`children` holds its child nodes. The matrix is the node's position, rotation and scale; a pivot
+matrix is not written.
 
 | `type` | Reads | Writes |
 | --- | --- | --- |
 | `Group` (and three.js object types) | a `TransformNode` | any other node |
 | `ParticleEmitter` | `ps`: a particle system (`ParticleSystem.toJSON`) | a `ParticleEmitter` |
-| `Mesh` | `geometry` and `material` uuids | a `Mesh`: its positions, indices, uvs, uvs2 and normals |
+| `Mesh` | `geometry` and `material` uuids | a `Mesh`: its positions, indices, uvs, uvs2 and normals; an unindexed mesh gets its vertices in order; clones share one geometry |
 | `QuarksPrefab` | `animationData`, `timeScale` | a `QuarksPrefab` |
 
 Links between nodes use the target's `uuid`: a sub emitter's `subParticleSystem`, a mesh surface
 shape's `mesh` and a prefab animation's `targetUUID`. `quarksNodeId(node)` gives the id a node is
 written under: the uuid it was loaded with, or one given once to a node made in code. A loaded
-effect saved again writes the same ids.
+effect saved again writes the same ids. `serializeEffect` warns about a link to a node it does not
+write, since it loads unresolved. An `InstancedMesh` is written as a group, with a warning.
 
-A mesh node's material is written only for a `StandardMaterial`, and only what the loader rebuilds:
-`alphaMode`, `side` (0 culls back faces, 2 draws both), `alphaTest`, `depthWrite` and the diffuse
-texture as `map`.
+A mesh node's material is written only for a `StandardMaterial`, and only what the loader rebuilds,
+each field when it differs from the loader's default: `alphaMode` (default combine), `side` (default
+2, both faces; 0 culls back faces), `alphaTest` (default 0), `depthWrite` (default false) and the
+diffuse texture as `map`. Its alpha and colours are not written; `serializeEffect` warns when they
+are not opaque white.
 
 ## Textures
 
@@ -71,14 +77,22 @@ texture as `map`.
 file can point at (made in code, a `blob:` url, an image embedded in a glTF) is written without an
 image and reported through `onWarning`; give it a file url or a `data:` URI before saving.
 
+A texture loaded with a base url holds the joined url (`fx/tex/a.png` for `tex/a.png` loaded from
+`fx/`), and the loader joins the base again on the next load. To save a file next to the one it was
+loaded from, pass `imageUrl` to write each image's url relative to it.
+
 ## Reading bad or partial files
 
 - A document with no `object` throws `QuarksFormatError`.
 - A part the loader cannot read warns and takes its default, and the rest of the effect loads:
   - an unknown emitter shape: a point emitter;
   - an unknown behavior: skipped;
-  - an unknown curve or colour type: 0, white, a random rotation or a zero vector;
-  - a setting left out (a system's `startLife`, a behavior's `bounce`): the constructor's default.
+  - an unknown or missing curve or colour: 0, white, a random rotation or a zero vector. A burst
+    without a `count` therefore emits nothing;
+  - a setting left out that has a default: that default. A system's curves and shape take the
+    constructor's; a behavior's plain numbers and vectors take a fixed one where the constructor
+    has none (`bounce` 1, `dampen` 1, a force's `direction` and `magnitude` 0, turbulence `scale`,
+    `velocityMultiplier` and `timeScale` 1, a speed range of 0 to 1).
 - A sub emitter or mesh surface shape whose target is not in the effect warns and emits nothing.
 
 `loadFromJSON` and `loadFromJSONAll` leave the document they are given as it was, so one document

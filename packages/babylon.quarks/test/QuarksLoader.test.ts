@@ -1530,4 +1530,17 @@ describe('QuarksLoader documents', () => {
         expect(urls).toEqual(['fx/tex/a.png', 'fx/tex/a.png']);
         expect(json.images![0]).toEqual({uuid: 'img', url: 'tex/a.png'});
     });
+
+    it('loadFromJSONAll leaves its documents as they were', async () => {
+        const bare = textured([{uuid: 'img', url: 'tex/a.png'}]);
+        const wrapped = textured([{uuid: 'img', url: 'tex/a.png'}]);
+        const before = JSON.parse(JSON.stringify([bare, wrapped]));
+        const loader = new QuarksLoader(scene, {baseUrl: 'fx/'});
+        for (let i = 0; i < 2; i++) {
+            const roots = (await loader.loadFromJSONAll([bare, {json: wrapped, baseUrl: 'pack/'}])) as Mesh[];
+            const urls = roots.map((root) => ((root.material as StandardMaterial).diffuseTexture as Texture).url);
+            expect(urls).toEqual(['fx/tex/a.png', 'pack/tex/a.png']);
+        }
+        expect([bare, wrapped]).toEqual(before);
+    });
 });

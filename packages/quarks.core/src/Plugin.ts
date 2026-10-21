@@ -17,8 +17,8 @@ export const Plugins: Array<Plugin> = [];
 export function loadPlugin(plugin: Plugin) {
     const existing = Plugins.find((item) => item.id === plugin.id);
     if (!existing) {
-        Plugins.push(plugin);
         plugin.initialize();
+        Plugins.push(plugin);
         for (const emitterShape of plugin.emitterShapes) {
             if (!EmitterShapes[emitterShape.type]) {
                 EmitterShapes[emitterShape.type] = emitterShape;

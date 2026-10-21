@@ -1,3 +1,4 @@
+import {VertexBuffer} from '@babylonjs/core/Buffers/buffer';
 import {Constants} from '@babylonjs/core/Engines/constants';
 import {NullEngine} from '@babylonjs/core/Engines/nullEngine';
 import {PBRMaterial} from '@babylonjs/core/Materials/PBR/pbrMaterial';
@@ -117,7 +118,8 @@ describe('serializeEffect', () => {
         expect(source).toBeInstanceOf(Mesh);
         expect((surface.emitterShape as MeshSurfaceEmitter).mesh).toBe(source);
         expect(source.getTotalVertices()).toBe(24);
-        expect(source.isEnabled(false)).toBe(false);
+        expect(source.isVisible).toBe(false);
+        expect(source.isEnabled(false)).toBe(true);
         expect(loaded).toBeInstanceOf(QuarksPrefab);
         expect(loaded.timeScale).toBe(2);
         expect(loaded.animationData).toHaveLength(1);
@@ -203,7 +205,14 @@ describe('serializeEffect', () => {
         const json = serializeEffect(mesh);
         expect(json.object).toMatchObject({type: 'Mesh', geometry: expect.any(String), material: expect.any(String)});
         expect(json.materials).toEqual([
-            expect.objectContaining({alphaMode: Constants.ALPHA_ADD, side: 2, map: json.textures[0].uuid}),
+            {
+                uuid: expect.any(String),
+                type: 'MeshBasicMaterial',
+                alphaMode: Constants.ALPHA_ADD,
+                alphaTest: 0.4,
+                depthWrite: true,
+                map: json.textures[0].uuid,
+            },
         ]);
         const loaded = new QuarksLoader(scene).parse(plain(json)) as Mesh;
         expect(loaded.getTotalVertices()).toBe(mesh.getTotalVertices());
@@ -235,6 +244,89 @@ describe('serializeEffect', () => {
         expect(json.object.children!.map((child) => child.name)).toEqual(['a', 'b']);
         const loaded = new QuarksLoader(scene).parse(plain(json));
         expect(loaded.getChildren().map((node) => node.name)).toEqual(['a', 'b']);
+    });
+
+    test('keeps the emitters under a mesh that is not drawn', () => {
+        const mesh = MeshBuilder.CreateBox('hidden', {}, scene);
+        mesh.isVisible = false;
+        system('child').emitter.parent = mesh;
+        const json = serializeEffect(mesh);
+        expect(json.object).toMatchObject({isVisible: false});
+        expect(json.object.visible).toBeUndefined();
+        const loaded = new QuarksLoader(scene).parse(plain(json)) as Mesh;
+        expect(loaded.isVisible).toBe(false);
+        expect((loaded.getChildren()[0] as ParticleEmitter).visible).toBe(true);
+    });
+
+    test('writes an unindexed mesh with its vertices in order', () => {
+        const mesh = new Mesh('soup', scene);
+        mesh.setVerticesData(VertexBuffer.PositionKind, [0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 1, 0, 2, 1, 0, 1, 2, 0]);
+        const json = serializeEffect(mesh);
+        expect(json.geometries[0].indices).toEqual([0, 1, 2, 3, 4, 5]);
+        const loaded = new QuarksLoader(scene).parse(plain(json)) as Mesh;
+        expect(loaded.getTotalVertices()).toBe(6);
+        expect(loaded.getTotalIndices()).toBe(6);
+
+        const warnings: string[] = [];
+        serializeEffect(new Mesh('empty', scene), {onWarning: (m) => warnings.push(m)});
+        expect(warnings).toEqual([expect.stringContaining('no vertices')]);
+    });
+
+    test('writes the geometry of cloned meshes once', () => {
+        const group = new TransformNode('group', scene);
+        const box = MeshBuilder.CreateBox('a', {}, scene);
+        box.parent = group;
+        box.clone('b', group);
+        const json = serializeEffect(group);
+        expect(json.geometries).toHaveLength(1);
+        expect(new Set(json.object.children!.map((child) => child.geometry)).size).toBe(1);
+    });
+
+    test('writes a texture a mesh and a system share once, whichever comes first', () => {
+        const texture = new Texture('https://example.com/a.png', scene);
+        const group = new TransformNode('group', scene);
+        const mesh = MeshBuilder.CreatePlane('plane', {}, scene);
+        mesh.material = new StandardMaterial('m', scene);
+        (mesh.material as StandardMaterial).diffuseTexture = texture;
+        mesh.parent = group;
+        system('fx', {texture}).emitter.parent = group;
+        const json = serializeEffect(group);
+        expect(json.textures).toHaveLength(1);
+        expect(json.materials.find((m) => m.type === 'MeshBasicMaterial')!.map).toBe(json.textures[0].uuid);
+    });
+
+    test('writes image urls through imageUrl', () => {
+        const ps = system('fx', {texture: new Texture('fx/tex/a.png', scene)});
+        const json = serializeEffect(ps.emitter, {imageUrl: (texture) => texture.url!.replace(/^fx\//, '')});
+        expect(json.images).toEqual([{uuid: 'quarks_image_1', url: 'tex/a.png'}]);
+        const dropped = serializeEffect(ps.emitter, {imageUrl: () => null, onWarning: () => {}});
+        expect(dropped.images).toEqual([]);
+    });
+
+    test('warns about links to nodes it does not write', () => {
+        const target = system('target');
+        const parent = system('parent');
+        parent.addBehavior(new EmitSubParticleSystem(parent, false, target.emitter, SubParticleEmitMode.Death));
+        const warnings: string[] = [];
+        serializeEffect(parent.emitter, {onWarning: (m) => warnings.push(m)});
+        expect(warnings).toEqual([expect.stringContaining('a sub emitter')]);
+    });
+
+    test('writes only the mesh material settings that differ from the defaults, and warns about colour', () => {
+        const mesh = MeshBuilder.CreatePlane('plane', {}, scene);
+        const material = new StandardMaterial('m', scene);
+        material.backFaceCulling = false;
+        material.alphaCutOff = 0;
+        material.disableDepthWrite = true;
+        mesh.material = material;
+        const warnings: string[] = [];
+        expect(serializeEffect(mesh, {onWarning: (m) => warnings.push(m)}).materials).toEqual([
+            {uuid: expect.any(String), type: 'MeshBasicMaterial'},
+        ]);
+        expect(warnings).toEqual([]);
+        material.alpha = 0.5;
+        serializeEffect(mesh, {onWarning: (m) => warnings.push(m)});
+        expect(warnings).toEqual([expect.stringContaining('alpha and colours')]);
     });
 
     test('writes a disabled node as not visible', () => {
