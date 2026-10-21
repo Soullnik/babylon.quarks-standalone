@@ -175,21 +175,20 @@ const VARIANTS: Array<[string, ParticleSystemParameters]> = [
     ['beam', {renderMode: RenderMode.Beam}],
 ];
 
-/** Runtime state and per-frame scratch, not settings. */
-const RUNTIME_FIELDS = new Set([
-    'temp',
-    'temp2',
-    'temp3',
-    'tempQ',
-    'rotation',
-    'indexCount',
-    'memory',
-    'magnitudeValue',
-    'uuid',
-]);
+/** Per-frame scratch any class may keep, and per-particle generator memory: not settings. */
+const SCRATCH_FIELDS = new Set(['temp', 'temp2', 'temp3', 'tempQ', 'memory']);
+
+/** Runtime state particular to one class, left out for that class only. */
+const RUNTIME_FIELDS: Record<string, string[]> = {
+    OrbitOverLife: ['rotation'],
+    FrameOverLife: ['indexCount'],
+};
+
+const isRuntime = (owner: object, key: string) =>
+    SCRATCH_FIELDS.has(key) || key === 'uuid' || (RUNTIME_FIELDS[owner.constructor?.name] ?? []).includes(key);
 
 /** Babylon objects (textures, scenes, materials, nodes) are resources an effect refers to. */
-const isBabylon = (value: object): value is {getClassName(): string; name?: string} =>
+const isBabylon = (value: object): value is {getClassName(): string; name?: string; url?: string} =>
     typeof (value as {getClassName?: unknown}).getClassName === 'function';
 
 function state(value: unknown, seen = new Set<object>()): unknown {
@@ -197,7 +196,7 @@ function state(value: unknown, seen = new Set<object>()): unknown {
         return typeof value === 'function' ? undefined : value;
     }
     if (isBabylon(value)) {
-        return {$babylon: value.getClassName(), name: value.name};
+        return {$babylon: value.getClassName(), name: value.name, url: value.url};
     }
     if (seen.has(value)) {
         return '[cycle]';
@@ -211,7 +210,7 @@ function state(value: unknown, seen = new Set<object>()): unknown {
     }
     const out: Record<string, unknown> = {$class: value.constructor?.name};
     for (const key of Object.keys(value).sort()) {
-        if (!RUNTIME_FIELDS.has(key) && !key.startsWith('_')) {
+        if (!isRuntime(value, key) && !key.startsWith('_')) {
             out[key] = state((value as Record<string, unknown>)[key], seen);
         }
     }
@@ -251,7 +250,7 @@ function reachable(value: unknown, out = new Set<object>()): Set<object> {
     }
     out.add(value);
     for (const [key, child] of Object.entries(value)) {
-        if (!RUNTIME_FIELDS.has(key)) {
+        if (!isRuntime(value, key)) {
             reachable(child, out);
         }
     }
@@ -295,6 +294,36 @@ describe('ParticleSystem serialisation contract', () => {
             original.dispose();
             copy.dispose();
         });
+
+        it('loads through QuarksLoader with the same settings', () => {
+            const original = make();
+            const meta: any = newMeta();
+            const systemJSON = original.toJSON(meta);
+            const images: unknown[] = [];
+            const textures: unknown[] = [];
+            for (const [uuid, tex] of Object.entries(meta.textures as Record<string, Texture>)) {
+                images.push({uuid: `img-${uuid}`, url: tex.url});
+                textures.push({uuid, image: `img-${uuid}`});
+            }
+            const document = JSON.parse(
+                JSON.stringify({
+                    images,
+                    textures,
+                    geometries: Object.values(meta.geometries),
+                    materials: Object.values(meta.materials),
+                    object: {uuid: 'emitter', type: 'ParticleEmitter', name: 'fx', ps: systemJSON},
+                })
+            );
+            const root = new QuarksLoader(scene).parse(document);
+            const loaded = (root as unknown as {system: ParticleSystem}).system;
+            expect(loaded).toBeInstanceOf(ParticleSystem);
+            // A loaded texture gets its name from the loader; its url says which image it is.
+            const strip = (s: Record<string, unknown>) =>
+                JSON.parse(JSON.stringify(s, (k, v) => (k === 'name' ? undefined : v)));
+            expect(strip(settings(loaded))).toEqual(strip(settings(original)));
+            original.dispose();
+            root.dispose();
+        });
     });
 
     it('sets every parameter in at least one variant', () => {
@@ -306,34 +335,5 @@ describe('ParticleSystem serialisation contract', () => {
             .map(([key]) => key)
             .filter((key) => !VARIANTS.some(([, overrides]) => key in overrides));
         expect(unset).toEqual([]);
-    });
-
-    it('loads through QuarksLoader with the same settings', () => {
-        const original = new ParticleSystem(parameters());
-        const meta: any = newMeta();
-        const systemJSON = original.toJSON(meta);
-        const images: unknown[] = [];
-        const textures: unknown[] = [];
-        for (const [uuid, tex] of Object.entries(meta.textures as Record<string, Texture>)) {
-            images.push({uuid: `img-${uuid}`, url: tex.url});
-            textures.push({uuid, image: `img-${uuid}`});
-        }
-        const document = JSON.parse(
-            JSON.stringify({
-                images,
-                textures,
-                geometries: Object.values(meta.geometries),
-                materials: Object.values(meta.materials),
-                object: {uuid: 'emitter', type: 'ParticleEmitter', name: 'fx', ps: systemJSON},
-            })
-        );
-        const root = new QuarksLoader(scene).parse(document);
-        const loaded = (root as unknown as {system: ParticleSystem}).system;
-        expect(loaded).toBeInstanceOf(ParticleSystem);
-        const strip = (s: Record<string, unknown>) =>
-            JSON.parse(JSON.stringify(s, (k, v) => (k === 'name' ? undefined : v)));
-        expect(strip(settings(loaded))).toEqual(strip(settings(original)));
-        original.dispose();
-        root.dispose();
     });
 });

@@ -1,33 +1,43 @@
 import {
     ApplyForce,
+    AxisAngleGenerator,
     Behavior,
+    BehaviorTypes,
     Bezier,
     ColorOverLife,
     ConstantValue,
+    createSeededRandom,
     ForceOverLife,
     FrameOverLife,
     Gradient,
     GravityForce,
+    InheritVelocity,
     IntervalValue,
     IParticleSystem,
     LimitSpeedOverLife,
     Matrix4,
+    Noise,
     OrbitOverLife,
     PiecewiseBezier,
+    Quaternion,
+    Rotation3DOverLife,
     RotationBySpeed,
     RotationOverLife,
     SizeOverLife,
     SpeedOverLife,
     SpriteParticle,
+    TurbulenceField,
     Vector3,
     VelocityOverLife,
+    withRandomSource,
 } from '../../src';
 
 /**
  * quarks.core does not fix the step: an engine may call `update` at 30, 60 or 144 Hz. A behavior
  * that changes something over time must reach the same state after one second whatever the step,
  * up to the error of a first-order step. Each case runs one particle for {@link SECONDS} at every
- * rate in {@link RATES} and compares the result with a fine-stepped reference.
+ * rate in {@link RATES}, through `update` and through `updateAll` (which ParticleSystem calls when
+ * a behavior has it), and compares the result with a fine-stepped reference.
  */
 const SECONDS = 1;
 const LIFE = 2;
@@ -37,8 +47,20 @@ const REFERENCE_RATE = 960;
 const system = {
     worldSpace: false,
     emitter: {matrixWorld: new Matrix4()},
-    emitterVelocity: undefined,
+    emitterVelocity: new Vector3(0, 0, 2),
 } as unknown as IParticleSystem;
+
+/** Behaviors with nothing that runs over time, or that need a whole system to run. */
+const EXEMPT: Record<string, string> = {
+    ApplyCollision: 'bounces off what the host resolver reports; nothing integrates over time',
+    ApplySequences: 'places particles from a texture at emission',
+    ChangeEmitDirection: 'turns the velocity once, at emission',
+    // Until they read the current speed, as Unity's modules do, nothing they set changes over time.
+    ColorBySpeed: 'reads the start speed',
+    SizeBySpeed: 'reads the start speed',
+    EmitSubParticleSystem: 'emits into another system; the sub-emitter tests cover its timing',
+    WidthOverLength: 'shapes a trail along its length, not over time',
+};
 
 /** A linear ramp over the particle's life, from `from` to `to`. */
 const ramp = (from: number, to: number) =>
@@ -56,7 +78,11 @@ interface Case {
     tolerance?: number;
     /** How long to run, for a behavior whose state settles within the default second. */
     seconds?: number;
+    /** Rotate the particle by quaternion, as a mesh particle does, instead of by an angle. */
+    quaternion?: boolean;
 }
+
+type Path = 'update' | 'updateAll';
 
 const velocity = (p: SpriteParticle) => [p.velocity.x, p.velocity.y, p.velocity.z];
 const position = (p: SpriteParticle) => [p.position.x, p.position.y, p.position.z];
@@ -79,7 +105,7 @@ const CASES: Record<string, Case> = {
     VelocityOverLife: {
         behavior: () => new VelocityOverLife(ramp(0, 3), new ConstantValue(1), new ConstantValue(0)),
         read: position,
-        tolerance: 0.05,
+        tolerance: 0.01,
     },
     OrbitOverLife: {
         behavior: () => new OrbitOverLife(ramp(1, 3), new Vector3(0, 1, 0)),
@@ -89,6 +115,30 @@ const CASES: Record<string, Case> = {
     RotationOverLife: {
         behavior: () => new RotationOverLife(new ConstantValue(2)),
         read: (p) => [p.rotation as number],
+    },
+    Rotation3DOverLife: {
+        behavior: () => new Rotation3DOverLife(new AxisAngleGenerator(new Vector3(0, 0, 1), new ConstantValue(2))),
+        read: (p) => {
+            const q = p.rotation as Quaternion;
+            return [q.x, q.y, q.z, q.w];
+        },
+        quaternion: true,
+    },
+    InheritVelocity: {
+        behavior: () => new InheritVelocity(new ConstantValue(0.5), 'current'),
+        read: position,
+    },
+    Noise: {
+        behavior: () =>
+            new Noise(new ConstantValue(1), new ConstantValue(1), new ConstantValue(1), new ConstantValue(1)),
+        read: (p) => [...position(p), p.rotation as number],
+        // The field moves fast, so the one-step lag of a coarse step shows most here.
+        tolerance: 0.25,
+    },
+    TurbulenceField: {
+        behavior: () => new TurbulenceField(new Vector3(1, 1, 1), 2, new Vector3(2, 2, 2), new Vector3(0.5, 0.5, 0.5)),
+        read: velocity,
+        tolerance: 0.15,
     },
     RotationBySpeed: {
         behavior: () => new RotationBySpeed(new ConstantValue(2), new IntervalValue(0, 10)),
@@ -132,46 +182,74 @@ const CASES: Record<string, Case> = {
     },
 };
 
-function simulate(make: () => Behavior, rate: number, seconds = SECONDS): SpriteParticle {
-    const behavior = make();
-    const particle = new SpriteParticle();
-    particle.life = LIFE;
-    particle.age = 0;
-    particle.position.set(1, 0, 0);
-    particle.velocity.set(4, 0, 0);
-    particle.startSize.set(1, 1, 1);
-    particle.size.set(1, 1, 1);
-    particle.startColor.set(1, 1, 1, 1);
-    particle.color.set(1, 1, 1, 1);
-    behavior.initialize(particle, system);
+function simulate(test: Case, rate: number, path: Path = 'update'): SpriteParticle {
+    // Noise and TurbulenceField roll their fields at random; every run rolls the same ones.
+    return withRandomSource(createSeededRandom(7), () => {
+        const behavior = test.behavior();
+        const particle = new SpriteParticle();
+        particle.life = LIFE;
+        particle.age = 0;
+        particle.position.set(1, 0, 0);
+        particle.velocity.set(4, 0, 0);
+        particle.startSize.set(1, 1, 1);
+        particle.size.set(1, 1, 1);
+        particle.startColor.set(1, 1, 1, 1);
+        particle.color.set(1, 1, 1, 1);
+        if (test.quaternion) {
+            particle.rotation = new Quaternion();
+        }
+        behavior.initialize(particle, system);
 
-    // The order ParticleSystem steps in: behaviors, then motion, then age.
-    const delta = 1 / rate;
-    for (let step = 0; step < Math.round(seconds * rate); step++) {
-        behavior.frameUpdate(delta);
-        behavior.update(particle, delta);
-        particle.position.addScaledVector(particle.velocity, delta * particle.speedModifier);
-        particle.age += delta;
-    }
-    return particle;
+        // The order ParticleSystem steps in: behaviors, then motion, then age.
+        const delta = 1 / rate;
+        for (let step = 0; step < Math.round((test.seconds ?? SECONDS) * rate); step++) {
+            behavior.frameUpdate(delta);
+            if (path === 'updateAll' && behavior.updateAll) {
+                behavior.updateAll([particle], 1, delta);
+            } else {
+                behavior.update(particle, delta);
+            }
+            particle.position.addScaledVector(particle.velocity, delta * particle.speedModifier);
+            particle.age += delta;
+        }
+        return particle;
+    });
 }
 
 describe('behaviors are frame-rate independent', () => {
+    test('covers every behavior type, or says why not', () => {
+        const missing = Object.keys(BehaviorTypes).filter((type) => !(type in CASES) && !(type in EXEMPT));
+        expect(missing).toEqual([]);
+    });
+
     describe.each(Object.keys(CASES))('%s', (name) => {
-        const {behavior, read, tolerance = 0.02, seconds} = CASES[name];
-        const reference = read(simulate(behavior, REFERENCE_RATE, seconds));
+        const test_ = CASES[name];
+        const tolerance = test_.tolerance ?? 0.02;
+        const reference = test_.read(simulate(test_, REFERENCE_RATE));
 
         test('changes the state it is read on', () => {
-            const idle = () => new ApplyForce(new Vector3(0, 1, 0), new ConstantValue(0));
-            expect(reference).not.toEqual(read(simulate(idle, REFERENCE_RATE, seconds)));
+            const idle: Case = {
+                ...test_,
+                behavior: () => new ApplyForce(new Vector3(0, 1, 0), new ConstantValue(0)),
+            };
+            expect(reference).not.toEqual(test_.read(simulate(idle, REFERENCE_RATE)));
         });
 
-        test.each(RATES)('%i Hz matches the reference', (rate) => {
-            const values = read(simulate(behavior, rate, seconds));
-            values.forEach((value, i) => {
-                const allowed = Math.max(1e-3, Math.abs(reference[i]) * tolerance);
-                expect(Math.abs(value - reference[i])).toBeLessThanOrEqual(allowed);
-            });
+        test('lands closer to the reference as the step shrinks', () => {
+            const error = (rate: number) =>
+                Math.max(...test_.read(simulate(test_, rate)).map((value, i) => Math.abs(value - reference[i])));
+            expect(error(RATES[RATES.length - 1])).toBeLessThanOrEqual(Math.max(error(RATES[0]) * 0.5, 1e-3));
         });
+
+        test.each(RATES.flatMap((rate) => (['update', 'updateAll'] as Path[]).map((path) => [rate, path] as const)))(
+            '%i Hz through %s matches the reference',
+            (rate, path) => {
+                const values = test_.read(simulate(test_, rate, path));
+                values.forEach((value, i) => {
+                    const allowed = Math.max(1e-3, Math.abs(reference[i]) * tolerance);
+                    expect(Math.abs(value - reference[i])).toBeLessThanOrEqual(allowed);
+                });
+            }
+        );
     });
 });

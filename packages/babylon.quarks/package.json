@@ -35,7 +35,6 @@
         "build": "npm run clean && npm run build:types && npm run build:js",
         "test": "jest",
         "docs": "typedoc",
-        "test:coverage": "jest --coverage",
         "prettier": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\""
     },
     "repository": {

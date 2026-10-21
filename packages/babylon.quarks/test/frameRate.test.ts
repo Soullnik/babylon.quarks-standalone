@@ -118,24 +118,31 @@ describe('frame-rate independence', () => {
         }
     });
 
-    test.each(RATES)('a one-shot finishes at the same time at %i Hz', (rate) => {
+    /** When the one-shot fires `finished`, and how often, updating at `rate` Hz for 4 s. */
+    function finish(rate: number): {at?: number; count: number; left: number} {
         const ps = system();
-        let finishedAt: number | undefined;
-        let finishedCount = 0;
+        const result: {at?: number; count: number; left: number} = {count: 0, left: 0};
         let time = 0;
         ps.addEventListener('finished', () => {
-            finishedAt ??= time;
-            finishedCount++;
+            result.at ??= time;
+            result.count++;
         });
         for (let frame = 0; frame < 4 * rate; frame++) {
             time += 1 / rate;
             ps.update(1 / rate);
         }
-        expect(finishedCount).toBe(1);
+        result.left = ps.particleNum;
+        return result;
+    }
+
+    test.each(RATES)('a one-shot finishes within a frame of 60 Hz at %i Hz', (rate) => {
+        const baseline = finish(BASELINE);
         // The last particle can live 1.5 s past the 1 s of emission; finishing waits for it.
-        expect(finishedAt).toBeGreaterThan(1);
-        expect(finishedAt).toBeLessThanOrEqual(2.5 + 1 / rate);
-        expect(ps.particleNum).toBe(0);
+        expect(baseline.at).toBeGreaterThan(1);
+        const result = finish(rate);
+        expect(result.count).toBe(1);
+        expect(result.left).toBe(0);
+        expect(Math.abs(result.at! - baseline.at!)).toBeLessThanOrEqual(Math.max(1 / rate, 1 / BASELINE) + 1e-9);
     });
 
     test.each(RATES)('pausing at %i Hz holds the particles and resumes where it stopped', (rate) => {

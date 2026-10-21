@@ -3174,9 +3174,14 @@ export class ParticleSystem implements IParticleSystem {
             copy.tint = this.tint.clone();
         }
         copy.emissionMultiplier = this.emissionMultiplier;
-        if (this.beamEnd) {
-            // A point is copied; a node the beam follows stays the same node.
-            copy.beamEnd = 'getAbsolutePosition' in this.beamEnd ? this.beamEnd : {...this.beamEnd};
+        const beamEnd = this.beamEnd;
+        if (beamEnd) {
+            // A node the beam follows stays the same node. A point is copied by value: a Babylon
+            // Vector3 keeps x/y/z behind getters, which a spread would drop.
+            copy.beamEnd =
+                typeof (beamEnd as {getAbsolutePosition?: unknown}).getAbsolutePosition === 'function'
+                    ? beamEnd
+                    : {x: (beamEnd as Vector3).x, y: (beamEnd as Vector3).y, z: (beamEnd as Vector3).z};
         }
         return copy;
     }

@@ -256,12 +256,15 @@ function fragmentFor(behavior: Behavior, k: number): Fragment | null {
             };
         case 'ApplyForce':
             return {
-                setup: `const b${k} = behaviors[${k}];
-                    const f${k} = b${k}.magnitudeValue * delta;
-                    const dx${k} = b${k}.direction.x * f${k};
-                    const dy${k} = b${k}.direction.y * f${k};
-                    const dz${k} = b${k}.direction.z * f${k};`,
-                body: `vel[o3] += dx${k}; vel[o3 + 1] += dy${k}; vel[o3 + 2] += dz${k};`,
+                // The magnitude is rolled per particle; a constant one is read once.
+                setup: `const d${k} = behaviors[${k}].direction;
+                    const dx${k} = d${k}.x, dy${k} = d${k}.y, dz${k} = d${k}.z;
+                    ${scalarSetup(`g${k}`, `behaviors[${k}].magnitude`)}`,
+                body: `{
+                        ${scalarValue(`g${k}`, 'm', 't')}
+                        const s = m * delta;
+                        vel[o3] += dx${k} * s; vel[o3 + 1] += dy${k} * s; vel[o3 + 2] += dz${k} * s;
+                    }`,
             };
         case 'RotationOverLife':
             return {

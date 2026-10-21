@@ -128,6 +128,34 @@ describe('beam review fixes', () => {
         expect(velocities(renderer)[2]).toBeCloseTo(3);
     });
 
+    describe('clone()', () => {
+        it.each([
+            ['a quarks Vector3', () => new Vector3(1, 2, 3)],
+            ['a Babylon Vector3', () => new BVector3(1, 2, 3)],
+            ['a plain point', () => ({x: 1, y: 2, z: 3})],
+        ])('copies %s end by value', (_, end) => {
+            const system = beam();
+            const point = end();
+            system.beamEnd = point;
+            const copy = system.clone();
+            expect(copy.beamEnd).not.toBe(point);
+            const out = new Vector3();
+            expect(copy.getBeamEnd(out)).toBe(true);
+            expect([out.x, out.y, out.z]).toEqual([1, 2, 3]);
+            point.x = 9;
+            copy.getBeamEnd(out);
+            expect(out.x).toBe(1);
+        });
+
+        it('keeps following the same node', () => {
+            const system = beam();
+            const node = new TransformNode('cloneEnd', scene);
+            system.beamEnd = node;
+            expect(system.clone().beamEnd).toBe(node);
+            node.dispose();
+        });
+    });
+
     it('ignores flip, so U always runs from the particle to the end', () => {
         const renderer = new BatchedRenderer('flip', scene);
         const system = beam();

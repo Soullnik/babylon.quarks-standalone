@@ -73,25 +73,24 @@ import {
     WidthOverLength,
 } from '../src';
 
+/** Per-frame scratch any class may keep, and per-particle generator memory: not settings. */
+const SCRATCH_FIELDS = new Set(['temp', 'temp2', 'temp3', 'tempQ', 'memory']);
+
 /**
- * Fields that hold scratch or runtime state, not settings: left out of the comparison. `resolver`
- * is the host's collision resolver, shared on purpose; `generator` and `timeOffset` are
- * TurbulenceField's noise permutation and phase, rolled per instance (see `ParticleSystem.seed`), and
- * `magnitudeValue` is ApplyForce's roll of its magnitude.
+ * Runtime state particular to one class, left out of the comparison for that class only, so a
+ * setting with the same name elsewhere (a shape transform's `rotation`) is still compared.
+ * `resolver` is the host's collision resolver, shared on purpose; `generator` and `timeOffset` are
+ * TurbulenceField's noise permutation and phase, rolled per instance (see `ParticleSystem.seed`).
  */
-const RUNTIME_FIELDS = new Set([
-    'temp',
-    'temp2',
-    'temp3',
-    'tempQ',
-    'rotation',
-    'indexCount',
-    'memory',
-    'resolver',
-    'generator',
-    'timeOffset',
-    'magnitudeValue',
-]);
+const RUNTIME_FIELDS: Record<string, string[]> = {
+    OrbitOverLife: ['rotation'],
+    FrameOverLife: ['indexCount'],
+    ApplyCollision: ['resolver'],
+    TurbulenceField: ['generator', 'timeOffset'],
+};
+
+const isRuntime = (owner: object, key: string) =>
+    SCRATCH_FIELDS.has(key) || (RUNTIME_FIELDS[owner.constructor?.name] ?? []).includes(key);
 
 /** The instance's settings as plain data: class names, own fields and values, cycles cut. */
 function state(value: unknown, seen = new Set<object>()): unknown {
@@ -110,7 +109,7 @@ function state(value: unknown, seen = new Set<object>()): unknown {
     }
     const out: Record<string, unknown> = {$class: value.constructor?.name};
     for (const key of Object.keys(value).sort()) {
-        if (!RUNTIME_FIELDS.has(key) && !key.startsWith('_')) {
+        if (!isRuntime(value, key) && !key.startsWith('_')) {
             out[key] = state((value as Record<string, unknown>)[key], seen);
         }
     }
@@ -127,7 +126,7 @@ function reachable(value: unknown, out = new Set<object>()): Set<object> {
     }
     out.add(value);
     for (const [key, child] of Object.entries(value)) {
-        if (!RUNTIME_FIELDS.has(key)) {
+        if (!isRuntime(value, key)) {
             reachable(child, out);
         }
     }
@@ -369,7 +368,7 @@ describe('serialisation contract', () => {
     });
 });
 
-describe('files written before 0.27', () => {
+describe('files written before 0.28', () => {
     it('loads a texture sequencer that has no type and an object position', () => {
         const behavior = BehaviorFromJSON(
             {

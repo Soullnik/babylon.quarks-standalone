@@ -16,7 +16,7 @@ export class TextureSequencer implements Sequencer {
     }
 
     static fromJSON(json: any): Sequencer {
-        // Before 0.27 the position was written as a Vector3 object ({x, y, z}) instead of an array.
+        // Before 0.28 the position was written as a Vector3 object ({x, y, z}) instead of an array.
         const p = json.position;
         const position = Array.isArray(p)
             ? new Vector3(p[0], p[1], p[2])

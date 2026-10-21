@@ -5,7 +5,6 @@
     "moduleFileExtensions": ["ts", "tsx", "js"],
     "coveragePathIgnorePatterns": ["/node_modules/", "/test/"],
     "extensionsToTreatAsEsm": [".ts"],
-    "collectCoverageFrom": ["src/**/*.{js,ts}", "!src/index.ts", "!src/shaders/index.ts"],
     "transformIgnorePatterns": ["/node_modules/(?!@babylonjs)"],
     "transform": {
         "^.+\\.(ts|tsx)$": [

@@ -6,6 +6,7 @@ import {
     ColorBySpeed,
     ColorOverLife,
     ConstantValue,
+    createSeededRandom,
     ForceOverLife,
     FrameOverLife,
     Gradient,
@@ -32,6 +33,7 @@ import {
     Vector3Function,
     VelocityOverLife,
     WidthOverLength,
+    withRandomSource,
 } from '../../src';
 
 const system = {
@@ -338,14 +340,20 @@ describe('behavior fusion', () => {
             new ColorBySpeed(new Gradient(), new IntervalValue(0, 5)),
             new SizeBySpeed(new PiecewiseBezier([[new Bezier(1, 0.8, 0.4, 0), 0]]), new IntervalValue(0, 5)),
             new RotationBySpeed(new ConstantValue(2), new IntervalValue(0, 5)),
+            new ApplyForce(new Vector3(1, 0, 0), new IntervalValue(1, 3)),
         ];
         const fusedBehaviors = build();
         const separateBehaviors = build();
         const fused = makePool(COUNT);
         const separate = makePool(COUNT);
         for (const p of [...fused, ...separate]) p.startSpeed = 1 + p.position.x * 0.3;
-        for (const p of fused) for (const b of fusedBehaviors) b.initialize(p, system);
-        for (const p of separate) for (const b of separateBehaviors) b.initialize(p, system);
+        // Both pools roll the same per-particle force.
+        withRandomSource(createSeededRandom(3), () => {
+            for (const p of fused) for (const b of fusedBehaviors) b.initialize(p, system);
+        });
+        withRandomSource(createSeededRandom(3), () => {
+            for (const p of separate) for (const b of separateBehaviors) b.initialize(p, system);
+        });
 
         expect(planBehaviorFusion(fusedBehaviors)).toHaveLength(1);
 
