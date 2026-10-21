@@ -1,10 +1,10 @@
-import type {TransformNode} from '@babylonjs/core/Meshes/transformNode';
-import type {Scene} from '@babylonjs/core/scene';
+import type {TransformNode} from '@babylonjs/core/Meshes/transformNode.js';
+import type {Scene} from '@babylonjs/core/scene.js';
 import {ArrowPathIcon, ForwardIcon, PauseIcon, PlayIcon, RectangleGroupIcon} from '@heroicons/react/24/solid';
 import type {BatchedRenderer, ParticleSystem} from 'babylon.quarks';
 import React, {useMemo, useRef, useState} from 'react';
-import type {EffectBinding} from '../core/binding';
-import {groupNodes} from '../core/groups';
+import type {EffectBinding} from '../core/binding.js';
+import {groupNodes} from '../core/groups.js';
 import {
     clearFocusFinished,
     getFocusElapsed,
@@ -12,15 +12,15 @@ import {
     markFocusFinished,
     setFocusElapsed,
     type PlaybackState,
-} from '../core/playback';
-import {pauseFocus, playFocus, scrubFocusTo, scrubFocusToSettled} from '../core/scrub';
-import {computeTimelineRows, computeTimelineSpan} from '../core/timeline';
-import {PLAYBACK_SPEEDS, restartFocusPlayback, toggleStagePlayback} from '../core/transport';
-import {TimelineTrackRow} from './TimelineTrackRow';
-import {iconStyle} from './icons';
-import {buttonStyle, theme} from './theme';
+} from '../core/playback.js';
+import {pauseFocus, playFocus, scrubFocusTo, scrubFocusToSettled} from '../core/scrub.js';
+import {computeTimelineRows, computeTimelineSpan} from '../core/timeline.js';
+import {PLAYBACK_SPEEDS, restartFocusPlayback, toggleStagePlayback} from '../core/transport.js';
+import {TimelineTrackRow} from './TimelineTrackRow.js';
+import {iconStyle} from './icons.js';
+import {buttonStyle, theme} from './theme.js';
 
-export type {PlaybackState} from '../core/playback';
+export type {PlaybackState} from '../core/playback.js';
 
 export interface TimelinePanelProps {
     binding: EffectBinding;

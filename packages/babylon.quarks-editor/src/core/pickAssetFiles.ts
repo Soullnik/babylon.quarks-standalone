@@ -1,4 +1,4 @@
-import {isAssetImportFile, relativePathOf} from './assets';
+import {isAssetImportFile, relativePathOf} from './assets.js';
 
 interface DirectoryPickerWindow {
     showDirectoryPicker?: (options?: {mode?: 'read' | 'readwrite'}) => Promise<FileSystemDirectoryHandle>;

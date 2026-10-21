@@ -10,6 +10,13 @@ and the project follows the `quarks.core` 0.x version line.
 
 - Renderer module, trails: "Tessellation" and "Curve tension".
 
+### Fixed
+
+- **Node ESM and webpack 5 could not import the package.** `dist` was compiled with relative and
+  `@babylonjs` deep imports that had no file extension. Every import now ends in `.js`.
+- The `babylon.quarks` peer range was `>=0.17.0`, but the editor needs 0.26 APIs (beam mode,
+  rim fade, culling and sort settings). It is now `~0.26.0`.
+
 ## [0.26.0] — 2026-10-21
 
 ### Added

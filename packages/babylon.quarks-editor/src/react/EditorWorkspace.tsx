@@ -1,10 +1,10 @@
 import React, {useEffect, useMemo, useState} from 'react';
 import {createRoot} from 'react-dom/client';
-import {IndexedDbProjectStore} from '../core/indexedDbProjectStore';
-import type {ProjectMeta, ProjectStore} from '../core/projectStore';
-import {EffectEditorHost, type EffectEditorHostProps} from './EffectEditorHost';
-import {ProjectsPage} from './ProjectsPage';
-import {theme} from './theme';
+import {IndexedDbProjectStore} from '../core/indexedDbProjectStore.js';
+import type {ProjectMeta, ProjectStore} from '../core/projectStore.js';
+import {EffectEditorHost, type EffectEditorHostProps} from './EffectEditorHost.js';
+import {ProjectsPage} from './ProjectsPage.js';
+import {theme} from './theme.js';
 
 export interface EditorWorkspaceProps extends Omit<EffectEditorHostProps, 'project' | 'onExitProject' | 'effectJson'> {
     /** Where projects are kept; defaults to the browser's IndexedDB. */

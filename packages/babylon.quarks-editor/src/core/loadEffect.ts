@@ -1,6 +1,6 @@
-import {TransformNode} from '@babylonjs/core/Meshes/transformNode';
-import type {Node} from '@babylonjs/core/node';
-import type {Scene} from '@babylonjs/core/scene';
+import {TransformNode} from '@babylonjs/core/Meshes/transformNode.js';
+import type {Node} from '@babylonjs/core/node.js';
+import type {Scene} from '@babylonjs/core/scene.js';
 import type {BatchedRenderer, ParticleSystem} from 'babylon.quarks';
 import {ParticleEmitter, QuarksLoader, QuarksUtil} from 'babylon.quarks';
 

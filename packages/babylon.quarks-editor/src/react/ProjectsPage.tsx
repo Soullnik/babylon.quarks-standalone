@@ -1,11 +1,11 @@
 import {ArrowLeftIcon, FolderIcon, PlusIcon} from '@heroicons/react/24/solid';
 import React, {useCallback, useEffect, useState} from 'react';
-import {formatBytes, type ProjectMeta, type ProjectStore, type StorageEstimate} from '../core/projectStore';
-import {ChoiceDialog} from './ChoiceDialog';
-import {ContextMenu, type ContextMenuItem} from './ContextMenu';
-import {iconStyle} from './icons';
-import {PromptDialog} from './PromptDialog';
-import {buttonStyle, globalEditorStyles, theme} from './theme';
+import {formatBytes, type ProjectMeta, type ProjectStore, type StorageEstimate} from '../core/projectStore.js';
+import {ChoiceDialog} from './ChoiceDialog.js';
+import {ContextMenu, type ContextMenuItem} from './ContextMenu.js';
+import {iconStyle} from './icons.js';
+import {PromptDialog} from './PromptDialog.js';
+import {buttonStyle, globalEditorStyles, theme} from './theme.js';
 
 export interface ProjectsPageProps {
     store: ProjectStore;

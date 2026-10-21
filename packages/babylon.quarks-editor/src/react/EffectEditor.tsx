@@ -1,7 +1,7 @@
-import type {TransformNode} from '@babylonjs/core/Meshes/transformNode';
+import type {TransformNode} from '@babylonjs/core/Meshes/transformNode.js';
 import type {ParticleSystem} from 'babylon.quarks';
 import React, {useEffect, useSyncExternalStore} from 'react';
-import {EffectBinding} from '../core/binding';
+import {EffectBinding} from '../core/binding.js';
 import {
     CollisionModule,
     ColorBySpeedModule,
@@ -22,8 +22,8 @@ import {
     TurbulenceModule,
     VelocityOverLifeModule,
     WidthOverTrailModule,
-} from './behaviorModules';
-import type {GeometryData, GeometryOption, TextureOption} from './modules';
+} from './behaviorModules.js';
+import type {GeometryData, GeometryOption, TextureOption} from './modules.js';
 import {
     ColorOverLifeModule,
     EmissionModule,
@@ -31,10 +31,10 @@ import {
     RendererModule,
     ShapeModule,
     SizeOverLifeModule,
-} from './modules';
-import {ObjectModule} from './ObjectModule';
-import {SubEmittersModule} from './SubEmittersModule';
-import {theme} from './theme';
+} from './modules.js';
+import {ObjectModule} from './ObjectModule.js';
+import {SubEmittersModule} from './SubEmittersModule.js';
+import {theme} from './theme.js';
 
 export interface EffectEditorProps {
     binding: EffectBinding;

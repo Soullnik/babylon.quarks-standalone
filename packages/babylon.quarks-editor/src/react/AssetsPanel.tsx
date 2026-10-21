@@ -7,7 +7,7 @@ import {
     SparklesIcon,
 } from '@heroicons/react/24/solid';
 import React, {useCallback, useMemo, useRef, useState} from 'react';
-import {setAssetDragSession} from '../core/assetDragSession';
+import {setAssetDragSession} from '../core/assetDragSession.js';
 import {
     buildAssetTree,
     collectFolderAssets,
@@ -17,11 +17,11 @@ import {
     type AssetDragPayload,
     type AssetTreeFolder,
     type AssetTreeNode,
-} from '../core/assetTree';
-import {assetIconUrl, type AssetLoadProgress, type EffectAsset} from '../core/assets';
-import {ContextMenu, type ContextMenuItem} from './ContextMenu';
-import {iconStyle} from './icons';
-import {buttonStyle, hiddenFileInputStyle, inputStyle, theme} from './theme';
+} from '../core/assetTree.js';
+import {assetIconUrl, type AssetLoadProgress, type EffectAsset} from '../core/assets.js';
+import {ContextMenu, type ContextMenuItem} from './ContextMenu.js';
+import {iconStyle} from './icons.js';
+import {buttonStyle, hiddenFileInputStyle, inputStyle, theme} from './theme.js';
 
 const TREE_WIDTH = 200;
 const TILE_WIDTH = 92;

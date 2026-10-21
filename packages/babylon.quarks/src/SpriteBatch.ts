@@ -55,6 +55,9 @@ export class SpriteBatch extends VFXBatch {
 
     /** Concretely typed handle on the batch material, see syncStretchedSpeedFactor. */
     private shaderMaterial: ShaderMaterial | null = null;
+    /** Cancels the pending rebuild for an env atlas that has not loaded yet. */
+    private cancelAtlasRebuild: (() => void) | null = null;
+    private disposed = false;
     /** The `'fixed'` mesh light, as shader uniforms; see applyMeshLighting. */
     private readonly fixedLightDirection = new BVector3();
     private readonly fixedLightColor = new BVector3();
@@ -326,11 +329,23 @@ export class SpriteBatch extends VFXBatch {
         }
         const atlas = this.settings.reflectionAtlas;
         const atlasPending = this.settings.renderMode === RenderMode.Mesh && !!atlas && !atlas.isReady();
+        this.cancelAtlasRebuild?.();
+        this.cancelAtlasRebuild = null;
         if (atlasPending && atlas) {
-            const onLoad = (atlas as {onLoadObservable?: {addOnce: (cb: () => void) => void}}).onLoadObservable;
-            onLoad?.addOnce(() => {
-                this.rebuildMaterial();
-            });
+            const onLoad = (
+                atlas as {
+                    onLoadObservable?: {addOnce: (cb: () => void) => unknown; remove: (observer: unknown) => boolean};
+                }
+            ).onLoadObservable;
+            if (onLoad) {
+                const observer = onLoad.addOnce(() => {
+                    this.cancelAtlasRebuild = null;
+                    if (!this.disposed) {
+                        this.rebuildMaterial();
+                    }
+                });
+                this.cancelAtlasRebuild = () => onLoad.remove(observer);
+            }
         }
         const useEnvAtlas = this.settings.renderMode === RenderMode.Mesh && !!atlas && atlas.isReady();
         if (useEnvAtlas) {
@@ -545,7 +560,12 @@ export class SpriteBatch extends VFXBatch {
         mat.needDepthPrePass = this.settings.materialDepthWrite;
         mat.forceDepthWrite = this.settings.materialDepthWrite;
         mat.disableDepthWrite = !this.settings.materialDepthWrite;
+        // 0 keeps the engine's depth function (LEQUAL); ALWAYS draws over everything, like ZTest Always.
+        mat.depthFunction = this.settings.materialDepthTest ? 0 : Constants.ALWAYS;
 
+        // A rebuild (an env atlas that finished loading) replaces the material; the old one and its
+        // bind observers go with it. Textures belong to the settings, so they stay.
+        this.shaderMaterial?.dispose(false, false);
         this.mesh.material = mat;
         this.shaderMaterial = mat;
     }
@@ -1333,6 +1353,9 @@ export class SpriteBatch extends VFXBatch {
     }
 
     dispose(): void {
+        this.disposed = true;
+        this.cancelAtlasRebuild?.();
+        this.cancelAtlasRebuild = null;
         if (this.mesh.material) {
             this.mesh.material.dispose();
         }

@@ -33,17 +33,17 @@ import {
     WidthOverLength,
 } from 'babylon.quarks';
 import React from 'react';
-import {EffectBinding} from '../core/binding';
-import {buildGradient, DEFAULT_GRADIENT_STOPS, findBehavior, readGradientStops} from '../core/colors';
-import {buildCurve, buildScalar, readPieces, readScalar} from '../core/values';
-import {CurveEditor} from './CurveEditor';
-import {CheckboxField, NumberField, Row, SelectField} from './fields';
-import {GradientEditor} from './GradientEditor';
-import {iconStyle} from './icons';
-import type {TextureOption} from './modules';
-import {ModuleSection} from './ModuleSection';
-import {theme} from './theme';
-import {ValueField} from './ValueField';
+import {EffectBinding} from '../core/binding.js';
+import {buildGradient, DEFAULT_GRADIENT_STOPS, findBehavior, readGradientStops} from '../core/colors.js';
+import {buildCurve, buildScalar, readPieces, readScalar} from '../core/values.js';
+import {CurveEditor} from './CurveEditor.js';
+import {CheckboxField, NumberField, Row, SelectField} from './fields.js';
+import {GradientEditor} from './GradientEditor.js';
+import {iconStyle} from './icons.js';
+import type {TextureOption} from './modules.js';
+import {ModuleSection} from './ModuleSection.js';
+import {theme} from './theme.js';
+import {ValueField} from './ValueField.js';
 
 interface ModuleProps {
     binding: EffectBinding;

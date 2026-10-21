@@ -1,5 +1,5 @@
 import type {BatchedRenderer, ParticleSystem} from 'babylon.quarks';
-import type {EffectBinding} from './binding';
+import type {EffectBinding} from './binding.js';
 
 const WIDE_STEP_THRESHOLD = 8;
 

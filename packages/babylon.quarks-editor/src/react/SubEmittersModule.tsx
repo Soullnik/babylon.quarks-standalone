@@ -1,11 +1,11 @@
 import type {ParticleEmitter, ParticleSystem} from 'babylon.quarks';
 import {EmitSubParticleSystem, SubParticleEmitMode} from 'babylon.quarks';
-import {EffectBinding} from '../core/binding';
-import {findBehavior} from '../core/colors';
-import {createChildSystem} from '../core/systems';
-import {ModuleSection} from './ModuleSection';
-import {CheckboxField, NumberField, Row, SelectField} from './fields';
-import {theme} from './theme';
+import {EffectBinding} from '../core/binding.js';
+import {findBehavior} from '../core/colors.js';
+import {createChildSystem} from '../core/systems.js';
+import {ModuleSection} from './ModuleSection.js';
+import {CheckboxField, NumberField, Row, SelectField} from './fields.js';
+import {theme} from './theme.js';
 
 /**
  * Sub Emitters module for the currently selected system. The spawned target lives as a

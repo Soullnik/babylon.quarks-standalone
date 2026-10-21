@@ -1,10 +1,10 @@
-import {Color3} from '@babylonjs/core/Maths/math.color';
-import {Vector3} from '@babylonjs/core/Maths/math.vector';
-import {LinesMesh} from '@babylonjs/core/Meshes/linesMesh';
-import {MeshBuilder} from '@babylonjs/core/Meshes/meshBuilder';
-import {TransformNode} from '@babylonjs/core/Meshes/transformNode';
-import type {Scene} from '@babylonjs/core/scene';
-import './lineShaders';
+import {Color3} from '@babylonjs/core/Maths/math.color.js';
+import {Vector3} from '@babylonjs/core/Maths/math.vector.js';
+import {LinesMesh} from '@babylonjs/core/Meshes/linesMesh.js';
+import {MeshBuilder} from '@babylonjs/core/Meshes/meshBuilder.js';
+import {TransformNode} from '@babylonjs/core/Meshes/transformNode.js';
+import type {Scene} from '@babylonjs/core/scene.js';
+import './lineShaders.js';
 
 export const GROUND_RING_RADIUS = 1.2;
 const RING_SEGMENTS = 64;

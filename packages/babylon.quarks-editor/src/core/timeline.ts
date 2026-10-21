@@ -1,8 +1,8 @@
-import type {TransformNode} from '@babylonjs/core/Meshes/transformNode';
+import type {TransformNode} from '@babylonjs/core/Meshes/transformNode.js';
 import type {FunctionValueGenerator, ParticleSystem, ValueGenerator} from 'babylon.quarks';
 import {ConstantValue, IntervalValue} from 'babylon.quarks';
-import type {EffectBinding} from './binding';
-import type {EffectTreeNode} from './effectTree';
+import type {EffectBinding} from './binding.js';
+import type {EffectTreeNode} from './effectTree.js';
 
 /** Guards against a literally zero-width ruler (e.g. no tracks yet) — not a usability stretch. */
 const MIN_TIMELINE_SPAN = 0.01;

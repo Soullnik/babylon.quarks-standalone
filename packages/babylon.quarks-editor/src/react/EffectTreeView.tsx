@@ -1,9 +1,9 @@
-import type {TransformNode} from '@babylonjs/core/Meshes/transformNode';
+import type {TransformNode} from '@babylonjs/core/Meshes/transformNode.js';
 import {ChevronDownIcon, ChevronRightIcon, FolderIcon, SparklesIcon} from '@heroicons/react/24/solid';
 import React, {useState} from 'react';
-import {buildEffectTree, type EffectTreeNode} from '../core/effectTree';
-import {iconStyle} from './icons';
-import {theme} from './theme';
+import {buildEffectTree, type EffectTreeNode} from '../core/effectTree.js';
+import {iconStyle} from './icons.js';
+import {theme} from './theme.js';
 
 export interface EffectTreeViewProps {
     root: TransformNode;

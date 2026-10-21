@@ -1,5 +1,5 @@
 import React, {useEffect} from 'react';
-import {buttonStyle, theme} from './theme';
+import {buttonStyle, theme} from './theme.js';
 
 export interface ChoiceDialogAction {
     label: string;

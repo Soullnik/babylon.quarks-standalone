@@ -1,4 +1,4 @@
-import {TransformNode} from '@babylonjs/core/Meshes/transformNode';
+import {TransformNode} from '@babylonjs/core/Meshes/transformNode.js';
 
 /**
  * Groups the given nodes under a new organizational TransformNode. Each node's world

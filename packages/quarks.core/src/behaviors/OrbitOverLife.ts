@@ -70,7 +70,7 @@ export class OrbitOverLife implements Behavior {
     }
 
     clone(): Behavior {
-        return new OrbitOverLife(this.orbitSpeed.clone());
+        return new OrbitOverLife(this.orbitSpeed.clone(), this.axis.clone());
     }
     reset(): void {}
 }

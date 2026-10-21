@@ -1,4 +1,4 @@
-import type {Texture} from '@babylonjs/core/Materials/Textures/texture';
+import type {Texture} from '@babylonjs/core/Materials/Textures/texture.js';
 
 const bakedUrls = new WeakMap<Texture, string>();
 

@@ -272,6 +272,10 @@ export interface ParticleSystemParameters {
     worldSpace?: boolean;
     blendMode?: number;
     transparent?: boolean;
+    /**
+     * Whether particles are hidden behind nearer geometry. `false` draws them over everything
+     * (Unity's `ZTest Always`), in every render mode. Default `true`.
+     */
     depthTest?: boolean;
     depthWrite?: boolean;
     alphaTest?: number;
@@ -1180,10 +1184,7 @@ export class ParticleSystem implements IParticleSystem {
             travelDistance: 0,
         };
 
-        this.emissionBursts.forEach((burst) => burst.count.startGen(this.memory));
-        this.emissionOverDistance.startGen(this.memory);
-        this.startDelay.startGen(this.memory);
-        this.startDelayTimeLeft = this.startDelay.genValue(this.memory, 0);
+        this.initSystemGenerators();
 
         this.emitEnded = false;
         this.markForDestroy = false;
@@ -1566,6 +1567,28 @@ export class ParticleSystem implements IParticleSystem {
         this.fire({type: 'destroy', particleSystem: this});
     }
 
+    /**
+     * Rolls the system-level generators into the system's memory. Called on construction and on
+     * every restart, which empties the memory: a generator that keeps a slot index into it, such
+     * as `IntervalValue`, would otherwise read past the end and return NaN. A seeded system rolls
+     * them on its own generator, so a restart replays the same rates, counts and delay.
+     */
+    private initSystemGenerators(): void {
+        const rng = this.rng;
+        const previous = rng === undefined ? undefined : setRandomSource(rng);
+        try {
+            this.emissionBursts.forEach((burst) => burst.count.startGen(this.memory));
+            this.emissionOverDistance.startGen(this.memory);
+            this.startDelay.startGen(this.memory);
+            this.startDelayTimeLeft = this.startDelay.genValue(this.memory, 0);
+            this.emissionOverTime.startGen(this.memory);
+        } finally {
+            if (rng !== undefined) {
+                setRandomSource(previous ?? null);
+            }
+        }
+    }
+
     restart() {
         this.memory.length = 0;
         this.paused = false;
@@ -1582,15 +1605,18 @@ export class ParticleSystem implements IParticleSystem {
         this.emissionState.burstWaves = undefined;
         this.emissionState.time = 0;
         this.emissionState.waitEmiting = 0;
+        // Forget where the emitter was: a restarted (or pooled and moved) system must not spawn
+        // emission-over-distance particles along the jump from its previous position.
+        this.emissionState.travelDistance = 0;
+        this.emissionState.previousWorldPos = undefined;
+        this.emissionState.burstParticleIndex = 0;
+        this.emissionState.burstParticleCount = 0;
         this.behaviors.forEach((behavior) => behavior.reset());
         this.emitEnded = false;
         this.markForDestroy = false;
         this.finishedEventFired = false;
         this.prewarmed = false;
-        this.emissionBursts.forEach((burst) => burst.count.startGen(this.memory));
-        this.emissionOverDistance.startGen(this.memory);
-        this.startDelay.startGen(this.memory);
-        this.startDelayTimeLeft = this.startDelay.genValue(this.memory, 0);
+        this.initSystemGenerators();
         this.previousEmitterPos = undefined;
         this.emitterVelocity.set(0, 0, 0);
         this.simulationAccumulator = 0;

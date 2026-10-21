@@ -8,6 +8,10 @@ const production = process.env.NODE_ENV === 'production';
 
 const babylonExternal = ['@babylonjs/core', /^@babylonjs\/core\/.*/];
 
+// @babylonjs/core is a `type: module` package without an `exports` map, so Node ESM, webpack 5
+// and TypeScript's node16/nodenext resolution need the file extension on deep imports.
+const babylonPaths = (id) => (id.startsWith('@babylonjs/core/') && !id.endsWith('.js') ? `${id}.js` : id);
+
 const typescriptPlugin = () =>
     typescript({
         tsconfig: './tsconfig.json',
@@ -26,11 +30,13 @@ export default [
                 file: 'dist/babylon.quarks.esm.js',
                 format: 'esm',
                 sourcemap: true,
+                paths: babylonPaths,
             },
             {
                 file: 'dist/babylon.quarks.cjs',
                 format: 'cjs',
                 sourcemap: true,
+                paths: babylonPaths,
             },
         ],
         external: babylonExternal,
@@ -54,10 +60,12 @@ export default [
     // single self-contained public declaration bundle.
     {
         input: 'dist-types/index.d.ts',
-        output: {
-            file: 'dist/types/index.d.ts',
-            format: 'es',
-        },
+        // The same bundle is written twice: `.d.ts` for `import` and `.d.cts` for `require`, so
+        // TypeScript reads each with the module kind of the file it describes.
+        output: [
+            {file: 'dist/types/index.d.ts', format: 'es', paths: babylonPaths},
+            {file: 'dist/types/index.d.cts', format: 'es', paths: babylonPaths},
+        ],
         external: babylonExternal,
         // respectExternal: inline everything (quarks.core) except the external list above
         plugins: [dts({respectExternal: true})],

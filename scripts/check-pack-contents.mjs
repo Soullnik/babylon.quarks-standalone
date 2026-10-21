@@ -1,5 +1,10 @@
-import {execSync} from 'node:child_process';
-import {readFileSync} from 'node:fs';
+import {execFileSync, execSync} from 'node:child_process';
+import {mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync} from 'node:fs';
+import {tmpdir} from 'node:os';
+import {dirname, join} from 'node:path';
+import {fileURLToPath} from 'node:url';
+
+const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
 
 /**
  * Validates that npm pack output contains publish-critical artifacts.
@@ -40,6 +45,115 @@ function assertNoRuntimeDependencies(packageDir) {
 }
 
 /**
+ * Peer dependencies the consumer project links from the repo's own node_modules, so the smoke
+ * test runs offline against the same versions the packages are built with.
+ */
+const PEERS = [
+    '@babylonjs/core',
+    '@babylonjs/materials',
+    '@heroicons/react',
+    '@tanstack/react-virtual',
+    'react',
+    'react-dom',
+];
+
+function run(command, args, cwd) {
+    try {
+        return execFileSync(command, args, {cwd, encoding: 'utf8', stdio: 'pipe'});
+    } catch (error) {
+        throw new Error(`${command} ${args.join(' ')} failed in ${cwd}:\n${error.stdout ?? ''}${error.stderr ?? ''}`);
+    }
+}
+
+/**
+ * Packs both workspaces for real, installs the tarballs into a throwaway consumer project and
+ * imports them the way consumers do: Node ESM `import`, Node CJS `require` and TypeScript with
+ * node16 resolution in both module kinds. Bundlers such as Vite resolve extensionless deep
+ * imports leniently and hide what breaks in Node, webpack 5 and SSR; this catches it.
+ */
+function assertConsumersCanImport() {
+    const consumer = mkdtempSync(join(tmpdir(), 'quarks-pack-'));
+    try {
+        const modules = join(consumer, 'node_modules');
+        for (const workspace of ['babylon.quarks', 'babylon.quarks-editor']) {
+            const [{filename}] = JSON.parse(
+                run('npm', ['pack', '--json', `--workspace=${workspace}`, `--pack-destination=${consumer}`], repoRoot)
+            );
+            const target = join(modules, workspace);
+            mkdirSync(target, {recursive: true});
+            run('tar', ['-xzf', join(consumer, filename), '-C', target, '--strip-components=1'], consumer);
+        }
+        for (const peer of PEERS) {
+            mkdirSync(dirname(join(modules, peer)), {recursive: true});
+            symlinkSync(join(repoRoot, 'node_modules', peer), join(modules, peer), 'dir');
+        }
+        writeFileSync(join(consumer, 'package.json'), JSON.stringify({name: 'consumer', private: true}));
+
+        const esm = `
+            const quarks = await import('babylon.quarks');
+            if (typeof quarks.BatchedRenderer !== 'function') throw new Error('babylon.quarks: no BatchedRenderer');
+            const editor = await import('babylon.quarks-editor');
+            if (typeof editor.EffectBinding !== 'function') throw new Error('babylon.quarks-editor: no EffectBinding');
+            const ui = await import('babylon.quarks-editor/react');
+            if (typeof ui.EditorWorkspace !== 'function') throw new Error('babylon.quarks-editor/react: no EditorWorkspace');`;
+        run(process.execPath, ['--input-type=module', '-e', esm], consumer);
+        // @babylonjs/core is ESM-only, so `require` works only where Node can require ES modules.
+        if (process.features.require_module) {
+            const cjs = `if (typeof require('babylon.quarks').BatchedRenderer !== 'function') throw new Error('no BatchedRenderer');`;
+            run(process.execPath, ['-e', cjs], consumer);
+        }
+
+        const usage = `import {BatchedRenderer} from 'babylon.quarks';
+import type {TransformNode} from '@babylonjs/core/Meshes/transformNode.js';
+import {EffectBinding} from 'babylon.quarks-editor';
+declare const renderer: BatchedRenderer;
+export const node: TransformNode = renderer;
+export const binding: typeof EffectBinding = EffectBinding;
+`;
+        writeFileSync(join(consumer, 'esm.mts'), usage);
+        writeFileSync(
+            join(consumer, 'cjs.cts'),
+            usage
+                .split('\n')
+                .filter((line) => !line.includes('quarks-editor') && !line.includes('binding'))
+                .join('\n')
+        );
+        const tsc = join(repoRoot, 'node_modules', 'typescript', 'bin', 'tsc');
+        writeFileSync(
+            join(consumer, 'tsconfig.json'),
+            JSON.stringify({
+                compilerOptions: {
+                    noEmit: true,
+                    strict: true,
+                    module: 'nodenext',
+                    moduleResolution: 'nodenext',
+                    target: 'es2020',
+                    lib: ['es2020', 'dom'],
+                    types: [],
+                },
+                files: ['esm.mts', 'cjs.cts'],
+            })
+        );
+        // skipLibCheck stays off so errors inside our declaration bundles surface; errors inside
+        // @babylonjs/core's own declarations (it needs @webgpu/types) are not ours and are ignored.
+        let typeErrors = '';
+        try {
+            run(process.execPath, [tsc, '-p', 'tsconfig.json'], consumer);
+        } catch (error) {
+            typeErrors = error.message
+                .split('\n')
+                .filter((line) => / error TS\d+/.test(line) && !line.includes('node_modules/@babylonjs/'))
+                .join('\n');
+        }
+        if (typeErrors) {
+            throw new Error(`Consumer type check failed:\n${typeErrors}`);
+        }
+    } finally {
+        rmSync(consumer, {recursive: true, force: true});
+    }
+}
+
+/**
  * Main entrypoint for pack verification script.
  */
 function main() {
@@ -62,6 +176,8 @@ function main() {
         'README.md',
     ]);
     assertNoRuntimeDependencies('babylon.quarks-editor');
+
+    assertConsumersCanImport();
 
     console.log('Pack artifacts are valid.');
 }

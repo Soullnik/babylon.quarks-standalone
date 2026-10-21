@@ -7,7 +7,20 @@
     "collectCoverageFrom": ["src/core/**/*.ts"],
     "transformIgnorePatterns": ["/node_modules/(?!@babylonjs)"],
     "transform": {
-        "^.+\\.(ts|tsx)$": ["ts-jest", {"tsconfig": "<rootDir>/tsconfig.test.json"}],
-        "^.+\\.js$": ["babel-jest", {"plugins": ["@babel/plugin-transform-modules-commonjs"]}]
+        "^.+\\.(ts|tsx)$": [
+            "ts-jest",
+            {
+                "tsconfig": "<rootDir>/tsconfig.test.json"
+            }
+        ],
+        "^.+\\.js$": [
+            "babel-jest",
+            {
+                "plugins": ["@babel/plugin-transform-modules-commonjs"]
+            }
+        ]
+    },
+    "moduleNameMapper": {
+        "^(\\.{1,2}/.*)\\.js$": "$1"
     }
 }

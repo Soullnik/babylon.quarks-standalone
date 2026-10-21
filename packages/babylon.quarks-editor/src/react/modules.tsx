@@ -1,5 +1,5 @@
-import {Texture} from '@babylonjs/core/Materials/Textures/texture';
-import {Mesh} from '@babylonjs/core/Meshes/mesh';
+import {Texture} from '@babylonjs/core/Materials/Textures/texture.js';
+import {Mesh} from '@babylonjs/core/Meshes/mesh.js';
 import {PlusIcon, XMarkIcon} from '@heroicons/react/24/solid';
 import type {Behavior, CullingMode, MeshLighting, MeshRim, ParticleSystem, SortMode} from 'babylon.quarks';
 import {
@@ -22,7 +22,7 @@ import {
     Vector4,
 } from 'babylon.quarks';
 import React, {useMemo, useState} from 'react';
-import {EffectBinding} from '../core/binding';
+import {EffectBinding} from '../core/binding.js';
 import {
     DEFAULT_GRADIENT_STOPS,
     GradientStop,
@@ -31,9 +31,9 @@ import {
     hexToRgb,
     readGradientStops,
     rgbToHex,
-} from '../core/colors';
-import {applyRendererMaterial, getMaterialLabel} from '../core/material';
-import type {ShapeType} from '../core/shapes';
+} from '../core/colors.js';
+import {applyRendererMaterial, getMaterialLabel} from '../core/material.js';
+import type {ShapeType} from '../core/shapes.js';
 import {
     DEFAULT_SHAPE_PARAMS,
     SHAPE_PARAM_KEYS,
@@ -41,17 +41,17 @@ import {
     createShape,
     getShapeType,
     readShapeParams,
-} from '../core/shapes';
-import {buildCurve, buildScalar, readPieces, readScalar} from '../core/values';
-import {CurveEditor} from './CurveEditor';
-import {GradientEditor} from './GradientEditor';
-import {InspectorInfoIcon} from './InspectorInfoIcon';
-import {ModuleSection} from './ModuleSection';
-import {PromptDialog} from './PromptDialog';
-import {ValueField} from './ValueField';
-import {CheckboxField, NumberField, Row, SelectField} from './fields';
-import {iconStyle} from './icons';
-import {theme} from './theme';
+} from '../core/shapes.js';
+import {buildCurve, buildScalar, readPieces, readScalar} from '../core/values.js';
+import {CurveEditor} from './CurveEditor.js';
+import {GradientEditor} from './GradientEditor.js';
+import {InspectorInfoIcon} from './InspectorInfoIcon.js';
+import {ModuleSection} from './ModuleSection.js';
+import {PromptDialog} from './PromptDialog.js';
+import {ValueField} from './ValueField.js';
+import {CheckboxField, NumberField, Row, SelectField} from './fields.js';
+import {iconStyle} from './icons.js';
+import {theme} from './theme.js';
 
 interface ModuleProps {
     binding: EffectBinding;

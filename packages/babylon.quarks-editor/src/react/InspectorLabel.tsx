@@ -1,7 +1,7 @@
 import React from 'react';
-import {getInspectorHint} from './inspectorHints';
-import {InspectorInfoIcon} from './InspectorInfoIcon';
-import {labelStyle} from './theme';
+import {getInspectorHint} from './inspectorHints.js';
+import {InspectorInfoIcon} from './InspectorInfoIcon.js';
+import {labelStyle} from './theme.js';
 
 /** Inspector row label with an optional info icon tooltip. */
 export function InspectorLabel(props: {label: string; hint?: string; hintKey?: string}): React.ReactElement | null {

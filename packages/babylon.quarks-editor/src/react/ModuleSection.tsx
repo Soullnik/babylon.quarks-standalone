@@ -1,9 +1,9 @@
 import {ChevronDownIcon, ChevronRightIcon} from '@heroicons/react/24/solid';
 import React, {useState} from 'react';
-import {iconStyle} from './icons';
-import {getInspectorHint} from './inspectorHints';
-import {InspectorInfoIcon} from './InspectorInfoIcon';
-import {theme} from './theme';
+import {iconStyle} from './icons.js';
+import {getInspectorHint} from './inspectorHints.js';
+import {InspectorInfoIcon} from './InspectorInfoIcon.js';
+import {theme} from './theme.js';
 
 /** Unity-style module foldout with an optional enable checkbox. */
 export function ModuleSection(props: {

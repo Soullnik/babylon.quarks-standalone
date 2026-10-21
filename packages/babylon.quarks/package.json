@@ -10,10 +10,16 @@
     "jsdelivr": "./dist/babylon.quarks.umd.min.js",
     "exports": {
         ".": {
-            "import": "./dist/babylon.quarks.esm.js",
-            "require": "./dist/babylon.quarks.cjs",
-            "types": "./dist/types/index.d.ts"
-        }
+            "import": {
+                "types": "./dist/types/index.d.ts",
+                "default": "./dist/babylon.quarks.esm.js"
+            },
+            "require": {
+                "types": "./dist/types/index.d.cts",
+                "default": "./dist/babylon.quarks.cjs"
+            }
+        },
+        "./package.json": "./package.json"
     },
     "files": [
         "dist",

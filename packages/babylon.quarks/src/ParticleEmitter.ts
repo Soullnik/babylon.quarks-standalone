@@ -57,8 +57,18 @@ export class ParticleEmitter extends TransformNode {
         this.system = system;
     }
 
-    dispose(): void {
-        super.dispose();
+    /**
+     * Disposes the node and the particle system it carries, so `root.dispose()` on an effect tree
+     * also removes its systems from their renderer. Safe to call more than once, and from
+     * `ParticleSystem.dispose()`, which disposes its emitter in turn.
+     */
+    dispose(doNotRecurse?: boolean, disposeMaterialAndTextures = false): void {
+        if (this.isDisposed()) {
+            return;
+        }
+        super.dispose(doNotRecurse, disposeMaterialAndTextures);
+        // IParticleSystem (quarks.core) has no dispose(); ParticleSystem does.
+        (this.system as IParticleSystem & {dispose?: () => void}).dispose?.();
     }
 
     extractFromCache(cache: any): any[] {

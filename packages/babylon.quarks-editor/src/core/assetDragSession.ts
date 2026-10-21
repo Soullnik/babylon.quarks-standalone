@@ -1,4 +1,4 @@
-import type {AssetDragPayload} from './assetTree';
+import type {AssetDragPayload} from './assetTree.js';
 
 let activeDrag: AssetDragPayload | null = null;
 

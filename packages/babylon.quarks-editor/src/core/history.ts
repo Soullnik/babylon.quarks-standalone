@@ -1,4 +1,4 @@
-import type {EffectBinding} from './binding';
+import type {EffectBinding} from './binding.js';
 
 const COALESCE_MS = 400;
 const MAX_DEPTH = 50;

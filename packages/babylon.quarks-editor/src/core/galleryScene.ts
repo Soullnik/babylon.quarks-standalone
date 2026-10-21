@@ -1,9 +1,9 @@
-import '@babylonjs/core/Culling/ray';
-import {Vector3} from '@babylonjs/core/Maths/math.vector';
-import type {Scene} from '@babylonjs/core/scene';
+import '@babylonjs/core/Culling/ray.js';
+import {Vector3} from '@babylonjs/core/Maths/math.vector.js';
+import type {Scene} from '@babylonjs/core/scene.js';
 import type {BatchedRenderer} from 'babylon.quarks';
-import {DEFAULT_GALLERY_SPACING, galleryGridPosition} from './galleryLayout';
-import type {SceneEntry} from './sceneEntries';
+import {DEFAULT_GALLERY_SPACING, galleryGridPosition} from './galleryLayout.js';
+import type {SceneEntry} from './sceneEntries.js';
 
 /** Clears live particles and freezes simulation for one scene entry. */
 export function clearSceneEntrySimulation(entry: SceneEntry, renderer: BatchedRenderer): void {

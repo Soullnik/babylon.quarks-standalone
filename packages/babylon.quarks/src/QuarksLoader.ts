@@ -94,6 +94,9 @@ function sceneMap<T>(maps: WeakMap<Scene, Map<string, T>>, scene: Scene): Map<st
     return map;
 }
 
+/** Image entries {@link QuarksLoader.resolveLinkedResources} rewrote, with the url it wrote. */
+const resolvedImageUrls = new WeakMap<object, string>();
+
 /** Content key for a geometry: two independent 32-bit hashes over every array's bytes, plus lengths. */
 function geometryKey(geometry: ParsedGeometry): string {
     let h1 = 0x811c9dc5;
@@ -149,7 +152,8 @@ export class QuarksLoader {
     async loadFromJSON(json: any, baseUrl?: string): Promise<TransformNode> {
         const resolvedBase = baseUrl ?? this.options.baseUrl ?? '';
         await this.resolveResources(json, resolvedBase);
-        return this.parse(json, resolvedBase);
+        // The urls are resolved now; joining them with the base again would load `fx/fx/...`.
+        return this.parse(json, '');
     }
 
     /**
@@ -246,7 +250,13 @@ export class QuarksLoader {
                 if (typeof img?.url !== 'string' || !img.url) {
                     return;
                 }
+                // An entry this loader already rewrote keeps its url: resolving the same document
+                // again (a second load, or a fetch cached for several loads) would join it twice.
+                if (resolvedImageUrls.get(img) === img.url) {
+                    return;
+                }
                 img.url = await QuarksLoader.resolveWith(resolver, img.url, 'image', baseUrl);
+                resolvedImageUrls.set(img, img.url);
             })
         );
     }
@@ -590,7 +600,8 @@ export class QuarksLoader {
                 continue;
             }
             try {
-                settle(i, this.parse(doc.json, doc.baseUrl));
+                // Resolved above, so the base must not be joined a second time.
+                settle(i, this.parse(doc.json, ''));
             } catch (err) {
                 if (!options.continueOnError) {
                     throw err;

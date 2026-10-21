@@ -1,14 +1,14 @@
-import {Color3} from '@babylonjs/core/Maths/math.color';
-import {Vector3} from '@babylonjs/core/Maths/math.vector';
-import {LinesMesh} from '@babylonjs/core/Meshes/linesMesh';
-import {Mesh} from '@babylonjs/core/Meshes/mesh';
-import {MeshBuilder} from '@babylonjs/core/Meshes/meshBuilder';
-import {TransformNode} from '@babylonjs/core/Meshes/transformNode';
-import type {Scene} from '@babylonjs/core/scene';
+import {Color3} from '@babylonjs/core/Maths/math.color.js';
+import {Vector3} from '@babylonjs/core/Maths/math.vector.js';
+import {LinesMesh} from '@babylonjs/core/Meshes/linesMesh.js';
+import {Mesh} from '@babylonjs/core/Meshes/mesh.js';
+import {MeshBuilder} from '@babylonjs/core/Meshes/meshBuilder.js';
+import {TransformNode} from '@babylonjs/core/Meshes/transformNode.js';
+import type {Scene} from '@babylonjs/core/scene.js';
 import type {ParticleSystem} from 'babylon.quarks';
-import {EDITOR_SCENE_NODE_METADATA} from './editorScene';
-import './lineShaders';
-import {getShapeType, readShapeParams} from './shapes';
+import {EDITOR_SCENE_NODE_METADATA} from './editorScene.js';
+import './lineShaders.js';
+import {getShapeType, readShapeParams} from './shapes.js';
 
 const LINE_COLOR = new Color3(0.45, 0.82, 1);
 const DIRECTION_COLOR = new Color3(0.75, 0.92, 1);

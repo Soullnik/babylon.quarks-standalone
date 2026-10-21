@@ -1,19 +1,19 @@
-import {ArcRotateCamera} from '@babylonjs/core/Cameras/arcRotateCamera';
+import {ArcRotateCamera} from '@babylonjs/core/Cameras/arcRotateCamera.js';
 // scene.pick lives in Ray's side effect (Babylon 9.31 no longer pulls it in); gizmos pick through it.
-import '@babylonjs/core/Culling/ray';
-import {Engine} from '@babylonjs/core/Engines/engine';
-import {PointerEventTypes} from '@babylonjs/core/Events/pointerEvents';
-import {GizmoManager} from '@babylonjs/core/Gizmos/gizmoManager';
-import {DirectionalLight} from '@babylonjs/core/Lights/directionalLight';
-import {Color3, Color4} from '@babylonjs/core/Maths/math.color';
-import {Vector3 as BVector3} from '@babylonjs/core/Maths/math.vector';
-import {Viewport} from '@babylonjs/core/Maths/math.viewport';
-import type {Mesh} from '@babylonjs/core/Meshes/mesh';
-import {MeshBuilder} from '@babylonjs/core/Meshes/meshBuilder';
-import type {TransformNode} from '@babylonjs/core/Meshes/transformNode';
-import {UtilityLayerRenderer} from '@babylonjs/core/Rendering/utilityLayerRenderer';
-import {Scene} from '@babylonjs/core/scene';
-import {GridMaterial} from '@babylonjs/materials/grid/gridMaterial';
+import '@babylonjs/core/Culling/ray.js';
+import {Engine} from '@babylonjs/core/Engines/engine.js';
+import {PointerEventTypes} from '@babylonjs/core/Events/pointerEvents.js';
+import {GizmoManager} from '@babylonjs/core/Gizmos/gizmoManager.js';
+import {DirectionalLight} from '@babylonjs/core/Lights/directionalLight.js';
+import {Color3, Color4} from '@babylonjs/core/Maths/math.color.js';
+import {Vector3 as BVector3} from '@babylonjs/core/Maths/math.vector.js';
+import {Viewport} from '@babylonjs/core/Maths/math.viewport.js';
+import type {Mesh} from '@babylonjs/core/Meshes/mesh.js';
+import {MeshBuilder} from '@babylonjs/core/Meshes/meshBuilder.js';
+import type {TransformNode} from '@babylonjs/core/Meshes/transformNode.js';
+import {UtilityLayerRenderer} from '@babylonjs/core/Rendering/utilityLayerRenderer.js';
+import {Scene} from '@babylonjs/core/scene.js';
+import {GridMaterial} from '@babylonjs/materials/grid/gridMaterial.js';
 import {
     ArrowLeftIcon,
     ArrowPathIcon,
@@ -31,8 +31,8 @@ import {
 import {BatchedRenderer, QuarksUtil} from 'babylon.quarks';
 import React, {useCallback, useDeferredValue, useEffect, useMemo, useReducer, useRef, useState} from 'react';
 import {createRoot} from 'react-dom/client';
-import {getAssetDragSession, setAssetDragSession} from '../core/assetDragSession';
-import {ASSET_DRAG_MIME, describeAssetDrag, readAssetDrag, type AssetDragPayload} from '../core/assetTree';
+import {getAssetDragSession, setAssetDragSession} from '../core/assetDragSession.js';
+import {ASSET_DRAG_MIME, describeAssetDrag, readAssetDrag, type AssetDragPayload} from '../core/assetTree.js';
 import {
     collectJsonFiles,
     createEffectAsset,
@@ -41,24 +41,24 @@ import {
     removeAssets,
     type AssetLoadProgress,
     type EffectAsset,
-} from '../core/assets';
-import {EffectBinding} from '../core/binding';
-import {createSceneDefaultEntry} from '../core/defaultEffect';
-import {serializeEffectTree} from '../core/effectTree';
-import {EmitterShapeWireframes} from '../core/emitterShapeWireframe';
-import {GalleryDropMarker} from '../core/galleryDropMarker';
-import {cancelGalleryCameraFocus, focusGalleryEntry} from '../core/galleryLayout';
+} from '../core/assets.js';
+import {EffectBinding} from '../core/binding.js';
+import {createSceneDefaultEntry} from '../core/defaultEffect.js';
+import {serializeEffectTree} from '../core/effectTree.js';
+import {EmitterShapeWireframes} from '../core/emitterShapeWireframe.js';
+import {GalleryDropMarker} from '../core/galleryDropMarker.js';
+import {cancelGalleryCameraFocus, focusGalleryEntry} from '../core/galleryLayout.js';
 import {
     applyGalleryPlayback,
     countGalleryParticles,
     hasActivePreview,
     pauseFinishedPreviews,
-} from '../core/galleryPlayback';
-import {pickGroundPosition, placeSceneEntriesAt, setSceneEntryVisible} from '../core/galleryScene';
-import {GallerySelectionMarker} from '../core/gallerySelectionMarker';
-import {EffectHistory, type HistoryStacks} from '../core/history';
-import {parseEffectFromJson} from '../core/loadEffect';
-import {pickAssetFolderFiles} from '../core/pickAssetFiles';
+} from '../core/galleryPlayback.js';
+import {pickGroundPosition, placeSceneEntriesAt, setSceneEntryVisible} from '../core/galleryScene.js';
+import {GallerySelectionMarker} from '../core/gallerySelectionMarker.js';
+import {EffectHistory, type HistoryStacks} from '../core/history.js';
+import {parseEffectFromJson} from '../core/loadEffect.js';
+import {pickAssetFolderFiles} from '../core/pickAssetFiles.js';
 import {
     clearFocusFinished,
     createPlaybackState,
@@ -67,33 +67,33 @@ import {
     markFocusFinished,
     setFocusElapsed,
     type PlaybackState,
-} from '../core/playback';
-import type {ProjectStore, StoredAsset, StoredScene} from '../core/projectStore';
-import {logRenderMismatch} from '../core/renderDebug';
+} from '../core/playback.js';
+import type {ProjectStore, StoredAsset, StoredScene} from '../core/projectStore.js';
+import {logRenderMismatch} from '../core/renderDebug.js';
 import {
     bindingFromSceneEntry,
     countInstancesByAsset,
     disposeSceneEntry,
     instantiateSceneEntry,
     type SceneEntry,
-} from '../core/sceneEntries';
-import {pauseFocus, scrubFocusToSettled} from '../core/scrub';
-import {computeTimelineRows, computeTimelineSpan} from '../core/timeline';
-import {notifyTransformChanged, subscribeTransform} from '../core/transformStore';
-import {toggleStagePlayback} from '../core/transport';
-import {GalleryViewportPicker} from '../core/viewportPicker';
-import {AssetsPanel} from './AssetsPanel';
-import {ChoiceDialog} from './ChoiceDialog';
-import {EffectEditor} from './EffectEditor';
-import {EffectTreeView} from './EffectTreeView';
-import {MessageDialog} from './MessageDialog';
-import {PromptDialog} from './PromptDialog';
-import {ScenePanel} from './ScenePanel';
-import {TimelinePanel} from './TimelinePanel';
-import {TransportBar} from './TransportBar';
-import {iconStyle, type HeroIcon} from './icons';
-import type {GeometryData, GeometryOption, TextureOption} from './modules';
-import {buttonStyle, globalEditorStyles, theme} from './theme';
+} from '../core/sceneEntries.js';
+import {pauseFocus, scrubFocusToSettled} from '../core/scrub.js';
+import {computeTimelineRows, computeTimelineSpan} from '../core/timeline.js';
+import {notifyTransformChanged, subscribeTransform} from '../core/transformStore.js';
+import {toggleStagePlayback} from '../core/transport.js';
+import {GalleryViewportPicker} from '../core/viewportPicker.js';
+import {AssetsPanel} from './AssetsPanel.js';
+import {ChoiceDialog} from './ChoiceDialog.js';
+import {EffectEditor} from './EffectEditor.js';
+import {EffectTreeView} from './EffectTreeView.js';
+import {MessageDialog} from './MessageDialog.js';
+import {PromptDialog} from './PromptDialog.js';
+import {ScenePanel} from './ScenePanel.js';
+import {TimelinePanel} from './TimelinePanel.js';
+import {TransportBar} from './TransportBar.js';
+import {iconStyle, type HeroIcon} from './icons.js';
+import type {GeometryData, GeometryOption, TextureOption} from './modules.js';
+import {buttonStyle, globalEditorStyles, theme} from './theme.js';
 
 /**
  * The effect's JSON, with a warning when it points at object URLs: a texture

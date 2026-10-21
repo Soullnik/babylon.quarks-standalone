@@ -1,8 +1,8 @@
-import {Matrix, Quaternion} from '@babylonjs/core/Maths/math.vector';
-import {TransformNode} from '@babylonjs/core/Meshes/transformNode';
+import {Matrix, Quaternion} from '@babylonjs/core/Maths/math.vector.js';
+import {TransformNode} from '@babylonjs/core/Meshes/transformNode.js';
 import type {ParticleSystem} from 'babylon.quarks';
 import {ParticleEmitter} from 'babylon.quarks';
-import {isEditorSceneNode} from './editorScene';
+import {isEditorSceneNode} from './editorScene.js';
 
 /** A node in the editor's effect hierarchy: a Group (organizational) or a ParticleEmitter. */
 export interface EffectTreeNode {
