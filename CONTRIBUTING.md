@@ -38,7 +38,7 @@ changes to the library show up in demos without rebuilding.
 Run the full suite before opening a PR:
 
 ```bash
-npm run check        # build + test typecheck + tests + examples build + tarball content check
+npm run check        # build + test typecheck + tests with coverage gate + examples build + tarball content check
 ```
 
 Individual pieces:
@@ -46,7 +46,7 @@ Individual pieces:
 ```bash
 npm run test                                   # jest suites: quarks.core, babylon.quarks, babylon.quarks-editor
 npm run typecheck                              # tsc over sources and tests (jest only transpiles them)
-npm run test:coverage --workspace=babylon.quarks   # with coverage report
+npm run test:coverage                          # the same suites with the coverage gate (what CI runs)
 npm run docs                                   # TypeDoc API docs
 npm run check:demos                            # every demo in headless Chromium, fails on page/console errors
 npm run validate:wgsl                          # every WGSL shader variant through a real WGSL compiler
@@ -62,8 +62,11 @@ Jest transpiles TypeScript without checking types (`isolatedModules` in each pac
 `tsconfig.test.json`), which keeps the suites fast; `npm run typecheck` is where type errors in
 sources and tests fail. Run it after `npm run build`, since tests import the built packages' types.
 
-Tests live in `packages/babylon.quarks/test` and coverage thresholds are enforced
-(see `jest.config.json` — 97% statements). New runtime code needs tests.
+Tests live in each package's `test/` folder. `npm run test:coverage` enforces a coverage floor per
+package, set in the root `jest.config.json` under `coverageThreshold`. The floors are a ratchet: they
+sit one point under what the suites reach today, since random paths move coverage a little. A change
+may not lower them, and a PR that raises coverage raises the matching floor. New runtime code needs
+tests.
 
 Formatting is Prettier (`npm run prettier --workspace=babylon.quarks`); match the existing
 style — 4-space indent, single quotes in package sources.

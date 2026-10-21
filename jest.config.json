@@ -3,5 +3,25 @@
         "<rootDir>/packages/quarks.core",
         "<rootDir>/packages/babylon.quarks",
         "<rootDir>/packages/babylon.quarks-editor"
-    ]
+    ],
+    "coverageThreshold": {
+        "./packages/quarks.core/src/": {
+            "statements": 53,
+            "branches": 49,
+            "functions": 55,
+            "lines": 53
+        },
+        "./packages/babylon.quarks/src/": {
+            "statements": 93,
+            "branches": 86,
+            "functions": 84,
+            "lines": 93
+        },
+        "./packages/babylon.quarks-editor/src/": {
+            "statements": 83,
+            "branches": 62,
+            "functions": 85,
+            "lines": 83
+        }
+    }
 }
