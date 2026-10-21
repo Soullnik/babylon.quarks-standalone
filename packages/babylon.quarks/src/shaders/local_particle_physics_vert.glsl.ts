@@ -66,7 +66,8 @@ ${fogVertexGLSL('viewPos.xyz')}
 
 #ifdef SOFT_PARTICLES
     projPosition = gl_Position;
-    linearDepth = -viewPos.z;
+    // View depth is +z ahead of a left-handed camera and -z ahead of a right-handed one.
+    linearDepth = abs(viewPos.z);
 #endif
 
 #ifdef UV_TILE

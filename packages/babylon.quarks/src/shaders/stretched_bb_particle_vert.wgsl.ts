@@ -113,7 +113,8 @@ ${fogVertexWGSL('mvPosition.xyz')}
     let quadUV = select(vertexInputs.uv, 1.0 - vertexInputs.uv, vertexInputs.size.xy < vec2f(0.0));
 #ifdef SOFT_PARTICLES
     vertexOutputs.projPosition = clipPosition;
-    vertexOutputs.linearDepth = -mvPosition.z;
+    // View depth is +z ahead of a left-handed camera and -z ahead of a right-handed one.
+    vertexOutputs.linearDepth = abs(mvPosition.z);
 #endif
 
     #ifdef UV_TILE

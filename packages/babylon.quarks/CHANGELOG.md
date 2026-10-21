@@ -6,6 +6,13 @@ and the project follows the `quarks.core` 0.x version line.
 
 ## [Unreleased]
 
+### Added
+
+- **Soft-particle depth encodings:** `SoftDepthEncoding`, `DepthTextureOptions`,
+  `BatchedRenderer.depthEncoding`, and the decode helpers `softDepthParams` and `decodeSoftDepth`
+  (see Changed).
+- **`disposeEnvAtlas(cube, scene?)`** drops the env atlases built for a cube.
+
 ### Changed
 
 - **Box and edge shapes now apply their shape transform.** `BoxEmitter` and `EdgeEmitter` take a
@@ -41,9 +48,40 @@ and the project follows the `quarks.core` 0.x version line.
   file uuid.
 - **A Death sub emitter ignores `inherit: ['lifetime']`**, since its parent has no life left;
   its particles live their own life.
+- **Soft particles: the depth texture now says what it stores (breaking for hand-built depth).**
+  `setDepthTexture(depth, {encoding})` takes `'linear'` (Babylon's default depth renderer, the
+  default), `'nonLinear'` (the depth buffer value, Unity's `_CameraDepthTexture`) or `'viewZ'`
+  (view-space Z, Unreal's SceneDepth). Pass the `DepthRenderer` itself and its encoding and
+  packing are read off it: `setDepthTexture(scene.enableDepthRenderer(camera))`. Perspective and
+  orthographic cameras, WebGL and WebGPU depth ranges, a reverse depth buffer and an infinite far
+  plane (`'nonLinear'` or `'viewZ'`) are handled. Before, the shaders always decoded a depth buffer
+  value, which no Babylon depth renderer writes by default. If you fed a non-linear depth by hand,
+  pass `{encoding: 'nonLinear'}`. The `projParams` uniform now holds the decode coefficients from
+  `softDepthParams`; the `soft_pars_fragment` chunk uses them too.
+- **Soft particles are compiled in only while a depth texture is set**, as Unity turns them off for
+  a camera with no depth texture. Without one they draw hard instead of sampling an unbound
+  texture; setting or clearing it rebuilds the soft batches.
+- **Batch meshes are not pickable, take no collisions and are not serialized** by Babylon's scene
+  serializer. Their geometry is one quad or mesh at the origin, not the particles.
+- **Env atlases are cached per scene**, so a second scene or engine (an editor preview) gets its
+  own instead of a texture of the first scene. `getCachedEnvAtlas(cube, scene?)` takes the scene.
+  An atlas quarks built is disposed with its cube; `disposeEnvAtlas(cube, scene?)` drops one
+  sooner. A system whose atlas is disposed while its cube is kept builds a new one.
+- **`BatchedRenderer.depthTexture` is an accessor**, and setting it calls `setDepthTexture`.
+  `VFXBatch.applyDepthTexture` takes a depth binding as well as a texture.
 
 ### Fixed
 
+- **Camera-dependent uniforms reached the GPU one draw late.** The eye position (rim, env
+  reflection), the soft-particle depth decode, the `'scene'` light and a trail's render size were
+  written after the material had uploaded its uniforms, so each draw used the previous bind's
+  values: a frame late with one camera, and the other camera's with `activeCameras`. They now reach
+  the effect of the draw they are for.
+- **Soft particles faded against the wrong depth**, both from the decode (see Changed) and because
+  the particle's own depth had the wrong sign for a left-handed camera, Babylon's default.
+- **GLSL and WGSL applied fog and the soft fade in different orders**, so WebGPU kept a fog-coloured
+  fringe where a fogged soft particle met geometry. Both now fade last, after fog.
+- **A mesh batch rebuilt for its env atlas lost the soft-particle depth texture.**
 - **A non-looping system whose rate curve starts at 0 never emitted.** It reported nothing
   pending on its first step and finished at once. A rate that rises later in the cycle now counts
   as pending.

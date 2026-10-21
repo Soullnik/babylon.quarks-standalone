@@ -98,7 +98,8 @@ ${fogVertexGLSL('mvPosition.xyz')}
     vec2 quadUV = vec2(size.x < 0.0 ? 1.0 - uv.x : uv.x, size.y < 0.0 ? 1.0 - uv.y : uv.y);
 #ifdef SOFT_PARTICLES
     projPosition = gl_Position;
-    linearDepth = -mvPosition.z;
+    // View depth is +z ahead of a left-handed camera and -z ahead of a right-handed one.
+    linearDepth = abs(mvPosition.z);
 #endif
 
     #ifdef UV_TILE

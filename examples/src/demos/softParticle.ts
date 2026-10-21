@@ -21,7 +21,8 @@ export function init({scene, camera, batchRenderer, systems}: DemoContext) {
     const texture = createSharedTexture(scene, SHARED_ASSETS.smoke);
     if (typeof scene.enableDepthRenderer === 'function') {
         const depthRenderer = scene.enableDepthRenderer();
-        batchRenderer.setDepthTexture(depthRenderer.getDepthMap());
+        // The renderer reads the depth encoding off the DepthRenderer.
+        batchRenderer.setDepthTexture(depthRenderer);
     }
 
     const softParticles = new ParticleSystem({

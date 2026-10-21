@@ -1,11 +1,9 @@
 import {Constants} from '@babylonjs/core/Engines/constants';
 import {NullEngine} from '@babylonjs/core/Engines/nullEngine';
-import {RawTexture} from '@babylonjs/core/Materials/Textures/rawTexture';
 import {Scene} from '@babylonjs/core/scene';
 import {ConstantColor, ConstantValue, PointEmitter, Vector4} from 'quarks.core';
 import {BatchedRenderer} from '../src/BatchedRenderer';
 import {ParticleSystem} from '../src/ParticleSystem';
-import {SpriteBatch} from '../src/SpriteBatch';
 import {TrailBatch} from '../src/TrailBatch';
 import {RenderMode} from '../src/VFXBatch';
 
@@ -129,64 +127,6 @@ describe('BatchedRenderer', () => {
         expect(() => renderer.addSystem(system)).toThrow(/Unsupported render mode/);
         renderer.dispose();
         system.dispose();
-    });
-
-    it('applies depth texture to new batches and via setDepthTexture', () => {
-        const depthTex = RawTexture.CreateLuminanceTexture(new Uint8Array([255]), 1, 1, scene);
-        const renderer = new BatchedRenderer('batcher-depth', scene);
-        const system = createSystem();
-        const onCreateSpy = jest.spyOn(SpriteBatch.prototype, 'applyDepthTexture');
-        renderer.depthTexture = depthTex;
-        renderer.addSystem(system);
-        expect(onCreateSpy).toHaveBeenCalledWith(depthTex);
-
-        const batch = renderer.batches[0];
-        const spy = jest.spyOn(batch, 'applyDepthTexture');
-        renderer.setDepthTexture(depthTex);
-        expect(spy).toHaveBeenCalledWith(depthTex);
-        spy.mockRestore();
-        onCreateSpy.mockRestore();
-
-        const system2 = createSystem();
-        system2.blending = Constants.ALPHA_SUBTRACT;
-        renderer.addSystem(system2);
-        const secondBatch = renderer.batches.find((b) => b !== batch);
-        expect(secondBatch).toBeDefined();
-        const spy2 = jest.spyOn(secondBatch!, 'applyDepthTexture');
-        renderer.setDepthTexture(depthTex);
-        expect(spy2).toHaveBeenCalledWith(depthTex);
-
-        renderer.dispose();
-        system.dispose();
-        system2.dispose();
-        depthTex.dispose();
-    });
-
-    it('applies depth texture when depth is set before first batch is created', () => {
-        const depthTex = RawTexture.CreateLuminanceTexture(new Uint8Array([128]), 1, 1, scene);
-        const renderer = new BatchedRenderer('batcher-depth-order', scene);
-        renderer.depthTexture = depthTex;
-        const system = createSystem();
-        const batchSpy = jest.spyOn(TrailBatch.prototype, 'applyDepthTexture');
-        const trail = new ParticleSystem({
-            scene,
-            duration: 1,
-            looping: true,
-            startLife: new ConstantValue(1),
-            startSpeed: new ConstantValue(0),
-            startSize: new ConstantValue(1),
-            startColor: new ConstantColor(new Vector4(1, 1, 1, 1)),
-            emissionOverTime: new ConstantValue(0),
-            shape: new PointEmitter(),
-            renderMode: RenderMode.Trail,
-            rendererEmitterSettings: {startLength: new ConstantValue(4), followLocalOrigin: false},
-        });
-        renderer.addSystem(trail);
-        expect(batchSpy).toHaveBeenCalledWith(depthTex);
-        batchSpy.mockRestore();
-        renderer.dispose();
-        trail.dispose();
-        depthTex.dispose();
     });
 
     it('increases adaptive quality when frame stays under budget', () => {

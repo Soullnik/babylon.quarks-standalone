@@ -1,5 +1,6 @@
 import {VertexBuffer} from '@babylonjs/core/Buffers/buffer';
 import {Constants} from '@babylonjs/core/Engines/constants';
+import type {Effect} from '@babylonjs/core/Materials/effect';
 import {ShaderMaterial} from '@babylonjs/core/Materials/shaderMaterial';
 import {RawTexture} from '@babylonjs/core/Materials/Textures/rawTexture';
 import {Vector2 as BVector2, Vector3 as BVector3, Vector4 as BVector4} from '@babylonjs/core/Maths/math.vector';
@@ -31,6 +32,7 @@ import particle_vert_wgsl from './shaders/particle_vert.wgsl';
 import {registerShaders, shaderLanguageFor, ShaderSources} from './shaders/shaderLanguageSupport';
 import stretched_bb_particle_vert from './shaders/stretched_bb_particle_vert.glsl';
 import stretched_bb_particle_vert_wgsl from './shaders/stretched_bb_particle_vert.wgsl';
+import {DepthBinding, softDepthParams} from './softDepth';
 import {defaultMeshLighting, MeshLightingSettings, RenderMode, VFXBatch} from './VFXBatch';
 
 export class SpriteBatch extends VFXBatch {
@@ -70,8 +72,8 @@ export class SpriteBatch extends VFXBatch {
     private uvTileVB!: VertexBuffer;
     private velocityVB?: VertexBuffer;
 
-    constructor(settings: VFXBatchSettings, scene: Scene) {
-        super(settings, scene);
+    constructor(settings: VFXBatchSettings, scene: Scene, depth: DepthBinding | null = null) {
+        super(settings, scene, depth);
         this.storeFixedLighting(defaultMeshLighting());
         this.maxParticles = 1000;
         this.setupBuffers();
@@ -357,8 +359,11 @@ export class SpriteBatch extends VFXBatch {
         if (this.settings.blendTiles) {
             defines.push('TILE_BLEND');
         }
-        if (this.settings.softParticles) {
+        if (this.drawsSoft()) {
             defines.push('SOFT_PARTICLES');
+            if (this.depth!.packed) {
+                defines.push('SOFT_DEPTH_PACKED');
+            }
         }
         if (this.settings.materialAlphaTest > 0) {
             defines.push('USE_ALPHATEST');
@@ -438,7 +443,7 @@ export class SpriteBatch extends VFXBatch {
         if (SpriteBatch.drawsAlongVelocity(this.settings.renderMode)) {
             uniforms.push('speedFactor');
         }
-        if (this.settings.softParticles) {
+        if (this.drawsSoft()) {
             uniforms.push('softParams');
             uniforms.push('projParams');
             samplers.push('depthTexture');
@@ -492,7 +497,7 @@ export class SpriteBatch extends VFXBatch {
                     return;
                 }
                 eyePosition.copyFrom(camera.globalPosition);
-                mat.setVector3('eyePosition', eyePosition);
+                VFXBatch.writeBound(mat, (target) => target.setVector3('eyePosition', eyePosition));
             });
         }
         if (this.settings.uTileCount > 1 || this.settings.vTileCount > 1) {
@@ -502,7 +507,8 @@ export class SpriteBatch extends VFXBatch {
         if (SpriteBatch.drawsAlongVelocity(this.settings.renderMode)) {
             mat.setFloat('speedFactor', this.settings.softNearFade > 0 ? this.settings.softNearFade : 1.0);
         }
-        if (this.settings.softParticles) {
+        if (this.drawsSoft()) {
+            mat.setTexture('depthTexture', this.depth!.texture);
             mat.setVector2(
                 'softParams',
                 new BVector2(
@@ -511,13 +517,12 @@ export class SpriteBatch extends VFXBatch {
                 )
             );
             // Reused across binds: this runs on every draw call.
-            const projParams = new BVector4(0, 0, 0, 0);
+            const projParams = new BVector4(1, 0, 0, 1);
             mat.onBindObservable.add(() => {
                 const camera = this.scene.activeCamera;
-                if (camera) {
-                    projParams.x = camera.minZ;
-                    projParams.y = camera.maxZ;
-                    mat.setVector4('projParams', projParams);
+                if (camera && this.depth) {
+                    softDepthParams(camera, this.depth.encoding, projParams);
+                    VFXBatch.writeBound(mat, (target) => target.setVector4('projParams', projParams));
                 }
             });
         }
@@ -537,13 +542,15 @@ export class SpriteBatch extends VFXBatch {
                 const color = new BVector3();
                 const ambient = new BVector3();
                 mat.onBindObservable.add(() => {
-                    if (SpriteBatch.readSceneLight(this.scene, direction, color, ambient)) {
-                        mat.setVector3('lightDirection', direction);
-                        mat.setVector3('lightColor', color);
-                        mat.setVector3('ambientColor', ambient);
-                    } else {
-                        this.writeFixedLighting(mat);
-                    }
+                    const found = SpriteBatch.readSceneLight(this.scene, direction, color, ambient);
+                    VFXBatch.writeBound(mat, (target) =>
+                        found
+                            ? target
+                                  .setVector3('lightDirection', direction)
+                                  .setVector3('lightColor', color)
+                                  .setVector3('ambientColor', ambient)
+                            : this.writeFixedLighting(target)
+                    );
                 });
             }
         }
@@ -584,7 +591,7 @@ export class SpriteBatch extends VFXBatch {
         this.fixedAmbientColor.set(lighting.ambient.r, lighting.ambient.g, lighting.ambient.b);
     }
 
-    private writeFixedLighting(material: ShaderMaterial): void {
+    private writeFixedLighting(material: ShaderMaterial | Effect): void {
         material.setVector3('lightDirection', this.fixedLightDirection);
         material.setVector3('lightColor', this.fixedLightColor);
         material.setVector3('ambientColor', this.fixedAmbientColor);

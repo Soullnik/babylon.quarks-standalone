@@ -43,7 +43,7 @@ function cases(): Case[] {
     const out: Case[] = [];
     const tileOptions = [[], ['UV_TILE'], ['UV_TILE', 'TILE_BLEND']];
     const mapOptions = [[], ['USE_MAP']];
-    const softOptions = [[], ['SOFT_PARTICLES']];
+    const softOptions = [[], ['SOFT_PARTICLES'], ['SOFT_PARTICLES', 'SOFT_DEPTH_PACKED']];
     const alphaOptions = [[], ['USE_ALPHATEST']];
     const fogOptions = [[], ['FOG'], ['FOG', 'FOG_ADDITIVE']];
 

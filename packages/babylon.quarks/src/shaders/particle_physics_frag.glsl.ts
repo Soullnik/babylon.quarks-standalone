@@ -1,4 +1,5 @@
 import {fogFragmentDeclarationGLSL, fogFragmentGLSL} from './chunks/fog';
+import {softFragmentDeclarationGLSL, softFragmentGLSL} from './chunks/soft';
 import {surfaceColorGLSL, surfaceFragmentDeclarationGLSL} from './chunks/surface';
 
 export default /* glsl */ `
@@ -79,19 +80,13 @@ vec3 sampleEnvAtlas(vec3 r) {
 }
 #endif
 
-#ifdef SOFT_PARTICLES
-uniform sampler2D depthTexture;
-uniform vec2 softParams;
-uniform vec4 projParams;
-varying vec4 projPosition;
-varying float linearDepth;
-#endif
 
 #ifdef USE_ALPHATEST
 uniform float alphaTest;
 #endif
 
 ${fogFragmentDeclarationGLSL}
+${softFragmentDeclarationGLSL}
 ${surfaceFragmentDeclarationGLSL}
 void main() {
 ${surfaceColorGLSL(true)}
@@ -134,16 +129,6 @@ ${surfaceColorGLSL(true)}
 
 ${fogFragmentGLSL('color')}
     gl_FragColor = vec4(color, baseColor.a);
-
-#ifdef SOFT_PARTICLES
-    vec2 p2 = projPosition.xy / projPosition.w;
-    p2 = 0.5 * p2 + 0.5;
-    float readDepth = texture2D(depthTexture, p2.xy).r;
-    float zNear = projParams.x;
-    float zFar = projParams.y;
-    float viewDepth = (zFar * zNear) / (zFar - readDepth * (zFar - zNear));
-    float fade = clamp(softParams.y * ((viewDepth - softParams.x) - linearDepth), 0.0, 1.0);
-    gl_FragColor *= fade;
-#endif
+${softFragmentGLSL('gl_FragColor')}
 }
 `;

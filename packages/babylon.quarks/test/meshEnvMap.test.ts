@@ -179,7 +179,7 @@ describe('mesh particle environment map', () => {
             });
             expect(envAtlas.envAtlasBuilder.createFromFaceUrls).toHaveBeenCalledWith(faceUrls, scene);
             expect(ready).toBe(atlas);
-            expect(getCachedEnvAtlas(cube)).toBe(atlas);
+            expect(getCachedEnvAtlas(cube, scene)).toBe(atlas);
         } finally {
             envAtlas.envAtlasBuilder.createFromFaceUrls = originalBuilder;
             atlas.dispose();
