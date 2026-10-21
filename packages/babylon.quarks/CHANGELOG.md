@@ -22,6 +22,17 @@ and the project follows the `quarks.core` 0.x version line.
 - **Effect files carry a format version**, `metadata.quarksFormat` (`QUARKS_FORMAT_VERSION`). The
   loader warns about a file from a newer version. Files without one still load.
 - **`QuarksFormatError`**, thrown by `QuarksLoader.parse` for a document with no `object`.
+- **Loads can wait for textures, report what failed, and be cancelled.** The loader option
+  `waitForTextures` makes `load`, `loadFromJSON`, `loadAll` and `loadFromJSONAll` resolve once every
+  texture of the effect has loaded or failed, so it does not draw its first frames blank, like an
+  Addressables or Unreal streamable handle completing. `onResourceError(kind, url, error)` reports
+  each geometry file or image that fails; the effect still loads. A `signal` (`AbortSignal`) in the
+  new `QuarksLoadOptions`, and in `QuarksBatchLoadOptions`, cancels a load: it rejects with the
+  signal's reason and leaves no node of the effect in the scene, whatever `continueOnError` says. A
+  scene disposed during a load rejects it the same way.
+- **`QuarksLoader.disposeEffect(root)`** frees a loaded effect with what it owns: its nodes and
+  systems, the materials made for it, and each texture once no other loaded effect, or copy of one,
+  uses it. `root.dispose()` still frees only the nodes and systems.
 
 - **Soft particles and alpha test on trails.** `softParticles` and `alphaTest` now apply to trails
   as to every other render mode, in GLSL and WGSL. Before, a trail accepted them, batched on them
@@ -37,6 +48,12 @@ and the project follows the `quarks.core` 0.x version line.
   resolve urls and inline geometry files on a copy, so one document can be loaded many times, into
   several scenes or with several base urls. Code that read the resolved urls back from its own
   document should call `resolveResources` (which still works in place) or read the loaded nodes.
+- **`EffectPool` frees a copy with `QuarksLoader.disposeEffect`**, and `QuarksUtil.instantiate`
+  gives the copy a hold on the source's textures, so disposing the source leaves its copies drawing
+  and the last one to go frees the textures.
+- **A geometry file that fails to load is reported through `onResourceError`** (default: the
+  same console warning as before). With `waitForTextures`, `onProgress` counts an effect once its
+  textures have settled.
 - **Unreadable parts of an effect warn and take their default** instead of throwing a `TypeError`
   or going silent: an unknown shape gives a point emitter, an unknown behavior is skipped with a
   warning, an unknown curve or colour type warns, and a setting the file leaves out (a system's
@@ -115,6 +132,9 @@ and the project follows the `quarks.core` 0.x version line.
   `VFXBatch.applyDepthTexture` takes a depth binding as well as a texture.
 
 ### Fixed
+
+- **A texture whose image failed to load is no longer shared.** The next load of the same image
+  tries it again instead of reusing the broken texture.
 
 - **A loader read the images of the document it parsed before.** A document with textures but no
   `images` loaded the previous document's pictures. Each parse now has its own.

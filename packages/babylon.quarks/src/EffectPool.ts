@@ -2,6 +2,7 @@ import {Vector3} from '@babylonjs/core/Maths/math.vector';
 import {TransformNode} from '@babylonjs/core/Meshes/transformNode';
 import {Node} from '@babylonjs/core/node';
 import {BatchedRenderer} from './BatchedRenderer';
+import {disposeEffect} from './effectResources';
 import {ParticleSystem} from './ParticleSystem';
 import {QuarksUtil} from './QuarksUtil';
 
@@ -146,7 +147,8 @@ export class EffectPool {
             system.dispose();
         }
         this.systemsOf.delete(copy);
-        copy.dispose();
+        // Lets go of the textures the copy shares with the template.
+        disposeEffect(copy);
     }
 
     /** The copy a system belongs to is done when all of its systems are. */

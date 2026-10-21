@@ -2,6 +2,7 @@ import {TransformNode} from '@babylonjs/core/Meshes/transformNode';
 import {Node} from '@babylonjs/core/node';
 import {ConstantValue, EmitSubParticleSystem, FunctionValueGenerator, IntervalValue, ValueGenerator} from 'quarks.core';
 import {BatchedRenderer} from './BatchedRenderer';
+import {shareEffectResources} from './effectResources';
 import {ParticleEmitter} from './ParticleEmitter';
 import {ParticleSystem} from './ParticleSystem';
 
@@ -106,6 +107,8 @@ export class QuarksUtil {
             return copy;
         };
         const copy = copyNode(root, null, name) as TransformNode;
+        // The copy draws with the source's textures, so QuarksLoader.disposeEffect(source) keeps them.
+        shareEffectResources(root, copy);
         // Sub emitter behaviors on the copies still target the original emitters.
         for (const emitter of copies.values()) {
             for (const behavior of (emitter.system as unknown as ParticleSystem).behaviors) {

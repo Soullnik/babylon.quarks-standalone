@@ -98,3 +98,15 @@ loaded from, pass `imageUrl` to write each image's url relative to it.
 `loadFromJSON` and `loadFromJSONAll` leave the document they are given as it was, so one document
 can be loaded many times. `resolveResources` and `QuarksLoader.resolveLinkedResources` rewrite
 their document in place.
+
+## Loading and freeing
+
+A load resolves when the nodes are built; with the loader option `waitForTextures` it resolves once
+every texture has loaded or failed. A geometry file or image that fails is reported through
+`onResourceError` and the rest of the effect loads. Pass a `signal` to cancel a load: it rejects
+with the signal's reason and leaves nothing of the effect in the scene.
+
+Textures are shared per scene between effects that use the same image and sampler state. Free a
+loaded effect with `QuarksLoader.disposeEffect(root)`, which disposes its nodes, the materials made
+for it and each texture once no other loaded effect, or `QuarksUtil.instantiate` copy, still uses
+it. `EffectPool` frees its copies the same way.
