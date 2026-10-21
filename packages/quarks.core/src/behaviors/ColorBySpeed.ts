@@ -1,9 +1,12 @@
 import {Particle} from '../Particle';
 import {ColorGeneratorFromJSON, FunctionColorGenerator, IntervalValue} from '../functions';
 import {Behavior} from './Behavior';
+import {speedFraction} from './speedFraction';
 
 /**
- * Color particles by their speed.
+ * Colors particles by their current speed, like Unity's Color by Speed: the speed (velocity
+ * length times the speed modifier) is placed in `speedRange`, clamped to 0..1, and the gradient is
+ * read there and multiplied by the start colour.
  */
 export class ColorBySpeed implements Behavior {
     type = 'ColorBySpeed';
@@ -17,7 +20,7 @@ export class ColorBySpeed implements Behavior {
     }
 
     update(particle: Particle, delta: number): void {
-        const t = (particle.startSpeed - this.speedRange.a) / (this.speedRange.b - this.speedRange.a);
+        const t = speedFraction(particle, this.speedRange);
         (this.color as FunctionColorGenerator).genColor(particle.memory, particle.color, t);
         particle.color.x *= particle.startColor.x;
         particle.color.y *= particle.startColor.y;

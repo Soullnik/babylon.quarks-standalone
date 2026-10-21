@@ -3,6 +3,7 @@ import {Scene} from '@babylonjs/core/scene';
 import {IAnimationData, IPrefab} from 'quarks.core';
 import {BatchedRenderer} from './BatchedRenderer';
 import {ParticleEmitter} from './ParticleEmitter';
+import {quarksNodeId} from './nodeId';
 
 export interface QuarksTimelineClip {
     uuid?: string;
@@ -254,7 +255,7 @@ export class QuarksPrefab extends TransformNode implements IPrefab {
                 startTime: animation.startTime,
                 duration: animation.duration,
                 type: animation.type,
-                targetUUID: (animation.target as any)._quarksUUID ?? animation.target.uniqueId.toString(),
+                targetUUID: quarksNodeId(animation.target),
                 clipUUID: animation.type === 'three' ? (animation.clipUUID ?? animation.clip?.uuid) : undefined,
                 loop: animation.loop,
             })),

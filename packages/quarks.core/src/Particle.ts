@@ -111,6 +111,14 @@ export interface Particle extends IParticle {
      * @type {Vector3}
      */
     startSize: Vector3;
+    /**
+     * Counts the particles this object has held, when the implementation reuses particle objects:
+     * the system bumps it at every spawn. Something that keeps a reference to a particle, such as
+     * a sub emission following its parent, compares it to tell the particle it saw from a later
+     * one that took over the same object.
+     * @type {number}
+     */
+    serial?: number;
 
     reset(): void;
 }
@@ -204,6 +212,8 @@ export class SpriteParticle implements Particle {
      * @type {Matrix4}
      */
     parentMatrix?: Matrix4;
+    /** See {@link Particle.serial}. */
+    serial?: number;
     /**
      * Initial speed of the particle, kept in the store's `startSpeed` column.
      * @type {number}
@@ -492,6 +502,8 @@ export class TrailParticle implements Particle {
      * @type {Matrix4}
      */
     parentMatrix?: Matrix4;
+    /** See {@link Particle.serial}. */
+    serial?: number;
     /**
      * Initial speed of the particle, kept in the store's `startSpeed` column.
      * @type {number}

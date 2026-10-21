@@ -332,6 +332,55 @@ describe('behavior fusion', () => {
         }
     });
 
+    it.each([
+        ['local', false],
+        ['world', true],
+    ])('matches the separate path for VelocityOverLife radial and orbital offset in %s space', (_, worldSpace) => {
+        const matrixWorld = new Matrix4().compose(
+            new Vector3(3, -1, 2),
+            new Quaternion().setFromAxisAngle(new Vector3(0, 1, 0), 0.7),
+            new Vector3(2, 2, 2)
+        );
+        const ps = {worldSpace, emitter: {matrixWorld}} as unknown as IParticleSystem;
+        const build = (): Behavior[] => [
+            new VelocityOverLife(
+                new ConstantValue(0.5),
+                new ConstantValue(0),
+                new ConstantValue(0),
+                new ConstantValue(0.4),
+                new ConstantValue(0.8),
+                new ConstantValue(0),
+                'local',
+                new PiecewiseBezier([[new Bezier(1, 0.5, -0.5, -1), 0]]),
+                new Vector3(1, 0.5, -2)
+            ),
+        ];
+        const fusedBehaviors = build();
+        const separateBehaviors = build();
+        const fused = makePool(COUNT);
+        const separate = makePool(COUNT);
+        const start = fused.map((p) => p.position.clone());
+        for (const p of fused) for (const b of fusedBehaviors) b.initialize(p, ps);
+        for (const p of separate) for (const b of separateBehaviors) b.initialize(p, ps);
+        expect(planBehaviorFusion(fusedBehaviors)).toHaveLength(1);
+
+        for (let frame = 0; frame < 3; frame++) {
+            runPlan(fusedBehaviors, fused, DELTA);
+            runSeparately(separateBehaviors, separate, DELTA);
+            for (let i = 0; i < COUNT; i++) {
+                fused[i].age += DELTA;
+                separate[i].age += DELTA;
+            }
+        }
+
+        const expected = snapshot(separate);
+        const actual = snapshot(fused);
+        for (let i = 0; i < expected.length; i++) {
+            expect(actual[i]).toBeCloseTo(expected[i], 6);
+        }
+        expect(fused[0].position.distanceTo(start[0])).toBeGreaterThan(1e-3);
+    });
+
     it('matches the separate path for the force and by-speed behaviors', () => {
         const build = (): Behavior[] => [
             new ForceOverLife(new ConstantValue(1), new ConstantValue(-2), new ConstantValue(0.5)),

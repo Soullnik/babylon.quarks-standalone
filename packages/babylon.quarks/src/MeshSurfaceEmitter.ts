@@ -1,6 +1,7 @@
 import {VertexBuffer} from '@babylonjs/core/Buffers/buffer';
 import {Mesh} from '@babylonjs/core/Meshes/mesh';
 import {EmitterShape, IParticleSystem, Particle, Plugin, random, ShapeJSON, ShapeTransform, Vector3} from 'quarks.core';
+import {quarksNodeId} from './nodeId';
 
 export class MeshSurfaceEmitter implements EmitterShape {
     type = 'mesh_surface';
@@ -117,7 +118,7 @@ export class MeshSurfaceEmitter implements EmitterShape {
     toJSON(): ShapeJSON {
         return {
             type: 'mesh_surface',
-            mesh: this._mesh ? (this._mesh as any).uniqueId?.toString() : (this._meshReferenceId ?? ''),
+            mesh: this._mesh ? quarksNodeId(this._mesh) : (this._meshReferenceId ?? ''),
             ...ShapeTransform.toShapeJSON(this.transform),
         };
     }

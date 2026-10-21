@@ -203,6 +203,12 @@ export interface IParticleSystem {
      */
     onlyUsedByOther?: boolean;
     /**
+     * Whether the system has been disposed. A disposed system takes no more particles, so a sub
+     * emitter aimed at it emits nothing.
+     * @type {boolean}
+     */
+    readonly isDisposed?: boolean;
+    /**
      * Whether the ParticleSystem should be automatically disposed when it finishes emitting particles.
      * @type {string}
      */

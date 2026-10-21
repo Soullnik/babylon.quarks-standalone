@@ -18,8 +18,39 @@ and the project follows the `quarks.core` 0.x version line.
 - **Texture sequencer JSON names its type and writes `position` as `[x, y, z]`.** Files written
   before this release, with no type and an `{x, y, z}` position, still load.
 
+- **Color, Size and Rotation by Speed read the current speed**, like Unity's modules and
+  Niagara's Scale by Speed: the velocity's length times the speed modifier, clamped to
+  `speedRange`. Before, they read the start speed, so a particle slowed by drag, a limit or a
+  collision kept its birth colour and size. Effects that use them on particles whose speed changes
+  now look different. An empty `speedRange` is a step at its value instead of NaN. The helper is
+  exported as `speedFraction`.
+- **`LimitSpeedOverLife` dampen is clamped to 0..1 and no longer depends on the frame rate.** At
+  60 steps a second a step still removes `dampen / 3` of the excess speed, so babylon.quarks
+  effects, which step at 60 Hz, look the same. Other step lengths now remove the share that
+  compounds to the same loss per second; before, a long step could reverse the velocity.
+- **A disposed system stays disposed.** `restart()` no longer brings it back, it emits nothing,
+  and `dispose()` drops its particles. `isDisposed` (also on `IParticleSystem`) says so.
+- **`ParticleEmitter.uuid` is the id the emitter was loaded under**, the same id its `toJSON`
+  writes, and `quarksNodeId(node)` gives it for any node.
+
 ### Fixed
 
+- **A non-looping system whose rate curve starts at 0 never emitted.** It reported nothing
+  pending on its first step and finished at once. A rate that rises later in the cycle now counts
+  as pending.
+- **A looping system reported pending emission after `endEmit()`.**
+- **A disposed sub emitter target kept taking particles without limit**, since nothing updated it
+  any more. Sub emitters now skip disposed targets.
+- **Death sub emissions followed a newborn.** The dying particle's object is reused for the next
+  particle, and the emission followed that one back to the emitter, inheriting its colour and size.
+  A Death emission now stays where its parent died and inherits what the parent died with. Birth
+  and Frame emissions stop following when their parent dies (`Particle.serial`).
+- **`useVelocityAsBasis` stretched the sub emitter by the parent's speed**, and gave a NaN matrix
+  for a parent moving along -Z or faster than 1 along +Z. The basis is now orthonormal.
+- **The fused `VelocityOverLife` ignored `radial` and `orbitalOffset`.** The fused pass, which runs
+  by default, now matches the per-particle path.
+- **Sub emitter and mesh surface links broke when a loaded effect was saved again.** The links were
+  written with Babylon's `uniqueId` and the nodes with the uuid they were loaded under.
 - **`clone()` shared state with the original**, so editing one changed the other:
   - `ChangeEmitDirection`, the `Euler` rotation generator and `Vector3Function` (and with it
     `SizeOverLife` with separate axes) reused their child generators.

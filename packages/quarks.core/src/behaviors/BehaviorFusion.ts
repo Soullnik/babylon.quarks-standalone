@@ -101,6 +101,14 @@ function scalarSetup(n: string, expr: string): string {
         const ${n}_a = ${n}_iv ? ${n}.a : 0, ${n}_b = ${n}_iv ? ${n}.b : 0;`;
 }
 
+/** Statements declaring `ts`, the row's current speed within behavior `k`'s range; see speedFraction. */
+function speedFractionOf(k: number): string {
+    return `const vx = vel[o3], vy = vel[o3 + 1], vz = vel[o3 + 2];
+        const speed = Math.sqrt(vx * vx + vy * vy + vz * vz) * scalars[s + 2];
+        let ts = span${k} === 0 ? (speed >= lo${k} ? 1 : 0) : (speed - lo${k}) / span${k};
+        ts = ts < 0 ? 0 : ts > 1 ? 1 : ts;`;
+}
+
 /** Statements that declare `out` and set it to the generator's value at `t`. */
 function scalarValue(n: string, out: string, t: string): string {
     return `let ${out};
@@ -336,7 +344,7 @@ function fragmentFor(behavior: Behavior, k: number): Fragment | null {
             return {
                 setup: `const b${k} = behaviors[${k}];
                     ${scalarSetup(`g${k}`, `b${k}.speed`)}
-                    const dampen${k} = b${k}.dampen * delta * 20;
+                    const dampen${k} = b${k}.dampenStep(delta);
                     const ms${k} = typeof b${k}.motionScale === 'function' ? b${k}.motionScale() : 1;`,
                 body: `{const vx = vel[o3], vy = vel[o3 + 1], vz = vel[o3 + 2];
                     const speed = Math.sqrt(vx * vx + vy * vy + vz * vz);
@@ -365,7 +373,7 @@ function fragmentFor(behavior: Behavior, k: number): Fragment | null {
                     ${colorSetup(`g${k}`, `b${k}.color`)}
                     const lo${k} = b${k}.speedRange.a;
                     const span${k} = b${k}.speedRange.b - lo${k};`,
-                body: `{const ts = (startSpeed[row] - lo${k}) / span${k};
+                body: `{${speedFractionOf(k)}
                     ${colorWrite(`g${k}`, 'ts')}}`,
             };
         case 'SizeBySpeed':
@@ -376,7 +384,7 @@ function fragmentFor(behavior: Behavior, k: number): Fragment | null {
                     const span${k} = b${k}.speedRange.b - lo${k};
                     const vec3_${k} = g${k} instanceof deps.Vector3Function;
                     ${scalarSetup(`sg${k}`, `g${k}`)}`,
-                body: `{const ts = (startSpeed[row] - lo${k}) / span${k};
+                body: `{${speedFractionOf(k)}
                     if (vec3_${k}) {
                         g${k}.genValue(p.memory, p.size, ts).multiply(p.startSize);
                     } else {
@@ -394,7 +402,7 @@ function fragmentFor(behavior: Behavior, k: number): Fragment | null {
                     const span${k} = b${k}.speedRange.b - lo${k};
                     const angle_${k} = count > 0 && typeof particles[0].rotation === 'number';`,
                 body: `if (angle_${k}) {
-                        const ts = (startSpeed[row] - lo${k}) / span${k};
+                        ${speedFractionOf(k)}
                         ${scalarValue(`g${k}`, 'rate', 'ts')}
                         rot[row] += delta * rate;
                         angVel[row] = rate;
@@ -480,7 +488,8 @@ function fragmentFor(behavior: Behavior, k: number): Fragment | null {
                     ${vectorSetup(`aX${k}`, `b${k}._axisX`)}
                     ${vectorSetup(`aY${k}`, `b${k}._axisY`)}
                     ${vectorSetup(`aZ${k}`, `b${k}._axisZ`)}
-                    ${vectorSetup(`pv${k}`, `b${k}._tempEmitterPos`)}
+                    ${scalarSetup(`rd${k}`, `b${k}.radial`)}
+                    ${vectorSetup(`ce${k}`, `b${k}._center`)}
                     const world${k} = b${k}.ps !== undefined && b${k}.ps.worldSpace;
                     const toWorld${k} = world${k} && b${k}.space === 'local';
                     const convert${k} = toWorld${k} || (!world${k} && b${k}.space === 'world');
@@ -497,20 +506,26 @@ function fragmentFor(behavior: Behavior, k: number): Fragment | null {
                     let px = Math.fround(pos[o3] + fx * delta);
                     let py = Math.fround(pos[o3 + 1] + fy * delta);
                     let pz = Math.fround(pos[o3 + 2] + fz * delta);
+                    ${scalarValue(`rd${k}`, 'radial', 't')}
+                    if (radial !== 0) {
+                        // Away from the centre, along the line through the particle.
+                        const dx = px - ce${k}x, dy = py - ce${k}y, dz = pz - ce${k}z;
+                        const length = Math.sqrt(dx * dx + dy * dy + dz * dz);
+                        if (length > 0) {
+                            const f = (radial * delta) / length;
+                            px = Math.fround(px + dx * f); py = Math.fround(py + dy * f); pz = Math.fround(pz + dz * f);
+                        }
+                    }
                     ${scalarValue(`ox${k}`, 'rx', 't')}
                     ${scalarValue(`oy${k}`, 'ry', 't')}
                     ${scalarValue(`oz${k}`, 'rz', 't')}
                     rx *= delta; ry *= delta; rz *= delta;
                     if (rx !== 0 || ry !== 0 || rz !== 0) {
-                        if (world${k}) {
-                            px = Math.fround(px - pv${k}x); py = Math.fround(py - pv${k}y); pz = Math.fround(pz - pv${k}z);
-                        }
+                        px = Math.fround(px - ce${k}x); py = Math.fround(py - ce${k}y); pz = Math.fround(pz - ce${k}z);
                         if (rx !== 0) ${orbitInPlace('rx', `aX${k}x`, `aX${k}y`, `aX${k}z`)}
                         if (ry !== 0) ${orbitInPlace('ry', `aY${k}x`, `aY${k}y`, `aY${k}z`)}
                         if (rz !== 0) ${orbitInPlace('rz', `aZ${k}x`, `aZ${k}y`, `aZ${k}z`)}
-                        if (world${k}) {
-                            px = Math.fround(px + pv${k}x); py = Math.fround(py + pv${k}y); pz = Math.fround(pz + pv${k}z);
-                        }
+                        px = Math.fround(px + ce${k}x); py = Math.fround(py + ce${k}y); pz = Math.fround(pz + ce${k}z);
                     }
                     pos[o3] = px; pos[o3 + 1] = py; pos[o3 + 2] = pz;}`,
             };

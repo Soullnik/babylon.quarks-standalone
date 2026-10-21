@@ -17,6 +17,7 @@ export {
 } from './envAtlas';
 export * from './materials/';
 export {MeshSurfaceEmitter, MeshSurfaceEmitterPlugin} from './MeshSurfaceEmitter';
+export {quarksNodeId} from './nodeId';
 export {ParticleEmitter} from './ParticleEmitter';
 export {ParticleSystem} from './ParticleSystem';
 export type {
