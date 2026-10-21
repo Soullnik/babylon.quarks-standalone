@@ -7,9 +7,12 @@ import {
     Vector3Generator,
 } from '../functions';
 import {Behavior} from './Behavior';
+import {speedFraction} from './speedFraction';
 
 /**
- * Apply size to particles based on their speed.
+ * Sizes particles by their current speed, like Unity's Size by Speed: the speed (velocity length
+ * times the speed modifier) is placed in `speedRange`, clamped to 0..1, and the curve read there
+ * scales the start size.
  */
 export class SizeBySpeed implements Behavior {
     type = 'SizeBySpeed';
@@ -24,7 +27,7 @@ export class SizeBySpeed implements Behavior {
     ) {}
 
     update(particle: Particle): void {
-        const t = (particle.startSpeed - this.speedRange.a) / (this.speedRange.b - this.speedRange.a);
+        const t = speedFraction(particle, this.speedRange);
         if (this.size instanceof Vector3Function) {
             this.size.genValue(particle.memory, particle.size, t).multiply(particle.startSize);
         } else {

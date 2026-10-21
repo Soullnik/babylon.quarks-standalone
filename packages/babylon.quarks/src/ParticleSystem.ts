@@ -28,6 +28,7 @@ import {
     ParticleStore,
     ParticleSystemEvent,
     ParticleSystemEventType,
+    PiecewiseBezier,
     planBehaviorFusion,
     Quaternion,
     random,
@@ -132,6 +133,8 @@ const tempV2 = new Vector3();
 const PREWARM_FPS = 60;
 const SIMULATION_STEP = 1 / PREWARM_FPS;
 const MAX_SIMULATION_STEPS_PER_FRAME = 8;
+/** Points sampled over the rest of the cycle when a non-Bezier rate curve is 0 now, to see if it rises later. */
+const RATE_LOOKAHEAD_SAMPLES = 64;
 /** Most off-screen time a `'pauseAndCatchUp'` system replays on coming back into view. */
 const MAX_CATCH_UP_SECONDS = 2;
 /** Steps between full measurements of a system's bounds; see simulateStep. */
@@ -490,11 +493,11 @@ export class ParticleSystem implements IParticleSystem {
 
     /** Whether continuous or queued emission can still spawn particles before the system is done. */
     hasPendingEmission(): boolean {
-        if (this.looping) {
-            return true;
-        }
         if (this.emitEnded) {
             return false;
+        }
+        if (this.looping) {
+            return true;
         }
         if (this.onlyUsedByOther) {
             return false;
@@ -513,10 +516,37 @@ export class ParticleSystem implements IParticleSystem {
             return false;
         }
         const timeRatio = state.time / this.duration;
-        if (this.emissionOverTime.genValue(this.memory, timeRatio) > 0) {
+        return this.emitsFrom(this.emissionOverTime, timeRatio) || this.emitsFrom(this.emissionOverDistance, timeRatio);
+    }
+
+    /**
+     * Whether a rate is above 0 now or anywhere later in the cycle, so a curve that fades in from 0
+     * still counts as pending. A Bezier curve is checked exactly from its control points; another
+     * kind of curve is sampled, which only runs while the rate is 0.
+     */
+    private emitsFrom(rate: ValueGenerator | FunctionValueGenerator, timeRatio: number): boolean {
+        if (rate.genValue(this.memory, timeRatio) > 0) {
             return true;
         }
-        return this.emissionOverDistance.genValue(this.memory, timeRatio) > 0;
+        if (rate.type !== 'function') {
+            return false;
+        }
+        if (rate instanceof PiecewiseBezier) {
+            // A Bezier stays within its control points, so this is exact however short a pulse.
+            for (let i = 0; i < rate.functions.length; i++) {
+                if (rate.getEndX(i) > timeRatio && rate.functions[i][0].p.some((value) => value > 0)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+        const samples = RATE_LOOKAHEAD_SAMPLES;
+        for (let i = 1; i <= samples; i++) {
+            if (rate.genValue(this.memory, timeRatio + ((1 - timeRatio) * i) / samples) > 0) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -1385,6 +1415,7 @@ export class ParticleSystem implements IParticleSystem {
             }
             const particle = this.particles[this.particleNum - 1];
             particle.reset();
+            particle.serial = (particle.serial ?? 0) + 1;
             particle.speedModifier = 1;
             // Parent EmitSub can refill an onlyUsedByOther system after it had
             // already finished empty; clear the flag so update does not treat it
@@ -1563,11 +1594,18 @@ export class ParticleSystem implements IParticleSystem {
         this.fire({type: 'emitEnd', particleSystem: this});
     }
 
+    /** Whether {@link dispose} has run. A disposed system emits nothing and cannot be restarted. */
+    get isDisposed(): boolean {
+        return this.destroyed;
+    }
+
     dispose() {
         if (this.destroyed) {
             return;
         }
         this.destroyed = true;
+        // Nothing updates a disposed system again, so its particles would never die.
+        this.particleNum = 0;
         if (this._renderer) this._renderer.deleteSystem(this);
         disposeEmitterForSystem(this.emitter);
         this.fire({type: 'destroy', particleSystem: this});
@@ -1596,6 +1634,9 @@ export class ParticleSystem implements IParticleSystem {
     }
 
     restart() {
+        if (this.destroyed) {
+            return;
+        }
         this.memory.length = 0;
         this.paused = false;
         this.particleNum = 0;
@@ -1617,7 +1658,12 @@ export class ParticleSystem implements IParticleSystem {
         this.emissionState.previousWorldPos = undefined;
         this.emissionState.burstParticleIndex = 0;
         this.emissionState.burstParticleCount = 0;
-        this.behaviors.forEach((behavior) => behavior.reset());
+        this.behaviors.forEach((behavior) => {
+            behavior.reset();
+            if (behavior instanceof EmitSubParticleSystem) {
+                behavior.clearEmissions();
+            }
+        });
         this.emitEnded = false;
         this.markForDestroy = false;
         this.finishedEventFired = false;
@@ -1626,7 +1672,6 @@ export class ParticleSystem implements IParticleSystem {
         this.previousEmitterPos = undefined;
         this.emitterVelocity.set(0, 0, 0);
         this.simulationAccumulator = 0;
-        this.destroyed = false;
     }
 
     private firstTimeUpdate = true;
@@ -1644,7 +1689,7 @@ export class ParticleSystem implements IParticleSystem {
      * @internal
      */
     update(delta: number, stepDeadline = Infinity, catchUpDeadline?: number) {
-        if (this.paused) return;
+        if (this.paused || this.destroyed) return;
         delta *= this.playbackSpeed;
 
         if (this.culled) {
@@ -2248,7 +2293,8 @@ export class ParticleSystem implements IParticleSystem {
                     }
                 }
             }
-            this.particleNum = liveParticleCount;
+            // A particleDied listener may have disposed the system, which drops every particle.
+            this.particleNum = this.destroyed ? 0 : liveParticleCount;
             this.storeBounds(liveParticleCount, measure, minX, minY, minZ, maxX, maxY, maxZ, maxSize, maxSpeedSq);
             this.notifyFinished();
             return;
@@ -2376,7 +2422,8 @@ export class ParticleSystem implements IParticleSystem {
                 }
             }
         }
-        this.particleNum = liveParticleCount;
+        // A particleDied listener may have disposed the system, which drops every particle.
+        this.particleNum = this.destroyed ? 0 : liveParticleCount;
         this.notifyFinished();
     }
 
@@ -2524,6 +2571,9 @@ export class ParticleSystem implements IParticleSystem {
     }
 
     emit(delta: number, emissionState: EmissionState, emitterMatrix: Matrix4) {
+        if (this.destroyed) {
+            return;
+        }
         // Ended before this step (endEmit, or a past step's end of duration):
         // no more bursts either. A looping system would otherwise keep firing
         // them every loop after endEmit and never finish. Only the system's

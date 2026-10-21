@@ -4,6 +4,7 @@ import {MeshBuilder} from '@babylonjs/core/Meshes/meshBuilder';
 import {Scene} from '@babylonjs/core/scene';
 import {SpriteParticle} from 'quarks.core';
 import {MeshSurfaceEmitter} from '../src/MeshSurfaceEmitter';
+import {quarksNodeId} from '../src/nodeId';
 
 describe('MeshSurfaceEmitter', () => {
     let engine: NullEngine;
@@ -83,11 +84,11 @@ describe('MeshSurfaceEmitter', () => {
         expect(copy.mesh).toBe(box);
     });
 
-    it('serializes mesh surface emitter with live mesh unique id', () => {
+    it('serializes mesh surface emitter with the live mesh id', () => {
         const box = MeshBuilder.CreateBox('json-box', {size: 1}, scene);
         const emitter = new MeshSurfaceEmitter(box);
         const json = emitter.toJSON();
-        expect(json.mesh).toBe(String((box as any).uniqueId));
+        expect(json.mesh).toBe(quarksNodeId(box));
     });
 
     it('mesh setter returns early when clearing mesh reference', () => {

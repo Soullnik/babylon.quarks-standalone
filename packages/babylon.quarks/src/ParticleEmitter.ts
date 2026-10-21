@@ -1,6 +1,7 @@
 import {TransformNode} from '@babylonjs/core/Meshes/transformNode';
 import {Scene} from '@babylonjs/core/scene';
 import {IParticleSystem, Matrix4, SerializationOptions} from 'quarks.core';
+import {quarksNodeId} from './nodeId';
 
 /**
  * Above 0 while a particle system disposes its own emitter (`ParticleSystem.dispose()`, which
@@ -66,8 +67,9 @@ export class ParticleEmitter extends TransformNode {
         this.setEnabled(value);
     }
 
+    /** The id effect files know this emitter by; see {@link quarksNodeId}. */
     get uuid(): string {
-        return this.uniqueId.toString();
+        return quarksNodeId(this);
     }
 
     constructor(system: IParticleSystem, scene?: Scene) {
@@ -122,7 +124,7 @@ export class ParticleEmitter extends TransformNode {
 
     toJSON(meta?: any, options: SerializationOptions = {}): any {
         return {
-            uuid: (this as any)._quarksUUID ?? this.uniqueId.toString(),
+            uuid: quarksNodeId(this),
             type: 'ParticleEmitter',
             name: this.name,
             position: [this.position.x, this.position.y, this.position.z],

@@ -3,9 +3,12 @@ import {IntervalValue} from '../functions';
 import {FunctionValueGenerator, ValueGenerator, ValueGeneratorFromJSON} from '../functions/ValueGenerator';
 import {Quaternion} from '../math';
 import {Behavior} from './Behavior';
+import {speedFraction} from './speedFraction';
 
 /**
- * Apply rotation to particles based on their speed.
+ * Turns particles at a rate read off their current speed, like Unity's Rotation by Speed: the
+ * speed (velocity length times the speed modifier) is placed in `speedRange`, clamped to 0..1.
+ * Billboards only; particles rotating by quaternion are left alone.
  */
 export class RotationBySpeed implements Behavior {
     type = 'RotationBySpeed';
@@ -24,7 +27,7 @@ export class RotationBySpeed implements Behavior {
 
     update(particle: Particle, delta: number): void {
         if (typeof particle.rotation === 'number') {
-            const t = (particle.startSpeed - this.speedRange.a) / (this.speedRange.b - this.speedRange.a);
+            const t = speedFraction(particle, this.speedRange);
             const rate = (this.angularVelocity as FunctionValueGenerator).genValue(particle.memory, t);
             (particle.rotation as number) += delta * rate;
             // Kept for the renderer, which draws between steps.

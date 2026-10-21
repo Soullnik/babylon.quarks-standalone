@@ -1,9 +1,12 @@
 import {EmissionState, IEmitter, IParticleSystem} from '../IParticleSystem';
 import {Matrix4, Quaternion, Vector3} from '../math';
-import {Particle} from '../Particle';
+import {Particle, SpriteParticle} from '../Particle';
 import {ONE_VEC3, Z_VEC3} from '../util/MathUtil';
 import {random} from '../util/random';
 import {Behavior} from './Behavior';
+
+/** Below this, a speed counts as zero and a direction's X and Y as lying along Z. */
+const BASIS_EPSILON = 1e-6;
 
 export enum SubParticleEmitMode {
     Death,
@@ -14,6 +17,13 @@ export enum SubParticleEmitMode {
 interface SubEmissionState extends EmissionState {
     matrix: Matrix4;
     particle: undefined | Particle;
+    /** The parent's {@link Particle.serial} when the emission started. */
+    serial: number | undefined;
+    /**
+     * A still copy of a dying parent, for a Death emission: the parent's own object is reused for
+     * the next particle, but the emission stays where it died and inherits what it was.
+     */
+    ghost?: SpriteParticle;
 }
 
 /** A parent particle property sub emitted particles can take over (Unity's sub emitter Inherit). */
@@ -46,6 +56,7 @@ export class EmitSubParticleSystem implements Behavior {
     private q_ = new Quaternion();
     private v_ = new Vector3();
     private v2_ = new Vector3();
+    private v3_ = new Vector3();
 
     private subEmissions = new Array<SubEmissionState>();
     /** Finished emission states, kept for reuse: a burst of deaths would otherwise allocate one plus a matrix each. */
@@ -60,8 +71,9 @@ export class EmitSubParticleSystem implements Behavior {
         /**
          * Which of the parent particle's properties the sub particles start
          * from: its current colour and size multiply theirs, its rotation adds
-         * to theirs, and its remaining lifetime fraction scales theirs (so
-         * lifetime suits birth sub emitters, not death ones).
+         * to theirs, and its remaining lifetime fraction scales theirs. A Death
+         * sub emitter ignores lifetime, since the parent has none left; Unity
+         * would give its particles no life at all.
          */
         public inherit: SubEmitterInheritance[] = []
     ) {
@@ -94,15 +106,16 @@ export class EmitSubParticleSystem implements Behavior {
     /**
      * The system to emit into, or undefined when `subParticleSystem` does not
      * hold a resolved emitter — unset, or a uuid string a loader could not
-     * link. Every use goes through here, so a bad value is skipped rather
-     * than thrown on.
+     * link — or when that system was disposed. Every use goes through here,
+     * so a bad value is skipped rather than thrown on.
      */
     private get target(): IParticleSystem | undefined {
         const sub = this.subParticleSystem as unknown;
         if (sub === null || typeof sub !== 'object') {
             return undefined;
         }
-        return (sub as IEmitter).system as IParticleSystem | undefined;
+        const system = (sub as IEmitter).system as IParticleSystem | undefined;
+        return system?.isDisposed ? undefined : system;
     }
 
     private emit(particle: Particle, delta: number) {
@@ -125,6 +138,7 @@ export class EmitSubParticleSystem implements Behavior {
                       matrix: new Matrix4(),
                       travelDistance: 0,
                       particle: undefined,
+                      serial: undefined,
                       previousWorldPos: undefined,
                   };
         state.burstParticleCount = 0;
@@ -135,8 +149,18 @@ export class EmitSubParticleSystem implements Behavior {
         state.time = 0;
         state.waitEmiting = 0;
         state.travelDistance = 0;
-        state.particle = particle;
+        if (this.mode === SubParticleEmitMode.Death) {
+            state.particle = EmitSubParticleSystem.copyInto((state.ghost ??= new SpriteParticle()), particle);
+            state.serial = undefined;
+        } else {
+            state.particle = particle;
+            state.serial = particle.serial;
+        }
         state.inherit = subEmitterInheritMask(this.inherit);
+        if (this.mode === SubParticleEmitMode.Death) {
+            // A dying parent has no life left to hand on.
+            state.inherit &= ~SubEmitterInheritMask.lifetime;
+        }
         state.previousWorldPos = undefined;
         this.setMatrixFromParticle(state.matrix, particle);
         this.subEmissions.push(state);
@@ -146,7 +170,7 @@ export class EmitSubParticleSystem implements Behavior {
     frameUpdate(delta: number): void {
         const target = this.target;
         if (!target) {
-            this.subEmissions.length = 0;
+            this.clearEmissions();
             return;
         }
         for (let i = 0; i < this.subEmissions.length; i++) {
@@ -159,9 +183,17 @@ export class EmitSubParticleSystem implements Behavior {
                 i--;
             } else {
                 const subEmissionState = this.subEmissions[i];
-                if (subEmissionState.particle && subEmissionState.particle!.age < subEmissionState.particle!.life) {
-                    this.setMatrixFromParticle(subEmissionState.matrix, subEmissionState.particle!);
+                const parent = subEmissionState.particle;
+                if (parent !== undefined && parent === subEmissionState.ghost) {
+                    // A Death emission stays where its parent died.
+                } else if (
+                    parent !== undefined &&
+                    parent.age < parent.life &&
+                    parent.serial === subEmissionState.serial
+                ) {
+                    this.setMatrixFromParticle(subEmissionState.matrix, parent);
                 } else {
+                    // The parent died, and its object may already hold a newborn.
                     subEmissionState.particle = undefined;
                 }
                 target.emit(delta, subEmissionState, subEmissionState.matrix);
@@ -209,6 +241,30 @@ export class EmitSubParticleSystem implements Behavior {
     }
     reset(): void {}
 
+    /**
+     * Drops the emissions still running, as when the parent system restarts or stops: a Death
+     * emission would otherwise keep emitting where a particle of the last play died.
+     */
+    clearEmissions(): void {
+        for (const state of this.subEmissions) {
+            state.particle = undefined;
+            this.spareEmissions.push(state);
+        }
+        this.subEmissions.length = 0;
+    }
+
+    /** Copies what a sub emission reads from its parent: where it is, how it moves and what it inherits. */
+    private static copyInto(ghost: SpriteParticle, particle: Particle): SpriteParticle {
+        ghost.position.copy(particle.position);
+        ghost.velocity.copy(particle.velocity);
+        ghost.color.copy(particle.color);
+        ghost.size.copy(particle.size);
+        ghost.rotation = particle.rotation ?? 0;
+        ghost.age = particle.age;
+        ghost.life = particle.life;
+        return ghost;
+    }
+
     private static validInherit(value: unknown): SubEmitterInheritance[] {
         if (!Array.isArray(value)) {
             return [];
@@ -219,53 +275,31 @@ export class EmitSubParticleSystem implements Behavior {
     private setMatrixFromParticle(m: Matrix4, particle: Particle) {
         let rotation;
         if (particle.rotation === undefined || this.useVelocityAsBasis) {
-            if (
-                particle.velocity.x === 0 &&
-                particle.velocity.y === 0 &&
-                (particle.velocity.z === 1 || particle.velocity.z === 0)
-            ) {
-                m.set(
-                    1,
-                    0,
-                    0,
-                    particle.position.x,
-                    0,
-                    1,
-                    0,
-                    particle.position.y,
-                    0,
-                    0,
-                    1,
-                    particle.position.z,
-                    0,
-                    0,
-                    0,
-                    1
-                );
+            // An orthonormal basis whose Z is the direction of travel: the sub emitter turns with the
+            // parent but keeps its own size, whatever the parent's speed.
+            const position = particle.position;
+            const dir = this.v3_.copy(particle.velocity);
+            const speed = dir.length();
+            const x = this.v_;
+            const y = this.v2_;
+            if (speed < BASIS_EPSILON) {
+                x.set(1, 0, 0);
+                y.set(0, 1, 0);
+                dir.set(0, 0, 1);
             } else {
-                this.v_.copy(Z_VEC3).cross(particle.velocity);
-                this.v2_.copy(particle.velocity).cross(this.v_);
-                const len = this.v_.length();
-                const len2 = this.v2_.length();
-                m.set(
-                    this.v_.x / len,
-                    this.v2_.x / len2,
-                    particle.velocity.x,
-                    particle.position.x,
-                    this.v_.y / len,
-                    this.v2_.y / len2,
-                    particle.velocity.y,
-                    particle.position.y,
-                    this.v_.z / len,
-                    this.v2_.z / len2,
-                    particle.velocity.z,
-                    particle.position.z,
-                    0,
-                    0,
-                    0,
-                    1
-                );
+                dir.divideScalar(speed);
+                if (Math.abs(dir.x) < BASIS_EPSILON && Math.abs(dir.y) < BASIS_EPSILON) {
+                    // Along Z, where Z × dir vanishes: no turn forwards, a half turn about X backwards.
+                    const sign = dir.z > 0 ? 1 : -1;
+                    x.set(1, 0, 0);
+                    y.set(0, sign, 0);
+                    dir.set(0, 0, sign);
+                } else {
+                    x.copy(Z_VEC3).cross(dir).normalize();
+                    y.copy(dir).cross(x);
+                }
             }
+            m.set(x.x, y.x, dir.x, position.x, x.y, y.y, dir.y, position.y, x.z, y.z, dir.z, position.z, 0, 0, 0, 1);
         } else {
             if (particle.rotation instanceof Quaternion) {
                 rotation = particle.rotation;
