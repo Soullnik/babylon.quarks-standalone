@@ -106,6 +106,23 @@ export interface TrailSettings {
      * @type {Vector3}
      */
     sideAxis?: Vector3;
+    /**
+     * Draw each segment between two recorded samples as this many more
+     * segments, along a curve through the samples (Niagara's ribbon
+     * tessellation), so a fast or sharply turning trail stays round instead
+     * of showing the corners between frames. A whole number from 0 (the
+     * default: straight segments) to 16. The curve passes through every
+     * sample: it smooths the trail without moving it.
+     * @type {number}
+     */
+    tessellation?: number;
+    /**
+     * How tightly a tessellated trail's curve is drawn between its samples
+     * (Niagara's curve tension): 0 (the default) a Catmull-Rom spline, rising
+     * toward 1 for straight segments.
+     * @type {number}
+     */
+    curveTension?: number;
 }
 
 export interface MeshSettings {

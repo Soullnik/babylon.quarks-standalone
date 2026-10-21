@@ -53,6 +53,7 @@ import {BatchedRenderer, VFXBatchSettings} from './BatchedRenderer';
 import {ensureEnvAtlasFromCube, getCachedEnvAtlas} from './envAtlas';
 import {ensureTriangleIndices} from './geometryUtil';
 import {ParticleEmitter} from './ParticleEmitter';
+import {trailCurveTension, trailTessellation} from './trailCurve';
 import {
     MeshLighting,
     MeshRim,
@@ -195,6 +196,16 @@ function trailFlags(settings: TrailSettings | undefined): Partial<TrailSettings>
     if (settings?.dieWithParticle) flags.dieWithParticle = true;
     if (settings?.recordWorldSpace) flags.recordWorldSpace = true;
     return flags;
+}
+
+/** A trail's tessellation and curve tension, normalised, each only when it differs from the default. */
+function trailCurve(settings: TrailSettings | undefined): Partial<TrailSettings> {
+    const curve: Partial<TrailSettings> = {};
+    const tessellation = trailTessellation(settings);
+    const curveTension = trailCurveTension(settings);
+    if (tessellation > 0) curve.tessellation = tessellation;
+    if (curveTension > 0) curve.curveTension = curveTension;
+    return curve;
 }
 
 /** A trail's side axis as JSON `[x, y, z]`, or nothing when unset. */
@@ -2670,6 +2681,7 @@ export class ParticleSystem implements IParticleSystem {
                         : new ConstantValue(30),
                 followLocalOrigin: trailSettings?.followLocalOrigin ?? false,
                 ...trailFlags(trailSettings),
+                ...trailCurve(trailSettings),
                 ...trailSideAxisFromJSON((trailSettings as {sideAxis?: unknown} | undefined)?.sideAxis),
             };
         } else if (json.renderMode === RenderMode.StretchedBillBoard) {
@@ -2821,6 +2833,7 @@ export class ParticleSystem implements IParticleSystem {
                 startLength: (this.rendererEmitterSettings as TrailSettings).startLength.toJSON(),
                 followLocalOrigin: (this.rendererEmitterSettings as TrailSettings).followLocalOrigin,
                 ...trailFlags(this.rendererEmitterSettings as TrailSettings),
+                ...trailCurve(this.rendererEmitterSettings as TrailSettings),
                 ...(trailSideAxisJSON(this.rendererEmitterSettings as TrailSettings) as {sideAxis?: any}),
             };
         }
@@ -3041,6 +3054,7 @@ export class ParticleSystem implements IParticleSystem {
                 startLength: (this.rendererEmitterSettings as TrailSettings).startLength.clone(),
                 followLocalOrigin: (this.rendererEmitterSettings as TrailSettings).followLocalOrigin,
                 ...trailFlags(this.rendererEmitterSettings as TrailSettings),
+                ...trailCurve(this.rendererEmitterSettings as TrailSettings),
                 ...((this.rendererEmitterSettings as TrailSettings).sideAxis
                     ? {sideAxis: (this.rendererEmitterSettings as TrailSettings).sideAxis!.clone()}
                     : {}),

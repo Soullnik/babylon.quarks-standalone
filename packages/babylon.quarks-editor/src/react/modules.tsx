@@ -993,6 +993,30 @@ export function RendererModule({
                             />
                         </Row>
                     ))}
+                    <Row label="Tessellation">
+                        <NumberField
+                            value={(system.rendererEmitterSettings as {tessellation?: number}).tessellation ?? 0}
+                            min={0}
+                            step={1}
+                            onChange={(v) =>
+                                binding.apply((s) => {
+                                    (s.rendererEmitterSettings as {tessellation?: number}).tessellation = Math.round(v);
+                                })
+                            }
+                        />
+                    </Row>
+                    <Row label="Curve tension">
+                        <NumberField
+                            value={(system.rendererEmitterSettings as {curveTension?: number}).curveTension ?? 0}
+                            min={0}
+                            step={0.05}
+                            onChange={(v) =>
+                                binding.apply((s) => {
+                                    (s.rendererEmitterSettings as {curveTension?: number}).curveTension = v;
+                                })
+                            }
+                        />
+                    </Row>
                     <Row label="Head width scale">
                         <NumberField
                             value={(system.rendererEmitterSettings as {headWidthScale?: number}).headWidthScale ?? 1}
