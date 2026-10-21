@@ -83,6 +83,11 @@ renames below.
 - **Systems that share positions but not UVs batch apart.** Before, the first system's UVs drew
   for both. Systems given a geometry without UVs share one fallback array per geometry, so they
   still batch together.
+- **Mesh systems that share positions but not normals batch apart.** Before, the first system's
+  normals lit both. Fallback normals are shared per geometry, and trails no longer split batches
+  over instanced UVs they never read.
+- **Assigning `instancingGeometry` replaces stale normals and fallback UVs**: normals of a different
+  vertex count, and the previous geometry's fallbacks, move to the new geometry's.
 
 ## [0.25.0] — 2026-10-20
 

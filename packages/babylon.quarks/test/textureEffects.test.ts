@@ -499,6 +499,37 @@ describe('texture effects', () => {
             expect(s.instancingUVs2).toBeUndefined();
         });
 
+        it('batches meshes by their normals and trails regardless of the instanced UVs', () => {
+            const renderer = new BatchedRenderer('normalsKey', scene);
+            const mesh = {renderMode: RenderMode.Mesh, instancingGeometry: quad, instancingUVs: quadUVs};
+            const a = system({...mesh});
+            const b = system({...mesh});
+            const lit = system({...mesh, instancingNormals: new Float32Array(12).fill(1)});
+            const trailSettings = {startLength: new ConstantValue(4), followLocalOrigin: false};
+            const t1 = system({renderMode: RenderMode.Trail, rendererEmitterSettings: trailSettings});
+            const t2 = system({renderMode: RenderMode.Trail, rendererEmitterSettings: trailSettings});
+            t2.instancingUVs = new Float32Array(8);
+            [a, b, lit, t1, t2].forEach((s) => renderer.addSystem(s));
+            const batch = (s: ParticleSystem) => renderer.systemToBatchIndex.get(s);
+            expect(batch(a)).toBe(batch(b));
+            expect(batch(lit)).not.toBe(batch(a));
+            expect(batch(t1)).toBe(batch(t2));
+        });
+
+        it('moves fallback UVs and normals to a new geometry of the same size', () => {
+            const s = system({renderMode: RenderMode.Mesh, instancingGeometry: quad});
+            const other = new Float32Array(quad);
+            s.instancingGeometry = other;
+            const fresh = system({renderMode: RenderMode.Mesh, instancingGeometry: other});
+            expect(s.instancingUVs).toBe(fresh.instancingUVs);
+            expect((s as any).rendererSettings.instancingNormals).toBe(
+                (fresh as any).rendererSettings.instancingNormals
+            );
+            const renderer = new BatchedRenderer('sameSize', scene);
+            [s, fresh].forEach((x) => renderer.addSystem(x));
+            expect(renderer.systemToBatchIndex.get(s)).toBe(renderer.systemToBatchIndex.get(fresh));
+        });
+
         it('keeps the trail’s channel 1 when the trail grows, running it from the head under uvFromHead', () => {
             const renderer = new BatchedRenderer('trailGrow', scene);
             const trail = system({

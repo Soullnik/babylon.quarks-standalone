@@ -172,6 +172,7 @@ const DEFAULT_UVS = new Float32Array([0, 0, 1, 0, 1, 1, 0, 1]);
 
 /** Zero UVs sized to a position buffer — missing/mismatched uv attrs → GL_INVALID_OPERATION on iOS. */
 const fallbackUVs = new WeakMap<Float32Array, Float32Array>();
+const fallbackNormals = new WeakMap<Float32Array, Float32Array>();
 /**
  * Zero UVs for a geometry given without any, one array per geometry: batches
  * are keyed by the UV array too, so systems sharing a geometry share it.
@@ -810,8 +811,8 @@ export class ParticleSystem implements IParticleSystem {
 
     /**
      * The mesh particles' positions. A new geometry with a different vertex
-     * count drops UV sets that no longer fit it: the first falls back to zeros,
-     * the second to none. Assign {@link instancingUVs} and
+     * count drops UV sets and normals that no longer fit it: the first UV set
+     * falls back to zeros, the second to none, the normals to +Z. Assign {@link instancingUVs} and
      * {@link instancingUVs2} after it.
      */
     set instancingGeometry(geometry: Float32Array) {
@@ -819,9 +820,18 @@ export class ParticleSystem implements IParticleSystem {
         this.particles.length = 0;
         const settings = this.rendererSettings;
         const uvLength = (geometry.length / 3) * 2;
+        const previous = settings.instancingGeometry;
         settings.instancingGeometry = geometry;
-        if (settings.instancingUVs?.length !== uvLength) {
+        // Sets that no longer fit, or that were the old geometry's fallbacks, move to the new one's.
+        if (settings.instancingUVs?.length !== uvLength || settings.instancingUVs === fallbackUVs.get(previous)) {
             settings.instancingUVs = fallbackUVsForPositions(geometry);
+        }
+        if (
+            settings.instancingNormals &&
+            (settings.instancingNormals.length !== geometry.length ||
+                settings.instancingNormals === fallbackNormals.get(previous))
+        ) {
+            settings.instancingNormals = ParticleSystem.createFallbackNormals(geometry);
         }
         if (settings.instancingUVs2 && settings.instancingUVs2.length !== uvLength) {
             settings.instancingUVs2 = undefined;
@@ -2792,12 +2802,15 @@ export class ParticleSystem implements IParticleSystem {
         return `${prefix}_${ParticleSystem.serializationCounter}`;
     }
 
+    /** Normals facing +Z, one array per geometry so systems sharing it still batch together. */
     private static createFallbackNormals(positions: Float32Array): Float32Array {
-        const normals = new Float32Array(positions.length);
-        for (let i = 0; i < normals.length; i += 3) {
-            normals[i] = 0;
-            normals[i + 1] = 0;
-            normals[i + 2] = 1;
+        let normals = fallbackNormals.get(positions);
+        if (!normals) {
+            normals = new Float32Array(positions.length);
+            for (let i = 2; i < normals.length; i += 3) {
+                normals[i] = 1;
+            }
+            fallbackNormals.set(positions, normals);
         }
         return normals;
     }

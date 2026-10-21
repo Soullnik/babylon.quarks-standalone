@@ -323,8 +323,10 @@ export class BatchedRenderer extends TransformNode {
             a.uTileCount === b.uTileCount &&
             a.vTileCount === b.vTileCount &&
             a.instancingGeometry === b.instancingGeometry &&
-            a.instancingUVs === b.instancingUVs &&
-            // The second UV set only matters to a mesh that reads it.
+            // Trails draw their own strip and read none of the instanced geometry's UVs.
+            (a.renderMode === RenderMode.Trail || a.instancingUVs === b.instancingUVs) &&
+            // Normals, and the second UV set when read, only matter to meshes.
+            (a.renderMode !== RenderMode.Mesh || a.instancingNormals === b.instancingNormals) &&
             (a.renderMode !== RenderMode.Mesh || !readsUV1(a) || a.instancingUVs2 === b.instancingUVs2) &&
             a.renderOrder === b.renderOrder &&
             a.layerMask === b.layerMask &&
