@@ -259,8 +259,8 @@ export function init({scene, camera, batchRenderer, systems}: DemoContext) {
     strike.emitter.position = new BVector3(0, 0, 0);
     strike.beamEnd = ball;
 
-    // A blade swinging to and fro: its trail sweeps along the blade's axis,
-    // the surface the blade passed through.
+    // A blade slashing to and fro: its trail sweeps along the blade's axis,
+    // the surface the blade passed through, curved between frames.
     const pivot = new TransformNode('pivot', scene);
     pivot.position = new BVector3(3.5, 1, 0);
     const bladeNode = new TransformNode('blade', scene);
@@ -285,6 +285,9 @@ export function init({scene, camera, batchRenderer, systems}: DemoContext) {
             startLength: new ConstantValue(18),
             followLocalOrigin: true,
             sideAxis: new Vector3(1, 0, 0),
+            // A fast swing moves far between frames: curve the trail through
+            // its samples so it stays round instead of showing their corners.
+            tessellation: 6,
         },
     });
     swing.emitter.parent = bladeNode;
@@ -293,7 +296,7 @@ export function init({scene, camera, batchRenderer, systems}: DemoContext) {
     scene.onBeforeRenderObservable.add(() => {
         t += scene.getEngine().getDeltaTime() / 1000;
         ball.position.set(Math.sin(t * 0.7) * 0.4, 3 + Math.sin(t * 1.3) * 0.6, 0);
-        pivot.rotation.y = Math.sin(t * 2.4) * 1.4;
+        pivot.rotation.y = Math.sin(t * 5) * 1.4;
     });
 
     for (const system of [crown, rings, strike, swing]) {

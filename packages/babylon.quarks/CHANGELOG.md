@@ -4,6 +4,27 @@ All notable changes to the `babylon.quarks` package are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project follows the `quarks.core` 0.x version line.
 
+## [Unreleased]
+
+### Added
+
+- **Trail tessellation** (`TrailSettings.tessellation`, `curveTension`), like Niagara's ribbon
+  tessellation and curve tension:
+  - Each segment between two recorded samples is drawn as `tessellation + 1` segments along a
+    centripetal cardinal spline through the samples: Catmull-Rom at `curveTension` 0 (the
+    default), straight at 1. Centripetal spacing keeps the curve from overshooting where samples
+    lie unevenly apart.
+  - A fast or sharply turning trail, such as a weapon swing that moves far between frames, stays
+    round instead of showing its corners. The curve passes through every sample, so the trail
+    keeps its shape.
+  - Swept trails curve their sides with the points, keeping each side's length, so a blade's trail
+    stays as wide as the blade.
+  - Widths, colors and the texture's U are eased along the curve. The live tip drawn between
+    steps joins it with a straight segment, so the recorded part stays still as the tip moves.
+  - `tessellation` is a whole number from 0 (the default: off, no cost) to 16
+    (`MAX_TRAIL_TESSELLATION`). JSON writes both settings only when set. Helpers:
+    `trailTessellation`, `trailCurveTension`.
+
 ## [0.26.0] — 2026-10-21
 
 ### Changed (breaking)

@@ -12,7 +12,68 @@ import trail_frag from './shaders/trail_frag.glsl';
 import trail_frag_wgsl from './shaders/trail_frag.wgsl';
 import trail_vert from './shaders/trail_vert.glsl';
 import trail_vert_wgsl from './shaders/trail_vert.wgsl';
+import {trailCurveTension, trailTessellation} from './trailCurve';
 import {VFXBatch} from './VFXBatch';
+
+/**
+ * One trail's points for a frame, in world space: where each lies, its side
+ * when the trail is swept, its width and its color. Grown as needed and kept,
+ * so drawing a trail allocates nothing.
+ */
+class TrailSamples {
+    position = new Float32Array(0);
+    side = new Float32Array(0);
+    size = new Float32Array(0);
+    color = new Float32Array(0);
+
+    reserve(count: number): this {
+        if (count > this.size.length) {
+            const capacity = Math.max(count, this.size.length * 2, 64);
+            this.position = new Float32Array(capacity * 3);
+            this.side = new Float32Array(capacity * 3);
+            this.size = new Float32Array(capacity);
+            this.color = new Float32Array(capacity * 4);
+        }
+        return this;
+    }
+
+    /** Sample `i` at the point, carried by the matrix `m` (column-major elements) when given. */
+    writePoint(i: number, x: number, y: number, z: number, m: ArrayLike<number> | null): void {
+        const o = i * 3;
+        if (m) {
+            const w = 1 / (m[3] * x + m[7] * y + m[11] * z + m[15]);
+            this.position[o] = (m[0] * x + m[4] * y + m[8] * z + m[12]) * w;
+            this.position[o + 1] = (m[1] * x + m[5] * y + m[9] * z + m[13]) * w;
+            this.position[o + 2] = (m[2] * x + m[6] * y + m[10] * z + m[14]) * w;
+        } else {
+            this.position[o] = x;
+            this.position[o + 1] = y;
+            this.position[o + 2] = z;
+        }
+    }
+
+    /** Sample `i`'s side, a direction turned (and scaled) by `m` when given. */
+    writeSide(i: number, x: number, y: number, z: number, m: ArrayLike<number> | null): void {
+        const o = i * 3;
+        if (m) {
+            this.side[o] = m[0] * x + m[4] * y + m[8] * z;
+            this.side[o + 1] = m[1] * x + m[5] * y + m[9] * z;
+            this.side[o + 2] = m[2] * x + m[6] * y + m[10] * z;
+        } else {
+            this.side[o] = x;
+            this.side[o + 1] = y;
+            this.side[o + 2] = z;
+        }
+    }
+
+    writeColor(i: number, r: number, g: number, b: number, a: number): void {
+        const o = i * 4;
+        this.color[o] = r;
+        this.color[o + 1] = g;
+        this.color[o + 2] = b;
+        this.color[o + 3] = a;
+    }
+}
 
 export class TrailBatch extends VFXBatch {
     private positionBuffer!: Float32Array;
@@ -240,6 +301,147 @@ export class TrailBatch extends VFXBatch {
      * frame costs a matrix compose per system; checking the transform cache
      * first makes a still emitter free.
      */
+    private readonly samples_ = new TrailSamples();
+    private readonly curve_ = new TrailSamples();
+
+    /** The scratch a trail's samples are gathered into, room for `count`. */
+    private trailSamples(count: number): TrailSamples {
+        return this.samples_.reserve(count);
+    }
+
+    /**
+     * The curve through a trail's `count` samples, each segment drawn as
+     * `steps + 1`: through the first `curved` (the recorded samples) a
+     * centripetal cardinal spline (Catmull-Rom at tension 0, straight at 1),
+     * the same through the sides of a swept trail with each side's length
+     * eased between its ends'; past them (the live tip) a straight segment,
+     * so the recorded part does not move as the tip does. Widths and colors
+     * are eased along. The curve passes through every sample, so the trail
+     * keeps its shape and only loses its corners; centripetal spacing keeps
+     * it from overshooting where samples lie unevenly apart.
+     */
+    private tessellate(
+        samples: TrailSamples,
+        curved: number,
+        count: number,
+        steps: number,
+        tension: number,
+        swept: boolean
+    ): TrailSamples {
+        const out = this.curve_.reserve((count - 1) * (steps + 1) + 1);
+        const p = samples.position;
+        const sd = samples.side;
+        const op = out.position;
+        const os = out.side;
+        const tangent = 1 - tension;
+        // Knot spacing: the square root of a segment's length.
+        const knot = (from: number, to: number) =>
+            Math.sqrt(
+                Math.sqrt((p[to] - p[from]) ** 2 + (p[to + 1] - p[from + 1]) ** 2 + (p[to + 2] - p[from + 2]) ** 2)
+            );
+        let k = 0;
+        for (let i = 0; i + 1 < count; i++) {
+            const a = i * 3;
+            const b = a + 3;
+            // Each end's tangent, as weights of the neighbouring differences
+            // (Yuksel et al., parameterization of Catmull-Rom curves).
+            let w1a = 0;
+            let w1b = 0;
+            let w1c = 0;
+            let w2a = 0;
+            let w2b = 0;
+            let w2c = 0;
+            let before = a;
+            let after = b;
+            if (i + 1 < curved) {
+                before = (i > 0 ? i - 1 : i) * 3;
+                after = (i + 2 < curved ? i + 2 : i + 1) * 3;
+                const t12 = knot(a, b);
+                if (t12 > 1e-6) {
+                    const t01 = knot(before, a);
+                    const t23 = knot(b, after);
+                    w1c = tangent;
+                    w2a = tangent;
+                    if (t01 > 1e-6) {
+                        w1a = (tangent * t12) / t01;
+                        w1b = (-tangent * t12) / (t01 + t12);
+                    }
+                    if (t23 > 1e-6) {
+                        w2b = (-tangent * t12) / (t12 + t23);
+                        w2c = (tangent * t12) / t23;
+                    }
+                }
+            }
+            // m1 = w1a (A - Before) + w1b (B - Before) + w1c (B - A);
+            // m2 = w2a (B - A) + w2b (After - A) + w2c (After - B).
+            const la = swept ? Math.sqrt(sd[a] * sd[a] + sd[a + 1] * sd[a + 1] + sd[a + 2] * sd[a + 2]) : 0;
+            const lb = swept ? Math.sqrt(sd[b] * sd[b] + sd[b + 1] * sd[b + 1] + sd[b + 2] * sd[b + 2]) : 0;
+            for (let step = 0; step <= steps; step++, k++) {
+                const t = step / (steps + 1);
+                const t2 = t * t;
+                const t3 = t2 * t;
+                const h00 = 2 * t3 - 3 * t2 + 1;
+                const h10 = t3 - 2 * t2 + t;
+                const h01 = -2 * t3 + 3 * t2;
+                const h11 = t3 - t2;
+                const o = k * 3;
+                for (let c = 0; c < 3; c++) {
+                    const A = p[a + c];
+                    const B = p[b + c];
+                    const m1 = w1a * (A - p[before + c]) + w1b * (B - p[before + c]) + w1c * (B - A);
+                    const m2 = w2a * (B - A) + w2b * (p[after + c] - A) + w2c * (p[after + c] - B);
+                    op[o + c] = h00 * A + h10 * m1 + h01 * B + h11 * m2;
+                }
+                if (swept) {
+                    let x = 0;
+                    let y = 0;
+                    let z = 0;
+                    for (let c = 0; c < 3; c++) {
+                        const A = sd[a + c];
+                        const B = sd[b + c];
+                        const m1 = w1a * (A - sd[before + c]) + w1b * (B - sd[before + c]) + w1c * (B - A);
+                        const m2 = w2a * (B - A) + w2b * (sd[after + c] - A) + w2c * (sd[after + c] - B);
+                        const v = h00 * A + h10 * m1 + h01 * B + h11 * m2;
+                        if (c === 0) x = v;
+                        else if (c === 1) y = v;
+                        else z = v;
+                    }
+                    // A side turning with the blade keeps its length on the way round.
+                    let length = Math.sqrt(x * x + y * y + z * z);
+                    if (length <= 1e-6 * Math.max(la, lb, 1e-6)) {
+                        // Turned half round in one step: no way round to follow, so
+                        // hold the nearer end's side rather than pinch to nothing.
+                        const from = t < 0.5 ? a : b;
+                        x = sd[from];
+                        y = sd[from + 1];
+                        z = sd[from + 2];
+                        length = t < 0.5 ? la : lb;
+                    }
+                    const fit = length > 0 ? (la + (lb - la) * t) / length : 0;
+                    os[o] = x * fit;
+                    os[o + 1] = y * fit;
+                    os[o + 2] = z * fit;
+                }
+                out.size[k] = samples.size[i] + (samples.size[i + 1] - samples.size[i]) * t;
+                const ca = i * 4;
+                const co = k * 4;
+                for (let c = 0; c < 4; c++) {
+                    out.color[co + c] = samples.color[ca + c] + (samples.color[ca + 4 + c] - samples.color[ca + c]) * t;
+                }
+            }
+        }
+        // The last sample, as it is.
+        const last = (count - 1) * 3;
+        const o = k * 3;
+        for (let c = 0; c < 3; c++) {
+            op[o + c] = p[last + c];
+            os[o + c] = sd[last + c];
+        }
+        out.size[k] = samples.size[count - 1];
+        for (let c = 0; c < 4; c++) out.color[k * 4 + c] = samples.color[(count - 1) * 4 + c];
+        return out;
+    }
+
     /**
      * Writes a swept ribbon's vertex pair at `pi`: the sample at (x, y, z)
      * pushed `half` widths along its side (sx, sy, sz) one way for the first
@@ -283,14 +485,16 @@ export class TrailBatch extends VFXBatch {
         for (let s = 0; s < visibleSystems.length; s++) {
             const system = visibleSystems[s];
             const particles = system.particles;
+            const tessellation = trailTessellation(system.rendererEmitterSettings as TrailSettings);
             for (let j = 0; j < system.particleNum; j++) {
                 const historyCount = (particles[j] as TrailParticle).historyCount;
                 if (historyCount === 0) {
                     continue;
                 }
-                // +2 reserves the live tip vertex pair that frames between
-                // simulation steps append ahead of the recorded head.
-                particleCount += historyCount * 2 + 2;
+                // +1 reserves the live tip that frames between simulation
+                // steps append ahead of the recorded head; a tessellated trail
+                // draws each segment as several.
+                particleCount += (historyCount * (tessellation + 1) + 1) * 2;
             }
         }
         if (particleCount > this.maxParticles) {
@@ -344,6 +548,9 @@ export class TrailBatch extends VFXBatch {
             // behavior has motion no velocity term describes.
             const stepFraction = residual === 0 ? 0 : residual / (system.simulationStep ?? residual);
 
+            const tessellation = trailTessellation(trailSettings);
+            const curveTension = trailCurveTension(trailSettings);
+
             for (let j = 0; j < particleNum; j++) {
                 const particle = particles[j] as TrailParticle;
                 const particleHistoryLength = particle.historyCount;
@@ -363,150 +570,136 @@ export class TrailBatch extends VFXBatch {
                 const row = Math.floor(particle.uvTile / vTileCount + 0.001);
                 const particleMatrix = particle.parentMatrix as unknown as Matrix4 | undefined;
                 const me = (particleMatrix ?? emitterMatrix).elements;
-                const m00 = me[0],
-                    m01 = me[1],
-                    m02 = me[2],
-                    m03 = me[3];
-                const m10 = me[4],
-                    m11 = me[5],
-                    m12 = me[6],
-                    m13 = me[7];
-                const m20 = me[8],
-                    m21 = me[9],
-                    m22 = me[10],
-                    m23 = me[11];
-                const m30 = me[12],
-                    m31 = me[13],
-                    m32 = me[14],
-                    m33 = me[15];
-                // The texture spans the ribbon end to end: up to the live tip when one is
-                // drawn, otherwise up to the newest recorded sample.
-                const invHistoryLength =
-                    1 / (stepFraction !== 0 ? particleHistoryLength : Math.max(1, particleHistoryLength - 1));
+                const widthScale = systemWorldSpace || particle.parentMatrix ? 1 : objectScale;
+                const sampleCount = particleHistoryLength + (stepFraction !== 0 ? 1 : 0);
+                const samples = this.trailSamples(sampleCount);
 
-                // Walk the ring buffer oldest-first with hand-rolled wrapping so the
-                // inner loop stays free of modulo operations. Each sample is brought
-                // into world space once: the point written as `next` on one
-                // iteration is `current` on the following one and `previous` on
-                // the one after that.
-                let currentSlot = particle.getHistoryIndex(0);
-                let currentX = historyPositions[currentSlot * 3];
-                let currentY = historyPositions[currentSlot * 3 + 1];
-                let currentZ = historyPositions[currentSlot * 3 + 2];
-                if (!samplesInWorld) {
-                    const w = 1 / (m03 * currentX + m13 * currentY + m23 * currentZ + m33);
-                    const tx = (m00 * currentX + m10 * currentY + m20 * currentZ + m30) * w;
-                    const ty = (m01 * currentX + m11 * currentY + m21 * currentZ + m31) * w;
-                    currentZ = (m02 * currentX + m12 * currentY + m22 * currentZ + m32) * w;
-                    currentX = tx;
-                    currentY = ty;
-                }
-                let previousX = currentX;
-                let previousY = currentY;
-                let previousZ = currentZ;
-
-                for (let i = 0; i < particleHistoryLength; i++, index += 2) {
-                    let nextX = currentX;
-                    let nextY = currentY;
-                    let nextZ = currentZ;
-                    let nextSlot = currentSlot;
-                    if (i + 1 < particleHistoryLength) {
-                        nextSlot = currentSlot + 1 === historyCapacity ? 0 : currentSlot + 1;
-                        const nextPosIndex = nextSlot * 3;
-                        nextX = historyPositions[nextPosIndex];
-                        nextY = historyPositions[nextPosIndex + 1];
-                        nextZ = historyPositions[nextPosIndex + 2];
-                        if (!samplesInWorld) {
-                            const w = 1 / (m03 * nextX + m13 * nextY + m23 * nextZ + m33);
-                            const tx = (m00 * nextX + m10 * nextY + m20 * nextZ + m30) * w;
-                            const ty = (m01 * nextX + m11 * nextY + m21 * nextZ + m31) * w;
-                            nextZ = (m02 * nextX + m12 * nextY + m22 * nextZ + m32) * w;
-                            nextX = tx;
-                            nextY = ty;
-                        }
+                // The recorded samples, oldest first, brought into world space once.
+                let slot = particle.getHistoryIndex(0);
+                for (let i = 0; i < particleHistoryLength; i++) {
+                    const p = historyPositions;
+                    samples.writePoint(i, p[slot * 3], p[slot * 3 + 1], p[slot * 3 + 2], samplesInWorld ? null : me);
+                    if (swept) {
+                        const s = historySides;
+                        samples.writeSide(i, s[slot * 3], s[slot * 3 + 1], s[slot * 3 + 2], samplesInWorld ? null : me);
                     }
+                    samples.size[i] = historySizes[slot];
+                    const ci = colorFromParticle ? particleColorIndex : slot * 4;
+                    samples.writeColor(i, colors[ci], colors[ci + 1], colors[ci + 2], colors[ci + 3]);
+                    slot = slot + 1 === historyCapacity ? 0 : slot + 1;
+                }
 
-                    const currentSize = historySizes[currentSlot];
-                    const currentColorIndex = colorFromParticle ? particleColorIndex : currentSlot * 4;
-                    const currentColorX = colors[currentColorIndex];
-                    const currentColorY = colors[currentColorIndex + 1];
-                    const currentColorZ = colors[currentColorIndex + 2];
-                    const currentColorW = colors[currentColorIndex + 3];
+                // Live tip: same place a sprite would be drawn this frame, past
+                // the last recorded sample. The recorded ribbon stays put.
+                if (stepFraction !== 0) {
+                    const previousHead = particle.previousPosition;
+                    const position = particle.position;
+                    const tip = particleHistoryLength;
+                    samples.writePoint(
+                        tip,
+                        position.x + (position.x - previousHead.x) * stepFraction,
+                        position.y + (position.y - previousHead.y) * stepFraction,
+                        position.z + (position.z - previousHead.z) * stepFraction,
+                        systemWorldSpace ? null : me
+                    );
+                    if (swept) {
+                        // The side as the emitter holds it now.
+                        samples.writeSide(tip, sideAxis!.x, sideAxis!.y, sideAxis!.z, me);
+                    }
+                    samples.size[tip] = particle.size.x;
+                    const tipColor = particle.color;
+                    samples.writeColor(tip, tipColor.x, tipColor.y, tipColor.z, tipColor.w);
+                }
+
+                // Curved through the samples (see TrailSettings.tessellation),
+                // or drawn through them as they are.
+                const drawn =
+                    tessellation > 0
+                        ? this.tessellate(
+                              samples,
+                              particleHistoryLength,
+                              sampleCount,
+                              tessellation,
+                              curveTension,
+                              swept
+                          )
+                        : samples;
+                const drawnCount = tessellation > 0 ? (sampleCount - 1) * (tessellation + 1) + 1 : sampleCount;
+                // The texture spans the ribbon end to end.
+                const invLength = 1 / Math.max(1, drawnCount - 1);
+                const dp = drawn.position;
+                const vTop = (vTileCount - row - 1) * tileHeight;
+                const vBottom = (vTileCount - row) * tileHeight;
+
+                for (let k = 0; k < drawnCount; k++, index += 2) {
+                    const o = k * 3;
+                    const prev = k > 0 ? o - 3 : o;
+                    const next = k + 1 < drawnCount ? o + 3 : o;
+                    const x = dp[o];
+                    const y = dp[o + 1];
+                    const z = dp[o + 2];
+                    const size = drawn.size[k];
 
                     const pi = index * 3;
                     if (swept) {
-                        const si = currentSlot * 3;
-                        let sx = historySides[si];
-                        let sy = historySides[si + 1];
-                        let sz = historySides[si + 2];
-                        if (!samplesInWorld) {
-                            const tx = m00 * sx + m10 * sy + m20 * sz;
-                            const ty = m01 * sx + m11 * sy + m21 * sz;
-                            sz = m02 * sx + m12 * sy + m22 * sz;
-                            sx = tx;
-                            sy = ty;
-                        }
-                        this.writeSweptPair(pi, currentX, currentY, currentZ, sx, sy, sz, currentSize * 0.5);
-                    } else {
-                        this.positionBuffer[pi] = currentX;
-                        this.positionBuffer[pi + 1] = currentY;
-                        this.positionBuffer[pi + 2] = currentZ;
-                        this.positionBuffer[pi + 3] = currentX;
-                        this.positionBuffer[pi + 4] = currentY;
-                        this.positionBuffer[pi + 5] = currentZ;
-                    }
-
-                    this.previousBuffer[pi] = previousX;
-                    this.previousBuffer[pi + 1] = previousY;
-                    this.previousBuffer[pi + 2] = previousZ;
-                    this.previousBuffer[pi + 3] = previousX;
-                    this.previousBuffer[pi + 4] = previousY;
-                    this.previousBuffer[pi + 5] = previousZ;
-
-                    this.nextBuffer[pi] = nextX;
-                    this.nextBuffer[pi + 1] = nextY;
-                    this.nextBuffer[pi + 2] = nextZ;
-                    this.nextBuffer[pi + 3] = nextX;
-                    this.nextBuffer[pi + 4] = nextY;
-                    this.nextBuffer[pi + 5] = nextZ;
-
-                    if (swept) {
+                        const ds = drawn.side;
+                        this.writeSweptPair(pi, x, y, z, ds[o], ds[o + 1], ds[o + 2], size * 0.5);
+                        // A zero width keeps the shader from pushing the pair.
                         this.widthBuffer[index] = 0;
                         this.widthBuffer[index + 1] = 0;
-                    } else if (systemWorldSpace || particle.parentMatrix) {
-                        this.widthBuffer[index] = currentSize;
-                        this.widthBuffer[index + 1] = currentSize;
                     } else {
-                        this.widthBuffer[index] = currentSize * objectScale;
-                        this.widthBuffer[index + 1] = currentSize * objectScale;
+                        this.positionBuffer[pi] = x;
+                        this.positionBuffer[pi + 1] = y;
+                        this.positionBuffer[pi + 2] = z;
+                        this.positionBuffer[pi + 3] = x;
+                        this.positionBuffer[pi + 4] = y;
+                        this.positionBuffer[pi + 5] = z;
+                        this.widthBuffer[index] = size * widthScale;
+                        this.widthBuffer[index + 1] = size * widthScale;
                     }
 
+                    this.previousBuffer[pi] = dp[prev];
+                    this.previousBuffer[pi + 1] = dp[prev + 1];
+                    this.previousBuffer[pi + 2] = dp[prev + 2];
+                    this.previousBuffer[pi + 3] = dp[prev];
+                    this.previousBuffer[pi + 4] = dp[prev + 1];
+                    this.previousBuffer[pi + 5] = dp[prev + 2];
+
+                    this.nextBuffer[pi] = dp[next];
+                    this.nextBuffer[pi + 1] = dp[next + 1];
+                    this.nextBuffer[pi + 2] = dp[next + 2];
+                    this.nextBuffer[pi + 3] = dp[next];
+                    this.nextBuffer[pi + 4] = dp[next + 1];
+                    this.nextBuffer[pi + 5] = dp[next + 2];
+
                     const ui = index * 2;
-                    const along = i * invHistoryLength;
-                    const u = ((uvFromHead ? 1 - along : along) + col) * tileWidth;
+                    const along = k * invLength;
+                    const u1 = uvFromHead ? 1 - along : along;
+                    const u = (u1 + col) * tileWidth;
                     this.uvBuffer[ui] = u;
-                    this.uvBuffer[ui + 1] = (vTileCount - row - 1) * tileHeight;
+                    this.uvBuffer[ui + 1] = vTop;
                     this.uvBuffer[ui + 2] = u;
-                    this.uvBuffer[ui + 3] = (vTileCount - row) * tileHeight;
+                    this.uvBuffer[ui + 3] = vBottom;
                     if (uv1) {
-                        const u1 = uvFromHead ? 1 - along : along;
                         uv1[ui] = u1;
                         uv1[ui + 1] = 0;
                         uv1[ui + 2] = u1;
                         uv1[ui + 3] = 1;
                     }
 
+                    const dc = drawn.color;
+                    const c = k * 4;
                     const cci = index * 4;
-                    this.colorBuffer[cci] = currentColorX;
-                    this.colorBuffer[cci + 1] = currentColorY;
-                    this.colorBuffer[cci + 2] = currentColorZ;
-                    this.colorBuffer[cci + 3] = currentColorW;
-                    this.colorBuffer[cci + 4] = currentColorX;
-                    this.colorBuffer[cci + 5] = currentColorY;
-                    this.colorBuffer[cci + 6] = currentColorZ;
-                    this.colorBuffer[cci + 7] = currentColorW;
+                    this.colorBuffer[cci] = dc[c];
+                    this.colorBuffer[cci + 1] = dc[c + 1];
+                    this.colorBuffer[cci + 2] = dc[c + 2];
+                    this.colorBuffer[cci + 3] = dc[c + 3];
+                    this.colorBuffer[cci + 4] = dc[c];
+                    this.colorBuffer[cci + 5] = dc[c + 1];
+                    this.colorBuffer[cci + 6] = dc[c + 2];
+                    this.colorBuffer[cci + 7] = dc[c + 3];
 
-                    if (i + 1 < particleHistoryLength) {
+                    if (k + 1 < drawnCount) {
                         this.indexBuffer[triangles * 3] = index;
                         this.indexBuffer[triangles * 3 + 1] = index + 1;
                         this.indexBuffer[triangles * 3 + 2] = index + 2;
@@ -516,138 +709,6 @@ export class TrailBatch extends VFXBatch {
                         this.indexBuffer[triangles * 3 + 2] = index + 3;
                         triangles++;
                     }
-
-                    previousX = currentX;
-                    previousY = currentY;
-                    previousZ = currentZ;
-                    currentX = nextX;
-                    currentY = nextY;
-                    currentZ = nextZ;
-                    currentSlot = nextSlot;
-                }
-
-                // Live tip: same place a sprite would be drawn this frame, past
-                // the last recorded sample. The recorded ribbon stays put.
-                if (stepFraction !== 0) {
-                    const previousHead = particle.previousPosition;
-                    const position = particle.position;
-                    let tipX = position.x + (position.x - previousHead.x) * stepFraction;
-                    let tipY = position.y + (position.y - previousHead.y) * stepFraction;
-                    let tipZ = position.z + (position.z - previousHead.z) * stepFraction;
-                    const headIndex = index - 2;
-                    // The pair's midpoint: a swept pair lies to either side of its sample.
-                    const headX = (this.positionBuffer[headIndex * 3] + this.positionBuffer[headIndex * 3 + 3]) * 0.5;
-                    const headY =
-                        (this.positionBuffer[headIndex * 3 + 1] + this.positionBuffer[headIndex * 3 + 4]) * 0.5;
-                    const headZ =
-                        (this.positionBuffer[headIndex * 3 + 2] + this.positionBuffer[headIndex * 3 + 5]) * 0.5;
-
-                    if (!systemWorldSpace) {
-                        const w = 1 / (m03 * tipX + m13 * tipY + m23 * tipZ + m33);
-                        const tx = (m00 * tipX + m10 * tipY + m20 * tipZ + m30) * w;
-                        const ty = (m01 * tipX + m11 * tipY + m21 * tipZ + m31) * w;
-                        tipZ = (m02 * tipX + m12 * tipY + m22 * tipZ + m32) * w;
-                        tipX = tx;
-                        tipY = ty;
-                    }
-
-                    const tipPi = index * 3;
-                    const tipSize = particle.size.x;
-                    if (swept) {
-                        // The side as the emitter holds it now.
-                        const ax = sideAxis!.x;
-                        const ay = sideAxis!.y;
-                        const az = sideAxis!.z;
-                        this.writeSweptPair(
-                            tipPi,
-                            tipX,
-                            tipY,
-                            tipZ,
-                            m00 * ax + m10 * ay + m20 * az,
-                            m01 * ax + m11 * ay + m21 * az,
-                            m02 * ax + m12 * ay + m22 * az,
-                            tipSize * 0.5
-                        );
-                    } else {
-                        this.positionBuffer[tipPi] = tipX;
-                        this.positionBuffer[tipPi + 1] = tipY;
-                        this.positionBuffer[tipPi + 2] = tipZ;
-                        this.positionBuffer[tipPi + 3] = tipX;
-                        this.positionBuffer[tipPi + 4] = tipY;
-                        this.positionBuffer[tipPi + 5] = tipZ;
-                    }
-
-                    this.previousBuffer[tipPi] = headX;
-                    this.previousBuffer[tipPi + 1] = headY;
-                    this.previousBuffer[tipPi + 2] = headZ;
-                    this.previousBuffer[tipPi + 3] = headX;
-                    this.previousBuffer[tipPi + 4] = headY;
-                    this.previousBuffer[tipPi + 5] = headZ;
-
-                    this.nextBuffer[tipPi] = tipX;
-                    this.nextBuffer[tipPi + 1] = tipY;
-                    this.nextBuffer[tipPi + 2] = tipZ;
-                    this.nextBuffer[tipPi + 3] = tipX;
-                    this.nextBuffer[tipPi + 4] = tipY;
-                    this.nextBuffer[tipPi + 5] = tipZ;
-
-                    // The recorded head's `next` was itself; point it at the tip
-                    // so the shader builds the live segment from one version of
-                    // each endpoint.
-                    const headPi = headIndex * 3;
-                    this.nextBuffer[headPi] = tipX;
-                    this.nextBuffer[headPi + 1] = tipY;
-                    this.nextBuffer[headPi + 2] = tipZ;
-                    this.nextBuffer[headPi + 3] = tipX;
-                    this.nextBuffer[headPi + 4] = tipY;
-                    this.nextBuffer[headPi + 5] = tipZ;
-
-                    if (swept) {
-                        this.widthBuffer[index] = 0;
-                        this.widthBuffer[index + 1] = 0;
-                    } else if (systemWorldSpace || particle.parentMatrix) {
-                        this.widthBuffer[index] = tipSize;
-                        this.widthBuffer[index + 1] = tipSize;
-                    } else {
-                        this.widthBuffer[index] = tipSize * objectScale;
-                        this.widthBuffer[index + 1] = tipSize * objectScale;
-                    }
-
-                    const tipUi = index * 2;
-                    const tipU = ((uvFromHead ? 0 : 1) + col) * tileWidth;
-                    this.uvBuffer[tipUi] = tipU;
-                    this.uvBuffer[tipUi + 1] = (vTileCount - row - 1) * tileHeight;
-                    this.uvBuffer[tipUi + 2] = tipU;
-                    this.uvBuffer[tipUi + 3] = (vTileCount - row) * tileHeight;
-                    if (uv1) {
-                        const tipU1 = uvFromHead ? 0 : 1;
-                        uv1[tipUi] = tipU1;
-                        uv1[tipUi + 1] = 0;
-                        uv1[tipUi + 2] = tipU1;
-                        uv1[tipUi + 3] = 1;
-                    }
-
-                    const tipColor = particle.color;
-                    const tipCi = index * 4;
-                    this.colorBuffer[tipCi] = tipColor.x;
-                    this.colorBuffer[tipCi + 1] = tipColor.y;
-                    this.colorBuffer[tipCi + 2] = tipColor.z;
-                    this.colorBuffer[tipCi + 3] = tipColor.w;
-                    this.colorBuffer[tipCi + 4] = tipColor.x;
-                    this.colorBuffer[tipCi + 5] = tipColor.y;
-                    this.colorBuffer[tipCi + 6] = tipColor.z;
-                    this.colorBuffer[tipCi + 7] = tipColor.w;
-
-                    this.indexBuffer[triangles * 3] = headIndex;
-                    this.indexBuffer[triangles * 3 + 1] = headIndex + 1;
-                    this.indexBuffer[triangles * 3 + 2] = index;
-                    triangles++;
-                    this.indexBuffer[triangles * 3] = index;
-                    this.indexBuffer[triangles * 3 + 1] = headIndex + 1;
-                    this.indexBuffer[triangles * 3 + 2] = index + 1;
-                    triangles++;
-
-                    index += 2;
                 }
             }
             const tint = (system as ParticleSystem).tint;

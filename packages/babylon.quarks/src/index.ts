@@ -43,6 +43,7 @@ export {QuarksUtil} from './QuarksUtil';
 export * from './shaders/';
 export {SpriteBatch} from './SpriteBatch';
 export {TrailBatch} from './TrailBatch';
+export {MAX_TRAIL_TESSELLATION, trailCurveTension, trailTessellation} from './trailCurve';
 export {
     defaultMeshLighting,
     erosionEqual,
