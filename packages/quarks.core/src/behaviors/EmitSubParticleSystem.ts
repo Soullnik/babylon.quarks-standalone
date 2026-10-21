@@ -71,8 +71,9 @@ export class EmitSubParticleSystem implements Behavior {
         /**
          * Which of the parent particle's properties the sub particles start
          * from: its current colour and size multiply theirs, its rotation adds
-         * to theirs, and its remaining lifetime fraction scales theirs (so
-         * lifetime suits birth sub emitters, not death ones).
+         * to theirs, and its remaining lifetime fraction scales theirs. A Death
+         * sub emitter ignores lifetime, since the parent has none left; Unity
+         * would give its particles no life at all.
          */
         public inherit: SubEmitterInheritance[] = []
     ) {
@@ -156,6 +157,10 @@ export class EmitSubParticleSystem implements Behavior {
             state.serial = particle.serial;
         }
         state.inherit = subEmitterInheritMask(this.inherit);
+        if (this.mode === SubParticleEmitMode.Death) {
+            // A dying parent has no life left to hand on.
+            state.inherit &= ~SubEmitterInheritMask.lifetime;
+        }
         state.previousWorldPos = undefined;
         this.setMatrixFromParticle(state.matrix, particle);
         this.subEmissions.push(state);
@@ -165,7 +170,7 @@ export class EmitSubParticleSystem implements Behavior {
     frameUpdate(delta: number): void {
         const target = this.target;
         if (!target) {
-            this.subEmissions.length = 0;
+            this.clearEmissions();
             return;
         }
         for (let i = 0; i < this.subEmissions.length; i++) {
@@ -179,7 +184,7 @@ export class EmitSubParticleSystem implements Behavior {
             } else {
                 const subEmissionState = this.subEmissions[i];
                 const parent = subEmissionState.particle;
-                if (parent === subEmissionState.ghost) {
+                if (parent !== undefined && parent === subEmissionState.ghost) {
                     // A Death emission stays where its parent died.
                 } else if (
                     parent !== undefined &&
@@ -235,6 +240,18 @@ export class EmitSubParticleSystem implements Behavior {
         );
     }
     reset(): void {}
+
+    /**
+     * Drops the emissions still running, as when the parent system restarts or stops: a Death
+     * emission would otherwise keep emitting where a particle of the last play died.
+     */
+    clearEmissions(): void {
+        for (const state of this.subEmissions) {
+            state.particle = undefined;
+            this.spareEmissions.push(state);
+        }
+        this.subEmissions.length = 0;
+    }
 
     /** Copies what a sub emission reads from its parent: where it is, how it moves and what it inherits. */
     private static copyInto(ghost: SpriteParticle, particle: Particle): SpriteParticle {

@@ -28,6 +28,7 @@ import {
     ParticleStore,
     ParticleSystemEvent,
     ParticleSystemEventType,
+    PiecewiseBezier,
     planBehaviorFusion,
     Quaternion,
     random,
@@ -132,7 +133,7 @@ const tempV2 = new Vector3();
 const PREWARM_FPS = 60;
 const SIMULATION_STEP = 1 / PREWARM_FPS;
 const MAX_SIMULATION_STEPS_PER_FRAME = 8;
-/** Points sampled over the rest of the cycle when a rate curve is 0 now, to see if it rises later. */
+/** Points sampled over the rest of the cycle when a non-Bezier rate curve is 0 now, to see if it rises later. */
 const RATE_LOOKAHEAD_SAMPLES = 64;
 /** Most off-screen time a `'pauseAndCatchUp'` system replays on coming back into view. */
 const MAX_CATCH_UP_SECONDS = 2;
@@ -520,13 +521,23 @@ export class ParticleSystem implements IParticleSystem {
 
     /**
      * Whether a rate is above 0 now or anywhere later in the cycle, so a curve that fades in from 0
-     * still counts as pending. Curves are sampled, which only runs while the rate is 0.
+     * still counts as pending. A Bezier curve is checked exactly from its control points; another
+     * kind of curve is sampled, which only runs while the rate is 0.
      */
     private emitsFrom(rate: ValueGenerator | FunctionValueGenerator, timeRatio: number): boolean {
         if (rate.genValue(this.memory, timeRatio) > 0) {
             return true;
         }
         if (rate.type !== 'function') {
+            return false;
+        }
+        if (rate instanceof PiecewiseBezier) {
+            // A Bezier stays within its control points, so this is exact however short a pulse.
+            for (let i = 0; i < rate.functions.length; i++) {
+                if (rate.getEndX(i) > timeRatio && rate.functions[i][0].p.some((value) => value > 0)) {
+                    return true;
+                }
+            }
             return false;
         }
         const samples = RATE_LOOKAHEAD_SAMPLES;
@@ -1647,7 +1658,12 @@ export class ParticleSystem implements IParticleSystem {
         this.emissionState.previousWorldPos = undefined;
         this.emissionState.burstParticleIndex = 0;
         this.emissionState.burstParticleCount = 0;
-        this.behaviors.forEach((behavior) => behavior.reset());
+        this.behaviors.forEach((behavior) => {
+            behavior.reset();
+            if (behavior instanceof EmitSubParticleSystem) {
+                behavior.clearEmissions();
+            }
+        });
         this.emitEnded = false;
         this.markForDestroy = false;
         this.finishedEventFired = false;
@@ -1673,7 +1689,7 @@ export class ParticleSystem implements IParticleSystem {
      * @internal
      */
     update(delta: number, stepDeadline = Infinity, catchUpDeadline?: number) {
-        if (this.paused) return;
+        if (this.paused || this.destroyed) return;
         delta *= this.playbackSpeed;
 
         if (this.culled) {
@@ -2277,7 +2293,8 @@ export class ParticleSystem implements IParticleSystem {
                     }
                 }
             }
-            this.particleNum = liveParticleCount;
+            // A particleDied listener may have disposed the system, which drops every particle.
+            this.particleNum = this.destroyed ? 0 : liveParticleCount;
             this.storeBounds(liveParticleCount, measure, minX, minY, minZ, maxX, maxY, maxZ, maxSize, maxSpeedSq);
             this.notifyFinished();
             return;
@@ -2405,7 +2422,8 @@ export class ParticleSystem implements IParticleSystem {
                 }
             }
         }
-        this.particleNum = liveParticleCount;
+        // A particleDied listener may have disposed the system, which drops every particle.
+        this.particleNum = this.destroyed ? 0 : liveParticleCount;
         this.notifyFinished();
     }
 

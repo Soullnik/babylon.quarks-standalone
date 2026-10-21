@@ -80,19 +80,41 @@ describe('links survive loading and saving again', () => {
 
     test('an emitter and the links to it use the id it was loaded under', () => {
         const emitter = new ParticleSystem({scene}).emitter as ParticleEmitter;
-        expect(emitter.uuid).toBe(emitter.uniqueId.toString());
         (emitter as any)._quarksUUID = 'from-file';
         expect(emitter.uuid).toBe('from-file');
         expect(emitter.toJSON({geometries: {}, materials: {}, textures: {}}).uuid).toBe('from-file');
         emitter.dispose();
     });
 
+    test('a node made in code gets an id once, never a Babylon uniqueId', () => {
+        const emitter = new ParticleSystem({scene}).emitter as ParticleEmitter;
+        const id = emitter.uuid;
+        expect(id).not.toBe(emitter.uniqueId.toString());
+        expect(id).toMatch(/^[0-9a-f-]{36}$/);
+        expect(emitter.uuid).toBe(id);
+        expect(quarksNodeId(emitter)).toBe(id);
+        emitter.dispose();
+    });
+
+    test('a node made in code never takes the id of a loaded node', () => {
+        // An older file wrote a node made in code under its uniqueId; the next node made in code
+        // may well get that same uniqueId.
+        const loaded = new ParticleSystem({scene}).emitter as ParticleEmitter;
+        const fresh = new ParticleSystem({scene}).emitter as ParticleEmitter;
+        (loaded as any)._quarksUUID = fresh.uniqueId.toString();
+        expect(quarksNodeId(fresh)).not.toBe(quarksNodeId(loaded));
+        loaded.dispose();
+        fresh.dispose();
+    });
+
     test('a mesh surface shape names its mesh by the id it was loaded under', () => {
         const mesh = new Mesh('surface', scene);
-        expect(new MeshSurfaceEmitter(mesh).toJSON().mesh).toBe(quarksNodeId(mesh));
         (mesh as any)._quarksUUID = 'mesh-from-file';
         expect(new MeshSurfaceEmitter(mesh).toJSON().mesh).toBe('mesh-from-file');
+        const made = new Mesh('made', scene);
+        expect(new MeshSurfaceEmitter(made).toJSON().mesh).toBe(quarksNodeId(made));
         mesh.dispose();
+        made.dispose();
     });
 
     test('a clone gets an id of its own', () => {

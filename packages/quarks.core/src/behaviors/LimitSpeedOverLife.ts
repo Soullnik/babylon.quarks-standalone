@@ -34,7 +34,8 @@ export class LimitSpeedOverLife implements Behavior {
         /**
          * How much of the excess speed goes, from 0 (none) to 1, clamped. At 60 steps a second each
          * step removes `dampen / 3` of it; other step lengths remove the share that compounds to the
-         * same loss per second, so the result does not depend on the frame rate.
+         * same loss per second, so the result does not depend on the frame rate. Even at 1 the
+         * limit is approached over a few steps rather than held exactly.
          */
         public dampen: number
     ) {}

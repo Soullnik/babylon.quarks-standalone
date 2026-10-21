@@ -2,8 +2,9 @@ import {IntervalValue} from '../functions';
 import {Particle} from '../Particle';
 
 /**
- * Where a particle's current speed (its velocity's length times its speed modifier, as Unity's
- * by-speed modules read it) falls in `range`, clamped to 0..1. An empty range is a step at `a`.
+ * Where a particle's current speed (its velocity's length times its speed modifier) falls in
+ * `range`, clamped to 0..1. An empty range is a step at `a`. Unlike Unity, motion that
+ * `VelocityOverLife` adds moves the particle without changing its velocity, so it does not count.
  */
 export function speedFraction(particle: Particle, range: IntervalValue): number {
     const speed = particle.velocity.length() * particle.speedModifier;

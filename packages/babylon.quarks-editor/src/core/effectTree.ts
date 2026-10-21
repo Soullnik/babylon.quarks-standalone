@@ -1,7 +1,7 @@
 import {Matrix, Quaternion} from '@babylonjs/core/Maths/math.vector.js';
 import {TransformNode} from '@babylonjs/core/Meshes/transformNode.js';
 import type {ParticleSystem} from 'babylon.quarks';
-import {ParticleEmitter} from 'babylon.quarks';
+import {ParticleEmitter, quarksNodeId} from 'babylon.quarks';
 import {isEditorSceneNode} from './editorScene.js';
 
 /** A node in the editor's effect hierarchy: a Group (organizational) or a ParticleEmitter. */
@@ -56,14 +56,11 @@ function localMatrix(node: TransformNode): number[] {
     return Matrix.Compose(node.scaling, rotation, node.position).asArray().slice();
 }
 
-function serializeNode(tree: EffectTreeNode, meta: SerializeMeta, fallbackUuid: string): Record<string, unknown> {
-    // Emitter nodes must serialize with the ParticleEmitter's own `.uuid` — that is exactly
-    // what EmitSubParticleSystem.toJSON writes as its target reference, so the two match and
-    // QuarksLoader.linkReferences can re-resolve sub-emitters on reimport.
-    const uuid = tree.system
-        ? (tree.node as unknown as {uuid: string}).uuid
-        : ((tree.node as {_quarksUUID?: string})._quarksUUID ?? fallbackUuid);
-    const children = tree.children.map((child, i) => serializeNode(child, meta, `${fallbackUuid}-${i}`));
+function serializeNode(tree: EffectTreeNode, meta: SerializeMeta): Record<string, unknown> {
+    // Every node is written under quarksNodeId, which is also what sub emitters, mesh surface
+    // shapes and prefab animations write to name it, so QuarksLoader can relink them on reimport.
+    const uuid = quarksNodeId(tree.node);
+    const children = tree.children.map((child) => serializeNode(child, meta));
     const base = {
         uuid,
         name: tree.name,
@@ -87,7 +84,7 @@ function serializeNode(tree: EffectTreeNode, meta: SerializeMeta, fallbackUuid: 
  */
 export function serializeEffectTree(root: TransformNode, name = 'effect'): string {
     const meta: SerializeMeta = {textures: {}, materials: {}, geometries: {}};
-    const object = serializeNode(buildEffectTree(root), meta, `${name}-node`);
+    const object = serializeNode(buildEffectTree(root), meta);
     return finishEnvelope(object, meta);
 }
 
@@ -100,7 +97,7 @@ export function serializeEffectForest(roots: TransformNode[], name = 'effect'): 
         return serializeEffectTree(roots[0], name);
     }
     const meta: SerializeMeta = {textures: {}, materials: {}, geometries: {}};
-    const children = roots.map((root, i) => serializeNode(buildEffectTree(root), meta, `${name}-node-${i}`));
+    const children = roots.map((root) => serializeNode(buildEffectTree(root), meta));
     const object = {
         uuid: `${name}-root`,
         name,

@@ -52,7 +52,11 @@ function system(parameters: Partial<ConstructorParameters<typeof ParticleSystem>
 }
 
 /** A parent whose particles fly along +X and die at x = 10, emitting into `child`. */
-function parentOf(child: ParticleSystem, mode: SubParticleEmitMode, inherit: Array<'color'> = []): ParticleSystem {
+function parentOf(
+    child: ParticleSystem,
+    mode: SubParticleEmitMode,
+    inherit: Array<'color' | 'lifetime'> = []
+): ParticleSystem {
     const parent = system({
         startLife: new ConstantValue(0.5),
         startSpeed: new ConstantValue(20),
@@ -83,6 +87,22 @@ describe('a non-looping rate curve that starts at 0', () => {
         }
         expect(peak).toBeGreaterThan(20);
         expect(finishedAt).toBeGreaterThanOrEqual(2);
+    });
+
+    test('a short pulse late in a long cycle still counts', () => {
+        // 0, then 500/s for 0.05 s at t = 5 s of a 10 s cycle.
+        const rate = new PiecewiseBezier([
+            [new Bezier(0, 0, 0, 0), 0],
+            [new Bezier(500, 500, 500, 500), 0.5],
+            [new Bezier(0, 0, 0, 0), 0.505],
+        ]);
+        const ps = system({looping: false, duration: 10, emissionOverTime: rate});
+        let peak = 0;
+        for (let i = 0; i < 6 * 60; i++) {
+            ps.update(STEP);
+            peak = Math.max(peak, ps.particleNum);
+        }
+        expect(peak).toBeGreaterThan(10);
     });
 
     test('a rate that stays 0 still finishes at once', () => {
@@ -119,6 +139,14 @@ describe('a disposed sub emitter target', () => {
         for (let i = 0; i < 120; i++) renderer.update(STEP);
         expect(child.particleNum).toBe(0);
         expect(child.particles.length).toBe(capacity);
+    });
+
+    test('disposed from a particleDied listener, drops its particles there and then', () => {
+        const ps = system({startLife: new ConstantValue(0.2), emissionOverTime: new ConstantValue(60)});
+        ps.addEventListener('particleDied', () => ps.dispose());
+        for (let i = 0; i < 30; i++) ps.update(STEP);
+        expect(ps.isDisposed).toBe(true);
+        expect(ps.particleNum).toBe(0);
     });
 
     test('cannot be restarted back to life', () => {
@@ -170,6 +198,39 @@ describe('a Death sub emission', () => {
         expect(child.particleNum).toBeGreaterThan(0);
         for (let i = 0; i < child.particleNum; i++) {
             expect(child.particles[i].startColor.x).toBeGreaterThan(0.8);
+        }
+    });
+});
+
+describe('a Death sub emitter across a restart', () => {
+    test('drops the emissions of the last play', () => {
+        const renderer = new BatchedRenderer('restart', scene);
+        const child = system({onlyUsedByOther: true, duration: 1, emissionOverTime: new ConstantValue(120)});
+        const parent = parentOf(child, SubParticleEmitMode.Death);
+        renderer.addSystem(parent);
+        renderer.addSystem(child);
+        for (let i = 0; i < 60; i++) renderer.update(STEP);
+        expect(child.particleNum).toBeGreaterThan(0);
+
+        parent.stop();
+        child.stop();
+        parent.play();
+        child.play();
+        // Too soon for any parent of the new play to have died.
+        for (let i = 0; i < 5; i++) renderer.update(STEP);
+        expect(child.particleNum).toBe(0);
+    });
+
+    test('ignores lifetime inheritance, so its particles live their own life', () => {
+        const renderer = new BatchedRenderer('lifetime', scene);
+        const child = system({onlyUsedByOther: true, duration: 1, emissionOverTime: new ConstantValue(120)});
+        const parent = parentOf(child, SubParticleEmitMode.Death, ['lifetime']);
+        renderer.addSystem(parent);
+        renderer.addSystem(child);
+        for (let i = 0; i < 90; i++) renderer.update(STEP);
+        expect(child.particleNum).toBeGreaterThan(100);
+        for (let i = 0; i < child.particleNum; i++) {
+            expect(child.particles[i].life).toBe(1);
         }
     });
 });

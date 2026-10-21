@@ -75,6 +75,11 @@ interface Case {
      * which at 30 Hz is 1/60 of a 2 s life, so those cases allow 5%.
      */
     tolerance?: number;
+    /**
+     * The error already counted as converged, relative to the reference, for a behavior whose error
+     * does not shrink with the step because it compounds per second exactly. Default 0.
+     */
+    converged?: number;
     /** How long to run, for a behavior whose state settles within the default second. */
     seconds?: number;
     /** A behavior run first that drives the input this one reads, such as the speed. */
@@ -168,6 +173,7 @@ const CASES: Record<string, Case> = {
         read: velocity,
         tolerance: 0.05,
         seconds: 0.2,
+        converged: 0.005,
     },
     SpeedOverLife: {
         behavior: () => new SpeedOverLife(ramp(1, 0.5)),
@@ -256,11 +262,11 @@ describe('behaviors are frame-rate independent', () => {
             expect(reference).not.toEqual(test_.read(simulate(idle, REFERENCE_RATE)));
         });
 
-        test('lands closer to the reference as the step shrinks, unless already within a tenth of it', () => {
+        test('lands closer to the reference as the step shrinks', () => {
             const error = (rate: number) =>
                 Math.max(...test_.read(simulate(test_, rate)).map((value, i) => Math.abs(value - reference[i])));
             const scale = Math.max(...reference.map(Math.abs));
-            const close = Math.max(1e-3, scale * tolerance * 0.1);
+            const close = Math.max(1e-3, scale * (test_.converged ?? 0));
             expect(error(RATES[RATES.length - 1])).toBeLessThanOrEqual(Math.max(error(RATES[0]) * 0.5, close));
         });
 

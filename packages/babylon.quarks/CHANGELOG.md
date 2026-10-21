@@ -20,7 +20,8 @@ and the project follows the `quarks.core` 0.x version line.
 
 - **Color, Size and Rotation by Speed read the current speed**, like Unity's modules and
   Niagara's Scale by Speed: the velocity's length times the speed modifier, clamped to
-  `speedRange`. Before, they read the start speed, so a particle slowed by drag, a limit or a
+  `speedRange`. Motion `VelocityOverLife` adds does not count, since it moves particles without
+  changing their velocity. Before, they read the start speed, so a particle slowed by drag, a limit or a
   collision kept its birth colour and size. Effects that use them on particles whose speed changes
   now look different. An empty `speedRange` is a step at its value instead of NaN. The helper is
   exported as `speedFraction`.
@@ -28,10 +29,18 @@ and the project follows the `quarks.core` 0.x version line.
   60 steps a second a step still removes `dampen / 3` of the excess speed, so babylon.quarks
   effects, which step at 60 Hz, look the same. Other step lengths now remove the share that
   compounds to the same loss per second; before, a long step could reverse the velocity.
-- **A disposed system stays disposed.** `restart()` no longer brings it back, it emits nothing,
-  and `dispose()` drops its particles. `isDisposed` (also on `IParticleSystem`) says so.
-- **`ParticleEmitter.uuid` is the id the emitter was loaded under**, the same id its `toJSON`
-  writes, and `quarksNodeId(node)` gives it for any node.
+- **A disposed system stays disposed.** `restart()` no longer brings it back, `update()` and
+  `emit()` do nothing, and `dispose()` drops its particles, also when called from a
+  `particleDied` listener. `isDisposed` (also on `IParticleSystem`) says so.
+- **Node ids in saved effects.** `ParticleEmitter.uuid`, and every link a file writes to a node
+  (sub emitter targets, mesh surface meshes, prefab animation targets), is now
+  `quarksNodeId(node)`: the uuid the node was loaded under, or a GUID given once to a node made in
+  code. Before, nodes made in code were written under their Babylon `uniqueId`, which differs per
+  session and can equal a loaded node's id. The editor writes every node this way too. Files
+  saved earlier with numeric ids still load; a prefab resolves a numeric id only to a node with no
+  file uuid.
+- **A Death sub emitter ignores `inherit: ['lifetime']`**, since its parent has no life left;
+  its particles live their own life.
 
 ### Fixed
 
@@ -44,7 +53,8 @@ and the project follows the `quarks.core` 0.x version line.
 - **Death sub emissions followed a newborn.** The dying particle's object is reused for the next
   particle, and the emission followed that one back to the emitter, inheriting its colour and size.
   A Death emission now stays where its parent died and inherits what the parent died with. Birth
-  and Frame emissions stop following when their parent dies (`Particle.serial`).
+  and Frame emissions stop following when their parent dies (`Particle.serial`). A restart or
+  `stop()` drops the emissions still running from the last play.
 - **`useVelocityAsBasis` stretched the sub emitter by the parent's speed**, and gave a NaN matrix
   for a parent moving along -Z or faster than 1 along +Z. The basis is now orthonormal.
 - **The fused `VelocityOverLife` ignored `radial` and `orbitalOffset`.** The fused pass, which runs

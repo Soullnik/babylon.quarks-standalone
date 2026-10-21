@@ -207,10 +207,15 @@ export class QuarksPrefab extends TransformNode implements IPrefab {
     resolveReferences(root: TransformNode): void {
         const nodesMap: {[uuid: string]: TransformNode} = {};
         const traverse = (node: TransformNode) => {
-            if ((node as any)._quarksUUID) {
-                nodesMap[(node as any)._quarksUUID] = node;
+            // A file's uuid names the node it was loaded as; a Babylon uniqueId, which older files
+            // wrote for nodes made in code, only names a node that has no file uuid, and never
+            // takes over an id already claimed.
+            const fileId = (node as any)._quarksUUID as string | undefined;
+            if (fileId) {
+                nodesMap[fileId] = node;
+            } else {
+                nodesMap[node.uniqueId.toString()] ??= node;
             }
-            nodesMap[node.uniqueId.toString()] = node;
             const children = node.getChildren();
             for (const child of children) {
                 if (child instanceof TransformNode) {

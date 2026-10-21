@@ -101,7 +101,8 @@ describe('ParticleEmitter parity helpers', () => {
         const emitter = system.emitter as ParticleEmitter;
         emitter.visible = false;
         expect(emitter.visible).toBe(false);
-        expect(emitter.uuid).toBe(emitter.uniqueId.toString());
+        expect(emitter.uuid).toBe(emitter.uuid);
+        expect(emitter.uuid).not.toBe(emitter.uniqueId.toString());
     });
 
     it('clones without copying quaternion when unset', () => {
