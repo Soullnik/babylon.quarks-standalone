@@ -80,6 +80,15 @@ function fireRamp(ctx: CanvasRenderingContext2D, size: number): void {
     ctx.fillRect(0, 0, size, size);
 }
 
+/** Bright at U 0 fading to dark at U 1: an erosion mask that reveals from U 0 first. */
+function reach(ctx: CanvasRenderingContext2D, size: number): void {
+    const gradient = ctx.createLinearGradient(0, 0, size, 0);
+    gradient.addColorStop(0, '#fff');
+    gradient.addColorStop(1, '#000');
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, size, size);
+}
+
 /** Four jagged bolts stacked in rows, each running along U: a 1×4 sheet for a flickering beam. */
 function bolts(ctx: CanvasRenderingContext2D, size: number): void {
     ctx.clearRect(0, 0, size, size);
@@ -159,7 +168,7 @@ export function init({scene, camera, batchRenderer, systems}: DemoContext) {
         renderMode: RenderMode.VerticalBillBoard,
         texture: canvasTexture(scene, 'streaks', 128, true, streaks),
         blendMode: Constants.ALPHA_ADD,
-        uvScroll: [0, -0.6],
+        mapUV: {scroll: [0, -0.6]},
     });
     flow.emitter.position = new BVector3(-5, 1.5, 0);
 
@@ -176,7 +185,7 @@ export function init({scene, camera, batchRenderer, systems}: DemoContext) {
         shape: new ConeEmitter({radius: 0.3, angle: 0.2}),
         texture: canvasTexture(scene, 'blob', 64, false, blob),
         blendMode: Constants.ALPHA_ADD,
-        gradientMap: canvasTexture(scene, 'fireRamp', 64, false, fireRamp),
+        gradientMap: {ramp: canvasTexture(scene, 'fireRamp', 64, false, fireRamp)},
     });
     embers.addBehavior(createColorOverLifeGradient(new Vector4(1, 1, 1, 1), new Vector4(0.5, 0.5, 0.5, 1)));
     embers.emitter.position = new BVector3(0, 0, 0);
@@ -208,7 +217,9 @@ export function init({scene, camera, batchRenderer, systems}: DemoContext) {
     smoke.addBehavior(createColorOverLifeGradient(new Vector4(1, 1, 1, 1), new Vector4(1, 1, 1, 0)));
     smoke.emitter.position = new BVector3(5, 1.5, 0);
 
-    // Beam: a bolt laid from the emitter to a moving node, flickering between the sheet's rows.
+    // Beam: a bolt laid from the emitter to a moving node, flickering between the sheet's rows,
+    // and reaching out and back: a gradient mask on UV channel 1 runs once along the whole beam,
+    // whichever row the sheet shows, and the system's tint sets how far it has reached.
     const target = new TransformNode('beamTarget', scene);
     const bolt = new ParticleSystem({
         scene,
@@ -226,7 +237,9 @@ export function init({scene, camera, batchRenderer, systems}: DemoContext) {
         uTileCount: 1,
         vTileCount: 4,
         blendMode: Constants.ALPHA_ADD,
+        erosion: {mask: canvasTexture(scene, 'reach', 64, false, reach), maskUV: {channel: 1}, softness: 0.08},
     });
+    bolt.tint = new Vector4(1, 1, 1, 1);
     bolt.addBehavior(new FrameOverLife(new ConstantValue(0), {fps: 14, frameCount: 4}));
     bolt.emitter.position = new BVector3(-3, -1.5, 0);
     bolt.beamEnd = target;
@@ -234,6 +247,7 @@ export function init({scene, camera, batchRenderer, systems}: DemoContext) {
     scene.onBeforeRenderObservable.add(() => {
         t += scene.getEngine().getDeltaTime() / 1000;
         target.position.set(3 + Math.cos(t) * 0.8, -1.5 + Math.sin(t * 1.3) * 0.8, Math.sin(t) * 0.5);
+        bolt.tint!.w = Math.min(1, 0.6 + 0.6 * Math.sin(t * 1.7));
     });
 
     for (const system of [flow, embers, smoke, bolt]) {

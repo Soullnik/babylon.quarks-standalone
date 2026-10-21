@@ -57,11 +57,20 @@ import {
     MeshLighting,
     MeshRim,
     normalizeErosion,
+    normalizeGradientMap,
+    normalizeMapUV,
     normalizeMeshRim,
-    normalizeUVScroll,
+    normalizeUVDistortion,
     ParticleErosion,
+    ParticleErosionOptions,
+    ParticleGradientMap,
+    ParticleUVDistortion,
+    ParticleUVDistortionOptions,
     RenderMode,
     SortMode,
+    TextureUV,
+    textureUVToJSON,
+    UV_DISTORTION_DEFAULT_UV,
 } from './VFXBatch';
 
 export interface BurstParameters {
@@ -162,8 +171,19 @@ const DEFAULT_POSITIONS = new Float32Array([-0.5, -0.5, 0, 0.5, -0.5, 0, 0.5, 0.
 const DEFAULT_UVS = new Float32Array([0, 0, 1, 0, 1, 1, 0, 1]);
 
 /** Zero UVs sized to a position buffer — missing/mismatched uv attrs → GL_INVALID_OPERATION on iOS. */
+const fallbackUVs = new WeakMap<Float32Array, Float32Array>();
+const fallbackNormals = new WeakMap<Float32Array, Float32Array>();
+/**
+ * Zero UVs for a geometry given without any, one array per geometry: batches
+ * are keyed by the UV array too, so systems sharing a geometry share it.
+ */
 function fallbackUVsForPositions(positions: Float32Array): Float32Array {
-    return new Float32Array((positions.length / 3) * 2);
+    let uvs = fallbackUVs.get(positions);
+    if (uvs === undefined || uvs.length !== (positions.length / 3) * 2) {
+        uvs = new Float32Array((positions.length / 3) * 2);
+        fallbackUVs.set(positions, uvs);
+    }
+    return uvs;
 }
 const DEFAULT_INDICES = new Uint32Array([0, 1, 2, 0, 2, 3]);
 
@@ -175,6 +195,24 @@ function trailFlags(settings: TrailSettings | undefined): Partial<TrailSettings>
     if (settings?.dieWithParticle) flags.dieWithParticle = true;
     if (settings?.recordWorldSpace) flags.recordWorldSpace = true;
     return flags;
+}
+
+/** A trail's side axis as JSON `[x, y, z]`, or nothing when unset. */
+function trailSideAxisJSON(settings: TrailSettings | undefined): {sideAxis?: number[]} {
+    const axis = settings?.sideAxis;
+    return axis ? {sideAxis: [axis.x, axis.y, axis.z]} : {};
+}
+
+/** A trail's side axis from JSON `[x, y, z]` (or an object with x, y, z), or nothing. */
+function trailSideAxisFromJSON(value: unknown): {sideAxis?: Vector3} {
+    if (Array.isArray(value)) {
+        return {sideAxis: new Vector3(Number(value[0]) || 0, Number(value[1]) || 0, Number(value[2]) || 0)};
+    }
+    if (value && typeof value === 'object') {
+        const v = value as {x?: number; y?: number; z?: number};
+        return {sideAxis: new Vector3(v.x ?? 0, v.y ?? 0, v.z ?? 0)};
+    }
+    return {};
 }
 
 export interface ParticleSystemParameters {
@@ -200,6 +238,12 @@ export interface ParticleSystemParameters {
     instancingGeometry?: Float32Array;
     instancingIndices?: Uint32Array | Uint16Array;
     instancingUVs?: Float32Array;
+    /**
+     * A second UV set for the mesh (glTF `TEXCOORD_1`, Unity's `uv2`), what
+     * textures on UV channel 1 read on a mesh particle; see `UVChannel`.
+     * Default none: channel 1 reads the first set.
+     */
+    instancingUVs2?: Float32Array;
     instancingNormals?: Float32Array;
     renderMode?: RenderMode;
     rendererEmitterSettings?: RendererEmitterSettings;
@@ -229,12 +273,14 @@ export interface ParticleSystemParameters {
     lighting?: MeshLighting;
     /** Rim (Fresnel) term on mesh particles, see {@link ParticleSystem.rim}. Default none. */
     rim?: Partial<MeshRim>;
-    /** Map UV scroll in UV units per second, see {@link ParticleSystem.uvScroll}. Default none. */
-    uvScroll?: [number, number];
+    /** The main map's layout, see {@link ParticleSystem.mapUV}. Default as drawn. */
+    mapUV?: Partial<TextureUV>;
     /** Colour ramp for the map, see {@link ParticleSystem.gradientMap}. Default none. */
-    gradientMap?: BaseTexture | null;
+    gradientMap?: Partial<ParticleGradientMap>;
     /** Alpha erosion, see {@link ParticleSystem.erosion}. Default none. */
-    erosion?: Partial<ParticleErosion>;
+    erosion?: ParticleErosionOptions;
+    /** Map UV distortion, see {@link ParticleSystem.uvDistortion}. Default none. */
+    uvDistortion?: ParticleUVDistortionOptions;
     /** Multiplier on the time the system is advanced by, see {@link ParticleSystem.playbackSpeed}. Default 1. */
     playbackSpeed?: number;
     /** What the system does while off screen, see {@link CullingMode}. Default `'always'`. */
@@ -628,33 +674,39 @@ export class ParticleSystem implements IParticleSystem {
     }
 
     /**
-     * Scrolls the map's UV by `[u, v]` UV units per second on the renderer's
-     * clock: flowing energy, lava, a smear running along a mesh. The texture
-     * should wrap. Undefined (the default) or zero does not scroll. Assign a
-     * new array to change it. Saved with the material in the effect JSON.
+     * How the main map is laid over the particle, see {@link TextureUV}: its
+     * UV channel, tiling and offset (Unity's Tiling / Offset) and a scroll on
+     * the renderer's clock (Unreal's Panner), for flowing energy, lava or a
+     * smear running along a mesh. A scrolled or tiled map should repeat. On a
+     * sprite sheet (UV channel 0) the layout applies to the sheet's UV, so a
+     * scroll or tiling there runs into the neighbouring cells. Undefined (the
+     * default), or the identity: the map as drawn. Fields left out take their
+     * defaults; assign a new object to change it. Saved with the material in
+     * the effect JSON.
      */
-    get uvScroll(): [number, number] | undefined {
-        return this.rendererSettings.uvScroll;
+    get mapUV(): TextureUV | undefined {
+        return this.rendererSettings.mapUV;
     }
 
-    set uvScroll(scroll: [number, number] | undefined) {
-        this.rendererSettings.uvScroll = normalizeUVScroll(scroll);
+    set mapUV(uv: Partial<TextureUV> | undefined) {
+        this.rendererSettings.mapUV = normalizeMapUV(uv);
         this.neededToUpdateRender = true;
     }
 
     /**
-     * Colour ramp the map is recoloured through (a gradient map): the map's
-     * red channel picks a colour along U of this texture, whose alpha
-     * multiplies the map's; the particle colour still tints the result. One
-     * greyscale texture then serves every palette. Null (the default): none.
-     * Saved with the material in the effect JSON.
+     * Colour ramp the map is recoloured through (a gradient map), see
+     * {@link ParticleGradientMap}: a channel of the map, or its luminance,
+     * picks a colour along U of the ramp; the particle colour still tints the
+     * result. One greyscale or channel-packed texture then serves every
+     * palette. Undefined (the default), or without a ramp: none. Assign a new
+     * object to change it. Saved with the material in the effect JSON.
      */
-    get gradientMap(): BaseTexture | null {
-        return this.rendererSettings.gradientMap ?? null;
+    get gradientMap(): ParticleGradientMap | undefined {
+        return this.rendererSettings.gradientMap;
     }
 
-    set gradientMap(texture: BaseTexture | null) {
-        this.rendererSettings.gradientMap = texture ?? null;
+    set gradientMap(gradientMap: Partial<ParticleGradientMap> | undefined) {
+        this.rendererSettings.gradientMap = normalizeGradientMap(gradientMap);
         this.neededToUpdateRender = true;
     }
 
@@ -671,8 +723,24 @@ export class ParticleSystem implements IParticleSystem {
         return this.rendererSettings.erosion;
     }
 
-    set erosion(erosion: Partial<ParticleErosion> | undefined) {
+    set erosion(erosion: ParticleErosionOptions | undefined) {
         this.rendererSettings.erosion = normalizeErosion(erosion);
+        this.neededToUpdateRender = true;
+    }
+
+    /**
+     * Map UV distortion, see {@link ParticleUVDistortion}: a scrolling noise
+     * texture pushes the map's UV about, for heat shimmer and licking,
+     * breathing shapes. Undefined (the default), or without a map: none.
+     * Fields left out take their defaults; assign a new object to change it.
+     * Saved with the material in the effect JSON.
+     */
+    get uvDistortion(): ParticleUVDistortion | undefined {
+        return this.rendererSettings.uvDistortion;
+    }
+
+    set uvDistortion(distortion: ParticleUVDistortionOptions | undefined) {
+        this.rendererSettings.uvDistortion = normalizeUVDistortion(distortion);
         this.neededToUpdateRender = true;
     }
 
@@ -741,10 +809,53 @@ export class ParticleSystem implements IParticleSystem {
         return this.rendererSettings.instancingGeometry;
     }
 
+    /**
+     * The mesh particles' positions. A new geometry with a different vertex
+     * count drops UV sets and normals that no longer fit it: the first UV set
+     * falls back to zeros, the second to none, the normals to +Z. Assign {@link instancingUVs} and
+     * {@link instancingUVs2} after it.
+     */
     set instancingGeometry(geometry: Float32Array) {
         this.restart();
         this.particles.length = 0;
-        this.rendererSettings.instancingGeometry = geometry;
+        const settings = this.rendererSettings;
+        const uvLength = (geometry.length / 3) * 2;
+        const previous = settings.instancingGeometry;
+        settings.instancingGeometry = geometry;
+        // Sets that no longer fit, or that were the old geometry's fallbacks, move to the new one's.
+        if (settings.instancingUVs?.length !== uvLength || settings.instancingUVs === fallbackUVs.get(previous)) {
+            settings.instancingUVs = fallbackUVsForPositions(geometry);
+        }
+        if (
+            settings.instancingNormals &&
+            (settings.instancingNormals.length !== geometry.length ||
+                settings.instancingNormals === fallbackNormals.get(previous))
+        ) {
+            settings.instancingNormals = ParticleSystem.createFallbackNormals(geometry);
+        }
+        if (settings.instancingUVs2 && settings.instancingUVs2.length !== uvLength) {
+            settings.instancingUVs2 = undefined;
+        }
+        this.neededToUpdateRender = true;
+    }
+
+    /** The mesh particles' first UV set, two values per vertex. */
+    get instancingUVs(): Float32Array {
+        return this.rendererSettings.instancingUVs ?? fallbackUVsForPositions(this.rendererSettings.instancingGeometry);
+    }
+
+    set instancingUVs(uvs: Float32Array) {
+        this.rendererSettings.instancingUVs = uvs;
+        this.neededToUpdateRender = true;
+    }
+
+    /** The mesh particles' second UV set, read by textures on UV channel 1; see `UVChannel`. */
+    get instancingUVs2(): Float32Array | undefined {
+        return this.rendererSettings.instancingUVs2;
+    }
+
+    set instancingUVs2(uvs: Float32Array | undefined) {
+        this.rendererSettings.instancingUVs2 = uvs;
         this.neededToUpdateRender = true;
     }
 
@@ -983,6 +1094,7 @@ export class ParticleSystem implements IParticleSystem {
             instancingUVs:
                 parameters.instancingUVs ??
                 (parameters.instancingGeometry ? fallbackUVsForPositions(parameters.instancingGeometry) : DEFAULT_UVS),
+            instancingUVs2: parameters.instancingUVs2,
             instancingNormals: parameters.instancingNormals,
             renderMode: parameters.renderMode ?? RenderMode.BillBoard,
             renderOrder: parameters.renderOrder ?? 0,
@@ -1011,9 +1123,10 @@ export class ParticleSystem implements IParticleSystem {
             applyFog: parameters.applyFog ?? true,
             lighting: ParticleSystem.validLighting(parameters.lighting),
             rim: normalizeMeshRim(parameters.rim),
-            uvScroll: normalizeUVScroll(parameters.uvScroll),
-            gradientMap: parameters.gradientMap ?? null,
+            mapUV: normalizeMapUV(parameters.mapUV),
+            gradientMap: normalizeGradientMap(parameters.gradientMap),
             erosion: normalizeErosion(parameters.erosion),
+            uvDistortion: normalizeUVDistortion(parameters.uvDistortion),
         };
         this.flip = ParticleSystem.nonZeroFlip(parameters.flip);
         this.playbackSpeed = parameters.playbackSpeed ?? 1;
@@ -1684,6 +1797,19 @@ export class ParticleSystem implements IParticleSystem {
      */
     beamEnd?: BeamEnd;
 
+    /**
+     * Multiplies every particle's colour, alpha included, as it is drawn:
+     * a colour or a fade driven from code for this instance (Unity's custom
+     * per-instance data, Unreal's user parameters). With {@link erosion},
+     * alpha is the erosion level, so this wipes the shape in and out. The
+     * particles' own colours are untouched, so clearing it restores them, and
+     * systems with different tints still batch together. Under additive
+     * (`ALPHA_ONEONE`) or premultiplied blending, which ignore alpha, fade
+     * with the colour instead, or with erosion on. Unset (the default): none.
+     * Not saved in the effect JSON; copied by {@link clone}.
+     */
+    tint?: Vector4;
+
     private readonly beamEndScratch = new Vector3();
 
     /** The world position of {@link beamEnd} into `out`; false when it is unset. */
@@ -2140,6 +2266,10 @@ export class ParticleSystem implements IParticleSystem {
             // A world-space system records world positions already.
             const recordWorldSpace = trailSettings.recordWorldSpace && !this.worldSpace;
             const emitterMatrix = this.emitter.matrixWorld;
+            // A swept trail records its side as the emitter holds it, in the
+            // space its positions are recorded in.
+            const sideAxis = trailSettings.sideAxis;
+            const sidesInWorld = this.worldSpace || Boolean(trailSettings.recordWorldSpace);
             for (let i = 0; i < particleCount; i++) {
                 const trail = particles[i] as TrailParticle;
                 // Emptying the history lets the removal pass below take the
@@ -2158,6 +2288,25 @@ export class ParticleSystem implements IParticleSystem {
                     positions[offset] = tempV.x;
                     positions[offset + 1] = tempV.y;
                     positions[offset + 2] = tempV.z;
+                }
+                if (sideAxis && trail.age <= trail.life) {
+                    trail.ensureSideHistory();
+                    const offset = ((trail.historyHead + trail.historyCapacity - 1) % trail.historyCapacity) * 3;
+                    const sides = trail.historySides;
+                    let x = sideAxis.x;
+                    let y = sideAxis.y;
+                    let z = sideAxis.z;
+                    if (sidesInWorld) {
+                        const m = (trail.parentMatrix ?? emitterMatrix).elements;
+                        const tx = m[0] * x + m[4] * y + m[8] * z;
+                        const ty = m[1] * x + m[5] * y + m[9] * z;
+                        z = m[2] * x + m[6] * y + m[10] * z;
+                        x = tx;
+                        y = ty;
+                    }
+                    sides[offset] = x;
+                    sides[offset + 1] = y;
+                    sides[offset + 2] = z;
                 }
             }
         }
@@ -2521,6 +2670,7 @@ export class ParticleSystem implements IParticleSystem {
                         : new ConstantValue(30),
                 followLocalOrigin: trailSettings?.followLocalOrigin ?? false,
                 ...trailFlags(trailSettings),
+                ...trailSideAxisFromJSON((trailSettings as {sideAxis?: unknown} | undefined)?.sideAxis),
             };
         } else if (json.renderMode === RenderMode.StretchedBillBoard) {
             rendererEmitterSettings = {...(json.rendererEmitterSettings ?? {})};
@@ -2541,6 +2691,8 @@ export class ParticleSystem implements IParticleSystem {
         const resolveTexture = (ref: unknown): BaseTexture | null =>
             typeof ref === 'string' ? (meta.textures?.[ref] ?? null) : ((ref as BaseTexture | null) ?? null);
         const erosionMeta = materialMeta?.erosion;
+        const gradientMeta = materialMeta?.gradientMap;
+        const distortionMeta = materialMeta?.uvDistortion;
         const resolvedGeometryEntry =
             typeof json.instancingGeometry === 'string'
                 ? meta.geometries?.[json.instancingGeometry]
@@ -2580,6 +2732,7 @@ export class ParticleSystem implements IParticleSystem {
             instancingGeometry: resolvedGeometry.positions,
             instancingIndices: resolvedGeometry.indices,
             instancingUVs: resolvedGeometry.uvs,
+            instancingUVs2: resolvedGeometry.uvs2,
             instancingNormals: resolvedGeometry.normals,
             renderMode: json.renderMode,
             rendererEmitterSettings,
@@ -2618,11 +2771,18 @@ export class ParticleSystem implements IParticleSystem {
             flip: json.flip ? new Vector2(json.flip[0] ?? 0, json.flip[1] ?? 0) : undefined,
             lighting: materialMeta?.lighting,
             rim: materialMeta?.rim,
-            uvScroll: materialMeta?.uvScroll,
-            gradientMap: resolveTexture(materialMeta?.gradientMap),
+            mapUV: materialMeta?.mapUV,
+            gradientMap:
+                gradientMeta && typeof gradientMeta === 'object'
+                    ? {...gradientMeta, ramp: resolveTexture(gradientMeta.ramp)}
+                    : undefined,
             erosion:
                 erosionMeta && typeof erosionMeta === 'object'
                     ? {...erosionMeta, mask: resolveTexture(erosionMeta.mask)}
+                    : undefined,
+            uvDistortion:
+                distortionMeta && typeof distortionMeta === 'object'
+                    ? {...distortionMeta, map: resolveTexture(distortionMeta.map)}
                     : undefined,
         });
         ps.behaviors = (json.behaviors ?? [])
@@ -2642,12 +2802,15 @@ export class ParticleSystem implements IParticleSystem {
         return `${prefix}_${ParticleSystem.serializationCounter}`;
     }
 
+    /** Normals facing +Z, one array per geometry so systems sharing it still batch together. */
     private static createFallbackNormals(positions: Float32Array): Float32Array {
-        const normals = new Float32Array(positions.length);
-        for (let i = 0; i < normals.length; i += 3) {
-            normals[i] = 0;
-            normals[i + 1] = 0;
-            normals[i + 2] = 1;
+        let normals = fallbackNormals.get(positions);
+        if (!normals) {
+            normals = new Float32Array(positions.length);
+            for (let i = 2; i < normals.length; i += 3) {
+                normals[i] = 1;
+            }
+            fallbackNormals.set(positions, normals);
         }
         return normals;
     }
@@ -2658,6 +2821,7 @@ export class ParticleSystem implements IParticleSystem {
                 startLength: (this.rendererEmitterSettings as TrailSettings).startLength.toJSON(),
                 followLocalOrigin: (this.rendererEmitterSettings as TrailSettings).followLocalOrigin,
                 ...trailFlags(this.rendererEmitterSettings as TrailSettings),
+                ...(trailSideAxisJSON(this.rendererEmitterSettings as TrailSettings) as {sideAxis?: any}),
             };
         }
         if (this.renderMode === RenderMode.StretchedBillBoard) {
@@ -2677,6 +2841,7 @@ export class ParticleSystem implements IParticleSystem {
             positions: Array.from(this.rendererSettings.instancingGeometry),
             indices: Array.from(this.rendererSettings.instancingIndices),
             uvs: this.rendererSettings.instancingUVs ? Array.from(this.rendererSettings.instancingUVs) : undefined,
+            ...(this.rendererSettings.instancingUVs2 ? {uvs2: Array.from(this.rendererSettings.instancingUVs2)} : {}),
             normals: this.rendererSettings.instancingNormals
                 ? Array.from(this.rendererSettings.instancingNormals)
                 : undefined,
@@ -2708,6 +2873,9 @@ export class ParticleSystem implements IParticleSystem {
             return uuid;
         };
         const erosion = this.erosion;
+        const distortion = this.uvDistortion;
+        const gradientMap = this.gradientMap;
+        const optional = <T>(key: string, value: T | undefined) => (value !== undefined ? {[key]: value} : {});
 
         const materialUUID = ParticleSystem.nextSerializationId('quarks_material');
         meta.materials[materialUUID] = {
@@ -2724,16 +2892,32 @@ export class ParticleSystem implements IParticleSystem {
             // Written only when not the default, so existing effects serialise as before.
             ...(this.lighting !== 'fixed' ? {lighting: this.lighting} : {}),
             ...(this.rim ? {rim: {...this.rim, color: [...this.rim.color]}} : {}),
-            ...(this.uvScroll ? {uvScroll: [...this.uvScroll]} : {}),
-            ...(this.gradientMap ? {gradientMap: textureRef(this.gradientMap)} : {}),
+            ...optional('mapUV', this.mapUV ? textureUVToJSON(this.mapUV) : undefined),
+            ...(gradientMap
+                ? {
+                      gradientMap: {
+                          ramp: textureRef(gradientMap.ramp),
+                          ...(gradientMap.channel !== 'r' ? {channel: gradientMap.channel} : {}),
+                      },
+                  }
+                : {}),
             ...(erosion
                 ? {
                       erosion: {
                           mask: textureRef(erosion.mask),
+                          ...optional('maskUV', textureUVToJSON(erosion.maskUV)),
                           softness: erosion.softness,
                           edgeWidth: erosion.edgeWidth,
                           edgeColor: [...erosion.edgeColor],
-                          maskScroll: [...erosion.maskScroll],
+                      },
+                  }
+                : {}),
+            ...(distortion
+                ? {
+                      uvDistortion: {
+                          map: textureRef(distortion.map),
+                          ...optional('mapUV', textureUVToJSON(distortion.mapUV, UV_DISTORTION_DEFAULT_UV)),
+                          strength: distortion.strength,
                       },
                   }
                 : {}),
@@ -2746,6 +2930,7 @@ export class ParticleSystem implements IParticleSystem {
         positions: Float32Array;
         indices: Uint32Array | Uint16Array;
         uvs?: Float32Array;
+        uvs2?: Float32Array;
         normals?: Float32Array;
     } {
         if (entry?.positions) {
@@ -2764,6 +2949,11 @@ export class ParticleSystem implements IParticleSystem {
                     ? entry.uvs instanceof Float32Array
                         ? entry.uvs
                         : new Float32Array(entry.uvs)
+                    : undefined,
+                uvs2: entry.uvs2
+                    ? entry.uvs2 instanceof Float32Array
+                        ? entry.uvs2
+                        : new Float32Array(entry.uvs2)
                     : undefined,
                 normals: entry.normals
                     ? entry.normals instanceof Float32Array
@@ -2785,6 +2975,10 @@ export class ParticleSystem implements IParticleSystem {
                 positions,
                 indices: ensureTriangleIndices(positions, indices),
                 uvs: data.attributes.uv?.array ? new Float32Array(data.attributes.uv.array) : undefined,
+                // three.js names the second set `uv1` (r151 on), `uv2` before.
+                uvs2: (data.attributes.uv1 ?? data.attributes.uv2)?.array
+                    ? new Float32Array((data.attributes.uv1 ?? data.attributes.uv2).array)
+                    : undefined,
                 normals: data.attributes.normal?.array ? new Float32Array(data.attributes.normal.array) : undefined,
             };
         }
@@ -2847,6 +3041,9 @@ export class ParticleSystem implements IParticleSystem {
                 startLength: (this.rendererEmitterSettings as TrailSettings).startLength.clone(),
                 followLocalOrigin: (this.rendererEmitterSettings as TrailSettings).followLocalOrigin,
                 ...trailFlags(this.rendererEmitterSettings as TrailSettings),
+                ...((this.rendererEmitterSettings as TrailSettings).sideAxis
+                    ? {sideAxis: (this.rendererEmitterSettings as TrailSettings).sideAxis!.clone()}
+                    : {}),
             };
         } else if (this.renderMode === RenderMode.StretchedBillBoard) {
             rendererEmitterSettings = {
@@ -2877,6 +3074,7 @@ export class ParticleSystem implements IParticleSystem {
             instancingGeometry: this.rendererSettings.instancingGeometry,
             instancingIndices: this.rendererSettings.instancingIndices,
             instancingUVs: this.rendererSettings.instancingUVs,
+            instancingUVs2: this.rendererSettings.instancingUVs2,
             instancingNormals: this.rendererSettings.instancingNormals,
             renderMode: this.renderMode,
             renderOrder: this.renderOrder,
@@ -2912,9 +3110,10 @@ export class ParticleSystem implements IParticleSystem {
             flip: this.flip,
             lighting: this.lighting,
             rim: this.rim,
-            uvScroll: this.uvScroll,
+            mapUV: this.mapUV,
             gradientMap: this.gradientMap,
             erosion: this.erosion,
+            uvDistortion: this.uvDistortion,
             scene: this.emitter.getScene(),
         });
         // A sub emitter behavior transforms by its parent system's emitter;
@@ -2923,6 +3122,9 @@ export class ParticleSystem implements IParticleSystem {
             if (behavior instanceof EmitSubParticleSystem) {
                 behavior.particleSystem = copy;
             }
+        }
+        if (this.tint) {
+            copy.tint = this.tint.clone();
         }
         return copy;
     }

@@ -17,6 +17,11 @@ uniform sizeAttenuation: f32;
 
 varying vUV: vec2f;
 varying vColor: vec4f;
+#ifdef UV1
+// Along the trail and across it, without the sheet's cell (UV channel 1).
+attribute uv2: vec2f;
+varying vUV1: vec2f;
+#endif
 
 fn fix(i: vec4f, aspect: f32) -> vec2f {
     var res = i.xy / i.w;
@@ -62,6 +67,9 @@ fn main(input: VertexInputs) -> FragmentInputs {
     vertexOutputs.position = finalPosition;
 ${fogVertexWGSL('(uniforms.view * vec4f(vertexInputs.position, 1.0)).xyz')}
     vertexOutputs.vUV = vertexInputs.uv;
+#ifdef UV1
+    vertexOutputs.vUV1 = vertexInputs.uv2;
+#endif
     vertexOutputs.vColor = vertexInputs.color;
 }
 `;

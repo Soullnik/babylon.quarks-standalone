@@ -4,6 +4,9 @@ import {surfaceColorGLSL, surfaceFragmentDeclarationGLSL} from './chunks/surface
 export default /* glsl */ `
 varying vec2 vUV;
 varying vec4 vColor;
+#ifdef UV1
+varying vec2 vUV1;
+#endif
 varying vec3 vNormal;
 varying vec3 vWorldPos;
 
@@ -118,11 +121,14 @@ ${surfaceColorGLSL(true)}
 #ifdef MESH_RIM
     // Fresnel: strongest where the surface turns away from the camera.
     vec3 V = normalize(eyePosition - vWorldPos);
-    float rim = pow(1.0 - abs(dot(N, V)), rimParams.x) * rimParams.y;
-    #ifdef MESH_RIM_MIX
-    color = mix(color, rimColor, clamp(rim, 0.0, 1.0));
+    float edgeTerm = pow(1.0 - abs(dot(N, V)), rimParams.x);
+    #if defined(MESH_RIM_FADE)
+    // Faces turned to the camera fade by the strength; edges stay.
+    baseColor.a *= clamp(1.0 - rimParams.y * (1.0 - edgeTerm), 0.0, 1.0);
+    #elif defined(MESH_RIM_MIX)
+    color = mix(color, rimColor, clamp(edgeTerm * rimParams.y, 0.0, 1.0));
     #else
-    color += rimColor * rim;
+    color += rimColor * edgeTerm * rimParams.y;
     #endif
 #endif
 

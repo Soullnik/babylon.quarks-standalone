@@ -4,6 +4,9 @@ import {surfaceColorWGSL, surfaceFragmentDeclarationWGSL} from './chunks/surface
 export default /* wgsl */ `
 varying vUV: vec2f;
 varying vColor: vec4f;
+#ifdef UV1
+varying vUV1: vec2f;
+#endif
 
 #ifdef USE_MAP
 var mapSampler: sampler;

@@ -560,19 +560,28 @@ describe('ParticleSystem', () => {
         randomSpy.mockRestore();
     });
 
-    it('applies quality floor to burst particle counts', () => {
-        const ps = new ParticleSystem({
-            scene,
-            duration: 2,
-            looping: true,
-            startLife: new ConstantValue(1),
-            emissionOverTime: new ConstantValue(0),
-            emissionBursts: [{time: 0, count: new ConstantValue(11), probability: 1, interval: 0.1, cycle: 1}],
-            shape: new PointEmitter(),
-        });
-        ps.setQualityFactor(0.2);
-        ps.emit(0.1, ps.emissionState, ps.emitter.matrixWorld);
-        expect(ps.particleNum).toBe(2);
+    it('scales burst counts by quality, rounding the fraction at random', () => {
+        const randomSpy = jest.spyOn(Math, 'random');
+        // 11 * 0.2 = 2.2: a roll under 0.8 rounds down, one above up.
+        for (const [roll, expected] of [
+            [0.5, 2],
+            [0.9, 3],
+        ]) {
+            randomSpy.mockReturnValue(roll);
+            const ps = new ParticleSystem({
+                scene,
+                duration: 2,
+                looping: true,
+                startLife: new ConstantValue(1),
+                emissionOverTime: new ConstantValue(0),
+                emissionBursts: [{time: 0, count: new ConstantValue(11), probability: 1, interval: 0.1, cycle: 1}],
+                shape: new PointEmitter(),
+            });
+            ps.setQualityFactor(0.2);
+            ps.emit(0.1, ps.emissionState, ps.emitter.matrixWorld);
+            expect(ps.particleNum).toBe(expected);
+        }
+        randomSpy.mockRestore();
     });
 
     describe('maxParticles', () => {

@@ -15,6 +15,7 @@ import {
     SpriteParticle,
     StretchedBillBoardSettings,
     Vector3,
+    Vector4,
 } from 'quarks.core';
 import {VFXBatchSettings} from './BatchedRenderer';
 import {gather, sortByKey, SortScratch} from './instanceSort';
@@ -91,12 +92,42 @@ export class SpriteBatch extends VFXBatch {
         } else {
             vertexData.uvs = new Float32Array(vertexCount * 2);
         }
+        if (this.meshUV2()) {
+            vertexData.uvs2 = this.settings.instancingUVs2!;
+        }
         if (this.settings.instancingNormals) {
             vertexData.normals = this.settings.instancingNormals;
         }
         vertexData.applyToMesh(this.mesh, false);
 
         this.buildExpandableBuffers();
+    }
+
+    /**
+     * True when a mesh batch reads UV channel 1 and has a second UV set to
+     * read it from, two values per vertex. A set of any other length is left
+     * out with a warning, and channel 1 then reads the first set.
+     */
+    private warnedUV2 = false;
+
+    private meshUV2(): boolean {
+        const uvs2 = this.settings.instancingUVs2;
+        if (this.settings.renderMode !== RenderMode.Mesh || !uvs2 || !this.usesUV1()) {
+            return false;
+        }
+        const expected = (this.settings.instancingGeometry.length / 3) * 2;
+        if (uvs2.length !== expected) {
+            if (this.warnedUV2) {
+                return false;
+            }
+            this.warnedUV2 = true;
+            console.warn(
+                `[babylon.quarks] instancingUVs2 has ${uvs2.length} values for ${expected / 2} vertices ` +
+                    '(two per vertex expected); UV channel 1 reads the first UV set instead.'
+            );
+            return false;
+        }
+        return true;
     }
 
     /** Releases the instance vertex buffers so a resize does not leak GPU memory. */
@@ -343,7 +374,9 @@ export class SpriteBatch extends VFXBatch {
         const rim = isMesh ? this.settings.rim : undefined;
         if (rim) {
             defines.push('MESH_RIM');
-            if (rim.mode === 'mix') {
+            if (rim.mode === 'fade') {
+                defines.push('MESH_RIM_FADE');
+            } else if (rim.mode === 'mix') {
                 defines.push('MESH_RIM_MIX');
             }
         }
@@ -356,6 +389,10 @@ export class SpriteBatch extends VFXBatch {
         const attributes = ['position', 'uv', 'offset', 'color', 'size', 'rotation', 'uvTile'];
         if (this.settings.renderMode === RenderMode.Mesh) {
             attributes.push('normal');
+        }
+        if (this.usesUV1() && this.meshUV2()) {
+            defines.push('MESH_UV2');
+            attributes.push('uv2');
         }
         if (SpriteBatch.drawsAlongVelocity(this.settings.renderMode)) {
             attributes.push('velocity');
@@ -913,6 +950,10 @@ export class SpriteBatch extends VFXBatch {
                 }
             }
 
+            const tint = (system as ParticleSystem).tint;
+            if (tint !== undefined && index > firstIndex) {
+                SpriteBatch.applyTint(this.colorBuffer, firstIndex * 4, index - firstIndex, tint);
+            }
             if (flipsSprites && system.flip !== undefined) {
                 if (store !== undefined) {
                     SpriteBatch.applyFlip(this.sizeBuffer, firstIndex * 3, store.flip, particleNum);
@@ -1018,6 +1059,16 @@ export class SpriteBatch extends VFXBatch {
             renderMode === RenderMode.VerticalBillBoard ||
             renderMode === RenderMode.HorizontalBillBoard
         );
+    }
+
+    /** Multiplies `count` RGBA colours starting at `base` by a system's {@link ParticleSystem.tint}. */
+    private static applyTint(colors: Float32Array, base: number, count: number, tint: Vector4): void {
+        for (let j = 0, o = base; j < count; j++, o += 4) {
+            colors[o] *= tint.x;
+            colors[o + 1] *= tint.y;
+            colors[o + 2] *= tint.z;
+            colors[o + 3] *= tint.w;
+        }
     }
 
     /**

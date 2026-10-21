@@ -81,6 +81,7 @@ describe('FrameOverLife', () => {
             cycles: 3,
             frameCount: 8,
             loop: false,
+            random: true,
             startFrame: new IntervalValue(0, 4),
         });
         for (const copy of [
@@ -91,11 +92,54 @@ describe('FrameOverLife', () => {
             expect(copy.cycles).toBe(3);
             expect(copy.frameCount).toBe(8);
             expect(copy.loop).toBe(false);
+            expect(copy.random).toBe(true);
             expect(copy.startFrame).toBeInstanceOf(IntervalValue);
         }
         expect(new FrameOverLife(new ConstantValue(1)).toJSON()).toEqual({
             type: 'FrameOverLife',
             frame: new ConstantValue(1).toJSON(),
+        });
+    });
+
+    describe('random frames', () => {
+        const flicker = () => new FrameOverLife(new ConstantValue(4), {fps: 10, frameCount: 6, random: true});
+
+        it('stays within the segment, the same through the fused pass', () => {
+            const ages = Array.from({length: 40}, (_, i) => i * 0.05);
+            for (const frame of framesOf(flicker(), ages, 100)) {
+                expect(Number.isInteger(frame)).toBe(true);
+                expect(frame).toBeGreaterThanOrEqual(4);
+                expect(frame).toBeLessThan(10);
+            }
+        });
+
+        it('gives one particle a stable frame within a tick and changes it across ticks', () => {
+            const behavior = flicker();
+            const store = new ParticleStore(1);
+            const p = particle(store, 0, 0, 100);
+            behavior.initialize(p);
+            const at = (age: number) => behavior.frameAt(p, age, age / 100);
+            expect(at(0.31)).toBe(at(0.39));
+            const seen = new Set<number>();
+            for (let tick = 0; tick < 60; tick++) seen.add(at(tick / 10 + 0.05));
+            expect(seen.size).toBeGreaterThan(3);
+            for (const frame of seen) {
+                expect(frame).toBeGreaterThanOrEqual(4);
+                expect(frame).toBeLessThan(10);
+            }
+        });
+
+        it('sets particles apart', () => {
+            const behavior = flicker();
+            const store = new ParticleStore(8);
+            const particles = Array.from({length: 8}, (_, i) => particle(store, i, 0.25, 100));
+            for (const p of particles) behavior.initialize(p);
+            const frames = particles.map((p) => behavior.frameAt(p, 0.25, 0.0025));
+            expect(new Set(frames).size).toBeGreaterThan(1);
+        });
+
+        it('is not plain, so the fused pass goes through frameAt', () => {
+            expect(flicker().isPlain()).toBe(false);
         });
     });
 });

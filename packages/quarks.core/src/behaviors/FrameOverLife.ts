@@ -1,5 +1,5 @@
 import {Particle} from '../Particle';
-import {FunctionValueGenerator, ValueGenerator, ValueGeneratorFromJSON} from '../functions';
+import {FunctionValueGenerator, IntervalValue, ValueGenerator, ValueGeneratorFromJSON} from '../functions';
 import {Behavior} from './Behavior';
 
 /**
@@ -31,6 +31,13 @@ export interface FrameOverLifeOptions {
     /** FPS mode: wrap back to the first frame of the segment (default) or hold its last. */
     loop?: boolean;
     /**
+     * FPS mode: every `1 / fps` seconds show a random frame of the segment
+     * instead of the next one, each particle its own sequence: the flicker of
+     * lightning, sparks or a neon sign. Needs {@link frameCount}; `loop` does
+     * not apply. Default false.
+     */
+    random?: boolean;
+    /**
      * Per-particle frame offset, sampled once at birth: an `IntervalValue(0, n)`
      * starts each particle on a random frame (Unity's "Start Frame"). Default none.
      */
@@ -43,7 +50,8 @@ export interface FrameOverLifeOptions {
  * By default `frame` is sampled at the particle's life fraction. The
  * {@link FrameOverLifeOptions} add the rest of Unity's texture sheet
  * animation: playing at a fixed frame rate, several cycles per life, a frame
- * segment that loops or holds, and a random start frame.
+ * segment that loops or holds, a random start frame, and a random frame on
+ * every tick.
  */
 export class FrameOverLife implements Behavior {
     type = 'FrameOverLife';
@@ -54,7 +62,11 @@ export class FrameOverLife implements Behavior {
     cycles: number;
     frameCount: number;
     loop: boolean;
+    random: boolean;
     startFrame?: ValueGenerator;
+
+    /** A per-particle sample that sets each particle's random sequence apart. */
+    private readonly salt = new IntervalValue(0, 1);
 
     constructor(frame: FunctionValueGenerator | ValueGenerator, options: FrameOverLifeOptions = {}) {
         this.frame = frame;
@@ -62,6 +74,7 @@ export class FrameOverLife implements Behavior {
         this.cycles = options.cycles ?? 1;
         this.frameCount = options.frameCount ?? 0;
         this.loop = options.loop ?? true;
+        this.random = options.random ?? false;
         this.startFrame = options.startFrame;
     }
 
@@ -81,6 +94,9 @@ export class FrameOverLife implements Behavior {
     initialize(particle: Particle): void {
         this._frame.startGen(particle.memory);
         this.startFrame?.startGen(particle.memory);
+        // Claimed whether or not `random` is on, so turning it on mid-play
+        // reads each particle's own salt, not another generator's slot.
+        this.salt.startGen(particle.memory);
     }
 
     update(particle: Particle, delta: number): void {
@@ -103,6 +119,9 @@ export class FrameOverLife implements Behavior {
             const first = this.sampleFrame(particle, t);
             const n = this.frameCount;
             let step = Math.floor(age * this.fps) + this.offset(particle);
+            if (this.random && n > 0) {
+                return first + Math.floor(FrameOverLife.hash(step, this.saltOf(particle)) * n);
+            }
             if (n > 0) {
                 step = this.loop ? FrameOverLife.wrap(step, n) : Math.min(step, n - 1);
             }
@@ -129,6 +148,18 @@ export class FrameOverLife implements Behavior {
         return this.startFrame !== undefined ? Math.floor(this.startFrame.genValue(particle.memory)) : 0;
     }
 
+    /** The particle's salt; 0 for a particle born before this behaviour was added. */
+    private saltOf(particle: Particle): number {
+        const value = particle.memory[this.salt.indexCount];
+        return typeof value === 'number' ? value : 0;
+    }
+
+    /** A stable pseudo-random number in [0, 1) for a tick of a particle's sequence. */
+    private static hash(step: number, salt: number): number {
+        const x = Math.sin(step * 12.9898 + salt * 7833.233) * 43758.5453;
+        return Math.min(x - Math.floor(x), 0.999999);
+    }
+
     private static wrap(value: number, n: number): number {
         return ((value % n) + n) % n;
     }
@@ -151,6 +182,7 @@ export class FrameOverLife implements Behavior {
             ...(this.cycles !== 1 ? {cycles: this.cycles} : {}),
             ...(this.frameCount > 0 ? {frameCount: this.frameCount} : {}),
             ...(this.loop ? {} : {loop: false}),
+            ...(this.random ? {random: true} : {}),
             ...(this.startFrame !== undefined ? {startFrame: this.startFrame.toJSON()} : {}),
         };
     }
@@ -161,6 +193,7 @@ export class FrameOverLife implements Behavior {
             cycles: typeof json.cycles === 'number' ? json.cycles : undefined,
             frameCount: typeof json.frameCount === 'number' ? json.frameCount : undefined,
             loop: typeof json.loop === 'boolean' ? json.loop : undefined,
+            random: json.random === true,
             startFrame:
                 json.startFrame !== undefined ? (ValueGeneratorFromJSON(json.startFrame) as ValueGenerator) : undefined,
         });
@@ -172,6 +205,7 @@ export class FrameOverLife implements Behavior {
             cycles: this.cycles,
             frameCount: this.frameCount,
             loop: this.loop,
+            random: this.random,
             startFrame: this.startFrame?.clone() as ValueGenerator | undefined,
         });
     }

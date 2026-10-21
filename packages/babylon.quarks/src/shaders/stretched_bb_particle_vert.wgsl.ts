@@ -32,6 +32,10 @@ uniform pivot: vec3f;
 // Varyings
 varying vUV: vec2f;
 varying vColor: vec4f;
+#ifdef UV1
+// The particle's own UV, never moved by the sheet (UV channel 1).
+varying vUV1: vec2f;
+#endif
 #ifdef TILE_BLEND
 varying vUV2: vec2f;
 varying vTileBlend: f32;
@@ -45,6 +49,7 @@ varying linearDepth: f32;
 // Smallest and largest size a particle may have on screen, as fractions of the viewport height.
 uniform sizeLimits: vec2f;
 #endif
+
 ${fogVertexDeclarationWGSL}
 @vertex
 fn main(input: VertexInputs) -> FragmentInputs {
@@ -53,15 +58,6 @@ fn main(input: VertexInputs) -> FragmentInputs {
     // extent and mirrors its texture instead (see quadUV below).
     var avgSize = (abs(vertexInputs.size.x) + abs(vertexInputs.size.y)) * 0.5;
     var mvPosition = uniforms.view * uniforms.world * vec4f(vertexInputs.offset, 1.0);
-#ifdef SIZE_LIMITS
-    // The streak's width on screen as a fraction of the viewport height, held
-    // between the limits; a perspective projection divides by the view depth.
-    let limitDepth = select(1.0, abs(mvPosition.z), abs(uniforms.projection[2][3]) > 0.0);
-    let screenSize = avgSize * uniforms.projection[1][1] / (2.0 * limitDepth);
-    if (screenSize > 0.0) {
-        avgSize *= clamp(screenSize, uniforms.sizeLimits.x, uniforms.sizeLimits.y) / screenSize;
-    }
-#endif
     let viewWorld = uniforms.view * uniforms.world;
     let viewWorld3 = mat3x3f(viewWorld[0].xyz, viewWorld[1].xyz, viewWorld[2].xyz);
     let viewVelocity = viewWorld3 * vertexInputs.velocity.xyz;
@@ -82,6 +78,15 @@ fn main(input: VertexInputs) -> FragmentInputs {
     }
 #else
     let side = normalize(cross(mvPosition.xyz, vdir));
+#endif
+#ifdef SIZE_LIMITS
+    // The streak's width on screen as a fraction of the viewport height, held
+    // between the limits; a perspective projection divides by the view depth.
+    let limitDepth = select(1.0, abs(mvPosition.z), abs(uniforms.projection[2][3]) > 0.0);
+    let screenSize = avgSize * uniforms.projection[1][1] / (2.0 * limitDepth);
+    if (screenSize > 0.0) {
+        avgSize *= clamp(screenSize, uniforms.sizeLimits.x, uniforms.sizeLimits.y) / screenSize;
+    }
 #endif
     let widthOffset = vertexInputs.position.y * side * avgSize;
     // Equivalent to viewVelocity * (1.0 + lengthFactor / vlength) for moving particles, but the
@@ -128,6 +133,9 @@ ${fogVertexWGSL('mvPosition.xyz')}
         vertexOutputs.vUV = quadUV;
     #endif
 
+#ifdef UV1
+    vertexOutputs.vUV1 = quadUV;
+#endif
     vertexOutputs.vColor = vertexInputs.color;
 }
 `;

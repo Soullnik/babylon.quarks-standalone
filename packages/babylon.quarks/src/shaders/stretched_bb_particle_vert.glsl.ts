@@ -32,6 +32,10 @@ uniform vec3 pivot;
 // Varyings
 varying vec2 vUV;
 varying vec4 vColor;
+#ifdef UV1
+// The particle's own UV, never moved by the sheet (UV channel 1).
+varying vec2 vUV1;
+#endif
 #ifdef TILE_BLEND
 varying vec2 vUV2;
 varying float vTileBlend;
@@ -45,6 +49,7 @@ varying float linearDepth;
 // Smallest and largest size a particle may have on screen, as fractions of the viewport height.
 uniform vec2 sizeLimits;
 #endif
+
 ${fogVertexDeclarationGLSL}
 void main() {
     float lengthFactor = velocity.w;
@@ -52,15 +57,6 @@ void main() {
     // extent and mirrors its texture instead (see quadUV below).
     float avgSize = (abs(size.x) + abs(size.y)) * 0.5;
     vec4 mvPosition = view * world * vec4(offset, 1.0);
-#ifdef SIZE_LIMITS
-    // The streak's width on screen as a fraction of the viewport height, held
-    // between the limits; a perspective projection divides by the view depth.
-    float limitDepth = abs(projection[2][3]) > 0.0 ? abs(mvPosition.z) : 1.0;
-    float screenSize = avgSize * projection[1][1] / (2.0 * limitDepth);
-    if (screenSize > 0.0) {
-        avgSize *= clamp(screenSize, sizeLimits.x, sizeLimits.y) / screenSize;
-    }
-#endif
     vec3 viewVelocity = mat3(view * world) * velocity.xyz;
     float vlength = length(viewVelocity);
     // Stretch direction is the velocity direction; only a genuinely motionless particle has none.
@@ -73,6 +69,15 @@ void main() {
     vec3 side = dot(sideRaw, sideRaw) > 1e-12 ? normalize(sideRaw) : vec3(1.0, 0.0, 0.0);
 #else
     vec3 side = normalize(cross(mvPosition.xyz, vdir));
+#endif
+#ifdef SIZE_LIMITS
+    // The streak's width on screen as a fraction of the viewport height, held
+    // between the limits; a perspective projection divides by the view depth.
+    float limitDepth = abs(projection[2][3]) > 0.0 ? abs(mvPosition.z) : 1.0;
+    float screenSize = avgSize * projection[1][1] / (2.0 * limitDepth);
+    if (screenSize > 0.0) {
+        avgSize *= clamp(screenSize, sizeLimits.x, sizeLimits.y) / screenSize;
+    }
 #endif
     mvPosition.xyz += position.y * side * avgSize;
 #ifdef BEAM
@@ -113,6 +118,9 @@ ${fogVertexGLSL('mvPosition.xyz')}
         vUV = quadUV;
     #endif
 
+#ifdef UV1
+    vUV1 = quadUV;
+#endif
     vColor = color;
 }
 `;

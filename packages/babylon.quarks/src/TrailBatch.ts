@@ -19,6 +19,8 @@ export class TrailBatch extends VFXBatch {
     private previousBuffer!: Float32Array;
     private nextBuffer!: Float32Array;
     private uvBuffer!: Float32Array;
+    /** UV channel 1: along the trail and across it, without the sheet's cell; only when a texture reads it. */
+    private uv1Buffer: Float32Array | null = null;
     private sideBuffer!: Float32Array;
     private widthBuffer!: Float32Array;
     private colorBuffer!: Float32Array;
@@ -52,6 +54,7 @@ export class TrailBatch extends VFXBatch {
         this.previousBuffer = new Float32Array(this.maxParticles * 6);
         this.nextBuffer = new Float32Array(this.maxParticles * 6);
         this.uvBuffer = new Float32Array(this.maxParticles * 4);
+        this.uv1Buffer = this.usesUV1() ? new Float32Array(this.maxParticles * 4) : null;
         this.sideBuffer = new Float32Array(this.maxParticles * 2);
         this.widthBuffer = new Float32Array(this.maxParticles * 2);
         this.colorBuffer = new Float32Array(this.maxParticles * 8);
@@ -86,6 +89,9 @@ export class TrailBatch extends VFXBatch {
         // Set standard vertex data with full buffer capacity (updatable)
         this.mesh.setVerticesData(VertexBuffer.PositionKind, this.positionBuffer, true);
         this.mesh.setVerticesData(VertexBuffer.UVKind, this.uvBuffer, true);
+        if (this.uv1Buffer) {
+            this.mesh.setVerticesData(VertexBuffer.UV2Kind, this.uv1Buffer, true);
+        }
         this.mesh.setVerticesData(VertexBuffer.ColorKind, this.colorBuffer, true, 4);
         // The whole array, not just the dummy triangle: this call is what sizes
         // the GPU index buffer, and updateIndices later writes into it without
@@ -150,6 +156,9 @@ export class TrailBatch extends VFXBatch {
         );
 
         const attributes = ['position', 'previous', 'next', 'side', 'width', 'uv', 'color'];
+        if (this.uv1Buffer) {
+            attributes.push('uv2');
+        }
         const uniforms = [
             'world',
             'view',
@@ -231,6 +240,30 @@ export class TrailBatch extends VFXBatch {
      * frame costs a matrix compose per system; checking the transform cache
      * first makes a still emitter free.
      */
+    /**
+     * Writes a swept ribbon's vertex pair at `pi`: the sample at (x, y, z)
+     * pushed `half` widths along its side (sx, sy, sz) one way for the first
+     * vertex and the other way for the second.
+     */
+    private writeSweptPair(
+        pi: number,
+        x: number,
+        y: number,
+        z: number,
+        sx: number,
+        sy: number,
+        sz: number,
+        half: number
+    ): void {
+        const positions = this.positionBuffer;
+        positions[pi] = x + sx * half;
+        positions[pi + 1] = y + sy * half;
+        positions[pi + 2] = z + sz * half;
+        positions[pi + 3] = x - sx * half;
+        positions[pi + 4] = y - sy * half;
+        positions[pi + 5] = z - sz * half;
+    }
+
     private static ensureWorldMatrix(system: IParticleSystem): void {
         const emitter = system.emitter as {
             computeWorldMatrix?: (force: boolean) => void;
@@ -296,10 +329,15 @@ export class TrailBatch extends VFXBatch {
             // rather than by the particle's velocity, so it is left alone.
             const trailSettings = system.rendererEmitterSettings as TrailSettings;
             const uvFromHead = Boolean(trailSettings.uvFromHead);
+            const uv1 = this.uv1Buffer;
             const colorFromParticle = Boolean(trailSettings.colorFromParticle);
             // Recorded samples already sit in world space; the live tip still comes
             // from the particle's own (local) position.
             const samplesInWorld = systemWorldSpace || Boolean(trailSettings.recordWorldSpace);
+            // A swept trail spans each sample's recorded side instead of facing
+            // the camera: its vertices are laid out here, and a zero width
+            // keeps the shader from pushing them.
+            const sideAxis = trailSettings.sideAxis;
             const residual = trailSettings.followLocalOrigin ? 0 : (system.simulationResidual ?? 0);
             // Measured from the step the particle just took, not from its
             // velocity: a trail pulled along by an orbit or by a plugin's own
@@ -315,6 +353,8 @@ export class TrailBatch extends VFXBatch {
                 const historyCapacity = particle.historyCapacity;
                 const historyPositions = particle.historyPositions;
                 const historySizes = particle.historySizes;
+                const historySides = particle.historySides;
+                const swept = sideAxis !== undefined && historySides.length === historyCapacity * 3;
                 // Every sample takes its color from one place: its own recorded slot, or
                 // the particle's current row in the store.
                 const colors = colorFromParticle ? particle.store.color : particle.historyColors;
@@ -394,12 +434,27 @@ export class TrailBatch extends VFXBatch {
                     const currentColorW = colors[currentColorIndex + 3];
 
                     const pi = index * 3;
-                    this.positionBuffer[pi] = currentX;
-                    this.positionBuffer[pi + 1] = currentY;
-                    this.positionBuffer[pi + 2] = currentZ;
-                    this.positionBuffer[pi + 3] = currentX;
-                    this.positionBuffer[pi + 4] = currentY;
-                    this.positionBuffer[pi + 5] = currentZ;
+                    if (swept) {
+                        const si = currentSlot * 3;
+                        let sx = historySides[si];
+                        let sy = historySides[si + 1];
+                        let sz = historySides[si + 2];
+                        if (!samplesInWorld) {
+                            const tx = m00 * sx + m10 * sy + m20 * sz;
+                            const ty = m01 * sx + m11 * sy + m21 * sz;
+                            sz = m02 * sx + m12 * sy + m22 * sz;
+                            sx = tx;
+                            sy = ty;
+                        }
+                        this.writeSweptPair(pi, currentX, currentY, currentZ, sx, sy, sz, currentSize * 0.5);
+                    } else {
+                        this.positionBuffer[pi] = currentX;
+                        this.positionBuffer[pi + 1] = currentY;
+                        this.positionBuffer[pi + 2] = currentZ;
+                        this.positionBuffer[pi + 3] = currentX;
+                        this.positionBuffer[pi + 4] = currentY;
+                        this.positionBuffer[pi + 5] = currentZ;
+                    }
 
                     this.previousBuffer[pi] = previousX;
                     this.previousBuffer[pi + 1] = previousY;
@@ -415,7 +470,10 @@ export class TrailBatch extends VFXBatch {
                     this.nextBuffer[pi + 4] = nextY;
                     this.nextBuffer[pi + 5] = nextZ;
 
-                    if (systemWorldSpace || particle.parentMatrix) {
+                    if (swept) {
+                        this.widthBuffer[index] = 0;
+                        this.widthBuffer[index + 1] = 0;
+                    } else if (systemWorldSpace || particle.parentMatrix) {
                         this.widthBuffer[index] = currentSize;
                         this.widthBuffer[index + 1] = currentSize;
                     } else {
@@ -430,6 +488,13 @@ export class TrailBatch extends VFXBatch {
                     this.uvBuffer[ui + 1] = (vTileCount - row - 1) * tileHeight;
                     this.uvBuffer[ui + 2] = u;
                     this.uvBuffer[ui + 3] = (vTileCount - row) * tileHeight;
+                    if (uv1) {
+                        const u1 = uvFromHead ? 1 - along : along;
+                        uv1[ui] = u1;
+                        uv1[ui + 1] = 0;
+                        uv1[ui + 2] = u1;
+                        uv1[ui + 3] = 1;
+                    }
 
                     const cci = index * 4;
                     this.colorBuffer[cci] = currentColorX;
@@ -470,9 +535,12 @@ export class TrailBatch extends VFXBatch {
                     let tipY = position.y + (position.y - previousHead.y) * stepFraction;
                     let tipZ = position.z + (position.z - previousHead.z) * stepFraction;
                     const headIndex = index - 2;
-                    const headX = this.positionBuffer[headIndex * 3];
-                    const headY = this.positionBuffer[headIndex * 3 + 1];
-                    const headZ = this.positionBuffer[headIndex * 3 + 2];
+                    // The pair's midpoint: a swept pair lies to either side of its sample.
+                    const headX = (this.positionBuffer[headIndex * 3] + this.positionBuffer[headIndex * 3 + 3]) * 0.5;
+                    const headY =
+                        (this.positionBuffer[headIndex * 3 + 1] + this.positionBuffer[headIndex * 3 + 4]) * 0.5;
+                    const headZ =
+                        (this.positionBuffer[headIndex * 3 + 2] + this.positionBuffer[headIndex * 3 + 5]) * 0.5;
 
                     if (!systemWorldSpace) {
                         const w = 1 / (m03 * tipX + m13 * tipY + m23 * tipZ + m33);
@@ -484,12 +552,30 @@ export class TrailBatch extends VFXBatch {
                     }
 
                     const tipPi = index * 3;
-                    this.positionBuffer[tipPi] = tipX;
-                    this.positionBuffer[tipPi + 1] = tipY;
-                    this.positionBuffer[tipPi + 2] = tipZ;
-                    this.positionBuffer[tipPi + 3] = tipX;
-                    this.positionBuffer[tipPi + 4] = tipY;
-                    this.positionBuffer[tipPi + 5] = tipZ;
+                    const tipSize = particle.size.x;
+                    if (swept) {
+                        // The side as the emitter holds it now.
+                        const ax = sideAxis!.x;
+                        const ay = sideAxis!.y;
+                        const az = sideAxis!.z;
+                        this.writeSweptPair(
+                            tipPi,
+                            tipX,
+                            tipY,
+                            tipZ,
+                            m00 * ax + m10 * ay + m20 * az,
+                            m01 * ax + m11 * ay + m21 * az,
+                            m02 * ax + m12 * ay + m22 * az,
+                            tipSize * 0.5
+                        );
+                    } else {
+                        this.positionBuffer[tipPi] = tipX;
+                        this.positionBuffer[tipPi + 1] = tipY;
+                        this.positionBuffer[tipPi + 2] = tipZ;
+                        this.positionBuffer[tipPi + 3] = tipX;
+                        this.positionBuffer[tipPi + 4] = tipY;
+                        this.positionBuffer[tipPi + 5] = tipZ;
+                    }
 
                     this.previousBuffer[tipPi] = headX;
                     this.previousBuffer[tipPi + 1] = headY;
@@ -516,8 +602,10 @@ export class TrailBatch extends VFXBatch {
                     this.nextBuffer[headPi + 4] = tipY;
                     this.nextBuffer[headPi + 5] = tipZ;
 
-                    const tipSize = particle.size.x;
-                    if (systemWorldSpace || particle.parentMatrix) {
+                    if (swept) {
+                        this.widthBuffer[index] = 0;
+                        this.widthBuffer[index + 1] = 0;
+                    } else if (systemWorldSpace || particle.parentMatrix) {
                         this.widthBuffer[index] = tipSize;
                         this.widthBuffer[index + 1] = tipSize;
                     } else {
@@ -531,6 +619,13 @@ export class TrailBatch extends VFXBatch {
                     this.uvBuffer[tipUi + 1] = (vTileCount - row - 1) * tileHeight;
                     this.uvBuffer[tipUi + 2] = tipU;
                     this.uvBuffer[tipUi + 3] = (vTileCount - row) * tileHeight;
+                    if (uv1) {
+                        const tipU1 = uvFromHead ? 0 : 1;
+                        uv1[tipUi] = tipU1;
+                        uv1[tipUi + 1] = 0;
+                        uv1[tipUi + 2] = tipU1;
+                        uv1[tipUi + 3] = 1;
+                    }
 
                     const tipColor = particle.color;
                     const tipCi = index * 4;
@@ -553,6 +648,17 @@ export class TrailBatch extends VFXBatch {
                     triangles++;
 
                     index += 2;
+                }
+            }
+            const tint = (system as ParticleSystem).tint;
+            if (tint !== undefined) {
+                // As SpriteBatch does: the system's tint over its ribbons' vertices.
+                const colors = this.colorBuffer;
+                for (let o = firstVertex * 4, end = index * 4; o < end; o += 4) {
+                    colors[o] *= tint.x;
+                    colors[o + 1] *= tint.y;
+                    colors[o + 2] *= tint.z;
+                    colors[o + 3] *= tint.w;
                 }
             }
             this.measureSystemBounds(system as ParticleSystem, firstVertex, index);
@@ -578,8 +684,8 @@ export class TrailBatch extends VFXBatch {
         let maxX = -Infinity;
         let maxY = -Infinity;
         let maxZ = -Infinity;
-        // Each sample writes its position twice (both ribbon edges); one of the pair is enough.
-        for (let o = fromVertex * 3, end = toVertex * 3; o < end; o += 6) {
+        // Both of each pair: a swept ribbon's edges lie apart, a facing one's coincide.
+        for (let o = fromVertex * 3, end = toVertex * 3; o < end; o += 3) {
             const x = positions[o];
             const y = positions[o + 1];
             const z = positions[o + 2];
@@ -614,6 +720,9 @@ export class TrailBatch extends VFXBatch {
             // the high-water mark of every system in the batch.
             this.mesh.updateVerticesData(VertexBuffer.PositionKind, this.positionBuffer.subarray(0, index * 3));
             this.mesh.updateVerticesData(VertexBuffer.UVKind, this.uvBuffer.subarray(0, index * 2));
+            if (this.uv1Buffer) {
+                this.mesh.updateVerticesData(VertexBuffer.UV2Kind, this.uv1Buffer.subarray(0, index * 2));
+            }
             // Straight to the GPU buffer. Going through `mesh.updateIndices` with a
             // range whose length changes every frame makes Babylon copy the
             // indices, rebuild the sub mesh and recompute its bounds from the

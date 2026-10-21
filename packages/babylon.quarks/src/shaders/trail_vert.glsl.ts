@@ -17,6 +17,11 @@ uniform float sizeAttenuation;
 
 varying vec2 vUV;
 varying vec4 vColor;
+#ifdef UV1
+// Along the trail and across it, without the sheet's cell (UV channel 1).
+attribute vec2 uv2;
+varying vec2 vUV1;
+#endif
 
 vec2 fix(vec4 i, float aspect) {
     vec2 res = i.xy / i.w;
@@ -57,6 +62,9 @@ void main() {
     gl_Position = finalPosition;
 ${fogVertexGLSL('(view * vec4(position, 1.0)).xyz')}
     vUV = uv;
+#ifdef UV1
+    vUV1 = uv2;
+#endif
     vColor = color;
 }
 `;

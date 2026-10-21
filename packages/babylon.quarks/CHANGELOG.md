@@ -4,6 +4,91 @@ All notable changes to the `babylon.quarks` package are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project follows the `quarks.core` 0.x version line.
 
+## [0.26.0] — 2026-10-21
+
+### Changed (breaking)
+
+The texture effects of 0.25 are redesigned on the concepts Unity and Unreal use, so that one
+model covers every texture a particle samples. Effects and code written against 0.25 need the
+renames below.
+
+- `ParticleSystem.gradientMap` is now a `ParticleGradientMap` `{ramp, channel}` instead of a bare
+  texture. `channel` (`'r'` default, `'g'`, `'b'`, `'a'`, `'luminance'`) picks the texel value
+  the ramp is looked up by, so channel-packed and coloured textures work as well as greyscale ones.
+  Looked up by `'a'`, the ramp's alpha replaces the map's, so a soft shape can glow at its fringe
+  and stay solid at its heart. JSON: `gradientMap: {ramp: <texture uuid>, channel}`.
+- `ParticleSystem.uvScroll` is replaced by `mapUV`, a `TextureUV` that lays the main map (tiling,
+  offset, scroll, and UV channel 1). JSON: `mapUV` on the material, only the fields that differ from
+  the default. The `UV_SCROLL` define and `uvScrollOffset` uniform become `MAP_TRANSFORM` and
+  `mapTransform` (`uv * xy + zw`), with `MAP_UV1` when the map reads channel 1.
+- `ParticleErosion.maskScroll` is replaced by `maskUV`, a `TextureUV`.
+- Shader uniforms: `erosionParams` is a `vec2` (softness, edge width) and the mask is laid by
+  `erosionMaskTransform`. The gradient map adds `gradientMapChannel`.
+- 0.25 JSON is not migrated: a bare-texture `gradientMap`, `uvScroll`, and `erosion.maskScroll` are
+  ignored on load. Re-export those effects.
+
+### Added
+
+- **UV channels** (`UVChannel`: `0 | 1`), as Unity's UV channels and Niagara's ribbon UV0/UV1:
+  - Channel 0 is the map's UV as drawn.
+  - Channel 1 is the particle's own UV, which the sprite sheet never moves:
+    - the whole quad on billboards, stretched billboards and beams;
+    - along and across the trail on trails;
+    - the mesh's second UV set on meshes.
+  - A texture on channel 1 can run once across a whole trail or mesh however the map repeats or
+    animates. Shaders declare `vUV1` under `UV1` only when a texture reads it.
+- **Second UV set on mesh particles:** `instancingUVs2` (glTF `TEXCOORD_1`, Unity's `uv2`).
+  - It is saved with the geometry as `uvs2` and read from three.js `uv1`/`uv2` attributes by the
+    loader.
+  - Systems batch by both UV sets.
+  - A mesh without a second set reads its first on channel 1. A set whose length is not two values
+    per vertex is left out with a one-time warning.
+  - `ParticleSystem.instancingUVs` and `instancingUVs2` accessors. Assigning `instancingGeometry`
+    with a different vertex count resets the first set to zeros and drops the second, so assign
+    the UVs after the geometry.
+- **`TextureUV`** (`channel`, `tiling`, `offset`, `scroll`) lays a texture over the particle:
+  Unity's Tiling/Offset plus Unreal's Panner. `mapUV`, `erosion.maskUV` and `uvDistortion.mapUV`
+  take it. The offset is kept as given; only the scroll's share is wrapped.
+  JSON writes only the fields that differ from the default. Helpers: `normalizeTextureUV`,
+  `textureUVEqual`, `textureUVToJSON`.
+- **`ParticleSystem.tint`** (`Vector4`, runtime only, copied by `clone()`):
+  - Multiplies every particle's colour and alpha as drawn, without touching the particles or
+    splitting batches.
+  - Use it for a per-instance colour or fade driven from code, like Unreal's user parameters.
+    With erosion, alpha is the erosion level.
+  - Additive and premultiplied blending ignore alpha; fade those through the colour instead.
+- quarks.core `FrameOverLife` option **`random`** (FPS mode, with `frameCount`; saved in JSON only
+  when set):
+  - Every `1 / fps` seconds it shows a random frame of the segment instead of the next.
+  - Each particle has its own sequence.
+  - Like Cascade's random SubUV, for the flicker of lightning, sparks and neon.
+- Mesh particle **rim mode `'fade'`** (Fresnel to opacity):
+  - Faces turned to the camera fade by `strength` instead of gaining a colour.
+  - A wall of light reads thick along its silhouette and thin across its face.
+- **`ParticleSystem.uvDistortion`** (`ParticleUVDistortion`: noise `map`, `mapUV` (default
+  scroll `[0, 0.5]`), `strength`;
+  saved with the material only when set):
+  - A scrolling noise texture pushes the map's UV about, for heat shimmer and licking, breathing
+    shapes.
+  - Works on sprites, meshes and trails, in GLSL and WGSL.
+- quarks.core **`TrailSettings.sideAxis`** (JSON `[x, y, z]`, written only when set):
+  - The trail is swept along that emitter axis instead of facing the camera.
+  - Each sample records the axis as the emitter held it, so a trail on a blade is the surface the
+    blade swept, like Unreal's AnimTrail.
+  - `TrailParticle.historySides` holds the recorded sides.
+
+### Fixed
+
+- **Scrolls wrap over two repeats instead of one** in every `TextureUV`. A map with mirrored addressing no longer flips to its mirror image at every wrap.
+- **Systems that share positions but not UVs batch apart.** Before, the first system's UVs drew
+  for both. Systems given a geometry without UVs share one fallback array per geometry, so they
+  still batch together.
+- **Mesh systems that share positions but not normals batch apart.** Before, the first system's
+  normals lit both. Fallback normals are shared per geometry, and trails no longer split batches
+  over instanced UVs they never read.
+- **Assigning `instancingGeometry` replaces stale normals and fallback UVs**: normals of a different
+  vertex count, and the previous geometry's fallbacks, move to the new geometry's.
+
 ## [0.25.0] — 2026-10-20
 
 ### Added

@@ -175,6 +175,16 @@ export const demoManifest: DemoManifestEntry[] = [
         preview: {icon: 'TX', gradient: 'linear-gradient(135deg, #ff9a3c 0%, #3a1c5c 100%)'},
     },
     {
+        key: 'AuraTrailDemo',
+        name: 'Aura, Strike & Weapon Trail',
+        module: 'auraTrail',
+        sourcePath: 'examples/src/demos/auraTrail.ts',
+        description:
+            'Mesh-particle aura with UV distortion and a fading rim, a standing beam flickering through random frames, and a trail swept along a swinging blade.',
+        tags: ['material', 'beam', 'trail'],
+        preview: {icon: 'AT', gradient: 'linear-gradient(135deg, #ffd27a 0%, #1c2a5c 100%)'},
+    },
+    {
         key: 'MagicZoneUnityExample',
         name: 'MagicZone: Unity exported by unity-quarks-exporter example',
         module: 'MagicZoneUnityExample',

@@ -75,6 +75,7 @@ interface ParsedGeometry {
     positions: Float32Array;
     indices: Uint32Array | Uint16Array;
     uvs?: Float32Array;
+    uvs2?: Float32Array;
     normals?: Float32Array;
 }
 
@@ -101,6 +102,7 @@ function geometryKey(geometry: ParsedGeometry): string {
         geometry.positions,
         geometry.indices,
         geometry.uvs,
+        geometry.uvs2,
         geometry.normals,
     ];
     let lengths = '';
@@ -313,6 +315,7 @@ export class QuarksLoader {
                     positions: new Float32Array(geom.positions ?? []),
                     indices: geom.indices ? new Uint32Array(geom.indices) : new Uint32Array(0),
                     uvs: geom.uvs ? new Float32Array(geom.uvs) : undefined,
+                    uvs2: geom.uvs2 ? new Float32Array(geom.uvs2) : undefined,
                     normals: geom.normals ? new Float32Array(geom.normals) : undefined,
                 });
             }
@@ -427,7 +430,10 @@ export class QuarksLoader {
         let positions = new Float32Array(0);
         let indices: Uint32Array | Uint16Array = new Uint32Array(0);
         let uvs: Float32Array | undefined;
+        let uvs2: Float32Array | undefined;
         let normals: Float32Array | undefined;
+        // three.js names the second UV set `uv1` (r151 on), `uv2` before.
+        const uv2Attribute = data.attributes?.uv1 ?? data.attributes?.uv2;
 
         if (data.interleavedBuffers && data.arrayBuffers) {
             const buffers: {[uuid: string]: {data: Float32Array; stride: number}} = {};
@@ -453,6 +459,16 @@ export class QuarksLoader {
                     const buf = buffers[attr.data];
                     if (buf) uvs = this.extractInterleavedAttribute(buf.data, buf.stride, attr.offset, attr.itemSize);
                 }
+                if (uv2Attribute?.isInterleavedBufferAttribute) {
+                    const buf = buffers[uv2Attribute.data];
+                    if (buf)
+                        uvs2 = this.extractInterleavedAttribute(
+                            buf.data,
+                            buf.stride,
+                            uv2Attribute.offset,
+                            uv2Attribute.itemSize
+                        );
+                }
                 if (data.attributes.normal?.isInterleavedBufferAttribute) {
                     const attr = data.attributes.normal;
                     const buf = buffers[attr.data];
@@ -466,6 +482,9 @@ export class QuarksLoader {
             }
             if (data.attributes.uv?.array) {
                 uvs = new Float32Array(data.attributes.uv.array);
+            }
+            if (uv2Attribute?.array) {
+                uvs2 = new Float32Array(uv2Attribute.array);
             }
             if (data.attributes.normal?.array) {
                 normals = new Float32Array(data.attributes.normal.array);
@@ -482,7 +501,7 @@ export class QuarksLoader {
 
         indices = ensureTriangleIndices(positions, indices);
 
-        return {positions, indices, uvs, normals};
+        return {positions, indices, uvs, uvs2, normals};
     }
 
     private extractInterleavedAttribute(buffer: Float32Array, stride: number, offset: number, itemSize: number): any {
@@ -666,7 +685,7 @@ export class QuarksLoader {
                         const data = await loadGeometry(geom.url);
                         // Copy arrays so a shared fetch-cache document is not aliased across
                         // effects — mutating one effect's inlined geometry must not corrupt others.
-                        for (const key of ['positions', 'indices', 'uvs', 'normals']) {
+                        for (const key of ['positions', 'indices', 'uvs', 'uvs2', 'normals']) {
                             const value = data?.[key];
                             if (value === undefined) {
                                 continue;
@@ -824,18 +843,30 @@ export class QuarksLoader {
             if (matDef.rim && typeof matDef.rim === 'object') {
                 matInfo.rim = matDef.rim;
             }
-            // Texture effects (QuarksMaterial): uvScroll [u, v], gradientMap texture uuid,
-            // erosion {mask (texture uuid), softness, edgeWidth, edgeColor, maskScroll}.
-            if (Array.isArray(matDef.uvScroll)) {
-                matInfo.uvScroll = matDef.uvScroll;
+            // Texture effects (QuarksMaterial): mapUV {channel, tiling, offset, scroll},
+            // gradientMap {ramp (texture uuid), channel},
+            // erosion {mask (texture uuid), maskUV {channel, tiling, offset, scroll}, softness, edgeWidth,
+            // edgeColor}.
+            if (matDef.mapUV && typeof matDef.mapUV === 'object') {
+                matInfo.mapUV = matDef.mapUV;
             }
-            if (matDef.gradientMap) {
-                matInfo.gradientMap = meta.textures[matDef.gradientMap] || null;
+            if (matDef.gradientMap && typeof matDef.gradientMap === 'object') {
+                matInfo.gradientMap = {
+                    ...matDef.gradientMap,
+                    ramp: matDef.gradientMap.ramp ? meta.textures[matDef.gradientMap.ramp] || null : null,
+                };
             }
             if (matDef.erosion && typeof matDef.erosion === 'object') {
                 matInfo.erosion = {
                     ...matDef.erosion,
                     mask: matDef.erosion.mask ? meta.textures[matDef.erosion.mask] || null : null,
+                };
+            }
+            // uvDistortion {map (texture uuid), mapUV {channel, tiling, offset, scroll}, strength}.
+            if (matDef.uvDistortion && typeof matDef.uvDistortion === 'object') {
+                matInfo.uvDistortion = {
+                    ...matDef.uvDistortion,
+                    map: matDef.uvDistortion.map ? meta.textures[matDef.uvDistortion.map] || null : null,
                 };
             }
 
@@ -886,6 +917,9 @@ export class QuarksLoader {
             vertexData.indices = geometry.indices;
             if (geometry.uvs && geometry.uvs.length > 0) {
                 vertexData.uvs = geometry.uvs;
+            }
+            if (geometry.uvs2 && geometry.uvs2.length > 0) {
+                vertexData.uvs2 = geometry.uvs2;
             }
             if (geometry.normals && geometry.normals.length > 0) {
                 vertexData.normals = geometry.normals;

@@ -12,15 +12,21 @@ import {TrailBatch} from './TrailBatch';
 import {
     defaultMeshLighting,
     erosionEqual,
+    gradientMapEqual,
+    mapUVEqual,
     MeshLighting,
     MeshLightingSettings,
     MeshRim,
     meshRimEqual,
     ParticleErosion,
+    ParticleGradientMap,
+    ParticleUVDistortion,
+    readsUV1,
     RenderMode,
     SortMode,
     StoredBatchSettings,
-    uvScrollEqual,
+    TextureUV,
+    uvDistortionEqual,
     VFXBatch,
 } from './VFXBatch';
 
@@ -28,6 +34,8 @@ export interface VFXBatchSettings {
     instancingGeometry: Float32Array;
     instancingIndices: Uint32Array | Uint16Array;
     instancingUVs?: Float32Array;
+    /** The mesh's second UV set, see {@link UVChannel}. */
+    instancingUVs2?: Float32Array;
     instancingNormals?: Float32Array;
     renderMode: RenderMode;
     renderOrder: number;
@@ -103,20 +111,12 @@ export interface VFXBatchSettings {
     lighting?: MeshLighting;
     /** Rim (Fresnel) term on mesh particles; unset draws none. See {@link MeshRim}. */
     rim?: MeshRim;
-    /**
-     * Scrolls the map's UV by this many UV units per second, `[u, v]`, on the
-     * renderer's clock. The texture should wrap; scrolling one tile of a sheet
-     * runs into its neighbours. Unset or zero: no scroll. Systems that differ
-     * are batched apart.
-     */
-    uvScroll?: [number, number];
-    /**
-     * Colour ramp the map is recoloured through: the map's red channel picks
-     * a colour along U of this texture, and its alpha multiplies the map's. The
-     * particle colour still tints the result. Unset: none. Systems that differ
-     * are batched apart.
-     */
-    gradientMap?: BaseTexture | null;
+    /** How the main map is laid over the particle, see {@link TextureUV}. Unset: as drawn. Systems that differ are batched apart. */
+    mapUV?: TextureUV;
+    /** Colour ramp the map is recoloured through, see {@link ParticleGradientMap}. Unset: none. Systems that differ are batched apart. */
+    gradientMap?: ParticleGradientMap;
+    /** Map UV distortion by a noise texture, see {@link ParticleUVDistortion}. Unset: none. Systems that differ are batched apart. */
+    uvDistortion?: ParticleUVDistortion;
     /** Alpha erosion (dissolve / wipe), see {@link ParticleErosion}. Unset: none. Systems that differ are batched apart. */
     erosion?: ParticleErosion;
 }
@@ -323,6 +323,11 @@ export class BatchedRenderer extends TransformNode {
             a.uTileCount === b.uTileCount &&
             a.vTileCount === b.vTileCount &&
             a.instancingGeometry === b.instancingGeometry &&
+            // Trails draw their own strip and read none of the instanced geometry's UVs.
+            (a.renderMode === RenderMode.Trail || a.instancingUVs === b.instancingUVs) &&
+            // Normals, and the second UV set when read, only matter to meshes.
+            (a.renderMode !== RenderMode.Mesh || a.instancingNormals === b.instancingNormals) &&
+            (a.renderMode !== RenderMode.Mesh || !readsUV1(a) || a.instancingUVs2 === b.instancingUVs2) &&
             a.renderOrder === b.renderOrder &&
             a.layerMask === b.layerMask &&
             a.renderingGroupId === b.renderingGroupId &&
@@ -333,8 +338,9 @@ export class BatchedRenderer extends TransformNode {
             a.maxParticleSize === (b.maxParticleSize ?? Infinity) &&
             (a.lighting ?? 'fixed') === (b.lighting ?? 'fixed') &&
             meshRimEqual(a.rim, b.rim) &&
-            uvScrollEqual(a.uvScroll, b.uvScroll) &&
-            a.gradientMap === (b.gradientMap ?? null) &&
+            mapUVEqual(a.mapUV, b.mapUV) &&
+            uvDistortionEqual(a.uvDistortion, b.uvDistortion) &&
+            gradientMapEqual(a.gradientMap, b.gradientMap) &&
             erosionEqual(a.erosion, b.erosion)
         );
     }

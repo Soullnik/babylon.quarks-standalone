@@ -31,6 +31,10 @@ uniform vec3 pivot;
 // Varyings
 varying vec2 vUV;
 varying vec4 vColor;
+#ifdef UV1
+// The particle's own UV, never moved by the sheet (UV channel 1).
+varying vec2 vUV1;
+#endif
 #ifdef TILE_BLEND
 varying vec2 vUV2;
 varying float vTileBlend;
@@ -119,6 +123,9 @@ ${fogVertexGLSL('mvPosition.xyz')}
         vUV = uv;
     #endif
 
+#ifdef UV1
+    vUV1 = uv;
+#endif
     vColor = color;
 }
 `;
