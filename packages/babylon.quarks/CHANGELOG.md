@@ -18,11 +18,14 @@ and the project follows the `quarks.core` 0.x version line.
 
 ### Changed
 
-- **Trails face the camera in view space**, across their tangent and the line of sight, like
-  Unity's View alignment and Niagara's ribbons. The width is now exactly the particle's size in
-  world units. Before, the facing was worked out on screen, which spiked across the view when a
-  trail passed the camera and put NaN vertices (holes) at repeated points and hairpins. The
-  trail material lost its `resolution`, `lineWidth` and `sizeAttenuation` uniforms.
+- **Trails face the camera in view space (breaking for custom trail shaders)**, across their
+  tangent and the line of sight, like Unity's View alignment and Niagara's ribbons. The width is
+  the particle's size in world units, measured across the line of sight. Before, the facing was
+  worked out on screen, which spiked across the view when a trail passed the camera and put NaN
+  vertices (holes) at repeated points and hairpins. The trail material no longer has the
+  `lineWidth`, `resolution`, `sizeAttenuation`, `world` and `worldViewProjection` uniforms. Code
+  that set or read them, or a shader built on them, should drop them; to change a trail's width,
+  scale `startSize` or add `WidthOverLength`.
 - **A trail system made without `rendererEmitterSettings`** gets `startLength: 30` and
   `followLocalOrigin: false`, as setting `renderMode` to Trail does, instead of throwing on its
   first particle. `startLength` and `followLocalOrigin` are documented.
@@ -91,9 +94,8 @@ and the project follows the `quarks.core` 0.x version line.
 - **The live tip ignored `WidthOverLength`**, so a trail narrowed by it flared at the tip on
   frames between steps.
 - **`WidthOverLength` read its curve past the end** for a fractional or zero `startLength`.
-- **A trail rebuilt its material without disposing the old one.**
 - **Camera-dependent uniforms reached the GPU one draw late.** The eye position (rim, env
-  reflection), the soft-particle depth decode, the `'scene'` light and a trail's render size were
+  reflection), the soft-particle depth decode and the `'scene'` light were
   written after the material had uploaded its uniforms, so each draw used the previous bind's
   values: a frame late with one camera, and the other camera's with `activeCameras`. They now reach
   the effect of the draw they are for.

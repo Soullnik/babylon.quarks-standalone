@@ -7,6 +7,7 @@ import {
     PointEmitter,
     TrailParticle,
     TrailSettings,
+    Vector3,
     Vector4,
     WidthOverLength,
 } from 'quarks.core';
@@ -64,6 +65,7 @@ function trail(overrides: Partial<ParticleSystemParameters> = {}) {
 
 interface Buffers {
     positionBuffer: Float32Array;
+    uvBuffer: Float32Array;
     widthBuffer: Float32Array;
     indexCount: number;
 }
@@ -77,6 +79,18 @@ const drawnPairs = (renderer: BatchedRenderer) => {
     const mesh = renderer.batches[0].mesh;
     return mesh.getTotalIndices() > 0 ? (mesh.subMeshes?.[0]?.indexCount ?? 0) / 6 + 1 : 0;
 };
+
+/** U of drawn pair k. */
+const drawnU = (renderer: BatchedRenderer, k: number) => buffers(renderer).uvBuffer[k * 4];
+
+/** Redraws the batch as if the display were `residual` seconds off the last step. */
+function drawAt(system: ParticleSystem, renderer: BatchedRenderer, residual: number) {
+    (system as any).simulationAccumulator = residual;
+    renderer.batches[0].update();
+}
+
+const recordedZ = (particle: TrailParticle, i: number) =>
+    particle.historyPositions[particle.getHistoryIndex(i) * 3 + 2];
 
 /** Updates at 50 Hz until the residual has the sign asked for. */
 function frameWithResidual(system: ParticleSystem, renderer: BatchedRenderer, negative: boolean): number {
@@ -146,6 +160,67 @@ describe('the live tip of a trail', () => {
         renderer.dispose();
     });
 
+    test("keeps each sample's U as the residual changes sign", () => {
+        const {system, renderer, particle} = trail();
+        const count = particle.historyCount;
+        drawAt(system, renderer, -2e-4);
+        const behind = Array.from({length: count - 1}, (_, k) => drawnU(renderer, k));
+        drawAt(system, renderer, 2e-4);
+        // A residual of 2e-4 s is about 1% of a step: U may move by that share of a sample, not
+        // jump by a whole one (1 / count) as it did when the drawn count changed.
+        for (let k = 0; k < count - 1; k++) {
+            expect(Math.abs(drawnU(renderer, k) - behind[k])).toBeLessThan(0.05 / count);
+        }
+        // The ribbon still spans the texture end to end on both frames.
+        expect(drawnU(renderer, count)).toBeCloseTo(1, 5);
+        drawAt(system, renderer, -2e-4);
+        expect(drawnU(renderer, count - 1)).toBeCloseTo(1, 5);
+        renderer.dispose();
+    });
+
+    test.each([
+        ['tessellated', {tessellation: 3}],
+        ['swept', {sideAxis: new Vector3(1, 0, 0)}],
+        ['swept and tessellated', {sideAxis: new Vector3(1, 0, 0), tessellation: 2}],
+    ] as Array<[string, Partial<TrailSettings>]>)('pulls a %s head back along its last segment', (_name, extra) => {
+        const {system, renderer, particle} = trail({
+            rendererEmitterSettings: {startLength: new ConstantValue(30), followLocalOrigin: false, ...extra},
+        });
+        const perSegment = (extra.tessellation ?? 0) + 1;
+        const step = system.simulationStep;
+        drawAt(system, renderer, -0.25 * step);
+        const count = particle.historyCount;
+        const pairs = (count - 1) * perSegment + 1;
+        expect(drawnPairs(renderer)).toBe(pairs);
+        const head = drawnZ(renderer, pairs - 1);
+        expect(head).toBeCloseTo(recordedZ(particle, count - 1) - 0.25 * step * SPEED, 4);
+        // The pulled-back segment keeps its points in order, evenly along the straight trail.
+        const start = (count - 2) * perSegment;
+        const gap = (head - drawnZ(renderer, start)) / perSegment;
+        for (let k = start + 1; k < pairs; k++) {
+            expect(drawnZ(renderer, k) - drawnZ(renderer, k - 1)).toBeCloseTo(gap, 4);
+        }
+        for (let k = 0; k < pairs * 6; k++) {
+            expect(Number.isFinite(buffers(renderer).positionBuffer[k])).toBe(true);
+        }
+        renderer.dispose();
+    });
+
+    test('ends on the sample before the head when the display is a whole step behind', () => {
+        const {system, renderer, particle} = trail({
+            rendererEmitterSettings: {startLength: new ConstantValue(30), followLocalOrigin: false, tessellation: 2},
+        });
+        drawAt(system, renderer, -system.simulationStep);
+        const count = particle.historyCount;
+        const pairs = (count - 1) * 3 + 1;
+        expect(drawnZ(renderer, pairs - 1)).toBeCloseTo(recordedZ(particle, count - 2), 4);
+        expect(drawnU(renderer, pairs - 1)).toBeCloseTo(1, 5);
+        for (let k = 0; k < pairs * 2; k++) {
+            expect(Number.isFinite(buffers(renderer).uvBuffer[k])).toBe(true);
+        }
+        renderer.dispose();
+    });
+
     test('is as wide as the head under WidthOverLength', () => {
         const {system, renderer, particle} = trail();
         system.addBehavior(new WidthOverLength(new ConstantValue(0.2) as never));
@@ -177,6 +252,15 @@ describe('a trail system', () => {
         }).not.toThrow();
         expect(system.particleNum).toBeGreaterThan(0);
         renderer.dispose();
+    });
+
+    test("fills the defaults on a copy, leaving the caller's settings as they were", () => {
+        const given = {tessellation: 2} as TrailSettings;
+        const system = new ParticleSystem({scene, renderMode: RenderMode.Trail, rendererEmitterSettings: given});
+        expect(given).toEqual({tessellation: 2});
+        expect((system.rendererEmitterSettings as TrailSettings).tessellation).toBe(2);
+        expect((system.rendererEmitterSettings as TrailSettings).followLocalOrigin).toBe(false);
+        system.dispose();
     });
 
     test('compiles alpha test in, and cuts at the set value', () => {

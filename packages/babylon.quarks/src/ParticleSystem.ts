@@ -1137,8 +1137,10 @@ export class ParticleSystem implements IParticleSystem {
         this.rendererEmitterSettings = parameters.rendererEmitterSettings ?? {};
 
         if (parameters.renderMode === RenderMode.Trail) {
-            // The defaults the renderMode setter gives a trail, for settings left out.
-            const settings = this.rendererEmitterSettings as TrailSettings;
+            // The defaults the renderMode setter gives a trail, for settings left out, on a copy so
+            // the caller's object is left as it was.
+            const settings = {...this.rendererEmitterSettings} as TrailSettings;
+            this.rendererEmitterSettings = settings;
             settings.startLength = settings.startLength ?? new ConstantValue(30);
             settings.followLocalOrigin = settings.followLocalOrigin ?? false;
         }

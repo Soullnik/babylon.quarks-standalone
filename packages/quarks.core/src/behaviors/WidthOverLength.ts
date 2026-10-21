@@ -47,8 +47,8 @@ export class WidthOverLength implements Behavior {
         const capacity = particle.historyCapacity;
         const sizes = particle.historySizes;
         const baseSizes = particle.historyBaseSizes;
-        // The oldest sample sits at 1. A fractional or zero length keeps fewer samples than its
-        // capacity, so measure by whichever is longer and never sample the curve past its end.
+        // The oldest sample sits at 1. A fractional or zero length falls short of the capacity the
+        // history keeps, so measure by whichever is longer and never sample the curve past its end.
         const invLength = 1 / Math.max(particle.length, capacity);
         const absolute = this.absolute;
         // Walk the ring buffer oldest-first, wrapping by hand so the loop stays

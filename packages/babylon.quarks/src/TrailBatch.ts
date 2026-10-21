@@ -301,6 +301,37 @@ export class TrailBatch extends VFXBatch {
      * keeps its shape and only loses its corners; centripetal spacing keeps
      * it from overshooting where samples lie unevenly apart.
      */
+    /**
+     * Shortens the last segment of a drawn ribbon to `keep` of its length, along the points already
+     * drawn for it, so it stays a prefix of that same curve. Every channel follows.
+     */
+    private cutLastSegment(drawn: TrailSamples, count: number, perSegment: number, keep: number, swept: boolean): void {
+        const first = count - 1 - perSegment;
+        const scratch = this.cutScratch_.reserve(perSegment + 1);
+        scratch.position.set(drawn.position.subarray(first * 3, count * 3));
+        scratch.side.set(drawn.side.subarray(first * 3, count * 3));
+        scratch.size.set(drawn.size.subarray(first, count));
+        scratch.color.set(drawn.color.subarray(first * 4, count * 4));
+        for (let j = 1; j <= perSegment; j++) {
+            const at = keep * j;
+            const i = Math.min(perSegment - 1, Math.floor(at));
+            const t = at - i;
+            const d = first + j;
+            for (let c = 0; c < 3; c++) {
+                drawn.position[d * 3 + c] = scratch.position[i * 3 + c] * (1 - t) + scratch.position[i * 3 + 3 + c] * t;
+                if (swept) {
+                    drawn.side[d * 3 + c] = scratch.side[i * 3 + c] * (1 - t) + scratch.side[i * 3 + 3 + c] * t;
+                }
+            }
+            drawn.size[d] = scratch.size[i] * (1 - t) + scratch.size[i + 1] * t;
+            for (let c = 0; c < 4; c++) {
+                drawn.color[d * 4 + c] = scratch.color[i * 4 + c] * (1 - t) + scratch.color[i * 4 + 4 + c] * t;
+            }
+        }
+    }
+
+    private readonly cutScratch_ = new TrailSamples();
+
     private tessellate(
         samples: TrailSamples,
         curved: number,
@@ -581,23 +612,6 @@ export class TrailBatch extends VFXBatch {
                     slot = slot + 1 === historyCapacity ? 0 : slot + 1;
                 }
 
-                // The last step ran ahead of the display: draw the head where it was at display
-                // time, back along its last segment, rather than a tip folding back over it.
-                if (recording && stepFraction < 0 && particleHistoryLength > 1) {
-                    const back = -stepFraction;
-                    const h = (particleHistoryLength - 1) * 3;
-                    const sp = samples.position;
-                    for (let c = 0; c < 3; c++) {
-                        sp[h + c] += (sp[h - 3 + c] - sp[h + c]) * back;
-                    }
-                    if (swept) {
-                        const ss = samples.side;
-                        for (let c = 0; c < 3; c++) {
-                            ss[h + c] += (ss[h - 3 + c] - ss[h + c]) * back;
-                        }
-                    }
-                }
-
                 // Live tip: same place a sprite would be drawn this frame, past
                 // the last recorded sample. The recorded ribbon stays put.
                 if (tipAhead) {
@@ -635,8 +649,20 @@ export class TrailBatch extends VFXBatch {
                           )
                         : samples;
                 const drawnCount = tessellation > 0 ? (sampleCount - 1) * (tessellation + 1) + 1 : sampleCount;
-                // The texture spans the ribbon end to end.
-                const invLength = 1 / Math.max(1, drawnCount - 1);
+                const perSegment = tessellation + 1;
+                // The last step ran ahead of the display: the head is drawn where it was at display
+                // time, back along the drawn last segment, rather than a tip folding back over it.
+                // Cut from the drawn curve, so the rest of the ribbon is the same as on any frame.
+                const pullBack = recording && stepFraction < 0 && particleHistoryLength > 1;
+                if (pullBack) {
+                    this.cutLastSegment(drawn, drawnCount, perSegment, 1 + stepFraction, swept);
+                }
+                // The texture spans the ribbon end to end, measured in samples: the recorded ones,
+                // plus the part of a step the tip runs ahead or the head was drawn back. So a sample's
+                // U changes smoothly from frame to frame whichever way the residual falls.
+                const spanFraction = tipAhead || pullBack ? stepFraction : 0;
+                const invLength = 1 / Math.max(1e-3, particleHistoryLength - 1 + spanFraction);
+                const lastSegment = (sampleCount - 2) * perSegment;
                 const dp = drawn.position;
                 const vTop = (vTileCount - row - 1) * tileHeight;
                 const vBottom = (vTileCount - row) * tileHeight;
@@ -683,7 +709,15 @@ export class TrailBatch extends VFXBatch {
                     this.nextBuffer[pi + 5] = dp[next + 2];
 
                     const ui = index * 2;
-                    const along = k * invLength;
+                    // Where this point sits along the ribbon, in samples.
+                    let at = k / perSegment;
+                    if (k > lastSegment && (tipAhead || pullBack)) {
+                        const into = (k - lastSegment) / perSegment;
+                        at = tipAhead
+                            ? particleHistoryLength - 1 + stepFraction * into
+                            : particleHistoryLength - 2 + (1 + stepFraction) * into;
+                    }
+                    const along = Math.min(1, at * invLength);
                     const u1 = uvFromHead ? 1 - along : along;
                     const u = (u1 + col) * tileWidth;
                     this.uvBuffer[ui] = u;
