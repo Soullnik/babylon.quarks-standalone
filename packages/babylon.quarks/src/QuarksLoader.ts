@@ -216,8 +216,10 @@ export class QuarksLoader {
 
     /**
      * Inlines external geometry files and rewrites relative image urls through the loader's
-     * {@link QuarksResourceResolver}. Idempotent for already-inlined geometries. Failures warn
-     * and leave the entry as is.
+     * {@link QuarksResourceResolver}, in place on `json`. Each document is resolved once:
+     * geometries already inlined and image urls this method already rewrote are left alone, so
+     * loading the same document again does not join its base url twice. Failures warn and leave
+     * the entry as is.
      */
     async resolveResources(json: any, baseUrl: string = ''): Promise<void> {
         await QuarksLoader.resolveLinkedResources(json, {
@@ -230,6 +232,7 @@ export class QuarksLoader {
     /**
      * Same as instance {@link resolveResources}, but usable without constructing a loader (e.g.
      * editor import that only prepares JSON). Pass `scene` to share the per-scene fetch cache.
+     * Like it, resolves each document once.
      */
     static async resolveLinkedResources(
         json: any,

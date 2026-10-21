@@ -10,20 +10,27 @@ and the project follows the `quarks.core` 0.x version line.
 
 - **Trail tessellation** (`TrailSettings.tessellation`, `curveTension`), like Niagara's ribbon
   tessellation and curve tension:
-    - Each segment between two recorded samples is drawn as `tessellation + 1` segments along a
-      centripetal cardinal spline through the samples: Catmull-Rom at `curveTension` 0 (the
-      default), straight at 1. Centripetal spacing keeps the curve from overshooting where samples
-      lie unevenly apart.
-    - A fast or sharply turning trail, such as a weapon swing that moves far between frames, stays
-      round instead of showing its corners. The curve passes through every sample, so the trail
-      keeps its shape.
-    - Swept trails curve their sides with the points, keeping each side's length, so a blade's trail
-      stays as wide as the blade.
-    - Widths, colors and the texture's U are eased along the curve. The live tip drawn between
-      steps joins it with a straight segment, so the recorded part stays still as the tip moves.
-    - `tessellation` is a whole number from 0 (the default: off, no cost) to 16
-      (`MAX_TRAIL_TESSELLATION`). JSON writes both settings only when set. Helpers:
-      `trailTessellation`, `trailCurveTension`.
+  - Each segment between two recorded samples is drawn as `tessellation + 1` segments along a
+    centripetal cardinal spline through the samples: Catmull-Rom at `curveTension` 0 (the
+    default), straight at 1. Centripetal spacing keeps the curve from overshooting where samples
+    lie unevenly apart.
+  - A fast or sharply turning trail, such as a weapon swing that moves far between frames, stays
+    round instead of showing its corners. The curve passes through every sample, so the trail
+    keeps its shape.
+  - Swept trails curve their sides with the points, keeping each side's length, so a blade's trail
+    stays as wide as the blade.
+  - Widths, colors and the texture's U are eased along the curve. The live tip drawn between
+    steps joins it with a straight segment, so the recorded part stays still as the tip moves.
+  - `tessellation` is a whole number from 0 (the default: off, no cost) to 16
+    (`MAX_TRAIL_TESSELLATION`). JSON writes both settings only when set. Helpers:
+    `trailTessellation`, `trailCurveTension`.
+
+### Changed
+
+- **Seeded systems roll differently from 0.26.** A seeded system now rolls its emission rates,
+  burst counts and start delay on its own generator when it is created and on every restart, so
+  a restart replays them too. A seed saved with 0.26 gives a different, still repeatable, effect,
+  and lock-step sessions must not mix 0.26 and 0.27 clients.
 
 ### Fixed
 
@@ -36,13 +43,13 @@ and the project follows the `quarks.core` 0.x version line.
   `nodenext`.
 - **`restart()` broke random emission.** It emptied the system's generator memory without
   rolling `emissionOverTime` again, so an `IntervalValue` rate became NaN and the system emitted
-  nothing. Every effect taken from an `EffectPool` was empty from its second play. A seeded
-  system now also rolls its rates, burst counts and start delay on its own generator, so a
-  restart replays them.
+  nothing. Every pooled effect with a random emission rate was empty from its second play.
 - **`restart()` kept the emission-over-distance history.** A pooled effect placed somewhere new
   and restarted spawned a line of particles along the jump from where it last played.
 - **Disposing an emitter node left its system running.** `root.dispose()` on an effect tree now
-  disposes every `ParticleSystem` in it and removes it from its renderer.
+  disposes every `ParticleSystem` in it and removes it from its renderer. A system that disposes
+  itself (`dispose()`, or `autoDestroy` when it finishes) still leaves the systems of its child
+  emitters playing until they finish.
 - **`depthTest: false` had no effect.** It was stored, batched and saved, but never reached the
   material. It now draws particles over all geometry (Unity's `ZTest Always`) in every render mode.
 - **A mesh batch leaked a material when its env atlas finished loading.** The rebuild now disposes
@@ -82,52 +89,52 @@ renames below.
 ### Added
 
 - **UV channels** (`UVChannel`: `0 | 1`), as Unity's UV channels and Niagara's ribbon UV0/UV1:
-    - Channel 0 is the map's UV as drawn.
-    - Channel 1 is the particle's own UV, which the sprite sheet never moves:
-        - the whole quad on billboards, stretched billboards and beams;
-        - along and across the trail on trails;
-        - the mesh's second UV set on meshes.
-    - A texture on channel 1 can run once across a whole trail or mesh however the map repeats or
-      animates. Shaders declare `vUV1` under `UV1` only when a texture reads it.
+  - Channel 0 is the map's UV as drawn.
+  - Channel 1 is the particle's own UV, which the sprite sheet never moves:
+    - the whole quad on billboards, stretched billboards and beams;
+    - along and across the trail on trails;
+    - the mesh's second UV set on meshes.
+  - A texture on channel 1 can run once across a whole trail or mesh however the map repeats or
+    animates. Shaders declare `vUV1` under `UV1` only when a texture reads it.
 - **Second UV set on mesh particles:** `instancingUVs2` (glTF `TEXCOORD_1`, Unity's `uv2`).
-    - It is saved with the geometry as `uvs2` and read from three.js `uv1`/`uv2` attributes by the
-      loader.
-    - Systems batch by both UV sets.
-    - A mesh without a second set reads its first on channel 1. A set whose length is not two values
-      per vertex is left out with a one-time warning.
-    - `ParticleSystem.instancingUVs` and `instancingUVs2` accessors. Assigning `instancingGeometry`
-      with a different vertex count resets the first set to zeros and drops the second, so assign
-      the UVs after the geometry.
+  - It is saved with the geometry as `uvs2` and read from three.js `uv1`/`uv2` attributes by the
+    loader.
+  - Systems batch by both UV sets.
+  - A mesh without a second set reads its first on channel 1. A set whose length is not two values
+    per vertex is left out with a one-time warning.
+  - `ParticleSystem.instancingUVs` and `instancingUVs2` accessors. Assigning `instancingGeometry`
+    with a different vertex count resets the first set to zeros and drops the second, so assign
+    the UVs after the geometry.
 - **`TextureUV`** (`channel`, `tiling`, `offset`, `scroll`) lays a texture over the particle:
   Unity's Tiling/Offset plus Unreal's Panner. `mapUV`, `erosion.maskUV` and `uvDistortion.mapUV`
   take it. The offset is kept as given; only the scroll's share is wrapped.
   JSON writes only the fields that differ from the default. Helpers: `normalizeTextureUV`,
   `textureUVEqual`, `textureUVToJSON`.
 - **`ParticleSystem.tint`** (`Vector4`, runtime only, copied by `clone()`):
-    - Multiplies every particle's colour and alpha as drawn, without touching the particles or
-      splitting batches.
-    - Use it for a per-instance colour or fade driven from code, like Unreal's user parameters.
-      With erosion, alpha is the erosion level.
-    - Additive and premultiplied blending ignore alpha; fade those through the colour instead.
+  - Multiplies every particle's colour and alpha as drawn, without touching the particles or
+    splitting batches.
+  - Use it for a per-instance colour or fade driven from code, like Unreal's user parameters.
+    With erosion, alpha is the erosion level.
+  - Additive and premultiplied blending ignore alpha; fade those through the colour instead.
 - quarks.core `FrameOverLife` option **`random`** (FPS mode, with `frameCount`; saved in JSON only
   when set):
-    - Every `1 / fps` seconds it shows a random frame of the segment instead of the next.
-    - Each particle has its own sequence.
-    - Like Cascade's random SubUV, for the flicker of lightning, sparks and neon.
+  - Every `1 / fps` seconds it shows a random frame of the segment instead of the next.
+  - Each particle has its own sequence.
+  - Like Cascade's random SubUV, for the flicker of lightning, sparks and neon.
 - Mesh particle **rim mode `'fade'`** (Fresnel to opacity):
-    - Faces turned to the camera fade by `strength` instead of gaining a colour.
-    - A wall of light reads thick along its silhouette and thin across its face.
+  - Faces turned to the camera fade by `strength` instead of gaining a colour.
+  - A wall of light reads thick along its silhouette and thin across its face.
 - **`ParticleSystem.uvDistortion`** (`ParticleUVDistortion`: noise `map`, `mapUV` (default
   scroll `[0, 0.5]`), `strength`;
   saved with the material only when set):
-    - A scrolling noise texture pushes the map's UV about, for heat shimmer and licking, breathing
-      shapes.
-    - Works on sprites, meshes and trails, in GLSL and WGSL.
+  - A scrolling noise texture pushes the map's UV about, for heat shimmer and licking, breathing
+    shapes.
+  - Works on sprites, meshes and trails, in GLSL and WGSL.
 - quarks.core **`TrailSettings.sideAxis`** (JSON `[x, y, z]`, written only when set):
-    - The trail is swept along that emitter axis instead of facing the camera.
-    - Each sample records the axis as the emitter held it, so a trail on a blade is the surface the
-      blade swept, like Unreal's AnimTrail.
-    - `TrailParticle.historySides` holds the recorded sides.
+  - The trail is swept along that emitter axis instead of facing the camera.
+  - Each sample records the axis as the emitter held it, so a trail on a blade is the surface the
+    blade swept, like Unreal's AnimTrail.
+  - `TrailParticle.historySides` holds the recorded sides.
 
 ### Fixed
 

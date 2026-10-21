@@ -52,7 +52,7 @@ import {
 import {BatchedRenderer, VFXBatchSettings} from './BatchedRenderer';
 import {ensureEnvAtlasFromCube, getCachedEnvAtlas} from './envAtlas';
 import {ensureTriangleIndices} from './geometryUtil';
-import {ParticleEmitter} from './ParticleEmitter';
+import {disposeEmitterForSystem, ParticleEmitter} from './ParticleEmitter';
 import {trailCurveTension, trailTessellation} from './trailCurve';
 import {
     MeshLighting,
@@ -1023,6 +1023,12 @@ export class ParticleSystem implements IParticleSystem {
     set seed(seed: number | undefined) {
         this.seedValue = seed;
         this.rng = seed === undefined ? undefined : createSeededRandom(seed);
+        // Seeded before it has played: roll the system-level values on the new generator, so the
+        // first play matches every restart. (The constructor sets the seed before they exist.)
+        if (this.emissionState !== undefined && this.emissionState.time === 0 && this.particleNum === 0) {
+            this.memory.length = 0;
+            this.initSystemGenerators();
+        }
     }
 
     /**
@@ -1563,7 +1569,7 @@ export class ParticleSystem implements IParticleSystem {
         }
         this.destroyed = true;
         if (this._renderer) this._renderer.deleteSystem(this);
-        this.emitter.dispose();
+        disposeEmitterForSystem(this.emitter);
         this.fire({type: 'destroy', particleSystem: this});
     }
 

@@ -85,7 +85,7 @@ function assertConsumersCanImport() {
         }
         for (const peer of PEERS) {
             mkdirSync(dirname(join(modules, peer)), {recursive: true});
-            symlinkSync(join(repoRoot, 'node_modules', peer), join(modules, peer), 'dir');
+            symlinkSync(join(repoRoot, 'node_modules', peer), join(modules, peer), 'junction');
         }
         writeFileSync(join(consumer, 'package.json'), JSON.stringify({name: 'consumer', private: true}));
 
@@ -101,6 +101,8 @@ function assertConsumersCanImport() {
         if (process.features.require_module) {
             const cjs = `if (typeof require('babylon.quarks').BatchedRenderer !== 'function') throw new Error('no BatchedRenderer');`;
             run(process.execPath, ['-e', cjs], consumer);
+        } else {
+            console.log(`Skipping the CommonJS require check: Node ${process.version} cannot require ES modules.`);
         }
 
         const usage = `import {BatchedRenderer} from 'babylon.quarks';
@@ -140,10 +142,12 @@ export const binding: typeof EffectBinding = EffectBinding;
         try {
             run(process.execPath, [tsc, '-p', 'tsconfig.json'], consumer);
         } catch (error) {
-            typeErrors = error.message
-                .split('\n')
-                .filter((line) => / error TS\d+/.test(line) && !line.includes('node_modules/@babylonjs/'))
-                .join('\n');
+            const lines = error.message.split('\n').filter((line) => / error TS\d+/.test(line));
+            // No diagnostics at all means tsc itself failed (bad config, crash): report all of it.
+            typeErrors =
+                lines.length === 0
+                    ? error.message
+                    : lines.filter((line) => !line.includes('node_modules/@babylonjs/')).join('\n');
         }
         if (typeErrors) {
             throw new Error(`Consumer type check failed:\n${typeErrors}`);

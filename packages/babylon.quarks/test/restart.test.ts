@@ -2,7 +2,9 @@ import {NullEngine} from '@babylonjs/core/Engines/nullEngine';
 import {Scene} from '@babylonjs/core/scene';
 import {Bezier, ConstantColor, ConstantValue, IntervalValue, PiecewiseBezier, PointEmitter, Vector4} from 'quarks.core';
 import {BatchedRenderer} from '../src/BatchedRenderer';
+import {EffectPool} from '../src/EffectPool';
 import {ParticleSystem} from '../src/ParticleSystem';
+import {QuarksUtil} from '../src/QuarksUtil';
 
 let engine: NullEngine;
 let scene: Scene;
@@ -97,6 +99,43 @@ describe('restart()', () => {
         ps.dispose();
     });
 
+    it('keeps emitting with an unseeded random rate after a restart', () => {
+        const ps = system({seed: undefined, emissionOverTime: new IntervalValue(50, 60)});
+        expect(run(ps, 0.5)).toBeGreaterThan(20);
+        ps.restart();
+        expect(run(ps, 0.5)).toBeGreaterThan(20);
+        ps.dispose();
+    });
+
+    it('plays a random-rate effect from an EffectPool more than once', () => {
+        const renderer = new BatchedRenderer('pool-restart', scene);
+        const template = system({
+            seed: undefined,
+            looping: false,
+            duration: 0.5,
+            emissionOverTime: new IntervalValue(50, 60),
+        });
+        renderer.addSystem(template);
+        const pool = new EffectPool(template.emitter, {renderer});
+        for (let play = 0; play < 3; play++) {
+            const copy = pool.acquire()!;
+            const copySystem = (copy as any).system as ParticleSystem;
+            expect(run(copySystem, 0.3)).toBeGreaterThan(10);
+            pool.release(copy);
+        }
+        pool.dispose();
+        renderer.dispose();
+    });
+
+    it('replays its first play when the seed is set after construction', () => {
+        const ps = system({seed: undefined, emissionOverTime: new IntervalValue(50, 60)});
+        ps.seed = 11;
+        const first = run(ps, 0.5);
+        ps.restart();
+        expect(run(ps, 0.5)).toBe(first);
+        ps.dispose();
+    });
+
     it('does not spawn a line of distance particles when the emitter moved before the restart', () => {
         const ps = system({emissionOverDistance: new ConstantValue(1)});
         moveTo(ps, 0);
@@ -150,6 +189,37 @@ describe('disposing the emitter node', () => {
         expect(renderer['systems']).toHaveLength(0);
         expect(child.emitter.isDisposed()).toBe(true);
         renderer.dispose();
+    });
+
+    it('keeps a child system playing when its autoDestroy parent finishes first', () => {
+        const renderer = new BatchedRenderer('dispose-auto', scene);
+        const parent = system({
+            looping: false,
+            duration: 0.1,
+            startLife: new ConstantValue(0.2),
+            emissionOverTime: new ConstantValue(60),
+        });
+        const child = system({
+            looping: false,
+            duration: 2,
+            startLife: new ConstantValue(1),
+            emissionOverTime: new ConstantValue(30),
+        });
+        child.emitter.parent = parent.emitter;
+        renderer.addSystem(parent);
+        renderer.addSystem(child);
+        QuarksUtil.setAutoDestroy(parent.emitter, true);
+        let childFramesAfterParent = 0;
+        for (let i = 0; i < 120; i++) {
+            renderer.update(STEP);
+            if (parent.emitter.isDisposed() && renderer['systems'].includes(child) && child.particleNum > 0) {
+                childFramesAfterParent++;
+            }
+        }
+        expect(parent.emitter.isDisposed()).toBe(true);
+        expect(childFramesAfterParent).toBeGreaterThan(30);
+        renderer.dispose();
+        child.dispose();
     });
 
     it('still disposes the emitter when the system is disposed first', () => {

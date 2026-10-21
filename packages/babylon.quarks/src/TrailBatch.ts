@@ -568,9 +568,10 @@ export class TrailBatch extends VFXBatch {
                 // the particle's current row in the store.
                 const colors = colorFromParticle ? particle.store.color : particle.historyColors;
                 const particleColorIndex = particle.storeIndex * 4;
-                // The same cell as the sprite shader: frames run along the rows, uTileCount per row.
-                const tile = Math.floor(particle.uvTile + 0.001);
-                const col = tile % uTileCount;
+                // The same cell as the sprite shader: frames run along the rows, uTileCount per row,
+                // with floor and a positive modulo, as the shader's floor() and mod().
+                const tile = Math.floor(particle.uvTile);
+                const col = ((tile % uTileCount) + uTileCount) % uTileCount;
                 const row = Math.floor(tile / uTileCount);
                 const particleMatrix = particle.parentMatrix as unknown as Matrix4 | undefined;
                 const me = (particleMatrix ?? emitterMatrix).elements;
