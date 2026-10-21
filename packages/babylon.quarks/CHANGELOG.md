@@ -34,6 +34,11 @@ and the project follows the `quarks.core` 0.x version line.
   drawn, without touching the particles or splitting batches. A per-instance colour or fade driven
   from code; with erosion, alpha is the erosion level, so it wipes a shape in and out.
 
+### Fixed
+
+- UV scroll, distortion scroll and erosion mask scroll offsets wrap over two repeats instead of
+  one, so a map with mirrored addressing no longer flips to its mirror image at every wrap.
+
 ## [0.25.0] — 2026-10-20
 
 ### Added

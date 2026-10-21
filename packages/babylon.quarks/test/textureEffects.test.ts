@@ -78,9 +78,9 @@ describe('texture effects', () => {
         expect(normalizeErosion(undefined)).toBeUndefined();
     });
 
-    it('scroll the map on the renderer clock, wrapped to 0…1', () => {
+    it('scroll the map on the renderer clock, wrapped over two repeats so a mirrored map never flips', () => {
         const renderer = new BatchedRenderer('scroll', scene);
-        const s = system({uvScroll: [0.25, -0.5]});
+        const s = system({uvScroll: [0.6, -0.5]});
         renderer.addSystem(s);
         renderer.update(3);
         const mat = materialOf(renderer, s);
@@ -88,7 +88,7 @@ describe('texture effects', () => {
         expect(uniforms(mat)).toContain('uvScrollOffset');
         mat.onBindObservable.notifyObservers(undefined as any);
         const offset = (mat as any)._vectors2.uvScrollOffset;
-        expect(offset.x).toBeCloseTo(0.75);
+        expect(offset.x).toBeCloseTo(1.8);
         expect(offset.y).toBeCloseTo(0.5);
     });
 
@@ -257,6 +257,10 @@ describe('texture effects', () => {
         );
         const particle = tinted.particles[0];
         expect([particle.color.x, particle.color.w]).toEqual([1, 1]);
+        const copy = tinted.clone();
+        expect(copy.tint).toEqual(tinted.tint);
+        expect(copy.tint).not.toBe(tinted.tint);
+        expect(plain.clone().tint).toBeUndefined();
     });
 
     describe('UV distortion', () => {
@@ -291,7 +295,7 @@ describe('texture effects', () => {
                 const params = (mat as any)._vectors4.distortionParams;
                 expect([params.x, params.y]).toEqual([0.1, 2]);
                 expect(params.z).toBeCloseTo(0.75, 6);
-                expect(params.w).toBeCloseTo(0.5, 6);
+                expect(params.w).toBeCloseTo(1.5, 6);
             }
             for (const source of [
                 particleFragGLSL,

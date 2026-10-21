@@ -1040,13 +1040,6 @@ export class SpriteBatch extends VFXBatch {
         );
     }
 
-    /**
-     * Negates the size of each flipped particle along the axes it flips on,
-     * starting at `base` in `sizes`. The billboard shader scales the quad by
-     * the size, so a negative one mirrors it — and with it the texture, the
-     * quad being centred — the way Unity's renderer Flip mirrors U and V. The
-     * stretched shader reads the sign and mirrors the texture coordinates.
-     */
     /** Multiplies `count` RGBA colours starting at `base` by a system's {@link ParticleSystem.tint}. */
     private static applyTint(colors: Float32Array, base: number, count: number, tint: Vector4): void {
         for (let j = 0, o = base; j < count; j++, o += 4) {
@@ -1057,6 +1050,13 @@ export class SpriteBatch extends VFXBatch {
         }
     }
 
+    /**
+     * Negates the size of each flipped particle along the axes it flips on,
+     * starting at `base` in `sizes`. The billboard shader scales the quad by
+     * the size, so a negative one mirrors it — and with it the texture, the
+     * quad being centred — the way Unity's renderer Flip mirrors U and V. The
+     * stretched shader reads the sign and mirrors the texture coordinates.
+     */
     private static applyFlip(sizes: Float32Array, base: number, flips: Uint8Array, count: number): void {
         for (let j = 0, o = base; j < count; j++, o += 3) {
             const flip = flips[j];

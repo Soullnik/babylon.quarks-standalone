@@ -613,7 +613,9 @@ export abstract class VFXBatch {
             return;
         }
         // Wrapped on the CPU: a raw speed × time grows until float32 UVs lose their fraction.
-        const wrap = (value: number) => value - Math.floor(value);
+        // Over two repeats, not one: a mirrored texture repeats every two, and
+        // wrapped over one it jumped to its mirror image at every wrap.
+        const wrap = (value: number) => value - 2 * Math.floor(value / 2);
         const scrollOffset = new BVector2();
         const distortionParams = new BVector4();
         const erosionParams = new BVector4();
