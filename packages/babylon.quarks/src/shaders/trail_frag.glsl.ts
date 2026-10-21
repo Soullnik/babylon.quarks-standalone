@@ -4,6 +4,9 @@ import {surfaceColorGLSL, surfaceFragmentDeclarationGLSL} from './chunks/surface
 export default /* glsl */ `
 varying vec2 vUV;
 varying vec4 vColor;
+#ifdef UV1
+varying vec2 vUV1;
+#endif
 
 #ifdef USE_MAP
 uniform sampler2D map;

@@ -121,24 +121,24 @@ function noise(ctx: CanvasRenderingContext2D, size: number): void {
     ctx.putImageData(image, 0, 0);
 }
 
-/** Six jagged strikes side by side, each running up its column, the last column left empty: a gap in the flicker. */
+/** Six jagged strikes stacked in rows, each running along U, the last row left empty: a gap in the flicker. */
 function strikes(ctx: CanvasRenderingContext2D, size: number): void {
     ctx.clearRect(0, 0, size, size);
-    const columns = 6;
-    const width = size / columns;
-    for (let c = 0; c < columns - 1; c++) {
-        const mid = width * (c + 0.5);
+    const rows = 6;
+    const height = size / rows;
+    for (let r = 0; r < rows - 1; r++) {
+        const mid = height * (r + 0.5);
         for (const [lineWidth, alpha] of [
             [5, 0.25],
             [1.6, 1],
         ]) {
-            const random = seeded(7 + c * 31);
+            const random = seeded(7 + r * 31);
             ctx.strokeStyle = `rgba(255, 255, 255, ${alpha})`;
             ctx.lineWidth = lineWidth;
             ctx.beginPath();
-            ctx.moveTo(mid, size);
-            for (let y = size - 8; y >= 0; y -= 8) {
-                ctx.lineTo(mid + (random() - 0.5) * width * 0.7 * Math.sin((y / size) * Math.PI), y);
+            ctx.moveTo(0, mid);
+            for (let x = 8; x <= size; x += 8) {
+                ctx.lineTo(x, mid + (random() - 0.5) * height * 0.7 * Math.sin((x / size) * Math.PI));
             }
             ctx.stroke();
         }
@@ -203,8 +203,8 @@ export function init({scene, camera, batchRenderer, systems}: DemoContext) {
         lighting: 'unlit',
         texture: canvasTexture(scene, 'pillars', 256, true, pillars),
         blendMode: Constants.ALPHA_ADD,
-        uvScroll: [0.05, 0],
-        uvDistortion: {map: distortionMap, strength: 0.04, scale: 1.5, scroll: [0, -0.6]},
+        mapUV: {scroll: [0.05, 0]},
+        uvDistortion: {map: distortionMap, strength: 0.04, mapUV: {tiling: [1.5, 1.5], scroll: [0, -0.6]}},
         rim: {mode: 'fade', strength: 0.6, power: 1},
     });
     crown.emitter.position = new BVector3(-3.5, 0, 0);
@@ -235,8 +235,8 @@ export function init({scene, camera, batchRenderer, systems}: DemoContext) {
     rings.addBehavior(new VelocityOverLife(new ConstantValue(0), new ConstantValue(1.6)));
     rings.emitter.position = new BVector3(-3.5, 0, 0);
 
-    // A standing strike flickering between the sheet's columns, now and then
-    // a gap: V runs up the beam, and its width keeps the drawing's proportions.
+    // A standing strike flickering between the sheet's rows, now and then a
+    // gap: U runs up the beam, from the ground to the ball.
     const ball = new TransformNode('ball', scene);
     const strike = new ParticleSystem({
         scene,
@@ -251,10 +251,9 @@ export function init({scene, camera, batchRenderer, systems}: DemoContext) {
         shape: new PointEmitter(),
         renderMode: RenderMode.Beam,
         texture: canvasTexture(scene, 'strikes', 256, false, strikes),
-        uTileCount: 6,
-        vTileCount: 1,
+        uTileCount: 1,
+        vTileCount: 6,
         blendMode: Constants.ALPHA_ADD,
-        beam: {textureAxis: 'v', widthPerLength: 0.25},
     });
     strike.addBehavior(new FrameOverLife(new ConstantValue(0), {fps: 16, frameCount: 6, random: true}));
     strike.emitter.position = new BVector3(0, 0, 0);

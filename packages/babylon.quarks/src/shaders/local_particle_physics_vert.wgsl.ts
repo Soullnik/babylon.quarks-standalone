@@ -21,6 +21,14 @@ uniform tileCountY: f32;
 
 varying vUV: vec2f;
 varying vColor: vec4f;
+#ifdef UV1
+#ifdef MESH_UV2
+// The mesh's second UV set.
+attribute uv2: vec2f;
+#endif
+// UV channel 1: the mesh's second UV set, or its first when it has none.
+varying vUV1: vec2f;
+#endif
 varying vNormal: vec3f;
 varying vWorldPos: vec3f;
 
@@ -80,6 +88,13 @@ ${fogVertexWGSL('viewPos.xyz')}
     vertexOutputs.vUV = vertexInputs.uv;
 #endif
 
+#ifdef UV1
+#ifdef MESH_UV2
+    vertexOutputs.vUV1 = vertexInputs.uv2;
+#else
+    vertexOutputs.vUV1 = vertexInputs.uv;
+#endif
+#endif
     vertexOutputs.vColor = vertexInputs.color;
 }
 `;

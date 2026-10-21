@@ -44,29 +44,40 @@ export * from './shaders/';
 export {SpriteBatch} from './SpriteBatch';
 export {TrailBatch} from './TrailBatch';
 export {
-    beamEqual,
     defaultMeshLighting,
     erosionEqual,
+    GRADIENT_MAP_WEIGHTS,
+    gradientMapEqual,
+    mapUVEqual,
     meshRimEqual,
-    normalizeBeam,
     normalizeErosion,
+    normalizeGradientMap,
+    normalizeMapUV,
     normalizeMeshRim,
+    normalizeTextureUV,
     normalizeUVDistortion,
-    normalizeUVScroll,
+    readsUV1,
     RenderMode,
+    textureUVEqual,
+    textureUVToJSON,
+    UV_DISTORTION_DEFAULT_UV,
     uvDistortionEqual,
-    uvScrollEqual,
     VFXBatch,
 } from './VFXBatch';
 export type {
+    GradientMapChannel,
     MeshLighting,
     MeshLightingSettings,
     MeshRim,
-    ParticleBeam,
     ParticleErosion,
+    ParticleErosionOptions,
+    ParticleGradientMap,
     ParticleUVDistortion,
+    ParticleUVDistortionOptions,
     SortMode,
     StoredBatchSettings,
+    TextureUV,
+    UVChannel,
 } from './VFXBatch';
 
 // Re-export quarks.core types (interfaces - type-only)

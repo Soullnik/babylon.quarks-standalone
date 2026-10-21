@@ -19,6 +19,8 @@ export class TrailBatch extends VFXBatch {
     private previousBuffer!: Float32Array;
     private nextBuffer!: Float32Array;
     private uvBuffer!: Float32Array;
+    /** UV channel 1: along the trail and across it, without the sheet's cell; only when a texture reads it. */
+    private uv1Buffer: Float32Array | null = null;
     private sideBuffer!: Float32Array;
     private widthBuffer!: Float32Array;
     private colorBuffer!: Float32Array;
@@ -52,6 +54,7 @@ export class TrailBatch extends VFXBatch {
         this.previousBuffer = new Float32Array(this.maxParticles * 6);
         this.nextBuffer = new Float32Array(this.maxParticles * 6);
         this.uvBuffer = new Float32Array(this.maxParticles * 4);
+        this.uv1Buffer = this.usesUV1() ? new Float32Array(this.maxParticles * 4) : null;
         this.sideBuffer = new Float32Array(this.maxParticles * 2);
         this.widthBuffer = new Float32Array(this.maxParticles * 2);
         this.colorBuffer = new Float32Array(this.maxParticles * 8);
@@ -86,6 +89,9 @@ export class TrailBatch extends VFXBatch {
         // Set standard vertex data with full buffer capacity (updatable)
         this.mesh.setVerticesData(VertexBuffer.PositionKind, this.positionBuffer, true);
         this.mesh.setVerticesData(VertexBuffer.UVKind, this.uvBuffer, true);
+        if (this.uv1Buffer) {
+            this.mesh.setVerticesData(VertexBuffer.UV2Kind, this.uv1Buffer, true);
+        }
         this.mesh.setVerticesData(VertexBuffer.ColorKind, this.colorBuffer, true, 4);
         // The whole array, not just the dummy triangle: this call is what sizes
         // the GPU index buffer, and updateIndices later writes into it without
@@ -150,6 +156,9 @@ export class TrailBatch extends VFXBatch {
         );
 
         const attributes = ['position', 'previous', 'next', 'side', 'width', 'uv', 'color'];
+        if (this.uv1Buffer) {
+            attributes.push('uv2');
+        }
         const uniforms = [
             'world',
             'view',
@@ -320,6 +329,7 @@ export class TrailBatch extends VFXBatch {
             // rather than by the particle's velocity, so it is left alone.
             const trailSettings = system.rendererEmitterSettings as TrailSettings;
             const uvFromHead = Boolean(trailSettings.uvFromHead);
+            const uv1 = this.uv1Buffer;
             const colorFromParticle = Boolean(trailSettings.colorFromParticle);
             // Recorded samples already sit in world space; the live tip still comes
             // from the particle's own (local) position.
@@ -478,6 +488,13 @@ export class TrailBatch extends VFXBatch {
                     this.uvBuffer[ui + 1] = (vTileCount - row - 1) * tileHeight;
                     this.uvBuffer[ui + 2] = u;
                     this.uvBuffer[ui + 3] = (vTileCount - row) * tileHeight;
+                    if (uv1) {
+                        const u1 = uvFromHead ? 1 - along : along;
+                        uv1[ui] = u1;
+                        uv1[ui + 1] = 0;
+                        uv1[ui + 2] = u1;
+                        uv1[ui + 3] = 1;
+                    }
 
                     const cci = index * 4;
                     this.colorBuffer[cci] = currentColorX;
@@ -602,6 +619,13 @@ export class TrailBatch extends VFXBatch {
                     this.uvBuffer[tipUi + 1] = (vTileCount - row - 1) * tileHeight;
                     this.uvBuffer[tipUi + 2] = tipU;
                     this.uvBuffer[tipUi + 3] = (vTileCount - row) * tileHeight;
+                    if (uv1) {
+                        const tipU1 = uvFromHead ? 0 : 1;
+                        uv1[tipUi] = tipU1;
+                        uv1[tipUi + 1] = 0;
+                        uv1[tipUi + 2] = tipU1;
+                        uv1[tipUi + 3] = 1;
+                    }
 
                     const tipColor = particle.color;
                     const tipCi = index * 4;
@@ -696,6 +720,9 @@ export class TrailBatch extends VFXBatch {
             // the high-water mark of every system in the batch.
             this.mesh.updateVerticesData(VertexBuffer.PositionKind, this.positionBuffer.subarray(0, index * 3));
             this.mesh.updateVerticesData(VertexBuffer.UVKind, this.uvBuffer.subarray(0, index * 2));
+            if (this.uv1Buffer) {
+                this.mesh.updateVerticesData(VertexBuffer.UV2Kind, this.uv1Buffer.subarray(0, index * 2));
+            }
             // Straight to the GPU buffer. Going through `mesh.updateIndices` with a
             // range whose length changes every frame makes Babylon copy the
             // indices, rebuild the sub mesh and recompute its bounds from the

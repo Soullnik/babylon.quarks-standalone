@@ -136,12 +136,12 @@ function cases(): Case[] {
         ['BEAM']
     );
     push(
-        'beam uv v, width from length, tiled',
+        'beam tiled',
         stretchedVert,
         particleFrag,
         [...SPRITE_ATTRS, 'velocity'],
-        [...SPRITE_UNIFORMS, 'speedFactor', 'beamWidthPerLength', 'tileCountX', 'tileCountY'],
-        ['BEAM', 'BEAM_UV_V', 'BEAM_WIDTH_FROM_LENGTH', 'UV_TILE', 'USE_MAP']
+        [...SPRITE_UNIFORMS, 'speedFactor', 'tileCountX', 'tileCountY'],
+        ['BEAM', 'UV_TILE', 'USE_MAP']
     );
     push(
         'mesh',
@@ -180,13 +180,27 @@ function cases(): Case[] {
 
     // Texture effects (chunks/surface.ts), with and without a map and a blended second tile.
     const surfaceOptions = [
-        ['UV_SCROLL'],
+        ['MAP_TRANSFORM'],
+        ['UV1', 'MAP_TRANSFORM', 'MAP_UV1'],
+        ['UV1', 'MAP_TRANSFORM', 'MAP_UV1', 'UV_DISTORTION', 'GRADIENT_MAP', 'EROSION'],
         ['GRADIENT_MAP'],
         ['EROSION'],
         ['EROSION', 'EROSION_MASK'],
-        ['UV_SCROLL', 'GRADIENT_MAP', 'EROSION', 'EROSION_MASK'],
+        ['MAP_TRANSFORM', 'GRADIENT_MAP', 'EROSION', 'EROSION_MASK'],
         ['UV_DISTORTION'],
-        ['UV_SCROLL', 'UV_DISTORTION', 'GRADIENT_MAP', 'EROSION', 'EROSION_MASK'],
+        ['MAP_TRANSFORM', 'UV_DISTORTION', 'GRADIENT_MAP', 'EROSION', 'EROSION_MASK'],
+        ['UV1', 'UV_DISTORTION', 'UV_DISTORTION_UV1'],
+        ['UV1', 'EROSION', 'EROSION_MASK', 'EROSION_MASK_UV1'],
+        [
+            'UV1',
+            'MAP_TRANSFORM',
+            'UV_DISTORTION',
+            'UV_DISTORTION_UV1',
+            'GRADIENT_MAP',
+            'EROSION',
+            'EROSION_MASK',
+            'EROSION_MASK_UV1',
+        ],
     ];
     const surfaceTargets = [
         {name: 'billboard', vertex: particleVert, fragment: particleFrag, attributes: SPRITE_ATTRS, extra: []},
@@ -198,6 +212,20 @@ function cases(): Case[] {
             extra: ['MESH_UNLIT'],
         },
         {
+            name: 'mesh unlit uv2',
+            vertex: meshVert,
+            fragment: physicsFrag,
+            attributes: [...SPRITE_ATTRS, 'normal', 'uv2'],
+            extra: ['MESH_UNLIT', 'MESH_UV2'],
+        },
+        {
+            name: 'beam',
+            vertex: stretchedVert,
+            fragment: particleFrag,
+            attributes: [...SPRITE_ATTRS, 'velocity'],
+            extra: ['BEAM'],
+        },
+        {
             name: 'trail',
             vertex: trailVert,
             fragment: trailFrag,
@@ -206,32 +234,43 @@ function cases(): Case[] {
         },
     ];
     for (const target of surfaceTargets)
-        for (const surface of surfaceOptions)
+        for (const surface of surfaceOptions.filter(
+            // The second UV set is only read under UV1.
+            (options) => !target.extra.includes('MESH_UV2') || options.includes('UV1')
+        ))
             for (const map of mapOptions)
                 for (const tile of target.name === 'trail' ? [[]] : [[], ['UV_TILE', 'TILE_BLEND']]) {
                     const defines = [...target.extra, ...surface, ...map, ...tile];
                     const uniforms =
                         target.name === 'trail'
                             ? ['world', 'view', 'projection', 'lineWidth', 'resolution', 'sizeAttenuation']
-                            : [...SPRITE_UNIFORMS];
+                            : [...SPRITE_UNIFORMS, ...(target.name === 'beam' ? ['speedFactor'] : [])];
                     const samplers: string[] = [...map.map(() => 'map')];
                     if (tile.length) uniforms.push('tileCountX', 'tileCountY');
-                    if (surface.includes('UV_SCROLL')) uniforms.push('uvScrollOffset');
+                    if (surface.includes('MAP_TRANSFORM')) uniforms.push('mapTransform');
                     if (surface.includes('UV_DISTORTION')) {
-                        uniforms.push('distortionParams');
+                        uniforms.push('distortionTransform', 'distortionStrength');
                         samplers.push('distortionMap');
                     }
-                    if (surface.includes('GRADIENT_MAP')) samplers.push('gradientMap');
+                    if (surface.includes('GRADIENT_MAP')) {
+                        uniforms.push('gradientMapRange', 'gradientMapChannel');
+                        samplers.push('gradientMap');
+                    }
                     if (surface.includes('EROSION')) uniforms.push('erosionParams', 'erosionEdgeColor');
                     if (surface.includes('EROSION_MASK')) {
                         samplers.push('erosionMask');
-                        uniforms.push('erosionMaskTiling');
+                        uniforms.push('erosionMaskTransform');
                     }
+                    // A trail's channel 1 arrives as its own vertex buffer.
+                    const attributes =
+                        target.name === 'trail' && surface.includes('UV1')
+                            ? [...target.attributes, 'uv2']
+                            : target.attributes;
                     out.push({
                         name: `${target.name} surface [${defines.join(',')}]`,
                         vertex: target.vertex,
                         fragment: target.fragment,
-                        attributes: target.attributes,
+                        attributes,
                         uniforms,
                         samplers,
                         defines,

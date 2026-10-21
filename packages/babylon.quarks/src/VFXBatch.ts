@@ -133,6 +133,144 @@ export function meshRimEqual(a: MeshRim | undefined, b: MeshRim | undefined): bo
 }
 
 /**
+ * Which texture coordinates a texture is sampled with, as Unity's UV channels
+ * and Niagara's ribbon UV0 / UV1:
+ *
+ * - `0`: the particle's first UV, with the sprite sheet's cell applied: on a
+ *   sheet the current frame's cell, on a trail the cell's stretch along it, on
+ *   a mesh its first UV set. Read before the map's own layout and distortion,
+ *   so a texture on it does not move with them.
+ * - `1`: the particle's own UV, never moved by the sheet. The whole quad on a
+ *   billboard, a stretched billboard or a beam (mirrored with the quad when it
+ *   flips); on a trail U along it the way the map's runs (from the tail, or
+ *   from the head with `uvFromHead`) and V across it; on a mesh its second UV
+ *   set (`instancingUVs2`), or its first when it has none.
+ *
+ * A mesh can then repeat its picture along UV0 while a mask on UV1 runs once
+ * across its whole length, as a lightmap UV does in a game engine.
+ */
+export type UVChannel = 0 | 1;
+
+/**
+ * How a texture is laid over the particle: its UV channel, then tiling and
+ * offset as in Unity's material Tiling / Offset, then a scroll on the
+ * renderer's clock as Unreal's Panner. Sampled at
+ * `uv(channel) * tiling + offset + scroll * time`; the offset is used as
+ * given, so a clamped texture can be moved off its edge, and only the
+ * scroll's share is wrapped (over two repeats, so a mirrored texture stays
+ * seamless). A texture that scrolls or tiles should repeat.
+ */
+export interface TextureUV {
+    /** See {@link UVChannel}. Default 0. */
+    channel: UVChannel;
+    /** Repeats across the channel's 0…1, `[u, v]`. Default `[1, 1]`. */
+    tiling: [number, number];
+    /** Added after tiling, in texture UV units. Default `[0, 0]`. */
+    offset: [number, number];
+    /** UV units per second on the renderer's clock. Default `[0, 0]`. */
+    scroll: [number, number];
+}
+
+/** A complete {@link TextureUV} from a partial one, with `defaults` under the fields left out. */
+export function normalizeTextureUV(
+    uv: Partial<TextureUV> | null | undefined,
+    defaults: Partial<TextureUV> = {}
+): TextureUV {
+    const source = uv && typeof uv === 'object' ? uv : {};
+    const num = (value: unknown, fallback: number) =>
+        typeof value === 'number' && Number.isFinite(value) ? value : fallback;
+    const pair = (value: unknown, fallback: [number, number]): [number, number] =>
+        Array.isArray(value) ? [num(value[0], fallback[0]), num(value[1], fallback[1])] : [fallback[0], fallback[1]];
+    const channel = source.channel ?? defaults.channel;
+    return {
+        channel: channel === 1 ? 1 : 0,
+        tiling: pair(source.tiling, defaults.tiling ?? [1, 1]),
+        offset: pair(source.offset, defaults.offset ?? [0, 0]),
+        scroll: pair(source.scroll, defaults.scroll ?? [0, 0]),
+    };
+}
+
+/** True when both lay a texture the same way. */
+export function textureUVEqual(a: TextureUV, b: TextureUV): boolean {
+    return (
+        a === b ||
+        (a.channel === b.channel &&
+            a.tiling[0] === b.tiling[0] &&
+            a.tiling[1] === b.tiling[1] &&
+            a.offset[0] === b.offset[0] &&
+            a.offset[1] === b.offset[1] &&
+            a.scroll[0] === b.scroll[0] &&
+            a.scroll[1] === b.scroll[1])
+    );
+}
+
+/** The fields of `uv` that differ from `defaults`, for JSON written only when set. */
+export function textureUVToJSON(uv: TextureUV, defaults: Partial<TextureUV> = {}): Partial<TextureUV> | undefined {
+    const base = normalizeTextureUV(undefined, defaults);
+    const json: Partial<TextureUV> = {};
+    if (uv.channel !== base.channel) json.channel = uv.channel;
+    if (uv.tiling[0] !== base.tiling[0] || uv.tiling[1] !== base.tiling[1]) json.tiling = [...uv.tiling];
+    if (uv.offset[0] !== base.offset[0] || uv.offset[1] !== base.offset[1]) json.offset = [...uv.offset];
+    if (uv.scroll[0] !== base.scroll[0] || uv.scroll[1] !== base.scroll[1]) json.scroll = [...uv.scroll];
+    return Object.keys(json).length > 0 ? json : undefined;
+}
+
+/**
+ * Which value of the map's texel picks the colour along a gradient map's
+ * ramp: one channel, so a texture can pack several masks (Unreal's and
+ * Unity's channel-packed textures), or the Rec. 709 luminance of its colour.
+ */
+export type GradientMapChannel = 'r' | 'g' | 'b' | 'a' | 'luminance';
+
+/**
+ * A gradient map (colour ramp): the map is recoloured by looking its
+ * {@link channel} up along U of {@link ramp}. See
+ * {@link VFXBatchSettings.gradientMap}.
+ */
+export interface ParticleGradientMap {
+    /**
+     * The ramp, read along U at mid V: low values on the left. Make it without
+     * mipmaps and clamped. Required: without one there is no gradient map.
+     */
+    ramp: BaseTexture | null;
+    /**
+     * The texel value the ramp is looked up by. Default `'r'`. With `'a'` the
+     * ramp's alpha becomes the texel's alpha, so a soft shape can glow at its
+     * fringe and stay solid at its heart; with any other channel the ramp's
+     * alpha multiplies the map's.
+     */
+    channel: GradientMapChannel;
+}
+
+/** The weights a texel is dotted with to look up the ramp, per {@link GradientMapChannel}. */
+export const GRADIENT_MAP_WEIGHTS: Readonly<Record<GradientMapChannel, readonly [number, number, number, number]>> = {
+    r: [1, 0, 0, 0],
+    g: [0, 1, 0, 0],
+    b: [0, 0, 1, 0],
+    a: [0, 0, 0, 1],
+    luminance: [0.2126, 0.7152, 0.0722, 0],
+};
+
+/** A complete gradient map, or undefined when unset or without a ramp. */
+export function normalizeGradientMap(
+    gradientMap: Partial<ParticleGradientMap> | null | undefined
+): ParticleGradientMap | undefined {
+    if (!gradientMap || typeof gradientMap !== 'object' || !gradientMap.ramp) {
+        return undefined;
+    }
+    const channel = gradientMap.channel;
+    return {
+        ramp: gradientMap.ramp,
+        channel: channel !== undefined && channel in GRADIENT_MAP_WEIGHTS ? channel : 'r',
+    };
+}
+
+/** True when both recolour the same way (or both not at all). */
+export function gradientMapEqual(a: ParticleGradientMap | undefined, b: ParticleGradientMap | undefined): boolean {
+    return a === b || (!!a && !!b && a.ramp === b.ramp && a.channel === b.channel);
+}
+
+/**
  * Alpha erosion: the particle's alpha decides how much of its shape is left
  * instead of how transparent it is, so `ColorOverLife` fading alpha out
  * dissolves (noise mask) or wipes (gradient mask) the shape away. See
@@ -140,50 +278,45 @@ export function meshRimEqual(a: MeshRim | undefined, b: MeshRim | undefined): bo
  */
 export interface ParticleErosion {
     /**
-     * Mask whose red channel orders what goes first, sampled with the
-     * particle's UV (the quad, mesh or trail UV, unscrolled). Null: the map's
-     * own alpha, so a soft shape shrinks from its edges.
+     * Mask whose red channel orders what goes first, laid by {@link maskUV}.
+     * Null: the map's own alpha, so a soft shape shrinks from its edges.
      */
     mask: BaseTexture | null;
+    /**
+     * How the mask is laid over the particle, see {@link TextureUV}. On UV
+     * channel 1 a gradient mask wipes a whole trail or mesh however its map
+     * repeats. Default channel 0, untiled, still.
+     */
+    maskUV: TextureUV;
     /** Width of the soft transition at the cut, in mask units. Default 0.05. */
     softness: number;
     /** Width of the glowing band above the cut, in mask units; 0 (default) draws none. */
     edgeWidth: number;
     /** Colour added in the edge band, linear RGB, may exceed 1. Default `[1, 1, 1]`. */
     edgeColor: [number, number, number];
-    /** Mask UV scroll, UV units per second. Default `[0, 0]`. */
-    maskScroll: [number, number];
-    /**
-     * Times the mask repeats across the particle's UV, `[u, v]`; default
-     * `[1, 1]`. Lets the mask run its own scale while the map tiles: a mesh
-     * whose UV repeats a picture eight times along it takes `[1 / 8, 1]`, and
-     * one gradient then wipes its whole length.
-     */
-    maskTiling: [number, number];
 }
-// Limits worth knowing: the mask is sampled with the UV as drawn (on a sheet,
-// the current tile's), erosion only changes alpha (one-one and premultiplied
+// Limits worth knowing: erosion only changes alpha (one-one and premultiplied
 // blending show a hard cut), and with neither a mask nor a map there is
 // nothing to order the cut by, so the shape goes all at once near alpha 0.
 // Scrolling runs on the renderer's clock, not a system's playback speed.
 
+/** {@link ParticleErosion} as given: any field may be left out, the mask's layout too. */
+export type ParticleErosionOptions = Partial<Omit<ParticleErosion, 'maskUV'>> & {maskUV?: Partial<TextureUV>};
+
 /** A complete erosion from a partial one, every field defaulted, or undefined when `erosion` is unset. */
-export function normalizeErosion(erosion: Partial<ParticleErosion> | null | undefined): ParticleErosion | undefined {
+export function normalizeErosion(erosion: ParticleErosionOptions | null | undefined): ParticleErosion | undefined {
     if (!erosion || typeof erosion !== 'object') {
         return undefined;
     }
     const num = (value: unknown, fallback: number) =>
         typeof value === 'number' && Number.isFinite(value) ? value : fallback;
     const color = Array.isArray(erosion.edgeColor) ? erosion.edgeColor : [1, 1, 1];
-    const scroll = Array.isArray(erosion.maskScroll) ? erosion.maskScroll : [0, 0];
-    const tiling = Array.isArray(erosion.maskTiling) ? erosion.maskTiling : [1, 1];
     return {
         mask: erosion.mask ?? null,
+        maskUV: normalizeTextureUV(erosion.maskUV),
         softness: Math.max(0.0001, num(erosion.softness, 0.05)),
         edgeWidth: Math.max(0, num(erosion.edgeWidth, 0)),
         edgeColor: [num(color[0], 1), num(color[1], 1), num(color[2], 1)],
-        maskScroll: [num(scroll[0], 0), num(scroll[1], 0)],
-        maskTiling: [num(tiling[0], 1), num(tiling[1], 1)],
     };
 }
 
@@ -197,17 +330,17 @@ export function erosionEqual(a: ParticleErosion | undefined, b: ParticleErosion 
     }
     return (
         a.mask === b.mask &&
+        textureUVEqual(a.maskUV, b.maskUV) &&
         a.softness === b.softness &&
         a.edgeWidth === b.edgeWidth &&
         a.edgeColor[0] === b.edgeColor[0] &&
         a.edgeColor[1] === b.edgeColor[1] &&
-        a.edgeColor[2] === b.edgeColor[2] &&
-        a.maskScroll[0] === b.maskScroll[0] &&
-        a.maskScroll[1] === b.maskScroll[1] &&
-        a.maskTiling[0] === b.maskTiling[0] &&
-        a.maskTiling[1] === b.maskTiling[1]
+        a.edgeColor[2] === b.edgeColor[2]
     );
 }
+
+/** The distortion noise's default layout: drifting up half a repeat a second. */
+export const UV_DISTORTION_DEFAULT_UV: Partial<TextureUV> = {scroll: [0, 0.5]};
 
 /**
  * UV distortion: the map's UV pushed about by a noise texture, for heat
@@ -220,29 +353,30 @@ export interface ParticleUVDistortion {
      * wrap (repeat). Required: without one there is no distortion.
      */
     map: BaseTexture | null;
-    /** How far the UV is pushed at most, in UV units. Default 0.05. */
+    /**
+     * How the noise is laid over the particle, see {@link TextureUV}. Default
+     * channel 0, untiled, scrolling `[0, 0.5]`.
+     */
+    mapUV: TextureUV;
+    /** How far the map's UV is pushed at most, in UV units. Default 0.05. */
     strength: number;
-    /** How many times the noise repeats across the particle's UV. Default 1. */
-    scale: number;
-    /** Noise scroll, in noise UV units per second, on the renderer's clock. Default `[0, 0.5]`. */
-    scroll: [number, number];
 }
+
+/** {@link ParticleUVDistortion} as given: any field may be left out, the noise's layout too. */
+export type ParticleUVDistortionOptions = Partial<Omit<ParticleUVDistortion, 'mapUV'>> & {mapUV?: Partial<TextureUV>};
 
 /** A complete distortion from a partial one, or undefined when unset or without a map. */
 export function normalizeUVDistortion(
-    distortion: Partial<ParticleUVDistortion> | null | undefined
+    distortion: ParticleUVDistortionOptions | null | undefined
 ): ParticleUVDistortion | undefined {
     if (!distortion || typeof distortion !== 'object' || !distortion.map) {
         return undefined;
     }
-    const num = (value: unknown, fallback: number) =>
-        typeof value === 'number' && Number.isFinite(value) ? value : fallback;
-    const scroll = Array.isArray(distortion.scroll) ? distortion.scroll : [0, 0.5];
+    const strength = distortion.strength;
     return {
         map: distortion.map,
-        strength: Math.max(0, num(distortion.strength, 0.05)),
-        scale: num(distortion.scale, 1),
-        scroll: [num(scroll[0], 0), num(scroll[1], 0.5)],
+        mapUV: normalizeTextureUV(distortion.mapUV, UV_DISTORTION_DEFAULT_UV),
+        strength: Math.max(0, typeof strength === 'number' && Number.isFinite(strength) ? strength : 0.05),
     };
 }
 
@@ -254,71 +388,48 @@ export function uvDistortionEqual(a: ParticleUVDistortion | undefined, b: Partic
     if (!a || !b) {
         return false;
     }
-    return (
-        a.map === b.map &&
-        a.strength === b.strength &&
-        a.scale === b.scale &&
-        a.scroll[0] === b.scroll[0] &&
-        a.scroll[1] === b.scroll[1]
-    );
+    return a.map === b.map && a.strength === b.strength && textureUVEqual(a.mapUV, b.mapUV);
 }
 
 /**
- * How a {@link RenderMode.Beam} quad takes its texture and width. See
- * {@link VFXBatchSettings.beam}.
+ * The main map's layout, or undefined when it is the identity (channel 0,
+ * untiled, unmoved, still), which costs nothing in the shader.
  */
-export interface ParticleBeam {
-    /**
-     * The texture axis that runs along the beam, from the particle (0) to the
-     * end (1): `'u'` (default), or `'v'` for a sheet drawn standing up, its
-     * frames side by side.
-     */
-    textureAxis: 'u' | 'v';
-    /**
-     * Above 0, the beam's width is its length times this, times the particle
-     * size: a drawing keeps its proportions however far the beam reaches, as
-     * a strike drawn four times as long as it is wide does at 0.25. 0
-     * (default): the width is the particle size.
-     */
-    widthPerLength: number;
-}
-
-/** A complete beam setting, or undefined when unset or all defaults. */
-export function normalizeBeam(beam: Partial<ParticleBeam> | null | undefined): ParticleBeam | undefined {
-    if (!beam || typeof beam !== 'object') {
+export function normalizeMapUV(uv: Partial<TextureUV> | null | undefined): TextureUV | undefined {
+    if (!uv || typeof uv !== 'object') {
         return undefined;
     }
-    const textureAxis = beam.textureAxis === 'v' ? 'v' : 'u';
-    const width =
-        typeof beam.widthPerLength === 'number' && Number.isFinite(beam.widthPerLength) ? beam.widthPerLength : 0;
-    const widthPerLength = Math.max(0, width);
-    return textureAxis === 'u' && widthPerLength === 0 ? undefined : {textureAxis, widthPerLength};
+    const normalized = normalizeTextureUV(uv);
+    return textureUVToJSON(normalized) === undefined ? undefined : normalized;
 }
 
-/** True when both lay the beam the same way (or both by default). */
-export function beamEqual(a: ParticleBeam | undefined, b: ParticleBeam | undefined): boolean {
-    return a === b || (!!a && !!b && a.textureAxis === b.textureAxis && a.widthPerLength === b.widthPerLength);
+/** True when both lay the map the same way (or both as drawn). */
+export function mapUVEqual(a: TextureUV | undefined, b: TextureUV | undefined): boolean {
+    return a === b || (!!a && !!b && textureUVEqual(a, b));
 }
 
-/** A UV scroll speed, or undefined when unset or zero. */
-export function normalizeUVScroll(scroll: ArrayLike<number> | null | undefined): [number, number] | undefined {
-    if (!scroll || typeof scroll !== 'object') {
-        return undefined;
-    }
-    const u = Number.isFinite(scroll[0]) ? scroll[0] : 0;
-    const v = Number.isFinite(scroll[1]) ? scroll[1] : 0;
-    return u === 0 && v === 0 ? undefined : [u, v];
-}
-
-/** True when both scroll the same way (or both not at all). */
-export function uvScrollEqual(a: [number, number] | undefined, b: [number, number] | undefined): boolean {
-    return a === b || (!!a && !!b && a[0] === b[0] && a[1] === b[1]);
+/**
+ * True when a texture effect of `settings` samples UV channel 1, see
+ * {@link UVChannel}: the map, the distortion noise or an erosion mask laid
+ * on it.
+ */
+export function readsUV1(settings: {
+    mapUV?: TextureUV;
+    uvDistortion?: ParticleUVDistortion;
+    erosion?: ParticleErosion;
+}): boolean {
+    const {mapUV, uvDistortion, erosion} = settings;
+    return (
+        mapUV?.channel === 1 || uvDistortion?.mapUV.channel === 1 || (!!erosion?.mask && erosion.maskUV.channel === 1)
+    );
 }
 
 export interface StoredBatchSettings {
     instancingGeometry: Float32Array;
     instancingIndices: Uint32Array | Uint16Array;
     instancingUVs?: Float32Array;
+    /** The mesh's second UV set, see {@link UVChannel}. */
+    instancingUVs2?: Float32Array;
     instancingNormals?: Float32Array;
     renderMode: RenderMode;
     renderOrder: number;
@@ -355,14 +466,12 @@ export interface StoredBatchSettings {
     lighting?: MeshLighting;
     /** Mesh particle rim, see {@link VFXBatchSettings.rim}. */
     rim?: MeshRim;
-    /** Beam texture axis and width, see {@link VFXBatchSettings.beam}. */
-    beam?: ParticleBeam;
-    /** Map UV scroll, see {@link VFXBatchSettings.uvScroll}. */
-    uvScroll?: [number, number];
+    /** The main map's layout, see {@link VFXBatchSettings.mapUV}. */
+    mapUV?: TextureUV;
     /** Map UV distortion, see {@link VFXBatchSettings.uvDistortion}. */
     uvDistortion?: ParticleUVDistortion;
     /** Colour ramp for the map, see {@link VFXBatchSettings.gradientMap}. */
-    gradientMap: BaseTexture | null;
+    gradientMap?: ParticleGradientMap;
     /** Alpha erosion, see {@link VFXBatchSettings.erosion}. */
     erosion?: ParticleErosion;
 }
@@ -383,6 +492,7 @@ export abstract class VFXBatch {
             instancingGeometry: settings.instancingGeometry,
             instancingIndices: settings.instancingIndices,
             instancingUVs: settings.instancingUVs,
+            instancingUVs2: settings.instancingUVs2,
             instancingNormals: settings.instancingNormals,
             renderMode: settings.renderMode,
             renderOrder: settings.renderOrder,
@@ -411,10 +521,9 @@ export abstract class VFXBatch {
             applyFog: settings.applyFog ?? true,
             lighting: settings.lighting,
             rim: normalizeMeshRim(settings.rim),
-            beam: normalizeBeam(settings.beam),
-            uvScroll: normalizeUVScroll(settings.uvScroll),
+            mapUV: normalizeMapUV(settings.mapUV),
             uvDistortion: normalizeUVDistortion(settings.uvDistortion),
-            gradientMap: settings.gradientMap ?? null,
+            gradientMap: normalizeGradientMap(settings.gradientMap),
             erosion: normalizeErosion(settings.erosion),
         };
         this.mesh = new Mesh('vfxBatch', scene);
@@ -545,23 +654,40 @@ export abstract class VFXBatch {
      */
     time = 0;
 
+    /** True when a texture effect of this batch samples UV channel 1, see {@link UVChannel}. */
+    protected usesUV1(): boolean {
+        return readsUV1(this.settings);
+    }
+
     /** Defines of the texture effects (see `shaders/chunks/surface.ts`) this batch uses. */
     protected surfaceDefines(): string[] {
         const defines: string[] = [];
-        if (this.settings.uvScroll) {
-            defines.push('UV_SCROLL');
+        const {mapUV, uvDistortion, gradientMap, erosion} = this.settings;
+        if (this.usesUV1()) {
+            defines.push('UV1');
         }
-        if (this.settings.uvDistortion) {
+        if (mapUV) {
+            defines.push('MAP_TRANSFORM');
+            if (mapUV.channel === 1) {
+                defines.push('MAP_UV1');
+            }
+        }
+        if (uvDistortion) {
             defines.push('UV_DISTORTION');
+            if (uvDistortion.mapUV.channel === 1) {
+                defines.push('UV_DISTORTION_UV1');
+            }
         }
-        if (this.settings.gradientMap) {
+        if (gradientMap) {
             defines.push('GRADIENT_MAP');
         }
-        const erosion = this.settings.erosion;
         if (erosion) {
             defines.push('EROSION');
             if (erosion.mask) {
                 defines.push('EROSION_MASK');
+                if (erosion.maskUV.channel === 1) {
+                    defines.push('EROSION_MASK_UV1');
+                }
             }
         }
         return defines;
@@ -569,91 +695,93 @@ export abstract class VFXBatch {
 
     /** Adds the uniforms and samplers of the texture effects this batch uses. */
     protected surfaceUniforms(uniforms: string[], samplers: string[]): void {
-        if (this.settings.uvScroll) {
-            uniforms.push('uvScrollOffset');
+        const {mapUV, uvDistortion, gradientMap, erosion} = this.settings;
+        if (mapUV) {
+            uniforms.push('mapTransform');
         }
-        if (this.settings.uvDistortion) {
+        if (uvDistortion) {
             samplers.push('distortionMap');
-            uniforms.push('distortionParams');
+            uniforms.push('distortionTransform', 'distortionStrength');
         }
-        if (this.settings.gradientMap) {
+        if (gradientMap) {
             samplers.push('gradientMap');
-            uniforms.push('gradientMapRange');
+            uniforms.push('gradientMapRange', 'gradientMapChannel');
         }
-        const erosion = this.settings.erosion;
         if (erosion) {
             uniforms.push('erosionParams', 'erosionEdgeColor');
             if (erosion.mask) {
                 samplers.push('erosionMask');
-                uniforms.push('erosionMaskTiling');
+                uniforms.push('erosionMaskTransform');
             }
         }
     }
 
     /** Sets the texture effects' textures and constants, and advances their scrolling on every bind. */
     protected bindSurface(material: ShaderMaterial): void {
-        const {uvScroll, uvDistortion, gradientMap, erosion} = this.settings;
+        const {mapUV, uvDistortion, gradientMap, erosion} = this.settings;
         if (uvDistortion?.map) {
             material.setTexture('distortionMap', uvDistortion.map);
+            material.setFloat('distortionStrength', uvDistortion.strength);
         }
-        if (gradientMap) {
-            material.setTexture('gradientMap', gradientMap);
+        if (gradientMap?.ramp) {
+            material.setTexture('gradientMap', gradientMap.ramp);
+            const [r, g, b, a] = GRADIENT_MAP_WEIGHTS[gradientMap.channel];
+            material.setVector4('gradientMapChannel', new BVector4(r, g, b, a));
         }
         if (erosion) {
             if (erosion.mask) {
                 material.setTexture('erosionMask', erosion.mask);
-                material.setVector2('erosionMaskTiling', new BVector2(erosion.maskTiling[0], erosion.maskTiling[1]));
             }
+            material.setVector2('erosionParams', new BVector2(erosion.softness, erosion.edgeWidth));
             material.setVector3(
                 'erosionEdgeColor',
                 new BVector3(erosion.edgeColor[0], erosion.edgeColor[1], erosion.edgeColor[2])
             );
         }
-        if (!uvScroll && !uvDistortion && !erosion && !gradientMap) {
+        if (!mapUV && !uvDistortion && !erosion?.mask && !gradientMap) {
             return;
         }
         // Wrapped on the CPU: a raw speed × time grows until float32 UVs lose their fraction.
         // Over two repeats, not one: a mirrored texture repeats every two, and
         // wrapped over one it jumped to its mirror image at every wrap.
         const wrap = (value: number) => value - 2 * Math.floor(value / 2);
-        const scrollOffset = new BVector2();
-        const distortionParams = new BVector4();
-        const erosionParams = new BVector4();
+        const mapTransform = new BVector4();
+        const distortionTransform = new BVector4();
+        const maskTransform = new BVector4();
         const gradientRange = new BVector2(0, 1);
+        // Only the scroll is wrapped: an offset is kept as given, so a clamped
+        // texture moved off its edge stays moved.
+        const transform = (uv: TextureUV, time: number, out: BVector4) =>
+            out.set(
+                uv.tiling[0],
+                uv.tiling[1],
+                uv.offset[0] + wrap(uv.scroll[0] * time),
+                uv.offset[1] + wrap(uv.scroll[1] * time)
+            );
         // Written to the material for the next bind and to the bound effect for
         // this one: ShaderMaterial uploads its values before the bind observers run.
         const write = () => {
             const time = this.time;
             const effect = material.getEffect();
-            if (uvScroll) {
-                scrollOffset.set(wrap(uvScroll[0] * time), wrap(uvScroll[1] * time));
-                material.setVector2('uvScrollOffset', scrollOffset);
-                effect?.setVector2('uvScrollOffset', scrollOffset);
+            if (mapUV) {
+                transform(mapUV, time, mapTransform);
+                material.setVector4('mapTransform', mapTransform);
+                effect?.setVector4('mapTransform', mapTransform);
             }
             if (uvDistortion) {
-                distortionParams.set(
-                    uvDistortion.strength,
-                    uvDistortion.scale,
-                    wrap(uvDistortion.scroll[0] * time),
-                    wrap(uvDistortion.scroll[1] * time)
-                );
-                material.setVector4('distortionParams', distortionParams);
-                effect?.setVector4('distortionParams', distortionParams);
+                transform(uvDistortion.mapUV, time, distortionTransform);
+                material.setVector4('distortionTransform', distortionTransform);
+                effect?.setVector4('distortionTransform', distortionTransform);
             }
-            if (erosion) {
-                erosionParams.set(
-                    erosion.softness,
-                    erosion.edgeWidth,
-                    wrap(erosion.maskScroll[0] * time),
-                    wrap(erosion.maskScroll[1] * time)
-                );
-                material.setVector4('erosionParams', erosionParams);
-                effect?.setVector4('erosionParams', erosionParams);
+            if (erosion?.mask) {
+                transform(erosion.maskUV, time, maskTransform);
+                material.setVector4('erosionMaskTransform', maskTransform);
+                effect?.setVector4('erosionMaskTransform', maskTransform);
             }
-            if (gradientMap) {
+            if (gradientMap?.ramp) {
                 // Texel centres of the first and last texel, so a repeating
                 // ramp does not blend its two ends at black and white.
-                const width = gradientMap.getSize().width;
+                const width = gradientMap.ramp.getSize().width;
                 const half = width > 0 ? 0.5 / width : 0;
                 gradientRange.set(half, 1 - half);
                 material.setVector2('gradientMapRange', gradientRange);

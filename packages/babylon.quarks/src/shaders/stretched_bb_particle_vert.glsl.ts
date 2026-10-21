@@ -32,6 +32,10 @@ uniform vec3 pivot;
 // Varyings
 varying vec2 vUV;
 varying vec4 vColor;
+#ifdef UV1
+// The particle's own UV, never moved by the sheet (UV channel 1).
+varying vec2 vUV1;
+#endif
 #ifdef TILE_BLEND
 varying vec2 vUV2;
 varying float vTileBlend;
@@ -46,10 +50,6 @@ varying float linearDepth;
 uniform vec2 sizeLimits;
 #endif
 
-#ifdef BEAM_WIDTH_FROM_LENGTH
-// A beam's width per unit of its length, times the particle size.
-uniform float beamWidthPerLength;
-#endif
 ${fogVertexDeclarationGLSL}
 void main() {
     float lengthFactor = velocity.w;
@@ -70,13 +70,9 @@ void main() {
 #else
     vec3 side = normalize(cross(mvPosition.xyz, vdir));
 #endif
-#if defined(BEAM) && defined(BEAM_WIDTH_FROM_LENGTH)
-    avgSize *= vlength * beamWidthPerLength;
-#endif
 #ifdef SIZE_LIMITS
     // The streak's width on screen as a fraction of the viewport height, held
-    // between the limits (a beam's once its length has set it); a perspective
-    // projection divides by the view depth.
+    // between the limits; a perspective projection divides by the view depth.
     float limitDepth = abs(projection[2][3]) > 0.0 ? abs(mvPosition.z) : 1.0;
     float screenSize = avgSize * projection[1][1] / (2.0 * limitDepth);
     if (screenSize > 0.0) {
@@ -100,10 +96,6 @@ void main() {
     gl_Position = projection * mvPosition;
 ${fogVertexGLSL('mvPosition.xyz')}
     vec2 quadUV = vec2(size.x < 0.0 ? 1.0 - uv.x : uv.x, size.y < 0.0 ? 1.0 - uv.y : uv.y);
-#if defined(BEAM) && defined(BEAM_UV_V)
-    // V along the beam, from the particle (0) to the end (1); U across it.
-    quadUV = quadUV.yx;
-#endif
 #ifdef SOFT_PARTICLES
     projPosition = gl_Position;
     linearDepth = -mvPosition.z;
@@ -126,6 +118,9 @@ ${fogVertexGLSL('mvPosition.xyz')}
         vUV = quadUV;
     #endif
 
+#ifdef UV1
+    vUV1 = quadUV;
+#endif
     vColor = color;
 }
 `;

@@ -32,6 +32,10 @@ uniform pivot: vec3f;
 // Varyings
 varying vUV: vec2f;
 varying vColor: vec4f;
+#ifdef UV1
+// The particle's own UV, never moved by the sheet (UV channel 1).
+varying vUV1: vec2f;
+#endif
 #ifdef TILE_BLEND
 varying vUV2: vec2f;
 varying vTileBlend: f32;
@@ -46,10 +50,6 @@ varying linearDepth: f32;
 uniform sizeLimits: vec2f;
 #endif
 
-#ifdef BEAM_WIDTH_FROM_LENGTH
-// A beam's width per unit of its length, times the particle size.
-uniform beamWidthPerLength: f32;
-#endif
 ${fogVertexDeclarationWGSL}
 @vertex
 fn main(input: VertexInputs) -> FragmentInputs {
@@ -79,13 +79,9 @@ fn main(input: VertexInputs) -> FragmentInputs {
 #else
     let side = normalize(cross(mvPosition.xyz, vdir));
 #endif
-#if defined(BEAM) && defined(BEAM_WIDTH_FROM_LENGTH)
-    avgSize *= vlength * uniforms.beamWidthPerLength;
-#endif
 #ifdef SIZE_LIMITS
     // The streak's width on screen as a fraction of the viewport height, held
-    // between the limits (a beam's once its length has set it); a perspective
-    // projection divides by the view depth.
+    // between the limits; a perspective projection divides by the view depth.
     let limitDepth = select(1.0, abs(mvPosition.z), abs(uniforms.projection[2][3]) > 0.0);
     let screenSize = avgSize * uniforms.projection[1][1] / (2.0 * limitDepth);
     if (screenSize > 0.0) {
@@ -114,12 +110,7 @@ fn main(input: VertexInputs) -> FragmentInputs {
     let clipPosition = uniforms.projection * mvPosition;
     vertexOutputs.position = clipPosition;
 ${fogVertexWGSL('mvPosition.xyz')}
-#if defined(BEAM) && defined(BEAM_UV_V)
-    // V along the beam, from the particle (0) to the end (1); U across it.
-    let quadUV = select(vertexInputs.uv, 1.0 - vertexInputs.uv, vertexInputs.size.xy < vec2f(0.0)).yx;
-#else
     let quadUV = select(vertexInputs.uv, 1.0 - vertexInputs.uv, vertexInputs.size.xy < vec2f(0.0));
-#endif
 #ifdef SOFT_PARTICLES
     vertexOutputs.projPosition = clipPosition;
     vertexOutputs.linearDepth = -mvPosition.z;
@@ -142,6 +133,9 @@ ${fogVertexWGSL('mvPosition.xyz')}
         vertexOutputs.vUV = quadUV;
     #endif
 
+#ifdef UV1
+    vertexOutputs.vUV1 = quadUV;
+#endif
     vertexOutputs.vColor = vertexInputs.color;
 }
 `;

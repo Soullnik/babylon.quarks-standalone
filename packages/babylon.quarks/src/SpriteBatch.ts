@@ -92,12 +92,42 @@ export class SpriteBatch extends VFXBatch {
         } else {
             vertexData.uvs = new Float32Array(vertexCount * 2);
         }
+        if (this.meshUV2()) {
+            vertexData.uvs2 = this.settings.instancingUVs2!;
+        }
         if (this.settings.instancingNormals) {
             vertexData.normals = this.settings.instancingNormals;
         }
         vertexData.applyToMesh(this.mesh, false);
 
         this.buildExpandableBuffers();
+    }
+
+    /**
+     * True when a mesh batch reads UV channel 1 and has a second UV set to
+     * read it from, two values per vertex. A set of any other length is left
+     * out with a warning, and channel 1 then reads the first set.
+     */
+    private warnedUV2 = false;
+
+    private meshUV2(): boolean {
+        const uvs2 = this.settings.instancingUVs2;
+        if (this.settings.renderMode !== RenderMode.Mesh || !uvs2 || !this.usesUV1()) {
+            return false;
+        }
+        const expected = (this.settings.instancingGeometry.length / 3) * 2;
+        if (uvs2.length !== expected) {
+            if (this.warnedUV2) {
+                return false;
+            }
+            this.warnedUV2 = true;
+            console.warn(
+                `[babylon.quarks] instancingUVs2 has ${uvs2.length} values for ${expected / 2} vertices ` +
+                    '(two per vertex expected); UV channel 1 reads the first UV set instead.'
+            );
+            return false;
+        }
+        return true;
     }
 
     /** Releases the instance vertex buffers so a resize does not leak GPU memory. */
@@ -324,15 +354,8 @@ export class SpriteBatch extends VFXBatch {
         if (this.settings.renderMode === RenderMode.HorizontalBillBoard) {
             defines.push('HORIZONTAL');
         }
-        const beam = this.settings.renderMode === RenderMode.Beam ? this.settings.beam : undefined;
         if (this.settings.renderMode === RenderMode.Beam) {
             defines.push('BEAM');
-            if (beam?.textureAxis === 'v') {
-                defines.push('BEAM_UV_V');
-            }
-            if (beam && beam.widthPerLength > 0) {
-                defines.push('BEAM_WIDTH_FROM_LENGTH');
-            }
         }
         const pivot = SpriteBatch.takesPivotAndFlip(this.settings.renderMode) ? this.settings.pivot : undefined;
         if (pivot) {
@@ -366,6 +389,10 @@ export class SpriteBatch extends VFXBatch {
         const attributes = ['position', 'uv', 'offset', 'color', 'size', 'rotation', 'uvTile'];
         if (this.settings.renderMode === RenderMode.Mesh) {
             attributes.push('normal');
+        }
+        if (this.usesUV1() && this.meshUV2()) {
+            defines.push('MESH_UV2');
+            attributes.push('uv2');
         }
         if (SpriteBatch.drawsAlongVelocity(this.settings.renderMode)) {
             attributes.push('velocity');
@@ -406,9 +433,6 @@ export class SpriteBatch extends VFXBatch {
         }
         if (pivot) {
             uniforms.push('pivot');
-        }
-        if (beam && beam.widthPerLength > 0) {
-            uniforms.push('beamWidthPerLength');
         }
         if (sizeLimits) {
             uniforms.push('sizeLimits');
@@ -459,9 +483,6 @@ export class SpriteBatch extends VFXBatch {
         if (this.settings.uTileCount > 1 || this.settings.vTileCount > 1) {
             mat.setFloat('tileCountX', this.settings.uTileCount);
             mat.setFloat('tileCountY', this.settings.vTileCount);
-        }
-        if (beam && beam.widthPerLength > 0) {
-            mat.setFloat('beamWidthPerLength', beam.widthPerLength);
         }
         if (SpriteBatch.drawsAlongVelocity(this.settings.renderMode)) {
             mat.setFloat('speedFactor', this.settings.softNearFade > 0 ? this.settings.softNearFade : 1.0);
