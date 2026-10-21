@@ -152,16 +152,25 @@ describe('per-camera uniforms reach the effect of the draw they are for', () => 
         expect(written.ambientColor).toBeDefined();
     });
 
-    test('the render size a trail is drawn at, once it changes', () => {
-        scene.activeCamera = camera('a', new Vector3(0, 0, -10), 0.1, 100);
+    test('the depth decode of each camera, for a soft trail', () => {
+        const a = camera('a', new Vector3(0, 0, -10), 0.1, 100);
+        const b = camera('b', new Vector3(0, 0, -20), 0.5, 50);
         const renderer = new BatchedRenderer('trail', scene);
-        renderer.addSystem(system({renderMode: RenderMode.Trail}));
+        renderer.setDepthTexture(RawTexture.CreateLuminanceTexture(new Uint8Array([200]), 1, 1, scene));
+        renderer.addSystem(
+            system({
+                renderMode: RenderMode.Trail,
+                softParticles: true,
+                rendererEmitterSettings: {startLength: new ConstantValue(4), followLocalOrigin: false},
+            })
+        );
         const material = renderer.batches[0].mesh.material as ShaderMaterial;
         const written = boundEffect(material);
-
-        jest.spyOn(engine, 'getRenderWidth').mockReturnValue(640);
-        jest.spyOn(engine, 'getRenderHeight').mockReturnValue(360);
-        bind(material);
-        expect(written.resolution).toEqual([640, 360]);
+        for (const current of [a, b]) {
+            scene.activeCamera = current;
+            bind(material);
+            const expected = softDepthParams(current, 'linear', new BVector4()).asArray();
+            written.projParams.forEach((value, i) => expect(value).toBeCloseTo(expected[i], 4));
+        }
     });
 });

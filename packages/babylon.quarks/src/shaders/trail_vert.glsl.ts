@@ -11,9 +11,6 @@ attribute vec4 color;
 
 uniform mat4 view;
 uniform mat4 projection;
-uniform float lineWidth;
-uniform vec2 resolution;
-uniform float sizeAttenuation;
 
 varying vec2 vUV;
 varying vec4 vColor;
@@ -23,44 +20,56 @@ attribute vec2 uv2;
 varying vec2 vUV1;
 #endif
 
-vec2 fix(vec4 i, float aspect) {
-    vec2 res = i.xy / i.w;
-    res.x *= aspect;
-    return res;
+#ifdef SOFT_PARTICLES
+varying vec4 projPosition;
+varying float linearDepth;
+#endif
+
+// The unit tangent of a segment, or zero for a segment of no length.
+vec3 trailDirection(vec3 d) {
+    float l = dot(d, d);
+    return l > 1e-12 ? d * inversesqrt(l) : vec3(0.0);
+}
+
+// The direction a ribbon point is widened along, in view space: across the trail's tangent and
+// the line of sight, as Unity's View alignment and Niagara's ribbon facing do. Stays finite at
+// repeated points, at a hairpin and for a segment pointing at the camera.
+vec3 trailSide(vec3 previousPoint, vec3 point, vec3 nextPoint) {
+    vec3 incoming = trailDirection(point - previousPoint);
+    vec3 outgoing = trailDirection(nextPoint - point);
+    vec3 tangent = incoming + outgoing;
+    if (dot(tangent, tangent) < 1e-6) {
+        // A hairpin turns the two directions against each other: face the way it now goes.
+        tangent = dot(outgoing, outgoing) > 0.0 ? outgoing : incoming;
+    }
+    // The line of sight: to the point for a perspective camera, the view axis for an orthographic one.
+    vec3 sight = projection[3][3] > 0.5 ? vec3(0.0, 0.0, 1.0) : point;
+    vec3 side = cross(tangent, sight);
+    if (dot(side, side) < 1e-12) {
+        side = cross(tangent, vec3(0.0, 0.0, 1.0));
+    }
+    if (dot(side, side) < 1e-12) {
+        side = vec3(1.0, 0.0, 0.0);
+    }
+    return normalize(side);
 }
 
 ${fogVertexDeclarationGLSL}
 void main() {
-    float aspect = resolution.x / resolution.y;
-    vec4 finalPosition = projection * view * vec4(position, 1.0);
-    vec4 prevPos = projection * view * vec4(previous, 1.0);
-    vec4 nextPos = projection * view * vec4(next, 1.0);
-
-    vec2 currentP = fix(finalPosition, aspect);
-    vec2 prevP = fix(prevPos, aspect);
-    vec2 nextP = fix(nextPos, aspect);
-
-    float w = lineWidth * width;
-    vec2 dir;
-    if (distance(nextP, currentP) < 0.0001) {
-        dir = normalize(currentP - prevP);
-    } else if (distance(prevP, currentP) < 0.0001) {
-        dir = normalize(nextP - currentP);
-    } else {
-        vec2 dir1 = normalize(currentP - prevP);
-        vec2 dir2 = normalize(nextP - currentP);
-        dir = normalize(dir1 + dir2);
+    vec3 point = (view * vec4(position, 1.0)).xyz;
+    // A swept trail lays its vertices out on the CPU and gives them no width.
+    if (width > 0.0) {
+        vec3 previousPoint = (view * vec4(previous, 1.0)).xyz;
+        vec3 nextPoint = (view * vec4(next, 1.0)).xyz;
+        point += trailSide(previousPoint, point, nextPoint) * (0.5 * width * side);
     }
-    vec4 normal = vec4(-dir.y, dir.x, 0.0, 1.0);
-    normal.xy *= 0.5 * w;
-    normal *= projection;
-    if (sizeAttenuation == 0.0) {
-        normal.xy *= finalPosition.w;
-        normal.xy /= (vec4(resolution, 0.0, 1.0) * projection).xy;
-    }
-    finalPosition.xy += normal.xy * side;
-    gl_Position = finalPosition;
-${fogVertexGLSL('(view * vec4(position, 1.0)).xyz')}
+    gl_Position = projection * vec4(point, 1.0);
+${fogVertexGLSL('point')}
+#ifdef SOFT_PARTICLES
+    projPosition = gl_Position;
+    // View depth is +z ahead of a left-handed camera and -z ahead of a right-handed one.
+    linearDepth = abs(point.z);
+#endif
     vUV = uv;
 #ifdef UV1
     vUV1 = uv2;

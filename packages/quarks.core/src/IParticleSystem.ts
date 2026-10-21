@@ -60,12 +60,16 @@ export interface BillBoardSettings {}
 
 export interface TrailSettings {
     /**
-     * Start length of the trail.
+     * How many samples the trail keeps, rolled per particle at emission. The particle records one
+     * sample per simulation step, so in babylon.quarks, which steps at 60 Hz, 30 samples is half a
+     * second of travel. Defaults to 30 in babylon.quarks.
      * @type {ValueGenerator | FunctionValueGenerator}
      */
     startLength: ValueGenerator | FunctionValueGenerator;
     /**
-     * Whether to follow the local origin.
+     * Keep each particle where it was emitted relative to the emitter, carried by the emitter's
+     * transform instead of its own velocity, so the trail draws the emitter's motion (a weapon
+     * tip) rather than the particle's travel. Defaults to false.
      * @type {boolean}
      */
     followLocalOrigin: boolean;

@@ -12,6 +12,10 @@ import particleFragGLSL from '../src/shaders/particle_frag.glsl';
 import particleFragWGSL from '../src/shaders/particle_frag.wgsl';
 import physicsFragGLSL from '../src/shaders/particle_physics_frag.glsl';
 import physicsFragWGSL from '../src/shaders/particle_physics_frag.wgsl';
+import trailFragGLSL from '../src/shaders/trail_frag.glsl';
+import trailFragWGSL from '../src/shaders/trail_frag.wgsl';
+import trailVertGLSL from '../src/shaders/trail_vert.glsl';
+import trailVertWGSL from '../src/shaders/trail_vert.wgsl';
 import {decodeSoftDepth, depthBinding, SoftDepthEncoding, softDepthParams} from '../src/softDepth';
 import {RenderMode} from '../src/VFXBatch';
 
@@ -167,6 +171,7 @@ describe('GLSL and WGSL apply the fragment features in the same order', () => {
     test.each([
         ['particle_frag', particleFragGLSL, particleFragWGSL],
         ['particle_physics_frag', physicsFragGLSL, physicsFragWGSL],
+        ['trail_frag', trailFragGLSL, trailFragWGSL],
     ])('%s', (_name, glsl, wgsl) => {
         expect(featureBlocks(glsl)).toEqual(featureBlocks(wgsl));
         // The soft fade runs last, after fog.
@@ -233,7 +238,7 @@ describe('soft particles and the depth texture', () => {
         renderer.dispose();
     });
 
-    test('a trail keeps the depth texture but draws hard, with no rebuild', () => {
+    test('a trail draws soft once there is a depth texture, and fades last in both languages', () => {
         const renderer = new BatchedRenderer('trail', scene);
         renderer.addSystem(
             softSystem({
@@ -242,9 +247,21 @@ describe('soft particles and the depth texture', () => {
             })
         );
         const material = materialOf(renderer);
-        renderer.setDepthTexture(RawTexture.CreateLuminanceTexture(new Uint8Array([200]), 1, 1, scene));
-        expect(materialOf(renderer)).toBe(material);
         expect(definesOf(renderer)).not.toContain('SOFT_PARTICLES');
+        const depth = RawTexture.CreateLuminanceTexture(new Uint8Array([200]), 1, 1, scene);
+        renderer.setDepthTexture(depth);
+        expect(materialOf(renderer)).not.toBe(material);
+        // The old material goes with the rebuild.
+        expect(scene.materials).not.toContain(material);
+        expect(definesOf(renderer)).toContain('SOFT_PARTICLES');
+        expect(depthTextureOf(renderer)).toBe(depth);
+        expect(featureBlocks(trailFragGLSL)).toEqual(featureBlocks(trailFragWGSL));
+        const blocks = featureBlocks(trailFragGLSL);
+        expect(blocks[blocks.length - 1]).toBe('SOFT_PARTICLES');
+        for (const source of [trailVertGLSL, trailVertWGSL]) {
+            expect(source).toContain('#ifdef SOFT_PARTICLES');
+            expect(source).toContain('abs(point.z)');
+        }
         renderer.dispose();
     });
 

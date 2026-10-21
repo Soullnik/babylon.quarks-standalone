@@ -243,7 +243,7 @@ function cases(): Case[] {
                     const defines = [...target.extra, ...surface, ...map, ...tile];
                     const uniforms =
                         target.name === 'trail'
-                            ? ['world', 'view', 'projection', 'lineWidth', 'resolution', 'sizeAttenuation']
+                            ? ['view', 'projection']
                             : [...SPRITE_UNIFORMS, ...(target.name === 'beam' ? ['speedFactor'] : [])];
                     const samplers: string[] = [...map.map(() => 'map')];
                     if (tile.length) uniforms.push('tileCountX', 'tileCountY');
@@ -277,17 +277,32 @@ function cases(): Case[] {
                     });
                 }
 
-    for (const map of mapOptions) {
-        out.push({
-            name: `trail ${map.length ? '[USE_MAP]' : '[none]'}`,
-            vertex: trailVert,
-            fragment: trailFrag,
-            attributes: ['position', 'previous', 'next', 'side', 'width', 'uv', 'color'],
-            uniforms: ['world', 'view', 'projection', 'lineWidth', 'resolution', 'sizeAttenuation'],
-            samplers: map.length ? ['map'] : [],
-            defines: map,
-        });
-    }
+    const trailSoft = [[], ['SOFT_PARTICLES'], ['SOFT_PARTICLES', 'SOFT_DEPTH_PACKED']];
+    const trailAlpha = [[], ['USE_ALPHATEST']];
+    const trailFog = [[], ['FOG'], ['FOG', 'FOG_ADDITIVE']];
+    for (const map of mapOptions)
+        for (const soft of trailSoft)
+            for (const alpha of trailAlpha)
+                for (const fog of trailFog) {
+                    const defines = [...map, ...soft, ...alpha, ...fog];
+                    const uniforms = ['view', 'projection'];
+                    const samplers: string[] = map.length ? ['map'] : [];
+                    if (soft.length) {
+                        uniforms.push('softParams', 'projParams');
+                        samplers.push('depthTexture');
+                    }
+                    if (alpha.length) uniforms.push('alphaTest');
+                    if (fog.length) uniforms.push('vFogInfos', 'vFogColor');
+                    out.push({
+                        name: `trail [${defines.join(',') || 'none'}]`,
+                        vertex: trailVert,
+                        fragment: trailFrag,
+                        attributes: ['position', 'previous', 'next', 'side', 'width', 'uv', 'color'],
+                        uniforms,
+                        samplers,
+                        defines,
+                    });
+                }
     return out;
 }
 
