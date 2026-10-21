@@ -8,6 +8,9 @@ and the project follows the `quarks.core` 0.x version line.
 
 ### Added
 
+- **Soft particles and alpha test on trails.** `softParticles` and `alphaTest` now apply to trails
+  as to every other render mode, in GLSL and WGSL. Before, a trail accepted them, batched on them
+  and drew hard with a fixed 0.01 cutoff.
 - **Soft-particle depth encodings:** `SoftDepthEncoding`, `DepthTextureOptions`,
   `BatchedRenderer.depthEncoding`, and the decode helpers `softDepthParams` and `decodeSoftDepth`
   (see Changed).
@@ -15,6 +18,14 @@ and the project follows the `quarks.core` 0.x version line.
 
 ### Changed
 
+- **Trails face the camera in view space**, across their tangent and the line of sight, like
+  Unity's View alignment and Niagara's ribbons. The width is now exactly the particle's size in
+  world units. Before, the facing was worked out on screen, which spiked across the view when a
+  trail passed the camera and put NaN vertices (holes) at repeated points and hairpins. The
+  trail material lost its `resolution`, `lineWidth` and `sizeAttenuation` uniforms.
+- **A trail system made without `rendererEmitterSettings`** gets `startLength: 30` and
+  `followLocalOrigin: false`, as setting `renderMode` to Trail does, instead of throwing on its
+  first particle. `startLength` and `followLocalOrigin` are documented.
 - **Box and edge shapes now apply their shape transform.** `BoxEmitter` and `EdgeEmitter` take a
   `transform` (offset, rotation and scale within the system) like the other shapes, and write and
   read it in JSON. Before, a Unity export that moved, turned or scaled a Box, Rectangle or Edge
@@ -72,6 +83,15 @@ and the project follows the `quarks.core` 0.x version line.
 
 ### Fixed
 
+- **A trail's live tip folded back over its head** on frames where the last step ran ahead of the
+  display, about every other frame at 120 Hz. The head is now drawn back along its last segment
+  instead. Float noise in the step accumulator no longer adds a tip of no length.
+- **A dead trail particle's tip kept moving**, drawing a spike that grew while the trail shrank.
+  The trail now ends at its last sample.
+- **The live tip ignored `WidthOverLength`**, so a trail narrowed by it flared at the tip on
+  frames between steps.
+- **`WidthOverLength` read its curve past the end** for a fractional or zero `startLength`.
+- **A trail rebuilt its material without disposing the old one.**
 - **Camera-dependent uniforms reached the GPU one draw late.** The eye position (rim, env
   reflection), the soft-particle depth decode, the `'scene'` light and a trail's render size were
   written after the material had uploaded its uniforms, so each draw used the previous bind's

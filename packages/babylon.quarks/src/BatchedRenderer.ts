@@ -442,7 +442,7 @@ export class BatchedRenderer extends TransformNode {
      * Babylon's default `'linear'` metric unless `options.encoding` says otherwise; see
      * {@link SoftDepthEncoding}. The depth should be drawn by the camera that draws the particles.
      * The texture is held, not the renderer: set it again if the `DepthRenderer` is disposed or
-     * replaced. Trails draw hard whatever the depth.
+     * replaced.
      *
      * @param depth - A depth texture, a Babylon `DepthRenderer`, or null to turn soft particles off.
      * @param options - What the texture stores, when it cannot be read off a `DepthRenderer`.

@@ -10,7 +10,7 @@ import {Scene} from '@babylonjs/core/scene';
 import {IParticleSystem, Vector3} from 'quarks.core';
 import {VFXBatchSettings} from './BatchedRenderer';
 import type {ParticleSystem} from './ParticleSystem';
-import type {DepthBinding} from './softDepth';
+import {DepthBinding, softDepthParams} from './softDepth';
 
 /**
  * The order the particles of a batch are drawn in (Unity's Sort Mode). Alpha
@@ -869,6 +869,64 @@ export abstract class VFXBatch {
         const material = this.mesh.material;
         if (depth && material instanceof ShaderMaterial) {
             material.setTexture('depthTexture', depth.texture);
+        }
+    }
+
+    /**
+     * Defines for soft particles (while a depth texture is attached) and alpha test, shared by
+     * every render mode's material.
+     */
+    protected softDefines(): string[] {
+        const defines: string[] = [];
+        if (this.drawsSoft()) {
+            defines.push('SOFT_PARTICLES');
+            if (this.depth!.packed) {
+                defines.push('SOFT_DEPTH_PACKED');
+            }
+        }
+        if (this.settings.materialAlphaTest > 0) {
+            defines.push('USE_ALPHATEST');
+        }
+        return defines;
+    }
+
+    /** The uniforms and samplers {@link softDefines} need. */
+    protected softUniforms(uniforms: string[], samplers: string[]): void {
+        if (this.drawsSoft()) {
+            uniforms.push('softParams', 'projParams');
+            samplers.push('depthTexture');
+        }
+        if (this.settings.materialAlphaTest > 0) {
+            uniforms.push('alphaTest');
+        }
+    }
+
+    /**
+     * Sets the soft-particle and alpha-test values on a material, and decodes the depth for the
+     * camera of each draw.
+     */
+    protected bindSoft(material: ShaderMaterial): void {
+        if (this.drawsSoft()) {
+            material.setTexture('depthTexture', this.depth!.texture);
+            material.setVector2(
+                'softParams',
+                new BVector2(
+                    this.settings.softNearFade,
+                    1.0 / Math.max(this.settings.softFarFade - this.settings.softNearFade, 0.0001)
+                )
+            );
+            // Reused across binds: this runs on every draw call.
+            const projParams = new BVector4(1, 0, 0, 1);
+            material.onBindObservable.add(() => {
+                const camera = this.scene.activeCamera;
+                if (camera && this.depth) {
+                    softDepthParams(camera, this.depth.encoding, projParams);
+                    VFXBatch.writeBound(material, (target) => target.setVector4('projParams', projParams));
+                }
+            });
+        }
+        if (this.settings.materialAlphaTest > 0) {
+            material.setFloat('alphaTest', this.settings.materialAlphaTest);
         }
     }
 

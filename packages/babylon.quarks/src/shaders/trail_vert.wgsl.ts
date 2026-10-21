@@ -11,9 +11,6 @@ attribute color: vec4f;
 
 uniform view: mat4x4f;
 uniform projection: mat4x4f;
-uniform lineWidth: f32;
-uniform resolution: vec2f;
-uniform sizeAttenuation: f32;
 
 varying vUV: vec2f;
 varying vColor: vec4f;
@@ -23,49 +20,58 @@ attribute uv2: vec2f;
 varying vUV1: vec2f;
 #endif
 
-fn fix(i: vec4f, aspect: f32) -> vec2f {
-    var res = i.xy / i.w;
-    res.x *= aspect;
-    return res;
+#ifdef SOFT_PARTICLES
+varying projPosition: vec4f;
+varying linearDepth: f32;
+#endif
+
+// The unit tangent of a segment, or zero for a segment of no length.
+fn trailDirection(d: vec3f) -> vec3f {
+    let l = dot(d, d);
+    return select(vec3f(0.0), d * inverseSqrt(max(l, 1e-24)), l > 1e-12);
+}
+
+// The direction a ribbon point is widened along, in view space: across the trail's tangent and
+// the line of sight, as Unity's View alignment and Niagara's ribbon facing do. Stays finite at
+// repeated points, at a hairpin and for a segment pointing at the camera.
+fn trailSide(previousPoint: vec3f, point: vec3f, nextPoint: vec3f) -> vec3f {
+    let incoming = trailDirection(point - previousPoint);
+    let outgoing = trailDirection(nextPoint - point);
+    var tangent = incoming + outgoing;
+    if (dot(tangent, tangent) < 1e-6) {
+        // A hairpin turns the two directions against each other: face the way it now goes.
+        tangent = select(incoming, outgoing, dot(outgoing, outgoing) > 0.0);
+    }
+    // The line of sight: to the point for a perspective camera, the view axis for an orthographic one.
+    let sight = select(point, vec3f(0.0, 0.0, 1.0), uniforms.projection[3][3] > 0.5);
+    var side = cross(tangent, sight);
+    if (dot(side, side) < 1e-12) {
+        side = cross(tangent, vec3f(0.0, 0.0, 1.0));
+    }
+    if (dot(side, side) < 1e-12) {
+        side = vec3f(1.0, 0.0, 0.0);
+    }
+    return normalize(side);
 }
 
 ${fogVertexDeclarationWGSL}
 @vertex
 fn main(input: VertexInputs) -> FragmentInputs {
-    let aspect = uniforms.resolution.x / uniforms.resolution.y;
-    var finalPosition = uniforms.projection * uniforms.view * vec4f(vertexInputs.position, 1.0);
-    let prevPos = uniforms.projection * uniforms.view * vec4f(vertexInputs.previous, 1.0);
-    let nextPos = uniforms.projection * uniforms.view * vec4f(vertexInputs.next, 1.0);
-
-    let currentP = fix(finalPosition, aspect);
-    let prevP = fix(prevPos, aspect);
-    let nextP = fix(nextPos, aspect);
-
-    let w = uniforms.lineWidth * vertexInputs.width;
-    var dir: vec2f;
-    if (distance(nextP, currentP) < 0.0001) {
-        dir = normalize(currentP - prevP);
-    } else if (distance(prevP, currentP) < 0.0001) {
-        dir = normalize(nextP - currentP);
-    } else {
-        let dir1 = normalize(currentP - prevP);
-        let dir2 = normalize(nextP - currentP);
-        dir = normalize(dir1 + dir2);
+    var point = (uniforms.view * vec4f(vertexInputs.position, 1.0)).xyz;
+    // A swept trail lays its vertices out on the CPU and gives them no width.
+    if (vertexInputs.width > 0.0) {
+        let previousPoint = (uniforms.view * vec4f(vertexInputs.previous, 1.0)).xyz;
+        let nextPoint = (uniforms.view * vec4f(vertexInputs.next, 1.0)).xyz;
+        point += trailSide(previousPoint, point, nextPoint) * (0.5 * vertexInputs.width * vertexInputs.side);
     }
-    var normal = vec4f(-dir.y, dir.x, 0.0, 1.0);
-    normal.x *= 0.5 * w;
-    normal.y *= 0.5 * w;
-    normal = normal * uniforms.projection;
-    if (uniforms.sizeAttenuation == 0.0) {
-        let screen = (vec4f(uniforms.resolution, 0.0, 1.0) * uniforms.projection).xy;
-        normal.x = normal.x * finalPosition.w / screen.x;
-        normal.y = normal.y * finalPosition.w / screen.y;
-    }
-    finalPosition.x += normal.x * vertexInputs.side;
-    finalPosition.y += normal.y * vertexInputs.side;
-
-    vertexOutputs.position = finalPosition;
-${fogVertexWGSL('(uniforms.view * vec4f(vertexInputs.position, 1.0)).xyz')}
+    let clipPosition = uniforms.projection * vec4f(point, 1.0);
+    vertexOutputs.position = clipPosition;
+${fogVertexWGSL('point')}
+#ifdef SOFT_PARTICLES
+    vertexOutputs.projPosition = clipPosition;
+    // View depth is +z ahead of a left-handed camera and -z ahead of a right-handed one.
+    vertexOutputs.linearDepth = abs(point.z);
+#endif
     vertexOutputs.vUV = vertexInputs.uv;
 #ifdef UV1
     vertexOutputs.vUV1 = vertexInputs.uv2;

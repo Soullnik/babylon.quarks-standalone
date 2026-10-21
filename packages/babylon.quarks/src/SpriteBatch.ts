@@ -3,7 +3,7 @@ import {Constants} from '@babylonjs/core/Engines/constants';
 import type {Effect} from '@babylonjs/core/Materials/effect';
 import {ShaderMaterial} from '@babylonjs/core/Materials/shaderMaterial';
 import {RawTexture} from '@babylonjs/core/Materials/Textures/rawTexture';
-import {Vector2 as BVector2, Vector3 as BVector3, Vector4 as BVector4} from '@babylonjs/core/Maths/math.vector';
+import {Vector2 as BVector2, Vector3 as BVector3} from '@babylonjs/core/Maths/math.vector';
 import {Mesh} from '@babylonjs/core/Meshes/mesh';
 import {VertexData} from '@babylonjs/core/Meshes/mesh.vertexData';
 import {Scene} from '@babylonjs/core/scene';
@@ -32,7 +32,7 @@ import particle_vert_wgsl from './shaders/particle_vert.wgsl';
 import {registerShaders, shaderLanguageFor, ShaderSources} from './shaders/shaderLanguageSupport';
 import stretched_bb_particle_vert from './shaders/stretched_bb_particle_vert.glsl';
 import stretched_bb_particle_vert_wgsl from './shaders/stretched_bb_particle_vert.wgsl';
-import {DepthBinding, softDepthParams} from './softDepth';
+import type {DepthBinding} from './softDepth';
 import {defaultMeshLighting, MeshLightingSettings, RenderMode, VFXBatch} from './VFXBatch';
 
 export class SpriteBatch extends VFXBatch {
@@ -359,15 +359,7 @@ export class SpriteBatch extends VFXBatch {
         if (this.settings.blendTiles) {
             defines.push('TILE_BLEND');
         }
-        if (this.drawsSoft()) {
-            defines.push('SOFT_PARTICLES');
-            if (this.depth!.packed) {
-                defines.push('SOFT_DEPTH_PACKED');
-            }
-        }
-        if (this.settings.materialAlphaTest > 0) {
-            defines.push('USE_ALPHATEST');
-        }
+        defines.push(...this.softDefines());
         if (this.settings.renderMode === RenderMode.VerticalBillBoard) {
             defines.push('VERTICAL');
         }
@@ -443,14 +435,7 @@ export class SpriteBatch extends VFXBatch {
         if (SpriteBatch.drawsAlongVelocity(this.settings.renderMode)) {
             uniforms.push('speedFactor');
         }
-        if (this.drawsSoft()) {
-            uniforms.push('softParams');
-            uniforms.push('projParams');
-            samplers.push('depthTexture');
-        }
-        if (this.settings.materialAlphaTest > 0) {
-            uniforms.push('alphaTest');
-        }
+        this.softUniforms(uniforms, samplers);
         if (pivot) {
             uniforms.push('pivot');
         }
@@ -507,28 +492,7 @@ export class SpriteBatch extends VFXBatch {
         if (SpriteBatch.drawsAlongVelocity(this.settings.renderMode)) {
             mat.setFloat('speedFactor', this.settings.softNearFade > 0 ? this.settings.softNearFade : 1.0);
         }
-        if (this.drawsSoft()) {
-            mat.setTexture('depthTexture', this.depth!.texture);
-            mat.setVector2(
-                'softParams',
-                new BVector2(
-                    this.settings.softNearFade,
-                    1.0 / Math.max(this.settings.softFarFade - this.settings.softNearFade, 0.0001)
-                )
-            );
-            // Reused across binds: this runs on every draw call.
-            const projParams = new BVector4(1, 0, 0, 1);
-            mat.onBindObservable.add(() => {
-                const camera = this.scene.activeCamera;
-                if (camera && this.depth) {
-                    softDepthParams(camera, this.depth.encoding, projParams);
-                    VFXBatch.writeBound(mat, (target) => target.setVector4('projParams', projParams));
-                }
-            });
-        }
-        if (this.settings.materialAlphaTest > 0) {
-            mat.setFloat('alphaTest', this.settings.materialAlphaTest);
-        }
+        this.bindSoft(mat);
         if (pivot) {
             mat.setVector3('pivot', new BVector3(pivot.x, pivot.y, pivot.z));
         }

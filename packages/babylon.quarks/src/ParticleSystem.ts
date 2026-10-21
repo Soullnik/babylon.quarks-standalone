@@ -272,7 +272,7 @@ export interface ParticleSystemParameters {
      * Fade particles out as they near the scene behind them, like Unity's Soft Particles and
      * Unreal's Depth Fade, between `softNearFade` and `softFarFade` world units. Needs a depth
      * texture, see `BatchedRenderer.setDepthTexture`; without one particles draw hard. Applies to
-     * billboard, stretched, mesh and beam particles; trails draw hard.
+     * every render mode: billboard, stretched, mesh, beam and trail.
      */
     softParticles?: boolean;
     softFarFade?: number;
@@ -1136,6 +1136,12 @@ export class ParticleSystem implements IParticleSystem {
         this.worldSpace = parameters.worldSpace ?? false;
         this.rendererEmitterSettings = parameters.rendererEmitterSettings ?? {};
 
+        if (parameters.renderMode === RenderMode.Trail) {
+            // The defaults the renderMode setter gives a trail, for settings left out.
+            const settings = this.rendererEmitterSettings as TrailSettings;
+            settings.startLength = settings.startLength ?? new ConstantValue(30);
+            settings.followLocalOrigin = settings.followLocalOrigin ?? false;
+        }
         if (parameters.renderMode === RenderMode.StretchedBillBoard) {
             const settings = this.rendererEmitterSettings as StretchedBillBoardSettings;
             if (parameters.speedFactor !== undefined) {

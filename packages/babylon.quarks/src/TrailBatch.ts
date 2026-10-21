@@ -1,8 +1,6 @@
 import {VertexBuffer} from '@babylonjs/core/Buffers/buffer';
 import {Constants} from '@babylonjs/core/Engines/constants';
 import {ShaderMaterial} from '@babylonjs/core/Materials/shaderMaterial';
-import {BaseTexture} from '@babylonjs/core/Materials/Textures/baseTexture';
-import {Vector2 as BVector2} from '@babylonjs/core/Maths/math.vector';
 import {Mesh} from '@babylonjs/core/Meshes/mesh';
 import {Scene} from '@babylonjs/core/scene';
 import {IParticleSystem, Matrix4, Quaternion, TrailParticle, TrailSettings, Vector3} from 'quarks.core';
@@ -199,11 +197,6 @@ export class TrailBatch extends VFXBatch {
         this.buildGeometryBuffers();
     }
 
-    /** Trails draw hard, so the depth texture is only kept: nothing to rebuild. */
-    override applyDepthTexture(depth: DepthBinding | BaseTexture | null): void {
-        this.depth = depth instanceof BaseTexture ? {texture: depth, encoding: 'linear', packed: false} : depth;
-    }
-
     rebuildMaterial(): void {
         // Stable name: the trail shader source never varies, so registering it once
         // keeps Effect.ShadersStore bounded and lets Babylon reuse compiled effects.
@@ -214,6 +207,7 @@ export class TrailBatch extends VFXBatch {
             defines.push('USE_MAP');
         }
         defines.push(...this.surfaceDefines());
+        defines.push(...this.softDefines());
 
         const shaderLanguage = shaderLanguageFor(this.scene.getEngine());
         registerShaders(
@@ -227,22 +221,14 @@ export class TrailBatch extends VFXBatch {
         if (this.uv1Buffer) {
             attributes.push('uv2');
         }
-        const uniforms = [
-            'world',
-            'view',
-            'projection',
-            'worldViewProjection',
-            'lineWidth',
-            'resolution',
-            'sizeAttenuation',
-            ...VFXBatch.FOG_UNIFORMS,
-        ];
+        const uniforms = ['view', 'projection', ...VFXBatch.FOG_UNIFORMS];
         const samplers: string[] = [];
 
         if (this.settings.texture) {
             samplers.push('map');
         }
         this.surfaceUniforms(uniforms, samplers);
+        this.softUniforms(uniforms, samplers);
 
         const mat = new ShaderMaterial(
             shaderName,
@@ -261,24 +247,8 @@ export class TrailBatch extends VFXBatch {
         if (this.settings.texture) {
             mat.setTexture('map', this.settings.texture);
         }
-        const engine = this.scene.getEngine();
-        mat.setFloat('lineWidth', 1);
-        // Reused across binds, and only re-uploaded when the render target resizes.
-        const resolution = new BVector2(engine.getRenderWidth(), engine.getRenderHeight());
-        mat.setVector2('resolution', resolution);
-        mat.setFloat('sizeAttenuation', 1);
-        mat.onBindObservable.add(() => {
-            const renderEngine = this.scene.getEngine();
-            const width = renderEngine.getRenderWidth();
-            const height = renderEngine.getRenderHeight();
-            if (resolution.x !== width || resolution.y !== height) {
-                resolution.x = width;
-                resolution.y = height;
-                VFXBatch.writeBound(mat, (target) => target.setVector2('resolution', resolution));
-            }
-        });
-
         this.bindFog(mat);
+        this.bindSoft(mat);
         this.bindSurface(mat);
         mat.backFaceCulling = false;
 
@@ -293,10 +263,12 @@ export class TrailBatch extends VFXBatch {
         // 0 keeps the engine's depth function (LEQUAL); ALWAYS draws over everything, like ZTest Always.
         mat.depthFunction = this.settings.materialDepthTest ? 0 : Constants.ALWAYS;
 
+        // A rebuild (a depth texture attached or removed) replaces the material and its bind
+        // observers. Textures belong to the settings, so they stay.
+        (this.mesh.material as ShaderMaterial | null)?.dispose(false, false);
         this.mesh.material = mat;
     }
 
-    private vector_ = new Vector3();
     private vector2_ = new Vector3();
     private vector3_ = new Vector3();
     private quaternion_ = new Quaternion();
@@ -555,7 +527,10 @@ export class TrailBatch extends VFXBatch {
             // Measured from the step the particle just took, not from its
             // velocity: a trail pulled along by an orbit or by a plugin's own
             // behavior has motion no velocity term describes.
-            const stepFraction = residual === 0 ? 0 : residual / (system.simulationStep ?? residual);
+            const rawFraction = residual === 0 ? 0 : residual / (system.simulationStep ?? residual);
+            // A few ten-thousandths of a step are float noise left in the accumulator, not time: a
+            // tip there would sit on the head as a segment of no length.
+            const stepFraction = Math.abs(rawFraction) < 1e-4 ? 0 : rawFraction;
 
             const tessellation = trailTessellation(trailSettings);
             const curveTension = trailCurveTension(trailSettings);
@@ -583,7 +558,12 @@ export class TrailBatch extends VFXBatch {
                 const particleMatrix = particle.parentMatrix as unknown as Matrix4 | undefined;
                 const me = (particleMatrix ?? emitterMatrix).elements;
                 const widthScale = systemWorldSpace || particle.parentMatrix ? 1 : objectScale;
-                const sampleCount = particleHistoryLength + (stepFraction !== 0 ? 1 : 0);
+                // A particle past its life records nothing more (TrailParticle.update), so its trail
+                // ends at the last sample: a tip would follow the particle on as a growing spike.
+                const recording = particle.age <= particle.life;
+                // The display runs ahead of the last step: draw a tip that far past the head.
+                const tipAhead = recording && stepFraction > 0;
+                const sampleCount = particleHistoryLength + (tipAhead ? 1 : 0);
                 const samples = this.trailSamples(sampleCount);
 
                 // The recorded samples, oldest first, brought into world space once.
@@ -601,9 +581,26 @@ export class TrailBatch extends VFXBatch {
                     slot = slot + 1 === historyCapacity ? 0 : slot + 1;
                 }
 
+                // The last step ran ahead of the display: draw the head where it was at display
+                // time, back along its last segment, rather than a tip folding back over it.
+                if (recording && stepFraction < 0 && particleHistoryLength > 1) {
+                    const back = -stepFraction;
+                    const h = (particleHistoryLength - 1) * 3;
+                    const sp = samples.position;
+                    for (let c = 0; c < 3; c++) {
+                        sp[h + c] += (sp[h - 3 + c] - sp[h + c]) * back;
+                    }
+                    if (swept) {
+                        const ss = samples.side;
+                        for (let c = 0; c < 3; c++) {
+                            ss[h + c] += (ss[h - 3 + c] - ss[h + c]) * back;
+                        }
+                    }
+                }
+
                 // Live tip: same place a sprite would be drawn this frame, past
                 // the last recorded sample. The recorded ribbon stays put.
-                if (stepFraction !== 0) {
+                if (tipAhead) {
                     const previousHead = particle.previousPosition;
                     const position = particle.position;
                     const tip = particleHistoryLength;
@@ -618,7 +615,8 @@ export class TrailBatch extends VFXBatch {
                         // The side as the emitter holds it now.
                         samples.writeSide(tip, sideAxis!.x, sideAxis!.y, sideAxis!.z, me);
                     }
-                    samples.size[tip] = particle.size.x;
+                    // As wide as the recorded head, which WidthOverLength has already scaled.
+                    samples.size[tip] = samples.size[tip - 1];
                     const tipColor = particle.color;
                     samples.writeColor(tip, tipColor.x, tipColor.y, tipColor.z, tipColor.w);
                 }
