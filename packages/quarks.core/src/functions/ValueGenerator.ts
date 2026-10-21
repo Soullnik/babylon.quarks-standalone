@@ -1,3 +1,4 @@
+import {describePart, warnFormat} from '../util/JSONUtil';
 import {ConstantValue} from './ConstantValue';
 import {FunctionJSON} from './FunctionJSON';
 import {GeneratorMemory} from './GeneratorMemory';
@@ -34,8 +35,9 @@ export interface FunctionValueGenerator {
     clone(): FunctionValueGenerator;
 }
 
+/** Reads a value generator; an unknown or missing type warns and gives 0. */
 export function ValueGeneratorFromJSON(json: FunctionJSON): FunctionValueGenerator | ValueGenerator {
-    switch (json.type) {
+    switch (json?.type) {
         case 'ConstantValue':
             return ConstantValue.fromJSON(json);
         case 'IntervalValue':
@@ -43,6 +45,7 @@ export function ValueGeneratorFromJSON(json: FunctionJSON): FunctionValueGenerat
         case 'PiecewiseBezier':
             return PiecewiseBezier.fromJSON(json);
         default:
+            warnFormat(`${describePart('value generator', json)}; using 0.`);
             return new ConstantValue(0);
     }
 }

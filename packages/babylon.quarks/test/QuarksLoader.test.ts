@@ -1,15 +1,18 @@
 import {Constants} from '@babylonjs/core/Engines/constants';
 import {NullEngine} from '@babylonjs/core/Engines/nullEngine';
 import {Texture} from '@babylonjs/core/Materials/Textures/texture';
+import {StandardMaterial} from '@babylonjs/core/Materials/standardMaterial';
 import {Matrix, Quaternion, Vector3} from '@babylonjs/core/Maths/math.vector';
 import {Mesh} from '@babylonjs/core/Meshes/mesh';
+import {TransformNode} from '@babylonjs/core/Meshes/transformNode';
 import {Scene} from '@babylonjs/core/scene';
-import {loadPlugin} from 'quarks.core';
-import {MeshSurfaceEmitterPlugin} from '../src/MeshSurfaceEmitter';
+import {loadPlugin, PointEmitter} from 'quarks.core';
+import {MeshSurfaceEmitter, MeshSurfaceEmitterPlugin} from '../src/MeshSurfaceEmitter';
 import {ParticleEmitter} from '../src/ParticleEmitter';
 import {ParticleSystem} from '../src/ParticleSystem';
-import {QuarksLoader} from '../src/QuarksLoader';
+import {QuarksFormatError, QuarksLoader} from '../src/QuarksLoader';
 import {QuarksPrefab} from '../src/QuarksPrefab';
+import {QUARKS_FORMAT_VERSION, serializeEffect} from '../src/QuarksSerializer';
 
 loadPlugin(MeshSurfaceEmitterPlugin);
 
@@ -460,15 +463,19 @@ describe('QuarksLoader matrix decomposition', () => {
 
         const json: any = {
             images: [{uuid: 'img', url: 'textures/smoke.png'}],
+            textures: [{uuid: 'tex', image: 'img'}],
+            materials: [{uuid: 'mat', map: 'tex'}],
             geometries: [{uuid: 'geo', type: 'QuarksGeometry', url: 'geometries/Quad.json'}],
-            object: {uuid: 'm', type: 'Mesh', name: 'quad', geometry: 'geo'},
+            object: {uuid: 'm', type: 'Mesh', name: 'quad', geometry: 'geo', material: 'mat'},
         };
+        const before = JSON.parse(JSON.stringify(json));
         const root = await loader.loadFromJSON(json, 'https://cdn.example.com/fx/');
         expect(root).toBeInstanceOf(Mesh);
         expect((root as Mesh).getTotalVertices()).toBe(3);
-        expect(json.geometries[0].url).toBeUndefined();
-        expect(json.geometries[0].positions).toEqual(geometryBody.positions);
-        expect(json.images[0].url).toBe('https://cdn.example.com/fx/textures/smoke.png');
+        const texture = ((root as Mesh).material as StandardMaterial).diffuseTexture as Texture;
+        expect(texture.url).toBe('https://cdn.example.com/fx/textures/smoke.png');
+        // The caller's document is left as it was.
+        expect(json).toEqual(before);
         expect(fetchSpy).toHaveBeenCalledWith('https://cdn.example.com/fx/geometries/Quad.json');
 
         fetchSpy.mockRestore();
@@ -574,14 +581,17 @@ describe('QuarksLoader matrix decomposition', () => {
 
         const json: any = {
             images: [{uuid: 'img', url: 'folder/tex.png'}],
+            textures: [{uuid: 'tex', image: 'img'}],
+            materials: [{uuid: 'mat', map: 'tex'}],
             geometries: [{uuid: 'geo', type: 'QuarksGeometry', url: 'folder/Box.json'}],
-            object: {uuid: 'm', type: 'Mesh', name: 'box', geometry: 'geo'},
+            object: {uuid: 'm', type: 'Mesh', name: 'box', geometry: 'geo', material: 'mat'},
         };
         const root = await loader.loadFromJSON(json, 'ignored/');
         expect(root).toBeInstanceOf(Mesh);
         expect(fetchJson).toHaveBeenCalledTimes(1);
-        expect(json.images[0].url).toBe('vfs:images/tex.png');
-        expect(json.geometries[0].positions).toHaveLength(9);
+        const texture = ((root as Mesh).material as StandardMaterial).diffuseTexture as Texture;
+        expect(texture.url).toBe('vfs:images/tex.png');
+        expect((root as Mesh).getTotalVertices()).toBe(3);
 
         scene.dispose();
         engine.dispose();
@@ -723,11 +733,10 @@ describe('QuarksLoader matrix decomposition', () => {
             {json: a, baseUrl: 'pack/'},
             {json: b, baseUrl: 'pack/'},
         ]);
-        expect(a.geometries[0].positions).not.toBe(b.geometries[0].positions);
-        expect(a.geometries[0].positions).not.toBe(shared.positions);
-        a.geometries[0].positions[0] = 99;
-        expect(b.geometries[0].positions[0]).toBe(0);
-        expect(shared.positions[0]).toBe(0);
+        // Neither document, nor the cached file, is written to.
+        expect(a.geometries[0]).toEqual({uuid: 'geo', type: 'QuarksGeometry', url: 'shared.json'});
+        expect(b.geometries[0]).toEqual({uuid: 'geo', type: 'QuarksGeometry', url: 'shared.json'});
+        expect(shared.positions).toEqual([0, 0, 0, 1, 0, 0, 0, 1, 0]);
 
         scene.dispose();
         engine.dispose();
@@ -1434,5 +1443,104 @@ describe('QuarksLoader shared resources', () => {
         scene.dispose();
         otherScene.dispose();
         engine.dispose();
+    });
+});
+
+describe('QuarksLoader documents', () => {
+    let engine: NullEngine;
+    let scene: Scene;
+    let warn: jest.SpyInstance;
+
+    beforeEach(() => {
+        engine = new NullEngine();
+        scene = new Scene(engine);
+        warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    });
+
+    afterEach(() => {
+        warn.mockRestore();
+        scene.dispose();
+        engine.dispose();
+    });
+
+    const textured = (images?: unknown[]) => ({
+        ...(images ? {images} : {}),
+        textures: [{uuid: 'tex', image: 'img'}],
+        materials: [{uuid: 'mat', map: 'tex'}],
+        geometries: [{uuid: 'geo', type: 'QuarksGeometry', positions: [0, 0, 0, 1, 0, 0, 0, 1, 0], indices: [0, 1, 2]}],
+        object: {uuid: 'm', type: 'Mesh', geometry: 'geo', material: 'mat'},
+    });
+
+    it("does not read one document's images for the next", () => {
+        const loader = new QuarksLoader(scene);
+        const first = loader.parse(textured([{uuid: 'img', url: 'https://example.com/a.png'}])) as Mesh;
+        expect(((first.material as StandardMaterial).diffuseTexture as Texture).url).toBe('https://example.com/a.png');
+        const second = loader.parse(textured()) as Mesh;
+        expect((second.material as StandardMaterial).diffuseTexture).toBeNull();
+    });
+
+    it.each([[{}], [null], [{object: 'nope'}], [{metadata: {}}]])('throws QuarksFormatError for %j', (json) => {
+        expect(() => new QuarksLoader(scene).parse(json)).toThrow(QuarksFormatError);
+    });
+
+    it('warns about a document from a newer format, and loads it', () => {
+        const root = new QuarksLoader(scene).parse({
+            metadata: {quarksFormat: QUARKS_FORMAT_VERSION + 1},
+            object: {uuid: 'g', type: 'Group'},
+        });
+        expect(root).toBeInstanceOf(TransformNode);
+        expect(warn).toHaveBeenCalledWith(expect.stringContaining(`format ${QUARKS_FORMAT_VERSION + 1}`));
+        warn.mockClear();
+        new QuarksLoader(scene).parse({
+            metadata: {quarksFormat: QUARKS_FORMAT_VERSION},
+            object: {uuid: 'g', type: 'Group'},
+        });
+        expect(warn).not.toHaveBeenCalled();
+    });
+
+    it('warns about a mesh surface shape whose mesh is not in the effect', () => {
+        loadPlugin(MeshSurfaceEmitterPlugin);
+        const ps = new ParticleSystem({scene, shape: new MeshSurfaceEmitter(undefined, 'gone')});
+        const json = serializeEffect(ps.emitter);
+        new QuarksLoader(scene).parse(JSON.parse(JSON.stringify(json)));
+        expect(warn).toHaveBeenCalledWith(expect.stringContaining('mesh surface shape on "gone"'));
+    });
+
+    it('loads a system that leaves out its curves with the defaults', () => {
+        const root = new QuarksLoader(scene).parse({
+            object: {uuid: 'e', type: 'ParticleEmitter', ps: {shape: {type: 'point'}}},
+        }) as ParticleEmitter;
+        const system = root.system as ParticleSystem;
+        const defaults = new ParticleSystem({scene, shape: new PointEmitter()});
+        expect(system.startLife.toJSON()).toEqual(defaults.startLife.toJSON());
+        expect(system.emissionOverTime.toJSON()).toEqual(defaults.emissionOverTime.toJSON());
+        expect(system.startColor.toJSON()).toEqual(defaults.startColor.toJSON());
+        expect(warn).not.toHaveBeenCalled();
+        defaults.dispose();
+    });
+
+    it('loads the same in-memory document twice with a relative base', async () => {
+        const json = textured([{uuid: 'img', url: 'tex/a.png'}]);
+        const loader = new QuarksLoader(scene);
+        const urls = [];
+        for (let i = 0; i < 2; i++) {
+            const mesh = (await loader.loadFromJSON(json, 'fx/')) as Mesh;
+            urls.push(((mesh.material as StandardMaterial).diffuseTexture as Texture).url);
+        }
+        expect(urls).toEqual(['fx/tex/a.png', 'fx/tex/a.png']);
+        expect(json.images![0]).toEqual({uuid: 'img', url: 'tex/a.png'});
+    });
+
+    it('loadFromJSONAll leaves its documents as they were', async () => {
+        const bare = textured([{uuid: 'img', url: 'tex/a.png'}]);
+        const wrapped = textured([{uuid: 'img', url: 'tex/a.png'}]);
+        const before = JSON.parse(JSON.stringify([bare, wrapped]));
+        const loader = new QuarksLoader(scene, {baseUrl: 'fx/'});
+        for (let i = 0; i < 2; i++) {
+            const roots = (await loader.loadFromJSONAll([bare, {json: wrapped, baseUrl: 'pack/'}])) as Mesh[];
+            const urls = roots.map((root) => ((root.material as StandardMaterial).diffuseTexture as Texture).url);
+            expect(urls).toEqual(['fx/tex/a.png', 'pack/tex/a.png']);
+        }
+        expect([bare, wrapped]).toEqual(before);
     });
 });

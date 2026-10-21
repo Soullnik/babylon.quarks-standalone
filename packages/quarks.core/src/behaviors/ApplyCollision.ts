@@ -47,7 +47,8 @@ export class ApplyCollision implements Behavior {
     }
 
     static fromJSON(json: any): Behavior {
-        return new ApplyCollision(getPhysicsResolver(), json.bounce);
+        // A file without a bounce keeps the full speed, as a Unity collision does by default.
+        return new ApplyCollision(getPhysicsResolver(), typeof json.bounce === 'number' ? json.bounce : 1);
     }
 
     clone(): Behavior {

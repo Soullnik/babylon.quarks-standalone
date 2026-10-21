@@ -46,7 +46,7 @@ export class RotationBySpeed implements Behavior {
     static fromJSON(json: any): Behavior {
         return new RotationBySpeed(
             ValueGeneratorFromJSON(json.angularVelocity) as FunctionValueGenerator,
-            IntervalValue.fromJSON(json.speedRange)
+            json.speedRange ? IntervalValue.fromJSON(json.speedRange) : new IntervalValue(0, 1)
         );
     }
 

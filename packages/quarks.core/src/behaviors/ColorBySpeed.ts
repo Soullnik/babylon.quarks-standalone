@@ -41,7 +41,7 @@ export class ColorBySpeed implements Behavior {
     static fromJSON(json: any): Behavior {
         return new ColorBySpeed(
             ColorGeneratorFromJSON(json.color) as FunctionColorGenerator,
-            IntervalValue.fromJSON(json.speedRange)
+            json.speedRange ? IntervalValue.fromJSON(json.speedRange) : new IntervalValue(0, 1)
         );
     }
 

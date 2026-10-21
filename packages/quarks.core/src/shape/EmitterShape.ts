@@ -1,5 +1,6 @@
 import {JsonMetaData} from '../IParticleSystem';
 import {Constructable, ParameterPair} from '../TypeUtil';
+import {describePart, warnFormat} from '../util/JSONUtil';
 import {BoxEmitter} from './BoxEmitter';
 import {CircleEmitter} from './CircleEmitter';
 import {ConeEmitter} from './ConeEmitter';
@@ -140,6 +141,15 @@ export const EmitterShapes: {[key: string]: EmitterShapePlugin} = {
     },
 };
 
+/**
+ * Reads an emitter shape. A type no plugin registered (a custom shape whose plugin is not
+ * loaded, or a typo) warns and gives a point emitter, so the rest of the effect still loads.
+ */
 export function EmitterFromJSON(json: ShapeJSON, meta: JsonMetaData): EmitterShape {
-    return EmitterShapes[json.type].loadJSON(json, meta);
+    const shape = json ? EmitterShapes[json.type] : undefined;
+    if (!shape) {
+        warnFormat(`${describePart('emitter shape', json)}; using a point emitter.`);
+        return new PointEmitter();
+    }
+    return shape.loadJSON(json, meta);
 }

@@ -10,10 +10,15 @@ export interface Plugin {
 
 export const Plugins: Array<Plugin> = [];
 
+/**
+ * Registers a plugin's emitter shapes and behaviors, so effect files can name them. Loading the
+ * same plugin id again does nothing. A type another plugin registered first keeps that plugin's.
+ */
 export function loadPlugin(plugin: Plugin) {
     const existing = Plugins.find((item) => item.id === plugin.id);
     if (!existing) {
         plugin.initialize();
+        Plugins.push(plugin);
         for (const emitterShape of plugin.emitterShapes) {
             if (!EmitterShapes[emitterShape.type]) {
                 EmitterShapes[emitterShape.type] = emitterShape;
@@ -27,18 +32,22 @@ export function loadPlugin(plugin: Plugin) {
     }
 }
 
+/** Removes a plugin and the types it registered; types another plugin registered stay. */
 export function unloadPlugin(pluginId: string) {
-    const plugin = Plugins.find((item) => item.id === pluginId);
-    if (plugin) {
-        for (const emitterShape of plugin.emitterShapes) {
-            if (EmitterShapes[emitterShape.type]) {
-                delete EmitterShapes[emitterShape.type];
-            }
+    const index = Plugins.findIndex((item) => item.id === pluginId);
+    if (index < 0) {
+        return;
+    }
+    const plugin = Plugins[index];
+    Plugins.splice(index, 1);
+    for (const emitterShape of plugin.emitterShapes) {
+        if (EmitterShapes[emitterShape.type] === emitterShape) {
+            delete EmitterShapes[emitterShape.type];
         }
-        for (const behavior of plugin.behaviors) {
-            if (BehaviorTypes[behavior.type]) {
-                delete BehaviorTypes[behavior.type];
-            }
+    }
+    for (const behavior of plugin.behaviors) {
+        if (BehaviorTypes[behavior.type] === behavior) {
+            delete BehaviorTypes[behavior.type];
         }
     }
 }

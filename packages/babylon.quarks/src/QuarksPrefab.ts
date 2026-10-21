@@ -269,6 +269,9 @@ export class QuarksPrefab extends TransformNode implements IPrefab {
 
     static fromJSON(json: any, scene?: Scene): QuarksPrefab {
         const prefab = new QuarksPrefab(json.name || 'QuarksPrefab', scene);
+        if (typeof json.timeScale === 'number') {
+            prefab.timeScale = json.timeScale;
+        }
         if (Array.isArray(json.animationData)) {
             prefab._tempAnimationJSON = json.animationData.filter(
                 (item: any) => item?.type === 'ps' || item?.type === 'three'

@@ -1,13 +1,15 @@
+import {describePart, warnFormat} from '../util/JSONUtil';
 import {ConstantValue} from './ConstantValue';
 import {FunctionJSON} from './FunctionJSON';
 import {RotationGenerator, RotationGeneratorFromJSON} from './RotationGenerator';
 import {FunctionValueGenerator, ValueGenerator, ValueGeneratorFromJSON} from './ValueGenerator';
 import {Vector3Generator, Vector3GeneratorFromJSON} from './Vector3Generator';
 
+/** Reads a value, rotation or vector generator; an unknown or missing type warns and gives 0. */
 export function GeneratorFromJSON(
     json: FunctionJSON
 ): FunctionValueGenerator | ValueGenerator | RotationGenerator | Vector3Generator {
-    switch (json.type) {
+    switch (json?.type) {
         case 'ConstantValue':
         case 'IntervalValue':
         case 'PiecewiseBezier':
@@ -19,6 +21,7 @@ export function GeneratorFromJSON(
         case 'Vector3Function':
             return Vector3GeneratorFromJSON(json);
         default:
+            warnFormat(`${describePart('generator', json)}; using 0.`);
             return new ConstantValue(0);
     }
 }

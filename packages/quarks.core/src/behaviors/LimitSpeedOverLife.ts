@@ -81,7 +81,10 @@ export class LimitSpeedOverLife implements Behavior {
     }
 
     static fromJSON(json: any): Behavior {
-        return new LimitSpeedOverLife(ValueGeneratorFromJSON(json.speed) as FunctionValueGenerator, json.dampen);
+        return new LimitSpeedOverLife(
+            ValueGeneratorFromJSON(json.speed) as FunctionValueGenerator,
+            typeof json.dampen === 'number' ? json.dampen : 1
+        );
     }
 
     frameUpdate(delta: number): void {

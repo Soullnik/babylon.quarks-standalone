@@ -177,6 +177,16 @@ const DEFAULT_UVS = new Float32Array([0, 0, 1, 0, 1, 1, 0, 1]);
 /** Zero UVs sized to a position buffer — missing/mismatched uv attrs → GL_INVALID_OPERATION on iOS. */
 const fallbackUVs = new WeakMap<Float32Array, Float32Array>();
 const fallbackNormals = new WeakMap<Float32Array, Float32Array>();
+
+/** `read(json)`, or `undefined` for a part the file leaves out. */
+function optionalJSON<T>(json: any, read: (json: any) => T): T | undefined {
+    return json === undefined || json === null ? undefined : read(json);
+}
+
+/** Per document being written: the last id handed out, and the geometries and textures written. */
+const serializationCounters = new WeakMap<object, number>();
+const serializedGeometries = new WeakMap<object, Array<{arrays: unknown[]; uuid: string}>>();
+const serializedTextures = new WeakMap<object, Map<BaseTexture, string>>();
 /**
  * Zero UVs for a geometry given without any, one array per geometry: batches
  * are keyed by the UV array too, so systems sharing a geometry share it.
@@ -414,8 +424,6 @@ export interface BabylonMetaData {
 }
 
 export class ParticleSystem implements IParticleSystem {
-    private static serializationCounter = 0;
-
     autoDestroy: boolean;
     prewarm: boolean;
     looping: boolean;
@@ -2722,6 +2730,13 @@ export class ParticleSystem implements IParticleSystem {
         emissionState.time += delta;
     }
 
+    /**
+     * Writes this system's settings. Its geometry, material and textures go into `metaData` as
+     * entries the result names by uuid; give the same `metaData` to every system of a document so
+     * shared ones are written once. The material entry holds live Babylon objects, so to write a
+     * file use `serializeEffect`, which turns them into plain data. Runtime-only state
+     * (`tint`, `beamEnd`, the playing time) is not written.
+     */
     toJSON(metaData?: BabylonMetaData | string, _options: SerializationOptions = {}): ParticleSystemJSONParameters {
         const isRootObject = metaData === undefined || typeof metaData === 'string';
         const meta: BabylonMetaData = isRootObject
@@ -2800,13 +2815,20 @@ export class ParticleSystem implements IParticleSystem {
         };
     }
 
+    /**
+     * Builds a system from {@link toJSON} output, resolving its geometry, material and texture
+     * uuids through `meta`. A setting the file leaves out takes the constructor's default; an
+     * unknown shape, behavior or curve type warns and takes its default. Sub emitter targets stay
+     * uuids until `QuarksLoader` links them.
+     */
     static fromJSON(
         json: ParticleSystemJSONParameters,
         meta: BabylonMetaData,
         dependencies: {[uuid: string]: Behavior} = {},
         scene?: Scene
     ): ParticleSystem {
-        const shape = EmitterFromJSON(json.shape, meta as any);
+        // A part the file leaves out takes the constructor's default, as a system made in code does.
+        const shape = json.shape ? EmitterFromJSON(json.shape, meta as any) : undefined;
         let rendererEmitterSettings: RendererEmitterSettings;
         if (json.renderMode === RenderMode.Trail) {
             const trailSettings = json.rendererEmitterSettings as TrailSettings;
@@ -2855,16 +2877,21 @@ export class ParticleSystem implements IParticleSystem {
             duration: json.duration,
             startDelay: json.startDelay ? ValueGeneratorFromJSON(json.startDelay) : undefined,
             shape,
-            startLife: ValueGeneratorFromJSON(json.startLife),
-            startSpeed: ValueGeneratorFromJSON(json.startSpeed),
-            startRotation: GeneratorFromJSON(json.startRotation) as
+            startLife: optionalJSON(json.startLife, ValueGeneratorFromJSON),
+            startSpeed: optionalJSON(json.startSpeed, ValueGeneratorFromJSON),
+            startRotation: optionalJSON(json.startRotation, GeneratorFromJSON) as
                 | RotationGenerator
                 | ValueGenerator
-                | FunctionValueGenerator,
-            startSize: GeneratorFromJSON(json.startSize) as Vector3Generator | ValueGenerator | FunctionValueGenerator,
-            startColor: ColorGeneratorFromJSON(json.startColor) as ColorGenerator,
-            emissionOverTime: ValueGeneratorFromJSON(json.emissionOverTime),
-            emissionOverDistance: ValueGeneratorFromJSON(json.emissionOverDistance),
+                | FunctionValueGenerator
+                | undefined,
+            startSize: optionalJSON(json.startSize, GeneratorFromJSON) as
+                | Vector3Generator
+                | ValueGenerator
+                | FunctionValueGenerator
+                | undefined,
+            startColor: optionalJSON(json.startColor, ColorGeneratorFromJSON) as ColorGenerator | undefined,
+            emissionOverTime: optionalJSON(json.emissionOverTime, ValueGeneratorFromJSON),
+            emissionOverDistance: optionalJSON(json.emissionOverDistance, ValueGeneratorFromJSON),
             emissionBursts: json.emissionBursts?.map((burst: any) => ({
                 time: burst.time,
                 count:
@@ -2905,7 +2932,7 @@ export class ParticleSystem implements IParticleSystem {
             startTileIndex:
                 typeof json.startTileIndex === 'number'
                     ? new ConstantValue(json.startTileIndex)
-                    : (ValueGeneratorFromJSON(json.startTileIndex) as ValueGenerator),
+                    : (optionalJSON(json.startTileIndex, ValueGeneratorFromJSON) as ValueGenerator | undefined),
             uTileCount: json.uTileCount,
             vTileCount: json.vTileCount,
             blendTiles: json.blendTiles,
@@ -2945,9 +2972,14 @@ export class ParticleSystem implements IParticleSystem {
         return ps;
     }
 
-    private static nextSerializationId(prefix: string): string {
-        ParticleSystem.serializationCounter += 1;
-        return `${prefix}_${ParticleSystem.serializationCounter}`;
+    /**
+     * The next id for an entry of `meta`. Counted per document, so serialising the same effect
+     * twice writes the same ids.
+     */
+    private static nextSerializationId(meta: BabylonMetaData, prefix: string): string {
+        const id = (serializationCounters.get(meta) ?? 0) + 1;
+        serializationCounters.set(meta, id);
+        return `${prefix}_${id}`;
     }
 
     /** Normals facing +Z, one array per geometry so systems sharing it still batch together. */
@@ -2983,7 +3015,26 @@ export class ParticleSystem implements IParticleSystem {
     }
 
     private ensureGeometryMeta(meta: BabylonMetaData): string {
-        const geometryUUID = ParticleSystem.nextSerializationId('quarks_geometry');
+        // Systems that share geometry arrays (the default quad, a loaded mesh) share one entry.
+        const rs = this.rendererSettings;
+        const arrays = [
+            rs.instancingGeometry,
+            rs.instancingIndices,
+            rs.instancingUVs,
+            rs.instancingUVs2,
+            rs.instancingNormals,
+        ];
+        let written = serializedGeometries.get(meta);
+        if (written === undefined) {
+            written = [];
+            serializedGeometries.set(meta, written);
+        }
+        const same = written.find((entry) => entry.arrays.every((array, i) => array === arrays[i]));
+        if (same !== undefined) {
+            return same.uuid;
+        }
+        const geometryUUID = ParticleSystem.nextSerializationId(meta, 'quarks_geometry');
+        written.push({arrays, uuid: geometryUUID});
         meta.geometries[geometryUUID] = {
             uuid: geometryUUID,
             type: 'QuarksGeometry',
@@ -2999,34 +3050,33 @@ export class ParticleSystem implements IParticleSystem {
     }
 
     private ensureMaterialMeta(meta: BabylonMetaData): string {
-        const texture = this.rendererSettings.texture;
-        let textureUUID: string | undefined;
-        if (texture) {
-            textureUUID = ParticleSystem.nextSerializationId('quarks_texture');
-            meta.textures[textureUUID] = texture;
+        // One entry per texture in a document, however many systems and slots use it.
+        let written = serializedTextures.get(meta);
+        if (written === undefined) {
+            written = new Map();
+            serializedTextures.set(meta, written);
         }
-
-        const reflectionAtlas = this.rendererSettings.reflectionAtlas;
-        let reflectionAtlasUUID: string | undefined;
-        if (reflectionAtlas instanceof Texture) {
-            reflectionAtlasUUID = ParticleSystem.nextSerializationId('quarks_texture');
-            meta.textures[reflectionAtlasUUID] = reflectionAtlas;
-        }
-
-        const textureRef = (value: BaseTexture | null | undefined): string | undefined => {
-            if (!(value instanceof Texture)) {
+        const textures = written;
+        const textureRef = (value: BaseTexture | null | undefined, anyKind = false): string | undefined => {
+            if (!(value instanceof Texture) && !(anyKind && value)) {
                 return undefined;
             }
-            const uuid = ParticleSystem.nextSerializationId('quarks_texture');
-            meta.textures[uuid] = value;
+            let uuid = textures.get(value);
+            if (uuid === undefined) {
+                uuid = ParticleSystem.nextSerializationId(meta, 'quarks_texture');
+                textures.set(value, uuid);
+                meta.textures[uuid] = value as Texture;
+            }
             return uuid;
         };
+        const textureUUID = textureRef(this.rendererSettings.texture, true);
+        const reflectionAtlasUUID = textureRef(this.rendererSettings.reflectionAtlas);
         const erosion = this.erosion;
         const distortion = this.uvDistortion;
         const gradientMap = this.gradientMap;
         const optional = <T>(key: string, value: T | undefined) => (value !== undefined ? {[key]: value} : {});
 
-        const materialUUID = ParticleSystem.nextSerializationId('quarks_material');
+        const materialUUID = ParticleSystem.nextSerializationId(meta, 'quarks_material');
         meta.materials[materialUUID] = {
             uuid: materialUUID,
             type: 'QuarksMaterial',

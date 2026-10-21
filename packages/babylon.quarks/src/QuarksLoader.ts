@@ -10,6 +10,7 @@ import {Behavior, EmitSubParticleSystem} from 'quarks.core';
 import {ParticleEmitter} from './ParticleEmitter';
 import {ParticleSystem} from './ParticleSystem';
 import {QuarksPrefab} from './QuarksPrefab';
+import {QUARKS_FORMAT_VERSION} from './QuarksSerializer';
 import {ensureTriangleIndices} from './geometryUtil';
 
 /** Kind of linked asset the loader asks a {@link QuarksResourceResolver} to handle. */
@@ -124,7 +125,43 @@ function geometryKey(geometry: ParsedGeometry): string {
     return `${lengths}${(h1 >>> 0).toString(16)}${(h2 >>> 0).toString(16)}`;
 }
 
+/**
+ * Thrown for a document the loader cannot read at all, such as one with no `object`. A part it
+ * cannot read (an unknown behavior, shape or curve type, a missing setting) only warns, and that
+ * part takes its default.
+ */
+export class QuarksFormatError extends Error {
+    constructor(message: string) {
+        super(message);
+        this.name = 'QuarksFormatError';
+    }
+}
+
+/**
+ * A copy of an effect document that loading can rewrite (resolved image urls, inlined geometry
+ * files) without touching the caller's. Only the entries that change are copied.
+ */
+function detachDocument(json: any): any {
+    if (json === null || typeof json !== 'object') {
+        return json;
+    }
+    const copy = {...json};
+    if (Array.isArray(json.images)) {
+        copy.images = json.images.map((image: unknown) =>
+            image && typeof image === 'object' ? {...(image as object)} : image
+        );
+    }
+    if (Array.isArray(json.geometries)) {
+        copy.geometries = json.geometries.map((geometry: unknown) =>
+            geometry && typeof geometry === 'object' ? {...(geometry as object)} : geometry
+        );
+    }
+    return copy;
+}
+
 interface LoadedMeta {
+    /** Image uuid to the url its textures load. */
+    images: {[uuid: string]: string | null};
     textures: {[uuid: string]: Texture | null};
     geometries: {[uuid: string]: ParsedGeometry};
     materials: {[uuid: string]: any};
@@ -146,11 +183,14 @@ export class QuarksLoader {
     }
 
     /**
-     * Resolves linked geometry / image urls on `json` (via {@link resolveResources}) then parses.
-     * Use when the effect JSON is already in hand (File, CDN payload, editor import).
+     * Resolves linked geometry / image urls (via {@link resolveResources}) then parses. Use when
+     * the effect JSON is already in hand (File, CDN payload, editor import). `json` itself is
+     * left as it was, so the same document can be loaded again, into another scene or with
+     * another base url.
      */
     async loadFromJSON(json: any, baseUrl?: string): Promise<TransformNode> {
         const resolvedBase = baseUrl ?? this.options.baseUrl ?? '';
+        json = detachDocument(json);
         await this.resolveResources(json, resolvedBase);
         // The urls are resolved now; joining them with the base again would load `fx/fx/...`.
         return this.parse(json, '');
@@ -205,11 +245,12 @@ export class QuarksLoader {
         options: QuarksBatchLoadOptions = {}
     ): Promise<(TransformNode | null)[]> {
         const docs: Array<{json: any; baseUrl: string} | null> = entries.map((entry) => {
+            // Copied, as loadFromJSON does, so the caller's documents stay as they were.
             if (entry !== null && typeof entry === 'object' && 'json' in (entry as object)) {
                 const typed = entry as QuarksJSONLoadEntry;
-                return {json: typed.json as any, baseUrl: typed.baseUrl ?? this.options.baseUrl ?? ''};
+                return {json: detachDocument(typed.json), baseUrl: typed.baseUrl ?? this.options.baseUrl ?? ''};
             }
-            return {json: entry as any, baseUrl: this.options.baseUrl ?? ''};
+            return {json: detachDocument(entry), baseUrl: this.options.baseUrl ?? ''};
         });
         return this.loadDocuments(docs, options);
     }
@@ -274,8 +315,25 @@ export class QuarksLoader {
         await QuarksLoader.inlineGeometryEntries(json, loadGeometry);
     }
 
+    /**
+     * Builds the node tree of an effect document whose linked files are already inline (see
+     * {@link loadFromJSON}). `baseUrl` is joined to relative image urls. Parts the loader cannot
+     * read warn and take their defaults; a document with no `object` throws
+     * {@link QuarksFormatError}.
+     */
     parse(json: any, baseUrl: string = ''): TransformNode {
+        if (json === null || typeof json !== 'object' || json.object === null || typeof json.object !== 'object') {
+            throw new QuarksFormatError('[QuarksLoader] Not an effect document: it has no "object" to load.');
+        }
+        const format = json.metadata?.quarksFormat;
+        if (typeof format === 'number' && format > QUARKS_FORMAT_VERSION) {
+            console.warn(
+                `[QuarksLoader] This effect was written in format ${format}, newer than the ${QUARKS_FORMAT_VERSION} ` +
+                    'this version of babylon.quarks reads; settings it does not know are left out.'
+            );
+        }
         const meta: LoadedMeta = {
+            images: {},
             textures: {},
             geometries: {},
             materials: {},
@@ -714,15 +772,14 @@ export class QuarksLoader {
         );
     }
 
-    private parseImages(images: any[], baseUrl: string, _meta: LoadedMeta): void {
-        (this as any)._images = {};
+    private parseImages(images: any[], baseUrl: string, meta: LoadedMeta): void {
         for (const img of images) {
             if (img.url) {
                 QuarksLoader.warnIfNotAnImageUrl(img.url);
             }
             // Urls are usually already absolute after resolveResources; joinUrl is a no-op for
             // data/blob/http(s) and still supports callers that use parse() with a baseUrl only.
-            (this as any)._images[img.uuid] = img.url ? QuarksLoader.joinUrl(baseUrl, img.url) : null;
+            meta.images[img.uuid] = img.url ? QuarksLoader.joinUrl(baseUrl, img.url) : null;
         }
     }
 
@@ -746,9 +803,8 @@ export class QuarksLoader {
     }
 
     private parseTextures(textures: any[], meta: LoadedMeta): void {
-        const images = (this as any)._images || {};
         for (const texDef of textures) {
-            const imageUrl = images[texDef.image];
+            const imageUrl = meta.images[texDef.image];
             if (imageUrl) {
                 const invertY = texDef.invertY !== undefined ? !!texDef.invertY : true;
                 const noMipmap = !!texDef.noMipmap;
@@ -1031,6 +1087,7 @@ export class QuarksLoader {
         }
 
         if (data.visible !== undefined) node.setEnabled(data.visible);
+        if (data.isVisible === false && node instanceof Mesh) node.isVisible = false;
 
         if (data.children) {
             for (const childData of data.children) {
@@ -1075,6 +1132,12 @@ export class QuarksLoader {
                     const targetNode = nodesMap[meshSurfaceUUID];
                     if (targetNode instanceof Mesh) {
                         (system.emitterShape as any).mesh = targetNode;
+                    } else {
+                        console.warn(
+                            `[QuarksLoader] Emitter "${node.name}" has a mesh surface shape on "${meshSurfaceUUID}", ` +
+                                (targetNode ? 'which is not a mesh' : 'which is not in the effect') +
+                                '; it emits nothing until a mesh is set.'
+                        );
                     }
                 }
                 for (let i = 0; i < system.behaviors.length; i++) {

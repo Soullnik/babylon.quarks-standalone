@@ -1,6 +1,7 @@
 import {Particle} from '../Particle';
 import {ConstantValue, ValueGenerator, ValueGeneratorFromJSON} from '../functions';
 import {Vector3} from '../math';
+import {readVector3} from '../util/JSONUtil';
 import {Behavior} from './Behavior';
 
 /**
@@ -65,7 +66,7 @@ export class ApplyForce implements Behavior {
 
     static fromJSON(json: any): Behavior {
         return new ApplyForce(
-            new Vector3(json.direction[0], json.direction[1], json.direction[2]),
+            readVector3(json.direction, new Vector3(0, 0, 0)),
             ValueGeneratorFromJSON(json.magnitude ?? json.force) as ValueGenerator
         );
     }
