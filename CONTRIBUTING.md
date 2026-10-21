@@ -38,13 +38,14 @@ changes to the library show up in demos without rebuilding.
 Run the full suite before opening a PR:
 
 ```bash
-npm run check        # build + tests + examples build + tarball content check
+npm run check        # build + test typecheck + tests + examples build + tarball content check
 ```
 
 Individual pieces:
 
 ```bash
 npm run test                                   # jest suites: quarks.core, babylon.quarks, babylon.quarks-editor
+npm run typecheck                              # tsc over sources and tests (jest only transpiles them)
 npm run test:coverage --workspace=babylon.quarks   # with coverage report
 npm run docs                                   # TypeDoc API docs
 npm run check:demos                            # every demo in headless Chromium, fails on page/console errors
@@ -55,6 +56,11 @@ The last two need the examples served on port 3010 (`npm run dev -w examples`, o
 `npm run build:examples && npm run preview -w examples` for what CI runs) and a Chromium: Playwright's
 own (`npx playwright install chromium`) or one named in `CHROMIUM_PATH`. `check:demos --webgpu` also
 opens every demo under WebGPU and needs a real adapter; software adapters crash on texture uploads.
+`check:demos --shard=1/2` opens every other demo, which is how CI splits them over two machines.
+
+Jest transpiles TypeScript without checking types (`isolatedModules` in each package's
+`tsconfig.test.json`), which keeps the suites fast; `npm run typecheck` is where type errors in
+sources and tests fail. Run it after `npm run build`, since tests import the built packages' types.
 
 Tests live in `packages/babylon.quarks/test` and coverage thresholds are enforced
 (see `jest.config.json` — 97% statements). New runtime code needs tests.

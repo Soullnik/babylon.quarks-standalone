@@ -12,6 +12,10 @@
  *                   Chromium with a working WebGPU adapter, so it is off by
  *                   default (software adapters crash on texture uploads)
  *   --frames=N      milliseconds to let each demo run (default 3500)
+ *   --shard=I/N     open only every Nth demo, starting at the Ith (1-based), so
+ *                   CI can split the demos over N machines. Demos are opened one
+ *                   at a time: software WebGL is CPU-bound, so pages opened side
+ *                   by side each render fewer frames instead of finishing sooner
  */
 import {readFileSync} from 'node:fs';
 import {dirname, join} from 'node:path';
@@ -22,15 +26,22 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const port = process.env.EXAMPLES_PORT ?? '3010';
 const exe = process.env.CHROMIUM_PATH;
 const webgpu = process.argv.includes('--webgpu');
-const settle = Number(process.argv.find((a) => a.startsWith('--frames='))?.slice('--frames='.length) ?? 3500);
+const arg = (name) => process.argv.find((a) => a.startsWith(`--${name}=`))?.slice(name.length + 3);
+const settle = Number(arg('frames') ?? 3500);
+const [shard, shards] = (arg('shard') ?? '1/1').split('/').map(Number);
+if (!(shards >= 1 && shard >= 1 && shard <= shards)) {
+    console.error(`--shard must be I/N with 1 <= I <= N, got ${arg('shard')}`);
+    process.exit(1);
+}
 
 // Every `key: 'X'` in the manifest is a demo the gallery lists.
 const manifest = readFileSync(join(root, 'examples/src/demoManifest.ts'), 'utf8');
-const keys = [...manifest.matchAll(/^\s*key:\s*'([A-Za-z0-9_]+)'/gm)].map((m) => m[1]);
-if (keys.length === 0) {
+const allKeys = [...manifest.matchAll(/^\s*key:\s*'([A-Za-z0-9_]+)'/gm)].map((m) => m[1]);
+if (allKeys.length === 0) {
     console.error('no demo keys found in examples/src/demoManifest.ts');
     process.exit(1);
 }
+const keys = allKeys.filter((_, i) => i % shards === shard - 1);
 
 // Errors any headless run produces that say nothing about the demos.
 const NOISE = /favicon|net::ERR_|404 \(|GL Driver Message|GPU stall due to ReadPixels/;
@@ -73,5 +84,7 @@ for (const engine of engines) {
     }
 }
 await browser.close();
-console.log(`${keys.length * engines.length} demo pages, ${failures} with errors`);
+console.log(
+    `${keys.length * engines.length} demo pages${shards > 1 ? ` (shard ${shard}/${shards})` : ''}, ${failures} with errors`
+);
 process.exit(failures === 0 ? 0 : 1);
