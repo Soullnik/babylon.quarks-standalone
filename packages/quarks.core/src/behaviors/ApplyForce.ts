@@ -1,30 +1,31 @@
 import {Particle} from '../Particle';
-import {ValueGenerator, ValueGeneratorFromJSON} from '../functions';
+import {ConstantValue, ValueGenerator, ValueGeneratorFromJSON} from '../functions';
 import {Vector3} from '../math';
 import {Behavior} from './Behavior';
 
 /**
- * Apply a global force to particles.
+ * Apply a constant force along one direction to every particle, like gravity or wind.
+ *
+ * `magnitude` is rolled per particle when it is emitted: a {@link ConstantValue} pushes every
+ * particle equally, an {@link IntervalValue} gives each particle its own strength for its whole
+ * life, as Unity's Force over Lifetime does with Random Between Two Constants.
  */
 export class ApplyForce implements Behavior {
     type = 'ApplyForce';
-    magnitudeValue: number;
-    memory = {
-        data: [],
-        dataCount: 0,
-    };
 
     constructor(
+        /** The direction of the force; its length scales it. */
         public direction: Vector3,
+        /** The force's strength, in units per second squared, rolled per particle. */
         public magnitude: ValueGenerator
-    ) {
-        this.magnitudeValue = this.magnitude.genValue(this.memory);
+    ) {}
+
+    initialize(particle: Particle): void {
+        this.magnitude.startGen(particle.memory);
     }
 
-    initialize(particle: Particle): void {}
-
     update(particle: Particle, delta: number): void {
-        const scale = this.magnitudeValue * delta;
+        const scale = this.magnitude.genValue(particle.memory) * delta;
         const direction = this.direction;
         const velocity = particle.velocity;
         velocity.x += direction.x * scale;
@@ -33,27 +34,26 @@ export class ApplyForce implements Behavior {
     }
 
     updateAll(particles: Array<Particle>, count: number, delta: number): void {
-        // The force is identical for every particle, so the vector maths
-        // collapses to three constants computed once per frame.
-        const scale = this.magnitudeValue * delta;
-        const dx = this.direction.x * scale;
-        const dy = this.direction.y * scale;
-        const dz = this.direction.z * scale;
+        const generator = this.magnitude;
+        const direction = this.direction;
+        // A constant force is the same for every particle, so it collapses to
+        // three numbers computed once per frame.
+        const constant = generator instanceof ConstantValue;
+        const fixed = constant ? generator.value * delta : 0;
         for (let i = 0; i < count; i++) {
             const particle = particles[i];
             if (particle.age >= particle.life) {
                 continue;
             }
+            const scale = constant ? fixed : generator.genValue(particle.memory) * delta;
             const velocity = particle.velocity;
-            velocity.x += dx;
-            velocity.y += dy;
-            velocity.z += dz;
+            velocity.x += direction.x * scale;
+            velocity.y += direction.y * scale;
+            velocity.z += direction.z * scale;
         }
     }
 
-    frameUpdate(delta: number): void {
-        this.magnitudeValue = this.magnitude.genValue(this.memory);
-    }
+    frameUpdate(delta: number): void {}
 
     toJSON(): any {
         return {

@@ -8,6 +8,7 @@ import {
 import {EmissionState, IParticleSystem} from '../IParticleSystem';
 import {Particle} from '../Particle';
 import {EmitterMode, EmitterShape, getValueFromEmitterMode, ShapeJSON} from './EmitterUtil';
+import {ShapeTransform} from './ShapeTransform';
 
 /**
  * Interface representing the parameters for an edge emitter.
@@ -30,6 +31,11 @@ export interface EdgeEmitterParameters {
      * {@link EmitterMode}
      */
     speed?: ValueGenerator | FunctionValueGenerator;
+    /**
+     * Offset, rotation and scale of the shape within the particle system.
+     * {@link ShapeTransform}
+     */
+    transform?: ShapeTransform;
 }
 
 /**
@@ -43,6 +49,7 @@ export class EdgeEmitter implements EmitterShape {
     spread: number;
     speed: ValueGenerator | FunctionValueGenerator;
     memory: GeneratorMemory;
+    transform?: ShapeTransform;
 
     private currentValue = 0;
 
@@ -52,6 +59,7 @@ export class EdgeEmitter implements EmitterShape {
         this.spread = parameters.spread ?? 0;
         this.speed = parameters.speed ?? new ConstantValue(1);
         this.memory = [];
+        this.transform = parameters.transform;
     }
 
     update(system: IParticleSystem, delta: number): void {
@@ -64,6 +72,7 @@ export class EdgeEmitter implements EmitterShape {
         const u = getValueFromEmitterMode(this.mode, this.currentValue, this.spread, emissionState);
         p.position.set((u * 2 - 1) * this.radius, 0, 0);
         p.velocity.set(0, p.startSpeed, 0);
+        this.transform?.apply(p);
     }
 
     toJSON(): ShapeJSON {
@@ -73,6 +82,7 @@ export class EdgeEmitter implements EmitterShape {
             mode: this.mode,
             spread: this.spread,
             speed: this.speed.toJSON(),
+            ...ShapeTransform.toShapeJSON(this.transform),
         };
     }
 
@@ -82,6 +92,7 @@ export class EdgeEmitter implements EmitterShape {
             mode: json.mode,
             speed: json.speed ? ValueGeneratorFromJSON(json.speed) : undefined,
             spread: json.spread,
+            transform: ShapeTransform.fromJSON(json.transform),
         });
     }
 
@@ -91,6 +102,7 @@ export class EdgeEmitter implements EmitterShape {
             mode: this.mode,
             speed: this.speed.clone(),
             spread: this.spread,
+            transform: this.transform?.clone(),
         });
     }
 }

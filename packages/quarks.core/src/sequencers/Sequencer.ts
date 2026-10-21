@@ -11,6 +11,8 @@ export interface Sequencer {
 
 export function SequencerFromJSON(json: any): Sequencer {
     switch (json.type) {
+        // Files written before 0.28 have no type; TextureSequencer was the only kind.
+        case undefined:
         case 'TextureSequencer':
             return TextureSequencer.fromJSON(json);
         default:

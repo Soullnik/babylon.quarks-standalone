@@ -48,7 +48,7 @@ export class ChangeEmitDirection implements Behavior {
     }
 
     clone(): Behavior {
-        return new ChangeEmitDirection(this.angle);
+        return new ChangeEmitDirection(this.angle.clone());
     }
     reset(): void {}
 }

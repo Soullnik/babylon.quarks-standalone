@@ -973,7 +973,7 @@ export class ParticleSystem implements IParticleSystem {
      * emission over time and over distance alike. Unlike
      * {@link setQualityFactor}, which only ever thins an effect, it may go
      * above 1 to make a stronger version of the same effect. The two multiply.
-     * 1 by default; not saved in the effect JSON.
+     * 1 by default; not saved in the effect JSON; copied by {@link clone}.
      */
     emissionMultiplier = 1;
 
@@ -1836,7 +1836,8 @@ export class ParticleSystem implements IParticleSystem {
     /**
      * Where a {@link RenderMode.Beam} system's quads end, see {@link BeamEnd}.
      * Unset (the default), a beam has no length and draws nothing. Not saved
-     * in the effect JSON: it is where this instance is aimed at runtime.
+     * in the effect JSON: it is where this instance is aimed at runtime. Copied by
+     * {@link clone}: a point as a copy, a node as the same node.
      */
     beamEnd?: BeamEnd;
 
@@ -3114,7 +3115,7 @@ export class ParticleSystem implements IParticleSystem {
             startColor: this.startColor.clone(),
             emissionOverTime: this.emissionOverTime.clone(),
             emissionOverDistance: this.emissionOverDistance.clone(),
-            emissionBursts: this.emissionBursts.map((b) => ({...b})),
+            emissionBursts: this.emissionBursts.map((b) => ({...b, count: b.count.clone()})),
             maxParticles: this.maxParticles,
             onlyUsedByOther: this.onlyUsedByOther,
             instancingGeometry: this.rendererSettings.instancingGeometry,
@@ -3137,7 +3138,7 @@ export class ParticleSystem implements IParticleSystem {
             rendererEmitterSettings,
             material: this.materialRef,
             texture: this.rendererSettings.texture,
-            startTileIndex: this.startTileIndex,
+            startTileIndex: this.startTileIndex.clone(),
             uTileCount: this.rendererSettings.uTileCount,
             vTileCount: this.rendererSettings.vTileCount,
             blendTiles: this.rendererSettings.blendTiles,
@@ -3171,6 +3172,16 @@ export class ParticleSystem implements IParticleSystem {
         }
         if (this.tint) {
             copy.tint = this.tint.clone();
+        }
+        copy.emissionMultiplier = this.emissionMultiplier;
+        const beamEnd = this.beamEnd;
+        if (beamEnd) {
+            // A node the beam follows stays the same node. A point is copied by value: a Babylon
+            // Vector3 keeps x/y/z behind getters, which a spread would drop.
+            copy.beamEnd =
+                typeof (beamEnd as {getAbsolutePosition?: unknown}).getAbsolutePosition === 'function'
+                    ? beamEnd
+                    : {x: (beamEnd as Vector3).x, y: (beamEnd as Vector3).y, z: (beamEnd as Vector3).z};
         }
         return copy;
     }

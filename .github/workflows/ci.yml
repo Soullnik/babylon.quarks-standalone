@@ -43,7 +43,7 @@ jobs:
               run: npm run typecheck
 
             - name: Run tests
-              run: npm test
+              run: npm run test:coverage
 
             - name: Smoothness sweep
               run: npm run check:smoothness

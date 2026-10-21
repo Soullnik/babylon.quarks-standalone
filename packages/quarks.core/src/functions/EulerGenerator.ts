@@ -53,6 +53,6 @@ export class EulerGenerator implements RotationGenerator {
     }
 
     clone(): RotationGenerator {
-        return new EulerGenerator(this.angleX, this.angleY, this.angleZ, this.eular.order);
+        return new EulerGenerator(this.angleX.clone(), this.angleY.clone(), this.angleZ.clone(), this.eular.order);
     }
 }

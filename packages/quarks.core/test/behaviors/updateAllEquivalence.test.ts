@@ -4,10 +4,12 @@ import {
     Bezier,
     ColorOverLife,
     ConstantValue,
+    createSeededRandom,
     ForceOverLife,
     FrameOverLife,
     Gradient,
     GravityForce,
+    IntervalValue,
     IParticleSystem,
     LimitSpeedOverLife,
     Matrix4,
@@ -21,6 +23,7 @@ import {
     SpeedOverLife,
     SpriteParticle,
     Vector3,
+    withRandomSource,
 } from '../../src';
 
 const makeSystem = (worldSpace = false) =>
@@ -88,6 +91,7 @@ const cases: Array<[string, () => Behavior]> = [
     ['ColorOverLife', () => new ColorOverLife(new Gradient())],
     ['SizeOverLife', () => new SizeOverLife(new PiecewiseBezier([[new Bezier(1, 0.8, 0.4, 0), 0]]))],
     ['ApplyForce', () => new ApplyForce(new Vector3(0, -1, 0), new ConstantValue(9.8))],
+    ['ApplyForce IntervalValue', () => new ApplyForce(new Vector3(0, -1, 0), new IntervalValue(2, 9.8))],
     ['RotationOverLife', () => new RotationOverLife(new ConstantValue(1.5))],
     ['FrameOverLife', () => new FrameOverLife(new PiecewiseBezier([[new Bezier(0, 1, 2, 3), 0]]))],
     ['FrameOverLife ConstantValue', () => new FrameOverLife(new ConstantValue(2))],
@@ -106,14 +110,19 @@ describe('behavior updateAll matches the per-particle path', () => {
 
             const singleBehavior = create();
             const singles = makePool(COUNT);
-            for (const particle of singles) singleBehavior.initialize(particle, system);
+            // Both pools roll the same per-particle values.
+            withRandomSource(createSeededRandom(5), () => {
+                for (const particle of singles) singleBehavior.initialize(particle, system);
+            });
             singleBehavior.frameUpdate(DELTA);
             for (const particle of singles) singleBehavior.update(particle, DELTA);
 
             const batchBehavior = create();
             expect(batchBehavior.updateAll).toBeDefined();
             const batched = makePool(COUNT);
-            for (const particle of batched) batchBehavior.initialize(particle, system);
+            withRandomSource(createSeededRandom(5), () => {
+                for (const particle of batched) batchBehavior.initialize(particle, system);
+            });
             batchBehavior.frameUpdate(DELTA);
             batchBehavior.updateAll!(batched, batched.length, DELTA);
 

@@ -43,6 +43,6 @@ export class Vector3Function implements Vector3Generator {
     }
 
     clone(): Vector3Generator {
-        return new Vector3Function(this.x, this.y, this.z);
+        return new Vector3Function(this.x.clone(), this.y.clone(), this.z.clone());
     }
 }

@@ -3,5 +3,33 @@
         "<rootDir>/packages/quarks.core",
         "<rootDir>/packages/babylon.quarks",
         "<rootDir>/packages/babylon.quarks-editor"
-    ]
+    ],
+    "collectCoverageFrom": [
+        "packages/quarks.core/src/**/*.{js,ts}",
+        "packages/babylon.quarks/src/**/*.{js,ts}",
+        "!packages/babylon.quarks/src/index.ts",
+        "!packages/babylon.quarks/src/shaders/index.ts",
+        "packages/babylon.quarks-editor/src/core/**/*.ts",
+        "!**/*.d.ts"
+    ],
+    "coverageThreshold": {
+        "./packages/quarks.core/src/": {
+            "statements": 54,
+            "branches": 52,
+            "functions": 55,
+            "lines": 54
+        },
+        "./packages/babylon.quarks/src/": {
+            "statements": 93,
+            "branches": 86,
+            "functions": 93,
+            "lines": 93
+        },
+        "./packages/babylon.quarks-editor/src/": {
+            "statements": 13,
+            "branches": 10,
+            "functions": 18,
+            "lines": 13
+        }
+    }
 }
