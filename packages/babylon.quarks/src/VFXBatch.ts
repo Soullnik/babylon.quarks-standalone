@@ -1,6 +1,7 @@
 import {BoundingInfo} from '@babylonjs/core/Culling/boundingInfo';
 import {Constants} from '@babylonjs/core/Engines/constants';
 import {BaseTexture} from '@babylonjs/core/Materials/Textures/baseTexture';
+import type {Effect} from '@babylonjs/core/Materials/effect';
 import {ShaderMaterial} from '@babylonjs/core/Materials/shaderMaterial';
 import {Color3} from '@babylonjs/core/Maths/math.color';
 import {Vector2 as BVector2, Vector3 as BVector3, Vector4 as BVector4} from '@babylonjs/core/Maths/math.vector';
@@ -9,6 +10,7 @@ import {Scene} from '@babylonjs/core/scene';
 import {IParticleSystem, Vector3} from 'quarks.core';
 import {VFXBatchSettings} from './BatchedRenderer';
 import type {ParticleSystem} from './ParticleSystem';
+import type {DepthBinding} from './softDepth';
 
 /**
  * The order the particles of a batch are drawn in (Unity's Sort Mode). Alpha
@@ -483,9 +485,12 @@ export abstract class VFXBatch {
     protected maxParticles: number;
     protected scene: Scene;
     protected readonly visibleSystems: IParticleSystem[] = [];
+    /** The depth texture soft particles read, from {@link BatchedRenderer.setDepthTexture}. */
+    protected depth: DepthBinding | null;
 
-    protected constructor(settings: VFXBatchSettings, scene: Scene) {
+    protected constructor(settings: VFXBatchSettings, scene: Scene, depth: DepthBinding | null = null) {
         this.scene = scene;
+        this.depth = depth;
         this.maxParticles = 1000;
         this.systems = new Set<IParticleSystem>();
         this.settings = {
@@ -553,6 +558,12 @@ export abstract class VFXBatch {
         mesh.alphaIndex = this.settings.renderOrder;
         // The shaders fog themselves; Babylon's own fog pass does not apply to a ShaderMaterial.
         mesh.applyFog = false;
+        // Its geometry is one quad or mesh at the origin, not the particles, so a pick or a
+        // collision against it would hit nothing that is drawn. The renderer rebuilds batches
+        // from its systems, so a scene serializer has nothing to write either.
+        mesh.isPickable = false;
+        mesh.checkCollisions = false;
+        mesh.doNotSerialize = true;
     }
 
     private readonly boundsMin_ = new Vector3();
@@ -630,6 +641,20 @@ export abstract class VFXBatch {
             (this.settings.materialBlendMode === Constants.ALPHA_ADD ||
                 this.settings.materialBlendMode === Constants.ALPHA_ONEONE);
         return additive ? ['FOG', 'FOG_ADDITIVE'] : ['FOG'];
+    }
+
+    /**
+     * Writes a uniform that changes per bind, such as one read off the active camera, to the
+     * material for the next bind and to its bound effect for this one: ShaderMaterial uploads its
+     * stored values before the bind observers run, so a value written only to the material would
+     * reach the GPU one draw late, and with two cameras it would always be the other camera's.
+     */
+    protected static writeBound(material: ShaderMaterial, write: (target: ShaderMaterial | Effect) => void): void {
+        write(material);
+        const effect = material.getEffect();
+        if (effect) {
+            write(effect);
+        }
     }
 
     protected bindFog(material: ShaderMaterial): void {
@@ -819,11 +844,35 @@ export abstract class VFXBatch {
         return visibleSystems;
     }
 
-    applyDepthTexture(depthTexture: BaseTexture | null): void {
-        const material = this.mesh.material;
-        if (material && material instanceof ShaderMaterial) {
-            material.setTexture('depthTexture', depthTexture);
+    /**
+     * Sets the depth texture soft particles read. Soft particles are compiled in only while there
+     * is one, as Unity turns them off for a camera without a depth texture, so attaching or
+     * removing it, or changing how it is packed, rebuilds a soft batch's material.
+     *
+     * @param depth - The binding, or a bare texture, read as `'linear'` and unpacked.
+     */
+    applyDepthTexture(depth: DepthBinding | BaseTexture | null): void {
+        if (depth instanceof BaseTexture) {
+            depth = {texture: depth, encoding: 'linear', packed: false};
         }
+        const previous = this.depth;
+        this.depth = depth;
+        if (!this.settings.softParticles) {
+            return;
+        }
+        if (!previous !== !depth || previous?.packed !== depth?.packed) {
+            this.rebuildMaterial();
+            return;
+        }
+        const material = this.mesh.material;
+        if (depth && material instanceof ShaderMaterial) {
+            material.setTexture('depthTexture', depth.texture);
+        }
+    }
+
+    /** True when this batch draws soft particles: they are on and a depth texture is attached. */
+    protected drawsSoft(): boolean {
+        return this.settings.softParticles && this.depth !== null;
     }
 
     /** Sets the light `'fixed'` mesh particles are lit by. Batches that draw no meshes ignore it. */

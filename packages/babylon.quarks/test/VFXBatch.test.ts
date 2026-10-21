@@ -53,21 +53,4 @@ describe('VFXBatch base helpers', () => {
 
         renderer.dispose();
     });
-
-    it('applies depth texture only for shader materials', () => {
-        const renderer = new BatchedRenderer('vfx-batch-depth', scene);
-        const system = createSystem();
-        renderer.addSystem(system);
-        const batch = renderer.batches[0] as VFXBatch;
-        const material = batch.mesh.material as any;
-        const setTextureSpy = jest.spyOn(material, 'setTexture');
-
-        batch.applyDepthTexture(null);
-        expect(setTextureSpy).toHaveBeenCalledWith('depthTexture', null);
-
-        batch.mesh.material = null;
-        expect(() => batch.applyDepthTexture(null)).not.toThrow();
-
-        renderer.dispose();
-    });
 });

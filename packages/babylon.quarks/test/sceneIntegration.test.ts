@@ -1,6 +1,8 @@
+import {Ray} from '@babylonjs/core/Culling/ray';
 import {Constants} from '@babylonjs/core/Engines/constants';
 import {NullEngine} from '@babylonjs/core/Engines/nullEngine';
 import {ShaderMaterial} from '@babylonjs/core/Materials/shaderMaterial';
+import {Vector3 as BVector3} from '@babylonjs/core/Maths/math.vector';
 import {Scene} from '@babylonjs/core/scene';
 import {
     ApplySequences,
@@ -57,6 +59,30 @@ describe('scene integration', () => {
         expect(mesh.layerMask).toBe(0x10);
         // The shaders fog themselves; Babylon's mesh-level fog must stay out of the way.
         expect(mesh.applyFog).toBe(false);
+        renderer.dispose();
+    });
+
+    it('keeps every batch mesh out of picking, collisions and scene serialization', () => {
+        const renderer = new BatchedRenderer('r', scene);
+        const modes = [
+            RenderMode.BillBoard,
+            RenderMode.StretchedBillBoard,
+            RenderMode.Mesh,
+            RenderMode.Trail,
+            RenderMode.Beam,
+        ];
+        for (const renderMode of modes) {
+            renderer.addSystem(makeSystem({renderMode}));
+        }
+        expect(renderer.batches.length).toBe(modes.length);
+        for (const batch of renderer.batches) {
+            expect(batch.mesh.isPickable).toBe(false);
+            expect(batch.mesh.checkCollisions).toBe(false);
+            expect(batch.mesh.doNotSerialize).toBe(true);
+        }
+        // A ray through the batches' base quad at the origin hits none of them.
+        const hit = scene.pickWithRay(new Ray(new BVector3(0, 0, -5), new BVector3(0, 0, 1), 100));
+        expect(renderer.batches.map((batch) => batch.mesh)).not.toContain(hit?.pickedMesh);
         renderer.dispose();
     });
 

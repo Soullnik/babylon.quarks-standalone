@@ -2,8 +2,16 @@ import {BaseTexture} from '@babylonjs/core/Materials/Textures/baseTexture';
 import {Texture} from '@babylonjs/core/Materials/Textures/texture';
 import {Scene} from '@babylonjs/core/scene';
 
-const atlasByCube = new WeakMap<BaseTexture, Texture>();
-const pendingByCube = new WeakMap<BaseTexture, Promise<Texture | null>>();
+/**
+ * Atlases by cube, then by the scene they were built for: a texture belongs to one scene and one
+ * engine, so a second scene (an editor preview, a second canvas) gets an atlas of its own.
+ */
+const atlasesByCube = new WeakMap<BaseTexture, Map<Scene, Texture>>();
+const pendingByCube = new WeakMap<BaseTexture, Map<Scene, Promise<Texture | null>>>();
+/** Atlases this module built, which it disposes; an atlas given to {@link cacheEnvAtlas} stays the caller's. */
+const builtAtlases = new WeakSet<Texture>();
+/** Cubes whose dispose this module already listens to. */
+const watchedCubes = new WeakSet<BaseTexture>();
 
 /** Reads the six face URLs from a Babylon CubeTexture (px py pz nx ny nz). */
 export function cubeFaceUrls(reflection: BaseTexture | null | undefined): string[] | null {
@@ -15,14 +23,80 @@ export function cubeFaceUrls(reflection: BaseTexture | null | undefined): string
     return files?.length === 6 ? files.slice() : null;
 }
 
-/** Returns a previously built atlas for this cube, if any. */
-export function getCachedEnvAtlas(cube: BaseTexture): Texture | null {
-    return atlasByCube.get(cube) ?? null;
+/** The scene a texture belongs to, or null for a disposed texture or one with no scene. */
+function sceneOf(texture: BaseTexture): Scene | null {
+    return (texture as {getScene?: () => Scene | null}).getScene?.() ?? null;
 }
 
-/** Stores an atlas for a cube source (tests / prebuilt atlases). */
+/**
+ * Returns the atlas already built or cached for this cube in `scene`, if any.
+ *
+ * @param cube - The cube texture the atlas was made from.
+ * @param scene - The scene the atlas must belong to. Defaults to the cube's own scene.
+ */
+export function getCachedEnvAtlas(cube: BaseTexture, scene: Scene | null = sceneOf(cube)): Texture | null {
+    return (scene && atlasesByCube.get(cube)?.get(scene)) || null;
+}
+
+/**
+ * Stores a prebuilt atlas for a cube in the atlas's scene, so systems that use the cube in that
+ * scene take it instead of building one. The atlas stays the caller's: quarks never disposes it,
+ * and drops it from the cache when it, or the cube, is disposed.
+ *
+ * @param cube - The cube texture the atlas stands in for.
+ * @param atlas - A 3×2 atlas in the layout of {@link createEnvAtlasFromFaceUrls}.
+ */
 export function cacheEnvAtlas(cube: BaseTexture, atlas: Texture): void {
-    atlasByCube.set(cube, atlas);
+    const scene = sceneOf(atlas) ?? sceneOf(cube);
+    if (scene) {
+        store(cube, scene, atlas);
+    }
+}
+
+/**
+ * Drops the atlases made for `cube` from the cache and disposes the ones quarks built. Runs by
+ * itself when the cube is disposed; call it when an environment is swapped out but the cube is
+ * kept. Systems that use the cube build a new atlas the next time their material is resolved.
+ *
+ * @param cube - The cube texture whose atlases to drop.
+ * @param scene - Only the atlas for this scene. Defaults to every scene.
+ */
+export function disposeEnvAtlas(cube: BaseTexture, scene?: Scene): void {
+    const atlases = atlasesByCube.get(cube);
+    if (!atlases) {
+        return;
+    }
+    for (const [atlasScene, atlas] of [...atlases]) {
+        if (scene && atlasScene !== scene) {
+            continue;
+        }
+        atlases.delete(atlasScene);
+        if (builtAtlases.has(atlas)) {
+            atlas.dispose();
+        }
+    }
+}
+
+function store(cube: BaseTexture, scene: Scene, atlas: Texture): void {
+    let atlases = atlasesByCube.get(cube);
+    if (!atlases) {
+        atlases = new Map();
+        atlasesByCube.set(cube, atlases);
+    }
+    atlases.set(scene, atlas);
+    // A scene disposes its textures, so this also lets go of a disposed scene.
+    atlas.onDisposeObservable?.addOnce(() => {
+        if (atlasesByCube.get(cube)?.get(scene) === atlas) {
+            atlasesByCube.get(cube)!.delete(scene);
+        }
+    });
+    if (!watchedCubes.has(cube) && cube.onDisposeObservable) {
+        watchedCubes.add(cube);
+        cube.onDisposeObservable.addOnce(() => {
+            watchedCubes.delete(cube);
+            disposeEnvAtlas(cube);
+        });
+    }
 }
 
 /**
@@ -63,23 +137,30 @@ export const envAtlasBuilder = {
 };
 
 /**
- * Ensures a 3×2 env atlas exists for a CubeTexture. Returns a cached atlas
- * synchronously when available; otherwise starts (or joins) an async build and
- * invokes onReady when the atlas is usable.
+ * Ensures a 3×2 env atlas exists for a CubeTexture in `scene`. Returns a cached atlas
+ * synchronously when available; otherwise starts (or joins) an async build and invokes onReady
+ * when the atlas is usable. A cube disposed before its build finishes gets no atlas.
  */
 export function ensureEnvAtlasFromCube(
     cube: BaseTexture,
     scene: Scene,
     onReady: (atlas: Texture) => void
 ): Texture | null {
-    const cached = atlasByCube.get(cube);
+    const cached = getCachedEnvAtlas(cube, scene);
     if (cached) {
         onReady(cached);
         return cached;
     }
 
+    let pendingByScene = pendingByCube.get(cube);
+    if (!pendingByScene) {
+        pendingByScene = new Map();
+        pendingByCube.set(cube, pendingByScene);
+    }
+    const pendings = pendingByScene;
+
     const kick = () => {
-        const existingPending = pendingByCube.get(cube);
+        const existingPending = pendings.get(scene);
         if (existingPending) {
             existingPending.then((atlas) => {
                 if (atlas) {
@@ -94,20 +175,27 @@ export function ensureEnvAtlasFromCube(
             return;
         }
 
+        let cubeDisposed = false;
+        cube.onDisposeObservable?.addOnce(() => (cubeDisposed = true));
         const pending = envAtlasBuilder
             .createFromFaceUrls(urls, scene)
             .then((atlas) => {
-                atlasByCube.set(cube, atlas);
-                pendingByCube.delete(cube);
+                pendings.delete(scene);
+                if (cubeDisposed || scene.isDisposed) {
+                    atlas.dispose();
+                    return null;
+                }
+                builtAtlases.add(atlas);
+                store(cube, scene, atlas);
                 onReady(atlas);
                 return atlas;
             })
             .catch((err) => {
-                pendingByCube.delete(cube);
+                pendings.delete(scene);
                 console.warn('[babylon.quarks] Failed to build env atlas from cubemap faces', err);
                 return null;
             });
-        pendingByCube.set(cube, pending);
+        pendings.set(scene, pending);
     };
 
     if (cube.isReady()) {
@@ -121,7 +209,7 @@ export function ensureEnvAtlasFromCube(
         }
     }
 
-    return atlasByCube.get(cube) ?? null;
+    return getCachedEnvAtlas(cube, scene);
 }
 
 /** Loads one image URL as an HTMLImageElement. */

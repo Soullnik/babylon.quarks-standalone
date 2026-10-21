@@ -68,7 +68,8 @@ ${fogVertexWGSL('viewPos.xyz')}
 
 #ifdef SOFT_PARTICLES
     vertexOutputs.projPosition = clipPosition;
-    vertexOutputs.linearDepth = -viewPos.z;
+    // View depth is +z ahead of a left-handed camera and -z ahead of a right-handed one.
+    vertexOutputs.linearDepth = abs(viewPos.z);
 #endif
 
 #ifdef UV_TILE

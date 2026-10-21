@@ -4,9 +4,11 @@ import {Texture} from '@babylonjs/core/Materials/Textures/texture';
 import {Frustum} from '@babylonjs/core/Maths/math.frustum';
 import {Plane} from '@babylonjs/core/Maths/math.plane';
 import {TransformNode} from '@babylonjs/core/Meshes/transformNode';
+import type {DepthRenderer} from '@babylonjs/core/Rendering/depthRenderer';
 import {Scene} from '@babylonjs/core/scene';
 import {EmitSubParticleSystem, IParticleSystem, Vector3} from 'quarks.core';
 import {ParticleSystem} from './ParticleSystem';
+import {depthBinding, DepthBinding, DepthTextureOptions, SoftDepthEncoding} from './softDepth';
 import {SpriteBatch} from './SpriteBatch';
 import {TrailBatch} from './TrailBatch';
 import {
@@ -161,7 +163,7 @@ export class BatchedRenderer extends TransformNode {
     /** Seconds this renderer has been updated for; the clock UV and erosion scrolling run on. */
     private elapsed = 0;
     systemToBatchIndex: Map<IParticleSystem, number> = new Map<IParticleSystem, number>();
-    depthTexture: BaseTexture | null = null;
+    private depth: DepthBinding | null = null;
     /** Systems in insertion order — iterated every frame, unlike the map. */
     private systems: Array<IParticleSystem> = [];
     /**
@@ -373,7 +375,7 @@ export class BatchedRenderer extends TransformNode {
         const scene = this.getScene();
         switch (settings.renderMode) {
             case RenderMode.Trail:
-                batch = new TrailBatch(settings, scene);
+                batch = new TrailBatch(settings, scene, this.depth);
                 break;
             case RenderMode.Mesh:
             case RenderMode.BillBoard:
@@ -381,15 +383,12 @@ export class BatchedRenderer extends TransformNode {
             case RenderMode.HorizontalBillBoard:
             case RenderMode.StretchedBillBoard:
             case RenderMode.Beam:
-                batch = new SpriteBatch(settings, scene);
+                batch = new SpriteBatch(settings, scene, this.depth);
                 break;
             default:
                 throw new Error(`Unsupported render mode: ${settings.renderMode}`);
         }
         batch.mesh.parent = this;
-        if (this.depthTexture) {
-            batch.applyDepthTexture(this.depthTexture);
-        }
         batch.applyMeshLighting(this.meshLighting);
         batch.addSystem(system);
         this.batches.push(batch);
@@ -434,11 +433,37 @@ export class BatchedRenderer extends TransformNode {
         this.addSystem(system);
     }
 
-    setDepthTexture(depthTexture: BaseTexture | null) {
-        this.depthTexture = depthTexture;
+    /**
+     * Sets the scene depth that soft particles fade against. Without one, soft particles are not
+     * compiled in and draw hard, as Unity does for a camera with no depth texture.
+     *
+     * Pass the `DepthRenderer` itself to have its encoding read off it, for example
+     * `renderer.setDepthTexture(scene.enableDepthRenderer(camera))`. A bare texture is read as
+     * Babylon's default `'linear'` metric unless `options.encoding` says otherwise; see
+     * {@link SoftDepthEncoding}. The depth should be drawn by the camera that draws the particles.
+     *
+     * @param depth - A depth texture, a Babylon `DepthRenderer`, or null to turn soft particles off.
+     * @param options - What the texture stores, when it cannot be read off a `DepthRenderer`.
+     */
+    setDepthTexture(depth: BaseTexture | DepthRenderer | null, options: DepthTextureOptions = {}) {
+        this.depth = depth ? depthBinding(depth, options) : null;
         for (const batch of this.batches) {
-            batch.applyDepthTexture(depthTexture);
+            batch.applyDepthTexture(this.depth);
         }
+    }
+
+    /** The depth texture soft particles fade against, see {@link setDepthTexture}. */
+    get depthTexture(): BaseTexture | null {
+        return this.depth?.texture ?? null;
+    }
+
+    set depthTexture(texture: BaseTexture | null) {
+        this.setDepthTexture(texture);
+    }
+
+    /** What the depth texture stores, see {@link setDepthTexture}. */
+    get depthEncoding(): SoftDepthEncoding | null {
+        return this.depth?.encoding ?? null;
     }
 
     /**

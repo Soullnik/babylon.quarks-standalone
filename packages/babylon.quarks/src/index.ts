@@ -12,6 +12,7 @@ export {
     cacheEnvAtlas,
     createEnvAtlasFromFaceUrls,
     cubeFaceUrls,
+    disposeEnvAtlas,
     ensureEnvAtlasFromCube,
     getCachedEnvAtlas,
 } from './envAtlas';
@@ -42,6 +43,8 @@ export {QuarksPrefab} from './QuarksPrefab';
 export type {AnimationData, QuarksTimelineClip} from './QuarksPrefab';
 export {QuarksUtil} from './QuarksUtil';
 export * from './shaders/';
+export {decodeSoftDepth, softDepthParams} from './softDepth';
+export type {DepthTextureOptions, SoftDepthEncoding} from './softDepth';
 export {SpriteBatch} from './SpriteBatch';
 export {TrailBatch} from './TrailBatch';
 export {MAX_TRAIL_TESSELLATION, trailCurveTension, trailTessellation} from './trailCurve';

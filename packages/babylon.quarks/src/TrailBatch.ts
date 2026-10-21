@@ -12,6 +12,7 @@ import trail_frag from './shaders/trail_frag.glsl';
 import trail_frag_wgsl from './shaders/trail_frag.wgsl';
 import trail_vert from './shaders/trail_vert.glsl';
 import trail_vert_wgsl from './shaders/trail_vert.wgsl';
+import type {DepthBinding} from './softDepth';
 import {trailCurveTension, trailTessellation} from './trailCurve';
 import {VFXBatch} from './VFXBatch';
 
@@ -93,8 +94,8 @@ export class TrailBatch extends VFXBatch {
     private sideVB!: VertexBuffer;
     private widthVB!: VertexBuffer;
 
-    constructor(settings: VFXBatchSettings, scene: Scene) {
-        super(settings, scene);
+    constructor(settings: VFXBatchSettings, scene: Scene, depth: DepthBinding | null = null) {
+        super(settings, scene, depth);
         // Trail buffers hold two vertices per recorded sample and are the largest
         // per-batch allocation in the library, so start small and let
         // expandBuffers grow to whatever the batch actually needs.
@@ -267,7 +268,7 @@ export class TrailBatch extends VFXBatch {
             if (resolution.x !== width || resolution.y !== height) {
                 resolution.x = width;
                 resolution.y = height;
-                mat.setVector2('resolution', resolution);
+                VFXBatch.writeBound(mat, (target) => target.setVector2('resolution', resolution));
             }
         });
 

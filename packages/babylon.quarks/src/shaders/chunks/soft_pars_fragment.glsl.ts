@@ -10,11 +10,12 @@ export default /* glsl */ `
     #define SOFT_NEAR_FADE softParams.x
     #define SOFT_INV_FADE_DISTANCE softParams.y
 
-    #define zNear projParams.x
-    #define zFar projParams.y
-
+    // View depth from a depth sample, with the coefficients BatchedRenderer writes to projParams
+    // for the depth texture's encoding (see softDepthParams). Nothing drawn reads as far away.
     float linearize_depth(float d) {
-        return (zFar * zNear) / (zFar - d * (zFar - zNear));
+        float denominator = projParams.z * d + projParams.w;
+        float depth = abs(denominator) > 1e-8 ? abs((projParams.x * d + projParams.y) / denominator) : 0.0;
+        return depth > 0.0 ? depth : 1e30;
     }
 #endif
 `;

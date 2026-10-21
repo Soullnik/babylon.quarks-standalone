@@ -1309,22 +1309,27 @@ export class ParticleSystem implements IParticleSystem {
             typeof material?.reflectionLevel === 'number' ? material.reflectionLevel : resolvedReflectionLevel;
         // Prefer an explicit atlas; otherwise build a 3×2 atlas from CubeTexture
         // face URLs (iOS-safe single sampler2D — not samplerCube / six faces).
+        // A disposed atlas (its cube was disposed, or disposeEnvAtlas ran) is skipped, so a new one is built.
+        const live = <T extends BaseTexture>(atlas: T | null | undefined): T | null =>
+            atlas?.getScene() ? atlas : null;
         let resolvedAtlas =
-            material?.reflectionAtlas ?? overrides.reflectionAtlas ?? this.rendererSettings.reflectionAtlas ?? null;
+            live(material?.reflectionAtlas) ??
+            live(overrides.reflectionAtlas) ??
+            live(this.rendererSettings.reflectionAtlas);
         if (!resolvedAtlas && resolvedReflection?.isCube) {
-            resolvedAtlas = getCachedEnvAtlas(resolvedReflection);
+            resolvedAtlas = getCachedEnvAtlas(resolvedReflection, this.sceneRef);
             if (!resolvedAtlas && this.sceneRef) {
                 ensureEnvAtlasFromCube(resolvedReflection, this.sceneRef, (atlas) => {
                     if (this.rendererSettings.reflectionAtlas === atlas) {
                         return;
                     }
                     this.rendererSettings.reflectionAtlas = atlas;
-                    if (material && material.reflectionAtlas == null) {
+                    if (material && !live(material.reflectionAtlas)) {
                         material.reflectionAtlas = atlas;
                     }
                     this.neededToUpdateRender = true;
                 });
-                resolvedAtlas = getCachedEnvAtlas(resolvedReflection);
+                resolvedAtlas = getCachedEnvAtlas(resolvedReflection, this.sceneRef);
             }
         }
         this.rendererSettings.reflectionAtlas = resolvedAtlas;

@@ -1,4 +1,5 @@
 import {fogFragmentDeclarationWGSL, fogFragmentWGSL} from './chunks/fog';
+import {softFragmentDeclarationWGSL, softFragmentWGSL} from './chunks/soft';
 import {surfaceColorWGSL, surfaceFragmentDeclarationWGSL} from './chunks/surface';
 
 export default /* wgsl */ `
@@ -18,20 +19,13 @@ var mapSampler: sampler;
 var map: texture_2d<f32>;
 #endif
 
-#ifdef SOFT_PARTICLES
-var depthTextureSampler: sampler;
-var depthTexture: texture_2d<f32>;
-uniform softParams: vec2f;
-uniform projParams: vec4f;
-varying projPosition: vec4f;
-varying linearDepth: f32;
-#endif
 
 #ifdef USE_ALPHATEST
 uniform alphaTest: f32;
 #endif
 
 ${fogFragmentDeclarationWGSL}
+${softFragmentDeclarationWGSL}
 ${surfaceFragmentDeclarationWGSL}
 @fragment
 fn main(input: FragmentInputs) -> FragmentOutputs {
@@ -46,18 +40,8 @@ ${surfaceColorWGSL(true)}
     if (baseColor.a < 0.01) { discard; }
 #endif
 
-#ifdef SOFT_PARTICLES
-    var p2 = fragmentInputs.projPosition.xy / fragmentInputs.projPosition.w;
-    p2 = 0.5 * p2 + 0.5;
-    let readDepth = textureSample(depthTexture, depthTextureSampler, p2).r;
-    let zNear = uniforms.projParams.x;
-    let zFar = uniforms.projParams.y;
-    let viewDepth = (zFar * zNear) / (zFar - readDepth * (zFar - zNear));
-    let fade = clamp(uniforms.softParams.y * ((viewDepth - uniforms.softParams.x) - fragmentInputs.linearDepth), 0.0, 1.0);
-    baseColor *= fade;
-#endif
-
 ${fogFragmentWGSL('baseColor')}
+${softFragmentWGSL('baseColor')}
     fragmentOutputs.color = baseColor;
 }
 `;
