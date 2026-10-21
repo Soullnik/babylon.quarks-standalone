@@ -626,6 +626,17 @@ export class TrailBatch extends VFXBatch {
                     index += 2;
                 }
             }
+            const tint = (system as ParticleSystem).tint;
+            if (tint !== undefined) {
+                // As SpriteBatch does: the system's tint over its ribbons' vertices.
+                const colors = this.colorBuffer;
+                for (let o = firstVertex * 4, end = index * 4; o < end; o += 4) {
+                    colors[o] *= tint.x;
+                    colors[o + 1] *= tint.y;
+                    colors[o + 2] *= tint.z;
+                    colors[o + 3] *= tint.w;
+                }
+            }
             this.measureSystemBounds(system as ParticleSystem, firstVertex, index);
         }
 

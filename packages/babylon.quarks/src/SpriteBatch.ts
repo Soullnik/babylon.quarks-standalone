@@ -15,6 +15,7 @@ import {
     SpriteParticle,
     StretchedBillBoardSettings,
     Vector3,
+    Vector4,
 } from 'quarks.core';
 import {VFXBatchSettings} from './BatchedRenderer';
 import {gather, sortByKey, SortScratch} from './instanceSort';
@@ -928,6 +929,10 @@ export class SpriteBatch extends VFXBatch {
                 }
             }
 
+            const tint = (system as ParticleSystem).tint;
+            if (tint !== undefined && index > firstIndex) {
+                SpriteBatch.applyTint(this.colorBuffer, firstIndex * 4, index - firstIndex, tint);
+            }
             if (flipsSprites && system.flip !== undefined) {
                 if (store !== undefined) {
                     SpriteBatch.applyFlip(this.sizeBuffer, firstIndex * 3, store.flip, particleNum);
@@ -1042,6 +1047,16 @@ export class SpriteBatch extends VFXBatch {
      * quad being centred — the way Unity's renderer Flip mirrors U and V. The
      * stretched shader reads the sign and mirrors the texture coordinates.
      */
+    /** Multiplies `count` RGBA colours starting at `base` by a system's {@link ParticleSystem.tint}. */
+    private static applyTint(colors: Float32Array, base: number, count: number, tint: Vector4): void {
+        for (let j = 0, o = base; j < count; j++, o += 4) {
+            colors[o] *= tint.x;
+            colors[o + 1] *= tint.y;
+            colors[o + 2] *= tint.z;
+            colors[o + 3] *= tint.w;
+        }
+    }
+
     private static applyFlip(sizes: Float32Array, base: number, flips: Uint8Array, count: number): void {
         for (let j = 0, o = base; j < count; j++, o += 3) {
             const flip = flips[j];

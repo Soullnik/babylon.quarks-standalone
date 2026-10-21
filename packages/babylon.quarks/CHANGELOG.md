@@ -27,6 +27,12 @@ and the project follows the `quarks.core` 0.x version line.
   emitter held it and the ribbon spans the particle's width along it, so a trail on a blade is the
   surface the blade swept (a weapon trail, Unreal's AnimTrail). `TrailParticle.historySides` holds
   the recorded sides.
+- Erosion `maskTiling` `[u, v]` (default `[1, 1]`, saved only when not the default): the mask's own
+  scale over the particle UV, so a mesh whose UV repeats its picture along it can still be wiped
+  by one gradient across its whole length.
+- `ParticleSystem.tint` (`Vector4`, runtime only): multiplies every particle's colour and alpha as
+  drawn, without touching the particles or splitting batches. A per-instance colour or fade driven
+  from code; with erosion, alpha is the erosion level, so it wipes a shape in and out.
 
 ## [0.25.0] — 2026-10-20
 

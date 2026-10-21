@@ -1756,6 +1756,17 @@ export class ParticleSystem implements IParticleSystem {
      */
     beamEnd?: BeamEnd;
 
+    /**
+     * Multiplies every particle's colour, alpha included, as it is drawn:
+     * a colour or a fade driven from code for this instance (Unity's custom
+     * per-instance data, Unreal's user parameters). With {@link erosion},
+     * alpha is the erosion level, so this wipes the shape in and out. The
+     * particles' own colours are untouched, so clearing it restores them, and
+     * systems with different tints still batch together. Unset (the
+     * default): none. Not saved in the effect JSON.
+     */
+    tint?: Vector4;
+
     private readonly beamEndScratch = new Vector3();
 
     /** The world position of {@link beamEnd} into `out`; false when it is unset. */
@@ -2839,6 +2850,9 @@ export class ParticleSystem implements IParticleSystem {
                           edgeWidth: erosion.edgeWidth,
                           edgeColor: [...erosion.edgeColor],
                           maskScroll: [...erosion.maskScroll],
+                          ...(erosion.maskTiling[0] !== 1 || erosion.maskTiling[1] !== 1
+                              ? {maskTiling: [...erosion.maskTiling]}
+                              : {}),
                       },
                   }
                 : {}),

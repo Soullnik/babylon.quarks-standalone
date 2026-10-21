@@ -25,8 +25,8 @@
  *   mask values first — a noise mask dissolves it, a gradient mask wipes it.
  *   `erosionParams` is (softness, edge width, mask offset u, mask offset v),
  *   the edge band just above the cut glows in `erosionEdgeColor`. The mask is
- *   sampled with the particle's UV as drawn, which on a sprite sheet is the
- *   current tile's. Erosion only changes alpha, so blend modes that ignore
+ *   sampled with the particle's UV as drawn (on a sprite sheet the current
+ *   tile's) times `erosionMaskTiling`. Erosion only changes alpha, so blend modes that ignore
  *   alpha (one-one, premultiplied) show a hard cut.
  */
 
@@ -48,6 +48,7 @@ uniform vec4 erosionParams;
 uniform vec3 erosionEdgeColor;
 #ifdef EROSION_MASK
 uniform sampler2D erosionMask;
+uniform vec2 erosionMaskTiling;
 #endif
 
 vec4 quarksErode(vec4 color, float level, float mask) {
@@ -118,7 +119,7 @@ export function surfaceColorGLSL(tileBlend: boolean): string {
 #endif
 #ifdef EROSION
     #ifdef EROSION_MASK
-        erosionMaskValue = texture2D(erosionMask, vUV + erosionParams.zw).r;
+        erosionMaskValue = texture2D(erosionMask, vUV * erosionMaskTiling + erosionParams.zw).r;
     #endif
     baseColor = quarksErode(baseColor, erosionLevel, erosionMaskValue);
 #endif
@@ -146,6 +147,7 @@ uniform erosionEdgeColor: vec3f;
 #ifdef EROSION_MASK
 var erosionMaskSampler: sampler;
 var erosionMask: texture_2d<f32>;
+uniform erosionMaskTiling: vec2f;
 #endif
 
 fn quarksErode(colorIn: vec4f, level: f32, mask: f32) -> vec4f {
@@ -211,7 +213,7 @@ export function surfaceColorWGSL(tileBlend: boolean): string {
 #endif
 #ifdef EROSION
     #ifdef EROSION_MASK
-        erosionMaskValue = textureSample(erosionMask, erosionMaskSampler, fragmentInputs.vUV + uniforms.erosionParams.zw).r;
+        erosionMaskValue = textureSample(erosionMask, erosionMaskSampler, fragmentInputs.vUV * uniforms.erosionMaskTiling + uniforms.erosionParams.zw).r;
     #endif
     baseColor = quarksErode(baseColor, erosionLevel, erosionMaskValue);
 #endif

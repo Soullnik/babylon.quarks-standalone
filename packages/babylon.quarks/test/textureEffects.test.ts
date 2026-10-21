@@ -72,6 +72,7 @@ describe('texture effects', () => {
             edgeWidth: 0,
             edgeColor: [1, 1, 1],
             maskScroll: [0, 0],
+            maskTiling: [1, 1],
         });
         expect(normalizeErosion({softness: -1, edgeWidth: -2})).toMatchObject({softness: 0.0001, edgeWidth: 0});
         expect(normalizeErosion(undefined)).toBeUndefined();
@@ -183,6 +184,7 @@ describe('texture effects', () => {
                 edgeWidth: 0.1,
                 edgeColor: [1, 0, 0],
                 maskScroll: [0, 0.3],
+                maskTiling: [1, 1],
             });
         }
 
@@ -200,6 +202,61 @@ describe('texture effects', () => {
         for (const key of ['uvScroll', 'gradientMap', 'erosion']) {
             expect(key in plainMaterial).toBe(false);
         }
+        expect('maskTiling' in material.erosion).toBe(false);
+    });
+
+    it('tile the erosion mask on its own scale, batched apart and saved when not 1', () => {
+        const mask = new Texture(null, scene);
+        const renderer = new BatchedRenderer('tiling', scene);
+        const a = system({renderMode: RenderMode.Mesh, erosion: {mask, maskTiling: [0.125, 1]}});
+        const b = system({renderMode: RenderMode.Mesh, erosion: {mask}});
+        [a, b].forEach((s) => renderer.addSystem(s));
+        renderer.update(1 / 60);
+        expect(renderer.systemToBatchIndex.get(a)).not.toBe(renderer.systemToBatchIndex.get(b));
+        const mat = materialOf(renderer, a);
+        expect(uniforms(mat)).toContain('erosionMaskTiling');
+        const tiling = (mat as any)._vectors2.erosionMaskTiling;
+        expect([tiling.x, tiling.y]).toEqual([0.125, 1]);
+        expect(normalizeErosion({})!.maskTiling).toEqual([1, 1]);
+
+        const meta = {geometries: {}, materials: {}, textures: {}} as any;
+        const json = a.toJSON(meta);
+        expect(meta.materials[json.material!].erosion.maskTiling).toEqual([0.125, 1]);
+        expect(ParticleSystem.fromJSON(json, meta, {}, scene).erosion!.maskTiling).toEqual([0.125, 1]);
+        expect(a.clone().erosion!.maskTiling).toEqual([0.125, 1]);
+        for (const source of [particleFragGLSL, physicsFragGLSL, trailFragGLSL]) {
+            expect(source).toContain('vUV * erosionMaskTiling');
+        }
+        for (const source of [particleFragWGSL, physicsFragWGSL, trailFragWGSL]) {
+            expect(source).toContain('vUV * uniforms.erosionMaskTiling');
+        }
+    });
+
+    it('multiply each system by its tint as drawn, leaving its particles and its batch alone', () => {
+        const renderer = new BatchedRenderer('tint', scene);
+        const startColor = new ConstantColor(new Vector4(1, 0.5, 0.25, 1));
+        const tinted = system({startColor, emissionOverTime: new ConstantValue(0)});
+        const plain = system({startColor, emissionOverTime: new ConstantValue(0)});
+        tinted.tint = new Vector4(0.5, 1, 1, 0.25);
+        for (const s of [tinted, plain]) {
+            s.emissionBursts = [{time: 0, count: new ConstantValue(1), cycle: 1, interval: 0, probability: 1}];
+            renderer.addSystem(s);
+        }
+        renderer.update(1 / 60);
+        expect(renderer.systemToBatchIndex.get(tinted)).toBe(renderer.systemToBatchIndex.get(plain));
+        const batch = renderer.batches[renderer.systemToBatchIndex.get(tinted)!] as any;
+        const colors = Array.from(batch.colorBuffer.subarray(0, 8) as Float32Array).map(
+            (v) => Math.round(v * 1e4) / 1e4
+        );
+        // One particle each, in whichever order the batch draws them.
+        expect([colors.slice(0, 4), colors.slice(4, 8)]).toEqual(
+            expect.arrayContaining([
+                [0.5, 0.5, 0.25, 0.25],
+                [1, 0.5, 0.25, 1],
+            ])
+        );
+        const particle = tinted.particles[0];
+        expect([particle.color.x, particle.color.w]).toEqual([1, 1]);
     });
 
     describe('UV distortion', () => {

@@ -223,7 +223,10 @@ function cases(): Case[] {
                     }
                     if (surface.includes('GRADIENT_MAP')) samplers.push('gradientMap');
                     if (surface.includes('EROSION')) uniforms.push('erosionParams', 'erosionEdgeColor');
-                    if (surface.includes('EROSION_MASK')) samplers.push('erosionMask');
+                    if (surface.includes('EROSION_MASK')) {
+                        samplers.push('erosionMask');
+                        uniforms.push('erosionMaskTiling');
+                    }
                     out.push({
                         name: `${target.name} surface [${defines.join(',')}]`,
                         vertex: target.vertex,

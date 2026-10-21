@@ -825,7 +825,7 @@ export class QuarksLoader {
                 matInfo.rim = matDef.rim;
             }
             // Texture effects (QuarksMaterial): uvScroll [u, v], gradientMap texture uuid,
-            // erosion {mask (texture uuid), softness, edgeWidth, edgeColor, maskScroll}.
+            // erosion {mask (texture uuid), softness, edgeWidth, edgeColor, maskScroll, maskTiling}.
             if (Array.isArray(matDef.uvScroll)) {
                 matInfo.uvScroll = matDef.uvScroll;
             }

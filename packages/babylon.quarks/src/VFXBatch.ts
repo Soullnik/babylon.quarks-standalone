@@ -153,6 +153,13 @@ export interface ParticleErosion {
     edgeColor: [number, number, number];
     /** Mask UV scroll, UV units per second. Default `[0, 0]`. */
     maskScroll: [number, number];
+    /**
+     * Times the mask repeats across the particle's UV, `[u, v]`; default
+     * `[1, 1]`. Lets the mask run its own scale while the map tiles: a mesh
+     * whose UV repeats a picture eight times along it takes `[1 / 8, 1]`, and
+     * one gradient then wipes its whole length.
+     */
+    maskTiling: [number, number];
 }
 // Limits worth knowing: the mask is sampled with the UV as drawn (on a sheet,
 // the current tile's), erosion only changes alpha (one-one and premultiplied
@@ -169,12 +176,14 @@ export function normalizeErosion(erosion: Partial<ParticleErosion> | null | unde
         typeof value === 'number' && Number.isFinite(value) ? value : fallback;
     const color = Array.isArray(erosion.edgeColor) ? erosion.edgeColor : [1, 1, 1];
     const scroll = Array.isArray(erosion.maskScroll) ? erosion.maskScroll : [0, 0];
+    const tiling = Array.isArray(erosion.maskTiling) ? erosion.maskTiling : [1, 1];
     return {
         mask: erosion.mask ?? null,
         softness: Math.max(0.0001, num(erosion.softness, 0.05)),
         edgeWidth: Math.max(0, num(erosion.edgeWidth, 0)),
         edgeColor: [num(color[0], 1), num(color[1], 1), num(color[2], 1)],
         maskScroll: [num(scroll[0], 0), num(scroll[1], 0)],
+        maskTiling: [num(tiling[0], 1), num(tiling[1], 1)],
     };
 }
 
@@ -194,7 +203,9 @@ export function erosionEqual(a: ParticleErosion | undefined, b: ParticleErosion 
         a.edgeColor[1] === b.edgeColor[1] &&
         a.edgeColor[2] === b.edgeColor[2] &&
         a.maskScroll[0] === b.maskScroll[0] &&
-        a.maskScroll[1] === b.maskScroll[1]
+        a.maskScroll[1] === b.maskScroll[1] &&
+        a.maskTiling[0] === b.maskTiling[0] &&
+        a.maskTiling[1] === b.maskTiling[1]
     );
 }
 
@@ -574,6 +585,7 @@ export abstract class VFXBatch {
             uniforms.push('erosionParams', 'erosionEdgeColor');
             if (erosion.mask) {
                 samplers.push('erosionMask');
+                uniforms.push('erosionMaskTiling');
             }
         }
     }
@@ -590,6 +602,7 @@ export abstract class VFXBatch {
         if (erosion) {
             if (erosion.mask) {
                 material.setTexture('erosionMask', erosion.mask);
+                material.setVector2('erosionMaskTiling', new BVector2(erosion.maskTiling[0], erosion.maskTiling[1]));
             }
             material.setVector3(
                 'erosionEdgeColor',
