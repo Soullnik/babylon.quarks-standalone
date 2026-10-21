@@ -58,15 +58,6 @@ fn main(input: VertexInputs) -> FragmentInputs {
     // extent and mirrors its texture instead (see quadUV below).
     var avgSize = (abs(vertexInputs.size.x) + abs(vertexInputs.size.y)) * 0.5;
     var mvPosition = uniforms.view * uniforms.world * vec4f(vertexInputs.offset, 1.0);
-#ifdef SIZE_LIMITS
-    // The streak's width on screen as a fraction of the viewport height, held
-    // between the limits; a perspective projection divides by the view depth.
-    let limitDepth = select(1.0, abs(mvPosition.z), abs(uniforms.projection[2][3]) > 0.0);
-    let screenSize = avgSize * uniforms.projection[1][1] / (2.0 * limitDepth);
-    if (screenSize > 0.0) {
-        avgSize *= clamp(screenSize, uniforms.sizeLimits.x, uniforms.sizeLimits.y) / screenSize;
-    }
-#endif
     let viewWorld = uniforms.view * uniforms.world;
     let viewWorld3 = mat3x3f(viewWorld[0].xyz, viewWorld[1].xyz, viewWorld[2].xyz);
     let viewVelocity = viewWorld3 * vertexInputs.velocity.xyz;
@@ -90,6 +81,16 @@ fn main(input: VertexInputs) -> FragmentInputs {
 #endif
 #if defined(BEAM) && defined(BEAM_WIDTH_FROM_LENGTH)
     avgSize *= vlength * uniforms.beamWidthPerLength;
+#endif
+#ifdef SIZE_LIMITS
+    // The streak's width on screen as a fraction of the viewport height, held
+    // between the limits (a beam's once its length has set it); a perspective
+    // projection divides by the view depth.
+    let limitDepth = select(1.0, abs(mvPosition.z), abs(uniforms.projection[2][3]) > 0.0);
+    let screenSize = avgSize * uniforms.projection[1][1] / (2.0 * limitDepth);
+    if (screenSize > 0.0) {
+        avgSize *= clamp(screenSize, uniforms.sizeLimits.x, uniforms.sizeLimits.y) / screenSize;
+    }
 #endif
     let widthOffset = vertexInputs.position.y * side * avgSize;
     // Equivalent to viewVelocity * (1.0 + lengthFactor / vlength) for moving particles, but the

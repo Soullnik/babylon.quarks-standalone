@@ -57,15 +57,6 @@ void main() {
     // extent and mirrors its texture instead (see quadUV below).
     float avgSize = (abs(size.x) + abs(size.y)) * 0.5;
     vec4 mvPosition = view * world * vec4(offset, 1.0);
-#ifdef SIZE_LIMITS
-    // The streak's width on screen as a fraction of the viewport height, held
-    // between the limits; a perspective projection divides by the view depth.
-    float limitDepth = abs(projection[2][3]) > 0.0 ? abs(mvPosition.z) : 1.0;
-    float screenSize = avgSize * projection[1][1] / (2.0 * limitDepth);
-    if (screenSize > 0.0) {
-        avgSize *= clamp(screenSize, sizeLimits.x, sizeLimits.y) / screenSize;
-    }
-#endif
     vec3 viewVelocity = mat3(view * world) * velocity.xyz;
     float vlength = length(viewVelocity);
     // Stretch direction is the velocity direction; only a genuinely motionless particle has none.
@@ -81,6 +72,16 @@ void main() {
 #endif
 #if defined(BEAM) && defined(BEAM_WIDTH_FROM_LENGTH)
     avgSize *= vlength * beamWidthPerLength;
+#endif
+#ifdef SIZE_LIMITS
+    // The streak's width on screen as a fraction of the viewport height, held
+    // between the limits (a beam's once its length has set it); a perspective
+    // projection divides by the view depth.
+    float limitDepth = abs(projection[2][3]) > 0.0 ? abs(mvPosition.z) : 1.0;
+    float screenSize = avgSize * projection[1][1] / (2.0 * limitDepth);
+    if (screenSize > 0.0) {
+        avgSize *= clamp(screenSize, sizeLimits.x, sizeLimits.y) / screenSize;
+    }
 #endif
     mvPosition.xyz += position.y * side * avgSize;
 #ifdef BEAM

@@ -94,9 +94,9 @@ export class FrameOverLife implements Behavior {
     initialize(particle: Particle): void {
         this._frame.startGen(particle.memory);
         this.startFrame?.startGen(particle.memory);
-        if (this.random) {
-            this.salt.startGen(particle.memory);
-        }
+        // Claimed whether or not `random` is on, so turning it on mid-play
+        // reads each particle's own salt, not another generator's slot.
+        this.salt.startGen(particle.memory);
     }
 
     update(particle: Particle, delta: number): void {
@@ -148,7 +148,7 @@ export class FrameOverLife implements Behavior {
         return this.startFrame !== undefined ? Math.floor(this.startFrame.genValue(particle.memory)) : 0;
     }
 
-    /** The particle's salt; 0 for a particle born before `random` was set, which claimed none. */
+    /** The particle's salt; 0 for a particle born before this behaviour was added. */
     private saltOf(particle: Particle): number {
         const value = particle.memory[this.salt.indexCount];
         return typeof value === 'number' ? value : 0;

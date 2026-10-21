@@ -101,7 +101,8 @@ export interface TrailSettings {
      * particle. With the emitter on a blade, the axis along the blade and the
      * width the blade's length, the trail is the surface the blade swept, as a
      * weapon trail (Unreal's AnimTrail) is. The emitter's scale applies to the
-     * width. Unset (the default): a camera-facing ribbon.
+     * width, and so does the axis's length: give a unit vector for the width
+     * as set. Unset (the default): a camera-facing ribbon.
      * @type {Vector3}
      */
     sideAxis?: Vector3;

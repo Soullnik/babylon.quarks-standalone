@@ -649,8 +649,8 @@ export class TrailBatch extends VFXBatch {
         let maxX = -Infinity;
         let maxY = -Infinity;
         let maxZ = -Infinity;
-        // Each sample writes its position twice (both ribbon edges); one of the pair is enough.
-        for (let o = fromVertex * 3, end = toVertex * 3; o < end; o += 6) {
+        // Both of each pair: a swept ribbon's edges lie apart, a facing one's coincide.
+        for (let o = fromVertex * 3, end = toVertex * 3; o < end; o += 3) {
             const x = positions[o];
             const y = positions[o + 1];
             const z = positions[o + 2];

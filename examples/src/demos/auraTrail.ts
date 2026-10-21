@@ -7,10 +7,12 @@ import {CreateCylinder} from '@babylonjs/core/Meshes/Builders/cylinderBuilder';
 import {TransformNode} from '@babylonjs/core/Meshes/transformNode';
 import type {Scene} from '@babylonjs/core/scene';
 import {
+    AxisAngleGenerator,
     Bezier,
     ConstantColor,
     ConstantValue,
     FrameOverLife,
+    IntervalValue,
     ParticleSystem,
     PiecewiseBezier,
     PointEmitter,
@@ -19,6 +21,7 @@ import {
     Vector3,
     Vector3Function,
     Vector4,
+    VelocityOverLife,
 } from 'babylon.quarks';
 import {createColorOverLifeGradient} from '../shared/common';
 import type {DemoContext} from '../types';
@@ -212,7 +215,10 @@ export function init({scene, camera, batchRenderer, systems}: DemoContext) {
         duration: 1,
         looping: true,
         startLife: new ConstantValue(1.4),
-        startSpeed: new ConstantValue(1.6),
+        // Still at birth, each turned its own way about the tube's axis: a
+        // point emitter would fling them, and face them, any which way.
+        startSpeed: new ConstantValue(0),
+        startRotation: new AxisAngleGenerator(new Vector3(0, 1, 0), new IntervalValue(0, Math.PI * 2)),
         startSize: new Vector3Function(new ConstantValue(1), new ConstantValue(0.12), new ConstantValue(1)),
         startColor: new ConstantColor(new Vector4(1, 0.9, 0.5, 1)),
         emissionOverTime: new ConstantValue(1.5),
@@ -226,8 +232,8 @@ export function init({scene, camera, batchRenderer, systems}: DemoContext) {
     });
     rings.addBehavior(new SizeOverLife(new PiecewiseBezier([[new Bezier(1, 0.9, 0.75, 0.65), 0]])));
     rings.addBehavior(createColorOverLifeGradient(new Vector4(1, 1, 1, 1), new Vector4(1, 1, 1, 0)));
+    rings.addBehavior(new VelocityOverLife(new ConstantValue(0), new ConstantValue(1.6)));
     rings.emitter.position = new BVector3(-3.5, 0, 0);
-    rings.emitter.rotation.x = -Math.PI / 2;
 
     // A standing strike flickering between the sheet's columns, now and then
     // a gap: V runs up the beam, and its width keeps the drawing's proportions.

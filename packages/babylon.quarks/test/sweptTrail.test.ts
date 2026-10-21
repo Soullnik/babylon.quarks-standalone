@@ -67,6 +67,23 @@ describe('swept trail', () => {
         expect(sides[last + 2]).toBeCloseTo(-1, 5);
     });
 
+    it('bounds the ribbon by both its edges', () => {
+        const renderer = new BatchedRenderer('swept', scene);
+        const system = blade();
+        renderer.addSystem(system);
+        for (let i = 0; i < 4; i++) {
+            system.emitter.position.z = i;
+            system.emitter.computeWorldMatrix(true);
+            renderer.update(1 / 60);
+        }
+        const min = new Vector3();
+        const max = new Vector3();
+        expect(system.getWorldBounds(min, max)).toBe(true);
+        // The blade is 2 long across X: its edges lie at -1 and +1.
+        expect(min.x).toBeLessThanOrEqual(-1 + 1e-4);
+        expect(max.x).toBeGreaterThanOrEqual(1 - 1e-4);
+    });
+
     it('lays each vertex pair half the width to either side along it, with no camera-facing width', () => {
         const renderer = new BatchedRenderer('swept', scene);
         const system = blade();
