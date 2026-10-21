@@ -6,7 +6,10 @@ import {NullEngine} from '@babylonjs/core/Engines/nullEngine';
 import {StandardMaterial} from '@babylonjs/core/Materials/standardMaterial';
 import {Texture} from '@babylonjs/core/Materials/Textures/texture';
 import {Mesh} from '@babylonjs/core/Meshes/mesh';
+import {TransformNode} from '@babylonjs/core/Meshes/transformNode';
 import {Scene} from '@babylonjs/core/scene';
+import {BatchedRenderer} from '../src/BatchedRenderer';
+import {EffectPool} from '../src/EffectPool';
 import {ParticleEmitter} from '../src/ParticleEmitter';
 import {ParticleSystem} from '../src/ParticleSystem';
 import {QuarksLoader, QuarksLoaderOptions} from '../src/QuarksLoader';
@@ -132,6 +135,36 @@ describe('waiting for textures', () => {
         expect(system(again)).toBe(system(root));
     });
 
+    test('stops waiting for a texture disposed before it loads', async () => {
+        const loading = new QuarksLoader(scene, {waitForTextures: true}).loadFromJSON(effect());
+        await settled(loading);
+        scene.textures.slice().forEach((texture) => texture.dispose());
+        await expect(loading).resolves.toBeInstanceOf(Mesh);
+    });
+
+    test('loads a delayed texture rather than wait for a draw that cannot come', async () => {
+        scene.useDelayedTextureLoading = true;
+        const loading = new QuarksLoader(scene, {waitForTextures: true}).loadFromJSON(effect());
+        await settled(loading);
+        expect([...images.keys()].sort()).toEqual(['https://example.com/a.png', 'https://example.com/p.png']);
+        images.forEach((image) => image.load());
+        await expect(loading).resolves.toBeInstanceOf(Mesh);
+    });
+
+    test('reports an image whose texture fails while it is made', async () => {
+        const onResourceError = jest.fn();
+        const error = new Error('no engine texture');
+        (engine.createTexture as unknown as jest.SpyInstance).mockImplementationOnce(() => {
+            throw error;
+        });
+        const loading = new QuarksLoader(scene, {waitForTextures: true, onResourceError}).loadFromJSON(effect());
+        await settled(loading);
+        images.forEach((image) => image.load());
+        const root = (await loading) as Mesh;
+        expect(onResourceError).toHaveBeenCalledWith('image', 'https://example.com/a.png', error);
+        expect((root.material as StandardMaterial).diffuseTexture).toBeNull();
+    });
+
     test('reports a geometry file that fails, and loads without it', async () => {
         const onResourceError = jest.fn();
         const error = new Error('gone');
@@ -184,9 +217,41 @@ describe('stopping a load', () => {
         );
         await settled(loading);
         controller.abort();
-        release();
+        // The fetch never answers, and the load stops anyway.
         await expect(loading).rejects.toBe(controller.signal.reason);
+        release();
+        await settled(loading);
         expect(nodeCount()).toBe(before);
+    });
+
+    test('a signal reaches the resolver for the effect document, and stops loadAll', async () => {
+        const controller = new AbortController();
+        const fetchJson = jest.fn((_url: string, _options?: {signal?: AbortSignal}) => new Promise<unknown>(() => {}));
+        const loading = new QuarksLoader(scene, {resolver: {fetchJson}}).loadAll(['fx/a.json', 'fx/b.json'], {
+            concurrency: 1,
+            continueOnError: true,
+            signal: controller.signal,
+        });
+        await settled(loading);
+        expect(fetchJson).toHaveBeenCalledTimes(1);
+        expect(fetchJson.mock.calls[0][1]?.signal).toBe(controller.signal);
+        controller.abort();
+        await expect(loading).rejects.toBe(controller.signal.reason);
+        await settled(loading);
+        expect(fetchJson).toHaveBeenCalledTimes(1);
+    });
+
+    test('a failed effect in a batch rejects at once and frees the others still waiting', async () => {
+        const progress = jest.fn();
+        const before = nodeCount();
+        const loading = new QuarksLoader(scene, {waitForTextures: true}).loadFromJSONAll([effect(), {object: null}], {
+            onProgress: progress,
+        });
+        await expect(loading).rejects.toThrow('Not an effect document');
+        expect(nodeCount()).toBe(before);
+        images.forEach((image) => image.load());
+        await settled(loading);
+        expect(progress).not.toHaveBeenCalled();
     });
 
     test('aborting while textures load frees the effect and its textures', async () => {
@@ -267,6 +332,52 @@ describe('disposeEffect', () => {
         QuarksLoader.disposeEffect(source);
         expect(texture.getScene()).toBe(scene);
         QuarksLoader.disposeEffect(copy);
+        expect(texture.getScene()).toBeNull();
+    });
+
+    test('frees what an effect holds however it is disposed', async () => {
+        const loader = new QuarksLoader(scene);
+        const level = new TransformNode('level', scene);
+        const first = (await loader.loadFromJSON(effect())) as Mesh;
+        first.parent = level;
+        const texture = textureOf(first);
+        const second = (await loader.loadFromJSON(effect())) as Mesh;
+        level.dispose();
+        expect(texture.getScene()).toBe(scene);
+        second.dispose();
+        expect(texture.getScene()).toBeNull();
+        QuarksLoader.disposeEffect(second);
+    });
+
+    test('an effect parsed with its own textures frees them', () => {
+        const loader = new QuarksLoader(scene, {shareResources: false});
+        const first = loader.parse(effect()) as Mesh;
+        const second = loader.parse(effect()) as Mesh;
+        expect(textureOf(first)).not.toBe(textureOf(second));
+        const texture = textureOf(first);
+        QuarksLoader.disposeEffect(first);
+        expect(texture.getScene()).toBeNull();
+        expect(textureOf(second).getScene()).toBe(scene);
+    });
+
+    test('a copy of a node inside an effect holds the textures too', async () => {
+        const source = (await new QuarksLoader(scene).loadFromJSON(effect())) as Mesh;
+        const emitter = source.getChildren()[0] as ParticleEmitter;
+        const texture = (emitter.system as ParticleSystem).texture!;
+        const copy = QuarksUtil.instantiate(emitter);
+        QuarksLoader.disposeEffect(source);
+        expect(texture.getScene()).toBe(scene);
+        copy.dispose();
+        expect(texture.getScene()).toBeNull();
+    });
+
+    test("a pool's copies keep the template's textures until the last one goes", async () => {
+        const template = (await new QuarksLoader(scene).loadFromJSON(effect())) as Mesh;
+        const texture = ((template.getChildren()[0] as ParticleEmitter).system as ParticleSystem).texture!;
+        const pool = new EffectPool(template, {renderer: new BatchedRenderer('pool', scene), prewarm: 1});
+        QuarksLoader.disposeEffect(template);
+        expect(texture.getScene()).toBe(scene);
+        pool.dispose();
         expect(texture.getScene()).toBeNull();
     });
 

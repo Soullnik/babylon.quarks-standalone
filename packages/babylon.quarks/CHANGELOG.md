@@ -28,11 +28,15 @@ and the project follows the `quarks.core` 0.x version line.
   Addressables or Unreal streamable handle completing. `onResourceError(kind, url, error)` reports
   each geometry file or image that fails; the effect still loads. A `signal` (`AbortSignal`) in the
   new `QuarksLoadOptions`, and in `QuarksBatchLoadOptions`, cancels a load: it rejects with the
-  signal's reason and leaves no node of the effect in the scene, whatever `continueOnError` says. A
-  scene disposed during a load rejects it the same way.
-- **`QuarksLoader.disposeEffect(root)`** frees a loaded effect with what it owns: its nodes and
-  systems, the materials made for it, and each texture once no other loaded effect, or copy of one,
-  uses it. `root.dispose()` still frees only the nodes and systems.
+  signal's reason as soon as it is aborted and leaves no node of the effect in the scene, whatever
+  `continueOnError` says. The effect document's fetch is cancelled, and a custom
+  `QuarksResourceResolver.fetchJson` gets the signal for it. A scene disposed during a load rejects
+  it the same way, and a batch whose effect fails stops waiting on the others' textures.
+- **A loaded effect frees what it owns when it is disposed**: the materials made for it, and each
+  texture once no other loaded effect, or copy of one, uses it. This holds however the root goes
+  (`root.dispose()`, its parent's or the scene's); `QuarksLoader.disposeEffect(root)` says so in
+  code. Before, those materials and textures stayed in the scene. A material or texture of a loaded
+  effect handed to other code is freed with the effect.
 
 - **Soft particles and alpha test on trails.** `softParticles` and `alphaTest` now apply to trails
   as to every other render mode, in GLSL and WGSL. Before, a trail accepted them, batched on them
@@ -134,8 +138,8 @@ and the project follows the `quarks.core` 0.x version line.
 ### Fixed
 
 - **A texture whose image failed to load is no longer shared.** The next load of the same image
-  tries it again instead of reusing the broken texture.
-
+  tries it again instead of reusing the broken texture. A texture the engine cannot make at all is
+  reported and left out instead of failing the load.
 - **A loader read the images of the document it parsed before.** A document with textures but no
   `images` loaded the previous document's pictures. Each parse now has its own.
 - **`loadPlugin` did not record the plugin**, so loading it again ran `initialize` again and

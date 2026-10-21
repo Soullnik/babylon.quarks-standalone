@@ -1,4 +1,5 @@
 import {Constants} from '@babylonjs/core/Engines/constants';
+import type {ITextureCreationOptions} from '@babylonjs/core/Materials/Textures/texture';
 import {Texture} from '@babylonjs/core/Materials/Textures/texture';
 import type {Material} from '@babylonjs/core/Materials/material';
 import {StandardMaterial} from '@babylonjs/core/Materials/standardMaterial';
@@ -25,8 +26,12 @@ export type QuarksResourceKind = 'effect' | 'geometry' | 'image';
 export interface QuarksResourceResolver {
     /** Resolve a relative url to an absolute / blob / data url. Default: {@link QuarksLoader.joinUrl}. */
     resolve?(url: string, kind: QuarksResourceKind, baseUrl: string): string | Promise<string>;
-    /** Load a JSON asset (geometry files). Default: `fetch(resolvedUrl).json()`. */
-    fetchJson?(resolvedUrl: string): Promise<unknown>;
+    /**
+     * Load a JSON asset (effect and geometry files). Default: `fetch(resolvedUrl).json()`.
+     * `options.signal` is passed for an effect document, whose fetch belongs to one load; geometry
+     * fetches are shared between loads and get none.
+     */
+    fetchJson?(resolvedUrl: string, options?: {signal?: AbortSignal}): Promise<unknown>;
 }
 
 export interface QuarksLoaderOptions {
@@ -45,7 +50,8 @@ export interface QuarksLoaderOptions {
     /**
      * Makes `load`, `loadFromJSON`, `loadAll` and `loadFromJSONAll` resolve only once every texture
      * the effect uses has loaded or failed, so it does not draw its first frames without them.
-     * `parse` never waits. Default false: they resolve when the nodes are built.
+     * A texture a scene with `useDelayedTextureLoading` would load only once drawn is loaded at
+     * once. `parse` never waits. Default false: they resolve when the nodes are built.
      */
     waitForTextures?: boolean;
     /**
@@ -58,9 +64,10 @@ export interface QuarksLoaderOptions {
 /** Options for one {@link QuarksLoader.load} or {@link QuarksLoader.loadFromJSON}. */
 export interface QuarksLoadOptions {
     /**
-     * Cancels the load, e.g. on a level change. The promise rejects with the signal's reason and
-     * no node of the effect is left in the scene. A scene disposed during the load rejects it the
-     * same way.
+     * Cancels the load, e.g. on a level change. The promise rejects with the signal's reason as
+     * soon as it is aborted, and no node of the effect is left in the scene. The effect document's
+     * own fetch is cancelled; a geometry fetch shared with other loads runs on, and its result is
+     * dropped. A scene disposed during the load rejects it the same way.
      */
     signal?: AbortSignal;
 }
@@ -185,14 +192,31 @@ function detachDocument(json: any): any {
 /** Settles when a texture the loader made has loaded or failed. */
 const textureSettled = new WeakMap<Texture, Promise<void>>();
 
-/** Rejects with the reason a load stops early: its signal was aborted, or its scene disposed. */
+const abortReason = (signal: AbortSignal) => signal.reason ?? new Error('[QuarksLoader] The load was aborted.');
+const sceneDisposed = () => new Error('[QuarksLoader] The scene was disposed while the effect loaded.');
+
+/** Throws the reason a load stops early: its signal was aborted, or its scene disposed. */
 function checkLoad(scene: Scene, signal: AbortSignal | undefined): void {
     if (signal?.aborted) {
-        throw signal.reason ?? new Error('[QuarksLoader] The load was aborted.');
+        throw abortReason(signal);
     }
     if (scene.isDisposed) {
-        throw new Error('[QuarksLoader] The scene was disposed while the effect loaded.');
+        throw sceneDisposed();
     }
+}
+
+/** Follows `promise`, or rejects as {@link checkLoad} would as soon as the load is stopped. */
+function untilStopped<T>(promise: Promise<T>, scene: Scene, signal: AbortSignal | undefined): Promise<T> {
+    checkLoad(scene, signal);
+    return new Promise<T>((resolve, reject) => {
+        const aborted = () => reject(abortReason(signal!));
+        signal?.addEventListener('abort', aborted, {once: true});
+        const disposed = scene.onDisposeObservable.addOnce(() => reject(sceneDisposed()));
+        promise.then(resolve, reject).finally(() => {
+            signal?.removeEventListener('abort', aborted);
+            scene.onDisposeObservable.remove(disposed);
+        });
+    });
 }
 
 interface LoadedMeta {
@@ -219,8 +243,11 @@ export class QuarksLoader {
      * with {@link disposeEffect}.
      */
     async load(url: string, options: QuarksLoadOptions = {}): Promise<TransformNode> {
-        checkLoad(this.scene, options.signal);
-        const {json, baseUrl} = await this.fetchEffectDocument(url, options.signal);
+        const {json, baseUrl} = await untilStopped(
+            this.fetchEffectDocument(url, options.signal),
+            this.scene,
+            options.signal
+        );
         return this.loadFromJSON(json, baseUrl, options);
     }
 
@@ -235,8 +262,7 @@ export class QuarksLoader {
         checkLoad(this.scene, signal);
         const resolvedBase = baseUrl ?? this.options.baseUrl ?? '';
         json = detachDocument(json);
-        await this.resolveResources(json, resolvedBase);
-        checkLoad(this.scene, signal);
+        await untilStopped(this.resolveResources(json, resolvedBase), this.scene, signal);
         // The urls are resolved now; joining them with the base again would load `fx/fx/...`.
         const loaded = this.parseDocument(json, '');
         await this.finishLoad(loaded, signal);
@@ -248,8 +274,9 @@ export class QuarksLoader {
      * each texture it uses once no other loaded effect uses it (textures are shared per scene,
      * see {@link QuarksLoaderOptions.shareResources}). Copies made with
      * `QuarksUtil.instantiate` hold the textures too, so disposing the source effect leaves them
-     * drawing. Calling `root.dispose()` instead frees the nodes and systems and leaves the
-     * textures and materials in the scene. For a root the loader did not build, this is
+     * drawing. The same happens when the root is disposed any other way (`root.dispose()`, its
+     * parent's dispose, the scene's). The materials and textures are freed even when other code
+     * was handed them; give that code its own. For a root the loader did not build, this is
      * `root.dispose()`.
      */
     static disposeEffect(root: TransformNode): void {
@@ -261,20 +288,20 @@ export class QuarksLoader {
      * load is stopped meanwhile.
      */
     private async finishLoad(loaded: {root: TransformNode; textures: Texture[]}, signal?: AbortSignal): Promise<void> {
-        if (this.options.waitForTextures) {
-            const ready = Promise.all(loaded.textures.map((texture) => textureSettled.get(texture)));
-            let stop!: () => void;
-            const stopped = new Promise<void>((resolve) => (stop = () => resolve()));
-            signal?.addEventListener('abort', stop, {once: true});
-            const disposed = this.scene.onDisposeObservable.addOnce(() => stop());
-            try {
-                await Promise.race([ready, stopped]);
-            } finally {
-                signal?.removeEventListener('abort', stop);
-                this.scene.onDisposeObservable.remove(disposed);
-            }
-        }
         try {
+            if (this.options.waitForTextures) {
+                for (const texture of loaded.textures) {
+                    // A delayed texture would load only once drawn, which it is not until the load resolves.
+                    if (texture.delayLoadState === Constants.DELAYLOADSTATE_NOTLOADED) {
+                        texture.delayLoad();
+                    }
+                }
+                await untilStopped(
+                    Promise.all(loaded.textures.map((texture) => textureSettled.get(texture))),
+                    this.scene,
+                    signal
+                );
+            }
             checkLoad(this.scene, signal);
         } catch (err) {
             if (!this.scene.isDisposed) {
@@ -303,7 +330,8 @@ export class QuarksLoader {
     ): Promise<(TransformNode | null)[]>;
     async loadAll(urls: string[], options: QuarksBatchLoadOptions = {}): Promise<(TransformNode | null)[]> {
         checkLoad(this.scene, options.signal);
-        const docs = await QuarksLoader.mapPool(urls, options.concurrency, async (url, index) => {
+        const fetching = QuarksLoader.mapPool(urls, options.concurrency, async (url, index) => {
+            checkLoad(this.scene, options.signal);
             try {
                 return await this.fetchEffectDocument(url, options.signal);
             } catch (err) {
@@ -315,6 +343,7 @@ export class QuarksLoader {
                 return null;
             }
         });
+        const docs = await untilStopped(fetching, this.scene, options.signal);
         return this.loadDocuments(docs, options);
     }
 
@@ -423,6 +452,11 @@ export class QuarksLoader {
      * {@link QuarksFormatError}. Free the effect with {@link disposeEffect}.
      */
     parse(json: any, baseUrl: string = ''): TransformNode {
+        return this.parseDocument(json, baseUrl).root;
+    }
+
+    /** {@link parse}, and the textures the effect uses. */
+    private parseDocument(json: any, baseUrl: string): {root: TransformNode; textures: Texture[]} {
         if (json === null || typeof json !== 'object' || json.object === null || typeof json.object !== 'object') {
             throw new QuarksFormatError('[QuarksLoader] Not an effect document: it has no "object" to load.');
         }
@@ -432,14 +466,6 @@ export class QuarksLoader {
                 `[QuarksLoader] This effect was written in format ${format}, newer than the ${QUARKS_FORMAT_VERSION} ` +
                     'this version of babylon.quarks reads; settings it does not know are left out.'
             );
-        }
-        return this.parseDocument(json, baseUrl).root;
-    }
-
-    /** {@link parse}, and the textures the effect uses. */
-    private parseDocument(json: any, baseUrl: string): {root: TransformNode; textures: Texture[]} {
-        if (json === null || typeof json !== 'object' || json.object === null || typeof json.object !== 'object') {
-            throw new QuarksFormatError('[QuarksLoader] Not an effect document: it has no "object" to load.');
         }
         const meta: LoadedMeta = {
             ownedMaterials: [],
@@ -731,13 +757,30 @@ export class QuarksLoader {
         if (total === 0) {
             return [];
         }
-        const signal = options.signal;
+        checkLoad(this.scene, options.signal);
+        // Stops the whole batch on abort, and the effects still waiting for textures once one fails.
+        const stopAll = new AbortController();
+        const abort = () => stopAll.abort(abortReason(options.signal!));
+        options.signal?.addEventListener('abort', abort, {once: true});
+        try {
+            return await this.loadResolvedDocuments(docs, options, stopAll);
+        } finally {
+            options.signal?.removeEventListener('abort', abort);
+        }
+    }
 
+    private async loadResolvedDocuments(
+        docs: Array<{json: any; baseUrl: string} | null>,
+        options: QuarksBatchLoadOptions,
+        stopAll: AbortController
+    ): Promise<(TransformNode | null)[]> {
+        const total = docs.length;
+        const signal = stopAll.signal;
         const results: (TransformNode | null)[] = new Array(total).fill(null);
         const settled = new Array<boolean>(total).fill(false);
         let done = 0;
         const settle = (index: number, value: TransformNode | null) => {
-            if (settled[index]) {
+            if (settled[index] || signal.aborted) {
                 return;
             }
             settled[index] = true;
@@ -746,25 +789,27 @@ export class QuarksLoader {
             options.onProgress?.(done, total);
         };
 
-        checkLoad(this.scene, signal);
-        await Promise.all(
-            docs.map(async (doc, i) => {
-                if (!doc) {
-                    return;
-                }
-                try {
-                    await this.resolveResources(doc.json, doc.baseUrl);
-                } catch (err) {
-                    if (!options.continueOnError) {
-                        throw err;
+        await untilStopped(
+            Promise.all(
+                docs.map(async (doc, i) => {
+                    if (!doc) {
+                        return;
                     }
-                    console.warn(`[QuarksLoader] Failed to resolve resources for effect ${i + 1}/${total}:`, err);
-                    docs[i] = null;
-                    settle(i, null);
-                }
-            })
+                    try {
+                        await this.resolveResources(doc.json, doc.baseUrl);
+                    } catch (err) {
+                        if (!options.continueOnError) {
+                            throw err;
+                        }
+                        console.warn(`[QuarksLoader] Failed to resolve resources for effect ${i + 1}/${total}:`, err);
+                        docs[i] = null;
+                        settle(i, null);
+                    }
+                })
+            ),
+            this.scene,
+            signal
         );
-        checkLoad(this.scene, signal);
 
         const loaded: Array<{root: TransformNode; textures: Texture[]}> = [];
         const finishing: Promise<void>[] = [];
@@ -796,8 +841,11 @@ export class QuarksLoader {
             }
             await Promise.all(finishing);
         } catch (err) {
-            // One failure, or the load stopped: free every effect already built.
-            await Promise.allSettled(finishing);
+            // One failure, or the load stopped: stop the rest and free every effect already built.
+            if (!signal.aborted) {
+                stopAll.abort(err);
+            }
+            void Promise.allSettled(finishing);
             if (!this.scene.isDisposed) {
                 loaded.forEach((effect) => disposeEffect(effect.root));
             }
@@ -852,7 +900,7 @@ export class QuarksLoader {
     ): Promise<unknown> {
         const load = async () => {
             if (resolver?.fetchJson) {
-                return resolver.fetchJson(resolvedUrl);
+                return signal ? resolver.fetchJson(resolvedUrl, {signal}) : resolver.fetchJson(resolvedUrl);
             }
             // Only an uncached fetch (an effect document) can be cancelled: a cached one is shared.
             const response = await (signal ? fetch(resolvedUrl, {signal}) : fetch(resolvedUrl));
@@ -979,7 +1027,10 @@ export class QuarksLoader {
                 let settle!: () => void;
                 const settled = new Promise<void>((resolve) => (settle = resolve));
                 let failed = false;
-                const texture: Texture = new Texture(imageUrl, this.scene, {
+                // Babylon calls onError from inside the constructor, before `texture` is assigned, and
+                // then throws, when the engine cannot make the texture at all.
+                let texture: Texture | undefined = undefined;
+                const options: ITextureCreationOptions = {
                     noMipmap,
                     invertY,
                     samplingMode: typeof texDef.samplingMode === 'number' ? texDef.samplingMode : undefined,
@@ -993,8 +1044,17 @@ export class QuarksLoader {
                         this.reportResourceError('image', imageUrl, exception ?? message);
                         settle();
                     },
-                });
+                };
+                try {
+                    texture = new Texture(imageUrl, this.scene, options);
+                } catch {
+                    // Reported through onError: the effect draws without this texture.
+                    meta.textures[texDef.uuid] = null;
+                    continue;
+                }
                 textureSettled.set(texture, settled);
+                // A texture disposed before it loads never will.
+                texture.onDisposeObservable.addOnce(() => settle());
                 if (Array.isArray(texDef.wrap)) {
                     texture.wrapU = this.mapWrapMode(texDef.wrap[0]);
                     texture.wrapV = this.mapWrapMode(texDef.wrap[1] ?? texDef.wrap[0]);
