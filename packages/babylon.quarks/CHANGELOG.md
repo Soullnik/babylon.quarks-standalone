@@ -4,7 +4,7 @@ All notable changes to the `babylon.quarks` package are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project follows the `quarks.core` 0.x version line.
 
-## [Unreleased]
+## [0.27.0] — 2026-10-21
 
 ### Added
 

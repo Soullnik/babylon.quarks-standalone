@@ -4,7 +4,7 @@ All notable changes to the `babylon.quarks-editor` package are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project follows the `quarks.core` 0.x version line.
 
-## [Unreleased]
+## [0.27.0] — 2026-10-21
 
 ### Added
 
@@ -14,8 +14,8 @@ and the project follows the `quarks.core` 0.x version line.
 
 - **Node ESM and webpack 5 could not import the package.** `dist` was compiled with relative and
   `@babylonjs` deep imports that had no file extension. Every import now ends in `.js`.
-- The `babylon.quarks` peer range was `>=0.17.0`, but the editor needs 0.26 APIs (beam mode,
-  rim fade, culling and sort settings). It is now `~0.26.0`.
+- The `babylon.quarks` peer range was `>=0.17.0`, but the editor needs current APIs (beam mode,
+  rim fade, culling and sort settings). It is now `~0.27.0`.
 
 ## [0.26.0] — 2026-10-21
 
