@@ -31,7 +31,7 @@ export type {
     ParticleSystemParameters,
     ScalingMode,
 } from './ParticleSystem';
-export {QuarksLoader} from './QuarksLoader';
+export {QuarksFormatError, QuarksLoader} from './QuarksLoader';
 export type {
     QuarksBatchLoadOptions,
     QuarksJSONLoadEntry,
@@ -41,6 +41,15 @@ export type {
 } from './QuarksLoader';
 export {QuarksPrefab} from './QuarksPrefab';
 export type {AnimationData, QuarksTimelineClip} from './QuarksPrefab';
+export {QUARKS_FORMAT_VERSION, serializeEffect} from './QuarksSerializer';
+export type {
+    QuarksEffectJSON,
+    QuarksGeometryJSON,
+    QuarksImageJSON,
+    QuarksNodeJSON,
+    QuarksTextureJSON,
+    SerializeEffectOptions,
+} from './QuarksSerializer';
 export {QuarksUtil} from './QuarksUtil';
 export * from './shaders/';
 export {decodeSoftDepth, softDepthParams} from './softDepth';

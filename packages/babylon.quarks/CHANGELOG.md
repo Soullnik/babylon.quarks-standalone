@@ -8,6 +8,19 @@ and the project follows the `quarks.core` 0.x version line.
 
 ### Added
 
+- **`serializeEffect(root, options?)` writes a whole effect** as one document `QuarksLoader`
+  loads back, the counterpart of `loader.load()`. It writes the node tree (groups, emitters, mesh
+  nodes with their geometry, prefabs with `timeScale`), each texture with its sampler state, and a
+  format version. The result is plain data, so `JSON.stringify` takes it; a loaded effect saved
+  again writes the same file. A texture with no url a file can point at is reported through
+  `onWarning`. Options: `filter` to leave out helper nodes, `generator`, and `name` for several
+  roots. The document types are exported (`QuarksEffectJSON` and the rest), and the format is
+  described in `docs/FORMAT.md`. Before, `ParticleSystem.toJSON` left live textures and materials
+  in its meta, and every caller wrote its own envelope.
+- **Effect files carry a format version**, `metadata.quarksFormat` (`QUARKS_FORMAT_VERSION`). The
+  loader warns about a file from a newer version. Files without one still load.
+- **`QuarksFormatError`**, thrown by `QuarksLoader.parse` for a document with no `object`.
+
 - **Soft particles and alpha test on trails.** `softParticles` and `alphaTest` now apply to trails
   as to every other render mode, in GLSL and WGSL. Before, a trail accepted them, batched on them
   and drew hard with a fixed 0.01 cutoff.
@@ -17,6 +30,19 @@ and the project follows the `quarks.core` 0.x version line.
 - **`disposeEnvAtlas(cube, scene?)`** drops the env atlases built for a cube.
 
 ### Changed
+
+- **`loadFromJSON` and `loadFromJSONAll` no longer change the document they are given.** They
+  resolve urls and inline geometry files on a copy, so one document can be loaded many times, into
+  several scenes or with several base urls. Code that read the resolved urls back from its own
+  document should call `resolveResources` (which still works in place) or read the loaded nodes.
+- **Unreadable parts of an effect warn and take their default** instead of throwing a `TypeError`
+  or going silent: an unknown shape gives a point emitter, an unknown behavior is skipped with a
+  warning, an unknown curve or colour type warns, and a setting the file leaves out (a system's
+  `startLife`, a behavior's `bounce`, `dampen`, vectors or speed range) takes the constructor's
+  default. A mesh surface shape whose mesh is not in the effect warns, as a sub emitter does.
+- **Systems of one document share geometry and texture entries.** `ParticleSystem.toJSON(meta)`
+  writes a geometry or texture once per `meta`, however many systems or slots use it, and numbers
+  its ids per document, so the same effect serializes to the same file.
 
 - **Trails face the camera in view space (breaking for custom trail shaders)**, across their
   tangent and the line of sight, like Unity's View alignment and Niagara's ribbons. The width is
@@ -85,6 +111,12 @@ and the project follows the `quarks.core` 0.x version line.
   `VFXBatch.applyDepthTexture` takes a depth binding as well as a texture.
 
 ### Fixed
+
+- **A loader read the images of the document it parsed before.** A document with textures but no
+  `images` loaded the previous document's pictures. Each parse now has its own.
+- **`loadPlugin` did not record the plugin**, so loading it again ran `initialize` again and
+  `unloadPlugin` removed nothing. `unloadPlugin` now removes only the types that plugin registered.
+- **`QuarksPrefab.timeScale` was not read from files.**
 
 - **A trail's live tip folded back over its head** on frames where the last step ran ahead of the
   display, about every other frame at 120 Hz. The head is now drawn back along its last segment

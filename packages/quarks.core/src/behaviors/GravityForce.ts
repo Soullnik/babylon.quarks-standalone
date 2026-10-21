@@ -1,5 +1,6 @@
 import {Particle} from '../Particle';
 import {Vector3} from '../math';
+import {readVector3} from '../util/JSONUtil';
 import {Behavior} from './Behavior';
 
 /**
@@ -69,7 +70,10 @@ export class GravityForce implements Behavior {
     }
 
     static fromJSON(json: any): Behavior {
-        return new GravityForce(new Vector3(json.center[0], json.center[1], json.center[2]), json.magnitude);
+        return new GravityForce(
+            readVector3(json.center, new Vector3(0, 0, 0)),
+            typeof json.magnitude === 'number' ? json.magnitude : 0
+        );
     }
 
     clone(): Behavior {

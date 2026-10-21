@@ -1,6 +1,7 @@
 import {Particle} from '../Particle';
 import {ParticleStore} from '../ParticleStore';
 import {Vector3} from '../math';
+import {readVector3} from '../util/JSONUtil';
 import SimplexNoise from '../util/SimplexNoise';
 import {random} from '../util/random';
 import {Behavior} from './Behavior';
@@ -120,10 +121,10 @@ export class TurbulenceField implements Behavior {
 
     static fromJSON(json: any): Behavior {
         return new TurbulenceField(
-            new Vector3(json.scale[0], json.scale[1], json.scale[2]),
-            json.octaves,
-            new Vector3(json.velocityMultiplier[0], json.velocityMultiplier[1], json.velocityMultiplier[2]),
-            new Vector3(json.timeScale[0], json.timeScale[1], json.timeScale[2])
+            readVector3(json.scale, new Vector3(1, 1, 1)),
+            typeof json.octaves === 'number' ? json.octaves : 1,
+            readVector3(json.velocityMultiplier, new Vector3(1, 1, 1)),
+            readVector3(json.timeScale, new Vector3(1, 1, 1))
         );
     }
 

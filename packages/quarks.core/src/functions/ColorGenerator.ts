@@ -1,5 +1,5 @@
 import {Vector4} from '../math';
-import {ColorToJSON, JSONToColor} from '../util/JSONUtil';
+import {ColorToJSON, describeType, JSONToColor, warnFormat} from '../util/JSONUtil';
 import {ColorRange} from './ColorRange';
 import {FunctionJSON} from './FunctionJSON';
 import {GeneratorMemory} from './GeneratorMemory';
@@ -52,8 +52,9 @@ export class ConstantColor implements ColorGenerator {
     }
 }
 
+/** Reads a colour generator; an unknown or missing type warns and gives opaque white. */
 export function ColorGeneratorFromJSON(json: FunctionJSON) {
-    switch (json.type) {
+    switch (json?.type) {
         case 'ConstantColor':
             return ConstantColor.fromJSON(json);
         case 'ColorRange':
@@ -65,6 +66,7 @@ export function ColorGeneratorFromJSON(json: FunctionJSON) {
         case 'RandomColorBetweenGradient':
             return RandomColorBetweenGradient.fromJSON(json);
         default:
+            warnFormat(`Unknown colour generator ${describeType(json)}; using white.`);
             return new ConstantColor(new Vector4(1, 1, 1, 1));
     }
 }

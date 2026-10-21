@@ -1,7 +1,6 @@
-import {Matrix, Quaternion} from '@babylonjs/core/Maths/math.vector.js';
 import {TransformNode} from '@babylonjs/core/Meshes/transformNode.js';
 import type {ParticleSystem} from 'babylon.quarks';
-import {ParticleEmitter, quarksNodeId} from 'babylon.quarks';
+import {ParticleEmitter, serializeEffect} from 'babylon.quarks';
 import {isEditorSceneNode} from './editorScene.js';
 
 /** A node in the editor's effect hierarchy: a Group (organizational) or a ParticleEmitter. */
@@ -45,37 +44,14 @@ export function collectSystems(tree: EffectTreeNode): ParticleSystem[] {
     return out;
 }
 
-interface SerializeMeta {
-    textures: {[k: string]: {url?: string; name?: string; invertY?: boolean}};
-    materials: {[k: string]: {[key: string]: unknown}};
-    geometries: {[k: string]: unknown};
-}
-
-function localMatrix(node: TransformNode): number[] {
-    const rotation = node.rotationQuaternion ?? Quaternion.FromEulerVector(node.rotation);
-    return Matrix.Compose(node.scaling, rotation, node.position).asArray().slice();
-}
-
-function serializeNode(tree: EffectTreeNode, meta: SerializeMeta): Record<string, unknown> {
-    // Every node is written under quarksNodeId, which is also what sub emitters, mesh surface
-    // shapes and prefab animations write to name it, so QuarksLoader can relink them on reimport.
-    const uuid = quarksNodeId(tree.node);
-    const children = tree.children.map((child) => serializeNode(child, meta));
-    const base = {
-        uuid,
-        name: tree.name,
-        layers: 1,
-        matrix: localMatrix(tree.node),
-        children: children.length > 0 ? children : undefined,
-    };
-    if (tree.system) {
-        return {
-            ...base,
-            type: 'ParticleEmitter',
-            ps: tree.system.toJSON(meta as never, {useUrlForImage: true} as never),
-        };
-    }
-    return {...base, type: 'Group'};
+/** Writes the effect under `roots`, leaving out the editor's own helper nodes. */
+function serialize(roots: TransformNode | TransformNode[], name: string): string {
+    const json = serializeEffect(roots, {
+        name,
+        generator: 'babylon.quarks-editor',
+        filter: (node) => !isEditorSceneNode(node),
+    });
+    return JSON.stringify(json, null, 2);
 }
 
 /**
@@ -83,9 +59,7 @@ function serializeNode(tree: EffectTreeNode, meta: SerializeMeta): Record<string
  * preserving the group/emitter hierarchy (not flattened).
  */
 export function serializeEffectTree(root: TransformNode, name = 'effect'): string {
-    const meta: SerializeMeta = {textures: {}, materials: {}, geometries: {}};
-    const object = serializeNode(buildEffectTree(root), meta);
-    return finishEnvelope(object, meta);
+    return serialize(root, name);
 }
 
 /**
@@ -93,64 +67,5 @@ export function serializeEffectTree(root: TransformNode, name = 'effect'): strin
  * spans multiple top-level trees (e.g. a demo running several loaded effects at once).
  */
 export function serializeEffectForest(roots: TransformNode[], name = 'effect'): string {
-    if (roots.length === 1) {
-        return serializeEffectTree(roots[0], name);
-    }
-    const meta: SerializeMeta = {textures: {}, materials: {}, geometries: {}};
-    const children = roots.map((root) => serializeNode(buildEffectTree(root), meta));
-    const object = {
-        uuid: `${name}-root`,
-        name,
-        type: 'Group',
-        layers: 1,
-        matrix: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1],
-        children,
-    };
-    return finishEnvelope(object, meta);
-}
-
-/** Flattens accumulated meta and wraps the serialized object into the Quarks envelope. */
-function finishEnvelope(object: Record<string, unknown>, meta: SerializeMeta): string {
-    // toJSON stashes live Texture instances and material records in meta; flatten them into
-    // the serializable images/textures/materials arrays QuarksLoader expects.
-    const images: Array<{uuid: string; url: string}> = [];
-    const textures: Array<{uuid: string; image?: string; invertY?: boolean; noMipmap?: boolean}> = [];
-    for (const [uuid, tex] of Object.entries(meta.textures)) {
-        const url = tex?.url ?? tex?.name;
-        const invertY = typeof tex?.invertY === 'boolean' ? tex.invertY : undefined;
-        const isEnvAtlas =
-            tex?.name === 'quarksEnvAtlas' || (typeof tex?.name === 'string' && tex.name.endsWith('_envAtlas'));
-        if (url) {
-            const imageUuid = `${uuid}-image`;
-            images.push({uuid: imageUuid, url});
-            const entry: {uuid: string; image?: string; invertY?: boolean; noMipmap?: boolean} = {
-                uuid,
-                image: imageUuid,
-            };
-            if (invertY === false || isEnvAtlas) {
-                entry.invertY = false;
-                entry.noMipmap = true;
-            }
-            textures.push(entry);
-        } else {
-            textures.push({uuid});
-        }
-    }
-    const materials = Object.values(meta.materials).map((material) => {
-        const {sourceMaterial: _sourceMaterial, ...serializable} = material;
-        return serializable;
-    });
-
-    return JSON.stringify(
-        {
-            metadata: {version: 4.5, type: 'Object3D', generator: 'babylon.quarks-editor'},
-            geometries: Object.values(meta.geometries),
-            materials,
-            textures,
-            images,
-            object,
-        },
-        null,
-        2
-    );
+    return serialize(roots.length === 1 ? roots[0] : roots, name);
 }

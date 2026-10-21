@@ -84,8 +84,8 @@ export class ApplySequences implements Behavior {
     }
 
     static fromJSON(json: any): Behavior {
-        const seq = new ApplySequences(json.delay);
-        json.sequencers.forEach((sequencerJson: any) => {
+        const seq = new ApplySequences(typeof json.delay === 'number' ? json.delay : 0);
+        (Array.isArray(json.sequencers) ? json.sequencers : []).forEach((sequencerJson: any) => {
             seq.sequencers.push([
                 ValueGeneratorFromJSON(sequencerJson.range) as IntervalValue,
                 SequencerFromJSON(sequencerJson.sequencer),

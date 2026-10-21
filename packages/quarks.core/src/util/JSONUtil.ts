@@ -37,3 +37,21 @@ export const ValueToJSON = (value: any, type: string) => {
             return value;
     }
 };
+
+/**
+ * Reports a part of an effect file that could not be read as written, and what was used instead.
+ * Loading goes on: one unknown behavior or curve type should not cost the whole effect.
+ */
+export const warnFormat = (message: string): void => {
+    console.warn(`[quarks] ${message}`);
+};
+
+/** `[x, y, z]` from JSON as a Vector3, or `fallback` when the field is missing or not an array. */
+export const readVector3 = (json: unknown, fallback: Vector3): Vector3 =>
+    Array.isArray(json) ? new Vector3(json[0] ?? fallback.x, json[1] ?? fallback.y, json[2] ?? fallback.z) : fallback;
+
+/** The `type` of a JSON part, for a message: `"Foo"`, or `nothing` when it has none. */
+export const describeType = (json: unknown): string => {
+    const type = (json as {type?: unknown} | null | undefined)?.type;
+    return type === undefined ? 'nothing' : JSON.stringify(type);
+};

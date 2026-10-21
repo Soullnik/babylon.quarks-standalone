@@ -282,8 +282,9 @@ export class Noise implements Behavior {
         return new Noise(
             ValueGeneratorFromJSON(json.frequency),
             ValueGeneratorFromJSON(json.power),
-            ValueGeneratorFromJSON(json.positionAmount),
-            ValueGeneratorFromJSON(json.rotationAmount),
+            // Files written before the amounts existed take the constructor's.
+            json.positionAmount ? ValueGeneratorFromJSON(json.positionAmount) : undefined,
+            json.rotationAmount ? ValueGeneratorFromJSON(json.rotationAmount) : undefined,
             json.scrollSpeed ? ValueGeneratorFromJSON(json.scrollSpeed) : new ConstantValue(0),
             json.remap ? (ValueGeneratorFromJSON(json.remap) as FunctionValueGenerator) : undefined
         );

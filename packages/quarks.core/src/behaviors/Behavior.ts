@@ -1,6 +1,7 @@
 import {IParticleSystem} from '../IParticleSystem';
 import {Particle} from '../Particle';
 import {Constructable, ParameterPair} from '../TypeUtil';
+import {describeType, warnFormat} from '../util/JSONUtil';
 import {ApplyCollision} from './ApplyCollision';
 import {ApplyForce} from './ApplyForce';
 import {ApplySequences} from './ApplySequences';
@@ -254,9 +255,15 @@ export const BehaviorTypes: {[key: string]: BehaviorPlugin} = {
     },
 };
 
+/**
+ * Reads a behavior. A type no plugin registered warns and gives `null`; the system loads without
+ * that behavior.
+ */
 export function BehaviorFromJSON(json: any, particleSystem: IParticleSystem): Behavior | null {
-    if (BehaviorTypes[json.type]) {
-        return BehaviorTypes[json.type].loadJSON(json, particleSystem);
+    const behavior = json ? BehaviorTypes[json.type] : undefined;
+    if (behavior) {
+        return behavior.loadJSON(json, particleSystem);
     }
+    warnFormat(`Unknown behavior ${describeType(json)}; it is skipped.`);
     return null;
 }

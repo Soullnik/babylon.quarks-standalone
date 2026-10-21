@@ -4,6 +4,15 @@ All notable changes to the `babylon.quarks-editor` package are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project follows the `quarks.core` 0.x version line.
 
+## [Unreleased]
+
+### Fixed
+
+- **Saving lost mesh nodes and texture settings.** The editor now saves through `serializeEffect`:
+  mesh nodes keep their geometry (so mesh surface emitters still emit after a save and reload),
+  and textures keep their wrap, sampling, repeat, offset and rotation. Textures with no url a file
+  can point at are reported instead of written as an empty entry.
+
 ## [0.27.0] — 2026-10-21
 
 ### Added
