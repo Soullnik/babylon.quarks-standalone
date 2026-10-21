@@ -12,13 +12,16 @@ permissions:
     pages: write
     id-token: write
 
+# Supersede older runs of the same PR. Runs on main queue instead, so a deploy is never cut short.
+concurrency:
+    group: ci-${{ github.ref }}
+    cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+# The jobs below run side by side; `npm run check` is the same work in one command for local use.
 jobs:
-    validate:
+    check:
+        name: Build, typecheck and test
         runs-on: ubuntu-latest
-        # Supersede older runs of the same branch/PR.
-        concurrency:
-            group: ci-${{ github.ref }}
-            cancel-in-progress: true
         steps:
             - name: Checkout
               uses: actions/checkout@v4
@@ -32,37 +35,104 @@ jobs:
             - name: Install dependencies
               run: npm ci
 
-            - name: Validate build, tests and package artifacts
-              run: npm run check
+            - name: Build packages
+              run: npm run build && npm run build:editor
 
+            # Jest only transpiles TypeScript; type errors in sources and tests fail here.
+            - name: Typecheck sources and tests
+              run: npm run typecheck
+
+            - name: Run tests
+              run: npm test
+
+            - name: Smoothness sweep
+              run: npm run check:smoothness
+
+            - name: Verify package tarball contents
+              run: npm run check:pack
+
+    # Every demo opened in headless WebGL; any page or console error fails the job. Software WebGL
+    # is CPU-bound, so the demos are split over two machines rather than opened side by side.
+    demos:
+        name: Demo smoke (${{ matrix.shard }}/2)
+        runs-on: ubuntu-latest
+        strategy:
+            fail-fast: false
+            matrix:
+                shard: [1, 2]
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v4
+
+            - name: Setup Node.js
+              uses: actions/setup-node@v4
+              with:
+                  node-version: 20
+                  cache: npm
+
+            - name: Install dependencies
+              run: npm ci
+
+            - name: Build examples
+              run: npm run build:examples
+
+            - name: Read Playwright version
+              id: playwright
+              run: echo "version=$(node -p "require('playwright/package.json').version")" >> "$GITHUB_OUTPUT"
+
+            - name: Cache Playwright browsers
+              uses: actions/cache@v4
+              with:
+                  path: ~/.cache/ms-playwright
+                  key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}-chromium-headless-shell
+
+            # Headless runs only need the headless shell. On a cache hit this installs just the
+            # system libraries.
             - name: Install Chromium for the demo smoke
-              run: npx playwright install --with-deps chromium
+              run: npx playwright install --with-deps --only-shell chromium
 
-            # Every demo opened in headless WebGL; any page or console error fails the job.
             - name: Smoke-test the demos
               run: |
                   npm run preview -w examples -- --host 127.0.0.1 --port 3010 --strictPort &
                   for i in $(seq 1 60); do curl -sf http://127.0.0.1:3010/ >/dev/null && break; sleep 1; done
-                  npm run check:demos
+                  npm run check:demos -- --shard=${{ matrix.shard }}/2
 
-            # Pages build only on main / manual dispatch. Runs after `npm run check` because
-            # check's build:examples writes examples/dist and would otherwise wipe the docs.
+    # Pages build only on main / manual dispatch. The docs are written into examples/dist, so they
+    # are built after the examples.
+    pages:
+        name: Build Pages
+        if: github.event_name != 'pull_request'
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v4
+
+            - name: Setup Node.js
+              uses: actions/setup-node@v4
+              with:
+                  node-version: 20
+                  cache: npm
+
+            - name: Install dependencies
+              run: npm ci
+
+            - name: Build examples
+              run: npm run build:examples
+
+            # TypeDoc resolves quarks.core through its built types.
             - name: Build API docs
-              if: github.event_name != 'pull_request'
-              run: npm run docs
+              run: npm run build:core && npm run docs
 
             - name: Configure Pages
-              if: github.event_name != 'pull_request'
               uses: actions/configure-pages@v5
 
             - name: Upload Pages artifact
-              if: github.event_name != 'pull_request'
               uses: actions/upload-pages-artifact@v3
               with:
                   path: examples/dist
 
     deploy:
-        needs: validate
+        needs: [check, demos, pages]
         if: github.event_name != 'pull_request'
         runs-on: ubuntu-latest
         # Never cancel an in-progress Pages deployment — that leaves it in a failed state.

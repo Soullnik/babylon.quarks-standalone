@@ -7,7 +7,7 @@
     "collectCoverageFrom": ["src/core/**/*.ts"],
     "transformIgnorePatterns": ["/node_modules/(?!@babylonjs)"],
     "transform": {
-        "^.+\\.(ts|tsx)$": ["ts-jest", {"tsconfig": "tsconfig.test.json"}],
+        "^.+\\.(ts|tsx)$": ["ts-jest", {"tsconfig": "<rootDir>/tsconfig.test.json"}],
         "^.+\\.js$": ["babel-jest", {"plugins": ["@babel/plugin-transform-modules-commonjs"]}]
     }
 }

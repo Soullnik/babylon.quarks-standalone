@@ -1,6 +1,14 @@
 import {NullEngine} from '@babylonjs/core/Engines/nullEngine';
 import {Scene} from '@babylonjs/core/scene';
-import {ConstantValue, ParticleSystem, PointEmitter, QuarksLoader, RenderMode, SizeOverLife} from 'babylon.quarks';
+import {
+    ConstantValue,
+    FunctionValueGenerator,
+    ParticleSystem,
+    PointEmitter,
+    QuarksLoader,
+    RenderMode,
+    SizeOverLife,
+} from 'babylon.quarks';
 import {EffectBinding} from '../src/core/binding';
 import {EffectHistory} from '../src/core/history';
 import {formatBytes} from '../src/core/projectStore';
@@ -64,7 +72,16 @@ describe('effect binding and history', () => {
         const system = makeSystem();
         system.duration = 2.5;
         system.addBehavior(
-            new SizeOverLife(buildScalar({mode: 'curve', value: 0, min: 0, max: 0, curve: [1, 0.8, 0.3, 0]}))
+            // A curve builds a function generator; buildScalar's type also admits constants.
+            new SizeOverLife(
+                buildScalar({
+                    mode: 'curve',
+                    value: 0,
+                    min: 0,
+                    max: 0,
+                    curve: [1, 0.8, 0.3, 0],
+                }) as FunctionValueGenerator
+            )
         );
         const binding = new EffectBinding(system);
         const json = JSON.parse(binding.exportJSON('fx'));

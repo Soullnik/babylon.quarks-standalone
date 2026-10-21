@@ -1,0 +1,7 @@
+{
+    "projects": [
+        "<rootDir>/packages/quarks.core",
+        "<rootDir>/packages/babylon.quarks",
+        "<rootDir>/packages/babylon.quarks-editor"
+    ]
+}
