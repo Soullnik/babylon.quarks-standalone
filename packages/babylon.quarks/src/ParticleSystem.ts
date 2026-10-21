@@ -56,10 +56,14 @@ import {ParticleEmitter} from './ParticleEmitter';
 import {
     MeshLighting,
     MeshRim,
+    normalizeBeam,
     normalizeErosion,
     normalizeMeshRim,
+    normalizeUVDistortion,
     normalizeUVScroll,
+    ParticleBeam,
     ParticleErosion,
+    ParticleUVDistortion,
     RenderMode,
     SortMode,
 } from './VFXBatch';
@@ -177,6 +181,24 @@ function trailFlags(settings: TrailSettings | undefined): Partial<TrailSettings>
     return flags;
 }
 
+/** A trail's side axis as JSON `[x, y, z]`, or nothing when unset. */
+function trailSideAxisJSON(settings: TrailSettings | undefined): {sideAxis?: number[]} {
+    const axis = settings?.sideAxis;
+    return axis ? {sideAxis: [axis.x, axis.y, axis.z]} : {};
+}
+
+/** A trail's side axis from JSON `[x, y, z]` (or an object with x, y, z), or nothing. */
+function trailSideAxisFromJSON(value: unknown): {sideAxis?: Vector3} {
+    if (Array.isArray(value)) {
+        return {sideAxis: new Vector3(Number(value[0]) || 0, Number(value[1]) || 0, Number(value[2]) || 0)};
+    }
+    if (value && typeof value === 'object') {
+        const v = value as {x?: number; y?: number; z?: number};
+        return {sideAxis: new Vector3(v.x ?? 0, v.y ?? 0, v.z ?? 0)};
+    }
+    return {};
+}
+
 export interface ParticleSystemParameters {
     autoDestroy?: boolean;
     looping?: boolean;
@@ -235,6 +257,10 @@ export interface ParticleSystemParameters {
     gradientMap?: BaseTexture | null;
     /** Alpha erosion, see {@link ParticleSystem.erosion}. Default none. */
     erosion?: Partial<ParticleErosion>;
+    /** Map UV distortion, see {@link ParticleSystem.uvDistortion}. Default none. */
+    uvDistortion?: Partial<ParticleUVDistortion>;
+    /** Beam texture axis and width, see {@link ParticleSystem.beam}. Default U along it, as wide as the size. */
+    beam?: Partial<ParticleBeam>;
     /** Multiplier on the time the system is advanced by, see {@link ParticleSystem.playbackSpeed}. Default 1. */
     playbackSpeed?: number;
     /** What the system does while off screen, see {@link CullingMode}. Default `'always'`. */
@@ -330,6 +356,8 @@ export interface ParticleSystemJSONParameters {
     pivot?: number[];
     /** `[u, v]`; written only when non-zero. */
     flip?: number[];
+    /** {@link ParticleBeam}; written only when not the default. */
+    beam?: ParticleBeam;
 }
 
 export interface BabylonMetaData {
@@ -677,6 +705,22 @@ export class ParticleSystem implements IParticleSystem {
     }
 
     /**
+     * Map UV distortion, see {@link ParticleUVDistortion}: a scrolling noise
+     * texture pushes the map's UV about, for heat shimmer and licking,
+     * breathing shapes. Undefined (the default), or without a map: none.
+     * Fields left out take their defaults; assign a new object to change it.
+     * Saved with the material in the effect JSON.
+     */
+    get uvDistortion(): ParticleUVDistortion | undefined {
+        return this.rendererSettings.uvDistortion;
+    }
+
+    set uvDistortion(distortion: Partial<ParticleUVDistortion> | undefined) {
+        this.rendererSettings.uvDistortion = normalizeUVDistortion(distortion);
+        this.neededToUpdateRender = true;
+    }
+
+    /**
      * The emitter's world scale per axis, measured with {@link motionScale}
      * before every step; what `'hierarchy'` multiplies start speeds by. Taken
      * from the system's own emitter rather than the emission matrix, whose
@@ -1014,6 +1058,8 @@ export class ParticleSystem implements IParticleSystem {
             uvScroll: normalizeUVScroll(parameters.uvScroll),
             gradientMap: parameters.gradientMap ?? null,
             erosion: normalizeErosion(parameters.erosion),
+            uvDistortion: normalizeUVDistortion(parameters.uvDistortion),
+            beam: normalizeBeam(parameters.beam),
         };
         this.flip = ParticleSystem.nonZeroFlip(parameters.flip);
         this.playbackSpeed = parameters.playbackSpeed ?? 1;
@@ -1670,11 +1716,37 @@ export class ParticleSystem implements IParticleSystem {
             if (!this.getBeamEnd(end)) {
                 return true;
             }
-            const pad = this.boundsInWorld ? this.boundsPadding : this.boundsPadding * this.emitterMaxScale();
+            let pad = this.boundsInWorld ? this.boundsPadding : this.boundsPadding * this.emitterMaxScale();
+            const widthPerLength = this.rendererSettings.beam?.widthPerLength ?? 0;
+            if (widthPerLength > 0) {
+                // A beam whose width follows its length is half that width to either side.
+                const dx = Math.max(Math.abs(end.x - min.x), Math.abs(end.x - max.x));
+                const dy = Math.max(Math.abs(end.y - min.y), Math.abs(end.y - max.y));
+                const dz = Math.max(Math.abs(end.z - min.z), Math.abs(end.z - max.z));
+                const scale = this.boundsInWorld ? 1 : this.emitterMaxScale();
+                pad += Math.sqrt(dx * dx + dy * dy + dz * dz) * widthPerLength * this.boundsMaxSize * scale * 0.5;
+                min.set(min.x - pad, min.y - pad, min.z - pad);
+                max.set(max.x + pad, max.y + pad, max.z + pad);
+            }
             min.set(Math.min(min.x, end.x - pad), Math.min(min.y, end.y - pad), Math.min(min.z, end.z - pad));
             max.set(Math.max(max.x, end.x + pad), Math.max(max.y, end.y + pad), Math.max(max.z, end.z + pad));
         }
         return true;
+    }
+
+    /**
+     * How a {@link RenderMode.Beam} system's quads take their texture and
+     * width, see {@link ParticleBeam}: which texture axis runs along the beam,
+     * and whether the width follows its length. Undefined (the default): U
+     * along it, as wide as the particle size. Assign a new object to change it.
+     */
+    get beam(): ParticleBeam | undefined {
+        return this.rendererSettings.beam;
+    }
+
+    set beam(beam: Partial<ParticleBeam> | undefined) {
+        this.rendererSettings.beam = normalizeBeam(beam);
+        this.neededToUpdateRender = true;
     }
 
     /**
@@ -2140,6 +2212,10 @@ export class ParticleSystem implements IParticleSystem {
             // A world-space system records world positions already.
             const recordWorldSpace = trailSettings.recordWorldSpace && !this.worldSpace;
             const emitterMatrix = this.emitter.matrixWorld;
+            // A swept trail records its side as the emitter holds it, in the
+            // space its positions are recorded in.
+            const sideAxis = trailSettings.sideAxis;
+            const sidesInWorld = this.worldSpace || Boolean(trailSettings.recordWorldSpace);
             for (let i = 0; i < particleCount; i++) {
                 const trail = particles[i] as TrailParticle;
                 // Emptying the history lets the removal pass below take the
@@ -2158,6 +2234,25 @@ export class ParticleSystem implements IParticleSystem {
                     positions[offset] = tempV.x;
                     positions[offset + 1] = tempV.y;
                     positions[offset + 2] = tempV.z;
+                }
+                if (sideAxis && trail.age <= trail.life) {
+                    trail.ensureSideHistory();
+                    const offset = ((trail.historyHead + trail.historyCapacity - 1) % trail.historyCapacity) * 3;
+                    const sides = trail.historySides;
+                    let x = sideAxis.x;
+                    let y = sideAxis.y;
+                    let z = sideAxis.z;
+                    if (sidesInWorld) {
+                        const m = (trail.parentMatrix ?? emitterMatrix).elements;
+                        const tx = m[0] * x + m[4] * y + m[8] * z;
+                        const ty = m[1] * x + m[5] * y + m[9] * z;
+                        z = m[2] * x + m[6] * y + m[10] * z;
+                        x = tx;
+                        y = ty;
+                    }
+                    sides[offset] = x;
+                    sides[offset + 1] = y;
+                    sides[offset + 2] = z;
                 }
             }
         }
@@ -2501,6 +2596,7 @@ export class ParticleSystem implements IParticleSystem {
             worldSpace: this.worldSpace,
             ...(this.pivot ? {pivot: [this.pivot.x, this.pivot.y, this.pivot.z]} : {}),
             ...(this.flip ? {flip: [this.flip.x, this.flip.y]} : {}),
+            ...(this.beam ? {beam: {...this.beam}} : {}),
         };
     }
 
@@ -2521,6 +2617,7 @@ export class ParticleSystem implements IParticleSystem {
                         : new ConstantValue(30),
                 followLocalOrigin: trailSettings?.followLocalOrigin ?? false,
                 ...trailFlags(trailSettings),
+                ...trailSideAxisFromJSON((trailSettings as {sideAxis?: unknown} | undefined)?.sideAxis),
             };
         } else if (json.renderMode === RenderMode.StretchedBillBoard) {
             rendererEmitterSettings = {...(json.rendererEmitterSettings ?? {})};
@@ -2541,6 +2638,7 @@ export class ParticleSystem implements IParticleSystem {
         const resolveTexture = (ref: unknown): BaseTexture | null =>
             typeof ref === 'string' ? (meta.textures?.[ref] ?? null) : ((ref as BaseTexture | null) ?? null);
         const erosionMeta = materialMeta?.erosion;
+        const distortionMeta = materialMeta?.uvDistortion;
         const resolvedGeometryEntry =
             typeof json.instancingGeometry === 'string'
                 ? meta.geometries?.[json.instancingGeometry]
@@ -2616,6 +2714,7 @@ export class ParticleSystem implements IParticleSystem {
             layerMask: json.layers,
             pivot: json.pivot ? new Vector3(json.pivot[0] ?? 0, json.pivot[1] ?? 0, json.pivot[2] ?? 0) : undefined,
             flip: json.flip ? new Vector2(json.flip[0] ?? 0, json.flip[1] ?? 0) : undefined,
+            beam: json.beam,
             lighting: materialMeta?.lighting,
             rim: materialMeta?.rim,
             uvScroll: materialMeta?.uvScroll,
@@ -2623,6 +2722,10 @@ export class ParticleSystem implements IParticleSystem {
             erosion:
                 erosionMeta && typeof erosionMeta === 'object'
                     ? {...erosionMeta, mask: resolveTexture(erosionMeta.mask)}
+                    : undefined,
+            uvDistortion:
+                distortionMeta && typeof distortionMeta === 'object'
+                    ? {...distortionMeta, map: resolveTexture(distortionMeta.map)}
                     : undefined,
         });
         ps.behaviors = (json.behaviors ?? [])
@@ -2658,6 +2761,7 @@ export class ParticleSystem implements IParticleSystem {
                 startLength: (this.rendererEmitterSettings as TrailSettings).startLength.toJSON(),
                 followLocalOrigin: (this.rendererEmitterSettings as TrailSettings).followLocalOrigin,
                 ...trailFlags(this.rendererEmitterSettings as TrailSettings),
+                ...(trailSideAxisJSON(this.rendererEmitterSettings as TrailSettings) as {sideAxis?: any}),
             };
         }
         if (this.renderMode === RenderMode.StretchedBillBoard) {
@@ -2708,6 +2812,7 @@ export class ParticleSystem implements IParticleSystem {
             return uuid;
         };
         const erosion = this.erosion;
+        const distortion = this.uvDistortion;
 
         const materialUUID = ParticleSystem.nextSerializationId('quarks_material');
         meta.materials[materialUUID] = {
@@ -2734,6 +2839,16 @@ export class ParticleSystem implements IParticleSystem {
                           edgeWidth: erosion.edgeWidth,
                           edgeColor: [...erosion.edgeColor],
                           maskScroll: [...erosion.maskScroll],
+                      },
+                  }
+                : {}),
+            ...(distortion
+                ? {
+                      uvDistortion: {
+                          map: textureRef(distortion.map),
+                          strength: distortion.strength,
+                          scale: distortion.scale,
+                          scroll: [...distortion.scroll],
                       },
                   }
                 : {}),
@@ -2847,6 +2962,9 @@ export class ParticleSystem implements IParticleSystem {
                 startLength: (this.rendererEmitterSettings as TrailSettings).startLength.clone(),
                 followLocalOrigin: (this.rendererEmitterSettings as TrailSettings).followLocalOrigin,
                 ...trailFlags(this.rendererEmitterSettings as TrailSettings),
+                ...((this.rendererEmitterSettings as TrailSettings).sideAxis
+                    ? {sideAxis: (this.rendererEmitterSettings as TrailSettings).sideAxis!.clone()}
+                    : {}),
             };
         } else if (this.renderMode === RenderMode.StretchedBillBoard) {
             rendererEmitterSettings = {
@@ -2915,6 +3033,8 @@ export class ParticleSystem implements IParticleSystem {
             uvScroll: this.uvScroll,
             gradientMap: this.gradientMap,
             erosion: this.erosion,
+            uvDistortion: this.uvDistortion,
+            beam: this.beam,
             scene: this.emitter.getScene(),
         });
         // A sub emitter behavior transforms by its parent system's emitter;

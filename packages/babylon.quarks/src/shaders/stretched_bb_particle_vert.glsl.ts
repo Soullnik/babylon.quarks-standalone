@@ -45,6 +45,11 @@ varying float linearDepth;
 // Smallest and largest size a particle may have on screen, as fractions of the viewport height.
 uniform vec2 sizeLimits;
 #endif
+
+#ifdef BEAM_WIDTH_FROM_LENGTH
+// A beam's width per unit of its length, times the particle size.
+uniform float beamWidthPerLength;
+#endif
 ${fogVertexDeclarationGLSL}
 void main() {
     float lengthFactor = velocity.w;
@@ -74,6 +79,9 @@ void main() {
 #else
     vec3 side = normalize(cross(mvPosition.xyz, vdir));
 #endif
+#if defined(BEAM) && defined(BEAM_WIDTH_FROM_LENGTH)
+    avgSize *= vlength * beamWidthPerLength;
+#endif
     mvPosition.xyz += position.y * side * avgSize;
 #ifdef BEAM
     // The vector runs from the particle to the beam's end: the quad spans it
@@ -91,6 +99,10 @@ void main() {
     gl_Position = projection * mvPosition;
 ${fogVertexGLSL('mvPosition.xyz')}
     vec2 quadUV = vec2(size.x < 0.0 ? 1.0 - uv.x : uv.x, size.y < 0.0 ? 1.0 - uv.y : uv.y);
+#if defined(BEAM) && defined(BEAM_UV_V)
+    // V along the beam, from the particle (0) to the end (1); U across it.
+    quadUV = quadUV.yx;
+#endif
 #ifdef SOFT_PARTICLES
     projPosition = gl_Position;
     linearDepth = -mvPosition.z;

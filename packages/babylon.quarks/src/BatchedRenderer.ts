@@ -10,16 +10,20 @@ import {ParticleSystem} from './ParticleSystem';
 import {SpriteBatch} from './SpriteBatch';
 import {TrailBatch} from './TrailBatch';
 import {
+    beamEqual,
     defaultMeshLighting,
     erosionEqual,
     MeshLighting,
     MeshLightingSettings,
     MeshRim,
     meshRimEqual,
+    ParticleBeam,
     ParticleErosion,
+    ParticleUVDistortion,
     RenderMode,
     SortMode,
     StoredBatchSettings,
+    uvDistortionEqual,
     uvScrollEqual,
     VFXBatch,
 } from './VFXBatch';
@@ -117,6 +121,10 @@ export interface VFXBatchSettings {
      * are batched apart.
      */
     gradientMap?: BaseTexture | null;
+    /** How a {@link RenderMode.Beam} quad takes its texture and width, see {@link ParticleBeam}. Unset: U along it, as wide as the size. */
+    beam?: ParticleBeam;
+    /** Map UV distortion by a noise texture, see {@link ParticleUVDistortion}. Unset: none. Systems that differ are batched apart. */
+    uvDistortion?: ParticleUVDistortion;
     /** Alpha erosion (dissolve / wipe), see {@link ParticleErosion}. Unset: none. Systems that differ are batched apart. */
     erosion?: ParticleErosion;
 }
@@ -333,7 +341,9 @@ export class BatchedRenderer extends TransformNode {
             a.maxParticleSize === (b.maxParticleSize ?? Infinity) &&
             (a.lighting ?? 'fixed') === (b.lighting ?? 'fixed') &&
             meshRimEqual(a.rim, b.rim) &&
+            beamEqual(a.beam, b.beam) &&
             uvScrollEqual(a.uvScroll, b.uvScroll) &&
+            uvDistortionEqual(a.uvDistortion, b.uvDistortion) &&
             a.gradientMap === (b.gradientMap ?? null) &&
             erosionEqual(a.erosion, b.erosion)
         );

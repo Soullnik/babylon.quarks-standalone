@@ -1298,6 +1298,7 @@ export function RendererModule({
                                     options={[
                                         {value: 'add', label: 'Add (glow)'},
                                         {value: 'mix', label: 'Mix (outline)'},
+                                        {value: 'fade', label: 'Fade (faces fade, edges stay)'},
                                     ]}
                                     onChange={(mode) => patchRim({mode})}
                                 />

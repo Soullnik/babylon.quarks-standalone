@@ -323,8 +323,15 @@ export class SpriteBatch extends VFXBatch {
         if (this.settings.renderMode === RenderMode.HorizontalBillBoard) {
             defines.push('HORIZONTAL');
         }
+        const beam = this.settings.renderMode === RenderMode.Beam ? this.settings.beam : undefined;
         if (this.settings.renderMode === RenderMode.Beam) {
             defines.push('BEAM');
+            if (beam?.textureAxis === 'v') {
+                defines.push('BEAM_UV_V');
+            }
+            if (beam && beam.widthPerLength > 0) {
+                defines.push('BEAM_WIDTH_FROM_LENGTH');
+            }
         }
         const pivot = SpriteBatch.takesPivotAndFlip(this.settings.renderMode) ? this.settings.pivot : undefined;
         if (pivot) {
@@ -343,7 +350,9 @@ export class SpriteBatch extends VFXBatch {
         const rim = isMesh ? this.settings.rim : undefined;
         if (rim) {
             defines.push('MESH_RIM');
-            if (rim.mode === 'mix') {
+            if (rim.mode === 'fade') {
+                defines.push('MESH_RIM_FADE');
+            } else if (rim.mode === 'mix') {
                 defines.push('MESH_RIM_MIX');
             }
         }
@@ -397,6 +406,9 @@ export class SpriteBatch extends VFXBatch {
         if (pivot) {
             uniforms.push('pivot');
         }
+        if (beam && beam.widthPerLength > 0) {
+            uniforms.push('beamWidthPerLength');
+        }
         if (sizeLimits) {
             uniforms.push('sizeLimits');
         }
@@ -446,6 +458,9 @@ export class SpriteBatch extends VFXBatch {
         if (this.settings.uTileCount > 1 || this.settings.vTileCount > 1) {
             mat.setFloat('tileCountX', this.settings.uTileCount);
             mat.setFloat('tileCountY', this.settings.vTileCount);
+        }
+        if (beam && beam.widthPerLength > 0) {
+            mat.setFloat('beamWidthPerLength', beam.widthPerLength);
         }
         if (SpriteBatch.drawsAlongVelocity(this.settings.renderMode)) {
             mat.setFloat('speedFactor', this.settings.softNearFade > 0 ? this.settings.softNearFade : 1.0);

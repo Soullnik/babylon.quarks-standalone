@@ -136,6 +136,14 @@ function cases(): Case[] {
         ['BEAM']
     );
     push(
+        'beam uv v, width from length, tiled',
+        stretchedVert,
+        particleFrag,
+        [...SPRITE_ATTRS, 'velocity'],
+        [...SPRITE_UNIFORMS, 'speedFactor', 'beamWidthPerLength', 'tileCountX', 'tileCountY'],
+        ['BEAM', 'BEAM_UV_V', 'BEAM_WIDTH_FROM_LENGTH', 'UV_TILE', 'USE_MAP']
+    );
+    push(
         'mesh',
         meshVert,
         physicsFrag,
@@ -161,6 +169,14 @@ function cases(): Case[] {
         [...SPRITE_UNIFORMS, ...RIM_UNIFORMS],
         ['MESH_UNLIT', 'MESH_RIM', 'MESH_RIM_MIX']
     );
+    push(
+        'mesh unlit rim fade',
+        meshVert,
+        physicsFrag,
+        [...SPRITE_ATTRS, 'normal'],
+        [...SPRITE_UNIFORMS, ...RIM_UNIFORMS],
+        ['MESH_UNLIT', 'MESH_RIM', 'MESH_RIM_FADE']
+    );
 
     // Texture effects (chunks/surface.ts), with and without a map and a blended second tile.
     const surfaceOptions = [
@@ -169,6 +185,8 @@ function cases(): Case[] {
         ['EROSION'],
         ['EROSION', 'EROSION_MASK'],
         ['UV_SCROLL', 'GRADIENT_MAP', 'EROSION', 'EROSION_MASK'],
+        ['UV_DISTORTION'],
+        ['UV_SCROLL', 'UV_DISTORTION', 'GRADIENT_MAP', 'EROSION', 'EROSION_MASK'],
     ];
     const surfaceTargets = [
         {name: 'billboard', vertex: particleVert, fragment: particleFrag, attributes: SPRITE_ATTRS, extra: []},
@@ -199,6 +217,10 @@ function cases(): Case[] {
                     const samplers: string[] = [...map.map(() => 'map')];
                     if (tile.length) uniforms.push('tileCountX', 'tileCountY');
                     if (surface.includes('UV_SCROLL')) uniforms.push('uvScrollOffset');
+                    if (surface.includes('UV_DISTORTION')) {
+                        uniforms.push('distortionParams');
+                        samplers.push('distortionMap');
+                    }
                     if (surface.includes('GRADIENT_MAP')) samplers.push('gradientMap');
                     if (surface.includes('EROSION')) uniforms.push('erosionParams', 'erosionEdgeColor');
                     if (surface.includes('EROSION_MASK')) samplers.push('erosionMask');

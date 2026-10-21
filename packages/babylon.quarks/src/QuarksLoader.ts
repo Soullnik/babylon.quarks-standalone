@@ -838,6 +838,13 @@ export class QuarksLoader {
                     mask: matDef.erosion.mask ? meta.textures[matDef.erosion.mask] || null : null,
                 };
             }
+            // uvDistortion {map (texture uuid), strength, scale, scroll}.
+            if (matDef.uvDistortion && typeof matDef.uvDistortion === 'object') {
+                matInfo.uvDistortion = {
+                    ...matDef.uvDistortion,
+                    map: matDef.uvDistortion.map ? meta.textures[matDef.uvDistortion.map] || null : null,
+                };
+            }
 
             // QuarksMaterial (what ParticleSystem.ensureMaterialMeta emits) writes `alphaMode`
             // directly as a Babylon alpha-mode constant; three.js materials (MeshBasicMaterial

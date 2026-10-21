@@ -45,6 +45,11 @@ varying linearDepth: f32;
 // Smallest and largest size a particle may have on screen, as fractions of the viewport height.
 uniform sizeLimits: vec2f;
 #endif
+
+#ifdef BEAM_WIDTH_FROM_LENGTH
+// A beam's width per unit of its length, times the particle size.
+uniform beamWidthPerLength: f32;
+#endif
 ${fogVertexDeclarationWGSL}
 @vertex
 fn main(input: VertexInputs) -> FragmentInputs {
@@ -83,6 +88,9 @@ fn main(input: VertexInputs) -> FragmentInputs {
 #else
     let side = normalize(cross(mvPosition.xyz, vdir));
 #endif
+#if defined(BEAM) && defined(BEAM_WIDTH_FROM_LENGTH)
+    avgSize *= vlength * uniforms.beamWidthPerLength;
+#endif
     let widthOffset = vertexInputs.position.y * side * avgSize;
     // Equivalent to viewVelocity * (1.0 + lengthFactor / vlength) for moving particles, but the
     // size-based term (vdir * lengthFactor) survives when the velocity contribution vanishes.
@@ -105,7 +113,12 @@ fn main(input: VertexInputs) -> FragmentInputs {
     let clipPosition = uniforms.projection * mvPosition;
     vertexOutputs.position = clipPosition;
 ${fogVertexWGSL('mvPosition.xyz')}
+#if defined(BEAM) && defined(BEAM_UV_V)
+    // V along the beam, from the particle (0) to the end (1); U across it.
+    let quadUV = select(vertexInputs.uv, 1.0 - vertexInputs.uv, vertexInputs.size.xy < vec2f(0.0)).yx;
+#else
     let quadUV = select(vertexInputs.uv, 1.0 - vertexInputs.uv, vertexInputs.size.xy < vec2f(0.0));
+#endif
 #ifdef SOFT_PARTICLES
     vertexOutputs.projPosition = clipPosition;
     vertexOutputs.linearDepth = -mvPosition.z;

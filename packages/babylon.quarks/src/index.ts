@@ -44,13 +44,17 @@ export * from './shaders/';
 export {SpriteBatch} from './SpriteBatch';
 export {TrailBatch} from './TrailBatch';
 export {
+    beamEqual,
     defaultMeshLighting,
     erosionEqual,
     meshRimEqual,
+    normalizeBeam,
     normalizeErosion,
     normalizeMeshRim,
+    normalizeUVDistortion,
     normalizeUVScroll,
     RenderMode,
+    uvDistortionEqual,
     uvScrollEqual,
     VFXBatch,
 } from './VFXBatch';
@@ -58,7 +62,9 @@ export type {
     MeshLighting,
     MeshLightingSettings,
     MeshRim,
+    ParticleBeam,
     ParticleErosion,
+    ParticleUVDistortion,
     SortMode,
     StoredBatchSettings,
 } from './VFXBatch';

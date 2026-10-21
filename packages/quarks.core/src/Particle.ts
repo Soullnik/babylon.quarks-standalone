@@ -642,6 +642,12 @@ export class TrailParticle implements Particle {
     headWidthScale = 1;
     /** Ring buffer of recorded colors, 4 floats per sample. */
     historyColors: Float32Array = EMPTY_HISTORY;
+    /**
+     * Ring buffer of recorded side vectors, 3 floats per sample, in the space
+     * the positions are recorded in. Empty unless the trail is swept along an
+     * axis (`TrailSettings.sideAxis`); see {@link ensureSideHistory}.
+     */
+    historySides: Float32Array = EMPTY_HISTORY;
     /** Number of samples the ring buffers can hold. */
     historyCapacity = 0;
     /** Slot the next sample is written to. */
@@ -714,8 +720,18 @@ export class TrailParticle implements Particle {
         this.historySizes = new Float32Array(capacity);
         this.historyBaseSizes = new Float32Array(capacity);
         this.historyColors = new Float32Array(capacity * 4);
+        if (this.historySides.length > 0) {
+            this.historySides = new Float32Array(capacity * 3);
+        }
         this.historyHead = 0;
         this.historyCount = 0;
+    }
+
+    /** Allocates {@link historySides} for the current capacity, once a trail is swept. */
+    ensureSideHistory(): void {
+        if (this.historySides.length !== this.historyCapacity * 3) {
+            this.historySides = new Float32Array(this.historyCapacity * 3);
+        }
     }
 
     /** Drops every recorded sample without releasing the buffers. */

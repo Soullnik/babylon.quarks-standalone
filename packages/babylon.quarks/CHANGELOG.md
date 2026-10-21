@@ -4,6 +4,30 @@ All notable changes to the `babylon.quarks` package are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project follows the `quarks.core` 0.x version line.
 
+## [Unreleased]
+
+### Added
+
+- quarks.core `FrameOverLife` option `random` (FPS mode, with `frameCount`; saved in JSON only when
+  set): every `1 / fps` seconds a random frame of the segment instead of the next, each particle
+  its own sequence, for the flicker of lightning, sparks and neon.
+- `ParticleSystem.beam` (`ParticleBeam`: `textureAxis` `'u'` default | `'v'`, `widthPerLength`,
+  JSON written only when not the default): which texture axis runs along a `RenderMode.Beam` quad,
+  for a sheet drawn standing up, and a width that follows the beam's length so the drawing keeps
+  its proportions; bounds grow with that width.
+- Mesh particle rim mode `'fade'`: instead of adding or mixing a colour, the faces turned to the
+  camera fade by `strength` (alpha × `1 − strength × (1 − edge)`), so a wall of light reads thick
+  along its silhouette and thin across its face.
+- `ParticleSystem.uvDistortion` (`ParticleUVDistortion`: noise `map`, `strength`, `scale`,
+  `scroll`; saved with the material only when set): a scrolling noise texture pushes the map's UV
+  about, for heat shimmer and licking, breathing shapes, on sprites, meshes and trails, GLSL and
+  WGSL. Systems that differ are batched apart.
+- quarks.core `TrailSettings.sideAxis` (JSON `[x, y, z]`, written only when set): a trail swept
+  along that emitter axis instead of facing the camera. Each sample records the axis as the
+  emitter held it and the ribbon spans the particle's width along it, so a trail on a blade is the
+  surface the blade swept (a weapon trail, Unreal's AnimTrail). `TrailParticle.historySides` holds
+  the recorded sides.
+
 ## [0.25.0] — 2026-10-20
 
 ### Added

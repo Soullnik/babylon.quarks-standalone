@@ -11,6 +11,12 @@
  *   `gradientMapRange` keeps the lookup between the first and last texel
  *   centres. Make the ramp without mipmaps: the lookup's UV jumps with the
  *   map's detail, and the hardware would pick a blurred mip for it.
+ * - `UV_DISTORTION`: the map's UV is pushed about by a noise texture
+ *   (`distortionMap`, red and green around 0.5), sampled at the particle's
+ *   UV times `distortionParams.y` plus its scroll (`.zw`, wrapped on the
+ *   CPU), by up to `distortionParams.x` UV units: the heat shimmer, licking
+ *   and breathing of fire and auras. As with scrolling, on a sprite sheet the
+ *   pushed UV can reach the neighbouring tile.
  * - `EROSION`: the particle's alpha stops being a transparency and becomes how
  *   much of the shape is left. A fragment shows where the mask (the red
  *   channel of `erosionMask` under `EROSION_MASK`, the map's alpha otherwise)
@@ -28,6 +34,10 @@
 export const surfaceFragmentDeclarationGLSL = /* glsl */ `
 #ifdef UV_SCROLL
 uniform vec2 uvScrollOffset;
+#endif
+#ifdef UV_DISTORTION
+uniform sampler2D distortionMap;
+uniform vec4 distortionParams;
 #endif
 #ifdef GRADIENT_MAP
 uniform sampler2D gradientMap;
@@ -70,6 +80,10 @@ export function surfaceColorGLSL(tileBlend: boolean): string {
 #else
     vec2 mapUV = vUV;
 #endif
+#ifdef UV_DISTORTION
+    vec2 distortion = (texture2D(distortionMap, vUV * distortionParams.y + distortionParams.zw).rg - 0.5) * 2.0 * distortionParams.x;
+    mapUV += distortion;
+#endif
 #ifdef EROSION
     float erosionLevel = baseColor.a;
     baseColor.a = 1.0;
@@ -81,10 +95,14 @@ export function surfaceColorGLSL(tileBlend: boolean): string {
         tileBlend
             ? `#ifdef TILE_BLEND
     #ifdef UV_SCROLL
-        vec4 texColor2 = texture2D(map, vUV2 + uvScrollOffset);
+        vec2 mapUV2 = vUV2 + uvScrollOffset;
     #else
-        vec4 texColor2 = texture2D(map, vUV2);
+        vec2 mapUV2 = vUV2;
     #endif
+    #ifdef UV_DISTORTION
+        mapUV2 += distortion;
+    #endif
+        vec4 texColor2 = texture2D(map, mapUV2);
         texColor = mix(texColor, texColor2, vTileBlend);
     #endif`
             : ''
@@ -111,6 +129,11 @@ export function surfaceColorGLSL(tileBlend: boolean): string {
 export const surfaceFragmentDeclarationWGSL = /* wgsl */ `
 #ifdef UV_SCROLL
 uniform uvScrollOffset: vec2f;
+#endif
+#ifdef UV_DISTORTION
+var distortionMapSampler: sampler;
+var distortionMap: texture_2d<f32>;
+uniform distortionParams: vec4f;
 #endif
 #ifdef GRADIENT_MAP
 var gradientMapSampler: sampler;
@@ -146,9 +169,13 @@ export function surfaceColorWGSL(tileBlend: boolean): string {
     return /* wgsl */ `
     var baseColor = fragmentInputs.vColor;
 #ifdef UV_SCROLL
-    let mapUV = fragmentInputs.vUV + uniforms.uvScrollOffset;
+    var mapUV = fragmentInputs.vUV + uniforms.uvScrollOffset;
 #else
-    let mapUV = fragmentInputs.vUV;
+    var mapUV = fragmentInputs.vUV;
+#endif
+#ifdef UV_DISTORTION
+    let distortion = (textureSample(distortionMap, distortionMapSampler, fragmentInputs.vUV * uniforms.distortionParams.y + uniforms.distortionParams.zw).rg - 0.5) * 2.0 * uniforms.distortionParams.x;
+    mapUV += distortion;
 #endif
 #ifdef EROSION
     let erosionLevel = baseColor.a;
@@ -161,10 +188,14 @@ export function surfaceColorWGSL(tileBlend: boolean): string {
         tileBlend
             ? `#ifdef TILE_BLEND
     #ifdef UV_SCROLL
-        let texColor2 = textureSample(map, mapSampler, fragmentInputs.vUV2 + uniforms.uvScrollOffset);
+        var mapUV2 = fragmentInputs.vUV2 + uniforms.uvScrollOffset;
     #else
-        let texColor2 = textureSample(map, mapSampler, fragmentInputs.vUV2);
+        var mapUV2 = fragmentInputs.vUV2;
     #endif
+    #ifdef UV_DISTORTION
+        mapUV2 += distortion;
+    #endif
+        let texColor2 = textureSample(map, mapSampler, mapUV2);
         texColor = mix(texColor, texColor2, fragmentInputs.vTileBlend);
     #endif`
             : ''

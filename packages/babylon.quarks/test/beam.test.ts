@@ -8,7 +8,7 @@ import {BatchedRenderer} from '../src/BatchedRenderer';
 import {ParticleSystem} from '../src/ParticleSystem';
 import stretchedGLSL from '../src/shaders/stretched_bb_particle_vert.glsl';
 import stretchedWGSL from '../src/shaders/stretched_bb_particle_vert.wgsl';
-import {RenderMode} from '../src/VFXBatch';
+import {normalizeBeam, RenderMode} from '../src/VFXBatch';
 
 let engine: NullEngine;
 let scene: Scene;
@@ -137,5 +137,69 @@ describe('beam review fixes', () => {
         renderer.update(1 / 60);
         const size = (renderer.batches[0] as any).sizeBuffer as Float32Array;
         expect(size[0]).toBeGreaterThan(0);
+    });
+
+    describe('texture axis and width', () => {
+        it('defaults to U along it and the size as its width, and normalises', () => {
+            expect(beam().beam).toBeUndefined();
+            expect(normalizeBeam({textureAxis: 'u', widthPerLength: 0})).toBeUndefined();
+            expect(normalizeBeam({widthPerLength: -1})).toBeUndefined();
+            expect(normalizeBeam({textureAxis: 'v'})).toEqual({textureAxis: 'v', widthPerLength: 0});
+            expect(normalizeBeam({widthPerLength: 0.25})).toEqual({textureAxis: 'u', widthPerLength: 0.25});
+        });
+
+        it('compiles V along the beam and a width that follows its length', () => {
+            const renderer = new BatchedRenderer('axis', scene);
+            const system = beam();
+            system.beam = {textureAxis: 'v', widthPerLength: 0.25};
+            renderer.addSystem(system);
+            const mat = renderer.batches[0].mesh.material as ShaderMaterial;
+            const options = (mat as any).options;
+            expect(options.defines).toEqual(expect.arrayContaining(['BEAM', 'BEAM_UV_V', 'BEAM_WIDTH_FROM_LENGTH']));
+            expect(options.uniforms).toContain('beamWidthPerLength');
+            expect((mat as any)._floats.beamWidthPerLength).toBe(0.25);
+            for (const source of [stretchedGLSL, stretchedWGSL]) {
+                expect(source).toContain('defined(BEAM_UV_V)');
+                expect(source).toContain('defined(BEAM_WIDTH_FROM_LENGTH)');
+            }
+        });
+
+        it('batches different beam settings apart', () => {
+            const renderer = new BatchedRenderer('beamBatch', scene);
+            const a = beam();
+            const b = beam();
+            b.beam = {textureAxis: 'v'};
+            renderer.addSystem(a);
+            renderer.addSystem(b);
+            expect(renderer.systemToBatchIndex.get(a)).not.toBe(renderer.systemToBatchIndex.get(b));
+        });
+
+        it('widens its bounds by half the width it takes from its length', () => {
+            const narrow = beam();
+            const wide = beam();
+            wide.beam = {widthPerLength: 1};
+            const box = (system: ParticleSystem) => {
+                system.beamEnd = new Vector3(0, 10, 0);
+                system.update(1 / 60);
+                const min = new Vector3();
+                const max = new Vector3();
+                expect(system.getWorldBounds(min, max)).toBe(true);
+                return max.x - min.x;
+            };
+            // 10 long, size 0.5, one width per length: 5 wide, 2.5 to either side.
+            expect(box(wide) - box(narrow)).toBeGreaterThanOrEqual(5 - 1e-6);
+        });
+
+        it('round-trips through JSON and clone, written only when set', () => {
+            const system = beam();
+            system.beam = {textureAxis: 'v', widthPerLength: 0.25};
+            const json = system.toJSON();
+            expect(json.beam).toEqual({textureAxis: 'v', widthPerLength: 0.25});
+            const meta = {geometries: {}, materials: {}, textures: {}} as any;
+            for (const copy of [ParticleSystem.fromJSON(system.toJSON(meta), meta, {}, scene), system.clone()]) {
+                expect(copy.beam).toEqual({textureAxis: 'v', widthPerLength: 0.25});
+            }
+            expect('beam' in beam().toJSON()).toBe(false);
+        });
     });
 });

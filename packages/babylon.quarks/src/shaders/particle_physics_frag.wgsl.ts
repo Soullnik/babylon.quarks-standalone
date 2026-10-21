@@ -119,11 +119,14 @@ ${surfaceColorWGSL(true)}
 #ifdef MESH_RIM
     // Fresnel: strongest where the surface turns away from the camera.
     let V = normalize(uniforms.eyePosition - fragmentInputs.vWorldPos);
-    let rimTerm = pow(1.0 - abs(dot(N, V)), uniforms.rimParams.x) * uniforms.rimParams.y;
-    #ifdef MESH_RIM_MIX
-    color = mix(color, uniforms.rimColor, clamp(rimTerm, 0.0, 1.0));
+    let edgeTerm = pow(1.0 - abs(dot(N, V)), uniforms.rimParams.x);
+    #if defined(MESH_RIM_FADE)
+    // Faces turned to the camera fade by the strength; edges stay.
+    baseColor.a *= clamp(1.0 - uniforms.rimParams.y * (1.0 - edgeTerm), 0.0, 1.0);
+    #elif defined(MESH_RIM_MIX)
+    color = mix(color, uniforms.rimColor, clamp(edgeTerm * uniforms.rimParams.y, 0.0, 1.0));
     #else
-    color += uniforms.rimColor * rimTerm;
+    color += uniforms.rimColor * edgeTerm * uniforms.rimParams.y;
     #endif
 #endif
 

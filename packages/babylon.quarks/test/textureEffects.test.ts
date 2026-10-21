@@ -13,7 +13,7 @@ import physicsFragGLSL from '../src/shaders/particle_physics_frag.glsl';
 import physicsFragWGSL from '../src/shaders/particle_physics_frag.wgsl';
 import trailFragGLSL from '../src/shaders/trail_frag.glsl';
 import trailFragWGSL from '../src/shaders/trail_frag.wgsl';
-import {normalizeErosion, normalizeUVScroll, RenderMode} from '../src/VFXBatch';
+import {normalizeErosion, normalizeUVDistortion, normalizeUVScroll, RenderMode} from '../src/VFXBatch';
 
 let engine: NullEngine;
 let scene: Scene;
@@ -200,5 +200,83 @@ describe('texture effects', () => {
         for (const key of ['uvScroll', 'gradientMap', 'erosion']) {
             expect(key in plainMaterial).toBe(false);
         }
+    });
+
+    describe('UV distortion', () => {
+        it('needs a map, and fills in defaults', () => {
+            const noise = new Texture(null, scene);
+            expect(normalizeUVDistortion(undefined)).toBeUndefined();
+            expect(normalizeUVDistortion({strength: 0.2})).toBeUndefined();
+            expect(normalizeUVDistortion({map: noise})).toEqual({
+                map: noise,
+                strength: 0.05,
+                scale: 1,
+                scroll: [0, 0.5],
+            });
+            expect(normalizeUVDistortion({map: noise, strength: -1})?.strength).toBe(0);
+        });
+
+        it('compiles in on sprites, meshes and trails, and scrolls its noise on the renderer clock', () => {
+            const noise = new Texture(null, scene);
+            const renderer = new BatchedRenderer('distortion', scene);
+            const modes = [RenderMode.BillBoard, RenderMode.Mesh, RenderMode.Trail];
+            const systems = modes.map((renderMode) =>
+                system({renderMode, uvDistortion: {map: noise, strength: 0.1, scale: 2, scroll: [0.25, 0.5]}})
+            );
+            systems.forEach((s) => renderer.addSystem(s));
+            renderer.update(3);
+            for (const s of systems) {
+                const mat = materialOf(renderer, s);
+                expect(defines(mat)).toContain('UV_DISTORTION');
+                expect(samplers(mat)).toContain('distortionMap');
+                expect(uniforms(mat)).toContain('distortionParams');
+                mat.onBindObservable.notifyObservers(undefined as any);
+                const params = (mat as any)._vectors4.distortionParams;
+                expect([params.x, params.y]).toEqual([0.1, 2]);
+                expect(params.z).toBeCloseTo(0.75, 6);
+                expect(params.w).toBeCloseTo(0.5, 6);
+            }
+            for (const source of [
+                particleFragGLSL,
+                particleFragWGSL,
+                physicsFragGLSL,
+                physicsFragWGSL,
+                trailFragGLSL,
+                trailFragWGSL,
+            ]) {
+                expect(source).toContain('#ifdef UV_DISTORTION');
+            }
+        });
+
+        it('batches different distortions apart, and round-trips through JSON, clone and the loader', () => {
+            const noise = new Texture(null, scene);
+            const renderer = new BatchedRenderer('distortionBatch', scene);
+            const a = system({uvDistortion: {map: noise, strength: 0.1}});
+            const b = system({uvDistortion: {map: noise, strength: 0.1}});
+            const c = system({uvDistortion: {map: noise, strength: 0.2}});
+            const none = system();
+            [a, b, c, none].forEach((s) => renderer.addSystem(s));
+            const index = (s: ParticleSystem) => renderer.systemToBatchIndex.get(s);
+            expect(index(a)).toBe(index(b));
+            expect(new Set([a, c, none].map(index)).size).toBe(3);
+
+            const meta = {geometries: {}, materials: {}, textures: {}} as any;
+            const json = a.toJSON(meta);
+            const material = meta.materials[json.material!];
+            expect(meta.textures[material.uvDistortion.map]).toBe(noise);
+            for (const copy of [ParticleSystem.fromJSON(json, meta, {}, scene), a.clone()]) {
+                expect(copy.uvDistortion).toEqual({map: noise, strength: 0.1, scale: 1, scroll: [0, 0.5]});
+            }
+            const loader = new QuarksLoader(scene);
+            const root = loader.parse({
+                textures: [],
+                materials: [{uuid: 'm', type: 'QuarksMaterial', uvDistortion: {map: 'missing', strength: 0.3}}],
+                object: {uuid: 'e', type: 'ParticleEmitter', ps: {...system().toJSON(), material: 'm'}},
+            });
+            // A map the file does not carry leaves no distortion.
+            expect(((root as ParticleEmitter).system as ParticleSystem).uvDistortion).toBeUndefined();
+            const plain = {geometries: {}, materials: {}, textures: {}} as any;
+            expect('uvDistortion' in plain.materials[none.toJSON(plain).material!]).toBe(false);
+        });
     });
 });

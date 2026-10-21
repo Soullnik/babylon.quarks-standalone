@@ -87,9 +87,12 @@ export interface MeshRim {
     strength: number;
     /**
      * `'add'` (default) adds the colour, for a glowing edge; `'mix'` blends the
-     * surface toward it, for an outline (a dark ink line with a dark colour).
+     * surface toward it, for an outline (a dark ink line with a dark colour);
+     * `'fade'` leaves the colour and fades the faces turned to the camera by
+     * `strength` instead, alpha times `1 - strength * (1 - edge)`: a wall of
+     * light that reads thick along its silhouette and thin across its face.
      */
-    mode: 'add' | 'mix';
+    mode: 'add' | 'mix' | 'fade';
 }
 
 /**
@@ -107,7 +110,7 @@ export function normalizeMeshRim(rim: Partial<MeshRim> | null | undefined): Mesh
         color: [channel(color[0], 1), channel(color[1], 1), channel(color[2], 1)],
         power: Math.max(0.01, channel(rim.power, 2)),
         strength: Math.max(0, channel(rim.strength, 1)),
-        mode: rim.mode === 'mix' ? 'mix' : 'add',
+        mode: rim.mode === 'mix' || rim.mode === 'fade' ? rim.mode : 'add',
     };
 }
 
@@ -195,6 +198,97 @@ export function erosionEqual(a: ParticleErosion | undefined, b: ParticleErosion 
     );
 }
 
+/**
+ * UV distortion: the map's UV pushed about by a noise texture, for heat
+ * shimmer, licking flames and breathing auras. See
+ * {@link VFXBatchSettings.uvDistortion}.
+ */
+export interface ParticleUVDistortion {
+    /**
+     * Noise whose red and green channels, around 0.5, push U and V. It should
+     * wrap (repeat). Required: without one there is no distortion.
+     */
+    map: BaseTexture | null;
+    /** How far the UV is pushed at most, in UV units. Default 0.05. */
+    strength: number;
+    /** How many times the noise repeats across the particle's UV. Default 1. */
+    scale: number;
+    /** Noise scroll, in noise UV units per second, on the renderer's clock. Default `[0, 0.5]`. */
+    scroll: [number, number];
+}
+
+/** A complete distortion from a partial one, or undefined when unset or without a map. */
+export function normalizeUVDistortion(
+    distortion: Partial<ParticleUVDistortion> | null | undefined
+): ParticleUVDistortion | undefined {
+    if (!distortion || typeof distortion !== 'object' || !distortion.map) {
+        return undefined;
+    }
+    const num = (value: unknown, fallback: number) =>
+        typeof value === 'number' && Number.isFinite(value) ? value : fallback;
+    const scroll = Array.isArray(distortion.scroll) ? distortion.scroll : [0, 0.5];
+    return {
+        map: distortion.map,
+        strength: Math.max(0, num(distortion.strength, 0.05)),
+        scale: num(distortion.scale, 1),
+        scroll: [num(scroll[0], 0), num(scroll[1], 0.5)],
+    };
+}
+
+/** True when both describe the same distortion (or both none). */
+export function uvDistortionEqual(a: ParticleUVDistortion | undefined, b: ParticleUVDistortion | undefined): boolean {
+    if (a === b) {
+        return true;
+    }
+    if (!a || !b) {
+        return false;
+    }
+    return (
+        a.map === b.map &&
+        a.strength === b.strength &&
+        a.scale === b.scale &&
+        a.scroll[0] === b.scroll[0] &&
+        a.scroll[1] === b.scroll[1]
+    );
+}
+
+/**
+ * How a {@link RenderMode.Beam} quad takes its texture and width. See
+ * {@link VFXBatchSettings.beam}.
+ */
+export interface ParticleBeam {
+    /**
+     * The texture axis that runs along the beam, from the particle (0) to the
+     * end (1): `'u'` (default), or `'v'` for a sheet drawn standing up, its
+     * frames side by side.
+     */
+    textureAxis: 'u' | 'v';
+    /**
+     * Above 0, the beam's width is its length times this, times the particle
+     * size: a drawing keeps its proportions however far the beam reaches, as
+     * a strike drawn four times as long as it is wide does at 0.25. 0
+     * (default): the width is the particle size.
+     */
+    widthPerLength: number;
+}
+
+/** A complete beam setting, or undefined when unset or all defaults. */
+export function normalizeBeam(beam: Partial<ParticleBeam> | null | undefined): ParticleBeam | undefined {
+    if (!beam || typeof beam !== 'object') {
+        return undefined;
+    }
+    const textureAxis = beam.textureAxis === 'v' ? 'v' : 'u';
+    const width =
+        typeof beam.widthPerLength === 'number' && Number.isFinite(beam.widthPerLength) ? beam.widthPerLength : 0;
+    const widthPerLength = Math.max(0, width);
+    return textureAxis === 'u' && widthPerLength === 0 ? undefined : {textureAxis, widthPerLength};
+}
+
+/** True when both lay the beam the same way (or both by default). */
+export function beamEqual(a: ParticleBeam | undefined, b: ParticleBeam | undefined): boolean {
+    return a === b || (!!a && !!b && a.textureAxis === b.textureAxis && a.widthPerLength === b.widthPerLength);
+}
+
 /** A UV scroll speed, or undefined when unset or zero. */
 export function normalizeUVScroll(scroll: ArrayLike<number> | null | undefined): [number, number] | undefined {
     if (!scroll || typeof scroll !== 'object') {
@@ -250,8 +344,12 @@ export interface StoredBatchSettings {
     lighting?: MeshLighting;
     /** Mesh particle rim, see {@link VFXBatchSettings.rim}. */
     rim?: MeshRim;
+    /** Beam texture axis and width, see {@link VFXBatchSettings.beam}. */
+    beam?: ParticleBeam;
     /** Map UV scroll, see {@link VFXBatchSettings.uvScroll}. */
     uvScroll?: [number, number];
+    /** Map UV distortion, see {@link VFXBatchSettings.uvDistortion}. */
+    uvDistortion?: ParticleUVDistortion;
     /** Colour ramp for the map, see {@link VFXBatchSettings.gradientMap}. */
     gradientMap: BaseTexture | null;
     /** Alpha erosion, see {@link VFXBatchSettings.erosion}. */
@@ -302,7 +400,9 @@ export abstract class VFXBatch {
             applyFog: settings.applyFog ?? true,
             lighting: settings.lighting,
             rim: normalizeMeshRim(settings.rim),
+            beam: normalizeBeam(settings.beam),
             uvScroll: normalizeUVScroll(settings.uvScroll),
+            uvDistortion: normalizeUVDistortion(settings.uvDistortion),
             gradientMap: settings.gradientMap ?? null,
             erosion: normalizeErosion(settings.erosion),
         };
@@ -440,6 +540,9 @@ export abstract class VFXBatch {
         if (this.settings.uvScroll) {
             defines.push('UV_SCROLL');
         }
+        if (this.settings.uvDistortion) {
+            defines.push('UV_DISTORTION');
+        }
         if (this.settings.gradientMap) {
             defines.push('GRADIENT_MAP');
         }
@@ -458,6 +561,10 @@ export abstract class VFXBatch {
         if (this.settings.uvScroll) {
             uniforms.push('uvScrollOffset');
         }
+        if (this.settings.uvDistortion) {
+            samplers.push('distortionMap');
+            uniforms.push('distortionParams');
+        }
         if (this.settings.gradientMap) {
             samplers.push('gradientMap');
             uniforms.push('gradientMapRange');
@@ -473,7 +580,10 @@ export abstract class VFXBatch {
 
     /** Sets the texture effects' textures and constants, and advances their scrolling on every bind. */
     protected bindSurface(material: ShaderMaterial): void {
-        const {uvScroll, gradientMap, erosion} = this.settings;
+        const {uvScroll, uvDistortion, gradientMap, erosion} = this.settings;
+        if (uvDistortion?.map) {
+            material.setTexture('distortionMap', uvDistortion.map);
+        }
         if (gradientMap) {
             material.setTexture('gradientMap', gradientMap);
         }
@@ -486,12 +596,13 @@ export abstract class VFXBatch {
                 new BVector3(erosion.edgeColor[0], erosion.edgeColor[1], erosion.edgeColor[2])
             );
         }
-        if (!uvScroll && !erosion && !gradientMap) {
+        if (!uvScroll && !uvDistortion && !erosion && !gradientMap) {
             return;
         }
         // Wrapped on the CPU: a raw speed × time grows until float32 UVs lose their fraction.
         const wrap = (value: number) => value - Math.floor(value);
         const scrollOffset = new BVector2();
+        const distortionParams = new BVector4();
         const erosionParams = new BVector4();
         const gradientRange = new BVector2(0, 1);
         // Written to the material for the next bind and to the bound effect for
@@ -503,6 +614,16 @@ export abstract class VFXBatch {
                 scrollOffset.set(wrap(uvScroll[0] * time), wrap(uvScroll[1] * time));
                 material.setVector2('uvScrollOffset', scrollOffset);
                 effect?.setVector2('uvScrollOffset', scrollOffset);
+            }
+            if (uvDistortion) {
+                distortionParams.set(
+                    uvDistortion.strength,
+                    uvDistortion.scale,
+                    wrap(uvDistortion.scroll[0] * time),
+                    wrap(uvDistortion.scroll[1] * time)
+                );
+                material.setVector4('distortionParams', distortionParams);
+                effect?.setVector4('distortionParams', distortionParams);
             }
             if (erosion) {
                 erosionParams.set(

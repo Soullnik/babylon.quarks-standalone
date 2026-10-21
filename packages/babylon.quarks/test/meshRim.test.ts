@@ -98,6 +98,18 @@ describe('mesh particle rim', () => {
         expect(defines(material(renderer))).toEqual(expect.arrayContaining(['MESH_RIM', 'MESH_RIM_MIX', 'MESH_UNLIT']));
     });
 
+    it('fades the faces in fade mode, a mode of its own', () => {
+        expect(normalizeMeshRim({mode: 'fade'})?.mode).toBe('fade');
+        const renderer = new BatchedRenderer('rimFade', scene);
+        renderer.addSystem(meshSystem({rim: {mode: 'fade', strength: 0.6}, lighting: 'unlit'}));
+        const list = defines(material(renderer));
+        expect(list).toEqual(expect.arrayContaining(['MESH_RIM', 'MESH_RIM_FADE']));
+        expect(list).not.toContain('MESH_RIM_MIX');
+        for (const source of [physicsFragGLSL, physicsFragWGSL]) {
+            expect(source).toContain('defined(MESH_RIM_FADE)');
+        }
+    });
+
     it('batches different rims apart and equal ones together', () => {
         const renderer = new BatchedRenderer('rimBatch', scene);
         const geometry = new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0]);

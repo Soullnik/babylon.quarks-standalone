@@ -231,6 +231,30 @@ export class TrailBatch extends VFXBatch {
      * frame costs a matrix compose per system; checking the transform cache
      * first makes a still emitter free.
      */
+    /**
+     * Writes a swept ribbon's vertex pair at `pi`: the sample at (x, y, z)
+     * pushed `half` widths along its side (sx, sy, sz) one way for the first
+     * vertex and the other way for the second.
+     */
+    private writeSweptPair(
+        pi: number,
+        x: number,
+        y: number,
+        z: number,
+        sx: number,
+        sy: number,
+        sz: number,
+        half: number
+    ): void {
+        const positions = this.positionBuffer;
+        positions[pi] = x + sx * half;
+        positions[pi + 1] = y + sy * half;
+        positions[pi + 2] = z + sz * half;
+        positions[pi + 3] = x - sx * half;
+        positions[pi + 4] = y - sy * half;
+        positions[pi + 5] = z - sz * half;
+    }
+
     private static ensureWorldMatrix(system: IParticleSystem): void {
         const emitter = system.emitter as {
             computeWorldMatrix?: (force: boolean) => void;
@@ -300,6 +324,10 @@ export class TrailBatch extends VFXBatch {
             // Recorded samples already sit in world space; the live tip still comes
             // from the particle's own (local) position.
             const samplesInWorld = systemWorldSpace || Boolean(trailSettings.recordWorldSpace);
+            // A swept trail spans each sample's recorded side instead of facing
+            // the camera: its vertices are laid out here, and a zero width
+            // keeps the shader from pushing them.
+            const sideAxis = trailSettings.sideAxis;
             const residual = trailSettings.followLocalOrigin ? 0 : (system.simulationResidual ?? 0);
             // Measured from the step the particle just took, not from its
             // velocity: a trail pulled along by an orbit or by a plugin's own
@@ -315,6 +343,8 @@ export class TrailBatch extends VFXBatch {
                 const historyCapacity = particle.historyCapacity;
                 const historyPositions = particle.historyPositions;
                 const historySizes = particle.historySizes;
+                const historySides = particle.historySides;
+                const swept = sideAxis !== undefined && historySides.length === historyCapacity * 3;
                 // Every sample takes its color from one place: its own recorded slot, or
                 // the particle's current row in the store.
                 const colors = colorFromParticle ? particle.store.color : particle.historyColors;
@@ -394,12 +424,27 @@ export class TrailBatch extends VFXBatch {
                     const currentColorW = colors[currentColorIndex + 3];
 
                     const pi = index * 3;
-                    this.positionBuffer[pi] = currentX;
-                    this.positionBuffer[pi + 1] = currentY;
-                    this.positionBuffer[pi + 2] = currentZ;
-                    this.positionBuffer[pi + 3] = currentX;
-                    this.positionBuffer[pi + 4] = currentY;
-                    this.positionBuffer[pi + 5] = currentZ;
+                    if (swept) {
+                        const si = currentSlot * 3;
+                        let sx = historySides[si];
+                        let sy = historySides[si + 1];
+                        let sz = historySides[si + 2];
+                        if (!samplesInWorld) {
+                            const tx = m00 * sx + m10 * sy + m20 * sz;
+                            const ty = m01 * sx + m11 * sy + m21 * sz;
+                            sz = m02 * sx + m12 * sy + m22 * sz;
+                            sx = tx;
+                            sy = ty;
+                        }
+                        this.writeSweptPair(pi, currentX, currentY, currentZ, sx, sy, sz, currentSize * 0.5);
+                    } else {
+                        this.positionBuffer[pi] = currentX;
+                        this.positionBuffer[pi + 1] = currentY;
+                        this.positionBuffer[pi + 2] = currentZ;
+                        this.positionBuffer[pi + 3] = currentX;
+                        this.positionBuffer[pi + 4] = currentY;
+                        this.positionBuffer[pi + 5] = currentZ;
+                    }
 
                     this.previousBuffer[pi] = previousX;
                     this.previousBuffer[pi + 1] = previousY;
@@ -415,7 +460,10 @@ export class TrailBatch extends VFXBatch {
                     this.nextBuffer[pi + 4] = nextY;
                     this.nextBuffer[pi + 5] = nextZ;
 
-                    if (systemWorldSpace || particle.parentMatrix) {
+                    if (swept) {
+                        this.widthBuffer[index] = 0;
+                        this.widthBuffer[index + 1] = 0;
+                    } else if (systemWorldSpace || particle.parentMatrix) {
                         this.widthBuffer[index] = currentSize;
                         this.widthBuffer[index + 1] = currentSize;
                     } else {
@@ -470,9 +518,12 @@ export class TrailBatch extends VFXBatch {
                     let tipY = position.y + (position.y - previousHead.y) * stepFraction;
                     let tipZ = position.z + (position.z - previousHead.z) * stepFraction;
                     const headIndex = index - 2;
-                    const headX = this.positionBuffer[headIndex * 3];
-                    const headY = this.positionBuffer[headIndex * 3 + 1];
-                    const headZ = this.positionBuffer[headIndex * 3 + 2];
+                    // The pair's midpoint: a swept pair lies to either side of its sample.
+                    const headX = (this.positionBuffer[headIndex * 3] + this.positionBuffer[headIndex * 3 + 3]) * 0.5;
+                    const headY =
+                        (this.positionBuffer[headIndex * 3 + 1] + this.positionBuffer[headIndex * 3 + 4]) * 0.5;
+                    const headZ =
+                        (this.positionBuffer[headIndex * 3 + 2] + this.positionBuffer[headIndex * 3 + 5]) * 0.5;
 
                     if (!systemWorldSpace) {
                         const w = 1 / (m03 * tipX + m13 * tipY + m23 * tipZ + m33);
@@ -484,12 +535,30 @@ export class TrailBatch extends VFXBatch {
                     }
 
                     const tipPi = index * 3;
-                    this.positionBuffer[tipPi] = tipX;
-                    this.positionBuffer[tipPi + 1] = tipY;
-                    this.positionBuffer[tipPi + 2] = tipZ;
-                    this.positionBuffer[tipPi + 3] = tipX;
-                    this.positionBuffer[tipPi + 4] = tipY;
-                    this.positionBuffer[tipPi + 5] = tipZ;
+                    const tipSize = particle.size.x;
+                    if (swept) {
+                        // The side as the emitter holds it now.
+                        const ax = sideAxis!.x;
+                        const ay = sideAxis!.y;
+                        const az = sideAxis!.z;
+                        this.writeSweptPair(
+                            tipPi,
+                            tipX,
+                            tipY,
+                            tipZ,
+                            m00 * ax + m10 * ay + m20 * az,
+                            m01 * ax + m11 * ay + m21 * az,
+                            m02 * ax + m12 * ay + m22 * az,
+                            tipSize * 0.5
+                        );
+                    } else {
+                        this.positionBuffer[tipPi] = tipX;
+                        this.positionBuffer[tipPi + 1] = tipY;
+                        this.positionBuffer[tipPi + 2] = tipZ;
+                        this.positionBuffer[tipPi + 3] = tipX;
+                        this.positionBuffer[tipPi + 4] = tipY;
+                        this.positionBuffer[tipPi + 5] = tipZ;
+                    }
 
                     this.previousBuffer[tipPi] = headX;
                     this.previousBuffer[tipPi + 1] = headY;
@@ -516,8 +585,10 @@ export class TrailBatch extends VFXBatch {
                     this.nextBuffer[headPi + 4] = tipY;
                     this.nextBuffer[headPi + 5] = tipZ;
 
-                    const tipSize = particle.size.x;
-                    if (systemWorldSpace || particle.parentMatrix) {
+                    if (swept) {
+                        this.widthBuffer[index] = 0;
+                        this.widthBuffer[index + 1] = 0;
+                    } else if (systemWorldSpace || particle.parentMatrix) {
                         this.widthBuffer[index] = tipSize;
                         this.widthBuffer[index + 1] = tipSize;
                     } else {
