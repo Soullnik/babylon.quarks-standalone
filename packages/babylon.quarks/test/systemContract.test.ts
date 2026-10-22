@@ -79,7 +79,6 @@ const PARAMETERS: {[K in keyof Required<ParticleSystemParameters>]: Parameter<K>
     startSpeed: () => new IntervalValue(1, 3),
     startRotation: () => new EulerGenerator(curve(), new ConstantValue(1), new IntervalValue(0, 2)),
     startSize: () => new Vector3Function(curve(), new ConstantValue(2), new IntervalValue(1, 3)),
-    startLength: 'not-a-setting',
     startColor: () => new ConstantColor(new Vector4(0.1, 0.2, 0.3, 0.4)),
     emissionOverTime: () => new IntervalValue(20, 30),
     emissionOverDistance: () => new ConstantValue(4),
@@ -328,10 +327,7 @@ describe('ParticleSystem serialisation contract', () => {
 
     it('sets every parameter in at least one variant', () => {
         const unset = Object.entries(PARAMETERS)
-            .filter(
-                ([key, make]) =>
-                    make === 'not-a-setting' && !['scene', 'material', 'startLength', 'speedFactor'].includes(key)
-            )
+            .filter(([key, make]) => make === 'not-a-setting' && !['scene', 'material', 'speedFactor'].includes(key))
             .map(([key]) => key)
             .filter((key) => !VARIANTS.some(([, overrides]) => key in overrides));
         expect(unset).toEqual([]);

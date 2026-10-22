@@ -46,8 +46,45 @@ and the project follows the `quarks.core` 0.x version line.
   (see Changed).
 - **`disposeEnvAtlas(cube, scene?)`** drops the env atlases built for a cube.
 
+### Removed (breaking)
+
+The public API is now what the docs describe; these exports were left over from the three.js port
+or duplicated something else, and nothing in the package used them.
+
+- **`ParticleMeshStandardMaterial`, `ParticleMeshPhysicsMaterial` and
+  `BabylonParticleMaterialParameters`.** Mesh particles are drawn by the batch's own material; set
+  their look with the system's `material`, `texture` and lighting settings.
+- **The three.js shader chunk registry**: `registerShaderChunks`, `getShaderChunk`,
+  `getRegisteredShaderChunks`, and the side effect that ran it on import. The batches never read
+  it.
+- **The GLSL shader string exports** (`particleVertShader`, `particleFragShader`,
+  `localParticleVertShader`, `trailVertShader` and the rest). The batches build their shaders
+  themselves, in GLSL and WGSL.
+- **`BatchedParticleRenderer`**, an alias of `BatchedRenderer`.
+- **The `SpriteBatch` and `TrailBatch` exports.** `BatchedRenderer` makes the batches; `VFXBatch`
+  stays exported as the type of `renderer.batches`.
+- **`ParticleEmitter.extractFromCache`**, a three.js serialisation helper.
+- **`ParticleSystemParameters.startLength`**, which nothing read. A trail's length is
+  `rendererEmitterSettings.startLength`.
+- **The duplicate type re-exports of `quarks.core`.** The same types still come from
+  `export * from 'quarks.core'`.
+
 ### Changed
 
+- **Every export has TSDoc**, and `npm run docs:check`, part of `npm run check` and CI, keeps it
+  that way. Members that are public only for other files of the package are tagged `@internal`
+  and left out of the API docs: the batches' buffers and lifecycle methods, `VFXBatch.addSystem`,
+  `applyDepthTexture`, `applyMeshLighting` and the like. They still compile, but are not part of
+  the contract.
+- **`StoredBatchSettings.texture` is typed `BaseTexture | null`** instead of `any` (breaking for
+  TypeScript code that assigned something else), and `ParticleSystemParameters.material` is
+  `unknown`: a Babylon material, or the material record a loaded system carries.
+- **`ParticleSystemParameters.speedFactor` is deprecated** in favour of
+  `rendererEmitterSettings.speedFactor`, and the demos use the latter.
+- **`BatchedRenderer.deleteSystem` is typed to return `boolean`**, whether the system was in a
+  batch, which it already returned.
+- **`QuarksPrefab.toJSON` writes `timeScale`** when it is not 1, so `toJSON` and `fromJSON` round-trip;
+  only `serializeEffect` wrote it before.
 - **The package compiles with TypeScript's `strict` mode.** The published declarations are the
   same as before.
 
@@ -140,6 +177,12 @@ and the project follows the `quarks.core` 0.x version line.
 
 ### Fixed
 
+- **`QuarksPrefab.play()` after `pause()` resumes the timeline's systems and clips**; before, a
+  system paused in the middle of its track stayed paused until the track ended.
+- **Setting `MeshSurfaceEmitter.mesh` to nothing, or to a mesh without positions or indices,
+  emits from the origin** as documented, instead of from the previous mesh.
+- **A stretched billboard system no longer writes its defaults into the
+  `rendererEmitterSettings` object it was given**, as trails already did not.
 - **A texture whose image failed to load is no longer shared.** The next load of the same image
   tries it again instead of reusing the broken texture. A texture the engine cannot make at all is
   reported and left out instead of failing the load.

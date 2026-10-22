@@ -6,6 +6,7 @@ import {disposeEffect} from './effectResources';
 import {ParticleSystem} from './ParticleSystem';
 import {QuarksUtil} from './QuarksUtil';
 
+/** Options for a new {@link EffectPool}. */
 export interface EffectPoolOptions {
     /** The renderer every copy the pool makes is added to. */
     renderer: BatchedRenderer;

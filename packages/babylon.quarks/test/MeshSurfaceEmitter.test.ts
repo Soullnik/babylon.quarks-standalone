@@ -91,10 +91,22 @@ describe('MeshSurfaceEmitter', () => {
         expect(json.mesh).toBe(quarksNodeId(box));
     });
 
-    it('mesh setter returns early when clearing mesh reference', () => {
-        const box = MeshBuilder.CreateBox('ms-clear', {size: 1}, scene);
+    it('emits from the origin once its mesh is cleared or replaced by one without data', () => {
+        const box = MeshBuilder.CreateBox('ms-clear', {size: 4}, scene);
         const emitter = new MeshSurfaceEmitter(box);
+        const particle = new SpriteParticle();
+        particle.startSpeed = 1;
+        emitter.initialize(particle);
+        expect(particle.position.length()).toBeGreaterThan(1);
+
         emitter.mesh = undefined;
         expect(emitter.mesh).toBeUndefined();
+        emitter.initialize(particle);
+        expect(particle.position.length()).toBe(0);
+
+        emitter.mesh = box;
+        emitter.mesh = new Mesh('ms-empty', scene);
+        emitter.initialize(particle);
+        expect(particle.position.length()).toBe(0);
     });
 });

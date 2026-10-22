@@ -169,7 +169,7 @@ export function init({scene, camera, batchRenderer, systems}: DemoContext) {
             emissionBursts: [{time: 0, count: new ConstantValue(8), cycle: 1, interval: 0.01, probability: 1}],
             shape: new ConeEmitter({angle: (20 * Math.PI) / 180, radius: 0.3, thickness: 1, arc: Math.PI * 2}),
             renderMode: RenderMode.StretchedBillBoard,
-            speedFactor: 0.4,
+            rendererEmitterSettings: {speedFactor: 0.4},
             texture,
             transparent: true,
             blendMode: Constants.ALPHA_ADD,

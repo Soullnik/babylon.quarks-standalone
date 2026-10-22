@@ -19,39 +19,6 @@ describe('ParticleEmitter parity helpers', () => {
         engine.dispose();
     });
 
-    it('extractFromCache strips metadata entries', () => {
-        const emitter = new ParticleSystem({
-            scene,
-            startLife: new ConstantValue(1),
-            emissionOverTime: new ConstantValue(1),
-        }).emitter as ParticleEmitter;
-
-        const values = emitter.extractFromCache({
-            first: {metadata: {source: 'meta'}, payload: 1},
-            second: {metadata: {source: 'meta'}, payload: 2},
-        });
-
-        expect(values.length).toBe(2);
-        expect(values[0].metadata).toBeUndefined();
-        expect(values[1].metadata).toBeUndefined();
-    });
-
-    it('extractFromCache keeps primitives and skips metadata stripping for non-objects', () => {
-        const emitter = new ParticleSystem({
-            scene,
-            startLife: new ConstantValue(1),
-            emissionOverTime: new ConstantValue(1),
-        }).emitter as ParticleEmitter;
-
-        const values = emitter.extractFromCache({
-            num: 42,
-            str: 'x',
-            obj: {metadata: {a: 1}, v: 1},
-        });
-
-        expect(values).toEqual([42, 'x', {v: 1}]);
-    });
-
     it('clones transform and serialization fields', () => {
         const system = new ParticleSystem({
             scene,

@@ -110,7 +110,7 @@ export function init({scene, camera, batchRenderer, systems, demoState}: DemoCon
         uTileCount: 10,
         vTileCount: 10,
         renderMode: RenderMode.StretchedBillBoard,
-        speedFactor: 0.1,
+        rendererEmitterSettings: {speedFactor: 0.1},
         renderOrder: 1,
     });
     particles.addBehavior(new SizeOverLife(new PiecewiseBezier([[new Bezier(1, 0.3, 0.25, 0.1), 0]])));

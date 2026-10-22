@@ -275,7 +275,7 @@ export function mountIndexHeroBackground() {
         uTileCount: 10,
         vTileCount: 10,
         renderMode: RenderMode.StretchedBillBoard,
-        speedFactor: 1.2,
+        rendererEmitterSettings: {speedFactor: 1.2},
         renderOrder: 5,
     });
     dust.addBehavior(new ColorOverLife(fadeEnvelope(0.15, 0.75)));

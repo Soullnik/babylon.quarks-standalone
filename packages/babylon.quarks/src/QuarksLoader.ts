@@ -34,7 +34,12 @@ export interface QuarksResourceResolver {
     fetchJson?(resolvedUrl: string, options?: {signal?: AbortSignal}): Promise<unknown>;
 }
 
+/** Options for a {@link QuarksLoader}, shared by every load it does. */
 export interface QuarksLoaderOptions {
+    /**
+     * Prefix joined to relative geometry and image urls (see {@link QuarksLoader.joinUrl}).
+     * Unset, {@link QuarksLoader.load} uses the effect file's own folder and the other loads `''`.
+     */
     baseUrl?: string;
     /**
      * Reuse one Texture per scene for every effect that references the same image with the same
@@ -74,6 +79,7 @@ export interface QuarksLoadOptions {
 
 /** One in-memory effect for {@link QuarksLoader.loadFromJSONAll}. */
 export interface QuarksJSONLoadEntry {
+    /** The effect document, as {@link serializeEffect} or the editor writes it. Left unchanged. */
     json: unknown;
     /** Overrides loader `baseUrl` for relative texture / geometry links in this effect. */
     baseUrl?: string;
@@ -229,6 +235,20 @@ interface LoadedMeta {
     materials: {[uuid: string]: any};
 }
 
+/**
+ * Loads effects saved as JSON into a scene: fetches the document and the geometry and image files
+ * it links, builds the nodes, particle systems, textures and materials, and returns the root.
+ * Add the systems to a {@link BatchedRenderer} with {@link QuarksUtil.addToBatchRenderer} to draw
+ * them, and free the effect with {@link QuarksLoader.disposeEffect}.
+ *
+ * @example
+ * ```ts
+ * const loader = new QuarksLoader(scene, {waitForTextures: true});
+ * const effect = await loader.load('effects/fireball.json');
+ * QuarksUtil.addToBatchRenderer(effect, renderer);
+ * QuarksUtil.play(effect);
+ * ```
+ */
 export class QuarksLoader {
     private scene: Scene;
     private options: QuarksLoaderOptions;

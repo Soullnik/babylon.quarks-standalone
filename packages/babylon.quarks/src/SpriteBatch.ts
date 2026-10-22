@@ -35,6 +35,7 @@ import stretched_bb_particle_vert_wgsl from './shaders/stretched_bb_particle_ver
 import type {DepthBinding} from './softDepth';
 import {defaultMeshLighting, MeshLightingSettings, RenderMode, VFXBatch} from './VFXBatch';
 
+/** The batch of billboard, stretched, mesh and beam particles. @internal */
 export class SpriteBatch extends VFXBatch {
     private static whiteTextureByScene = new WeakMap<Scene, RawTexture>();
 
@@ -80,6 +81,7 @@ export class SpriteBatch extends VFXBatch {
         this.rebuildMaterial();
     }
 
+    /** @internal */
     setupBuffers(): void {
         this.mesh.dispose();
         this.mesh = new Mesh('spriteBatch', this.scene);
@@ -185,6 +187,7 @@ export class SpriteBatch extends VFXBatch {
         this.mesh.doNotSyncBoundingInfo = true;
     }
 
+    /** @internal */
     expandBuffers(target: number): void {
         while (target >= this.maxParticles) {
             this.maxParticles *= 2;
@@ -300,6 +303,7 @@ export class SpriteBatch extends VFXBatch {
         return spare;
     }
 
+    /** @internal */
     rebuildMaterial(): void {
         // The shader sources only depend on the render mode, so the store entry is
         // registered once per mode. A unique name per rebuild would leak entries in
@@ -613,6 +617,7 @@ export class SpriteBatch extends VFXBatch {
     /** Slot 0 holds the zero-alpha instance since the batch last went empty. */
     private clearedInstanceUploaded = false;
 
+    /** @internal */
     update(): void {
         let index = 0;
         let particleCount = 0;
@@ -1323,6 +1328,7 @@ export class SpriteBatch extends VFXBatch {
         }
     }
 
+    /** @internal */
     dispose(): void {
         this.disposed = true;
         this.cancelAtlasRebuild?.();

@@ -3,7 +3,16 @@ import {Mesh} from '@babylonjs/core/Meshes/mesh';
 import {EmitterShape, IParticleSystem, Particle, Plugin, random, ShapeJSON, ShapeTransform, Vector3} from 'quarks.core';
 import {quarksNodeId} from './nodeId';
 
+/**
+ * Emits from the surface of a Babylon mesh (Unity's Shape: Mesh, Unreal's Skeletal/Static Mesh
+ * Location): a point picked at random over the triangles, weighted by their area, moving along the
+ * triangle's normal at the particle's start speed. The mesh's vertices are read once, when it is
+ * set, in the mesh's own space, and laid in the emitter's space as they are, moved by
+ * {@link transform}; moving the mesh node afterwards does not move the shape. A shape without a
+ * mesh emits from the origin along +Z.
+ */
 export class MeshSurfaceEmitter implements EmitterShape {
+    /** The shape's type in effect files. */
     type = 'mesh_surface';
 
     private _triangleIndexToArea: number[] = [];
@@ -14,12 +23,16 @@ export class MeshSurfaceEmitter implements EmitterShape {
     /** Offset, rotation and scale of the mesh within the particle system. */
     transform?: ShapeTransform;
 
-    get mesh() {
+    /** The mesh emitted from. Setting it reads its positions and indices; a mesh without both emits from the origin. */
+    get mesh(): Mesh | undefined {
         return this._mesh;
     }
 
     set mesh(mesh: Mesh | undefined) {
         this._mesh = mesh;
+        this._positions = undefined;
+        this._indices = undefined;
+        this._triangleIndexToArea.length = 0;
         if (!mesh) return;
 
         const positions = mesh.getVerticesData(VertexBuffer.PositionKind);
@@ -56,13 +69,19 @@ export class MeshSurfaceEmitter implements EmitterShape {
         }
     }
 
+    /**
+     * @param mesh The mesh to emit from.
+     * @param meshReferenceId The id of a mesh node in the effect file, kept until the loader links it.
+     * @param transform Offset, rotation and scale of the mesh within the system.
+     */
     constructor(mesh?: Mesh, meshReferenceId?: string, transform?: ShapeTransform) {
         this._meshReferenceId = meshReferenceId;
         this.transform = transform;
         if (mesh) this.mesh = mesh;
     }
 
-    initialize(p: Particle) {
+    /** Places a new particle on the surface and sets its velocity along the triangle's normal. */
+    initialize(p: Particle): void {
         if (!this._positions || !this._indices) {
             p.position.set(0, 0, 0);
             p.velocity.set(0, 0, 1).multiplyScalar(p.startSpeed);
@@ -115,6 +134,7 @@ export class MeshSurfaceEmitter implements EmitterShape {
         this.transform?.apply(p);
     }
 
+    /** The shape in effect-file form; the mesh is written as its node id. */
     toJSON(): ShapeJSON {
         return {
             type: 'mesh_surface',
@@ -123,17 +143,21 @@ export class MeshSurfaceEmitter implements EmitterShape {
         };
     }
 
+    /** Reads {@link toJSON} output; the mesh stays an id until `QuarksLoader` links it. */
     static fromJSON(json: any): MeshSurfaceEmitter {
         return new MeshSurfaceEmitter(undefined, json?.mesh, ShapeTransform.fromJSON(json?.transform));
     }
 
+    /** A copy emitting from the same mesh. */
     clone(): EmitterShape {
         return new MeshSurfaceEmitter(this._mesh, this._meshReferenceId, this.transform?.clone());
     }
 
+    /** Does nothing: the shape keeps no state between steps. */
     update(_system: IParticleSystem, _delta: number): void {}
 }
 
+/** Registers {@link MeshSurfaceEmitter} with quarks.core's shape table; loaded when the package is imported. */
 export const MeshSurfaceEmitterPlugin: Plugin = {
     id: 'babylon.quarks',
     initialize: () => {},
