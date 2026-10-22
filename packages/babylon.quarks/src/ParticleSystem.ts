@@ -7,19 +7,14 @@ import {
     Behavior,
     BehaviorFromJSON,
     ColorGenerator,
-    ColorGeneratorFromJSON,
     ConstantColor,
     ConstantValue,
     createSeededRandom,
     EmissionState,
     EmitSubParticleSystem,
-    EmitterFromJSON,
     EmitterShape,
     FunctionColorGenerator,
-    FunctionJSON,
     FunctionValueGenerator,
-    FusionStep,
-    GeneratorFromJSON,
     GeneratorMemory,
     IParticleSystem,
     Matrix3,
@@ -29,7 +24,6 @@ import {
     ParticleSystemEvent,
     ParticleSystemEventType,
     PiecewiseBezier,
-    planBehaviorFusion,
     Quaternion,
     random,
     RandomSource,
@@ -44,7 +38,6 @@ import {
     TrailParticle,
     TrailSettings,
     ValueGenerator,
-    ValueGeneratorFromJSON,
     Vector2,
     Vector3,
     Vector3Generator,
@@ -52,9 +45,22 @@ import {
 } from 'quarks.core';
 import {BatchedRenderer, VFXBatchSettings} from './BatchedRenderer';
 import {ensureEnvAtlasFromCube, getCachedEnvAtlas} from './envAtlas';
-import {ensureTriangleIndices} from './geometryUtil';
 import {disposeEmitterForSystem, ParticleEmitter} from './ParticleEmitter';
-import {trailCurveTension, trailTessellation} from './trailCurve';
+import {BehaviorPlan} from './system/BehaviorPlan';
+import {BoundsTracker} from './system/BoundsTracker';
+import {EventDispatcher} from './system/EventDispatcher';
+import {
+    DEFAULT_INDICES,
+    DEFAULT_POSITIONS,
+    DEFAULT_UVS,
+    fallbackNormalsForPositions,
+    fallbackUVsForPositions,
+    isFallbackNormals,
+    isFallbackUVs,
+} from './system/geometry';
+import {liveAtlas, MaterialOverrides, resolveMaterialSettings} from './system/materialResolve';
+import {nonZeroFlip, nonZeroPivot, validLighting, validSortMode} from './system/normalize';
+import {particleSystemParametersFromJSON, particleSystemToJSON, trailCurve, trailFlags} from './system/serialization';
 import {
     MeshLighting,
     MeshRim,
@@ -71,88 +77,28 @@ import {
     RenderMode,
     SortMode,
     TextureUV,
-    textureUVToJSON,
-    UV_DISTORTION_DEFAULT_UV,
 } from './VFXBatch';
 
-/**
- * One burst of a system's emission (Unity's Emission Bursts): `count` particles at `time` seconds
- * into each loop, repeated `cycle` times `interval` seconds apart, each wave with the chance
- * `probability`.
- */
-export interface BurstParameters {
-    /** Seconds into the system's duration the first wave fires at. */
-    time: number;
-    /**
-     * Particles each wave spawns, rolled once per loop. A curve is read at the seconds into the
-     * cycle the wave fires, not at the 0 to 1 fraction of the duration the start curves use.
-     */
-    count: ValueGenerator | FunctionValueGenerator;
-    /** How many waves the burst fires, at least 1. */
-    cycle: number;
-    /** Seconds between waves; 0 or less fires them all at once. */
-    interval: number;
-    /** Chance from 0 to 1 that a wave spawns at all, rolled per wave. */
-    probability: number;
-}
+import type {
+    BabylonMetaData,
+    BeamEnd,
+    BurstParameters,
+    CullingMode,
+    ParticleSystemJSONParameters,
+    ParticleSystemParameters,
+    ScalingMode,
+} from './system/types';
 
-/**
- * What a system does while no camera can see its particles (Unity's Culling
- * Mode). The {@link BatchedRenderer} tests each system's bounds against the
- * active cameras' frusta every frame.
- *
- * - `'always'` keeps simulating off screen, so an effect is exactly where it
- *   would have been when it comes back into view. The default, and the only
- *   safe choice for an emitter whose particles reach the screen from off it.
- * - `'pause'` freezes the system off screen and resumes it where it left off.
- * - `'pauseAndCatchUp'` freezes it too, then runs the missed time (up to a few
- *   seconds) within the renderer's catch-up budget when it is seen again.
- *
- * An empty system is never culled, so it can start emitting and grow the
- * bounds that decide its visibility. A system another one emits into is never
- * culled either; its parent decides.
- */
-export type CullingMode = 'always' | 'pause' | 'pauseAndCatchUp';
-
-/**
- * What the emitter's world scale does to a world-space system (Unity's
- * Scaling Mode, as far as it differs here). A local-space system lives in its
- * emitter's space, so its scale reaches everything either way.
- *
- * - `'shape'` (default): the scale sizes the emission shape and the
- *   particles; speeds, forces and speed limits stay in world units, so a
- *   scaled-down effect moves as far as the full-size one.
- * - `'hierarchy'`: the scale also multiplies start speeds (per axis),
- *   `ForceOverLife` and `LimitSpeedOverLife` (by the mean of the axes), so the
- *   whole effect, motion included, scales like a model would.
- */
-export type ScalingMode = 'shape' | 'hierarchy';
-
-/**
- * Where a {@link RenderMode.Beam} system's quads end: a point in world space,
- * or anything with a world position, such as a Babylon `TransformNode`, read
- * every frame.
- */
-export type BeamEnd =
-    | {
-          /** World x. */
-          x: number;
-          /** World y. */
-          y: number;
-          /** World z. */
-          z: number;
-      }
-    | {
-          /** The world position, read every frame. */
-          getAbsolutePosition(): {
-              /** World x. */
-              x: number;
-              /** World y. */
-              y: number;
-              /** World z. */
-              z: number;
-          };
-      };
+export type {
+    BabylonMetaData,
+    BeamEnd,
+    BurstParameters,
+    BurstParametersJSON,
+    CullingMode,
+    ParticleSystemJSONParameters,
+    ParticleSystemParameters,
+    ScalingMode,
+} from './system/types';
 
 /** Particle backed by a {@link ParticleStore} row, as this system always creates. */
 type StoreBackedParticle = Particle & {storeIndex: number; setStoreIndex(index: number): void};
@@ -169,8 +115,6 @@ const MAX_SIMULATION_STEPS_PER_FRAME = 8;
 const RATE_LOOKAHEAD_SAMPLES = 64;
 /** Most off-screen time a `'pauseAndCatchUp'` system replays on coming back into view. */
 const MAX_CATCH_UP_SECONDS = 2;
-/** Steps between full measurements of a system's bounds; see simulateStep. */
-const BOUNDS_REFRESH_STEPS = 4;
 // Math.round() breaks an exact tie (accumulator sitting at precisely half a
 // step) by rounding up. At exactly 120Hz that tie is not a corner case — it is
 // every single frame — and rounding it up would run a step on every one of
@@ -178,390 +122,6 @@ const BOUNDS_REFRESH_STEPS = 4;
 // real display (real frame times essentially never land on the tie exactly)
 // and keeps the well-tested "half a step is no step yet" behavior.
 const ROUND_TIE_BIAS = 1e-9;
-
-/** Built-in behaviors that write a particle's size / colour, and those that touch neither. */
-const SIZE_BEHAVIORS = new Set(['SizeOverLife', 'SizeBySpeed']);
-const COLOR_BEHAVIORS = new Set(['ColorOverLife', 'ColorBySpeed']);
-const INERT_FOR_SIZE_AND_COLOR = new Set([
-    'ApplyForce',
-    'Noise',
-    'TurbulenceField',
-    'GravityForce',
-    'RotationOverLife',
-    'Rotation3DOverLife',
-    'RotationBySpeed',
-    'SpeedOverLife',
-    'FrameOverLife',
-    'ForceOverLife',
-    'VelocityOverLife',
-    'InheritVelocity',
-    'OrbitOverLife',
-    'WidthOverLength',
-    'ChangeEmitDirection',
-    'EmitSubParticleSystem',
-    'LimitSpeedOverLife',
-    'ApplyCollision',
-]);
-
-const DEFAULT_POSITIONS = new Float32Array([-0.5, -0.5, 0, 0.5, -0.5, 0, 0.5, 0.5, 0, -0.5, 0.5, 0]);
-const DEFAULT_UVS = new Float32Array([0, 0, 1, 0, 1, 1, 0, 1]);
-
-/** Zero UVs sized to a position buffer — missing/mismatched uv attrs → GL_INVALID_OPERATION on iOS. */
-const fallbackUVs = new WeakMap<Float32Array, Float32Array>();
-const fallbackNormals = new WeakMap<Float32Array, Float32Array>();
-
-/** `read(json)`, or `undefined` for a part the file leaves out. */
-function optionalJSON<T>(json: any, read: (json: any) => T): T | undefined {
-    return json === undefined || json === null ? undefined : read(json);
-}
-
-/** Per document being written: the last id handed out, and the geometries and textures written. */
-const serializationCounters = new WeakMap<object, number>();
-const serializedGeometries = new WeakMap<object, Array<{arrays: unknown[]; uuid: string}>>();
-const serializedTextures = new WeakMap<object, Map<BaseTexture, string>>();
-/**
- * Zero UVs for a geometry given without any, one array per geometry: batches
- * are keyed by the UV array too, so systems sharing a geometry share it.
- */
-function fallbackUVsForPositions(positions: Float32Array): Float32Array {
-    let uvs = fallbackUVs.get(positions);
-    if (uvs === undefined || uvs.length !== (positions.length / 3) * 2) {
-        uvs = new Float32Array((positions.length / 3) * 2);
-        fallbackUVs.set(positions, uvs);
-    }
-    return uvs;
-}
-const DEFAULT_INDICES = new Uint32Array([0, 1, 2, 0, 2, 3]);
-
-/** The optional trail flags that are switched on, so JSON and clones only carry the ones in use. */
-function trailFlags(settings: TrailSettings | undefined): Partial<TrailSettings> {
-    const flags: Partial<TrailSettings> = {};
-    if (settings?.uvFromHead) flags.uvFromHead = true;
-    if (settings?.colorFromParticle) flags.colorFromParticle = true;
-    if (settings?.dieWithParticle) flags.dieWithParticle = true;
-    if (settings?.recordWorldSpace) flags.recordWorldSpace = true;
-    return flags;
-}
-
-/** A trail's tessellation and curve tension, normalised, each only when it differs from the default. */
-function trailCurve(settings: TrailSettings | undefined): Partial<TrailSettings> {
-    const curve: Partial<TrailSettings> = {};
-    const tessellation = trailTessellation(settings);
-    const curveTension = trailCurveTension(settings);
-    if (tessellation > 0) curve.tessellation = tessellation;
-    if (curveTension > 0) curve.curveTension = curveTension;
-    return curve;
-}
-
-/** A trail's side axis as JSON `[x, y, z]`, or nothing when unset. */
-function trailSideAxisJSON(settings: TrailSettings | undefined): {sideAxis?: number[]} {
-    const axis = settings?.sideAxis;
-    return axis ? {sideAxis: [axis.x, axis.y, axis.z]} : {};
-}
-
-/** A trail's side axis from JSON `[x, y, z]` (or an object with x, y, z), or nothing. */
-function trailSideAxisFromJSON(value: unknown): {sideAxis?: Vector3} {
-    if (Array.isArray(value)) {
-        return {sideAxis: new Vector3(Number(value[0]) || 0, Number(value[1]) || 0, Number(value[2]) || 0)};
-    }
-    if (value && typeof value === 'object') {
-        const v = value as {x?: number; y?: number; z?: number};
-        return {sideAxis: new Vector3(v.x ?? 0, v.y ?? 0, v.z ?? 0)};
-    }
-    return {};
-}
-
-/**
- * Settings for a new {@link ParticleSystem}. Every one is optional: a setting left out takes the
- * default named on it, the same default `fromJSON` gives a file that leaves it out.
- */
-export interface ParticleSystemParameters {
-    /** See {@link ParticleSystem.autoDestroy}. Default false. */
-    autoDestroy?: boolean;
-    /** See {@link ParticleSystem.looping}. Default true. */
-    looping?: boolean;
-    /** See {@link ParticleSystem.prewarm}. Default false. */
-    prewarm?: boolean;
-    /** See {@link ParticleSystem.duration}. Default 1 second. */
-    duration?: number;
-    /** See {@link ParticleSystem.startDelay}. Default 0. */
-    startDelay?: ValueGenerator | FunctionValueGenerator;
-    /** Where particles are born and which way they start, see {@link ParticleSystem.emitterShape}. Default a `SphereEmitter`. */
-    shape?: EmitterShape;
-    /** See {@link ParticleSystem.startLife}. Default 5 seconds. */
-    startLife?: ValueGenerator | FunctionValueGenerator;
-    /** See {@link ParticleSystem.startSpeed}. Default 0. */
-    startSpeed?: ValueGenerator | FunctionValueGenerator;
-    /** See {@link ParticleSystem.startRotation}. Default 0. */
-    startRotation?: ValueGenerator | FunctionValueGenerator | RotationGenerator;
-    /** See {@link ParticleSystem.startSize}. Default 1. */
-    startSize?: ValueGenerator | FunctionValueGenerator | Vector3Generator;
-    /** See {@link ParticleSystem.startColor}. Default opaque white. */
-    startColor?: ColorGenerator | FunctionColorGenerator;
-    /** See {@link ParticleSystem.emissionOverTime}. Default 10 per second. */
-    emissionOverTime?: ValueGenerator | FunctionValueGenerator;
-    /** See {@link ParticleSystem.emissionOverDistance}. Default 0. */
-    emissionOverDistance?: ValueGenerator | FunctionValueGenerator;
-    /** See {@link ParticleSystem.emissionBursts}. Default none. */
-    emissionBursts?: Array<BurstParameters>;
-    /** Most particles alive at once; emission past it is dropped. Leave unset for no limit. */
-    maxParticles?: number;
-    /** See {@link ParticleSystem.onlyUsedByOther}. Default false. */
-    onlyUsedByOther?: boolean;
-    /** See {@link ParticleSystem.behaviors}. Default none. */
-    behaviors?: Array<Behavior>;
-    /** Mesh particles' vertex positions, three values per vertex. Default a unit quad in XY. */
-    instancingGeometry?: Float32Array;
-    /** Triangle indices into {@link instancingGeometry}. Default the unit quad's two triangles. */
-    instancingIndices?: Uint32Array | Uint16Array;
-    /** Mesh particles' first UV set, two values per vertex. Default the quad's UVs, or zeros for another geometry. */
-    instancingUVs?: Float32Array;
-    /**
-     * A second UV set for the mesh (glTF `TEXCOORD_1`, Unity's `uv2`), what
-     * textures on UV channel 1 read on a mesh particle; see `UVChannel`.
-     * Default none: channel 1 reads the first set.
-     */
-    instancingUVs2?: Float32Array;
-    /** Mesh particles' vertex normals, three values per vertex. Default +Z for every vertex. */
-    instancingNormals?: Float32Array;
-    /** See {@link ParticleSystem.renderMode}. Default `RenderMode.BillBoard`. */
-    renderMode?: RenderMode;
-    /** See {@link ParticleSystem.rendererEmitterSettings}. Default the render mode's own. */
-    rendererEmitterSettings?: RendererEmitterSettings;
-    /** @deprecated Set `speedFactor` in {@link rendererEmitterSettings} instead; this one wins when both are set. */
-    speedFactor?: number;
-    /** See {@link ParticleSystem.material}. Default none. */
-    material?: unknown;
-    /** See {@link ParticleSystem.texture}. Unset takes the material's texture; null draws without one. */
-    texture?: Texture | null;
-    /** See {@link ParticleSystem.startTileIndex}. Default 0. */
-    startTileIndex?: ValueGenerator;
-    /** See {@link ParticleSystem.uTileCount}. Default 1. */
-    uTileCount?: number;
-    /** See {@link ParticleSystem.vTileCount}. Default 1. */
-    vTileCount?: number;
-    /** See {@link ParticleSystem.blendTiles}. Default false. */
-    blendTiles?: boolean;
-    /**
-     * Fade particles out as they near the scene behind them, like Unity's Soft Particles and
-     * Unreal's Depth Fade, between `softNearFade` and `softFarFade` world units. Needs a depth
-     * texture, see `BatchedRenderer.setDepthTexture`; without one particles draw hard. Applies to
-     * every render mode: billboard, stretched, mesh, beam and trail.
-     */
-    softParticles?: boolean;
-    /** See {@link ParticleSystem.softFarFade}. Default 0. */
-    softFarFade?: number;
-    /** See {@link ParticleSystem.softNearFade}. Default 0. */
-    softNearFade?: number;
-    /** See {@link ParticleSystem.renderOrder}. Default 0. */
-    renderOrder?: number;
-    /** See {@link ParticleSystem.worldSpace}. Default false. */
-    worldSpace?: boolean;
-    /** Babylon alpha mode the batch blends with, see {@link ParticleSystem.blending}. Default `Constants.ALPHA_ADD`. */
-    blendMode?: number;
-    /** Whether the batch draws in the transparent pass. Default true. */
-    transparent?: boolean;
-    /**
-     * Whether particles are hidden behind nearer geometry. `false` draws them over everything
-     * (Unity's `ZTest Always`), in every render mode. Default `true`.
-     */
-    depthTest?: boolean;
-    /** Whether the particles write depth. Default false. */
-    depthWrite?: boolean;
-    /** Alpha below which a fragment is discarded, 0 to 1. Default 0: nothing is. */
-    alphaTest?: number;
-    /** Camera layer mask the batch draws for, see {@link ParticleSystem.layers}. Default `0x0fffffff`. */
-    layerMask?: number;
-    /** Billboard pivot in particle-size units, see {@link VFXBatchSettings.pivot}. */
-    pivot?: Vector3;
-    /** Fraction of billboard particles mirrored along U (x) and V (y), see {@link ParticleSystem.flip}. */
-    flip?: Vector2;
-    /** How mesh particles are lit, see {@link ParticleSystem.lighting}. Default `'fixed'`. */
-    lighting?: MeshLighting;
-    /** Rim (Fresnel) term on mesh particles, see {@link ParticleSystem.rim}. Default none. */
-    rim?: Partial<MeshRim>;
-    /** The main map's layout, see {@link ParticleSystem.mapUV}. Default as drawn. */
-    mapUV?: Partial<TextureUV>;
-    /** Colour ramp for the map, see {@link ParticleSystem.gradientMap}. Default none. */
-    gradientMap?: Partial<ParticleGradientMap>;
-    /** Alpha erosion, see {@link ParticleSystem.erosion}. Default none. */
-    erosion?: ParticleErosionOptions;
-    /** Map UV distortion, see {@link ParticleSystem.uvDistortion}. Default none. */
-    uvDistortion?: ParticleUVDistortionOptions;
-    /** Multiplier on the time the system is advanced by, see {@link ParticleSystem.playbackSpeed}. Default 1. */
-    playbackSpeed?: number;
-    /** What the system does while off screen, see {@link CullingMode}. Default `'always'`. */
-    cullingMode?: CullingMode;
-    /** What the emitter's scale does to a world-space system, see {@link ScalingMode}. Default `'shape'`. */
-    scalingMode?: ScalingMode;
-    /** Seed for this system's own random generator, see {@link ParticleSystem.seed}. Default none. */
-    seed?: number;
-    /** Draw order within the batch, see {@link ParticleSystem.sortMode}. Default `'none'`. */
-    sortMode?: SortMode;
-    /** Whether particles start turned along their direction of travel, see {@link ParticleSystem.alignToDirection}. Default false. */
-    alignToDirection?: boolean;
-    /** Smallest on-screen size, as a fraction of the viewport height, see {@link ParticleSystem.minParticleSize}. Default 0. */
-    minParticleSize?: number;
-    /** Largest on-screen size, as a fraction of the viewport height, see {@link ParticleSystem.maxParticleSize}. Default unlimited. */
-    maxParticleSize?: number;
-    /** Babylon rendering group of the batch, see {@link ParticleSystem.renderingGroupId}. Default 0. */
-    renderingGroupId?: number;
-    /** Whether the scene's fog applies, see {@link ParticleSystem.applyFog}. Default true. */
-    applyFog?: boolean;
-    /** Scene the emitter node is created in. Default Babylon's last created scene. */
-    scene?: Scene;
-}
-
-/** A {@link BurstParameters} in an effect file. A plain number `count` is read as a constant. */
-export interface BurstParametersJSON {
-    /** See {@link BurstParameters.time}. */
-    time: number;
-    /** See {@link BurstParameters.count}. */
-    count: FunctionJSON | number;
-    /** See {@link BurstParameters.cycle}. */
-    cycle: number;
-    /** See {@link BurstParameters.interval}. */
-    interval: number;
-    /** See {@link BurstParameters.probability}. */
-    probability: number;
-}
-
-/**
- * A particle system in an effect file, as {@link ParticleSystem.toJSON} writes it and
- * {@link ParticleSystem.fromJSON} reads it; `docs/FORMAT.md` describes the document around it.
- * Each field mirrors the {@link ParticleSystem} member of the same name. Curves and generators
- * are written as quarks.core's `FunctionJSON`; textures, materials and geometries as uuids into
- * the document.
- */
-export interface ParticleSystemJSONParameters {
-    /** The quarks.core version line the system was written with. */
-    version: string;
-    /** See {@link ParticleSystem.autoDestroy}. */
-    autoDestroy: boolean;
-    /** See {@link ParticleSystem.looping}. */
-    looping: boolean;
-    /** See {@link ParticleSystem.prewarm}. */
-    prewarm: boolean;
-    /** See {@link ParticleSystem.duration}. */
-    duration: number;
-    /** See {@link ParticleSystem.startDelay}. */
-    startDelay?: FunctionJSON;
-    /** The emitter shape, as its `toJSON` writes it. */
-    shape: any;
-    /** See {@link ParticleSystem.startLife}. */
-    startLife: FunctionJSON;
-    /** See {@link ParticleSystem.startSpeed}. */
-    startSpeed: FunctionJSON;
-    /** See {@link ParticleSystem.startRotation}. */
-    startRotation: FunctionJSON;
-    /** See {@link ParticleSystem.startSize}. */
-    startSize: FunctionJSON;
-    /** See {@link ParticleSystem.startColor}. */
-    startColor: FunctionJSON;
-    /** See {@link ParticleSystem.emissionOverTime}. */
-    emissionOverTime: FunctionJSON;
-    /** See {@link ParticleSystem.emissionOverDistance}. */
-    emissionOverDistance: FunctionJSON;
-    /** See {@link ParticleSystem.emissionBursts}. */
-    emissionBursts?: Array<BurstParametersJSON>;
-    /** See {@link ParticleSystem.maxParticles}. */
-    maxParticles?: number;
-    /** See {@link ParticleSystem.onlyUsedByOther}. */
-    onlyUsedByOther: boolean;
-    /** Trail, stretched or mesh settings; a trail's `startLength` as `FunctionJSON`. */
-    rendererEmitterSettings: RendererEmitterSettings;
-    /** Uuid of the mesh particles' geometry entry. */
-    instancingGeometry?: any;
-    /** A {@link RenderMode} value. */
-    renderMode: number;
-    /** See {@link ParticleSystem.renderOrder}. */
-    renderOrder?: number;
-    /** Written only when not 0. */
-    renderingGroupId?: number;
-    /** Written only when false. */
-    applyFog?: boolean;
-    /** Written only when not 1. */
-    playbackSpeed?: number;
-    /** Written only when not `'always'`. */
-    cullingMode?: CullingMode;
-    /** Written only when not `'shape'`. */
-    scalingMode?: ScalingMode;
-    /** Written only when set. */
-    seed?: number;
-    /** Written only when not `'none'`. */
-    sortMode?: SortMode;
-    /** Written only when true. */
-    alignToDirection?: boolean;
-    /** Written only when not 0. */
-    minParticleSize?: number;
-    /** Written only when limited. */
-    maxParticleSize?: number;
-    /** A stretched billboard's speed factor, as older files wrote it outside `rendererEmitterSettings`. */
-    speedFactor?: number;
-    /** Uuid of the texture entry. */
-    texture?: string;
-    /** Uuid of the material entry. */
-    material?: string;
-    /** The camera layer mask. */
-    layers?: number;
-    /** See {@link ParticleSystem.startTileIndex}. */
-    startTileIndex: FunctionJSON | number;
-    /** See {@link ParticleSystem.uTileCount}. */
-    uTileCount: number;
-    /** See {@link ParticleSystem.vTileCount}. */
-    vTileCount: number;
-    /** See {@link ParticleSystem.blendTiles}. */
-    blendTiles?: boolean;
-    /** See {@link ParticleSystem.softParticles}. */
-    softParticles?: boolean;
-    /** See {@link ParticleSystem.softFarFade}. */
-    softFarFade?: number;
-    /** See {@link ParticleSystem.softNearFade}. */
-    softNearFade?: number;
-    /** See {@link ParticleSystem.blending}. */
-    blending?: number;
-    /** See {@link ParticleSystemParameters.transparent}. */
-    transparent?: boolean;
-    /** See {@link ParticleSystemParameters.depthTest}. */
-    depthTest?: boolean;
-    /** See {@link ParticleSystemParameters.depthWrite}. */
-    depthWrite?: boolean;
-    /** See {@link ParticleSystemParameters.alphaTest}. */
-    alphaTest?: number;
-    /** Each behavior as its `toJSON` writes it. */
-    behaviors: Array<any>;
-    /** See {@link ParticleSystem.worldSpace}. */
-    worldSpace: boolean;
-    /** `[x, y, z]`; written only when non-zero. */
-    pivot?: number[];
-    /** `[u, v]`; written only when non-zero. */
-    flip?: number[];
-}
-
-/**
- * The resources of one effect document, by uuid: what {@link ParticleSystem.toJSON} writes a
- * system's geometry, material and texture into, and what {@link ParticleSystem.fromJSON} resolves
- * them from. While writing, entries hold live Babylon objects; `serializeEffect` turns them into
- * plain data.
- */
-export interface BabylonMetaData {
-    /** Textures by uuid; null for one that could not be made. */
-    textures: {[uuid: string]: Texture | null};
-    /** Material entries by uuid. */
-    materials: {[uuid: string]: any};
-    /** Geometry entries by uuid. */
-    geometries: {[uuid: string]: any};
-    /** Image entries by uuid. */
-    images?: {[uuid: string]: any};
-    /** Not used by babylon.quarks; kept for three.js-shaped documents. */
-    shapes?: {[uuid: string]: any};
-    /** Not used by babylon.quarks; kept for three.js-shaped documents. */
-    skeletons?: {[uuid: string]: any};
-    /** Not used by babylon.quarks; kept for three.js-shaped documents. */
-    animations?: {[uuid: string]: any};
-    /** Nodes by uuid, which a mesh surface shape links to. */
-    nodes?: {[uuid: string]: any};
-}
 
 /**
  * A particle system, the counterpart of a Unity Shuriken system or a Niagara emitter: it spawns
@@ -675,22 +235,15 @@ export class ParticleSystem implements IParticleSystem {
     private pathMatrix: Matrix4 = new Matrix4();
     private normalMatrix: Matrix3 = new Matrix3();
     private memory: GeneratorMemory = [];
-    private listeners: {[event: string]: Array<(event: ParticleSystemEvent) => void>} = {};
+    private readonly events = new EventDispatcher();
     private readonly layerMaskProxy: {mask: number};
     private materialRef: any = null;
     private sceneRef: Scene | undefined;
     private qualityFactor = 1;
     private simulationAccumulator = 0;
     private destroyed = false;
-    /** Behaviors the cached plan was built from, compared by identity. */
-    private fusionPlan?: Array<Behavior>;
-    private fusionSteps: Array<FusionStep> = [];
-    /**
-     * Whether any behavior in the plan can change a particle's size or colour
-     * after birth. Only then does a step have to snapshot them for the renderer.
-     */
-    private planChangesSize = true;
-    private planChangesColor = true;
+    /** How the behaviors run each step, rebuilt when the list changes. */
+    private readonly behaviorPlan = new BehaviorPlan();
     /** @internal **/
     _renderer?: BatchedRenderer;
 
@@ -892,7 +445,7 @@ export class ParticleSystem implements IParticleSystem {
     }
 
     set sortMode(mode: SortMode) {
-        this.rendererSettings.sortMode = ParticleSystem.validSortMode(mode);
+        this.rendererSettings.sortMode = validSortMode(mode);
         this.neededToUpdateRender = true;
     }
 
@@ -935,7 +488,7 @@ export class ParticleSystem implements IParticleSystem {
     }
 
     set pivot(v: Vector3 | undefined) {
-        this.rendererSettings.pivot = ParticleSystem.nonZeroPivot(v);
+        this.rendererSettings.pivot = nonZeroPivot(v);
         this.neededToUpdateRender = true;
     }
 
@@ -951,7 +504,7 @@ export class ParticleSystem implements IParticleSystem {
     }
 
     set lighting(lighting: MeshLighting) {
-        this.rendererSettings.lighting = ParticleSystem.validLighting(lighting);
+        this.rendererSettings.lighting = validLighting(lighting);
         this.neededToUpdateRender = true;
     }
 
@@ -1065,27 +618,6 @@ export class ParticleSystem implements IParticleSystem {
         return (sx + sy + sz) / 3;
     }
 
-    /** `lighting` if it is one of the modes, else the default. */
-    private static validLighting(lighting: unknown): MeshLighting {
-        return lighting === 'unlit' || lighting === 'scene' ? lighting : 'fixed';
-    }
-
-    private static validSortMode(mode: unknown): SortMode {
-        return mode === 'distance' || mode === 'oldestInFront' || mode === 'youngestInFront' ? mode : 'none';
-    }
-
-    private static validCullingMode(mode: unknown): CullingMode {
-        return mode === 'pause' || mode === 'pauseAndCatchUp' ? mode : 'always';
-    }
-
-    private static nonZeroPivot(v: Vector3 | undefined): Vector3 | undefined {
-        return v && (v.x !== 0 || v.y !== 0 || v.z !== 0) ? v.clone() : undefined;
-    }
-
-    private static nonZeroFlip(v: Vector2 | undefined): Vector2 | undefined {
-        return v && (v.x > 0 || v.y > 0) ? v.clone() : undefined;
-    }
-
     /** Distance in world units in front of the scene at which a soft particle is fully faded out. Default 0. */
     get softNearFade(): number {
         return this.rendererSettings.softNearFade;
@@ -1125,15 +657,15 @@ export class ParticleSystem implements IParticleSystem {
         const previous = settings.instancingGeometry;
         settings.instancingGeometry = geometry;
         // Sets that no longer fit, or that were the old geometry's fallbacks, move to the new one's.
-        if (settings.instancingUVs?.length !== uvLength || settings.instancingUVs === fallbackUVs.get(previous)) {
+        if (settings.instancingUVs?.length !== uvLength || isFallbackUVs(settings.instancingUVs, previous)) {
             settings.instancingUVs = fallbackUVsForPositions(geometry);
         }
         if (
             settings.instancingNormals &&
             (settings.instancingNormals.length !== geometry.length ||
-                settings.instancingNormals === fallbackNormals.get(previous))
+                isFallbackNormals(settings.instancingNormals, previous))
         ) {
-            settings.instancingNormals = ParticleSystem.createFallbackNormals(geometry);
+            settings.instancingNormals = fallbackNormalsForPositions(geometry);
         }
         if (settings.instancingUVs2 && settings.instancingUVs2.length !== uvLength) {
             settings.instancingUVs2 = undefined;
@@ -1357,20 +889,8 @@ export class ParticleSystem implements IParticleSystem {
      */
     static catchUpBudgetMs = 2;
 
-    /** Axis-aligned bounds of the live particles, in simulation space. See {@link getWorldBounds}. */
-    private readonly boundsMin = new Vector3();
-    private readonly boundsMax = new Vector3();
-    /** How far a particle's quad, mesh or stretch can reach past its position, in simulation units. */
-    private boundsPadding = 0;
-    private boundsValid = false;
-    /** Steps since the last full measurement; between them the bounds are carried and padded. */
-    private stepsSinceBounds = 0;
-    private boundsMaxSize = 0;
-    private boundsMaxSpeedSq = 0;
-    /** True when the bounds are already in world space (a world-space system, or bounds the renderer measured). */
-    private boundsInWorld = false;
-    private geometryRadiusFor?: Float32Array;
-    private geometryRadius = 1;
+    /** What the system draws covers, for culling. See {@link getWorldBounds}. */
+    private readonly bounds = new BoundsTracker();
 
     constructor(parameters: ParticleSystemParameters) {
         this.sceneRef = parameters.scene;
@@ -1449,27 +969,27 @@ export class ParticleSystem implements IParticleSystem {
             reflectionFaces: null,
             reflectionAtlas: null,
             layerMask: parameters.layerMask ?? 0x0fffffff,
-            pivot: ParticleSystem.nonZeroPivot(parameters.pivot),
-            sortMode: ParticleSystem.validSortMode(parameters.sortMode),
+            pivot: nonZeroPivot(parameters.pivot),
+            sortMode: validSortMode(parameters.sortMode),
             minParticleSize: Math.max(0, parameters.minParticleSize ?? 0),
             maxParticleSize: parameters.maxParticleSize ?? Infinity,
             renderingGroupId: parameters.renderingGroupId ?? 0,
             applyFog: parameters.applyFog ?? true,
-            lighting: ParticleSystem.validLighting(parameters.lighting),
+            lighting: validLighting(parameters.lighting),
             rim: normalizeMeshRim(parameters.rim),
             mapUV: normalizeMapUV(parameters.mapUV),
             gradientMap: normalizeGradientMap(parameters.gradientMap),
             erosion: normalizeErosion(parameters.erosion),
             uvDistortion: normalizeUVDistortion(parameters.uvDistortion),
         };
-        this.flip = ParticleSystem.nonZeroFlip(parameters.flip);
+        this.flip = nonZeroFlip(parameters.flip);
         this.playbackSpeed = parameters.playbackSpeed ?? 1;
         this.cullingMode = parameters.cullingMode ?? 'always';
         this.scalingMode = parameters.scalingMode === 'hierarchy' ? 'hierarchy' : 'shape';
         this.alignToDirection = parameters.alignToDirection === true;
         this.seed = parameters.seed;
         if (this.rendererSettings.renderMode === RenderMode.Mesh && !this.rendererSettings.instancingNormals) {
-            this.rendererSettings.instancingNormals = ParticleSystem.createFallbackNormals(
+            this.rendererSettings.instancingNormals = fallbackNormalsForPositions(
                 this.rendererSettings.instancingGeometry
             );
         }
@@ -1541,95 +1061,20 @@ export class ParticleSystem implements IParticleSystem {
         });
     }
 
-    private applyMaterialSettings(
-        material: any,
-        overrides: {
-            blendMode?: number;
-            transparent?: boolean;
-            depthTest?: boolean;
-            depthWrite?: boolean;
-            alphaTest?: number;
-            texture?: Texture | null;
-            reflectionAtlas?: BaseTexture | null;
-            layerMask?: number;
-        } = {}
-    ) {
+    private applyMaterialSettings(material: any, overrides: MaterialOverrides = {}) {
         /* istanbul ignore if -- rendererSettings is always assigned in the constructor before any code path can call this private method */
         if (!this.rendererSettings) {
             return;
         }
+        const resolved = resolveMaterialSettings(material, overrides, this.rendererSettings);
 
-        const resolvedTexture =
-            overrides.texture !== undefined
-                ? overrides.texture
-                : (material?.albedoTexture ??
-                  material?.diffuseTexture ??
-                  material?.emissiveTexture ??
-                  material?.opacityTexture ??
-                  material?.baseTexture ??
-                  this.rendererSettings.texture ??
-                  null);
-        const resolvedReflection =
-            material?.reflectionTexture ??
-            material?.environmentTexture ??
-            this.rendererSettings.reflectionTexture ??
-            null;
-        const resolvedReflectionLevel = typeof resolvedReflection?.level === 'number' ? resolvedReflection.level : 1;
-        const resolvedBlendMode =
-            overrides.blendMode ??
-            (typeof material?.alphaMode === 'number' ? material.alphaMode : this.rendererSettings.materialBlendMode);
-        const resolvedTransparent =
-            overrides.transparent ??
-            (typeof material?.needAlphaBlending === 'function'
-                ? material.needAlphaBlending()
-                : typeof material?.alpha === 'number'
-                  ? material.alpha < 1
-                  : this.rendererSettings.materialTransparent);
-        const resolvedDepthTest =
-            overrides.depthTest ??
-            (typeof material?.disableDepthTest === 'boolean'
-                ? !material.disableDepthTest
-                : this.rendererSettings.materialDepthTest);
-        const resolvedDepthWrite =
-            overrides.depthWrite ??
-            (typeof material?.disableDepthWrite === 'boolean'
-                ? !material.disableDepthWrite
-                : typeof material?.forceDepthWrite === 'boolean'
-                  ? material.forceDepthWrite
-                  : this.rendererSettings.materialDepthWrite);
-        const resolvedAlphaTest =
-            overrides.alphaTest ??
-            (() => {
-                // StandardMaterial always has alphaCutOff (default 0.4). Only treat it as
-                // particle alpha-test when the material is actually in an alpha-test mode —
-                // otherwise Mesh Material demos wrongly enable USE_ALPHATEST.
-                const mode = material?.transparencyMode;
-                const alphaTestMode = mode === 1 || mode === 3;
-                if (alphaTestMode && typeof material?.alphaCutOff === 'number') {
-                    return material.alphaCutOff;
-                }
-                if (alphaTestMode && typeof material?.alphaCutOffValue === 'number') {
-                    return material.alphaCutOffValue;
-                }
-                if (material) {
-                    return 0;
-                }
-                return this.rendererSettings.materialAlphaTest;
-            })();
-
-        this.rendererSettings.texture = resolvedTexture;
-        this.rendererSettings.reflectionTexture = resolvedReflection;
-        this.rendererSettings.reflectionLevel =
-            typeof material?.reflectionLevel === 'number' ? material.reflectionLevel : resolvedReflectionLevel;
+        this.rendererSettings.texture = resolved.texture;
+        this.rendererSettings.reflectionTexture = resolved.reflectionTexture;
+        this.rendererSettings.reflectionLevel = resolved.reflectionLevel;
         // Prefer an explicit atlas; otherwise build a 3×2 atlas from CubeTexture
         // face URLs (iOS-safe single sampler2D — not samplerCube / six faces).
-        // A disposed atlas (its cube was disposed, or disposeEnvAtlas ran) is skipped, so a new one is built.
-        const live = <T extends BaseTexture>(atlas: T | null | undefined): T | null =>
-            atlas?.getScene() ? atlas : null;
-        let resolvedAtlas =
-            live(material?.reflectionAtlas) ??
-            live(overrides.reflectionAtlas) ??
-            live(this.rendererSettings.reflectionAtlas);
+        let resolvedAtlas = resolved.reflectionAtlas;
+        const resolvedReflection = resolved.reflectionTexture;
         if (!resolvedAtlas && resolvedReflection?.isCube) {
             resolvedAtlas = getCachedEnvAtlas(resolvedReflection, this.sceneRef);
             if (!resolvedAtlas && this.sceneRef) {
@@ -1638,7 +1083,7 @@ export class ParticleSystem implements IParticleSystem {
                         return;
                     }
                     this.rendererSettings.reflectionAtlas = atlas;
-                    if (material && !live(material.reflectionAtlas)) {
+                    if (material && !liveAtlas(material.reflectionAtlas)) {
                         material.reflectionAtlas = atlas;
                     }
                     this.watchEnvAtlas(atlas, material);
@@ -1649,15 +1094,12 @@ export class ParticleSystem implements IParticleSystem {
         }
         this.rendererSettings.reflectionAtlas = resolvedAtlas;
         this.watchEnvAtlas(resolvedAtlas, material);
-        // Do not expand cube files into six face textures anymore — that path
-        // still trips GL_INVALID_OPERATION on iOS. Prefer a single atlas.
-        this.rendererSettings.reflectionFaces =
-            material?.reflectionFaces?.length === 6 ? material.reflectionFaces : null;
-        this.rendererSettings.materialBlendMode = resolvedBlendMode;
-        this.rendererSettings.materialTransparent = resolvedTransparent;
-        this.rendererSettings.materialDepthTest = resolvedDepthTest;
-        this.rendererSettings.materialDepthWrite = resolvedDepthWrite;
-        this.rendererSettings.materialAlphaTest = resolvedAlphaTest;
+        this.rendererSettings.reflectionFaces = resolved.reflectionFaces;
+        this.rendererSettings.materialBlendMode = resolved.blendMode;
+        this.rendererSettings.materialTransparent = resolved.transparent;
+        this.rendererSettings.materialDepthTest = resolved.depthTest;
+        this.rendererSettings.materialDepthWrite = resolved.depthWrite;
+        this.rendererSettings.materialAlphaTest = resolved.alphaTest;
         if (overrides.layerMask !== undefined) {
             this.rendererSettings.layerMask = overrides.layerMask;
         }
@@ -1924,7 +1366,7 @@ export class ParticleSystem implements IParticleSystem {
      */
     endEmit(): void {
         this.emitEnded = true;
-        this.fire({type: 'emitEnd', particleSystem: this});
+        this.events.fire({type: 'emitEnd', particleSystem: this});
     }
 
     /** Whether {@link dispose} has run. A disposed system emits nothing and cannot be restarted. */
@@ -1945,7 +1387,7 @@ export class ParticleSystem implements IParticleSystem {
         this.particleNum = 0;
         if (this._renderer) this._renderer.deleteSystem(this);
         disposeEmitterForSystem(this.emitter);
-        this.fire({type: 'destroy', particleSystem: this});
+        this.events.fire({type: 'destroy', particleSystem: this});
     }
 
     /**
@@ -1982,7 +1424,7 @@ export class ParticleSystem implements IParticleSystem {
         this.memory.length = 0;
         this.paused = false;
         this.particleNum = 0;
-        this.boundsValid = false;
+        this.bounds.valid = false;
         this.pendingCatchUp = 0;
         if (this.seedValue !== undefined) {
             // The same seed again, so a restart replays the same effect.
@@ -2130,70 +1572,6 @@ export class ParticleSystem implements IParticleSystem {
     }
 
     /**
-     * Records the bounds the sprite step measured over the live particles.
-     * Trails are measured by their renderer instead, since their ribbons live
-     * outside the store.
-     */
-    private storeBounds(
-        count: number,
-        measured: boolean,
-        minX: number,
-        minY: number,
-        minZ: number,
-        maxX: number,
-        maxY: number,
-        maxZ: number,
-        maxSize: number,
-        maxSpeedSq: number
-    ): void {
-        if (count === 0) {
-            this.boundsValid = false;
-            return;
-        }
-        this.stepsSinceBounds = measured ? 0 : this.stepsSinceBounds + 1;
-        this.boundsMaxSize = maxSize;
-        this.boundsMaxSpeedSq = maxSpeedSq;
-        const maxSpeed = Math.sqrt(maxSpeedSq);
-        const renderMode = this.rendererSettings.renderMode;
-        // How far past its position a particle can be drawn: half a quad's
-        // diagonal plus its pivot, a mesh's radius, or a stretched quad's tail.
-        // Plus the motion since the last measurement, and the step the renderer
-        // moves particles on along their velocity.
-        let padding = maxSpeed * SIMULATION_STEP * (this.stepsSinceBounds + 1);
-        if (renderMode === RenderMode.Mesh) {
-            padding += maxSize * this.meshGeometryRadius();
-        } else if (renderMode === RenderMode.StretchedBillBoard) {
-            const settings = this.rendererEmitterSettings as StretchedBillBoardSettings;
-            padding += maxSize * (1 + (settings.lengthFactor ?? 0) + maxSpeed * (settings.speedFactor ?? 0));
-        } else {
-            const pivot = this.rendererSettings.pivot;
-            const pivotReach = pivot === undefined ? 0 : Math.abs(pivot.x) + Math.abs(pivot.y) + Math.abs(pivot.z);
-            padding += maxSize * (0.75 + pivotReach);
-        }
-        this.boundsMin.set(minX, minY, minZ);
-        this.boundsMax.set(maxX, maxY, maxZ);
-        this.boundsPadding = padding;
-        this.boundsInWorld = this.worldSpace;
-        this.boundsValid = true;
-    }
-
-    /** Distance of the farthest vertex of the mesh particles' geometry from its origin. */
-    private meshGeometryRadius(): number {
-        const geometry = this.rendererSettings.instancingGeometry;
-        if (geometry !== this.geometryRadiusFor) {
-            let radiusSq = 0;
-            for (let o = 0; o + 2 < geometry.length; o += 3) {
-                const d =
-                    geometry[o] * geometry[o] + geometry[o + 1] * geometry[o + 1] + geometry[o + 2] * geometry[o + 2];
-                if (d > radiusSq) radiusSq = d;
-            }
-            this.geometryRadius = Math.sqrt(radiusSq);
-            this.geometryRadiusFor = geometry;
-        }
-        return this.geometryRadius;
-    }
-
-    /**
      * World-space axis-aligned bounds of everything this system draws, padded
      * for particle size, into `min` and `max`. False when the system has no
      * particles, or none have been measured yet; the caller should then treat
@@ -2202,7 +1580,7 @@ export class ParticleSystem implements IParticleSystem {
      * frame behind the display.
      */
     getWorldBounds(min: Vector3, max: Vector3): boolean {
-        if (!this.measureWorldBounds(min, max)) {
+        if (!this.bounds.toWorld(min, max, this.emitter)) {
             return false;
         }
         if (this.rendererSettings.renderMode === RenderMode.Beam) {
@@ -2212,7 +1590,7 @@ export class ParticleSystem implements IParticleSystem {
             if (!this.getBeamEnd(end)) {
                 return true;
             }
-            const pad = this.boundsInWorld ? this.boundsPadding : this.boundsPadding * this.emitterMaxScale();
+            const pad = this.bounds.worldPadding(this.emitter);
             min.set(Math.min(min.x, end.x - pad), Math.min(min.y, end.y - pad), Math.min(min.z, end.z - pad));
             max.set(Math.max(max.x, end.x + pad), Math.max(max.y, end.y + pad), Math.max(max.z, end.z + pad));
         }
@@ -2260,67 +1638,6 @@ export class ParticleSystem implements IParticleSystem {
         return true;
     }
 
-    /** The largest axis of the emitter's world scale. */
-    private emitterMaxScale(): number {
-        const e = this.emitter.matrixWorld.elements;
-        return Math.sqrt(
-            Math.max(
-                e[0] * e[0] + e[1] * e[1] + e[2] * e[2],
-                e[4] * e[4] + e[5] * e[5] + e[6] * e[6],
-                e[8] * e[8] + e[9] * e[9] + e[10] * e[10]
-            )
-        );
-    }
-
-    private measureWorldBounds(min: Vector3, max: Vector3): boolean {
-        if (!this.boundsValid) {
-            return false;
-        }
-        const bmin = this.boundsMin;
-        const bmax = this.boundsMax;
-        if (this.boundsInWorld) {
-            const pad = this.boundsPadding;
-            min.set(bmin.x - pad, bmin.y - pad, bmin.z - pad);
-            max.set(bmax.x + pad, bmax.y + pad, bmax.z + pad);
-            return true;
-        }
-        // Local bounds: the box of the eight transformed corners, padded by the
-        // reach scaled by the emitter's largest axis.
-        const e = this.emitter.matrixWorld.elements;
-        const scale = Math.sqrt(
-            Math.max(
-                e[0] * e[0] + e[1] * e[1] + e[2] * e[2],
-                e[4] * e[4] + e[5] * e[5] + e[6] * e[6],
-                e[8] * e[8] + e[9] * e[9] + e[10] * e[10]
-            )
-        );
-        const pad = this.boundsPadding * scale;
-        let minX = Infinity;
-        let minY = Infinity;
-        let minZ = Infinity;
-        let maxX = -Infinity;
-        let maxY = -Infinity;
-        let maxZ = -Infinity;
-        for (let corner = 0; corner < 8; corner++) {
-            const x = corner & 1 ? bmax.x : bmin.x;
-            const y = corner & 2 ? bmax.y : bmin.y;
-            const z = corner & 4 ? bmax.z : bmin.z;
-            const w = 1 / (e[3] * x + e[7] * y + e[11] * z + e[15]);
-            const wx = (e[0] * x + e[4] * y + e[8] * z + e[12]) * w;
-            const wy = (e[1] * x + e[5] * y + e[9] * z + e[13]) * w;
-            const wz = (e[2] * x + e[6] * y + e[10] * z + e[14]) * w;
-            if (wx < minX) minX = wx;
-            if (wx > maxX) maxX = wx;
-            if (wy < minY) minY = wy;
-            if (wy > maxY) maxY = wy;
-            if (wz < minZ) minZ = wz;
-            if (wz > maxZ) maxZ = wz;
-        }
-        min.set(minX - pad, minY - pad, minZ - pad);
-        max.set(maxX + pad, maxY + pad, maxZ + pad);
-        return true;
-    }
-
     /**
      * Records bounds a renderer measured in world space, for systems whose
      * drawn extent the store does not hold (trail ribbons).
@@ -2335,11 +1652,7 @@ export class ParticleSystem implements IParticleSystem {
         maxZ: number,
         padding: number
     ) {
-        this.boundsMin.set(minX, minY, minZ);
-        this.boundsMax.set(maxX, maxY, maxZ);
-        this.boundsPadding = padding;
-        this.boundsInWorld = true;
-        this.boundsValid = true;
+        this.bounds.setWorld(minX, minY, minZ, maxX, maxY, maxZ, padding);
     }
 
     /**
@@ -2386,50 +1699,6 @@ export class ParticleSystem implements IParticleSystem {
     }
 
     /**
-     * Execution plan for this system's behaviors, rebuilt when the list changes.
-     *
-     * Consecutive behaviors that can be compiled into one loop are merged, so
-     * the particles are walked once instead of once per behavior. The plan is
-     * keyed on the behavior instances, not their types: swapping one out has to
-     * change the generated code's indices.
-     */
-    private behaviorSteps(): Array<FusionStep> {
-        const behaviors = this.behaviors;
-        const cached = this.fusionPlan;
-        if (cached !== undefined && cached.length === behaviors.length) {
-            let same = true;
-            for (let i = 0; i < behaviors.length; i++) {
-                if (cached[i] !== behaviors[i]) {
-                    same = false;
-                    break;
-                }
-            }
-            if (same) {
-                return this.fusionSteps;
-            }
-        }
-        this.fusionPlan = behaviors.slice();
-        this.fusionSteps = planBehaviorFusion(behaviors);
-        let changesSize = false;
-        let changesColor = false;
-        for (let i = 0; i < behaviors.length; i++) {
-            const type = behaviors[i].type;
-            if (SIZE_BEHAVIORS.has(type)) {
-                changesSize = true;
-            } else if (COLOR_BEHAVIORS.has(type)) {
-                changesColor = true;
-            } else if (!INERT_FOR_SIZE_AND_COLOR.has(type)) {
-                // Unknown to this list, so it may write anything.
-                changesSize = true;
-                changesColor = true;
-            }
-        }
-        this.planChangesSize = changesSize;
-        this.planChangesColor = changesColor;
-        return this.fusionSteps;
-    }
-
-    /**
      * Advances emission, behaviors, motion and culling by one fixed timestep,
      * on the system's own random generator when it has a {@link seed}.
      */
@@ -2468,12 +1737,12 @@ export class ParticleSystem implements IParticleSystem {
         // held before, and so is drawn at the emitter instead of jumping.
         const columns = this.store;
         const vector3Rows = particleCount * 3;
-        const steps = this.behaviorSteps();
+        const steps = this.behaviorPlan.steps(behaviors);
         // Size and colour are only snapshotted when some behavior can change
         // them; otherwise the columns stay what spawn wrote and the renderer
         // reads them as they are.
-        const snapshotSize = this.planChangesSize;
-        const snapshotColor = this.planChangesColor;
+        const snapshotSize = this.behaviorPlan.changesSize;
+        const snapshotColor = this.behaviorPlan.changesColor;
         columns.useSizeSnapshot(snapshotSize);
         columns.useColorSnapshot(snapshotColor);
         columns.previousPosition.set(columns.position.subarray(0, vector3Rows));
@@ -2521,7 +1790,7 @@ export class ParticleSystem implements IParticleSystem {
             }
         }
 
-        const notifyDeaths = this.hasListeners('particleDied');
+        const notifyDeaths = this.events.has('particleDied');
         const store = this.store;
         const scalars = store.scalars;
         const stride = ParticleStore.SCALAR_STRIDE;
@@ -2558,17 +1827,17 @@ export class ParticleSystem implements IParticleSystem {
             // full measurement runs every few steps; in between, newborns extend
             // the last bounds and the fastest particle seen since pads them for
             // the motion, which keeps them conservative.
-            const measure = this.stepsSinceBounds >= BOUNDS_REFRESH_STEPS || !this.boundsValid;
-            const carriedMin = this.boundsMin;
-            const carriedMax = this.boundsMax;
+            const measure = this.bounds.due;
+            const carriedMin = this.bounds.min;
+            const carriedMax = this.bounds.max;
             let minX = measure ? Infinity : carriedMin.x;
             let minY = measure ? Infinity : carriedMin.y;
             let minZ = measure ? Infinity : carriedMin.z;
             let maxX = measure ? -Infinity : carriedMax.x;
             let maxY = measure ? -Infinity : carriedMax.y;
             let maxZ = measure ? -Infinity : carriedMax.z;
-            let maxSize = measure ? 0 : this.boundsMaxSize;
-            let maxSpeedSq = measure ? 0 : this.boundsMaxSpeedSq;
+            let maxSize = measure ? 0 : this.bounds.maxSize;
+            let maxSpeedSq = measure ? 0 : this.bounds.maxSpeedSq;
             for (let i = 0; i < liveParticleCount; i++) {
                 const scalar = i * stride;
                 let age = scalars[scalar + ParticleStore.AGE];
@@ -2629,13 +1898,28 @@ export class ParticleSystem implements IParticleSystem {
                     liveParticleCount--;
                     i--;
                     if (notifyDeaths) {
-                        this.fire({type: 'particleDied', particleSystem: this, particle: particle});
+                        this.events.fire({type: 'particleDied', particleSystem: this, particle: particle});
                     }
                 }
             }
             // A particleDied listener may have disposed the system, which drops every particle.
             this.particleNum = this.destroyed ? 0 : liveParticleCount;
-            this.storeBounds(liveParticleCount, measure, minX, minY, minZ, maxX, maxY, maxZ, maxSize, maxSpeedSq);
+            this.bounds.store(
+                liveParticleCount,
+                measure,
+                minX,
+                minY,
+                minZ,
+                maxX,
+                maxY,
+                maxZ,
+                maxSize,
+                maxSpeedSq,
+                this.rendererSettings,
+                this.rendererEmitterSettings,
+                this.worldSpace,
+                SIMULATION_STEP
+            );
             this.notifyFinished();
             return;
         }
@@ -2758,7 +2042,7 @@ export class ParticleSystem implements IParticleSystem {
                 liveParticleCount--;
                 i--;
                 if (notifyDeaths) {
-                    this.fire({type: 'particleDied', particleSystem: this, particle: particle});
+                    this.events.fire({type: 'particleDied', particleSystem: this, particle: particle});
                 }
             }
         }
@@ -2773,7 +2057,7 @@ export class ParticleSystem implements IParticleSystem {
         }
         if (!this.finishedEventFired) {
             this.finishedEventFired = true;
-            this.fire({type: 'finished', particleSystem: this});
+            this.events.fire({type: 'finished', particleSystem: this});
         }
         if (this.autoDestroy) {
             this.dispose();
@@ -3020,81 +2304,7 @@ export class ParticleSystem implements IParticleSystem {
      * (`tint`, `beamEnd`, the playing time) is not written.
      */
     toJSON(metaData?: BabylonMetaData | string, _options: SerializationOptions = {}): ParticleSystemJSONParameters {
-        const isRootObject = metaData === undefined || typeof metaData === 'string';
-        const meta: BabylonMetaData = isRootObject
-            ? {
-                  geometries: {},
-                  materials: {},
-                  textures: {},
-                  images: {},
-                  shapes: {},
-                  skeletons: {},
-                  animations: {},
-                  nodes: {},
-              }
-            : metaData;
-
-        const geometryUUID = this.ensureGeometryMeta(meta);
-        const materialUUID = this.ensureMaterialMeta(meta);
-        const rendererEmitterSettingsJSON = this.toRendererSettingsJSON();
-
-        return {
-            version: '3.0',
-            autoDestroy: this.autoDestroy,
-            looping: this.looping,
-            prewarm: this.prewarm,
-            duration: this.duration,
-            startDelay: this.startDelay.toJSON(),
-            shape: this.emitterShape.toJSON(),
-            startLife: this.startLife.toJSON(),
-            startSpeed: this.startSpeed.toJSON(),
-            startRotation: this.startRotation.toJSON(),
-            startSize: this.startSize.toJSON(),
-            startColor: this.startColor.toJSON(),
-            emissionOverTime: this.emissionOverTime.toJSON(),
-            emissionOverDistance: this.emissionOverDistance.toJSON(),
-            emissionBursts: this.emissionBursts.map((burst) => ({
-                time: burst.time,
-                count: burst.count.toJSON(),
-                probability: burst.probability,
-                interval: burst.interval,
-                cycle: burst.cycle,
-            })),
-            ...(this.maxParticles !== undefined ? {maxParticles: this.maxParticles} : {}),
-            onlyUsedByOther: this.onlyUsedByOther,
-            instancingGeometry: geometryUUID,
-            renderMode: this.renderMode,
-            renderOrder: this.renderOrder,
-            ...(this.renderingGroupId !== 0 ? {renderingGroupId: this.renderingGroupId} : {}),
-            ...(this.applyFog ? {} : {applyFog: false}),
-            ...(this.playbackSpeed !== 1 ? {playbackSpeed: this.playbackSpeed} : {}),
-            ...(this.cullingMode !== 'always' ? {cullingMode: this.cullingMode} : {}),
-            ...(this.scalingMode !== 'shape' ? {scalingMode: this.scalingMode} : {}),
-            ...(this.seedValue !== undefined ? {seed: this.seedValue} : {}),
-            ...(this.sortMode !== 'none' ? {sortMode: this.sortMode} : {}),
-            ...(this.alignToDirection ? {alignToDirection: true} : {}),
-            ...(this.minParticleSize > 0 ? {minParticleSize: this.minParticleSize} : {}),
-            ...(this.maxParticleSize !== Infinity ? {maxParticleSize: this.maxParticleSize} : {}),
-            rendererEmitterSettings: rendererEmitterSettingsJSON,
-            material: materialUUID,
-            layers: this.rendererSettings.layerMask,
-            startTileIndex: this.startTileIndex.toJSON(),
-            uTileCount: this.rendererSettings.uTileCount,
-            vTileCount: this.rendererSettings.vTileCount,
-            blendTiles: this.rendererSettings.blendTiles,
-            softParticles: this.rendererSettings.softParticles,
-            softFarFade: this.rendererSettings.softFarFade,
-            softNearFade: this.rendererSettings.softNearFade,
-            blending: this.rendererSettings.materialBlendMode,
-            transparent: this.rendererSettings.materialTransparent,
-            depthTest: this.rendererSettings.materialDepthTest,
-            depthWrite: this.rendererSettings.materialDepthWrite,
-            alphaTest: this.rendererSettings.materialAlphaTest,
-            behaviors: this.behaviors.map((b) => b.toJSON()),
-            worldSpace: this.worldSpace,
-            ...(this.pivot ? {pivot: [this.pivot.x, this.pivot.y, this.pivot.z]} : {}),
-            ...(this.flip ? {flip: [this.flip.x, this.flip.y]} : {}),
-        };
+        return particleSystemToJSON(this, metaData);
     }
 
     /**
@@ -3109,366 +2319,17 @@ export class ParticleSystem implements IParticleSystem {
         dependencies: {[uuid: string]: Behavior} = {},
         scene?: Scene
     ): ParticleSystem {
-        // A part the file leaves out takes the constructor's default, as a system made in code does.
-        const shape = json.shape ? EmitterFromJSON(json.shape, meta as any) : undefined;
-        let rendererEmitterSettings: RendererEmitterSettings;
-        if (json.renderMode === RenderMode.Trail) {
-            const trailSettings = json.rendererEmitterSettings as TrailSettings;
-            rendererEmitterSettings = {
-                startLength:
-                    trailSettings?.startLength !== undefined
-                        ? ValueGeneratorFromJSON(trailSettings.startLength)
-                        : new ConstantValue(30),
-                followLocalOrigin: trailSettings?.followLocalOrigin ?? false,
-                ...trailFlags(trailSettings),
-                ...trailCurve(trailSettings),
-                ...trailSideAxisFromJSON((trailSettings as {sideAxis?: unknown} | undefined)?.sideAxis),
-            };
-        } else if (json.renderMode === RenderMode.StretchedBillBoard) {
-            rendererEmitterSettings = {...(json.rendererEmitterSettings ?? {})};
-            if (json.speedFactor !== undefined) {
-                (rendererEmitterSettings as StretchedBillBoardSettings).speedFactor = json.speedFactor;
-            }
-        } else {
-            rendererEmitterSettings = {};
-        }
-
-        const materialMeta = json.material ? meta.materials?.[json.material] : undefined;
-        const materialTextureRef = materialMeta?.texture ?? json.texture;
-        const texture =
-            typeof materialTextureRef === 'string'
-                ? (meta.textures?.[materialTextureRef] ?? null)
-                : (materialTextureRef ?? null);
-        // Texture effects reference textures by uuid in a serialised meta, or hold them once a loader resolved them.
-        const resolveTexture = (ref: unknown): BaseTexture | null =>
-            typeof ref === 'string' ? (meta.textures?.[ref] ?? null) : ((ref as BaseTexture | null) ?? null);
-        const erosionMeta = materialMeta?.erosion;
-        const gradientMeta = materialMeta?.gradientMap;
-        const distortionMeta = materialMeta?.uvDistortion;
-        const resolvedGeometryEntry =
-            typeof json.instancingGeometry === 'string'
-                ? meta.geometries?.[json.instancingGeometry]
-                : json.instancingGeometry;
-        const resolvedGeometry = ParticleSystem.resolveGeometryData(resolvedGeometryEntry);
-
-        const ps = new ParticleSystem({
-            scene,
-            autoDestroy: json.autoDestroy,
-            looping: json.looping,
-            prewarm: json.prewarm,
-            duration: json.duration,
-            startDelay: json.startDelay ? ValueGeneratorFromJSON(json.startDelay) : undefined,
-            shape,
-            startLife: optionalJSON(json.startLife, ValueGeneratorFromJSON),
-            startSpeed: optionalJSON(json.startSpeed, ValueGeneratorFromJSON),
-            startRotation: optionalJSON(json.startRotation, GeneratorFromJSON) as
-                | RotationGenerator
-                | ValueGenerator
-                | FunctionValueGenerator
-                | undefined,
-            startSize: optionalJSON(json.startSize, GeneratorFromJSON) as
-                | Vector3Generator
-                | ValueGenerator
-                | FunctionValueGenerator
-                | undefined,
-            startColor: optionalJSON(json.startColor, ColorGeneratorFromJSON) as ColorGenerator | undefined,
-            emissionOverTime: optionalJSON(json.emissionOverTime, ValueGeneratorFromJSON),
-            emissionOverDistance: optionalJSON(json.emissionOverDistance, ValueGeneratorFromJSON),
-            emissionBursts: json.emissionBursts?.map((burst: any) => ({
-                time: burst.time,
-                count:
-                    typeof burst.count === 'number'
-                        ? new ConstantValue(burst.count)
-                        : ValueGeneratorFromJSON(burst.count),
-                probability: burst.probability ?? 1,
-                interval: burst.interval ?? 0.1,
-                cycle: burst.cycle ?? burst.cycleCount ?? 1,
-            })),
-            maxParticles: typeof json.maxParticles === 'number' ? json.maxParticles : undefined,
-            onlyUsedByOther: json.onlyUsedByOther,
-            instancingGeometry: resolvedGeometry.positions,
-            instancingIndices: resolvedGeometry.indices,
-            instancingUVs: resolvedGeometry.uvs,
-            instancingUVs2: resolvedGeometry.uvs2,
-            instancingNormals: resolvedGeometry.normals,
-            renderMode: json.renderMode,
-            rendererEmitterSettings,
-            renderOrder: json.renderOrder,
-            renderingGroupId: typeof json.renderingGroupId === 'number' ? json.renderingGroupId : undefined,
-            applyFog: json.applyFog !== false,
-            playbackSpeed: typeof json.playbackSpeed === 'number' ? json.playbackSpeed : undefined,
-            cullingMode: ParticleSystem.validCullingMode(json.cullingMode),
-            scalingMode: json.scalingMode === 'hierarchy' ? 'hierarchy' : 'shape',
-            seed: typeof json.seed === 'number' ? json.seed : undefined,
-            sortMode: ParticleSystem.validSortMode(json.sortMode),
-            alignToDirection: json.alignToDirection === true,
-            minParticleSize: typeof json.minParticleSize === 'number' ? json.minParticleSize : undefined,
-            maxParticleSize: typeof json.maxParticleSize === 'number' ? json.maxParticleSize : undefined,
-            texture,
-            material: materialMeta?.sourceMaterial ?? materialMeta,
-            blendMode: materialMeta?.alphaMode ?? json.blending ?? Constants.ALPHA_ADD,
-            transparent: materialMeta?.transparent ?? json.transparent ?? true,
-            depthTest: materialMeta?.depthTest ?? json.depthTest ?? true,
-            depthWrite: materialMeta?.depthWrite ?? json.depthWrite ?? false,
-            alphaTest: materialMeta?.alphaTest ?? json.alphaTest ?? 0,
-            startTileIndex:
-                typeof json.startTileIndex === 'number'
-                    ? new ConstantValue(json.startTileIndex)
-                    : (optionalJSON(json.startTileIndex, ValueGeneratorFromJSON) as ValueGenerator | undefined),
-            uTileCount: json.uTileCount,
-            vTileCount: json.vTileCount,
-            blendTiles: json.blendTiles,
-            softParticles: json.softParticles,
-            softFarFade: json.softFarFade,
-            softNearFade: json.softNearFade,
-            behaviors: [],
-            worldSpace: json.worldSpace,
-            layerMask: json.layers,
-            pivot: json.pivot ? new Vector3(json.pivot[0] ?? 0, json.pivot[1] ?? 0, json.pivot[2] ?? 0) : undefined,
-            flip: json.flip ? new Vector2(json.flip[0] ?? 0, json.flip[1] ?? 0) : undefined,
-            lighting: materialMeta?.lighting,
-            rim: materialMeta?.rim,
-            mapUV: materialMeta?.mapUV,
-            gradientMap:
-                gradientMeta && typeof gradientMeta === 'object'
-                    ? {...gradientMeta, ramp: resolveTexture(gradientMeta.ramp)}
-                    : undefined,
-            erosion:
-                erosionMeta && typeof erosionMeta === 'object'
-                    ? {...erosionMeta, mask: resolveTexture(erosionMeta.mask)}
-                    : undefined,
-            uvDistortion:
-                distortionMeta && typeof distortionMeta === 'object'
-                    ? {...distortionMeta, map: resolveTexture(distortionMeta.map)}
-                    : undefined,
-        });
+        const ps = new ParticleSystem(particleSystemParametersFromJSON(json, meta, scene));
         ps.behaviors = (json.behaviors ?? [])
             .map((behaviorJson) => {
                 const behavior = BehaviorFromJSON(behaviorJson, ps);
                 if (behavior && behavior.type === 'EmitSubParticleSystem') {
-                    dependencies[(behaviorJson as any).subParticleSystem] = behavior;
+                    dependencies[(behaviorJson as {subParticleSystem: string}).subParticleSystem] = behavior;
                 }
                 return behavior;
             })
             .filter((behavior) => behavior !== null) as Behavior[];
         return ps;
-    }
-
-    /**
-     * The next id for an entry of `meta`. Counted per document, so serialising the same effect
-     * twice writes the same ids.
-     */
-    private static nextSerializationId(meta: BabylonMetaData, prefix: string): string {
-        const id = (serializationCounters.get(meta) ?? 0) + 1;
-        serializationCounters.set(meta, id);
-        return `${prefix}_${id}`;
-    }
-
-    /** Normals facing +Z, one array per geometry so systems sharing it still batch together. */
-    private static createFallbackNormals(positions: Float32Array): Float32Array {
-        let normals = fallbackNormals.get(positions);
-        if (!normals) {
-            normals = new Float32Array(positions.length);
-            for (let i = 2; i < normals.length; i += 3) {
-                normals[i] = 1;
-            }
-            fallbackNormals.set(positions, normals);
-        }
-        return normals;
-    }
-
-    private toRendererSettingsJSON(): RendererEmitterSettings {
-        if (this.renderMode === RenderMode.Trail) {
-            return {
-                startLength: (this.rendererEmitterSettings as TrailSettings).startLength.toJSON(),
-                followLocalOrigin: (this.rendererEmitterSettings as TrailSettings).followLocalOrigin,
-                ...trailFlags(this.rendererEmitterSettings as TrailSettings),
-                ...trailCurve(this.rendererEmitterSettings as TrailSettings),
-                ...(trailSideAxisJSON(this.rendererEmitterSettings as TrailSettings) as {sideAxis?: any}),
-            };
-        }
-        if (this.renderMode === RenderMode.StretchedBillBoard) {
-            return {
-                speedFactor: (this.rendererEmitterSettings as StretchedBillBoardSettings).speedFactor,
-                lengthFactor: (this.rendererEmitterSettings as StretchedBillBoardSettings).lengthFactor,
-            };
-        }
-        return {};
-    }
-
-    private ensureGeometryMeta(meta: BabylonMetaData): string {
-        // Systems that share geometry arrays (the default quad, a loaded mesh) share one entry.
-        const rs = this.rendererSettings;
-        const arrays = [
-            rs.instancingGeometry,
-            rs.instancingIndices,
-            rs.instancingUVs,
-            rs.instancingUVs2,
-            rs.instancingNormals,
-        ];
-        let written = serializedGeometries.get(meta);
-        if (written === undefined) {
-            written = [];
-            serializedGeometries.set(meta, written);
-        }
-        const same = written.find((entry) => entry.arrays.every((array, i) => array === arrays[i]));
-        if (same !== undefined) {
-            return same.uuid;
-        }
-        const geometryUUID = ParticleSystem.nextSerializationId(meta, 'quarks_geometry');
-        written.push({arrays, uuid: geometryUUID});
-        meta.geometries[geometryUUID] = {
-            uuid: geometryUUID,
-            type: 'QuarksGeometry',
-            positions: Array.from(this.rendererSettings.instancingGeometry),
-            indices: Array.from(this.rendererSettings.instancingIndices),
-            uvs: this.rendererSettings.instancingUVs ? Array.from(this.rendererSettings.instancingUVs) : undefined,
-            ...(this.rendererSettings.instancingUVs2 ? {uvs2: Array.from(this.rendererSettings.instancingUVs2)} : {}),
-            normals: this.rendererSettings.instancingNormals
-                ? Array.from(this.rendererSettings.instancingNormals)
-                : undefined,
-        };
-        return geometryUUID;
-    }
-
-    private ensureMaterialMeta(meta: BabylonMetaData): string {
-        // One entry per texture in a document, however many systems and slots use it.
-        let written = serializedTextures.get(meta);
-        if (written === undefined) {
-            written = new Map();
-            serializedTextures.set(meta, written);
-        }
-        const textures = written;
-        const textureRef = (value: BaseTexture | null | undefined, anyKind = false): string | undefined => {
-            if (!(value instanceof Texture) && !(anyKind && value)) {
-                return undefined;
-            }
-            let uuid = textures.get(value);
-            if (uuid === undefined) {
-                uuid = ParticleSystem.nextSerializationId(meta, 'quarks_texture');
-                textures.set(value, uuid);
-                meta.textures[uuid] = value as Texture;
-            }
-            return uuid;
-        };
-        const textureUUID = textureRef(this.rendererSettings.texture, true);
-        const reflectionAtlasUUID = textureRef(this.rendererSettings.reflectionAtlas);
-        const erosion = this.erosion;
-        const distortion = this.uvDistortion;
-        const gradientMap = this.gradientMap;
-        const optional = <T>(key: string, value: T | undefined) => (value !== undefined ? {[key]: value} : {});
-
-        const materialUUID = ParticleSystem.nextSerializationId(meta, 'quarks_material');
-        meta.materials[materialUUID] = {
-            uuid: materialUUID,
-            type: 'QuarksMaterial',
-            transparent: this.rendererSettings.materialTransparent,
-            alphaMode: this.rendererSettings.materialBlendMode,
-            depthTest: this.rendererSettings.materialDepthTest,
-            depthWrite: this.rendererSettings.materialDepthWrite,
-            alphaTest: this.rendererSettings.materialAlphaTest,
-            texture: textureUUID,
-            reflectionAtlas: reflectionAtlasUUID,
-            reflectionLevel: this.rendererSettings.reflectionLevel,
-            // Written only when not the default, so existing effects serialise as before.
-            ...(this.lighting !== 'fixed' ? {lighting: this.lighting} : {}),
-            ...(this.rim ? {rim: {...this.rim, color: [...this.rim.color]}} : {}),
-            ...optional('mapUV', this.mapUV ? textureUVToJSON(this.mapUV) : undefined),
-            ...(gradientMap
-                ? {
-                      gradientMap: {
-                          ramp: textureRef(gradientMap.ramp),
-                          ...(gradientMap.channel !== 'r' ? {channel: gradientMap.channel} : {}),
-                      },
-                  }
-                : {}),
-            ...(erosion
-                ? {
-                      erosion: {
-                          mask: textureRef(erosion.mask),
-                          ...optional('maskUV', textureUVToJSON(erosion.maskUV)),
-                          softness: erosion.softness,
-                          edgeWidth: erosion.edgeWidth,
-                          edgeColor: [...erosion.edgeColor],
-                      },
-                  }
-                : {}),
-            ...(distortion
-                ? {
-                      uvDistortion: {
-                          map: textureRef(distortion.map),
-                          ...optional('mapUV', textureUVToJSON(distortion.mapUV, UV_DISTORTION_DEFAULT_UV)),
-                          strength: distortion.strength,
-                      },
-                  }
-                : {}),
-            sourceMaterial: this.materialRef ?? undefined,
-        };
-        return materialUUID;
-    }
-
-    private static resolveGeometryData(entry: any): {
-        positions: Float32Array;
-        indices: Uint32Array | Uint16Array;
-        uvs?: Float32Array;
-        uvs2?: Float32Array;
-        normals?: Float32Array;
-    } {
-        if (entry?.positions) {
-            const positions =
-                entry.positions instanceof Float32Array ? entry.positions : new Float32Array(entry.positions);
-            const rawIndices =
-                entry.indices instanceof Uint16Array || entry.indices instanceof Uint32Array
-                    ? entry.indices
-                    : entry.indices
-                      ? new Uint32Array(entry.indices)
-                      : undefined;
-            return {
-                positions,
-                indices: ensureTriangleIndices(positions, rawIndices),
-                uvs: entry.uvs
-                    ? entry.uvs instanceof Float32Array
-                        ? entry.uvs
-                        : new Float32Array(entry.uvs)
-                    : undefined,
-                uvs2: entry.uvs2
-                    ? entry.uvs2 instanceof Float32Array
-                        ? entry.uvs2
-                        : new Float32Array(entry.uvs2)
-                    : undefined,
-                normals: entry.normals
-                    ? entry.normals instanceof Float32Array
-                        ? entry.normals
-                        : new Float32Array(entry.normals)
-                    : undefined,
-            };
-        }
-
-        const data = entry?.data ?? entry;
-        if (data?.attributes?.position?.array) {
-            const positions = new Float32Array(data.attributes.position.array);
-            let indices: Uint32Array | Uint16Array | undefined;
-            if (data.index?.array) {
-                const indexType = data.index.type === 'Uint16Array' ? Uint16Array : Uint32Array;
-                indices = new indexType(data.index.array);
-            }
-            return {
-                positions,
-                indices: ensureTriangleIndices(positions, indices),
-                uvs: data.attributes.uv?.array ? new Float32Array(data.attributes.uv.array) : undefined,
-                // three.js names the second set `uv1` (r151 on), `uv2` before.
-                uvs2: (data.attributes.uv1 ?? data.attributes.uv2)?.array
-                    ? new Float32Array((data.attributes.uv1 ?? data.attributes.uv2).array)
-                    : undefined,
-                normals: data.attributes.normal?.array ? new Float32Array(data.attributes.normal.array) : undefined,
-            };
-        }
-
-        return {
-            positions: DEFAULT_POSITIONS,
-            indices: DEFAULT_INDICES,
-            uvs: DEFAULT_UVS,
-        };
     }
 
     /** Appends a behavior to {@link behaviors}; it runs on existing particles from the next step. */
@@ -3492,37 +2353,17 @@ export class ParticleSystem implements IParticleSystem {
      * `'destroy'` on dispose.
      */
     addEventListener(event: ParticleSystemEventType, callback: (event: ParticleSystemEvent) => void): void {
-        if (!this.listeners[event]) this.listeners[event] = [];
-        this.listeners[event].push(callback);
+        this.events.add(event, callback);
     }
 
     /** Removes every callback registered for `event`. */
     removeAllEventListeners(event: ParticleSystemEventType): void {
-        if (this.listeners[event]) this.listeners[event] = [];
+        this.events.removeAll(event);
     }
 
     /** Removes one callback added with {@link addEventListener}. */
     removeEventListener(event: ParticleSystemEventType, callback: (event: ParticleSystemEvent) => void): void {
-        if (this.listeners[event]) {
-            const index = this.listeners[event].indexOf(callback);
-            if (index !== -1) this.listeners[event].splice(index, 1);
-        }
-    }
-
-    /** True when at least one callback is registered for the event type. */
-    private hasListeners(event: ParticleSystemEventType): boolean {
-        const callbacks = this.listeners[event];
-        return callbacks !== undefined && callbacks.length > 0;
-    }
-
-    private fire(event: ParticleSystemEvent) {
-        const callbacks = this.listeners[event.type];
-        if (callbacks === undefined) {
-            return;
-        }
-        for (let i = 0; i < callbacks.length; i++) {
-            callbacks[i](event);
-        }
+        this.events.remove(event, callback);
     }
 
     /**

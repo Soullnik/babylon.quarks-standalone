@@ -1180,7 +1180,7 @@ export class QuarksLoader {
                 };
             }
 
-            // QuarksMaterial (what ParticleSystem.ensureMaterialMeta emits) writes `alphaMode`
+            // QuarksMaterial (what `materialMeta` in system/serialization.ts writes) writes `alphaMode`
             // directly as a Babylon alpha-mode constant; three.js materials (MeshBasicMaterial
             // etc.) instead use `blending` with three.js's own 1..4 numbering, which does NOT
             // line up with Babylon's constants (e.g. three.js Additive=2 vs Babylon ALPHA_ADD=1)
