@@ -3,6 +3,7 @@ import type {ParticleSystem} from 'babylon.quarks';
 import React, {useEffect, useSyncExternalStore} from 'react';
 import {EffectBinding} from '../core/binding.js';
 import {
+    AttractorModule,
     CollisionModule,
     ColorBySpeedModule,
     EmitDirectionModule,
@@ -112,6 +113,7 @@ export const EffectEditor = React.memo(function EffectEditor(props: EffectEditor
             <InheritVelocityModule binding={binding} />
             <ForceOverLifeModule binding={binding} />
             <GravityModule binding={binding} />
+            <AttractorModule binding={binding} />
             <OrbitOverLifeModule binding={binding} />
             <ColorOverLifeModule binding={binding} />
             <ColorBySpeedModule binding={binding} />

@@ -7,10 +7,29 @@ Shuriken-style effect editor for [babylon.quarks](https://www.npmjs.com/package/
 ## Install
 
 ```bash
-npm install babylon.quarks-editor babylon.quarks @babylonjs/core react @heroicons/react @tanstack/react-virtual
+npm install babylon.quarks-editor babylon.quarks @babylonjs/core @babylonjs/materials react react-dom @heroicons/react @tanstack/react-virtual
 ```
 
 ## Usage
+
+The supported embed is the host: it owns the scene, the timeline, undo/redo, playback and the
+module inspector, and mounts into any element.
+
+```ts
+import {Texture} from '@babylonjs/core/Materials/Textures/texture';
+import {QuarksEffectEditor} from 'babylon.quarks-editor/react';
+
+const editor = QuarksEffectEditor.Show({
+    hostElement: document.getElementById('editor')!,
+    effectJson, // optional: a Quarks JSON export to open; a default effect otherwise
+    textureOptions: [{label: 'Glow', url: '/textures/glow.png'}],
+    resolveTexture: (url, scene) => new Texture(url, scene),
+    onSave: (json) => save(json), // the effect as Quarks JSON, round-trips through QuarksLoader
+});
+editor.dispose();
+```
+
+The module inspector on its own, for a host that already has a scene and a selection:
 
 ```tsx
 import {EffectBinding, EffectHistory} from 'babylon.quarks-editor';
@@ -20,13 +39,25 @@ const binding = new EffectBinding(particleSystem); // your babylon.quarks Partic
 const history = new EffectHistory();
 history.attach(binding);
 
-<EffectEditor binding={binding} />;
+<EffectEditor
+    binding={binding}
+    selectedSystem={binding.system}
+    gizmoTargetNode={binding.system.emitter}
+    gizmoTargetLabel={binding.system.emitter.name}
+/>;
 
 // Serialize to Quarks JSON (round-trips through QuarksLoader):
 const json = binding.exportJSON('MyEffect');
 ```
 
-Modules: Main, Emission (bursts), Shape (7 emitter types), Speed/Limit Speed/Force/Rotation over Lifetime, Gravity, Color over Lifetime (gradient), Size over Lifetime (curve), Noise, Sub Emitters, Texture Sheet Animation, Renderer. Multi-system hierarchy with add/remove/rename, undo/redo via `EffectHistory`.
+Modules, in Unity's order: Main, Emission (rate over time and distance, bursts), Shape (cone,
+sphere, hemisphere, circle, donut, rectangle, grid, box, edge, mesh surface, point), Randomize
+Direction, Velocity / Speed / Limit Speed / Force over Lifetime, Inherit Velocity, Gravity,
+Attractor, Orbit over Lifetime, Color over Lifetime and by Speed, Size over Lifetime and by Speed,
+Rotation over Lifetime (2D and 3D) and by Speed, Noise, Turbulence, Collision, Width over Trail,
+Sub Emitters, Texture Sheet Animation, Sequences, Renderer (render modes incl. trail, mesh and
+beam; material, texture layout, flip, gradient map, erosion, UV distortion, soft particles, sorting).
+Multi-system hierarchy with add/remove/rename, undo/redo via `EffectHistory`.
 
 The `.` export is UI-free (edit model, serialization, value/shape/gradient helpers) — usable headless. The `./react` export ships the components; React is a peer dependency, so the same UI can mount in a standalone page or inside a [BabylonJS Editor](https://github.com/BabylonJS/Editor) plugin.
 
@@ -39,9 +70,11 @@ an opinion on your CDN, asset pipeline, or loader (`@babylonjs/loaders`, your ow
   "Load from file…" in the Renderer module) into whatever object you assign as `system.texture`.
 - `resolveGeometry(file) => Promise<GeometryData>` — turns a picked file (from "Load from file…"
   in the Mesh render mode's geometry dropdown) into vertex buffers: `{positions, indices?, uvs?,
-normals?}` (typed arrays or plain number arrays).
+uvs2?, normals?}` (typed arrays or plain number arrays; `uvs2` is the second UV set textures on
+  UV channel 1 read).
 - `textureOptions?: {label, url}[]` / `geometryOptions?: {label, positions, indices?, uvs?,
-normals?}[]` — preset lists shown alongside "Custom URL…" / "Load from file…".
+uvs2?, normals?}[]` — preset lists shown alongside "Custom URL…" / "Load from file…". The texture
+  presets also serve the gradient map's ramp, the erosion mask and the distortion noise.
 
 **Signature differs by entry point** — a common source of "works in the demo, throws in my
 host" bugs:

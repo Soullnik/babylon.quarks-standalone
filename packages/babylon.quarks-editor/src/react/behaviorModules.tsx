@@ -14,6 +14,7 @@ import {
     FrameOverLife,
     getPhysicsResolver,
     Gradient,
+    GravityForce,
     InheritVelocity,
     IntervalValue,
     LimitSpeedOverLife,
@@ -282,6 +283,42 @@ export function InheritVelocityModule({binding}: ModuleProps) {
                         curveMax={2}
                         onChange={(g) => binding.apply(() => (behavior.multiplier = g))}
                     />
+                </>
+            )}
+        </BehaviorModule>
+    );
+}
+
+/** A point attractor (`GravityForce`): particles fall towards a point, harder the nearer they are. */
+export function AttractorModule({binding}: ModuleProps) {
+    return (
+        <BehaviorModule<GravityForce>
+            binding={binding}
+            title="Attractor"
+            type="GravityForce"
+            create={() => new GravityForce(new Vector3(0, 0, 0), 1)}
+        >
+            {(behavior) => (
+                <>
+                    <Row label="Center" hintKey="attractor.center">
+                        <div style={{display: 'flex', gap: 6}}>
+                            {(['x', 'y', 'z'] as const).map((axis) => (
+                                <NumberField
+                                    key={axis}
+                                    value={behavior.center[axis]}
+                                    step={0.1}
+                                    onChange={(v) => binding.apply(() => (behavior.center[axis] = v))}
+                                />
+                            ))}
+                        </div>
+                    </Row>
+                    <Row label="Strength" hintKey="attractor.magnitude">
+                        <NumberField
+                            value={behavior.magnitude}
+                            step={0.1}
+                            onChange={(v) => binding.apply(() => (behavior.magnitude = v))}
+                        />
+                    </Row>
                 </>
             )}
         </BehaviorModule>
@@ -950,6 +987,12 @@ export function WidthOverTrailModule({binding}: ModuleProps) {
     );
 }
 
+/** How many of the first frames a start-frame generator picks from: its exclusive upper bound. */
+function startFrameCount(startFrame: FrameOverLife['startFrame']): number {
+    const state = readScalar(startFrame as never);
+    return Math.round(state.mode === 'random' ? state.max : state.value);
+}
+
 export function TextureSheetModule({binding}: ModuleProps) {
     const system = binding.system;
     const frameBehavior = findBehavior<FrameOverLife>(system.behaviors, 'FrameOverLife');
@@ -1080,13 +1123,109 @@ export function TextureSheetModule({binding}: ModuleProps) {
                 />
             </Row>
             {frameBehavior && (
-                <div style={{marginTop: 6}}>
-                    <CurveEditor
-                        pieces={readPieces(frameBehavior.frame)}
-                        maxValue={Math.max(1, tiles - 1)}
-                        onChange={(pieces) => binding.apply(() => (frameBehavior.frame = buildCurve(pieces) as never))}
-                    />
-                </div>
+                <>
+                    <Row label="Time mode">
+                        <SelectField<'life' | 'fps'>
+                            value={frameBehavior.fps > 0 ? 'fps' : 'life'}
+                            options={[
+                                {value: 'life', label: 'Lifetime (curve over life)'},
+                                {value: 'fps', label: 'FPS (frame from curve, then by age)'},
+                            ]}
+                            onChange={(mode) =>
+                                binding.apply(() => {
+                                    frameBehavior.fps = mode === 'fps' ? 12 : 0;
+                                    if (mode === 'fps' && frameBehavior.frameCount <= 0) {
+                                        frameBehavior.frameCount = tiles;
+                                    }
+                                })
+                            }
+                        />
+                    </Row>
+                    {frameBehavior.fps > 0 ? (
+                        <>
+                            <Row label="FPS">
+                                <NumberField
+                                    value={frameBehavior.fps}
+                                    min={0.01}
+                                    step={1}
+                                    onChange={(v) => binding.apply(() => (frameBehavior.fps = v))}
+                                />
+                            </Row>
+                            <Row label="Loop">
+                                <CheckboxField
+                                    value={frameBehavior.loop}
+                                    onChange={(v) => binding.apply(() => (frameBehavior.loop = v))}
+                                />
+                            </Row>
+                            <Row label="Random frame">
+                                <CheckboxField
+                                    value={frameBehavior.random}
+                                    onChange={(v) => binding.apply(() => (frameBehavior.random = v))}
+                                />
+                            </Row>
+                        </>
+                    ) : (
+                        <Row label="Cycles">
+                            <NumberField
+                                value={frameBehavior.cycles}
+                                min={0.01}
+                                step={1}
+                                onChange={(v) => binding.apply(() => (frameBehavior.cycles = v))}
+                            />
+                        </Row>
+                    )}
+                    <Row label="Frame count">
+                        <NumberField
+                            value={frameBehavior.frameCount}
+                            min={frameBehavior.fps > 0 || frameBehavior.startFrame ? 1 : 0}
+                            max={tiles}
+                            step={1}
+                            onChange={(v) =>
+                                binding.apply(() => (frameBehavior.frameCount = Math.max(0, Math.round(v))))
+                            }
+                        />
+                    </Row>
+                    <Row label="Start frame">
+                        <CheckboxField
+                            value={!!frameBehavior.startFrame}
+                            onChange={(v) =>
+                                binding.apply(() => {
+                                    frameBehavior.startFrame = v ? new IntervalValue(0, tiles) : undefined;
+                                    // The offset only wraps into a segment; without one it runs off the sheet.
+                                    if (v && frameBehavior.frameCount <= 0) {
+                                        frameBehavior.frameCount = tiles;
+                                    }
+                                })
+                            }
+                        />
+                        {frameBehavior.startFrame && (
+                            <NumberField
+                                value={startFrameCount(frameBehavior.startFrame)}
+                                min={1}
+                                max={tiles}
+                                step={1}
+                                onChange={(v) =>
+                                    binding.apply(
+                                        () =>
+                                            (frameBehavior.startFrame = new IntervalValue(
+                                                0,
+                                                Math.max(1, Math.round(v))
+                                            ))
+                                    )
+                                }
+                            />
+                        )}
+                    </Row>
+                    <div style={{marginTop: 6}}>
+                        <CurveEditor
+                            pieces={readPieces(frameBehavior.frame)}
+                            maxValue={Math.max(1, tiles - 1)}
+                            onChange={(pieces) =>
+                                binding.apply(() => (frameBehavior.frame = buildCurve(pieces) as never))
+                            }
+                        />
+                    </div>
+                </>
             )}
         </ModuleSection>
     );
