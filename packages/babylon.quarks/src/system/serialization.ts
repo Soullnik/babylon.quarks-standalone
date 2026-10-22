@@ -3,35 +3,22 @@ import type {BaseTexture} from '@babylonjs/core/Materials/Textures/baseTexture';
 import {Texture} from '@babylonjs/core/Materials/Textures/texture';
 import type {Scene} from '@babylonjs/core/scene';
 import {
-    ColorGenerator,
-    ColorGeneratorFromJSON,
     ConstantValue,
     EmitterFromJSON,
-    FunctionValueGenerator,
-    GeneratorFromJSON,
     RendererEmitterSettings,
-    RotationGenerator,
     StretchedBillBoardSettings,
     TrailSettings,
-    ValueGenerator,
     ValueGeneratorFromJSON,
-    Vector2,
     Vector3,
-    Vector3Generator,
 } from 'quarks.core';
 import type {ParticleSystem} from '../ParticleSystem';
 import {trailCurveTension, trailTessellation} from '../trailCurve';
 import {RenderMode, textureUVToJSON, UV_DISTORTION_DEFAULT_UV} from '../VFXBatch';
 import {resolveGeometryData} from './geometry';
-import {validCullingMode, validSortMode} from './normalize';
+import {settingsFromJSON, settingsToJSON} from './settingsSchema';
 import type {BabylonMetaData, ParticleSystemJSONParameters, ParticleSystemParameters} from './types';
 
 // Reading and writing a ParticleSystem's JSON. The class's toJSON and fromJSON call these.
-
-/** `read(json)`, or `undefined` for a part the file leaves out. */
-function optionalJSON<T>(json: any, read: (json: any) => T): T | undefined {
-    return json === undefined || json === null ? undefined : read(json);
-}
 
 /** Per document being written: the last id handed out, and the geometries and textures written. */
 const serializationCounters = new WeakMap<object, number>();
@@ -109,62 +96,17 @@ export function particleSystemToJSON(
     const materialUUID = materialMeta(system, meta);
     const rendererSettingsJSON = rendererEmitterSettingsJSON(system);
 
+    // Only what differs from the defaults the constructor and fromJSON give a setting left out.
+    // The shape, the settings the table marks `always`, the geometry, the material and the
+    // behaviors are always written: the loaders of 0.27 and earlier, and three.quarks, need them.
     return {
         version: '3.0',
-        autoDestroy: system.autoDestroy,
-        looping: system.looping,
-        prewarm: system.prewarm,
-        duration: system.duration,
-        startDelay: system.startDelay.toJSON(),
         shape: system.emitterShape.toJSON(),
-        startLife: system.startLife.toJSON(),
-        startSpeed: system.startSpeed.toJSON(),
-        startRotation: system.startRotation.toJSON(),
-        startSize: system.startSize.toJSON(),
-        startColor: system.startColor.toJSON(),
-        emissionOverTime: system.emissionOverTime.toJSON(),
-        emissionOverDistance: system.emissionOverDistance.toJSON(),
-        emissionBursts: system.emissionBursts.map((burst) => ({
-            time: burst.time,
-            count: burst.count.toJSON(),
-            probability: burst.probability,
-            interval: burst.interval,
-            cycle: burst.cycle,
-        })),
-        ...(system.maxParticles !== undefined ? {maxParticles: system.maxParticles} : {}),
-        onlyUsedByOther: system.onlyUsedByOther,
+        ...settingsToJSON(system),
         instancingGeometry: geometryUUID,
-        renderMode: system.renderMode,
-        renderOrder: system.renderOrder,
-        ...(system.renderingGroupId !== 0 ? {renderingGroupId: system.renderingGroupId} : {}),
-        ...(system.applyFog ? {} : {applyFog: false}),
-        ...(system.playbackSpeed !== 1 ? {playbackSpeed: system.playbackSpeed} : {}),
-        ...(system.cullingMode !== 'always' ? {cullingMode: system.cullingMode} : {}),
-        ...(system.scalingMode !== 'shape' ? {scalingMode: system.scalingMode} : {}),
-        ...(system.seed !== undefined ? {seed: system.seed} : {}),
-        ...(system.sortMode !== 'none' ? {sortMode: system.sortMode} : {}),
-        ...(system.alignToDirection ? {alignToDirection: true} : {}),
-        ...(system.minParticleSize > 0 ? {minParticleSize: system.minParticleSize} : {}),
-        ...(system.maxParticleSize !== Infinity ? {maxParticleSize: system.maxParticleSize} : {}),
-        rendererEmitterSettings: rendererSettingsJSON,
+        ...(Object.keys(rendererSettingsJSON).length > 0 ? {rendererEmitterSettings: rendererSettingsJSON} : {}),
         material: materialUUID,
-        layers: system.rendererSettings.layerMask,
-        startTileIndex: system.startTileIndex.toJSON(),
-        uTileCount: system.rendererSettings.uTileCount,
-        vTileCount: system.rendererSettings.vTileCount,
-        blendTiles: system.rendererSettings.blendTiles,
-        softParticles: system.rendererSettings.softParticles,
-        softFarFade: system.rendererSettings.softFarFade,
-        softNearFade: system.rendererSettings.softNearFade,
-        blending: system.rendererSettings.materialBlendMode,
-        transparent: system.rendererSettings.materialTransparent,
-        depthTest: system.rendererSettings.materialDepthTest,
-        depthWrite: system.rendererSettings.materialDepthWrite,
-        alphaTest: system.rendererSettings.materialAlphaTest,
         behaviors: system.behaviors.map((b) => b.toJSON()),
-        worldSpace: system.worldSpace,
-        ...(system.pivot ? {pivot: [system.pivot.x, system.pivot.y, system.pivot.z]} : {}),
-        ...(system.flip ? {flip: [system.flip.x, system.flip.y]} : {}),
     };
 }
 
@@ -220,79 +162,26 @@ export function particleSystemParametersFromJSON(
             : json.instancingGeometry;
     const resolvedGeometry = resolveGeometryData(resolvedGeometryEntry);
 
+    const settings = settingsFromJSON(json);
     return {
+        ...settings,
         scene,
-        autoDestroy: json.autoDestroy,
-        looping: json.looping,
-        prewarm: json.prewarm,
-        duration: json.duration,
-        startDelay: json.startDelay ? ValueGeneratorFromJSON(json.startDelay) : undefined,
         shape,
-        startLife: optionalJSON(json.startLife, ValueGeneratorFromJSON),
-        startSpeed: optionalJSON(json.startSpeed, ValueGeneratorFromJSON),
-        startRotation: optionalJSON(json.startRotation, GeneratorFromJSON) as
-            | RotationGenerator
-            | ValueGenerator
-            | FunctionValueGenerator
-            | undefined,
-        startSize: optionalJSON(json.startSize, GeneratorFromJSON) as
-            | Vector3Generator
-            | ValueGenerator
-            | FunctionValueGenerator
-            | undefined,
-        startColor: optionalJSON(json.startColor, ColorGeneratorFromJSON) as ColorGenerator | undefined,
-        emissionOverTime: optionalJSON(json.emissionOverTime, ValueGeneratorFromJSON),
-        emissionOverDistance: optionalJSON(json.emissionOverDistance, ValueGeneratorFromJSON),
-        emissionBursts: json.emissionBursts?.map((burst: any) => ({
-            time: burst.time,
-            count:
-                typeof burst.count === 'number' ? new ConstantValue(burst.count) : ValueGeneratorFromJSON(burst.count),
-            probability: burst.probability ?? 1,
-            interval: burst.interval ?? 0.1,
-            cycle: burst.cycle ?? burst.cycleCount ?? 1,
-        })),
-        maxParticles: typeof json.maxParticles === 'number' ? json.maxParticles : undefined,
-        onlyUsedByOther: json.onlyUsedByOther,
         instancingGeometry: resolvedGeometry.positions,
         instancingIndices: resolvedGeometry.indices,
         instancingUVs: resolvedGeometry.uvs,
         instancingUVs2: resolvedGeometry.uvs2,
         instancingNormals: resolvedGeometry.normals,
-        renderMode: json.renderMode,
         rendererEmitterSettings,
-        renderOrder: json.renderOrder,
-        renderingGroupId: typeof json.renderingGroupId === 'number' ? json.renderingGroupId : undefined,
-        applyFog: json.applyFog !== false,
-        playbackSpeed: typeof json.playbackSpeed === 'number' ? json.playbackSpeed : undefined,
-        cullingMode: validCullingMode(json.cullingMode),
-        scalingMode: json.scalingMode === 'hierarchy' ? 'hierarchy' : 'shape',
-        seed: typeof json.seed === 'number' ? json.seed : undefined,
-        sortMode: validSortMode(json.sortMode),
-        alignToDirection: json.alignToDirection === true,
-        minParticleSize: typeof json.minParticleSize === 'number' ? json.minParticleSize : undefined,
-        maxParticleSize: typeof json.maxParticleSize === 'number' ? json.maxParticleSize : undefined,
         texture,
         material: materialMeta?.sourceMaterial ?? materialMeta,
-        blendMode: materialMeta?.alphaMode ?? json.blending ?? Constants.ALPHA_ADD,
-        transparent: materialMeta?.transparent ?? json.transparent ?? true,
-        depthTest: materialMeta?.depthTest ?? json.depthTest ?? true,
-        depthWrite: materialMeta?.depthWrite ?? json.depthWrite ?? false,
-        alphaTest: materialMeta?.alphaTest ?? json.alphaTest ?? 0,
-        startTileIndex:
-            typeof json.startTileIndex === 'number'
-                ? new ConstantValue(json.startTileIndex)
-                : (optionalJSON(json.startTileIndex, ValueGeneratorFromJSON) as ValueGenerator | undefined),
-        uTileCount: json.uTileCount,
-        vTileCount: json.vTileCount,
-        blendTiles: json.blendTiles,
-        softParticles: json.softParticles,
-        softFarFade: json.softFarFade,
-        softNearFade: json.softNearFade,
+        // The material entry wins over the system's own fields, which older files wrote too.
+        blendMode: materialMeta?.alphaMode ?? settings.blendMode ?? Constants.ALPHA_ADD,
+        transparent: materialMeta?.transparent ?? settings.transparent ?? true,
+        depthTest: materialMeta?.depthTest ?? settings.depthTest ?? true,
+        depthWrite: materialMeta?.depthWrite ?? settings.depthWrite ?? false,
+        alphaTest: materialMeta?.alphaTest ?? settings.alphaTest ?? 0,
         behaviors: [],
-        worldSpace: json.worldSpace,
-        layerMask: json.layers,
-        pivot: json.pivot ? new Vector3(json.pivot[0] ?? 0, json.pivot[1] ?? 0, json.pivot[2] ?? 0) : undefined,
-        flip: json.flip ? new Vector2(json.flip[0] ?? 0, json.flip[1] ?? 0) : undefined,
         lighting: materialMeta?.lighting,
         rim: materialMeta?.rim,
         mapUV: materialMeta?.mapUV,

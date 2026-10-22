@@ -264,49 +264,55 @@ export interface BurstParametersJSON {
  * {@link ParticleSystem.fromJSON} reads it; `docs/FORMAT.md` describes the document around it.
  * Each field mirrors the {@link ParticleSystem} member of the same name. Curves and generators
  * are written as quarks.core's `FunctionJSON`; textures, materials and geometries as uuids into
- * the document.
+ * the document. Most settings are written only when they differ from their default, and a field
+ * that is missing reads as the default, so every field but `version` is optional. The shape, the
+ * start and emission curves except `startDelay`, `startTileIndex`, `instancingGeometry`, `material`
+ * and `behaviors` are always written, because older loaders and three.quarks need them.
  */
 export interface ParticleSystemJSONParameters {
     /** The quarks.core version line the system was written with. */
     version: string;
     /** See {@link ParticleSystem.autoDestroy}. */
-    autoDestroy: boolean;
+    autoDestroy?: boolean;
     /** See {@link ParticleSystem.looping}. */
-    looping: boolean;
+    looping?: boolean;
     /** See {@link ParticleSystem.prewarm}. */
-    prewarm: boolean;
+    prewarm?: boolean;
     /** See {@link ParticleSystem.duration}. */
-    duration: number;
+    duration?: number;
     /** See {@link ParticleSystem.startDelay}. */
     startDelay?: FunctionJSON;
     /** The emitter shape, as its `toJSON` writes it. */
-    shape: any;
+    shape?: any;
     /** See {@link ParticleSystem.startLife}. */
-    startLife: FunctionJSON;
+    startLife?: FunctionJSON;
     /** See {@link ParticleSystem.startSpeed}. */
-    startSpeed: FunctionJSON;
+    startSpeed?: FunctionJSON;
     /** See {@link ParticleSystem.startRotation}. */
-    startRotation: FunctionJSON;
+    startRotation?: FunctionJSON;
     /** See {@link ParticleSystem.startSize}. */
-    startSize: FunctionJSON;
+    startSize?: FunctionJSON;
     /** See {@link ParticleSystem.startColor}. */
-    startColor: FunctionJSON;
+    startColor?: FunctionJSON;
     /** See {@link ParticleSystem.emissionOverTime}. */
-    emissionOverTime: FunctionJSON;
+    emissionOverTime?: FunctionJSON;
     /** See {@link ParticleSystem.emissionOverDistance}. */
-    emissionOverDistance: FunctionJSON;
+    emissionOverDistance?: FunctionJSON;
     /** See {@link ParticleSystem.emissionBursts}. */
     emissionBursts?: Array<BurstParametersJSON>;
     /** See {@link ParticleSystem.maxParticles}. */
     maxParticles?: number;
     /** See {@link ParticleSystem.onlyUsedByOther}. */
-    onlyUsedByOther: boolean;
-    /** Trail, stretched or mesh settings; a trail's `startLength` as `FunctionJSON`. */
-    rendererEmitterSettings: RendererEmitterSettings;
+    onlyUsedByOther?: boolean;
+    /**
+     * Trail, stretched or mesh settings; a trail's `startLength` as `FunctionJSON`. Left out when
+     * the render mode has none.
+     */
+    rendererEmitterSettings?: RendererEmitterSettings;
     /** Uuid of the mesh particles' geometry entry. */
     instancingGeometry?: any;
     /** A {@link RenderMode} value. */
-    renderMode: number;
+    renderMode?: number;
     /** See {@link ParticleSystem.renderOrder}. */
     renderOrder?: number;
     /** Written only when not 0. */
@@ -338,11 +344,11 @@ export interface ParticleSystemJSONParameters {
     /** The camera layer mask. */
     layers?: number;
     /** See {@link ParticleSystem.startTileIndex}. */
-    startTileIndex: FunctionJSON | number;
+    startTileIndex?: FunctionJSON | number;
     /** See {@link ParticleSystem.uTileCount}. */
-    uTileCount: number;
+    uTileCount?: number;
     /** See {@link ParticleSystem.vTileCount}. */
-    vTileCount: number;
+    vTileCount?: number;
     /** See {@link ParticleSystem.blendTiles}. */
     blendTiles?: boolean;
     /** See {@link ParticleSystem.softParticles}. */
@@ -362,9 +368,9 @@ export interface ParticleSystemJSONParameters {
     /** See {@link ParticleSystemParameters.alphaTest}. */
     alphaTest?: number;
     /** Each behavior as its `toJSON` writes it. */
-    behaviors: Array<any>;
+    behaviors?: Array<any>;
     /** See {@link ParticleSystem.worldSpace}. */
-    worldSpace: boolean;
+    worldSpace?: boolean;
     /** `[x, y, z]`; written only when non-zero. */
     pivot?: number[];
     /** `[u, v]`; written only when non-zero. */

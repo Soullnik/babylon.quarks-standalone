@@ -48,6 +48,15 @@ matrix is not written.
 | `Mesh` | `geometry` and `material` uuids | a `Mesh`: its positions, indices, uvs, uvs2 and normals; an unindexed mesh gets its vertices in order; clones share one geometry |
 | `QuarksPrefab` | `animationData`, `timeScale` | a `QuarksPrefab` |
 
+A particle system (`ps`) writes each setting only when it differs from the default its constructor
+gives a system that leaves the setting out, and a missing field reads as that default. Its shape, its start
+and emission curves (`startLife`, `startSpeed`, `startRotation`, `startSize`, `startColor`,
+`emissionOverTime`, `emissionOverDistance`, `startTileIndex`), `instancingGeometry`, `material` and
+`behaviors` are always written, because loaders from 0.27 and earlier, and three.quarks, fail on a
+file without them. A curve written as a bare number reads as a constant; a flag written as a number
+reads as true unless it is 0. Files that write every setting, as earlier
+releases did, still load.
+
 Links between nodes use the target's `uuid`: a sub emitter's `subParticleSystem`, a mesh surface
 shape's `mesh` and a prefab animation's `targetUUID`. `quarksNodeId(node)` gives the id a node is
 written under: the uuid it was loaded with, or one given once to a node made in code. A loaded

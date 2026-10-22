@@ -1,0 +1,304 @@
+import {Constants} from '@babylonjs/core/Engines/constants';
+import {
+    ColorGenerator,
+    ColorGeneratorFromJSON,
+    ConstantColor,
+    ConstantValue,
+    FunctionColorGenerator,
+    FunctionValueGenerator,
+    GeneratorFromJSON,
+    RotationGenerator,
+    ValueGenerator,
+    ValueGeneratorFromJSON,
+    Vector2,
+    Vector3,
+    Vector3Generator,
+    Vector4,
+} from 'quarks.core';
+import type {ParticleSystem} from '../ParticleSystem';
+import {RenderMode} from '../VFXBatch';
+import {validCullingMode, validSortMode} from './normalize';
+import type {BurstParameters, ParticleSystemJSONParameters, ParticleSystemParameters} from './types';
+
+/**
+ * One setting of a {@link ParticleSystem} that is a plain value or a generator: how to read it
+ * from a system, what its default is, and how it goes to and from JSON and into a copy. The
+ * table below drives `toJSON` (which writes only values that differ from the default),
+ * `fromJSON` and `clone`, so a setting cannot be added to one and forgotten in another.
+ *
+ * Settings that live in the document's meta (geometry, material, texture and the texture
+ * effects), the render mode's own settings, the shape and the behaviors are handled by the
+ * callers, since they need the meta or the system itself.
+ */
+export interface SettingDescriptor {
+    /** The constructor parameter. */
+    readonly param: keyof ParticleSystemParameters;
+    /** The JSON field, when it is named differently from the parameter. */
+    readonly json?: keyof ParticleSystemJSONParameters;
+    /** The current value on a system. */
+    get(system: ParticleSystem): unknown;
+    /** Whether `value` is what the constructor gives a system that leaves the setting out. */
+    isDefault(value: unknown): boolean;
+    /**
+     * Written even when it is the default, because the loaders of releases up to 0.27 fail on a
+     * file without it.
+     */
+    readonly always?: boolean;
+    /** The value as JSON. */
+    toJSON(value: unknown): unknown;
+    /** The constructor parameter for a JSON value that is present; undefined takes the default. */
+    fromJSON(json: unknown): unknown;
+    /** A copy that shares no mutable state with `value`. */
+    clone(value: unknown): unknown;
+}
+
+type Generator = {toJSON(): unknown; clone(): unknown};
+
+/** A number, boolean or string compared by value. */
+function plain<T>(
+    param: keyof ParticleSystemParameters,
+    get: (system: ParticleSystem) => T,
+    defaultValue: T,
+    read: (json: unknown) => T | undefined,
+    options: {json?: keyof ParticleSystemJSONParameters} = {}
+): SettingDescriptor {
+    return {
+        param,
+        json: options.json,
+        get,
+        isDefault: (value) => value === defaultValue,
+        toJSON: (value) => value,
+        fromJSON: read,
+        clone: (value) => value,
+    };
+}
+
+function number(json: unknown): number | undefined {
+    return typeof json === 'number' ? json : undefined;
+}
+
+/** A boolean; a number counts as true unless it is 0, as files with 0/1 flags meant it. */
+function boolean(json: unknown): boolean | undefined {
+    if (typeof json === 'number') return json !== 0;
+    return typeof json === 'boolean' ? json : undefined;
+}
+
+/**
+ * A generator, compared with its default through its JSON. `read` turns the JSON back into one;
+ * a bare number is read as a constant.
+ */
+function generator(
+    param: keyof ParticleSystemParameters,
+    get: (system: ParticleSystem) => Generator,
+    defaultValue: () => Generator,
+    read: (json: any) => unknown,
+    always = true
+): SettingDescriptor {
+    const defaultJSON = JSON.stringify(defaultValue().toJSON());
+    return {
+        param,
+        always,
+        get,
+        isDefault: (value) => JSON.stringify((value as Generator).toJSON()) === defaultJSON,
+        toJSON: (value) => (value as Generator).toJSON(),
+        fromJSON: (json) => (typeof json === 'number' ? new ConstantValue(json) : read(json)),
+        clone: (value) => (value as Generator).clone(),
+    };
+}
+
+function vectorJSON(value: unknown): number[] | undefined {
+    const v = value as {x: number; y: number; z?: number} | undefined;
+    if (v === undefined) return undefined;
+    return v.z === undefined ? [v.x, v.y] : [v.x, v.y, v.z];
+}
+
+/** Every plain and generator setting, in the order `toJSON` writes them. */
+export const SETTINGS: ReadonlyArray<SettingDescriptor> = [
+    plain('autoDestroy', (s) => s.autoDestroy, false, boolean),
+    plain('looping', (s) => s.looping, true, boolean),
+    plain('prewarm', (s) => s.prewarm, false, boolean),
+    plain('duration', (s) => s.duration, 1, number),
+    generator(
+        'startDelay',
+        (s) => s.startDelay,
+        () => new ConstantValue(0),
+        ValueGeneratorFromJSON,
+        false
+    ),
+    generator(
+        'startLife',
+        (s) => s.startLife,
+        () => new ConstantValue(5),
+        ValueGeneratorFromJSON
+    ),
+    generator(
+        'startSpeed',
+        (s) => s.startSpeed,
+        () => new ConstantValue(0),
+        ValueGeneratorFromJSON
+    ),
+    generator(
+        'startRotation',
+        (s) => s.startRotation,
+        () => new ConstantValue(0),
+        (json) => GeneratorFromJSON(json) as RotationGenerator | ValueGenerator | FunctionValueGenerator
+    ),
+    generator(
+        'startSize',
+        (s) => s.startSize,
+        () => new ConstantValue(1),
+        (json) => GeneratorFromJSON(json) as Vector3Generator | ValueGenerator | FunctionValueGenerator
+    ),
+    generator(
+        'startColor',
+        (s) => s.startColor,
+        () => new ConstantColor(new Vector4(1, 1, 1, 1)),
+        (json) => ColorGeneratorFromJSON(json) as ColorGenerator | FunctionColorGenerator
+    ),
+    generator(
+        'emissionOverTime',
+        (s) => s.emissionOverTime,
+        () => new ConstantValue(10),
+        ValueGeneratorFromJSON
+    ),
+    generator(
+        'emissionOverDistance',
+        (s) => s.emissionOverDistance,
+        () => new ConstantValue(0),
+        ValueGeneratorFromJSON
+    ),
+    {
+        param: 'emissionBursts',
+        get: (s) => s.emissionBursts,
+        isDefault: (value) => (value as BurstParameters[]).length === 0,
+        toJSON: (value) =>
+            (value as BurstParameters[]).map((burst) => ({
+                time: burst.time,
+                count: burst.count.toJSON(),
+                probability: burst.probability,
+                interval: burst.interval,
+                cycle: burst.cycle,
+            })),
+        fromJSON: (json) =>
+            Array.isArray(json)
+                ? json.map((burst: any) => ({
+                      time: burst.time,
+                      count:
+                          typeof burst.count === 'number'
+                              ? new ConstantValue(burst.count)
+                              : ValueGeneratorFromJSON(burst.count),
+                      probability: burst.probability ?? 1,
+                      interval: burst.interval ?? 0.1,
+                      cycle: burst.cycle ?? burst.cycleCount ?? 1,
+                  }))
+                : undefined,
+        clone: (value) => (value as BurstParameters[]).map((burst) => ({...burst, count: burst.count.clone()})),
+    },
+    plain('maxParticles', (s) => s.maxParticles, undefined, number),
+    plain('onlyUsedByOther', (s) => s.onlyUsedByOther, false, boolean),
+    plain('renderMode', (s) => s.renderMode, RenderMode.BillBoard, number),
+    plain('renderOrder', (s) => s.renderOrder, 0, number),
+    plain('renderingGroupId', (s) => s.renderingGroupId, 0, number),
+    plain(
+        'applyFog',
+        (s) => s.applyFog,
+        true,
+        (json) => json !== false
+    ),
+    plain('playbackSpeed', (s) => s.playbackSpeed, 1, number),
+    plain('cullingMode', (s) => s.cullingMode, 'always', validCullingMode),
+    plain(
+        'scalingMode',
+        (s) => s.scalingMode,
+        'shape',
+        (json) => (json === 'hierarchy' ? 'hierarchy' : 'shape')
+    ),
+    plain('seed', (s) => s.seed, undefined, number),
+    plain('sortMode', (s) => s.sortMode, 'none', validSortMode),
+    plain(
+        'alignToDirection',
+        (s) => s.alignToDirection,
+        false,
+        (json) => json === true
+    ),
+    plain('minParticleSize', (s) => s.minParticleSize, 0, number),
+    plain('maxParticleSize', (s) => s.maxParticleSize, Infinity, number),
+    plain('layerMask', (s) => s.layers.mask, 0x0fffffff, number, {json: 'layers'}),
+    generator(
+        'startTileIndex',
+        (s) => s.startTileIndex,
+        () => new ConstantValue(0),
+        ValueGeneratorFromJSON
+    ),
+    plain('uTileCount', (s) => s.uTileCount, 1, number),
+    plain('vTileCount', (s) => s.vTileCount, 1, number),
+    plain('blendTiles', (s) => s.blendTiles, false, boolean),
+    plain('softParticles', (s) => s.softParticles, false, boolean),
+    plain('softFarFade', (s) => s.softFarFade, 0, number),
+    plain('softNearFade', (s) => s.softNearFade, 0, number),
+    plain('blendMode', (s) => s.blending, Constants.ALPHA_ADD, number, {json: 'blending'}),
+    plain('transparent', (s) => s.getRendererSettings().materialTransparent, true, boolean),
+    plain('depthTest', (s) => s.getRendererSettings().materialDepthTest, true, boolean),
+    plain('depthWrite', (s) => s.getRendererSettings().materialDepthWrite, false, boolean),
+    plain('alphaTest', (s) => s.getRendererSettings().materialAlphaTest, 0, number),
+    plain('worldSpace', (s) => s.worldSpace, false, boolean),
+    {
+        param: 'pivot',
+        get: (s) => s.pivot,
+        isDefault: (value) => value === undefined,
+        toJSON: vectorJSON,
+        fromJSON: (json) => (Array.isArray(json) ? new Vector3(json[0] ?? 0, json[1] ?? 0, json[2] ?? 0) : undefined),
+        clone: (value) => (value as Vector3 | undefined)?.clone(),
+    },
+    {
+        param: 'flip',
+        get: (s) => s.flip,
+        isDefault: (value) => value === undefined,
+        toJSON: vectorJSON,
+        fromJSON: (json) => (Array.isArray(json) ? new Vector2(json[0] ?? 0, json[1] ?? 0) : undefined),
+        clone: (value) => (value as Vector2 | undefined)?.clone(),
+    },
+];
+
+/** The JSON field a setting is written under. */
+export function settingJSONKey(setting: SettingDescriptor): string {
+    return setting.json ?? setting.param;
+}
+
+/** The settings of `system` that differ from their defaults, as JSON fields. */
+export function settingsToJSON(system: ParticleSystem): Record<string, unknown> {
+    const json: Record<string, unknown> = {};
+    for (const setting of SETTINGS) {
+        const value = setting.get(system);
+        if (setting.always || !setting.isDefault(value)) {
+            json[settingJSONKey(setting)] = setting.toJSON(value);
+        }
+    }
+    return json;
+}
+
+/** Constructor parameters for the settings a document has; missing ones are left out, so they take the default. */
+export function settingsFromJSON(json: ParticleSystemJSONParameters): Partial<ParticleSystemParameters> {
+    const parameters: Record<string, unknown> = {};
+    const fields = json as unknown as Record<string, unknown>;
+    for (const setting of SETTINGS) {
+        const value = fields[settingJSONKey(setting)];
+        if (value === undefined || value === null) {
+            continue;
+        }
+        const read = setting.fromJSON(value);
+        if (read !== undefined) {
+            parameters[setting.param] = read;
+        }
+    }
+    return parameters as Partial<ParticleSystemParameters>;
+}
+
+/** Constructor parameters that copy every setting of `system`. */
+export function settingsForClone(system: ParticleSystem): Partial<ParticleSystemParameters> {
+    const parameters: Record<string, unknown> = {};
+    for (const setting of SETTINGS) {
+        parameters[setting.param] = setting.clone(setting.get(system));
+    }
+    return parameters as Partial<ParticleSystemParameters>;
+}

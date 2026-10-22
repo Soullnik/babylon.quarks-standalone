@@ -335,7 +335,7 @@ describe('TrailBatch', () => {
         // Flags left off stay out of the JSON.
         const plain = createTrailSystem();
         expect(
-            Object.keys(plain.toJSON({textures: {}, materials: {}, geometries: {}} as any).rendererEmitterSettings)
+            Object.keys(plain.toJSON({textures: {}, materials: {}, geometries: {}} as any).rendererEmitterSettings!)
         ).toEqual(['startLength', 'followLocalOrigin']);
         plain.dispose();
         system.dispose();
