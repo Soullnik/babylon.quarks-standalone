@@ -13,6 +13,7 @@
  * Babylon's processed WGSL is not the page that compiles it.
  */
 import {chromium} from 'playwright';
+import {examplesBase} from './examplesBase.mjs';
 const EXE = process.env.CHROMIUM_PATH;
 const PORT = process.env.EXAMPLES_PORT ?? '3010';
 /** Variants compiled at once. Each compile is a round trip to the GPU process; one at a time takes ten minutes. */
@@ -20,13 +21,14 @@ const CHUNK = 64;
 /** Phase 2 normally takes seconds; a wedged GPU process would otherwise hold the run for ever. */
 const COMPILE_TIMEOUT = 5 * 60 * 1000;
 const started = Date.now();
+const base = await examplesBase(PORT);
 const browser = await chromium.launch({args: ['--enable-unsafe-webgpu'], ...(EXE ? {executablePath: EXE} : {})});
 
 // Phase 1: Babylon processes our WGSL into what it would hand the browser.
 const page = await browser.newPage();
 const logs = [];
 page.on('pageerror', (e) => logs.push('pageerror: ' + e.message.slice(0, 300)));
-await page.goto(`http://127.0.0.1:${PORT}/wgsl-validate.html`, {waitUntil: 'load'});
+await page.goto(`${base}wgsl-validate.html`, {waitUntil: 'load'});
 try {
     await page.waitForFunction(() => window.__wgslSources !== undefined, {timeout: 120000});
 } catch {
@@ -41,7 +43,7 @@ console.log(`${sources.length} cases produced in ${Date.now() - started}ms`);
 // Phase 2: a page with no engine in it, so the WGSL compiler is alive.
 const compiler = await browser.newPage();
 // Any secure-context page will do; WebGPU needs one, about:blank does not count.
-await compiler.goto(`http://127.0.0.1:${PORT}/`);
+await compiler.goto(base);
 const compiled = await Promise.race([
     compiler.evaluate(
         async ({cases, chunk}) => {
