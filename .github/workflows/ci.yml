@@ -97,10 +97,10 @@ jobs:
                   path: ~/.cache/ms-playwright
                   key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}-chromium-headless-shell
 
-            # Headless runs only need the headless shell. On a cache hit this installs just the
-            # system libraries.
+            # Headless runs only need the headless shell, and the runner image already has its
+            # system libraries: `--with-deps` would spend minutes in apt on fonts and xvfb.
             - name: Install Chromium for the demo smoke
-              run: npx playwright install --with-deps --only-shell chromium
+              run: npx playwright install --only-shell chromium
 
             - name: Smoke-test the demos
               run: |
@@ -140,8 +140,9 @@ jobs:
                   path: ~/.cache/ms-playwright
                   key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}-chromium-headless-shell
 
+            # The runner image already has the headless shell's system libraries.
             - name: Install Chromium for the shader compile
-              run: npx playwright install --with-deps --only-shell chromium
+              run: npx playwright install --only-shell chromium
 
             - name: Compile every WGSL variant
               run: |
