@@ -108,6 +108,47 @@ jobs:
                   for i in $(seq 1 60); do curl -sf http://127.0.0.1:3010/ >/dev/null && break; sleep 1; done
                   npm run check:demos -- --shard=${{ matrix.shard }}/2
 
+    # Every WGSL shader variant the library can emit, compiled by Chromium's own WGSL compiler on its
+    # software (SwiftShader) adapter; no GPU needed. A variant that fails to compile fails the job.
+    wgsl:
+        name: WGSL shader compile
+        runs-on: ubuntu-latest
+        timeout-minutes: 20
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v4
+
+            - name: Setup Node.js
+              uses: actions/setup-node@v4
+              with:
+                  node-version: 20
+                  cache: npm
+
+            - name: Install dependencies
+              run: npm ci
+
+            - name: Build examples
+              run: npm run build:examples
+
+            - name: Read Playwright version
+              id: playwright
+              run: echo "version=$(node -p "require('playwright/package.json').version")" >> "$GITHUB_OUTPUT"
+
+            - name: Cache Playwright browsers
+              uses: actions/cache@v4
+              with:
+                  path: ~/.cache/ms-playwright
+                  key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}-chromium-headless-shell
+
+            - name: Install Chromium for the shader compile
+              run: npx playwright install --with-deps --only-shell chromium
+
+            - name: Compile every WGSL variant
+              run: |
+                  npm run preview -w examples -- --host 127.0.0.1 --port 3010 --strictPort &
+                  for i in $(seq 1 60); do curl -sf http://127.0.0.1:3010/ >/dev/null && break; sleep 1; done
+                  npm run validate:wgsl
+
     # Pages build only on main / manual dispatch. The docs are written into examples/dist, so they
     # are built after the examples.
     pages:
@@ -143,7 +184,7 @@ jobs:
                   path: examples/dist
 
     deploy:
-        needs: [check, demos, pages]
+        needs: [check, demos, wgsl, pages]
         if: github.event_name != 'pull_request'
         runs-on: ubuntu-latest
         # Never cancel an in-progress Pages deployment — that leaves it in a failed state.
