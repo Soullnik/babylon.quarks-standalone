@@ -71,6 +71,14 @@ or duplicated something else, and nothing in the package used them.
 
 ### Changed
 
+- **A particle system's JSON leaves out settings at their defaults.** `toJSON`, and so
+  `serializeEffect` and the editor's saves, used to write every setting; now a setting is written
+  only when it differs from the default, and a missing field reads as the default. The shape, the
+  start and emission curves except `startDelay`, `startTileIndex`, the geometry, the material and
+  the behaviors are still always written, since loaders up to 0.27 and three.quarks need them, so
+  both still load the files. Files from earlier releases load as before. The fields of
+  `ParticleSystemJSONParameters` other than `version` are therefore optional (breaking for
+  TypeScript code that read them without a check).
 - **Every export has TSDoc**, and `npm run docs:check`, part of `npm run check` and CI, keeps it
   that way. Members that are public only for other files of the package are tagged `@internal`
   and left out of the API docs: the batches' buffers and lifecycle methods, `VFXBatch.addSystem`,
@@ -264,6 +272,11 @@ or duplicated something else, and nothing in the package used them.
   split follows.
 
 ### Internal
+
+- **One table of `ParticleSystem` settings** (`src/system/settingsSchema.ts`) gives each plain and
+  generator setting its default, its JSON form and how it is copied. `toJSON`, `fromJSON` and
+  `clone` are built from it, and a test fails when a constructor parameter is in neither the table
+  nor the code that handles the meta, the shape or the behaviors.
 
 - **`ParticleSystem.ts` is being split into modules under `src/system/`.** This first part moves
   out the parameter and JSON types (`types.ts`), reading and writing JSON

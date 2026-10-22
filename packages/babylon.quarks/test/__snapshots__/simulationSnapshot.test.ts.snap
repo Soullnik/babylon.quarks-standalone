@@ -575,8 +575,6 @@ exports[`seeded simulation snapshot beam keeps its particles, bounds and JSON 1`
     },
   ],
   "json": {
-    "alphaTest": 0,
-    "autoDestroy": false,
     "behaviors": [
       {
         "direction": [
@@ -658,10 +656,6 @@ exports[`seeded simulation snapshot beam keeps its particles, bounds and JSON 1`
         "type": "RotationOverLife",
       },
     ],
-    "blendTiles": false,
-    "blending": 1,
-    "depthTest": true,
-    "depthWrite": false,
     "duration": 2,
     "emissionBursts": [
       {
@@ -685,14 +679,8 @@ exports[`seeded simulation snapshot beam keeps its particles, bounds and JSON 1`
       "value": 30,
     },
     "instancingGeometry": "quarks_geometry_1",
-    "layers": 268435455,
-    "looping": true,
     "material": "quarks_material_2",
-    "onlyUsedByOther": false,
-    "prewarm": false,
     "renderMode": 6,
-    "renderOrder": 0,
-    "rendererEmitterSettings": {},
     "seed": 1234,
     "shape": {
       "arc": 6.28319,
@@ -706,9 +694,6 @@ exports[`seeded simulation snapshot beam keeps its particles, bounds and JSON 1`
       "thickness": 1,
       "type": "sphere",
     },
-    "softFarFade": 0,
-    "softNearFade": 0,
-    "softParticles": false,
     "startColor": {
       "a": {
         "a": 1,
@@ -723,10 +708,6 @@ exports[`seeded simulation snapshot beam keeps its particles, bounds and JSON 1`
         "r": 0.2,
       },
       "type": "ColorRange",
-    },
-    "startDelay": {
-      "type": "ConstantValue",
-      "value": 0,
     },
     "startLife": {
       "a": 0.6,
@@ -752,11 +733,7 @@ exports[`seeded simulation snapshot beam keeps its particles, bounds and JSON 1`
       "type": "ConstantValue",
       "value": 0,
     },
-    "transparent": true,
-    "uTileCount": 1,
-    "vTileCount": 1,
     "version": "3.0",
-    "worldSpace": false,
   },
   "meta": {
     "geometries": {
@@ -1392,8 +1369,6 @@ exports[`seeded simulation snapshot billboard, local space keeps its particles, 
     },
   ],
   "json": {
-    "alphaTest": 0,
-    "autoDestroy": false,
     "behaviors": [
       {
         "direction": [
@@ -1475,10 +1450,6 @@ exports[`seeded simulation snapshot billboard, local space keeps its particles, 
         "type": "RotationOverLife",
       },
     ],
-    "blendTiles": false,
-    "blending": 1,
-    "depthTest": true,
-    "depthWrite": false,
     "duration": 2,
     "emissionBursts": [
       {
@@ -1502,14 +1473,7 @@ exports[`seeded simulation snapshot billboard, local space keeps its particles, 
       "value": 30,
     },
     "instancingGeometry": "quarks_geometry_1",
-    "layers": 268435455,
-    "looping": true,
     "material": "quarks_material_2",
-    "onlyUsedByOther": false,
-    "prewarm": false,
-    "renderMode": 0,
-    "renderOrder": 0,
-    "rendererEmitterSettings": {},
     "seed": 1234,
     "shape": {
       "arc": 6.28319,
@@ -1523,9 +1487,6 @@ exports[`seeded simulation snapshot billboard, local space keeps its particles, 
       "thickness": 1,
       "type": "sphere",
     },
-    "softFarFade": 0,
-    "softNearFade": 0,
-    "softParticles": false,
     "startColor": {
       "a": {
         "a": 1,
@@ -1540,10 +1501,6 @@ exports[`seeded simulation snapshot billboard, local space keeps its particles, 
         "r": 0.2,
       },
       "type": "ColorRange",
-    },
-    "startDelay": {
-      "type": "ConstantValue",
-      "value": 0,
     },
     "startLife": {
       "a": 0.6,
@@ -1569,11 +1526,7 @@ exports[`seeded simulation snapshot billboard, local space keeps its particles, 
       "type": "ConstantValue",
       "value": 0,
     },
-    "transparent": true,
-    "uTileCount": 1,
-    "vTileCount": 1,
     "version": "3.0",
-    "worldSpace": false,
   },
   "meta": {
     "geometries": {
@@ -2209,8 +2162,6 @@ exports[`seeded simulation snapshot billboard, world space keeps its particles, 
     },
   ],
   "json": {
-    "alphaTest": 0,
-    "autoDestroy": false,
     "behaviors": [
       {
         "direction": [
@@ -2292,10 +2243,6 @@ exports[`seeded simulation snapshot billboard, world space keeps its particles, 
         "type": "RotationOverLife",
       },
     ],
-    "blendTiles": false,
-    "blending": 1,
-    "depthTest": true,
-    "depthWrite": false,
     "duration": 2,
     "emissionBursts": [
       {
@@ -2319,14 +2266,7 @@ exports[`seeded simulation snapshot billboard, world space keeps its particles, 
       "value": 30,
     },
     "instancingGeometry": "quarks_geometry_1",
-    "layers": 268435455,
-    "looping": true,
     "material": "quarks_material_2",
-    "onlyUsedByOther": false,
-    "prewarm": false,
-    "renderMode": 0,
-    "renderOrder": 0,
-    "rendererEmitterSettings": {},
     "seed": 1234,
     "shape": {
       "arc": 6.28319,
@@ -2340,9 +2280,6 @@ exports[`seeded simulation snapshot billboard, world space keeps its particles, 
       "thickness": 1,
       "type": "sphere",
     },
-    "softFarFade": 0,
-    "softNearFade": 0,
-    "softParticles": false,
     "startColor": {
       "a": {
         "a": 1,
@@ -2357,10 +2294,6 @@ exports[`seeded simulation snapshot billboard, world space keeps its particles, 
         "r": 0.2,
       },
       "type": "ColorRange",
-    },
-    "startDelay": {
-      "type": "ConstantValue",
-      "value": 0,
     },
     "startLife": {
       "a": 0.6,
@@ -2386,9 +2319,6 @@ exports[`seeded simulation snapshot billboard, world space keeps its particles, 
       "type": "ConstantValue",
       "value": 0,
     },
-    "transparent": true,
-    "uTileCount": 1,
-    "vTileCount": 1,
     "version": "3.0",
     "worldSpace": true,
   },
@@ -3116,8 +3046,6 @@ exports[`seeded simulation snapshot mesh keeps its particles, bounds and JSON 1`
     },
   ],
   "json": {
-    "alphaTest": 0,
-    "autoDestroy": false,
     "behaviors": [
       {
         "direction": [
@@ -3191,10 +3119,6 @@ exports[`seeded simulation snapshot mesh keeps its particles, bounds and JSON 1`
         "type": "ColorOverLife",
       },
     ],
-    "blendTiles": false,
-    "blending": 1,
-    "depthTest": true,
-    "depthWrite": false,
     "duration": 2,
     "emissionBursts": [
       {
@@ -3218,14 +3142,8 @@ exports[`seeded simulation snapshot mesh keeps its particles, bounds and JSON 1`
       "value": 30,
     },
     "instancingGeometry": "quarks_geometry_1",
-    "layers": 268435455,
-    "looping": true,
     "material": "quarks_material_2",
-    "onlyUsedByOther": false,
-    "prewarm": false,
     "renderMode": 2,
-    "renderOrder": 0,
-    "rendererEmitterSettings": {},
     "seed": 1234,
     "shape": {
       "arc": 6.28319,
@@ -3239,9 +3157,6 @@ exports[`seeded simulation snapshot mesh keeps its particles, bounds and JSON 1`
       "thickness": 1,
       "type": "sphere",
     },
-    "softFarFade": 0,
-    "softNearFade": 0,
-    "softParticles": false,
     "startColor": {
       "a": {
         "a": 1,
@@ -3256,10 +3171,6 @@ exports[`seeded simulation snapshot mesh keeps its particles, bounds and JSON 1`
         "r": 0.2,
       },
       "type": "ColorRange",
-    },
-    "startDelay": {
-      "type": "ConstantValue",
-      "value": 0,
     },
     "startLife": {
       "a": 0.6,
@@ -3284,9 +3195,6 @@ exports[`seeded simulation snapshot mesh keeps its particles, bounds and JSON 1`
       "type": "ConstantValue",
       "value": 0,
     },
-    "transparent": true,
-    "uTileCount": 1,
-    "vTileCount": 1,
     "version": "3.0",
     "worldSpace": true,
   },
@@ -3937,8 +3845,6 @@ exports[`seeded simulation snapshot stretched billboard keeps its particles, bou
     },
   ],
   "json": {
-    "alphaTest": 0,
-    "autoDestroy": false,
     "behaviors": [
       {
         "direction": [
@@ -4020,10 +3926,6 @@ exports[`seeded simulation snapshot stretched billboard keeps its particles, bou
         "type": "RotationOverLife",
       },
     ],
-    "blendTiles": false,
-    "blending": 1,
-    "depthTest": true,
-    "depthWrite": false,
     "duration": 2,
     "emissionBursts": [
       {
@@ -4047,13 +3949,8 @@ exports[`seeded simulation snapshot stretched billboard keeps its particles, bou
       "value": 30,
     },
     "instancingGeometry": "quarks_geometry_1",
-    "layers": 268435455,
-    "looping": true,
     "material": "quarks_material_2",
-    "onlyUsedByOther": false,
-    "prewarm": false,
     "renderMode": 1,
-    "renderOrder": 0,
     "rendererEmitterSettings": {
       "lengthFactor": 1,
       "speedFactor": 0.2,
@@ -4071,9 +3968,6 @@ exports[`seeded simulation snapshot stretched billboard keeps its particles, bou
       "thickness": 1,
       "type": "sphere",
     },
-    "softFarFade": 0,
-    "softNearFade": 0,
-    "softParticles": false,
     "startColor": {
       "a": {
         "a": 1,
@@ -4088,10 +3982,6 @@ exports[`seeded simulation snapshot stretched billboard keeps its particles, bou
         "r": 0.2,
       },
       "type": "ColorRange",
-    },
-    "startDelay": {
-      "type": "ConstantValue",
-      "value": 0,
     },
     "startLife": {
       "a": 0.6,
@@ -4117,9 +4007,6 @@ exports[`seeded simulation snapshot stretched billboard keeps its particles, bou
       "type": "ConstantValue",
       "value": 0,
     },
-    "transparent": true,
-    "uTileCount": 1,
-    "vTileCount": 1,
     "version": "3.0",
     "worldSpace": true,
   },
@@ -4800,8 +4687,6 @@ exports[`seeded simulation snapshot trail keeps its particles, bounds and JSON 1
     },
   ],
   "json": {
-    "alphaTest": 0,
-    "autoDestroy": false,
     "behaviors": [
       {
         "direction": [
@@ -4883,10 +4768,6 @@ exports[`seeded simulation snapshot trail keeps its particles, bounds and JSON 1
         "type": "RotationOverLife",
       },
     ],
-    "blendTiles": false,
-    "blending": 1,
-    "depthTest": true,
-    "depthWrite": false,
     "duration": 2,
     "emissionBursts": [
       {
@@ -4910,13 +4791,8 @@ exports[`seeded simulation snapshot trail keeps its particles, bounds and JSON 1
       "value": 30,
     },
     "instancingGeometry": "quarks_geometry_1",
-    "layers": 268435455,
-    "looping": true,
     "material": "quarks_material_2",
-    "onlyUsedByOther": false,
-    "prewarm": false,
     "renderMode": 3,
-    "renderOrder": 0,
     "rendererEmitterSettings": {
       "followLocalOrigin": false,
       "startLength": {
@@ -4938,9 +4814,6 @@ exports[`seeded simulation snapshot trail keeps its particles, bounds and JSON 1
       "thickness": 1,
       "type": "cone",
     },
-    "softFarFade": 0,
-    "softNearFade": 0,
-    "softParticles": false,
     "startColor": {
       "a": {
         "a": 1,
@@ -4955,10 +4828,6 @@ exports[`seeded simulation snapshot trail keeps its particles, bounds and JSON 1
         "r": 0.2,
       },
       "type": "ColorRange",
-    },
-    "startDelay": {
-      "type": "ConstantValue",
-      "value": 0,
     },
     "startLife": {
       "a": 0.6,
@@ -4984,9 +4853,6 @@ exports[`seeded simulation snapshot trail keeps its particles, bounds and JSON 1
       "type": "ConstantValue",
       "value": 0,
     },
-    "transparent": true,
-    "uTileCount": 1,
-    "vTileCount": 1,
     "version": "3.0",
     "worldSpace": true,
   },
