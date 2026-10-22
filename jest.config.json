@@ -26,10 +26,10 @@
             "lines": 93
         },
         "./packages/babylon.quarks-editor/src/": {
-            "statements": 13,
-            "branches": 10,
-            "functions": 18,
-            "lines": 13
+            "statements": 95,
+            "branches": 88,
+            "functions": 95,
+            "lines": 95
         }
     }
 }

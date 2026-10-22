@@ -6,6 +6,11 @@ and the project follows the `quarks.core` 0.x version line.
 
 ## [Unreleased]
 
+### Added
+
+- Emitter shape wireframes for the Box and Edge shapes: the box outline with its +Z emit
+  direction, and the edge line with its +Y emit direction.
+
 ### Changed
 
 - **`TimelinePanelProps` and `TransportBarProps` take `RefObject<HTMLElement | null>` refs**, the
@@ -18,6 +23,16 @@ and the project follows the `quarks.core` 0.x version line.
   mesh nodes keep their geometry (so mesh surface emitters still emit after a save and reload),
   and textures keep their wrap, sampling, repeat, offset and rotation. Textures with no url a file
   can point at are reported instead of written as an empty entry.
+- The yellow hover ring stayed on the ground after the hovered effect was removed from the scene.
+
+### Internal
+
+- Jest tests now cover the whole editor core (`src/core`): systems, material, timeline, scrub,
+  playback and transport, groups, collision, effect tree, assets and asset tree, scene entries,
+  gallery layout, playback, markers and picker, emitter shape wireframes, texture export and the
+  IndexedDB project store. The coverage threshold for the editor is raised to match.
+- Editor tests resolve `babylon.quarks` to its sources, so they pick up library changes made in
+  the same branch without rebuilding it.
 
 ## [0.27.0] — 2026-10-21
 

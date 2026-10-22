@@ -225,6 +225,38 @@ function buildEmitterWireframe(system: ParticleSystem, scene: Scene): Mesh[] {
             }
             break;
         }
+        case 'box': {
+            // Spawn anywhere in the box (volume), on its faces (shell) or along its edges;
+            // velocity straight +Z, like Unity's Box shape.
+            const halfW = params.width / 2;
+            const halfH = params.height / 2;
+            const halfD = params.depth / 2;
+            lines('wf-box-front', xyRect(params.width, params.height, halfD));
+            lines('wf-box-back', xyRect(params.width, params.height, -halfD));
+            const corners: Array<[number, number]> = [
+                [-halfW, -halfH],
+                [halfW, -halfH],
+                [halfW, halfH],
+                [-halfW, halfH],
+            ];
+            corners.forEach(([x, y], i) => {
+                lines(`wf-box-side-${i}`, [new Vector3(x, y, -halfD), new Vector3(x, y, halfD)]);
+            });
+            const ray = Math.max(halfD * 2, 0.25);
+            lines('wf-box-dir', [new Vector3(0, 0, halfD), new Vector3(0, 0, halfD + ray)], DIRECTION_COLOR);
+            break;
+        }
+        case 'edge': {
+            // Spawn on a line along X of half-length `radius`; velocity straight +Y.
+            const radius = Math.max(params.radius, 0.001);
+            lines('wf-edge', [new Vector3(-radius, 0, 0), new Vector3(radius, 0, 0)]);
+            const ray = Math.max(radius * 0.5, 0.25);
+            for (let i = 0; i <= 4; i++) {
+                const x = -radius + (i / 4) * radius * 2;
+                lines(`wf-edge-ray-${i}`, [new Vector3(x, 0, 0), new Vector3(x, ray, 0)], DIRECTION_COLOR);
+            }
+            break;
+        }
         case 'mesh_surface': {
             const source = params.mesh;
             if (source && !source.isDisposed()) {
@@ -351,15 +383,15 @@ function arcPoint(radius: number, theta: number, z = 0): Vector3 {
     return new Vector3(Math.cos(theta) * radius, Math.sin(theta) * radius, z);
 }
 
-function xyRect(width: number, height: number): Vector3[] {
+function xyRect(width: number, height: number, z = 0): Vector3[] {
     const halfW = width / 2;
     const halfH = height / 2;
     return [
-        new Vector3(-halfW, -halfH, 0),
-        new Vector3(halfW, -halfH, 0),
-        new Vector3(halfW, halfH, 0),
-        new Vector3(-halfW, halfH, 0),
-        new Vector3(-halfW, -halfH, 0),
+        new Vector3(-halfW, -halfH, z),
+        new Vector3(halfW, -halfH, z),
+        new Vector3(halfW, halfH, z),
+        new Vector3(-halfW, halfH, z),
+        new Vector3(-halfW, -halfH, z),
     ];
 }
 
