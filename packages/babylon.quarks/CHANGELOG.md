@@ -185,6 +185,18 @@ or duplicated something else, and nothing in the package used them.
 
 ### Fixed
 
+- **The start colour and a burst's count curve run over the cycle like every other start curve.**
+  Both were sampled in seconds, so with a 4 s cycle a start-colour gradient was read past its end
+  from 1 s on, and a burst count curve was read at the burst's time in seconds. They now get the
+  normalised time of the cycle (0 to 1), as `startLife`, `startSpeed` and `startSize` do and as
+  Unity evaluates them. A sub emission reads the time since it began (its parent particle's birth
+  or death) over the target's duration, as its other start curves already did; before, a sub
+  emitter target's burst count curve was always read at 0, since the target's own clock never
+  runs. An effect authored to the old sampling changes: a start-colour gradient or burst count
+  curve meant to span the cycle now does.
+- **Distance covered while emission over distance is 0 is not owed later.** With a rate curve
+  that rises, or a rate switched on in code or in the editor, the emitter used to spawn a line of
+  particles for every metre it had moved while the rate was 0.
 - **A system stopped, paused or disposed from a listener stays stopped for the rest of the
   frame.** `stop()` from a `finished` listener (which `EffectPool` does on release), `dispose()`
   from `particleDied` and `autoDestroy` used to be followed by the frame's remaining steps, which
@@ -295,6 +307,12 @@ or duplicated something else, and nothing in the package used them.
 
 ### Internal
 
+- **`EmissionController` and `ParticleSpawner`** (`src/system/`) take emission (rates, bursts and
+  their waves, emission along the emitter's path, the system-level generator memory) and the
+  making of newborn particles (pool growth, start values, placement, behavior initialisation) out
+  of `ParticleSystem`, which goes from about 2460 to 1950 lines. The hot path is unchanged within
+  measurement noise (a 20-system, 88k-particle Node benchmark: 7.5 ms before, 7.9 ms after, a
+  spawn-heavy one 10.3 and 10.3 ms, with a run-to-run spread of about 1 ms).
 - **`SimulationClock`** (`src/system/SimulationClock.ts`) holds the fixed-step accumulator, the
   rounding rule that keeps the residual near zero, the start delay and the catch-up debt of a
   culled system, as pure numbers with their own tests. `ParticleSystem.update` is a client of it.

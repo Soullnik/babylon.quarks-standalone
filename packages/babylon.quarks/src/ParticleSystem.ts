@@ -15,26 +15,19 @@ import {
     EmitterShape,
     FunctionColorGenerator,
     FunctionValueGenerator,
-    GeneratorMemory,
     IParticleSystem,
-    Matrix3,
     Matrix4,
     Particle,
     ParticleStore,
     ParticleSystemEvent,
     ParticleSystemEventType,
-    PiecewiseBezier,
-    Quaternion,
-    random,
     RandomSource,
     RendererEmitterSettings,
     RotationGenerator,
     SerializationOptions,
     setRandomSource,
     SphereEmitter,
-    SpriteParticle,
     StretchedBillBoardSettings,
-    SubEmitterInheritMask,
     TrailParticle,
     TrailSettings,
     ValueGenerator,
@@ -48,6 +41,7 @@ import {ensureEnvAtlasFromCube, getCachedEnvAtlas} from './envAtlas';
 import {disposeEmitterForSystem, ParticleEmitter} from './ParticleEmitter';
 import {BehaviorPlan} from './system/BehaviorPlan';
 import {BoundsTracker} from './system/BoundsTracker';
+import {burstInterval, burstWaveCount, EmissionController} from './system/EmissionController';
 import {EventDispatcher} from './system/EventDispatcher';
 import {
     DEFAULT_INDICES,
@@ -67,6 +61,7 @@ import {
     validMaxParticles,
     validSortMode,
 } from './system/normalize';
+import {ParticleSpawner} from './system/ParticleSpawner';
 import {particleSystemParametersFromJSON, particleSystemToJSON, trailCurve, trailFlags} from './system/serialization';
 import {settingsForClone} from './system/settingsSchema';
 import {SIMULATION_STEP, SimulationClock} from './system/SimulationClock';
@@ -112,13 +107,7 @@ export type {
 /** Particle backed by a {@link ParticleStore} row, as this system always creates. */
 type StoreBackedParticle = Particle & {storeIndex: number; setStoreIndex(index: number): void};
 
-const UP = new Vector3(0, 0, 1);
-const tempQ = new Quaternion();
-const IDENTITY_QUATERNION = new Quaternion();
 const tempV = new Vector3();
-const tempV2 = new Vector3();
-/** Points sampled over the rest of the cycle when a non-Bezier rate curve is 0 now, to see if it rises later. */
-const RATE_LOOKAHEAD_SAMPLES = 64;
 
 /**
  * A particle system, the counterpart of a Unity Shuriken system or a Niagara emitter: it spawns
@@ -239,16 +228,20 @@ export class ParticleSystem implements IParticleSystem {
 
     private prewarmed: boolean;
     private emitEnded: boolean;
-    private finishedEventFired = false;
+    /**
+     * Whether `finished` fired for this play; the spawner clears it when a sub emission refills an
+     * empty target.
+     * @internal
+     */
+    finishedEventFired = false;
     /** The fixed-step clock: whole steps per frame, start delay and catch-up time. */
     private readonly clock = new SimulationClock();
     private previousEmitterPos?: Vector3;
     private tempEmitterPos: Vector3 = new Vector3();
-    private temp: Vector3 = new Vector3();
-    /** Emitter matrix moved along the step's path, see spawnAlongPath. */
-    private pathMatrix: Matrix4 = new Matrix4();
-    private normalMatrix: Matrix3 = new Matrix3();
-    private memory: GeneratorMemory = [];
+    /** Makes the newborn particles, see {@link ParticleSpawner}. */
+    private readonly spawner = new ParticleSpawner(this);
+    /** Decides how many particles each step owes, see {@link EmissionController}. */
+    private readonly emission = new EmissionController(this, this.spawner);
     private readonly events = new EventDispatcher();
     private readonly layerMaskProxy: {mask: number};
     private materialRef: any = null;
@@ -276,60 +269,7 @@ export class ParticleSystem implements IParticleSystem {
 
     /** Whether continuous or queued emission can still spawn particles before the system is done. */
     hasPendingEmission(): boolean {
-        if (this.emitEnded) {
-            return false;
-        }
-        if (this.looping) {
-            return true;
-        }
-        if (this.onlyUsedByOther) {
-            return false;
-        }
-        const state = this.emissionState;
-        if (state.waitEmiting > 0) {
-            return true;
-        }
-        if (state.burstIndex < this.emissionBursts.length) {
-            return true;
-        }
-        if (this.hasPendingBurstWaves(state)) {
-            return true;
-        }
-        if (state.time >= this.duration) {
-            return false;
-        }
-        const timeRatio = state.time / this.duration;
-        return this.emitsFrom(this.emissionOverTime, timeRatio) || this.emitsFrom(this.emissionOverDistance, timeRatio);
-    }
-
-    /**
-     * Whether a rate is above 0 now or anywhere later in the cycle, so a curve that fades in from 0
-     * still counts as pending. A Bezier curve is checked exactly from its control points; another
-     * kind of curve is sampled, which only runs while the rate is 0.
-     */
-    private emitsFrom(rate: ValueGenerator | FunctionValueGenerator, timeRatio: number): boolean {
-        if (rate.genValue(this.memory, timeRatio) > 0) {
-            return true;
-        }
-        if (rate.type !== 'function') {
-            return false;
-        }
-        if (rate instanceof PiecewiseBezier) {
-            // A Bezier stays within its control points, so this is exact however short a pulse.
-            for (let i = 0; i < rate.functions.length; i++) {
-                if (rate.getEndX(i) > timeRatio && rate.functions[i][0].p.some((value) => value > 0)) {
-                    return true;
-                }
-            }
-            return false;
-        }
-        const samples = RATE_LOOKAHEAD_SAMPLES;
-        for (let i = 1; i <= samples; i++) {
-            if (rate.genValue(this.memory, timeRatio + ((1 - timeRatio) * i) / samples) > 0) {
-                return true;
-            }
-        }
-        return false;
+        return this.emission.hasPendingEmission();
     }
 
     /**
@@ -614,8 +554,9 @@ export class ParticleSystem implements IParticleSystem {
      * before every step; what `'hierarchy'` multiplies start speeds by. Taken
      * from the system's own emitter rather than the emission matrix, whose
      * columns carry a parent particle's velocity for a sub emitter.
+     * @internal
      */
-    private readonly hierarchyScale = new Vector3(1, 1, 1);
+    readonly hierarchyScale = new Vector3(1, 1, 1);
 
     /** The mean world scale of the emitter for a world-space `'hierarchy'` system, else 1. */
     private measureMotionScale(): number {
@@ -884,7 +825,7 @@ export class ParticleSystem implements IParticleSystem {
         // Seeded before it has played: roll the system-level values on the new generator, so the
         // first play matches every restart. (The constructor sets the seed before they exist.)
         if (this.emissionState !== undefined && this.emissionState.time === 0 && this.particleNum === 0) {
-            this.memory.length = 0;
+            this.emission.memory.length = 0;
             this.initSystemGenerators();
         }
     }
@@ -1156,232 +1097,13 @@ export class ParticleSystem implements IParticleSystem {
         this.qualityFactor = Math.max(0.1, Math.min(1, qualityFactor));
     }
 
-    /** Quality factor times {@link emissionMultiplier}: what emission counts are scaled by. */
-    private emissionFactor(): number {
+    /**
+     * Quality factor times {@link emissionMultiplier}: what emission counts are scaled by.
+     * @internal
+     */
+    emissionFactor(): number {
         const multiplier = this.emissionMultiplier;
         return multiplier >= 0 ? this.qualityFactor * multiplier : this.qualityFactor;
-    }
-
-    /**
-     * Appends one particle to the pool, giving it the next row of the store.
-     *
-     * Growing the store replaces its arrays, so every particle already bound to
-     * it has to be re-pointed at the new ones.
-     */
-    /** Points every particle at the store's columns again, after any were replaced. */
-    private rebindParticles(): void {
-        const particles = this.particles;
-        for (let i = 0; i < particles.length; i++) {
-            (particles[i] as SpriteParticle | TrailParticle).rebind();
-        }
-    }
-
-    private growParticlePool(isTrailMode: boolean): void {
-        const index = this.particles.length;
-        if (this.store.ensureCapacity(index + 1)) {
-            this.rebindParticles();
-        }
-        this.particles.push(isTrailMode ? new TrailParticle(this.store, index) : new SpriteParticle(this.store, index));
-    }
-
-    private spawn(count: number, emissionState: EmissionState, matrix: Matrix4) {
-        const translation = tempV;
-        const scale = tempV2;
-        // decompose writes tempQ, so no separate setFromRotationMatrix is needed.
-        matrix.decompose(translation, tempQ, scale);
-        const behaviors = this.behaviors;
-        const behaviorCount = behaviors.length;
-        const renderMode = this.rendererSettings.renderMode;
-        const isTrailMode = renderMode === RenderMode.Trail;
-        const isSpriteMode = !isTrailMode;
-        const isMeshMode = renderMode === RenderMode.Mesh;
-        const startRotationIsRotation = this.startRotation.type === 'rotation';
-        const startSizeIsVector3 = this.startSize.type === 'vec3function';
-        const timeRatio = emissionState.time / this.duration;
-        const trailSettings = isTrailMode ? (this.rendererEmitterSettings as TrailSettings) : undefined;
-        const followLocalOrigin = Boolean(trailSettings?.followLocalOrigin);
-        if (this.maxParticles !== undefined) {
-            // Like Unity, a full system skips the particles it has no room for rather than queueing them.
-            count = Math.min(count, Math.max(0, this.maxParticles - this.particleNum));
-        }
-
-        for (let i = 0; i < count; i++) {
-            emissionState.burstParticleIndex = i;
-            this.particleNum++;
-            if (this.particles.length < this.particleNum) {
-                this.growParticlePool(isTrailMode);
-            }
-            const particle = this.particles[this.particleNum - 1];
-            particle.reset();
-            particle.serial = (particle.serial ?? 0) + 1;
-            particle.speedModifier = 1;
-            // Parent EmitSub can refill an onlyUsedByOther system after it had
-            // already finished empty; clear the flag so update does not treat it
-            // as done while it has live particles again.
-            this.finishedEventFired = false;
-            this.startColor.startGen(particle.memory);
-            this.startColor.genColor(particle.memory, particle.startColor, this.emissionState.time);
-            particle.color.copy(particle.startColor);
-            this.startSpeed.startGen(particle.memory);
-            particle.startSpeed = this.startSpeed.genValue(particle.memory, timeRatio);
-            this.startLife.startGen(particle.memory);
-            particle.life = this.startLife.genValue(particle.memory, timeRatio);
-            particle.age = 0;
-            this.startSize.startGen(particle.memory);
-            if (startSizeIsVector3) {
-                (this.startSize as Vector3Generator).genValue(particle.memory, particle.startSize, timeRatio);
-            } else {
-                const size = (this.startSize as FunctionValueGenerator).genValue(particle.memory, timeRatio);
-                particle.startSize.set(size, size, size);
-            }
-            this.startTileIndex.startGen(particle.memory);
-            particle.uvTile = this.startTileIndex.genValue(particle.memory);
-            particle.size.copy(particle.startSize);
-
-            if (isSpriteMode) {
-                const sprite = particle as SpriteParticle;
-                this.startRotation.startGen(particle.memory);
-                if (isMeshMode) {
-                    if (!(sprite.rotation instanceof Quaternion)) {
-                        // Assigning a quaternion gives the particle a row in the
-                        // store's quaternion column; the value is overwritten below.
-                        sprite.rotation = IDENTITY_QUATERNION;
-                    }
-                    // A recycled particle can still carry the turn of whatever
-                    // it was last time; the renderer would draw a fraction of it
-                    // before any behavior has had a chance to say otherwise.
-                    if (sprite.angularVelocity instanceof Quaternion) {
-                        sprite.angularVelocity.set(0, 0, 0, 1);
-                    }
-                    if (startRotationIsRotation) {
-                        (this.startRotation as RotationGenerator).genValue(
-                            particle.memory,
-                            sprite.rotation as Quaternion,
-                            1,
-                            timeRatio
-                        );
-                    } else {
-                        (sprite.rotation as Quaternion).setFromAxisAngle(
-                            UP,
-                            (this.startRotation as FunctionValueGenerator).genValue(sprite.memory, timeRatio)
-                        );
-                    }
-                } else {
-                    if (startRotationIsRotation) {
-                        sprite.rotation = 0;
-                    } else {
-                        sprite.rotation = (this.startRotation as FunctionValueGenerator).genValue(
-                            sprite.memory,
-                            timeRatio
-                        );
-                    }
-                    // Set until a turning behavior says otherwise, so the
-                    // renderer never carries a recycled particle's old spin.
-                    sprite.angularVelocity = 0;
-                    const flip = this.flip;
-                    sprite.flip = flip === undefined ? 0 : (random() < flip.x ? 1 : 0) | (random() < flip.y ? 2 : 0);
-                }
-            } else if (trailSettings) {
-                const trail = particle as TrailParticle;
-                trailSettings.startLength.startGen(trail.memory);
-                trail.length = trailSettings.startLength.genValue(trail.memory, timeRatio);
-                trail.ensureHistoryCapacity(Math.max(1, Math.ceil(trail.length)));
-                trail.resetHistory();
-            }
-
-            this.emitterShape.initialize(particle, emissionState);
-
-            if (this.alignToDirection && isSpriteMode) {
-                this.alignParticleToDirection(particle as SpriteParticle, isMeshMode);
-            }
-
-            const parent = emissionState.particle;
-            const inherit = emissionState.inherit;
-            if (parent !== undefined && inherit !== undefined && inherit !== 0) {
-                this.inheritFromParent(particle, parent, inherit, isSpriteMode);
-            }
-
-            if (isTrailMode && followLocalOrigin) {
-                const trail = particle as TrailParticle;
-                if (!trail.localPosition) {
-                    trail.localPosition = new Vector3();
-                }
-                trail.localPosition.copy(trail.position);
-            }
-
-            if (this.worldSpace) {
-                particle.position.applyMatrix4(matrix);
-                particle.startSize.multiply(scale).abs();
-                particle.size.copy(particle.startSize);
-                if (this.scalingMode === 'hierarchy') {
-                    // Scaled per axis by the emitter's world scale, then turned: the speed scales with it.
-                    particle.velocity.multiply(this.hierarchyScale).applyQuaternion(tempQ);
-                } else {
-                    particle.velocity.multiply(scale).applyMatrix3(this.normalMatrix);
-                }
-                if (particle.rotation && particle.rotation instanceof Quaternion) {
-                    particle.rotation.multiplyQuaternions(tempQ, particle.rotation);
-                }
-            } else {
-                if (this.onlyUsedByOther) {
-                    particle.parentMatrix = matrix;
-                }
-            }
-
-            for (let j = 0; j < behaviorCount; j++) {
-                behaviors[j].initialize(particle, this);
-            }
-            // Every generator has claimed its slot by now; give the compiled
-            // behavior passes a column copy of the samples.
-            this.store.recordMemory((particle as StoreBackedParticle).storeIndex, particle.memory);
-        }
-    }
-
-    /** Turns a newborn so that it faces the way its shape sent it; see {@link alignToDirection}. */
-    private alignParticleToDirection(sprite: SpriteParticle, isMeshMode: boolean): void {
-        const velocity = sprite.velocity;
-        const speedSq = velocity.x * velocity.x + velocity.y * velocity.y + velocity.z * velocity.z;
-        if (speedSq === 0) {
-            return;
-        }
-        if (isMeshMode) {
-            // +Z along the velocity, with the start rotation applied first.
-            const rotation = sprite.rotation as Quaternion;
-            tempV.copy(velocity).divideScalar(Math.sqrt(speedSq));
-            tempQ.setFromUnitVectors(UP, tempV);
-            rotation.multiplyQuaternions(tempQ, rotation);
-        } else {
-            // The quad's top (its +Y) toward the velocity in the emitter's XY plane.
-            if (velocity.x !== 0 || velocity.y !== 0) {
-                sprite.rotation = (sprite.rotation as number) + Math.atan2(-velocity.x, velocity.y);
-            }
-        }
-    }
-
-    /** Applies the parent particle's inherited properties to a sub emitted newborn; see `EmitSubParticleSystem.inherit`. */
-    private inheritFromParent(particle: Particle, parent: Particle, inherit: number, isSpriteMode: boolean): void {
-        if (inherit & SubEmitterInheritMask.color) {
-            particle.startColor.multiply(parent.color);
-            particle.color.copy(particle.startColor);
-        }
-        if (inherit & SubEmitterInheritMask.size) {
-            particle.startSize.multiply(parent.size);
-            particle.size.copy(particle.startSize);
-        }
-        if (inherit & SubEmitterInheritMask.rotation && isSpriteMode) {
-            const sprite = particle as SpriteParticle;
-            const parentRotation = parent.rotation;
-            if (typeof sprite.rotation === 'number') {
-                if (typeof parentRotation === 'number') {
-                    sprite.rotation += parentRotation;
-                }
-            } else if (parentRotation instanceof Quaternion) {
-                (sprite.rotation as Quaternion).multiplyQuaternions(parentRotation, sprite.rotation as Quaternion);
-            }
-        }
-        if (inherit & SubEmitterInheritMask.lifetime && parent.life > 0) {
-            particle.life *= Math.max(0, 1 - parent.age / parent.life);
-        }
     }
 
     /**
@@ -1425,11 +1147,7 @@ export class ParticleSystem implements IParticleSystem {
         const rng = this.rng;
         const previous = rng === undefined ? undefined : setRandomSource(rng);
         try {
-            this.emissionBursts.forEach((burst) => burst.count.startGen(this.memory));
-            this.emissionOverDistance.startGen(this.memory);
-            this.startDelay.startGen(this.memory);
-            this.clock.setStartDelay(this.startDelay.genValue(this.memory, 0));
-            this.emissionOverTime.startGen(this.memory);
+            this.clock.setStartDelay(this.emission.rollGenerators());
         } finally {
             if (rng !== undefined) {
                 setRandomSource(previous ?? null);
@@ -1446,7 +1164,7 @@ export class ParticleSystem implements IParticleSystem {
         if (this.destroyed) {
             return;
         }
-        this.memory.length = 0;
+        this.emission.memory.length = 0;
         this.paused = false;
         this.particleNum = 0;
         this.bounds.valid = false;
@@ -1597,8 +1315,8 @@ export class ParticleSystem implements IParticleSystem {
                 // The waves due before the warm-up count as fired, so the first step does not fire
                 // them late; the waves inside it still fire as the time comes.
                 const burst = bursts[state.burstIndex];
-                const cycles = ParticleSystem.burstWaveCount(burst);
-                const interval = ParticleSystem.burstInterval(burst);
+                const cycles = burstWaveCount(burst);
+                const interval = burstInterval(burst);
                 waves[state.burstIndex] =
                     interval > 0 ? Math.min(cycles, Math.ceil((state.time - burst.time) / interval)) : cycles;
                 state.burstIndex++;
@@ -1741,7 +1459,7 @@ export class ParticleSystem implements IParticleSystem {
         if (this.destroyed) return;
         this.motionScale = this.measureMotionScale();
         if (!this.onlyUsedByOther) {
-            this.emit(delta, this.emissionState, this.emitter.matrixWorld);
+            this.emission.emit(delta, this.emissionState, this.emitter.matrixWorld);
         }
 
         const particles = this.particles;
@@ -1773,7 +1491,7 @@ export class ParticleSystem implements IParticleSystem {
         }
         if (stretched) {
             if (columns.keepPreviousVelocity()) {
-                this.rebindParticles();
+                this.spawner.rebind();
             }
             columns.previousVelocity.set(columns.velocity.subarray(0, vector3Rows));
         }
@@ -2086,236 +1804,12 @@ export class ParticleSystem implements IParticleSystem {
         }
     }
 
-    /** Waves a burst fires per loop: its `cycle`, and never fewer than one. */
-    private static burstWaveCount(burst: BurstParameters): number {
-        return burst.cycle >= 1 ? Math.floor(burst.cycle) : 1;
-    }
-
-    /** Seconds between a burst's waves; a missing or negative interval fires them all at once. */
-    private static burstInterval(burst: BurstParameters): number {
-        return burst.interval > 0 ? burst.interval : 0;
-    }
-
-    /**
-     * Fires the burst waves that are due by `emissionState.time`.
-     *
-     * Wave `w` of a burst is due at `burst.time + w * burst.interval`, and the
-     * burst fires `cycle` of them, each rolling `probability` on its own — the
-     * way Unity repeats a burst. Bursts start in time order, as they always
-     * have; their repeats are tracked per burst so a burst that is still
-     * repeating never holds back a later one. Repeats falling past the
-     * system's duration are dropped (a looping system starts them over on its
-     * next loop), matching Unity, which never emits a burst cycle beyond the
-     * end of the duration.
-     */
-    private emitBursts(emissionState: EmissionState, emitterMatrix: Matrix4): void {
-        const bursts = this.emissionBursts;
-        const burstCount = bursts.length;
-        const time = emissionState.time;
-        const waves = (emissionState.burstWaves ??= []);
-        while (emissionState.burstIndex < burstCount && bursts[emissionState.burstIndex].time <= time) {
-            waves[emissionState.burstIndex] = 0;
-            emissionState.burstIndex++;
-        }
-        const started = emissionState.burstIndex;
-        for (let b = 0; b < started; b++) {
-            const burst = bursts[b];
-            const cycles = ParticleSystem.burstWaveCount(burst);
-            let wave = waves[b] ?? 0;
-            if (wave >= cycles) {
-                continue;
-            }
-            const interval = ParticleSystem.burstInterval(burst);
-            while (wave < cycles) {
-                const waveTime = burst.time + wave * interval;
-                if (wave > 0 && waveTime > this.duration) {
-                    wave = cycles;
-                    break;
-                }
-                if (waveTime > time) {
-                    break;
-                }
-                emissionState.burstWaveIndex = wave;
-                this.fireBurstWave(burst, emissionState, emitterMatrix);
-                wave++;
-            }
-            waves[b] = wave;
-        }
-    }
-
-    /** Spawns one wave of `burst`, if its probability roll passes. */
-    private fireBurstWave(burst: BurstParameters, emissionState: EmissionState, emitterMatrix: Matrix4): void {
-        if (random() >= burst.probability) {
-            return;
-        }
-        const rawCount = burst.count.genValue(this.memory, this.time);
-        const factor = this.emissionFactor();
-        // Rounded at random, so a fraction is not always lost: three at 1.5 is four or five, on average 4.5.
-        const count = Math.abs(factor - 1) < 0.001 ? rawCount : Math.floor(rawCount * factor + random());
-        emissionState.isBursting = true;
-        emissionState.burstParticleCount = count;
-        this.spawn(count, emissionState, emitterMatrix);
-        emissionState.isBursting = false;
-    }
-
-    /** True while a burst that has started still has a wave due within the duration. */
-    private hasPendingBurstWaves(state: EmissionState): boolean {
-        const waves = state.burstWaves;
-        if (waves === undefined) {
-            return false;
-        }
-        const bursts = this.emissionBursts;
-        for (let b = 0; b < state.burstIndex && b < bursts.length; b++) {
-            const burst = bursts[b];
-            const wave = waves[b] ?? 0;
-            if (
-                wave < ParticleSystem.burstWaveCount(burst) &&
-                (wave === 0 || burst.time + wave * ParticleSystem.burstInterval(burst) <= this.duration)
-            ) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    /**
-     * Spawns `count` particles owed to emission over distance, each where the
-     * emitter crossed its metre mark on the way from `from` to where
-     * `emitterMatrix` has it now, rather than all of them at the end of the
-     * path: a fast emitter then leaves a continuous trail instead of one clump
-     * per step.
-     *
-     * `carried` is how far the emitter had already gone past its last mark
-     * before this step, so the marks keep their spacing across steps. Only the
-     * position is interpolated; the emitter's current rotation and scale are
-     * used for every particle.
-     */
-    private spawnAlongPath(
-        count: number,
-        emissionState: EmissionState,
-        emitterMatrix: Matrix4,
-        from: Vector3,
-        carried: number,
-        spacing: number,
-        length: number
-    ): void {
-        const matrix = this.pathMatrix.copy(emitterMatrix);
-        const target = emitterMatrix.elements;
-        const elements = matrix.elements;
-        const tx = target[12];
-        const ty = target[13];
-        const tz = target[14];
-        for (let k = 1; k <= count; k++) {
-            const travelled = k * spacing - carried;
-            const f = travelled <= 0 ? 0 : travelled >= length ? 1 : travelled / length;
-            elements[12] = from.x + (tx - from.x) * f;
-            elements[13] = from.y + (ty - from.y) * f;
-            elements[14] = from.z + (tz - from.z) * f;
-            this.spawn(1, emissionState, matrix);
-        }
-    }
-
     /**
      * Spawns what this step's emission calls for. Called by the simulation step, and by
      * `EmitSubParticleSystem` on a sub emitter target with the parent particle's state and matrix.
      */
     emit(delta: number, emissionState: EmissionState, emitterMatrix: Matrix4): void {
-        if (this.destroyed) {
-            return;
-        }
-        // Ended before this step (endEmit, or a past step's end of duration):
-        // no more bursts either. A looping system would otherwise keep firing
-        // them every loop after endEmit and never finish. Only the system's
-        // own emission: a sub emitter's bursts belong to its parent particles,
-        // which still go off as they die after the effect was told to end.
-        const endedBefore = this.emitEnded && emissionState === this.emissionState;
-        if (emissionState.time > this.duration) {
-            if (this.looping) {
-                emissionState.time -= this.duration;
-                emissionState.burstIndex = 0;
-                if (emissionState.burstWaves !== undefined) {
-                    emissionState.burstWaves.length = 0;
-                }
-                for (let i = 0; i < this.behaviors.length; i++) {
-                    this.behaviors[i].reset();
-                }
-            } else {
-                if (!this.emitEnded && !this.onlyUsedByOther) {
-                    this.endEmit();
-                }
-            }
-        }
-
-        // Only spawns in world space consume the normal matrix, and computing it
-        // inverts a 4x4 — skip it for local-space systems.
-        if (this.worldSpace) {
-            this.normalMatrix.getNormalMatrix(emitterMatrix);
-        }
-        const emissionBurstCount = this.emissionBursts.length;
-        const qualityFactor = this.emissionFactor();
-
-        if (emissionBurstCount > 0 && !endedBefore) {
-            this.emitBursts(emissionState, emitterMatrix);
-        }
-
-        // Particles owed to the distance travelled this step, spawned along it.
-        let pathSpawn = 0;
-        let pathSpacing = 0;
-        let pathCarried = 0;
-        let pathLength = 0;
-        const previousWorldPos = emissionState.previousWorldPos;
-        if (!this.emitEnded) {
-            const timeRatio = emissionState.time / this.duration;
-            emissionState.waitEmiting += delta * this.emissionOverTime.genValue(this.memory, timeRatio) * qualityFactor;
-
-            if (previousWorldPos !== undefined) {
-                this.temp.set(emitterMatrix.elements[12], emitterMatrix.elements[13], emitterMatrix.elements[14]);
-                pathLength = previousWorldPos.distanceTo(this.temp);
-                pathCarried = emissionState.travelDistance;
-                emissionState.travelDistance += pathLength;
-                const emitPerMeter = this.emissionOverDistance.genValue(this.memory, timeRatio) * qualityFactor;
-                if (emissionState.travelDistance * emitPerMeter > 0) {
-                    const count = Math.floor(emissionState.travelDistance * emitPerMeter);
-                    emissionState.travelDistance -= count / emitPerMeter;
-                    // A world-space particle stays where it is born, so it is born
-                    // where the emitter passed its mark. A local-space one moves
-                    // with the emitter and has no path to be spread along.
-                    if (this.worldSpace && pathLength > 0) {
-                        pathSpawn = count;
-                        pathSpacing = 1 / emitPerMeter;
-                    } else {
-                        emissionState.waitEmiting += count;
-                    }
-                }
-            }
-        }
-
-        // Accrue before spawning so replacement particles can appear on the same
-        // frame an old one dies (rate * lifetime ≈ 1 would otherwise flicker).
-        const totalSpawn = Math.floor(emissionState.waitEmiting);
-        if (totalSpawn > 0) {
-            this.spawn(totalSpawn, emissionState, emitterMatrix);
-            emissionState.waitEmiting -= totalSpawn;
-        }
-        if (pathSpawn > 0) {
-            this.spawnAlongPath(
-                pathSpawn,
-                emissionState,
-                emitterMatrix,
-                previousWorldPos!,
-                pathCarried,
-                pathSpacing,
-                pathLength
-            );
-        }
-
-        if (emissionState.previousWorldPos === undefined) emissionState.previousWorldPos = new Vector3();
-        emissionState.previousWorldPos.set(
-            emitterMatrix.elements[12],
-            emitterMatrix.elements[13],
-            emitterMatrix.elements[14]
-        );
-        emissionState.time += delta;
+        this.emission.emit(delta, emissionState, emitterMatrix);
     }
 
     /**
