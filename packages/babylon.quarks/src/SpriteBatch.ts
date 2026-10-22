@@ -922,7 +922,7 @@ export class SpriteBatch extends VFXBatch {
                         const vx = velocity.x + (velocity.x - previousVelocity.x) * stepFraction;
                         const vy = velocity.y + (velocity.y - previousVelocity.y) * stepFraction;
                         const vz = velocity.z + (velocity.z - previousVelocity.z) * stepFraction;
-                        let vel: Vector3 = this.vector_;
+                        const vel: Vector3 = this.vector_;
                         vel.set(vx, vy, vz);
                         if (!systemWorldSpace) {
                             if (particle.parentMatrix) {

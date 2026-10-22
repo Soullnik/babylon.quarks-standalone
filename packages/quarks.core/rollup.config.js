@@ -12,7 +12,6 @@ const banner = `/**
  * Copyright ${date.slice(-4)} ${pkg.author}, ${pkg.license}
  */`;
 
-const production = process.env.NODE_ENV === 'production';
 const globals = {};
 const extensions = ['.js', '.jsx', '.ts', '.tsx'];
 

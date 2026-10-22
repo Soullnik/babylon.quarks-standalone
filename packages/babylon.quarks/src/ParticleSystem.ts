@@ -653,7 +653,7 @@ export class ParticleSystem implements IParticleSystem {
      * with different modes are batched apart. See {@link SortMode}.
      */
     get sortMode(): SortMode {
-        return this.rendererSettings.sortMode;
+        return this.rendererSettings.sortMode ?? 'none';
     }
 
     set sortMode(mode: SortMode) {
@@ -667,7 +667,7 @@ export class ParticleSystem implements IParticleSystem {
      * default. Keeps distant sparks from vanishing. Meshes and trails ignore it.
      */
     get minParticleSize(): number {
-        return this.rendererSettings.minParticleSize;
+        return this.rendererSettings.minParticleSize ?? 0;
     }
 
     set minParticleSize(size: number) {
@@ -682,7 +682,7 @@ export class ParticleSystem implements IParticleSystem {
      * trails ignore it.
      */
     get maxParticleSize(): number {
-        return this.rendererSettings.maxParticleSize;
+        return this.rendererSettings.maxParticleSize ?? Infinity;
     }
 
     set maxParticleSize(size: number) {
@@ -2175,7 +2175,6 @@ export class ParticleSystem implements IParticleSystem {
 
         const particles = this.particles;
         const behaviors = this.behaviors;
-        const behaviorCount = behaviors.length;
         const particleCount = this.particleNum;
         const isTrailMode = this.rendererSettings.renderMode === RenderMode.Trail;
         // Only stretched billboards draw from velocity, and only they pay for

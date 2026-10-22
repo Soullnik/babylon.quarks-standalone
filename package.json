@@ -18,14 +18,15 @@
         "capture:previews": "tsx ./scripts/capture-demo-previews.mts",
         "check:pack": "node ./scripts/check-pack-contents.mjs",
         "build:unitypackage": "node ./scripts/build-unitypackage.mjs",
-        "check": "npm run build && npm run build:editor && npm run typecheck && npm run test:coverage && npm run check:smoothness && npm run build:examples && npm run check:pack",
+        "check": "npm run format:check && npm run lint && npm run build && npm run build:editor && npm run typecheck && npm run test:coverage && npm run check:smoothness && npm run build:examples && npm run check:pack",
         "examples": "npm run dev --workspace=examples",
         "dev": "npm run examples",
         "validate:wgsl": "node ./scripts/validate-wgsl.mjs",
         "check:demos": "node ./scripts/demo-smoke.mjs",
         "check:smoothness": "tsx ./scripts/smoothness-sweep.mts",
         "format": "prettier --write .",
-        "format:check": "prettier --check ."
+        "format:check": "prettier --check .",
+        "lint": "eslint . --max-warnings 467"
     },
     "engines": {
         "node": ">=20.11.0",
@@ -34,12 +35,16 @@
     "devDependencies": {
         "@babel/core": "^7.29.0",
         "@babel/plugin-transform-modules-commonjs": "^7.27.1",
+        "@eslint/js": "^9.39.5",
         "@rollup/plugin-commonjs": "^29.0.0",
         "@rollup/plugin-node-resolve": "^16.0.3",
         "@rollup/plugin-terser": "^0.4.4",
         "@rollup/plugin-typescript": "^12.3.0",
         "@types/jest": "^30.0.0",
         "cross-env": "^7.0.3",
+        "eslint": "^9.39.5",
+        "eslint-plugin-react-hooks": "^5.2.0",
+        "globals": "^17.13.0",
         "jest": "^30.2.0",
         "jest-environment-jsdom": "^30.2.0",
         "playwright": "^1.59.1",
@@ -53,6 +58,7 @@
         "tsx": "^4.20.5",
         "typedoc": "^0.28.19",
         "typescript": "^5.9.3",
+        "typescript-eslint": "^8.72.0",
         "vite": "^7.3.1"
     },
     "version": "0.27.0"

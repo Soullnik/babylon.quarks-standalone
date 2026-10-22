@@ -35,8 +35,8 @@ export {QuarksFormatError, QuarksLoader} from './QuarksLoader';
 export type {
     QuarksBatchLoadOptions,
     QuarksJSONLoadEntry,
-    QuarksLoadOptions,
     QuarksLoaderOptions,
+    QuarksLoadOptions,
     QuarksResourceKind,
     QuarksResourceResolver,
 } from './QuarksLoader';

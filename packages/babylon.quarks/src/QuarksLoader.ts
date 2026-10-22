@@ -1038,7 +1038,7 @@ export class QuarksLoader {
                     onError: (message, exception) => {
                         failed = true;
                         // A later load tries the image again rather than reuse the failed texture.
-                        if (cache?.get(key) === texture) {
+                        if (cache !== undefined && cache.get(key) === texture) {
                             cache.delete(key);
                         }
                         this.reportResourceError('image', imageUrl, exception ?? message);

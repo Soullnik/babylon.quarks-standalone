@@ -53,9 +53,6 @@ const T2 = {
 };
 
 /** Hero palette — cool indigo bed, cyan→violet→magenta energy ramp, near-white core. */
-const CYAN = new QVector3(0.5, 0.9, 1.0);
-const VIOLET = new QVector3(0.62, 0.46, 1.0);
-const MAGENTA = new QVector3(0.88, 0.45, 0.95);
 const WHITE = new QVector3(1, 1, 1);
 
 /**

@@ -623,7 +623,6 @@ function generate(fragments: Array<Fragment>, indices: Array<number>): FusedPass
             ${fragments.map((f) => f.body).join('\n')}
         }`;
     try {
-        // eslint-disable-next-line @typescript-eslint/no-implied-eval
         const factory = new Function(
             'deps',
             `const tmpColor = new deps.Vector4View(new Float32Array(4), 0);

@@ -29,8 +29,8 @@ export interface TimelinePanelProps {
     scene: Scene;
     renderer: BatchedRenderer;
     playbackRef: React.MutableRefObject<PlaybackState>;
-    playheadRef: React.RefObject<HTMLDivElement>;
-    counterRef: React.RefObject<HTMLSpanElement>;
+    playheadRef: React.RefObject<HTMLDivElement | null>;
+    counterRef: React.RefObject<HTMLSpanElement | null>;
     stagePlaying: boolean;
     setStagePlaying: (playing: boolean) => void;
     speed: number;
@@ -146,7 +146,9 @@ export function TimelinePanel(props: TimelinePanelProps): React.ReactElement {
         return () => observer.disconnect();
     }, []);
 
-    const rows = useMemo(() => computeTimelineRows(binding), [binding, binding.getRevision()]);
+    const revision = binding.getRevision();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- the binding changes in place; its revision says when to recompute
+    const rows = useMemo(() => computeTimelineRows(binding), [binding, revision]);
     const timelineSpan = useMemo(() => computeTimelineSpan(rows), [rows]);
     const pxPerSecond = Math.max(1, bodyWidthPx - TIMELINE_INSET - RIGHT_PADDING) / timelineSpan;
     const anyLooping = useMemo(() => rows.some((r) => r.kind === 'track' && r.looping), [rows]);

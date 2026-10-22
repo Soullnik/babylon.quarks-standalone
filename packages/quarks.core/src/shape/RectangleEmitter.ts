@@ -89,7 +89,8 @@ export class RectangleEmitter implements EmitterShape {
 
     initialize(p: Particle, emissionState: EmissionState) {
         const u = getValueFromEmitterMode(this.mode, this.currentValue, this.spread, emissionState);
-        const v = random();
+        // Drawn and unused: seeded effects keep the random sequence they had.
+        random();
 
         // Calculate perimeter points
         const totalPerimeter = 2 * (this.width + this.height);

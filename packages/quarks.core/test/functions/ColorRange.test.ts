@@ -5,7 +5,7 @@ describe('ColorRange', () => {
         const colorRange = new ColorRange(new Vector4(0, 0.25, 0.75, 1), new Vector4(1, 0.75, 0.25, 0));
         const color = new Vector4();
 
-        let memory: never[] = [];
+        const memory: never[] = [];
         colorRange.startGen(memory);
         colorRange.genColor(memory, color);
         expect(color.x).toBeGreaterThanOrEqual(0);

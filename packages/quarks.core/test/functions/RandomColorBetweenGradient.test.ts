@@ -17,7 +17,7 @@ describe('RandomColorBetweenGradient', () => {
             ])
         );
         const color = new Vector4();
-        let memory: never[] = [];
+        const memory: never[] = [];
         gradient.startGen(memory);
         gradient.genColor(memory, color, 0);
         expect(color.x).toEqual(0);
@@ -83,7 +83,7 @@ describe('RandomColorBetweenGradient', () => {
         const json = JSON.parse(jsonOutput);
         const randomColorBetweenGradient = RandomColorBetweenGradient.fromJSON(json);
         const color = new Vector4();
-        let memory: never[] = [];
+        const memory: never[] = [];
         randomColorBetweenGradient.startGen(memory);
         randomColorBetweenGradient.genColor(memory, color, 0);
         expect(color.x).toEqual(0);

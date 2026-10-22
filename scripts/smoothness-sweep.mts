@@ -62,8 +62,7 @@ import {ParticleSystem} from '../packages/babylon.quarks/src/ParticleSystem';
 import {RenderMode} from '../packages/babylon.quarks/src/VFXBatch';
 
 /** Attributes the sprite batch uploads, by the buffer they land in. */
-const SPRITE_ATTRIBUTES = ['position', 'size', 'colour', 'rotation', 'uvTile', 'velocity'] as const;
-type Attribute = (typeof SPRITE_ATTRIBUTES)[number] | 'ribbon';
+type Attribute = 'position' | 'size' | 'colour' | 'rotation' | 'uvTile' | 'velocity' | 'ribbon';
 
 /**
  * Attributes that step on purpose. A flipbook holds a tile until it changes;
