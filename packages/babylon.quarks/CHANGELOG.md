@@ -256,6 +256,24 @@ or duplicated something else, and nothing in the package used them.
   the same state after a second at 30, 60, 120 and 144 Hz, through both `update` and `updateAll`.
   A seeded `ParticleSystem` gives the same particles, finishes within a frame of the same time and
   pauses the same way at 20 to 240 Hz.
+- **Seeded simulation snapshot.** A seeded system in each render mode (billboard in world and
+  local space, stretched, mesh, trail, beam), with a moving emitter, bursts and behaviors, is
+  stepped on uneven frames and its particles (trail history included), bounds and JSON are compared
+  with a stored snapshot; loaded back with `fromJSON`, it must write the same JSON and play the same.
+  It was recorded before `ParticleSystem.ts` was split and pins the simulation while the rest of the
+  split follows.
+
+### Internal
+
+- **`ParticleSystem.ts` is being split into modules under `src/system/`.** This first part moves
+  out the parameter and JSON types (`types.ts`), reading and writing JSON
+  (`serialization.ts`), culling bounds (`BoundsTracker.ts`), event listeners
+  (`EventDispatcher.ts`), the behavior fusion plan (`BehaviorPlan.ts`), reading draw settings from a
+  material (`materialResolve.ts`), default and fallback geometry (`geometry.ts`) and the setting
+  normalisers (`normalize.ts`). The file goes from 3641 to about 2500 lines. The public API and the
+  simulation are unchanged; the types are still exported from the package root. Still to come: one
+  table of settings for the constructor, setters, JSON and `clone`, the simulation clock, emission
+  and spawning, and the integration passes.
 
 ## [0.27.0] — 2026-10-21
 
