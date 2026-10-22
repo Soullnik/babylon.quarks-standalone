@@ -89,6 +89,22 @@ or duplicated something else, and nothing in the package used them.
 
 ### Changed
 
+- **A moving emitter's motion is spread over the steps of a frame.** The simulation runs in fixed
+  1/60 s steps, several per frame on a slow display, and every step of a frame used the emitter
+  where the frame ended: the frame's spawns clumped there, and a trail recorded in world space
+  stair-stepped behind a moving emitter. Each step now gets the emitter interpolated between
+  where the last simulated step had it and where it is now, position, rotation and scale apart,
+  the way Niagara's interpolated spawning does; emission over distance already spawned along the
+  path, and the rate's spawns and world-space trail samples now follow it too; a burst due on a
+  mid-frame step fires where the emitter was then. A single-step frame, the first frame after
+  `play()`, `restart()`, a catch-up or a spell out of view, and a still emitter are unchanged, so
+  a copy placed and restarted (as `EffectPool.acquire` does) starts where it was put. A large move
+  of a playing system is motion like any other: a frame of two or more steps lays that frame's
+  spawns and trail samples along the jump, so teleport with `pause()` or `stop()` first.
+  `emitterVelocity` is still the frame's displacement over its time, which is the per-step
+  velocity of a linear path, so Inherit Velocity is unaffected. A seeded system with a moving
+  emitter plays differently from 0.27 when a frame runs more than one step; the simulation
+  snapshot test was re-recorded.
 - **Batches are keyed on what the render mode draws.** The renderer used to split systems on
   every setting, including the ones their mode ignores: two billboards with different mesh rims,
   two meshes with different billboard pivots or size limits, two opaque systems with different

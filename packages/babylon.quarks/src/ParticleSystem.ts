@@ -21,6 +21,7 @@ import {
     ParticleStore,
     ParticleSystemEvent,
     ParticleSystemEventType,
+    Quaternion,
     RandomSource,
     RendererEmitterSettings,
     RotationGenerator,
@@ -112,6 +113,17 @@ export type {
     ParticleSystemParameters,
     ScalingMode,
 } from './system/types';
+
+// Scratch for the per-step emitter matrix of a frame that interpolates, see `update`.
+const fromPosition = new Vector3();
+const fromRotation = new Quaternion();
+const fromScale = new Vector3();
+const toPosition = new Vector3();
+const toRotation = new Quaternion();
+const toScale = new Vector3();
+const stepPosition = new Vector3();
+const stepRotation = new Quaternion();
+const stepScale = new Vector3();
 
 /**
  * A particle system, the counterpart of a Unity Shuriken system or a Niagara emitter: it spawns
@@ -260,6 +272,10 @@ export class ParticleSystem implements IParticleSystem {
     private readonly clock = new SimulationClock();
     private previousEmitterPos?: Vector3;
     private tempEmitterPos: Vector3 = new Vector3();
+    /** The emitter matrix the last simulated step used, to interpolate from; see {@link update}. */
+    private previousEmitterMatrix?: Matrix4;
+    /** The emitter matrix handed to each step of a frame, moved along the emitter's path. */
+    private readonly stepMatrix = new Matrix4();
     /** Makes the newborn particles, see {@link ParticleSpawner}. */
     private readonly spawner = new ParticleSpawner(this);
     /** Decides how many particles each step owes, see {@link EmissionController}. */
@@ -581,12 +597,12 @@ export class ParticleSystem implements IParticleSystem {
     readonly hierarchyScale = new Vector3(1, 1, 1);
 
     /** The mean world scale of the emitter for a world-space `'hierarchy'` system, else 1. */
-    private measureMotionScale(): number {
+    private measureMotionScale(emitterMatrix: Matrix4): number {
         if (this.scalingMode !== 'hierarchy' || !this.worldSpace) {
             this.hierarchyScale.set(1, 1, 1);
             return 1;
         }
-        const e = this.emitter.matrixWorld.elements;
+        const e = emitterMatrix.elements;
         const sx = Math.sqrt(e[0] * e[0] + e[1] * e[1] + e[2] * e[2]);
         const sy = Math.sqrt(e[4] * e[4] + e[5] * e[5] + e[6] * e[6]);
         const sz = Math.sqrt(e[8] * e[8] + e[9] * e[9] + e[10] * e[10]);
@@ -1176,6 +1192,8 @@ export class ParticleSystem implements IParticleSystem {
     /** Resumes a paused system. */
     play(): void {
         this.paused = false;
+        // A move made while paused is a placement, not motion to spread the next frame over.
+        this.previousEmitterMatrix = undefined;
     }
 
     /** Clears every particle, rewinds to the start ({@link restart}) and pauses until {@link play}. */
@@ -1292,6 +1310,7 @@ export class ParticleSystem implements IParticleSystem {
         this.prewarmed = false;
         this.initSystemGenerators();
         this.previousEmitterPos = undefined;
+        this.previousEmitterMatrix = undefined;
         this.emitterVelocity.set(0, 0, 0);
     }
 
@@ -1320,11 +1339,16 @@ export class ParticleSystem implements IParticleSystem {
             if (this.cullingMode === 'pauseAndCatchUp') {
                 this.clock.deferCatchUp(delta);
             }
+            // Where the emitter goes while out of view is not motion to spread the frame of its
+            // return over: that frame starts from wherever it is then.
+            this.previousEmitterMatrix = undefined;
             return;
         }
         if (this.clock.owesCatchUp) {
             this.catchUp(catchUpDeadline ?? performance.now() + ParticleSystem.catchUpBudgetMs);
             if (this.paused || this.destroyed) return;
+            // The caught-up steps ran where the emitter is now; so does this frame.
+            (this.previousEmitterMatrix ??= new Matrix4()).copy(this.emitter.matrixWorld);
         }
 
         if (this.firstTimeUpdate) {
@@ -1368,8 +1392,36 @@ export class ParticleSystem implements IParticleSystem {
         }
 
         const stepsToRun = this.clock.accrue(delta, speed);
+        if (stepsToRun === 0) return;
+        // A frame that runs several steps hands each of them the emitter where it was that far
+        // along the frame, between the matrix of the last simulated step and the current one
+        // (position, rotation and scale apart, as Niagara's interpolated spawning does): spawns
+        // land along the emitter's path and world-space trail samples follow it, instead of all
+        // sitting at the frame's end. A single step, the first frame after play, restart, a
+        // catch-up or a spell out of view, and a still emitter use the current matrix as it is.
+        // A node disabled and moved while disabled is not seen here; place it with `restart()`.
+        const current = this.emitter.matrixWorld;
+        const previous = this.previousEmitterMatrix;
+        const interpolate = stepsToRun > 1 && previous !== undefined && !previous.equals(current);
+        if (interpolate) {
+            previous.decompose(fromPosition, fromRotation, fromScale);
+            current.decompose(toPosition, toRotation, toScale);
+        }
+        let stepped = current;
         for (let i = 0; i < stepsToRun; i++) {
-            this.simulateStep(SIMULATION_STEP);
+            // The last step takes the current matrix itself, shear and all: decompose/compose
+            // only approximates a sheared matrix, and the step a still emitter's frame ends on
+            // must match a single-step frame exactly.
+            if (interpolate && i + 1 < stepsToRun) {
+                const t = (i + 1) / stepsToRun;
+                stepPosition.copy(fromPosition).lerp(toPosition, t);
+                stepRotation.copy(fromRotation).slerp(toRotation, t);
+                stepScale.copy(fromScale).lerp(toScale, t);
+                stepped = this.stepMatrix.compose(stepPosition, stepRotation, stepScale);
+            } else {
+                stepped = current;
+            }
+            this.simulateStep(SIMULATION_STEP, stepped);
             // A listener (finished, particleDied) may have stopped, paused or disposed the system
             // mid-frame; the remaining steps would emit into a stopped system.
             if (this.paused || this.destroyed) break;
@@ -1378,6 +1430,9 @@ export class ParticleSystem implements IParticleSystem {
                 // was taken off the clock without being simulated.
                 break;
             }
+        }
+        if (!this.destroyed) {
+            (this.previousEmitterMatrix ??= new Matrix4()).copy(stepped);
         }
     }
 
@@ -1536,28 +1591,29 @@ export class ParticleSystem implements IParticleSystem {
     }
 
     /**
-     * Advances emission, behaviors, motion and culling by one fixed timestep,
-     * on the system's own random generator when it has a {@link seed}.
+     * Advances emission, behaviors, motion and culling by one fixed timestep, on the system's own
+     * random generator when it has a {@link seed}, with the emitter at `emitterMatrix`: the
+     * current one, unless a frame interpolates (see {@link update}).
      */
-    private simulateStep(delta: number): void {
+    private simulateStep(delta: number, emitterMatrix: Matrix4 = this.emitter.matrixWorld): void {
         const rng = this.rng;
         if (rng === undefined) {
-            this.stepOnce(delta);
+            this.stepOnce(delta, emitterMatrix);
             return;
         }
         const previous = setRandomSource(rng);
         try {
-            this.stepOnce(delta);
+            this.stepOnce(delta, emitterMatrix);
         } finally {
             setRandomSource(previous);
         }
     }
 
-    private stepOnce(delta: number): void {
+    private stepOnce(delta: number, emitterMatrix: Matrix4): void {
         if (this.destroyed) return;
-        this.motionScale = this.measureMotionScale();
+        this.motionScale = this.measureMotionScale(emitterMatrix);
         if (!this.onlyUsedByOther) {
-            this.emission.emit(delta, this.emissionState, this.emitter.matrixWorld);
+            this.emission.emit(delta, this.emissionState, emitterMatrix);
         }
 
         const particles = this.particles;
@@ -1604,7 +1660,6 @@ export class ParticleSystem implements IParticleSystem {
             // Trails: the newborn collapse, then motion, then the trail history,
             // then removal, each over the particle objects the history lives on.
             const trailSettings = this.rendererEmitterSettings as TrailSettings;
-            const emitterMatrix = this.emitter.matrixWorld;
             collapseTrailNewborns(store, particleCount, snapshotSize, snapshotColor);
             moveTrails(delta, particles, store, particleCount, Boolean(trailSettings.followLocalOrigin), emitterMatrix);
             recordTrailHistory(particles, particleCount, trailSettings, this.worldSpace, emitterMatrix);
