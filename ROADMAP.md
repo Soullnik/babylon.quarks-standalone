@@ -27,8 +27,8 @@ performance and gap-closing pass; the older plan is in the git history.
 - Quality gates in CI: formatting, lint, `strict` TypeScript, build of every package, TSDoc on
   every export, unit tests with coverage floors for core, runtime and editor, a smoothness sweep,
   a tarball content check, and a headless WebGL smoke over every demo that also checks each has a
-  gallery preview. `npm run validate:wgsl` compiles every WGSL variant under a real compiler; it
-  runs locally, since CI has no WebGPU adapter.
+  gallery preview. `npm run validate:wgsl` compiles every WGSL variant under a real compiler, in
+  CI too, on Chromium's software WebGPU adapter.
 - Parity with Unity's Shuriken: see [docs/SHURIKEN_PARITY.md](docs/SHURIKEN_PARITY.md). What is
   left is collision triggers and arbitrary collider shapes, ring buffer / stop action, noise
   quality (octaves), texture-based emission, lights, custom data and renderer shadows.
@@ -39,20 +39,18 @@ In rough priority order; each is a few days of work.
 
 1. **WebGPU on real hardware** ([#19](https://github.com/Soullnik/babylon.quarks-standalone/issues/19)).
    The shaders are native WGSL and compile under a real WGSL compiler (`npm run validate:wgsl`,
-   run locally), but headless software adapters cannot run the demos end to end. A pass on real hardware across every
+   in CI), but headless software adapters cannot run the demos end to end. A pass on real hardware across every
    demo, with the soft-particle depth path and texture uploads checked, then `check:demos
 --webgpu` on a runner that has an adapter.
 2. **Editor to done** (the remainder of the former #16): min/max placeholders on random fields,
    a BabylonJS Editor window host, an embedding guide, a keyboard/accessibility pass on the curve
    and gradient editors.
-3. **Audit leftovers** (October 2026): `validate:wgsl` in CI once a software WebGPU adapter is
-   reliable.
-4. **Shuriken leftovers**: collision triggers and sub emitters on collision, collider shapes
+3. **Shuriken leftovers**: collision triggers and sub emitters on collision, collider shapes
    beyond planes, stop action, ring buffer, noise quality.
-5. **Perf, round two** (from the profiling report): a shared store per batch for scenes with
+4. **Perf, round two** (from the profiling report): a shared store per batch for scenes with
    hundreds of small systems, one interleaved instance buffer (one upload instead of five), trail
    colour in RGBA8 and neighbours through the vertex id instead of `previous`/`next` attributes.
-6. **Docs**: a step-by-step effect authoring guide with screenshots, StackBlitz / CodeSandbox
+5. **Docs**: a step-by-step effect authoring guide with screenshots, StackBlitz / CodeSandbox
    starters, an integration example with react-babylonjs.
 
 ## Later

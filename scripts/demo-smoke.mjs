@@ -21,9 +21,11 @@ import {existsSync, readFileSync} from 'node:fs';
 import {dirname, join} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {chromium} from 'playwright';
+import {examplesBase} from './examplesBase.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const port = process.env.EXAMPLES_PORT ?? '3010';
+const base = await examplesBase(port);
 const exe = process.env.CHROMIUM_PATH;
 const webgpu = process.argv.includes('--webgpu');
 const arg = (name) => process.argv.find((a) => a.startsWith(`--${name}=`))?.slice(name.length + 3);
@@ -80,9 +82,12 @@ for (const engine of engines) {
         page.on('console', (m) => {
             if (m.type() === 'error') problems.push('console: ' + m.text().slice(0, 300));
         });
-        const url = `http://127.0.0.1:${port}/babylonDemo.html${engine}#${key}`;
+        const url = `${base}babylonDemo.html${engine}#${key}`;
         try {
             await page.goto(url, {waitUntil: 'load', timeout: 60000});
+            // The viewer sets this hook once the demo is up; a page that never does (a 404
+            // page, a demo that threw before the viewer ran) is a failure, not a quiet pass.
+            await page.waitForFunction(() => window.__quarksViewer !== undefined, {timeout: 60000});
             await page.waitForTimeout(settle);
         } catch (e) {
             problems.push('navigation: ' + String(e).slice(0, 300));

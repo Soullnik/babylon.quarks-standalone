@@ -371,6 +371,18 @@ or duplicated something else, and nothing in the package used them.
 
 ### Internal
 
+- **`npm run validate:wgsl` runs in CI** (job `wgsl`), on Chromium's software WebGPU adapter, so a
+  WGSL variant that stops compiling fails the pull request. The script compiles the variants in
+  batches instead of one round trip each, which brings a run from ten minutes to about fifteen
+  seconds; it reports a missing WebGPU adapter or an empty run in plain words instead of a stack
+  trace, fails when the device is lost mid-run (a lost device compiles nothing and reports no
+  errors), and gives up after five minutes instead of holding the job.
+- **The demo smoke in CI opened the wrong pages.** The examples are built under `/<repository>/`
+  on GitHub Actions, and the preview server answers a request outside that path with a 404 page
+  that loads without an error, so `check:demos` had been passing on 404 pages there. Both
+  `check:demos` and `validate:wgsl` now ask the server for its base path
+  (`scripts/examplesBase.mjs`), and the smoke fails a page the viewer never comes up on.
+
 - **`batchKey.ts`** holds the batch key: `storedBatchSettings` reduces a system's settings to the
   canonical form a batch stores, `shaderKeyEqual` and `liveParamsEqual` compare the two groups
   and `batchSettingsEqual` both. `BatchedRenderer.updateSystem` writes live parameters through
