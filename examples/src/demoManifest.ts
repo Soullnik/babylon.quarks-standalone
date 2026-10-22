@@ -185,6 +185,36 @@ export const demoManifest: DemoManifestEntry[] = [
         preview: {icon: 'AT', gradient: 'linear-gradient(135deg, #ffd27a 0%, #1c2a5c 100%)'},
     },
     {
+        key: 'PooledHitsDemo',
+        name: 'Pooled One-Shot Hits',
+        module: 'pooledHits',
+        sourcePath: 'examples/src/demos/pooledHits.ts',
+        description:
+            'One hit effect cloned by an EffectPool and played on six targets in turn without allocating; QuarksUtil.getDuration paces the hits and emissionMultiplier makes every third one heavier.',
+        tags: ['pool', 'gameplay'],
+        preview: {icon: 'PH', gradient: 'linear-gradient(135deg, #ffb347 0%, #3a2d6b 100%)'},
+    },
+    {
+        key: 'RendererOptionsDemo',
+        name: 'Renderer Options',
+        module: 'rendererOptions',
+        sourcePath: 'examples/src/demos/rendererOptions.ts',
+        description:
+            'Four pairs, option off on the left and on on the right: sort mode, align to direction on mesh darts, min/max on-screen particle size, and shape vs hierarchy scaling under a scaled parent.',
+        tags: ['renderer', 'comparison'],
+        preview: {icon: 'RO', gradient: 'linear-gradient(135deg, #7ee8a2 0%, #1f3b5c 100%)'},
+    },
+    {
+        key: 'TrailSurfaceDemo',
+        name: 'Surface Trails and Mesh UV2',
+        module: 'trailSurface',
+        sourcePath: 'examples/src/demos/trailSurface.ts',
+        description:
+            'Trails shed from a spinning torus knot through a MeshSurfaceEmitter, smoothed and recorded in world space; and mesh-particle ripples whose map scrolls over a radial second UV set through a gradient map.',
+        tags: ['trail', 'mesh', 'material'],
+        preview: {icon: 'TS', gradient: 'linear-gradient(135deg, #8fd3ff 0%, #2a1f5c 100%)'},
+    },
+    {
         key: 'MagicZoneUnityExample',
         name: 'MagicZone: Unity exported by unity-quarks-exporter example',
         module: 'MagicZoneUnityExample',

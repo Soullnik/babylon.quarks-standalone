@@ -330,6 +330,19 @@ or duplicated something else, and nothing in the package used them.
   It was recorded before `ParticleSystem.ts` was split and pins the simulation while the rest of the
   split follows.
 
+### Docs
+
+- **README** describes the WebGPU path as it is: native WGSL shaders, nothing transpiled or
+  fetched at run time. The feature list names beams, the texture effects and the scene-integration
+  options; the Unity-style snippet imports from `babylon.quarks` (the npm package `quarks.core` is
+  the upstream three.quarks core, not this monorepo's fork of it); the demo count is current. `ROADMAP.md` and
+  `docs/SHURIKEN_PARITY.md` match what shipped in 0.24 to 0.27.
+- **Three new demos** in the examples app: pooled one-shot hits (`EffectPool`,
+  `QuarksUtil.getDuration`, `emissionMultiplier`), renderer options side by side (`sortMode`,
+  `alignToDirection`, `minParticleSize` / `maxParticleSize`, `scalingMode`), and surface trails with
+  a mesh second UV set (`MeshSurfaceEmitter`, the trail flags, `tessellation`, `curveTension`,
+  `instancingUVs2` with a map on UV channel 1 through a gradient map).
+
 ### Internal
 
 - **`batchKey.ts`** holds the batch key: `storedBatchSettings` reduces a system's settings to the

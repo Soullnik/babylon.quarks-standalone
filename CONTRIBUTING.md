@@ -24,7 +24,7 @@ Requirements: Node.js >= 20.11, npm >= 10.
 npm install
 npm run build        # build the package (ESM + CJS + UMD + types)
 npm run build:editor  # build the babylon.quarks-editor package
-npm run dev          # start the examples app at http://localhost:8000 (open editor.html for the effect editor)
+npm run dev          # start the examples app at http://localhost:3010 (open editor.html for the effect editor)
 ```
 
 Building the Unity exporter's `.unitypackage` is separate and only needed when touching
@@ -49,7 +49,7 @@ npm run typecheck                              # tsc over sources and tests (jes
 npm run test:coverage                          # the same suites with the coverage gate (what CI runs)
 npm run docs                                   # TypeDoc API docs
 npm run docs:check                             # fails on an exported symbol without TSDoc (CI runs it)
-npm run check:demos                            # every demo in headless Chromium, fails on page/console errors
+npm run check:demos                            # every demo in headless Chromium, fails on page/console errors or a missing gallery preview
 npm run validate:wgsl                          # every WGSL shader variant through a real WGSL compiler
 ```
 
@@ -102,7 +102,11 @@ users should not rely on it.
    see any existing demo for the `DemoContext` shape.
 2. Register it in `examples/src/demoManifest.ts` (key, name, description, tags, preview).
 3. Run `npm run dev`, verify it works, then capture the gallery preview:
-   `npm run capture:previews` (requires the dev server running).
+   `npm run capture:previews` (requires the dev server running; `CHROMIUM_PATH` as above). The
+   gallery shows `examples/public/previews/<key>.png`, and `npm run check:demos` fails on a demo
+   without one.
+4. Add it to the demo table in the root `README.md` and bump the demo count in
+   `packages/babylon.quarks/README.md`.
 
 ## Releases (maintainers)
 

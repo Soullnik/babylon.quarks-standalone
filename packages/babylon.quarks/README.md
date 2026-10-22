@@ -16,13 +16,14 @@ High-performance particle system for [Babylon.js](https://www.babylonjs.com/). B
 ## Features
 
 - **Batched rendering** — heterogeneous particle systems share draw calls via `BatchedRenderer`.
-- **Render modes** — billboard, vertical/horizontal billboard, stretched billboard, mesh particles, and **trails** (not available in Babylon's built-in particle systems).
-- **Sub-emitters** and a rich set of composable behaviors (color/size/speed over life, noise turbulence, forces, and more from `quarks.core`).
-- **Soft particles**, texture tile animation with blending, custom blend functions.
+- **Render modes** — billboard, vertical/horizontal billboard, stretched billboard, mesh particles, **trails** and **beams** (not available in Babylon's built-in particle systems).
+- **Sub-emitters** and a rich set of composable behaviors (color/size/speed over life, noise turbulence, forces, attractors, collision, and more from `quarks.core`).
+- **Texture effects** — per-texture UV layout (UV channel, tiling, offset, scroll), gradient maps, alpha erosion, UV distortion, flip, texture tile animation with blending, soft particles, custom blend functions, rim lighting on mesh particles, smoothed trails with curve tension.
+- **Scene integration** — render order and rendering groups, layer masks, fog, bounds and frustum culling with Unity's culling modes, sort modes, screen-size limits, and an `EffectPool` that plays one-shot effects without allocating.
 - **Visual authoring** — design effects in our own [effect editor](https://soullnik.github.io/babylon.quarks-standalone/editor.html) or export them from Unity, then load with `QuarksLoader` (quarks.art-exported JSON also works — same format).
 - **Cross-engine format** — the same effect JSON runs in three.js (three.quarks) and Babylon.js.
 - **Adaptive performance** — optional frame-budget quality scaling built into `BatchedRenderer`.
-- **WebGL and WebGPU** — runs on both Babylon engines; shaders are transpiled to WGSL automatically.
+- **WebGL and WebGPU** — runs on both Babylon engines with native GLSL and WGSL shaders; nothing is transpiled or downloaded at run time.
 
 ## Install
 
@@ -121,7 +122,7 @@ The same bundle works in any plain `<script>` setup alongside the global `babylo
 
 ## WebGPU
 
-The library runs on Babylon's `WebGPUEngine` — its GLSL shaders are transpiled to WGSL automatically by Babylon (glslang/twgsl are fetched by Babylon on engine init). Everything except engine creation stays the same:
+The library runs on Babylon's `WebGPUEngine` with its own WGSL shaders: every GLSL shader has a WGSL twin that is picked when the engine is WebGPU, so Babylon never fetches a GLSL-to-WGSL transpiler (glslang/twgsl) for it, and a Content-Security-Policy that blocks `cdn.babylonjs.com` is no obstacle. Everything except engine creation stays the same:
 
 ```ts
 import {WebGPUEngine} from '@babylonjs/core/Engines/webgpuEngine';
@@ -132,7 +133,7 @@ await engine.initAsync();
 // Scene + BatchedRenderer setup is identical to WebGL.
 ```
 
-All render modes (billboard, stretched billboard, mesh, trail) are validated to create WebGPU pipelines with zero validation errors. The [live demos](https://soullnik.github.io/babylon.quarks-standalone/) and the [benchmark page](https://soullnik.github.io/babylon.quarks-standalone/benchmark.html) accept `?engine=webgpu` in the URL to switch engines.
+Every render mode (billboard, stretched billboard, mesh, trail, beam) and every shader variant compiles under a real WGSL compiler with zero validation errors (`npm run validate:wgsl` in the monorepo). The [live demos](https://soullnik.github.io/babylon.quarks-standalone/) and the [benchmark page](https://soullnik.github.io/babylon.quarks-standalone/benchmark.html) accept `?engine=webgpu` in the URL to switch engines.
 
 ## Unity-style emitter options
 
@@ -140,7 +141,7 @@ A few optional settings mirror Shuriken so Unity exports look the same; all are 
 only written to the effect JSON when set.
 
 ```ts
-import {ConeEmitter, Quaternion, ShapeTransform, Vector2, Vector3} from 'quarks.core';
+import {ConeEmitter, Quaternion, ShapeTransform, Vector2, Vector3} from 'babylon.quarks';
 
 const system = new ParticleSystem({
     // Shape module Position / Rotation / Scale: spawn points and start directions go through it.
@@ -176,7 +177,7 @@ QuarksUtil.addToBatchRenderer(effect, batchRenderer);
 QuarksUtil.play(effect);
 ```
 
-See the [examples app](https://github.com/Soullnik/babylon.quarks-standalone/tree/main/examples) in the monorepo for 18 interactive demos and usage patterns.
+See the [examples app](https://github.com/Soullnik/babylon.quarks-standalone/tree/main/examples) in the monorepo for 24 interactive demos and usage patterns.
 
 ## Links
 
