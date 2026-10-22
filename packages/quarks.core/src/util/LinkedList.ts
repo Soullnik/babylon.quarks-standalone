@@ -45,7 +45,6 @@ export class CircularLinkedList<T> {
         } else {
             node.prev = this.head.prev;
             node.next = this.head;
-
             this.head.prev!.next = node;
             this.head.prev = node;
         }
@@ -57,7 +56,6 @@ export class CircularLinkedList<T> {
         const node = new LinkedListNode(data);
         node.prev = prevNode;
         node.next = prevNode.next;
-
         prevNode.next!.prev = node;
         prevNode.next = node;
         this.length++;
@@ -76,10 +74,8 @@ export class CircularLinkedList<T> {
         let current = this.head;
         if (current !== null) {
             yield current.data;
-
             while (current!.next !== this.head) {
                 current = current!.next;
-
                 yield current!.data;
             }
         }

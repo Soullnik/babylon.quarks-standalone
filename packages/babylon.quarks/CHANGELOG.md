@@ -48,6 +48,9 @@ and the project follows the `quarks.core` 0.x version line.
 
 ### Changed
 
+- **The package compiles with TypeScript's `strict` mode.** The published declarations are the
+  same as before.
+
 - **`loadFromJSON` and `loadFromJSONAll` no longer change the document they are given.** They
   resolve urls and inline geometry files on a copy, so one document can be loaded many times, into
   several scenes or with several base urls. Code that read the resolved urls back from its own

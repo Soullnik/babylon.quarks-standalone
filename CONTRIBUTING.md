@@ -78,8 +78,8 @@ quotes; Markdown lists indent 2 spaces, and code blocks in Markdown are left as 
 hook rules for the editor) and is part of `npm run check` and CI. Errors fail it. The warnings are
 explicit `any`s, kept while the JSON readers are typed; `--max-warnings` in the script is a ratchet
 like the coverage floors: a change may not add one, and a PR that removes some lowers the number.
-An `eslint-disable` comment names its rule and says why. All three packages compile with
-`strict: true`.
+An `eslint-disable` comment names its rule and says why. The three packages compile with
+`strict: true`; the examples do not yet.
 
 ## Commit and PR conventions
 

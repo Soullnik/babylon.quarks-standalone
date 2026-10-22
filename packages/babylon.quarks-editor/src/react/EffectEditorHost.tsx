@@ -1382,7 +1382,7 @@ export function EffectEditorHost(props: EffectEditorHostProps) {
             gizmoUtilityLayer.dispose();
             engine.dispose();
         };
-        // eslint-disable-next-line react-hooks/exhaustive-deps
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- mount only: builds the engine and scene once
     }, []);
 
     useEffect(() => {
