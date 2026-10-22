@@ -26,7 +26,11 @@ export interface QuarksTimelineClip {
 
 /** One track on a {@link QuarksPrefab} timeline. */
 export interface AnimationData extends IAnimationData {
-    /** `'ps'` plays a particle system, `'three'` plays a {@link QuarksTimelineClip}. */
+    /**
+     * `'ps'` plays a particle system, `'three'` plays a {@link QuarksTimelineClip}. The names are
+     * the effect format's, shared with three.quarks, where a `'three'` track plays a three.js
+     * `AnimationClip`; here the clip is whatever the host registered on the target node.
+     */
     type: 'three' | 'ps';
     /** The node the track drives: a {@link ParticleEmitter} for `'ps'`, any node for `'three'`. */
     target: TransformNode;

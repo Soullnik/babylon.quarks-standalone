@@ -5,7 +5,7 @@ import {EffectBinding} from '../../src/core/binding';
 import {createChildSystem} from '../../src/core/systems';
 import {EffectEditor} from '../../src/react/EffectEditor';
 import {makeSystem, useScene} from '../helpers';
-import {click, controlsOf, moduleTitles, mount, Mounted, openModule, rowOf} from './dom';
+import {click, controlsOf, hasRow, moduleTitles, mount, Mounted, openModule, rowOf, type} from './dom';
 
 const MODULES = [
     'Main',
@@ -74,6 +74,28 @@ describe('EffectEditor', () => {
             expect(system.behaviors.length).toBeGreaterThan(10);
         }
     );
+
+    it('shows the warm-up time only while prewarm is on and clamps a negative entry to 0', () => {
+        const system = makeSystem(scene.get());
+        const binding = new EffectBinding(system);
+        mounted = mount(
+            <EffectEditor
+                binding={binding}
+                selectedSystem={system}
+                gizmoTargetNode={system.emitter}
+                gizmoTargetLabel="Emitter"
+            />
+        );
+        const {container} = mounted;
+        openModule(container, 'Main');
+        expect(hasRow(container, 'Warm-up time')).toBe(false);
+        click(controlsOf(rowOf(container, 'Prewarm'))[0]);
+        expect(system.prewarm).toBe(true);
+        type(controlsOf(rowOf(container, 'Warm-up time'))[0], '0.5');
+        expect(system.prewarmTime).toBe(0.5);
+        type(controlsOf(rowOf(container, 'Warm-up time'))[0], '-2');
+        expect(system.prewarmTime).toBe(0);
+    });
 
     it('edits a selected sub-system through the root binding and re-renders on its changes', () => {
         const main = makeSystem(scene.get());

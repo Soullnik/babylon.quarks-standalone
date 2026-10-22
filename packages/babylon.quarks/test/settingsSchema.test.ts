@@ -28,6 +28,7 @@ const HANDLED_BY: Record<keyof ParticleSystemParameters, 'table' | 'elsewhere'> 
     autoDestroy: 'table',
     looping: 'table',
     prewarm: 'table',
+    prewarmTime: 'table',
     duration: 'table',
     startDelay: 'table',
     shape: 'elsewhere',

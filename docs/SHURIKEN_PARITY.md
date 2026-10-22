@@ -5,7 +5,7 @@ Three tiers: ✅ shipped · 🟡 runtime supports it, editor UI missing · 🔴 
 
 ## Main
 - ✅ duration, looping, start lifetime/speed/size (constant/random/curve), start color, world space
-- ✅ prewarm, start rotation (constant/random angle, 3D random), start color random-between-two
+- ✅ prewarm with a warm-up time (`prewarmTime`, Niagara's Warmup Time; 0 = whole cycle as Unity), start rotation (constant/random angle, 3D random), start color random-between-two
 - ✅ start delay (constant/random, ignored with prewarm, re-armed by restart)
 - ✅ 3D start size (uniform / per-axis `Vector3Function`), gradient start color (single `Gradient` and random-between-two-gradients `RandomColorBetweenGradient`)
 - ✅ max particles (`maxParticles`), simulation speed (`playbackSpeed`), culling mode (`cullingMode`: always / pause / pause and catch up), random seed (`seed`)

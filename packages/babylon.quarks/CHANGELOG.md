@@ -8,6 +8,12 @@ and the project follows the `quarks.core` 0.x version line.
 
 ### Added
 
+- **`prewarmTime` on `ParticleSystem`**: how much of the cycle `prewarm` simulates before the first
+  frame, in seconds (Niagara's Warmup Time), on a looping system like `prewarm` itself. 0, the
+  default, warms up a whole cycle as Unity's Prewarm does; a shorter time warms up the cycle's last part only, with the bursts before it
+  counted as fired, which is enough for an effect whose particles live shorter than its cycle and
+  keeps a long cycle's first frame cheap. Cut to the cycle and to the static
+  `ParticleSystem.maxPrewarmSeconds` guard; written to JSON only when set.
 - **`transparent`, `depthTest`, `depthWrite` and `alphaTest` on `ParticleSystem`**, the material
   flags a system is built with, readable and settable afterwards like `blending`. Setting one
   moves the system to a matching batch. `alphaTest` is kept to 0…1; the material flags were
@@ -59,6 +65,10 @@ and the project follows the `quarks.core` 0.x version line.
 The public API is now what the docs describe; these exports were left over from the three.js port
 or duplicated something else, and nothing in the package used them.
 
+- **`MeshSettings.rotationAxis`** (quarks.core), which was declared but never read, written or
+  cloned: a mesh particle's rotation is its start rotation (`startRotationX/Y/Z`, or a
+  `RandomQuatGenerator` / `EulerGenerator` start rotation) and `Rotation3DOverLife`. A file that
+  wrote it loses nothing, since no runtime ever read it.
 - **`ParticleMeshStandardMaterial`, `ParticleMeshPhysicsMaterial` and
   `BabylonParticleMaterialParameters`.** Mesh particles are drawn by the batch's own material; set
   their look with the system's `material`, `texture` and lighting settings.
