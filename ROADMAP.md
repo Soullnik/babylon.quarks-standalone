@@ -45,12 +45,10 @@ In rough priority order; each is a few days of work.
 2. **Editor to done** (the remainder of the former #16): min/max placeholders on random fields,
    a BabylonJS Editor window host, an embedding guide, a keyboard/accessibility pass on the curve
    and gradient editors.
-3. **Audit leftovers** (October 2026): a per-effect warm-up time (Niagara's Warmup Time) in place
-   of the static prewarm cap; `MeshSettings.rotationAxis`, which is declared but never read, to
-   implement or drop; the emitter transform interpolated across simulation sub-steps, so a trail
-   recorded in world space from a fast-moving emitter does not stair-step at low frame rates;
-   `validate:wgsl` in CI once a software WebGPU adapter is reliable; the prefab track type still
-   named `three`.
+3. **Audit leftovers** (October 2026): the emitter transform interpolated across simulation
+   sub-steps, so a trail recorded in world space from a fast-moving emitter does not stair-step at
+   low frame rates and a moving emitter's spawns spread along its path (Niagara's interpolated
+   spawning); `validate:wgsl` in CI once a software WebGPU adapter is reliable.
 4. **Shuriken leftovers**: collision triggers and sub emitters on collision, collider shapes
    beyond planes, stop action, ring buffer, noise quality.
 5. **Perf, round two** (from the profiling report): a shared store per batch for scenes with

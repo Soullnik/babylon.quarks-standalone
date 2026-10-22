@@ -115,6 +115,8 @@ export interface ParticleSystemParameters {
     looping?: boolean;
     /** See {@link ParticleSystem.prewarm}. Default false. */
     prewarm?: boolean;
+    /** See {@link ParticleSystem.prewarmTime}. Default 0: a whole cycle; only with `prewarm` on a looping system. */
+    prewarmTime?: number;
     /** See {@link ParticleSystem.duration}. Default 1 second. */
     duration?: number;
     /** See {@link ParticleSystem.startDelay}. Default 0. */
@@ -278,6 +280,8 @@ export interface ParticleSystemJSONParameters {
     looping?: boolean;
     /** See {@link ParticleSystem.prewarm}. */
     prewarm?: boolean;
+    /** See {@link ParticleSystem.prewarmTime}. */
+    prewarmTime?: number;
     /** See {@link ParticleSystem.duration}. */
     duration?: number;
     /** See {@link ParticleSystem.startDelay}. */

@@ -278,6 +278,16 @@ export function MainModule({binding}: ModuleProps) {
             <Row label="Prewarm">
                 <CheckboxField value={system.prewarm} onChange={(v) => binding.apply((s) => (s.prewarm = v))} />
             </Row>
+            {system.prewarm && (
+                <Row label="Warm-up time">
+                    <NumberField
+                        value={system.prewarmTime}
+                        step={0.1}
+                        min={0}
+                        onChange={(v) => binding.apply((s) => (s.prewarmTime = Math.max(0, v)))}
+                    />
+                </Row>
+            )}
             <Row label="Playback speed">
                 <NumberField
                     value={system.playbackSpeed}

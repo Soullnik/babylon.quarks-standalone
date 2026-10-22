@@ -8,6 +8,8 @@ and the project follows the `quarks.core` 0.x version line.
 
 ### Added
 
+- Main module: "Warm-up time", shown while Prewarm is on, the seconds of the cycle simulated
+  before the first frame (`prewarmTime`; 0 warms up a whole cycle).
 - **The Renderer module reaches the 0.25–0.26 texture features.** Map layout (UV channel,
   tiling, offset, scroll), Flip, a Gradient map section (ramp and channel), an Erosion section
   (mask with its own layout, softness, edge width and colour) and a UV distortion section (noise

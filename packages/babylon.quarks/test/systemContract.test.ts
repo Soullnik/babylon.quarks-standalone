@@ -66,6 +66,7 @@ const PARAMETERS: {[K in keyof Required<ParticleSystemParameters>]: Parameter<K>
     autoDestroy: () => true,
     looping: () => false,
     prewarm: () => true,
+    prewarmTime: () => 0.5,
     duration: () => 3,
     startDelay: () => new IntervalValue(0.1, 0.3),
     shape: () =>

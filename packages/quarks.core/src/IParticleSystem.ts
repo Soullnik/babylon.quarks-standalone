@@ -133,11 +133,6 @@ export interface TrailSettings {
 
 export interface MeshSettings {
     /**
-     * Rotation axis.
-     * @type {Vector3}
-     */
-    rotationAxis?: Vector3;
-    /**
      * Initial rotation around the X-axis.
      * @type {ValueGenerator | FunctionValueGenerator}
      */

@@ -134,6 +134,24 @@ export class ParticleSystem implements IParticleSystem {
      * or a mist is full from its first frame. Default false.
      */
     prewarm: boolean;
+
+    /**
+     * How much of the cycle {@link prewarm} simulates before the first frame, in seconds
+     * (Niagara's Warmup Time), on a looping system like `prewarm` itself. 0, the default, warms up a whole cycle, as Unity's Prewarm does; a
+     * shorter time warms up the cycle's last part only, with the bursts before it counted as
+     * fired, which is enough for an effect whose particles live shorter than its cycle and keeps
+     * a long cycle's first frame cheap. Longer than the cycle or than
+     * {@link maxPrewarmSeconds}, it is cut to them. Kept at 0 or above.
+     */
+    get prewarmTime(): number {
+        return this.prewarmTimeValue;
+    }
+
+    set prewarmTime(seconds: number) {
+        this.prewarmTimeValue = seconds > 0 ? seconds : 0;
+    }
+
+    private prewarmTimeValue = 0;
     /** Start the cycle again when {@link duration} ends instead of stopping emission. Default true. */
     looping: boolean;
     /**
@@ -928,7 +946,7 @@ export class ParticleSystem implements IParticleSystem {
      * `maxPrewarmSeconds` only, with the burst waves before that counted as fired, so a long
      * looping effect does not stall its first frame. 10 by default; raise it in an app whose
      * effects have longer cycles and particles that live longer than that. It is not an effect's
-     * own warm-up time and is not saved with one.
+     * own warm-up time, which is {@link prewarmTime}, and is not saved with one.
      */
     static maxPrewarmSeconds = 10;
 
@@ -952,6 +970,7 @@ export class ParticleSystem implements IParticleSystem {
         this.startDelay = parameters.startDelay ?? new ConstantValue(0);
         this.looping = parameters.looping ?? true;
         this.prewarm = parameters.prewarm ?? false;
+        this.prewarmTime = parameters.prewarmTime ?? 0;
         this.startLife = parameters.startLife ?? new ConstantValue(5);
         this.startSpeed = parameters.startSpeed ?? new ConstantValue(0);
         this.startRotation = parameters.startRotation ?? new ConstantValue(0);
@@ -1376,12 +1395,14 @@ export class ParticleSystem implements IParticleSystem {
 
     /**
      * Simulates the end of a cycle before the first frame, on the fixed step directly: no frame
-     * clamp, culling or emitter velocity in the way. A cycle longer than {@link maxPrewarmSeconds}
-     * is warmed up over its last part only, with the bursts before that skipped.
+     * clamp, culling or emitter velocity in the way. The cycle's last {@link prewarmTime} seconds
+     * (the whole cycle when that is 0), and at most {@link maxPrewarmSeconds}, with the bursts
+     * before that counted as fired.
      */
     private runPrewarm(): void {
         this.prewarmed = true;
-        const warm = Math.min(this.duration, Math.max(0, ParticleSystem.maxPrewarmSeconds));
+        const wanted = this.prewarmTime > 0 ? this.prewarmTime : this.duration;
+        const warm = Math.min(this.duration, wanted, Math.max(0, ParticleSystem.maxPrewarmSeconds));
         const steps = Math.round(warm / SIMULATION_STEP);
         if (warm < this.duration) {
             const state = this.emissionState;

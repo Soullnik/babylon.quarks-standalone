@@ -27,6 +27,7 @@ import {
 } from 'quarks.core';
 import {BatchedRenderer} from '../src/BatchedRenderer';
 import {ParticleSystem} from '../src/ParticleSystem';
+import type {ParticleSystemParameters} from '../src/system/types';
 import {RenderMode} from '../src/VFXBatch';
 
 let engine: NullEngine;
@@ -542,6 +543,63 @@ describe('ParticleSystem', () => {
         });
         ps.update(1 / 60);
         expect((ps as any).prewarmed).toBe(true);
+    });
+
+    describe('prewarmTime', () => {
+        const warmed = (parameters: Partial<ParticleSystemParameters>) => {
+            const ps = new ParticleSystem({
+                scene,
+                looping: true,
+                prewarm: true,
+                duration: 2,
+                startLife: new ConstantValue(10),
+                startSpeed: new ConstantValue(0),
+                startSize: new ConstantValue(1),
+                startColor: new ConstantColor(new Vector4(1, 1, 1, 1)),
+                emissionOverTime: new ConstantValue(60),
+                shape: new PointEmitter(),
+                ...parameters,
+            });
+            ps.update(1 / 60);
+            return ps;
+        };
+
+        it('warms up a whole cycle by default', () => {
+            const ps = warmed({});
+            expect(ps.prewarmTime).toBe(0);
+            // 120 steps of a 60/s rate, plus the first frame's own emission.
+            expect(ps.particleNum).toBe(121);
+        });
+
+        it('warms up only the last part of the cycle when set', () => {
+            const ps = warmed({prewarmTime: 0.5});
+            expect(ps.particleNum).toBe(31);
+        });
+
+        it('counts the bursts before the warm-up window as fired and fires the ones inside it', () => {
+            const ps = warmed({
+                prewarmTime: 0.5,
+                emissionOverTime: new ConstantValue(0),
+                emissionBursts: [
+                    {time: 0.2, count: new ConstantValue(100), cycle: 1, interval: 0.1, probability: 1},
+                    {time: 1.8, count: new ConstantValue(7), cycle: 1, interval: 0.1, probability: 1},
+                ],
+            });
+            expect(ps.particleNum).toBe(7);
+        });
+
+        it('is cut to the cycle, kept at 0 or above, and round-trips', () => {
+            // 50 s asked of a 2 s cycle warms up the whole cycle, no more.
+            const long = warmed({prewarmTime: 50});
+            expect(long.particleNum).toBe(121);
+            long.prewarmTime = -3;
+            expect(long.prewarmTime).toBe(0);
+            long.prewarmTime = 0.25;
+            expect(long.toJSON().prewarmTime).toBe(0.25);
+            expect(long.clone().prewarmTime).toBe(0.25);
+            long.prewarmTime = 0;
+            expect('prewarmTime' in long.toJSON()).toBe(false);
+        });
     });
 
     it('skips burst spawn when random exceeds probability', () => {

@@ -117,6 +117,7 @@ export const SETTINGS: ReadonlyArray<SettingDescriptor> = [
     plain('autoDestroy', (s) => s.autoDestroy, false, boolean),
     plain('looping', (s) => s.looping, true, boolean),
     plain('prewarm', (s) => s.prewarm, false, boolean),
+    plain('prewarmTime', (s) => s.prewarmTime, 0, number),
     plain('duration', (s) => s.duration, 1, number),
     generator(
         'startDelay',
