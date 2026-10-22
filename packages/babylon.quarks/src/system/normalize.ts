@@ -20,6 +20,11 @@ export function validCullingMode(mode: unknown): CullingMode {
     return mode === 'pause' || mode === 'pauseAndCatchUp' ? mode : 'always';
 }
 
+/** `count` as a whole number of particles, or undefined (no limit) when it is unset, NaN or negative. */
+export function validMaxParticles(count: unknown): number | undefined {
+    return typeof count === 'number' && count >= 0 && count < Infinity ? Math.floor(count) : undefined;
+}
+
 /** A copy of `v`, or undefined when it is unset or zero, which is the same as no pivot. */
 export function nonZeroPivot(v: Vector3 | undefined): Vector3 | undefined {
     return v && (v.x !== 0 || v.y !== 0 || v.z !== 0) ? v.clone() : undefined;
