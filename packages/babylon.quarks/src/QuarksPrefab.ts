@@ -5,20 +5,36 @@ import {BatchedRenderer} from './BatchedRenderer';
 import {ParticleEmitter} from './ParticleEmitter';
 import {quarksNodeId} from './nodeId';
 
+/**
+ * A clip a {@link QuarksPrefab} timeline can drive, such as a Babylon `AnimationGroup`. Every
+ * member is optional; the prefab calls only what is there.
+ */
 export interface QuarksTimelineClip {
+    /** Names the clip in a saved prefab, so it can be found again on load. */
     uuid?: string;
+    /** Length in seconds, used when the track gives none. */
     duration?: number;
+    /** Called when the timeline enters the track. */
     play?: () => void;
+    /** Called when the prefab pauses. */
     pause?: () => void;
+    /** Called when the timeline leaves the track or the prefab stops. */
     stop?: () => void;
+    /** Called while scrubbing with {@link QuarksPrefab.setTime}, with the time into the track in seconds. */
     setTime?: (time: number) => void;
 }
 
+/** One track on a {@link QuarksPrefab} timeline. */
 export interface AnimationData extends IAnimationData {
+    /** `'ps'` plays a particle system, `'three'` plays a {@link QuarksTimelineClip}. */
     type: 'three' | 'ps';
+    /** The node the track drives: a {@link ParticleEmitter} for `'ps'`, any node for `'three'`. */
     target: TransformNode;
+    /** Restart when the track ends instead of letting it finish. */
     loop: boolean;
+    /** The clip a `'three'` track plays. */
     clip?: QuarksTimelineClip;
+    /** The id of the clip on `target`, written to and read from JSON. */
     clipUUID?: string;
 }
 
@@ -31,12 +47,26 @@ interface AnimationJSON {
     loop: boolean;
 }
 
+/**
+ * A node with a timeline that starts and stops the particle systems and clips under it, like a
+ * Unity Timeline or a Niagara System's emitter spawn schedule. Each track starts at `startTime`
+ * and lasts `duration` seconds: a particle system restarts when its track begins and stops
+ * emitting when it ends, a clip plays and stops.
+ *
+ * Call {@link QuarksPrefab.update} every frame (or {@link QuarksPrefab.setTime} to scrub).
+ */
 export class QuarksPrefab extends TransformNode implements IPrefab {
+    /** Always `'QuarksPrefab'`; written to JSON. */
     type = 'QuarksPrefab';
+    /** The tracks, in the order they were added. */
     animationData: Array<AnimationData> = [];
+    /** Whether {@link QuarksPrefab.update} advances the timeline. */
     isPlaying = false;
+    /** Time on the timeline in seconds; just below 0 before the first update, so a track at 0 starts. */
     currentTime = -0.00001;
+    /** Playback speed; 1 is real time. */
     timeScale = 1;
+    /** End of the last track in seconds; the prefab stops when it passes it. */
     duration = 0;
 
     private _lastUpdateTimeMs = Date.now();
@@ -47,10 +77,17 @@ export class QuarksPrefab extends TransformNode implements IPrefab {
         super(name, scene);
     }
 
+    /** The renderer that a particle system is added to again when its track starts. */
     registerBatchedRenderer(renderer: BatchedRenderer): void {
         this._batchedRenderer = renderer;
     }
 
+    /**
+     * Adds a track that plays `emitter`'s system, and pauses the prefab.
+     * @param startTime - Seconds into the timeline.
+     * @param duration - Seconds; 0 or less uses the system's own duration.
+     * @param loop - Restart the system when the track ends.
+     */
     addParticleSystemAnimation(emitter: ParticleEmitter, startTime = 0, duration = 0, loop = false): AnimationData {
         const animationDuration = duration > 0 ? duration : emitter.system.duration;
         const data: AnimationData = {
@@ -66,6 +103,13 @@ export class QuarksPrefab extends TransformNode implements IPrefab {
         return data;
     }
 
+    /**
+     * Adds a track that plays `clip` on `target`.
+     * @param startTime - Seconds into the timeline.
+     * @param duration - Seconds; 0 or less uses the clip's duration.
+     * @param loop - Play the clip again when the track ends.
+     * @param clipUUID - Saved in JSON to find the clip on load; defaults to `clip.uuid`.
+     */
     addThreeAnimation(
         target: TransformNode,
         clip?: QuarksTimelineClip,
@@ -89,17 +133,33 @@ export class QuarksPrefab extends TransformNode implements IPrefab {
         return data;
     }
 
+    /** Removes the track at `index` in {@link QuarksPrefab.animationData}. */
     removeAnimation(index: number): void {
         this.animationData.splice(index, 1);
         this.updateDuration();
     }
 
+    /**
+     * Starts or resumes the timeline from {@link QuarksPrefab.currentTime}, resuming the systems and
+     * clips of the tracks it is inside, which {@link QuarksPrefab.pause} paused.
+     */
     play(): void {
         if (this.isPlaying) return;
         this.isPlaying = true;
         this._lastUpdateTimeMs = Date.now();
+        this.animationData.forEach((animation) => {
+            const inside =
+                this.currentTime >= animation.startTime && this.currentTime <= animation.startTime + animation.duration;
+            if (!inside) return;
+            if (animation.type === 'ps' && animation.target instanceof ParticleEmitter) {
+                animation.target.system.play();
+                return;
+            }
+            animation.clip?.play?.();
+        });
     }
 
+    /** Pauses the timeline and every system and clip on it. */
     pause(): void {
         if (!this.isPlaying) return;
         this.isPlaying = false;
@@ -112,6 +172,7 @@ export class QuarksPrefab extends TransformNode implements IPrefab {
         });
     }
 
+    /** Pauses, rewinds to the start, and stops every system and clip on it. */
     stop(): void {
         this.pause();
         this.currentTime = -0.00001;
@@ -124,6 +185,10 @@ export class QuarksPrefab extends TransformNode implements IPrefab {
         });
     }
 
+    /**
+     * Advances the timeline, starting and ending tracks it crosses. Stops past {@link QuarksPrefab.duration}.
+     * @param forceDelta - Seconds to advance; by default the wall-clock time since the last update.
+     */
     update(forceDelta?: number): void {
         if (!this.isPlaying) return;
         const now = Date.now();
@@ -170,6 +235,7 @@ export class QuarksPrefab extends TransformNode implements IPrefab {
         });
     }
 
+    /** Jumps to `time` seconds, starting and ending tracks it crosses and scrubbing clips to it. */
     setTime(time: number): void {
         const previousTime = this.currentTime;
         this.currentTime = time;
@@ -200,10 +266,15 @@ export class QuarksPrefab extends TransformNode implements IPrefab {
         });
     }
 
+    /** Same as {@link QuarksPrefab.duration}. */
     getDuration(): number {
         return this.duration;
     }
 
+    /**
+     * Links the tracks read by {@link QuarksPrefab.fromJSON} to the nodes under `root` they name.
+     * {@link QuarksLoader} calls it once the whole effect is built; tracks whose node is missing are dropped.
+     */
     resolveReferences(root: TransformNode): void {
         const nodesMap: {[uuid: string]: TransformNode} = {};
         const traverse = (node: TransformNode) => {
@@ -252,10 +323,12 @@ export class QuarksPrefab extends TransformNode implements IPrefab {
         this._tempAnimationJSON = [];
     }
 
+    /** Writes the prefab's name, time scale (when not 1) and tracks. */
     toJSON(): any {
         return {
             type: this.type,
             name: this.name,
+            ...(this.timeScale !== 1 ? {timeScale: this.timeScale} : {}),
             animationData: this.animationData.map((animation) => ({
                 startTime: animation.startTime,
                 duration: animation.duration,
@@ -267,6 +340,7 @@ export class QuarksPrefab extends TransformNode implements IPrefab {
         };
     }
 
+    /** Reads a prefab written by {@link QuarksPrefab.toJSON}; call {@link QuarksPrefab.resolveReferences} afterwards. */
     static fromJSON(json: any, scene?: Scene): QuarksPrefab {
         const prefab = new QuarksPrefab(json.name || 'QuarksPrefab', scene);
         if (typeof json.timeScale === 'number') {

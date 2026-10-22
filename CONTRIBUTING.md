@@ -48,6 +48,7 @@ npm run test                                   # jest suites: quarks.core, babyl
 npm run typecheck                              # tsc over sources and tests (jest only transpiles them)
 npm run test:coverage                          # the same suites with the coverage gate (what CI runs)
 npm run docs                                   # TypeDoc API docs
+npm run docs:check                             # fails on an exported symbol without TSDoc (CI runs it)
 npm run check:demos                            # every demo in headless Chromium, fails on page/console errors
 npm run validate:wgsl                          # every WGSL shader variant through a real WGSL compiler
 ```
@@ -80,6 +81,12 @@ explicit `any`s, kept while the JSON readers are typed; `--max-warnings` in the 
 like the coverage floors: a change may not add one, and a PR that removes some lowers the number.
 An `eslint-disable` comment names its rule and says why. The three packages compile with
 `strict: true`; the examples do not yet.
+
+Everything `babylon.quarks` exports carries TSDoc: `npm run docs:check`, part of `npm run check`
+and CI, fails on an exported class, function, type, member or accessor without a comment, and on a
+`{@link}` that does not resolve. A member that is public in TypeScript only so other files of the
+package can reach it is tagged `@internal`, which keeps it out of the docs and out of the contract;
+users should not rely on it.
 
 ## Commit and PR conventions
 

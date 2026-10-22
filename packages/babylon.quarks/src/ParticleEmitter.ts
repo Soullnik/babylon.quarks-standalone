@@ -21,7 +21,13 @@ export function disposeEmitterForSystem(emitter: TransformNode): void {
     }
 }
 
+/**
+ * The Babylon node a particle system lives at: its position, rotation and scale place the system,
+ * parenting it moves the effect with another node, and disabling it freezes and hides the system.
+ * Every {@link ParticleSystem} makes its own, as `system.emitter`.
+ */
 export class ParticleEmitter extends TransformNode {
+    /** The particle system this node carries. */
     system: IParticleSystem;
     private _matrixWorld: Matrix4 = new Matrix4();
     private _matrixWorldFlag = -1;
@@ -59,6 +65,7 @@ export class ParticleEmitter extends TransformNode {
         return this._matrixWorld;
     }
 
+    /** Whether the node and its parents are enabled; setting it is `setEnabled`. */
     get visible(): boolean {
         return this.isEnabled();
     }
@@ -95,18 +102,6 @@ export class ParticleEmitter extends TransformNode {
         (this.system as IParticleSystem & {dispose?: () => void}).dispose?.();
     }
 
-    extractFromCache(cache: any): any[] {
-        const values: any[] = [];
-        for (const key in cache) {
-            const data = cache[key];
-            if (data && typeof data === 'object') {
-                delete data.metadata;
-            }
-            values.push(data);
-        }
-        return values;
-    }
-
     clone(name?: string): ParticleEmitter {
         const clonedSystem = this.system.clone();
         const clonedEmitter = clonedSystem.emitter as ParticleEmitter;
@@ -122,6 +117,7 @@ export class ParticleEmitter extends TransformNode {
         return clonedEmitter;
     }
 
+    /** The node and its system in effect-file form; `serializeEffect` writes whole effects. @internal */
     toJSON(meta?: any, options: SerializationOptions = {}): any {
         return {
             uuid: quarksNodeId(this),

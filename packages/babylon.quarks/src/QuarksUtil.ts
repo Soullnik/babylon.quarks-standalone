@@ -6,7 +6,12 @@ import {shareEffectResources} from './effectResources';
 import {ParticleEmitter} from './ParticleEmitter';
 import {ParticleSystem} from './ParticleSystem';
 
+/**
+ * Helpers that act on a whole effect: every particle system under a root node, as a loaded effect
+ * or a hand-built tree has them.
+ */
 export class QuarksUtil {
+    /** Calls `callback` on `root` and every node under it that is a {@link ParticleEmitter}. */
     static runOnAllParticleEmitters(root: Node, callback: (emitter: ParticleEmitter) => void): void {
         QuarksUtil.traverseNode(root, (node) => {
             if (node instanceof ParticleEmitter) {
@@ -15,42 +20,49 @@ export class QuarksUtil {
         });
     }
 
+    /** Adds every system under `root` to `batchRenderer`. */
     static addToBatchRenderer(root: Node, batchRenderer: BatchedRenderer): void {
         QuarksUtil.runOnAllParticleEmitters(root, (emitter) => {
             batchRenderer.addSystem(emitter.system);
         });
     }
 
+    /** Resumes every system under `root`, see {@link ParticleSystem.play}. */
     static play(root: Node): void {
         QuarksUtil.runOnAllParticleEmitters(root, (emitter) => {
             (emitter.system as unknown as ParticleSystem).play();
         });
     }
 
+    /** Clears, rewinds and pauses every system under `root`, see {@link ParticleSystem.stop}. */
     static stop(root: Node): void {
         QuarksUtil.runOnAllParticleEmitters(root, (emitter) => {
             (emitter.system as unknown as ParticleSystem).stop();
         });
     }
 
+    /** Pauses every system under `root`, see {@link ParticleSystem.pause}. */
     static pause(root: Node): void {
         QuarksUtil.runOnAllParticleEmitters(root, (emitter) => {
             (emitter.system as unknown as ParticleSystem).pause();
         });
     }
 
+    /** Restarts every system under `root` from the beginning, see {@link ParticleSystem.restart}. */
     static restart(root: Node): void {
         QuarksUtil.runOnAllParticleEmitters(root, (emitter) => {
             (emitter.system as unknown as ParticleSystem).restart();
         });
     }
 
+    /** Sets {@link ParticleSystem.autoDestroy} on every system under `root`. */
     static setAutoDestroy(root: Node, autoDestroy: boolean): void {
         QuarksUtil.runOnAllParticleEmitters(root, (emitter) => {
             (emitter.system as unknown as ParticleSystem).autoDestroy = autoDestroy;
         });
     }
 
+    /** Ends emission on every system under `root` and lets the particles die out, see {@link ParticleSystem.endEmit}. */
     static endEmit(root: Node): void {
         QuarksUtil.runOnAllParticleEmitters(root, (emitter) => {
             (emitter.system as unknown as ParticleSystem).endEmit();

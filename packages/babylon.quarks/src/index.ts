@@ -1,9 +1,7 @@
 import {loadPlugin} from 'quarks.core';
 import {MeshSurfaceEmitterPlugin} from './MeshSurfaceEmitter';
-import {registerShaderChunks} from './shaders';
 
 export * from 'quarks.core';
-export {BatchedParticleRenderer} from './BatchedParticleRenderer';
 export {BatchedRenderer} from './BatchedRenderer';
 export type {AdaptivePerformanceOptions, AdaptivePerformanceState, VFXBatchSettings} from './BatchedRenderer';
 export {EffectPool} from './EffectPool';
@@ -16,7 +14,6 @@ export {
     ensureEnvAtlasFromCube,
     getCachedEnvAtlas,
 } from './envAtlas';
-export * from './materials/';
 export {MeshSurfaceEmitter, MeshSurfaceEmitterPlugin} from './MeshSurfaceEmitter';
 export {quarksNodeId} from './nodeId';
 export {ParticleEmitter} from './ParticleEmitter';
@@ -52,11 +49,8 @@ export type {
     SerializeEffectOptions,
 } from './QuarksSerializer';
 export {QuarksUtil} from './QuarksUtil';
-export * from './shaders/';
 export {decodeSoftDepth, softDepthParams} from './softDepth';
 export type {DepthTextureOptions, SoftDepthEncoding} from './softDepth';
-export {SpriteBatch} from './SpriteBatch';
-export {TrailBatch} from './TrailBatch';
 export {MAX_TRAIL_TESSELLATION, trailCurveTension, trailTessellation} from './trailCurve';
 export {
     defaultMeshLighting,
@@ -95,30 +89,4 @@ export type {
     UVChannel,
 } from './VFXBatch';
 
-// Re-export quarks.core types (interfaces - type-only)
-export type {
-    Behavior,
-    BillBoardSettings,
-    ColorGenerator,
-    EmissionState,
-    EmitterShape,
-    FunctionColorGenerator,
-    FunctionValueGenerator,
-    IEmitter,
-    IParticle,
-    IParticleSystem,
-    MeshSettings,
-    Particle,
-    ParticleSystemEvent,
-    ParticleSystemEventType,
-    RendererEmitterSettings,
-    RotationGenerator,
-    SerializationOptions,
-    StretchedBillBoardSettings,
-    TrailSettings,
-    ValueGenerator,
-    Vector3Generator,
-} from 'quarks.core';
-
-registerShaderChunks();
 loadPlugin(MeshSurfaceEmitterPlugin);

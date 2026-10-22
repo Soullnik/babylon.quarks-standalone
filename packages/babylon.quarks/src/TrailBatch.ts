@@ -75,6 +75,7 @@ class TrailSamples {
     }
 }
 
+/** The batch of trail particles. @internal */
 export class TrailBatch extends VFXBatch {
     private positionBuffer!: Float32Array;
     private previousBuffer!: Float32Array;
@@ -103,6 +104,7 @@ export class TrailBatch extends VFXBatch {
         this.rebuildMaterial();
     }
 
+    /** @internal */
     setupBuffers(): void {
         this.mesh.dispose();
         this.mesh = new Mesh('trailBatch', this.scene);
@@ -184,6 +186,7 @@ export class TrailBatch extends VFXBatch {
         }
     }
 
+    /** @internal */
     expandBuffers(target: number): void {
         while (target >= this.maxParticles) {
             this.maxParticles *= 2;
@@ -197,6 +200,7 @@ export class TrailBatch extends VFXBatch {
         this.buildGeometryBuffers();
     }
 
+    /** @internal */
     rebuildMaterial(): void {
         // Stable name: the trail shader source never varies, so registering it once
         // keeps Effect.ShadersStore bounded and lets Babylon reuse compiled effects.
@@ -488,6 +492,7 @@ export class TrailBatch extends VFXBatch {
         }
     }
 
+    /** @internal */
     update(): void {
         let index = 0;
         let triangles = 0;
@@ -888,6 +893,7 @@ export class TrailBatch extends VFXBatch {
         }
     }
 
+    /** @internal */
     dispose(): void {
         if (this.mesh.material) {
             this.mesh.material.dispose();

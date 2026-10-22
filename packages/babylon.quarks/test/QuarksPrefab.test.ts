@@ -121,6 +121,39 @@ describe('QuarksPrefab', () => {
         expect(json.animationData[0].clipUUID).toBe('clip-uuid');
     });
 
+    it('resumes the systems and clips it paused mid-track when played again', () => {
+        const system = new ParticleSystem({
+            scene,
+            startLife: new ConstantValue(1),
+            emissionOverTime: new ConstantValue(1),
+        });
+        const prefab = new QuarksPrefab('prefab-resume', scene);
+        const clip = {duration: 2, play: jest.fn(), pause: jest.fn(), stop: jest.fn()};
+        prefab.addParticleSystemAnimation(system.emitter as ParticleEmitter, 0, 2);
+        prefab.addThreeAnimation(new TransformNode('resume-target', scene), clip, 0, 2);
+        prefab.play();
+        prefab.update(0.5);
+        expect(clip.play).toHaveBeenCalledTimes(1);
+
+        prefab.pause();
+        expect(system.paused).toBe(true);
+        expect(clip.pause).toHaveBeenCalled();
+
+        prefab.play();
+        expect(system.paused).toBe(false);
+        expect(clip.play).toHaveBeenCalledTimes(2);
+        system.dispose();
+    });
+
+    it('writes timeScale only when it is not 1, and reads it back', () => {
+        const prefab = new QuarksPrefab('prefab-speed', scene);
+        expect(prefab.toJSON()).not.toHaveProperty('timeScale');
+        prefab.timeScale = 0.5;
+        const json = prefab.toJSON();
+        expect(json.timeScale).toBe(0.5);
+        expect(QuarksPrefab.fromJSON(json, scene).timeScale).toBe(0.5);
+    });
+
     it('supports clip-only animations and removeAnimation bookkeeping', () => {
         const prefab = new QuarksPrefab('prefab-clip-only', scene);
         const target = new TransformNode('clip-target', scene);

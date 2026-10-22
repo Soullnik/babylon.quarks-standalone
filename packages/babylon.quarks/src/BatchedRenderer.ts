@@ -32,26 +32,50 @@ import {
     VFXBatch,
 } from './VFXBatch';
 
+/**
+ * Everything about a system that decides how it is drawn: {@link ParticleSystem.getRendererSettings}
+ * returns it, and the renderer draws systems whose settings match from one batch. Prefer the
+ * system's own setters, which also move it to a matching batch; after changing a field directly,
+ * set {@link ParticleSystem.neededToUpdateRender}.
+ */
 export interface VFXBatchSettings {
+    /** Mesh particles' vertex positions, see {@link ParticleSystem.instancingGeometry}. A quad for other modes. */
     instancingGeometry: Float32Array;
+    /** Triangle indices into {@link instancingGeometry}. */
     instancingIndices: Uint32Array | Uint16Array;
+    /** The mesh's first UV set, two values per vertex. */
     instancingUVs?: Float32Array;
     /** The mesh's second UV set, see {@link UVChannel}. */
     instancingUVs2?: Float32Array;
+    /** The mesh's vertex normals; mesh particles fall back to +Z. */
     instancingNormals?: Float32Array;
+    /** See {@link ParticleSystem.renderMode}. */
     renderMode: RenderMode;
+    /** See {@link ParticleSystem.renderOrder}. */
     renderOrder: number;
+    /** See {@link ParticleSystem.uTileCount}. */
     uTileCount: number;
+    /** See {@link ParticleSystem.vTileCount}. */
     vTileCount: number;
+    /** See {@link ParticleSystem.blendTiles}. */
     blendTiles: boolean;
+    /** See {@link ParticleSystem.softParticles}. */
     softParticles: boolean;
+    /** See {@link ParticleSystem.softNearFade}. */
     softNearFade: number;
+    /** See {@link ParticleSystem.softFarFade}. */
     softFarFade: number;
+    /** Babylon alpha mode, see {@link ParticleSystem.blending}. */
     materialBlendMode: number;
+    /** Whether the batch draws in the transparent pass. */
     materialTransparent: boolean;
+    /** Whether particles are hidden behind nearer geometry. */
     materialDepthTest: boolean;
+    /** Whether particles write depth. */
     materialDepthWrite: boolean;
+    /** Alpha below which a fragment is discarded; 0 discards nothing. */
     materialAlphaTest: number;
+    /** See {@link ParticleSystem.texture}. */
     texture: Texture | null;
     /**
      * Cubemap (or other reflection texture) harvested from a Babylon material's
@@ -72,6 +96,7 @@ export interface VFXBatchSettings {
      * the path that stays valid on iOS WebKit ShaderMaterial draws.
      */
     reflectionAtlas: BaseTexture | null;
+    /** Camera layer mask of the batch mesh, see {@link ParticleSystem.layers}. */
     layerMask: number;
     /**
      * Babylon rendering group (`mesh.renderingGroupId`) the batch draws in,
@@ -123,11 +148,22 @@ export interface VFXBatchSettings {
     erosion?: ParticleErosion;
 }
 
+/**
+ * How {@link BatchedRenderer.configureAdaptivePerformance} trades particles for frame time: each
+ * update that runs over `targetFrameMs` lowers every system's quality factor (see
+ * {@link ParticleSystem.setQualityFactor}) by `decreaseStep`, each one under it raises the factor
+ * by `increaseStep`, within `minQuality` and `maxQuality`.
+ */
 export interface AdaptivePerformanceOptions {
+    /** CPU time in milliseconds the renderer's update may take before quality drops. Default 16.7. */
     targetFrameMs: number;
+    /** Lowest quality factor, 0.1 to 1 ({@link ParticleSystem.setQualityFactor} clamps lower values). Default 0.35. */
     minQuality: number;
+    /** Highest quality factor, `minQuality` to 1. Default 1. */
     maxQuality: number;
+    /** Quality lost per update over budget. Default 0.08. */
     decreaseStep: number;
+    /** Quality regained per update within budget. Default 0.02. */
     increaseStep: number;
 }
 
@@ -152,16 +188,35 @@ function reflectionFacesEqual(a: BaseTexture[] | null | undefined, b: BaseTextur
     return true;
 }
 
+/** A snapshot of the renderer's adaptive performance, from {@link BatchedRenderer.getAdaptivePerformanceState}. */
 export interface AdaptivePerformanceState extends AdaptivePerformanceOptions {
+    /** Whether adaptive performance is on. */
     enabled: boolean;
+    /** The quality factor the systems run at now. */
     currentQuality: number;
+    /** CPU time the last measured update took, in milliseconds; kept from the last update while off. */
     lastFrameCpuMs: number;
 }
 
+/**
+ * Draws particle systems, batching the ones that draw alike into one instanced mesh each, and
+ * advances them every frame. It is a node in the scene; make one per scene, add each system with
+ * {@link addSystem}, and call {@link update} once per frame:
+ *
+ * ```ts
+ * const renderer = new BatchedRenderer('particles', scene);
+ * renderer.addSystem(system);
+ * scene.onBeforeRenderObservable.add(() => renderer.update(scene.getEngine().getDeltaTime() / 1000));
+ * ```
+ *
+ * Systems step on a fixed 60 Hz clock, so an effect plays out the same at any frame rate.
+ */
 export class BatchedRenderer extends TransformNode {
+    /** The batches, one draw each. Read to inspect what is drawn; the renderer owns them. */
     batches: Array<VFXBatch> = [];
     /** Seconds this renderer has been updated for; the clock UV and erosion scrolling run on. */
     private elapsed = 0;
+    /** Index into {@link batches} of each system's batch. The renderer owns it. */
     systemToBatchIndex: Map<IParticleSystem, number> = new Map<IParticleSystem, number>();
     private depth: DepthBinding | null = null;
     /** Systems in insertion order — iterated every frame, unlike the map. */
@@ -347,7 +402,11 @@ export class BatchedRenderer extends TransformNode {
         );
     }
 
-    addSystem(system: IParticleSystem) {
+    /**
+     * Starts drawing and updating `system`, in the batch whose settings match its own (a new one if
+     * none does). Add each system of an effect, or use `QuarksUtil.addToBatchRenderer` on its root.
+     */
+    addSystem(system: IParticleSystem): void {
         const particleSystem = system as ParticleSystem;
         particleSystem._renderer = this;
         if (!this.systemToBatchIndex.has(system) && this.systems.indexOf(system) === -1) {
@@ -396,7 +455,11 @@ export class BatchedRenderer extends TransformNode {
         this.systemToBatchIndex.set(system, this.batches.length - 1);
     }
 
-    deleteSystem(system: IParticleSystem) {
+    /**
+     * Stops drawing and updating `system`; disposing the system calls it. Its particles are left as they are.
+     * @returns Whether the system was in one of this renderer's batches.
+     */
+    deleteSystem(system: IParticleSystem): boolean {
         const removed = this.removeFromBatch(system);
         const index = this.systems.indexOf(system);
         if (index !== -1) {
@@ -505,7 +568,12 @@ export class BatchedRenderer extends TransformNode {
         };
     }
 
-    configureAdaptivePerformance(options: Partial<AdaptivePerformanceOptions> = {}) {
+    /**
+     * Turns on adaptive performance: the renderer measures its own update and thins every system's
+     * emission while it runs over budget, see {@link AdaptivePerformanceOptions}. Options left out
+     * keep their current values.
+     */
+    configureAdaptivePerformance(options: Partial<AdaptivePerformanceOptions> = {}): void {
         const state = this.adaptivePerformanceState;
         const minQuality = BatchedRenderer.clamp(options.minQuality ?? state.minQuality, 0.05, 1);
         const maxQuality = BatchedRenderer.clamp(options.maxQuality ?? state.maxQuality, minQuality, 1);
@@ -519,7 +587,8 @@ export class BatchedRenderer extends TransformNode {
         this.lastAppliedQuality = Number.NaN;
     }
 
-    disableAdaptivePerformance(resetQuality = true) {
+    /** Turns adaptive performance off, and by default puts every system back at `maxQuality`. */
+    disableAdaptivePerformance(resetQuality = true): void {
         this.adaptivePerformanceState.enabled = false;
         if (resetQuality) {
             this.adaptivePerformanceState.currentQuality = this.adaptivePerformanceState.maxQuality;
@@ -527,6 +596,7 @@ export class BatchedRenderer extends TransformNode {
         }
     }
 
+    /** A copy of the adaptive performance settings and the current quality. */
     getAdaptivePerformanceState(): AdaptivePerformanceState {
         return {...this.adaptivePerformanceState};
     }
@@ -600,7 +670,12 @@ export class BatchedRenderer extends TransformNode {
         return ordered;
     }
 
-    update(delta: number) {
+    /**
+     * Advances every visible system by `delta` seconds and refills the batches. Call it once per
+     * frame. A system whose emitter is disabled is frozen; one no camera sees pauses if its
+     * {@link ParticleSystem.cullingMode} says so.
+     */
+    update(delta: number): void {
         this.elapsed += delta;
         const adaptiveState = this.adaptivePerformanceState;
         const frameStart = adaptiveState.enabled ? performance.now() : 0;
@@ -696,10 +771,15 @@ export class BatchedRenderer extends TransformNode {
 
     /** Per-batch particle vs GPU instance counts — for diagnosing stale render state. */
     getBatchRenderStats(): Array<{
+        /** Index into {@link batches}. */
         batchIndex: number;
+        /** The batch's render mode. */
         renderMode: RenderMode;
+        /** Instances the batch mesh draws. */
         instanceCount: number;
+        /** Live particles of the batch's systems. */
         particleCount: number;
+        /** The emitter names of the batch's systems. */
         systemNames: string[];
     }> {
         return this.batches.map((batch, batchIndex) => {

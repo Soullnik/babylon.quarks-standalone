@@ -25,12 +25,25 @@ import {DepthBinding, softDepthParams} from './softDepth';
  */
 export type SortMode = 'none' | 'distance' | 'oldestInFront' | 'youngestInFront';
 
+/** How a system draws its particles (Unity's Render Mode), see {@link ParticleSystem.renderMode}. */
 export enum RenderMode {
+    /** A quad facing the camera (Unity's Billboard). The default. */
     BillBoard = 0,
+    /**
+     * A quad facing the camera and stretched along the particle's velocity (Unity's Stretched
+     * Billboard), by `speedFactor` and `lengthFactor` in the system's `rendererEmitterSettings`.
+     */
     StretchedBillBoard = 1,
+    /** The system's mesh, one instance per particle (Unity's Mesh), see {@link ParticleSystem.instancingGeometry}. */
     Mesh = 2,
+    /**
+     * A ribbon drawn through the particle's past positions (Unity's Trails module, Niagara's
+     * ribbon), facing the camera; its settings are `TrailSettings` in `rendererEmitterSettings`.
+     */
     Trail = 3,
+    /** A quad lying flat in the world's XZ plane, facing up (Unity's Horizontal Billboard). */
     HorizontalBillBoard = 4,
+    /** A quad standing upright and turning only about the world's Y axis to face the camera (Unity's Vertical Billboard). */
     VerticalBillBoard = 5,
     /**
      * A quad laid from each particle to the system's {@link ParticleSystem.beamEnd}
@@ -303,7 +316,10 @@ export interface ParticleErosion {
 // Scrolling runs on the renderer's clock, not a system's playback speed.
 
 /** {@link ParticleErosion} as given: any field may be left out, the mask's layout too. */
-export type ParticleErosionOptions = Partial<Omit<ParticleErosion, 'maskUV'>> & {maskUV?: Partial<TextureUV>};
+export type ParticleErosionOptions = Partial<Omit<ParticleErosion, 'maskUV'>> & {
+    /** See {@link ParticleErosion.maskUV}; fields left out take their defaults. */
+    maskUV?: Partial<TextureUV>;
+};
 
 /** A complete erosion from a partial one, every field defaulted, or undefined when `erosion` is unset. */
 export function normalizeErosion(erosion: ParticleErosionOptions | null | undefined): ParticleErosion | undefined {
@@ -365,7 +381,10 @@ export interface ParticleUVDistortion {
 }
 
 /** {@link ParticleUVDistortion} as given: any field may be left out, the noise's layout too. */
-export type ParticleUVDistortionOptions = Partial<Omit<ParticleUVDistortion, 'mapUV'>> & {mapUV?: Partial<TextureUV>};
+export type ParticleUVDistortionOptions = Partial<Omit<ParticleUVDistortion, 'mapUV'>> & {
+    /** See {@link ParticleUVDistortion.mapUV}; fields left out take their defaults. */
+    mapUV?: Partial<TextureUV>;
+};
 
 /** A complete distortion from a partial one, or undefined when unset or without a map. */
 export function normalizeUVDistortion(
@@ -426,31 +445,58 @@ export function readsUV1(settings: {
     );
 }
 
+/**
+ * A batch's copy of the {@link VFXBatchSettings} its systems share, every optional field
+ * defaulted. The renderer adds a system to the batch whose settings match its own.
+ */
 export interface StoredBatchSettings {
+    /** See {@link VFXBatchSettings.instancingGeometry}. */
     instancingGeometry: Float32Array;
+    /** See {@link VFXBatchSettings.instancingIndices}. */
     instancingIndices: Uint32Array | Uint16Array;
+    /** See {@link VFXBatchSettings.instancingUVs}. */
     instancingUVs?: Float32Array;
     /** The mesh's second UV set, see {@link UVChannel}. */
     instancingUVs2?: Float32Array;
+    /** See {@link VFXBatchSettings.instancingNormals}. */
     instancingNormals?: Float32Array;
+    /** See {@link VFXBatchSettings.renderMode}. */
     renderMode: RenderMode;
+    /** See {@link VFXBatchSettings.renderOrder}. */
     renderOrder: number;
+    /** See {@link VFXBatchSettings.uTileCount}. */
     uTileCount: number;
+    /** See {@link VFXBatchSettings.vTileCount}. */
     vTileCount: number;
+    /** See {@link VFXBatchSettings.blendTiles}. */
     blendTiles: boolean;
+    /** See {@link VFXBatchSettings.softParticles}. */
     softParticles: boolean;
+    /** See {@link VFXBatchSettings.softNearFade}. */
     softNearFade: number;
+    /** See {@link VFXBatchSettings.softFarFade}. */
     softFarFade: number;
+    /** See {@link VFXBatchSettings.materialBlendMode}. */
     materialBlendMode: number;
+    /** See {@link VFXBatchSettings.materialTransparent}. */
     materialTransparent: boolean;
+    /** See {@link VFXBatchSettings.materialDepthTest}. */
     materialDepthTest: boolean;
+    /** See {@link VFXBatchSettings.materialDepthWrite}. */
     materialDepthWrite: boolean;
+    /** See {@link VFXBatchSettings.materialAlphaTest}. */
     materialAlphaTest: number;
-    texture: any;
+    /** See {@link VFXBatchSettings.texture}. */
+    texture: BaseTexture | null;
+    /** See {@link VFXBatchSettings.reflectionTexture}. */
     reflectionTexture: BaseTexture | null;
+    /** See {@link VFXBatchSettings.reflectionLevel}. */
     reflectionLevel: number;
+    /** See {@link VFXBatchSettings.reflectionFaces}. */
     reflectionFaces: BaseTexture[] | null;
+    /** See {@link VFXBatchSettings.reflectionAtlas}. */
     reflectionAtlas: BaseTexture | null;
+    /** See {@link VFXBatchSettings.layerMask}. */
     layerMask: number;
     /** Babylon rendering group the batch mesh draws in, see {@link VFXBatchSettings.renderingGroupId}. */
     renderingGroupId: number;
@@ -478,16 +524,32 @@ export interface StoredBatchSettings {
     erosion?: ParticleErosion;
 }
 
+/**
+ * One draw call of a {@link BatchedRenderer}: the systems that share a material, texture and
+ * geometry, drawn together from one instanced mesh. The renderer makes and frees batches as
+ * systems are added and their settings change; read them through `renderer.batches` to inspect
+ * what is drawn, not to change it.
+ */
 export abstract class VFXBatch {
+    /** The Babylon mesh the batch draws with. */
     mesh: Mesh;
+    /** The systems drawn by this batch. */
     systems: Set<IParticleSystem>;
+    /** The settings every system in the batch shares. */
     settings: StoredBatchSettings;
+    /** @internal */
     protected maxParticles: number;
+    /** @internal */
     protected scene: Scene;
+    /** @internal */
     protected readonly visibleSystems: IParticleSystem[] = [];
-    /** The depth texture soft particles read, from {@link BatchedRenderer.setDepthTexture}. */
+    /**
+     * The depth texture soft particles read, from {@link BatchedRenderer.setDepthTexture}.
+     * @internal
+     */
     protected depth: DepthBinding | null;
 
+    /** @internal */
     protected constructor(settings: VFXBatchSettings, scene: Scene, depth: DepthBinding | null = null) {
         this.scene = scene;
         this.depth = depth;
@@ -632,6 +694,7 @@ export abstract class VFXBatch {
      */
     protected static readonly FOG_UNIFORMS = ['vFogInfos', 'vFogColor'];
 
+    /** @internal */
     protected fogDefines(): string[] {
         if (!this.settings.applyFog) {
             return [];
@@ -659,6 +722,7 @@ export abstract class VFXBatch {
         }
     }
 
+    /** @internal */
     protected bindFog(material: ShaderMaterial): void {
         if (!this.settings.applyFog) {
             return;
@@ -819,11 +883,13 @@ export abstract class VFXBatch {
         material.onBindObservable.add(write);
     }
 
-    addSystem(system: IParticleSystem) {
+    /** @internal */
+    addSystem(system: IParticleSystem): void {
         this.systems.add(system);
     }
 
-    removeSystem(system: IParticleSystem) {
+    /** @internal */
+    removeSystem(system: IParticleSystem): void {
         this.systems.delete(system);
     }
 
@@ -852,6 +918,7 @@ export abstract class VFXBatch {
      * removing it, or changing how it is packed, rebuilds a soft batch's material.
      *
      * @param depth - The binding, or a bare texture, read as `'linear'` and unpacked.
+     * @internal Use {@link BatchedRenderer.setDepthTexture}.
      */
     applyDepthTexture(depth: DepthBinding | BaseTexture | null): void {
         if (depth instanceof BaseTexture) {
@@ -935,14 +1002,22 @@ export abstract class VFXBatch {
         return this.settings.softParticles && this.depth !== null;
     }
 
-    /** Sets the light `'fixed'` mesh particles are lit by. Batches that draw no meshes ignore it. */
+    /**
+     * Sets the light `'fixed'` mesh particles are lit by. Batches that draw no meshes ignore it.
+     * @internal Use {@link BatchedRenderer.setMeshLighting}.
+     */
     applyMeshLighting(_lighting: MeshLightingSettings): void {}
 
+    /** @internal */
     abstract setupBuffers(): void;
+    /** @internal */
     abstract expandBuffers(target: number): void;
+    /** @internal */
     abstract rebuildMaterial(): void;
+    /** @internal */
     abstract update(): void;
 
+    /** @internal */
     dispose(): void {
         this.mesh.dispose();
     }

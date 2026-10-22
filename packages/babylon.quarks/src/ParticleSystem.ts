@@ -75,11 +75,24 @@ import {
     UV_DISTORTION_DEFAULT_UV,
 } from './VFXBatch';
 
+/**
+ * One burst of a system's emission (Unity's Emission Bursts): `count` particles at `time` seconds
+ * into each loop, repeated `cycle` times `interval` seconds apart, each wave with the chance
+ * `probability`.
+ */
 export interface BurstParameters {
+    /** Seconds into the system's duration the first wave fires at. */
     time: number;
+    /**
+     * Particles each wave spawns, rolled once per loop. A curve is read at the seconds into the
+     * cycle the wave fires, not at the 0 to 1 fraction of the duration the start curves use.
+     */
     count: ValueGenerator | FunctionValueGenerator;
+    /** How many waves the burst fires, at least 1. */
     cycle: number;
+    /** Seconds between waves; 0 or less fires them all at once. */
     interval: number;
+    /** Chance from 0 to 1 that a wave spawns at all, rolled per wave. */
     probability: number;
 }
 
@@ -120,7 +133,26 @@ export type ScalingMode = 'shape' | 'hierarchy';
  * or anything with a world position, such as a Babylon `TransformNode`, read
  * every frame.
  */
-export type BeamEnd = {x: number; y: number; z: number} | {getAbsolutePosition(): {x: number; y: number; z: number}};
+export type BeamEnd =
+    | {
+          /** World x. */
+          x: number;
+          /** World y. */
+          y: number;
+          /** World z. */
+          z: number;
+      }
+    | {
+          /** The world position, read every frame. */
+          getAbsolutePosition(): {
+              /** World x. */
+              x: number;
+              /** World y. */
+              y: number;
+              /** World z. */
+              z: number;
+          };
+      };
 
 /** Particle backed by a {@link ParticleStore} row, as this system always creates. */
 type StoreBackedParticle = Particle & {storeIndex: number; setStoreIndex(index: number): void};
@@ -239,28 +271,50 @@ function trailSideAxisFromJSON(value: unknown): {sideAxis?: Vector3} {
     return {};
 }
 
+/**
+ * Settings for a new {@link ParticleSystem}. Every one is optional: a setting left out takes the
+ * default named on it, the same default `fromJSON` gives a file that leaves it out.
+ */
 export interface ParticleSystemParameters {
+    /** See {@link ParticleSystem.autoDestroy}. Default false. */
     autoDestroy?: boolean;
+    /** See {@link ParticleSystem.looping}. Default true. */
     looping?: boolean;
+    /** See {@link ParticleSystem.prewarm}. Default false. */
     prewarm?: boolean;
+    /** See {@link ParticleSystem.duration}. Default 1 second. */
     duration?: number;
+    /** See {@link ParticleSystem.startDelay}. Default 0. */
     startDelay?: ValueGenerator | FunctionValueGenerator;
+    /** Where particles are born and which way they start, see {@link ParticleSystem.emitterShape}. Default a `SphereEmitter`. */
     shape?: EmitterShape;
+    /** See {@link ParticleSystem.startLife}. Default 5 seconds. */
     startLife?: ValueGenerator | FunctionValueGenerator;
+    /** See {@link ParticleSystem.startSpeed}. Default 0. */
     startSpeed?: ValueGenerator | FunctionValueGenerator;
+    /** See {@link ParticleSystem.startRotation}. Default 0. */
     startRotation?: ValueGenerator | FunctionValueGenerator | RotationGenerator;
+    /** See {@link ParticleSystem.startSize}. Default 1. */
     startSize?: ValueGenerator | FunctionValueGenerator | Vector3Generator;
-    startLength?: ValueGenerator | FunctionValueGenerator;
+    /** See {@link ParticleSystem.startColor}. Default opaque white. */
     startColor?: ColorGenerator | FunctionColorGenerator;
+    /** See {@link ParticleSystem.emissionOverTime}. Default 10 per second. */
     emissionOverTime?: ValueGenerator | FunctionValueGenerator;
+    /** See {@link ParticleSystem.emissionOverDistance}. Default 0. */
     emissionOverDistance?: ValueGenerator | FunctionValueGenerator;
+    /** See {@link ParticleSystem.emissionBursts}. Default none. */
     emissionBursts?: Array<BurstParameters>;
     /** Most particles alive at once; emission past it is dropped. Leave unset for no limit. */
     maxParticles?: number;
+    /** See {@link ParticleSystem.onlyUsedByOther}. Default false. */
     onlyUsedByOther?: boolean;
+    /** See {@link ParticleSystem.behaviors}. Default none. */
     behaviors?: Array<Behavior>;
+    /** Mesh particles' vertex positions, three values per vertex. Default a unit quad in XY. */
     instancingGeometry?: Float32Array;
+    /** Triangle indices into {@link instancingGeometry}. Default the unit quad's two triangles. */
     instancingIndices?: Uint32Array | Uint16Array;
+    /** Mesh particles' first UV set, two values per vertex. Default the quad's UVs, or zeros for another geometry. */
     instancingUVs?: Float32Array;
     /**
      * A second UV set for the mesh (glTF `TEXCOORD_1`, Unity's `uv2`), what
@@ -268,15 +322,25 @@ export interface ParticleSystemParameters {
      * Default none: channel 1 reads the first set.
      */
     instancingUVs2?: Float32Array;
+    /** Mesh particles' vertex normals, three values per vertex. Default +Z for every vertex. */
     instancingNormals?: Float32Array;
+    /** See {@link ParticleSystem.renderMode}. Default `RenderMode.BillBoard`. */
     renderMode?: RenderMode;
+    /** See {@link ParticleSystem.rendererEmitterSettings}. Default the render mode's own. */
     rendererEmitterSettings?: RendererEmitterSettings;
+    /** @deprecated Set `speedFactor` in {@link rendererEmitterSettings} instead; this one wins when both are set. */
     speedFactor?: number;
-    material?: any;
+    /** See {@link ParticleSystem.material}. Default none. */
+    material?: unknown;
+    /** See {@link ParticleSystem.texture}. Unset takes the material's texture; null draws without one. */
     texture?: Texture | null;
+    /** See {@link ParticleSystem.startTileIndex}. Default 0. */
     startTileIndex?: ValueGenerator;
+    /** See {@link ParticleSystem.uTileCount}. Default 1. */
     uTileCount?: number;
+    /** See {@link ParticleSystem.vTileCount}. Default 1. */
     vTileCount?: number;
+    /** See {@link ParticleSystem.blendTiles}. Default false. */
     blendTiles?: boolean;
     /**
      * Fade particles out as they near the scene behind them, like Unity's Soft Particles and
@@ -285,19 +349,28 @@ export interface ParticleSystemParameters {
      * every render mode: billboard, stretched, mesh, beam and trail.
      */
     softParticles?: boolean;
+    /** See {@link ParticleSystem.softFarFade}. Default 0. */
     softFarFade?: number;
+    /** See {@link ParticleSystem.softNearFade}. Default 0. */
     softNearFade?: number;
+    /** See {@link ParticleSystem.renderOrder}. Default 0. */
     renderOrder?: number;
+    /** See {@link ParticleSystem.worldSpace}. Default false. */
     worldSpace?: boolean;
+    /** Babylon alpha mode the batch blends with, see {@link ParticleSystem.blending}. Default `Constants.ALPHA_ADD`. */
     blendMode?: number;
+    /** Whether the batch draws in the transparent pass. Default true. */
     transparent?: boolean;
     /**
      * Whether particles are hidden behind nearer geometry. `false` draws them over everything
      * (Unity's `ZTest Always`), in every render mode. Default `true`.
      */
     depthTest?: boolean;
+    /** Whether the particles write depth. Default false. */
     depthWrite?: boolean;
+    /** Alpha below which a fragment is discarded, 0 to 1. Default 0: nothing is. */
     alphaTest?: number;
+    /** Camera layer mask the batch draws for, see {@link ParticleSystem.layers}. Default `0x0fffffff`. */
     layerMask?: number;
     /** Billboard pivot in particle-size units, see {@link VFXBatchSettings.pivot}. */
     pivot?: Vector3;
@@ -335,38 +408,73 @@ export interface ParticleSystemParameters {
     renderingGroupId?: number;
     /** Whether the scene's fog applies, see {@link ParticleSystem.applyFog}. Default true. */
     applyFog?: boolean;
+    /** Scene the emitter node is created in. Default Babylon's last created scene. */
     scene?: Scene;
 }
 
+/** A {@link BurstParameters} in an effect file. A plain number `count` is read as a constant. */
 export interface BurstParametersJSON {
+    /** See {@link BurstParameters.time}. */
     time: number;
+    /** See {@link BurstParameters.count}. */
     count: FunctionJSON | number;
+    /** See {@link BurstParameters.cycle}. */
     cycle: number;
+    /** See {@link BurstParameters.interval}. */
     interval: number;
+    /** See {@link BurstParameters.probability}. */
     probability: number;
 }
 
+/**
+ * A particle system in an effect file, as {@link ParticleSystem.toJSON} writes it and
+ * {@link ParticleSystem.fromJSON} reads it; `docs/FORMAT.md` describes the document around it.
+ * Each field mirrors the {@link ParticleSystem} member of the same name. Curves and generators
+ * are written as quarks.core's `FunctionJSON`; textures, materials and geometries as uuids into
+ * the document.
+ */
 export interface ParticleSystemJSONParameters {
+    /** The quarks.core version line the system was written with. */
     version: string;
+    /** See {@link ParticleSystem.autoDestroy}. */
     autoDestroy: boolean;
+    /** See {@link ParticleSystem.looping}. */
     looping: boolean;
+    /** See {@link ParticleSystem.prewarm}. */
     prewarm: boolean;
+    /** See {@link ParticleSystem.duration}. */
     duration: number;
+    /** See {@link ParticleSystem.startDelay}. */
     startDelay?: FunctionJSON;
+    /** The emitter shape, as its `toJSON` writes it. */
     shape: any;
+    /** See {@link ParticleSystem.startLife}. */
     startLife: FunctionJSON;
+    /** See {@link ParticleSystem.startSpeed}. */
     startSpeed: FunctionJSON;
+    /** See {@link ParticleSystem.startRotation}. */
     startRotation: FunctionJSON;
+    /** See {@link ParticleSystem.startSize}. */
     startSize: FunctionJSON;
+    /** See {@link ParticleSystem.startColor}. */
     startColor: FunctionJSON;
+    /** See {@link ParticleSystem.emissionOverTime}. */
     emissionOverTime: FunctionJSON;
+    /** See {@link ParticleSystem.emissionOverDistance}. */
     emissionOverDistance: FunctionJSON;
+    /** See {@link ParticleSystem.emissionBursts}. */
     emissionBursts?: Array<BurstParametersJSON>;
+    /** See {@link ParticleSystem.maxParticles}. */
     maxParticles?: number;
+    /** See {@link ParticleSystem.onlyUsedByOther}. */
     onlyUsedByOther: boolean;
+    /** Trail, stretched or mesh settings; a trail's `startLength` as `FunctionJSON`. */
     rendererEmitterSettings: RendererEmitterSettings;
+    /** Uuid of the mesh particles' geometry entry. */
     instancingGeometry?: any;
+    /** A {@link RenderMode} value. */
     renderMode: number;
+    /** See {@link ParticleSystem.renderOrder}. */
     renderOrder?: number;
     /** Written only when not 0. */
     renderingGroupId?: number;
@@ -388,23 +496,41 @@ export interface ParticleSystemJSONParameters {
     minParticleSize?: number;
     /** Written only when limited. */
     maxParticleSize?: number;
+    /** A stretched billboard's speed factor, as older files wrote it outside `rendererEmitterSettings`. */
     speedFactor?: number;
+    /** Uuid of the texture entry. */
     texture?: string;
+    /** Uuid of the material entry. */
     material?: string;
+    /** The camera layer mask. */
     layers?: number;
+    /** See {@link ParticleSystem.startTileIndex}. */
     startTileIndex: FunctionJSON | number;
+    /** See {@link ParticleSystem.uTileCount}. */
     uTileCount: number;
+    /** See {@link ParticleSystem.vTileCount}. */
     vTileCount: number;
+    /** See {@link ParticleSystem.blendTiles}. */
     blendTiles?: boolean;
+    /** See {@link ParticleSystem.softParticles}. */
     softParticles?: boolean;
+    /** See {@link ParticleSystem.softFarFade}. */
     softFarFade?: number;
+    /** See {@link ParticleSystem.softNearFade}. */
     softNearFade?: number;
+    /** See {@link ParticleSystem.blending}. */
     blending?: number;
+    /** See {@link ParticleSystemParameters.transparent}. */
     transparent?: boolean;
+    /** See {@link ParticleSystemParameters.depthTest}. */
     depthTest?: boolean;
+    /** See {@link ParticleSystemParameters.depthWrite}. */
     depthWrite?: boolean;
+    /** See {@link ParticleSystemParameters.alphaTest}. */
     alphaTest?: number;
+    /** Each behavior as its `toJSON` writes it. */
     behaviors: Array<any>;
+    /** See {@link ParticleSystem.worldSpace}. */
     worldSpace: boolean;
     /** `[x, y, z]`; written only when non-zero. */
     pivot?: number[];
@@ -412,29 +538,80 @@ export interface ParticleSystemJSONParameters {
     flip?: number[];
 }
 
+/**
+ * The resources of one effect document, by uuid: what {@link ParticleSystem.toJSON} writes a
+ * system's geometry, material and texture into, and what {@link ParticleSystem.fromJSON} resolves
+ * them from. While writing, entries hold live Babylon objects; `serializeEffect` turns them into
+ * plain data.
+ */
 export interface BabylonMetaData {
+    /** Textures by uuid; null for one that could not be made. */
     textures: {[uuid: string]: Texture | null};
+    /** Material entries by uuid. */
     materials: {[uuid: string]: any};
+    /** Geometry entries by uuid. */
     geometries: {[uuid: string]: any};
+    /** Image entries by uuid. */
     images?: {[uuid: string]: any};
+    /** Not used by babylon.quarks; kept for three.js-shaped documents. */
     shapes?: {[uuid: string]: any};
+    /** Not used by babylon.quarks; kept for three.js-shaped documents. */
     skeletons?: {[uuid: string]: any};
+    /** Not used by babylon.quarks; kept for three.js-shaped documents. */
     animations?: {[uuid: string]: any};
+    /** Nodes by uuid, which a mesh surface shape links to. */
     nodes?: {[uuid: string]: any};
 }
 
+/**
+ * A particle system, the counterpart of a Unity Shuriken system or a Niagara emitter: it spawns
+ * particles from an {@link emitterShape}, gives them start values, runs its {@link behaviors} on
+ * them every step and hands them to a {@link BatchedRenderer} to draw.
+ *
+ * The system lives at its {@link emitter}, a Babylon node: move, parent or disable that to place
+ * the effect. Add the system to a renderer with `renderer.addSystem(system)`; the renderer
+ * advances it every frame on a fixed 60 Hz step and batches it with systems that draw alike.
+ *
+ * Curves and random values are quarks.core generators (`ConstantValue`, `IntervalValue`,
+ * `PiecewiseBezier`, `Gradient`, ...); a curve's x is the system's time over its duration for
+ * start values and emission, and the particle's age over its life inside behaviors.
+ */
 export class ParticleSystem implements IParticleSystem {
+    /** Dispose the system, its emitter and its batch slot when it finishes. Default false. */
     autoDestroy: boolean;
+    /**
+     * Start a looping system as if it had already run one full cycle (Unity's Prewarm), so a fire
+     * or a mist is full from its first frame. Default false.
+     */
     prewarm: boolean;
+    /** Start the cycle again when {@link duration} ends instead of stopping emission. Default true. */
     looping: boolean;
+    /** Length of one emission cycle in seconds; curves over the system's time run over it. Default 1. */
     duration: number;
+    /** Seconds before the system first emits, rolled on each restart. Default 0. */
     startDelay: ValueGenerator | FunctionValueGenerator;
+    /** Seconds each particle lives, rolled at birth. Default 5. */
     startLife: ValueGenerator | FunctionValueGenerator;
+    /** Speed each particle starts with along the direction its shape gives it, in units per second. Default 0. */
     startSpeed: ValueGenerator | FunctionValueGenerator;
+    /**
+     * Rotation each particle starts with: an angle in radians around the view axis for billboards,
+     * or a rotation generator (`AxisAngleGenerator`, `EulerGenerator`, `RandomQuatGenerator`) for
+     * mesh particles. Default 0.
+     */
     startRotation: ValueGenerator | FunctionValueGenerator | RotationGenerator;
+    /** Size each particle starts with in world units; a `Vector3Generator` sizes each axis (Unity's 3D Start Size). Default 1. */
     startSize: ValueGenerator | FunctionValueGenerator | Vector3Generator;
+    /** Colour and alpha each particle starts with, multiplied with the texture. Default opaque white. */
     startColor: ColorGenerator | FunctionColorGenerator;
+    /** Flipbook cell each particle starts on, counted across rows, see {@link uTileCount}. Default 0. */
     startTileIndex: ValueGenerator;
+    /**
+     * The render mode's own settings: `TrailSettings` for a trail (`startLength` and the trail
+     * flags), `StretchedBillBoardSettings` for a stretched billboard (`speedFactor`,
+     * `lengthFactor`), `MeshSettings` or nothing otherwise. Setting {@link renderMode} replaces it
+     * with that mode's defaults.
+     */
     rendererEmitterSettings: RendererEmitterSettings;
     /**
      * Fraction of billboard particles mirrored along U (x) and V (y), each
@@ -442,29 +619,53 @@ export class ParticleSystem implements IParticleSystem {
      * Undefined: nothing is mirrored. Meshes ignore it.
      */
     flip?: Vector2;
+    /** Particles emitted per second, read over the system's time. Default 10. */
     emissionOverTime: ValueGenerator | FunctionValueGenerator;
+    /** Particles emitted per world unit the emitter moves (Unity's Rate over Distance). Default 0. */
     emissionOverDistance: ValueGenerator | FunctionValueGenerator;
+    /** Bursts of particles at set times in each cycle. Default none. */
     emissionBursts: Array<BurstParameters>;
     /** Most particles alive at once (Unity's Max Particles); emission past it is dropped. Undefined means no limit. */
     maxParticles?: number;
+    /**
+     * The system emits nothing of its own and only spawns what an `EmitSubParticleSystem` on
+     * another system sends it (a Unity sub emitter). Default false.
+     */
     onlyUsedByOther: boolean;
+    /**
+     * Simulate in world space (Unity's Simulation Space: World): particles stay where they were
+     * born when the emitter moves. False keeps them in the emitter's space, so they move with it.
+     * Default false.
+     */
     worldSpace: boolean;
+    /** How many of {@link particles} are alive. Read only. */
     particleNum: number;
+    /** Set by {@link pause}: the renderer skips the system's simulation while true. */
     paused: boolean;
+    /** The particle pool; the first {@link particleNum} are alive. Read only. */
     particles: Array<Particle>;
-    /** Column storage shared by this system's particles. */
+    /** Column storage shared by this system's particles; behaviors read and write it. */
     readonly store: ParticleStore = new ParticleStore(64);
+    /** Where particles are born and which way they start (Unity's Shape module). Default a `SphereEmitter`. */
     emitterShape: EmitterShape;
+    /** The node the system lives at; move, parent or disable it to place or hide the effect. */
     emitter: ParticleEmitter;
+    /** What the renderer batches on; read it with {@link getRendererSettings}. @internal */
     rendererSettings: VFXBatchSettings;
+    /**
+     * Set when a render setting changed, so the renderer moves the system to a matching batch.
+     * The system's setters set it; set it yourself after changing {@link getRendererSettings} directly.
+     */
     neededToUpdateRender: boolean;
+    /** Modules run on every particle each step, in order (`ColorOverLife`, `SizeOverLife`, forces, ...). */
     behaviors: Array<Behavior>;
+    /** Emission progress: time in the cycle, burst and distance counters. */
     emissionState: EmissionState;
+    /** The emitter's velocity over the last step, which `InheritVelocity` reads. */
     emitterVelocity: Vector3 = new Vector3();
 
     private prewarmed: boolean;
     private emitEnded: boolean;
-    private markForDestroy: boolean;
     private finishedEventFired = false;
     private startDelayTimeLeft = 0;
     private previousEmitterPos?: Vector3;
@@ -493,6 +694,7 @@ export class ParticleSystem implements IParticleSystem {
     /** @internal **/
     _renderer?: BatchedRenderer;
 
+    /** Seconds into the current emission cycle. Setting it jumps emission; particles alive stay. */
     set time(time: number) {
         this.emissionState.time = time;
     }
@@ -501,6 +703,7 @@ export class ParticleSystem implements IParticleSystem {
         return this.emissionState.time;
     }
 
+    /** Whether {@link endEmit} ran, or a non-looping system reached the end of its duration. */
     get isEmitEnded(): boolean {
         return this.emitEnded;
     }
@@ -583,11 +786,24 @@ export class ParticleSystem implements IParticleSystem {
         return !this.hasPendingEmission();
     }
 
-    get layers() {
+    /**
+     * The camera layer mask the particles draw for (Babylon's `mesh.layerMask`), as
+     * `system.layers.mask`. Default `0x0fffffff`, every camera's default mask. Systems that differ
+     * are batched apart.
+     */
+    get layers(): {
+        /** The mask; setting it moves the system to a matching batch. */
+        mask: number;
+    } {
         return this.layerMaskProxy;
     }
 
-    get texture() {
+    /**
+     * The particles' main texture, multiplied with their colour; a flipbook when
+     * {@link uTileCount} or {@link vTileCount} is above 1. Null draws the colour alone. Systems
+     * with different textures are batched apart.
+     */
+    get texture(): Texture | null {
         return this.rendererSettings.texture;
     }
 
@@ -596,7 +812,15 @@ export class ParticleSystem implements IParticleSystem {
         this.neededToUpdateRender = true;
     }
 
-    get material() {
+    /**
+     * A Babylon material the system takes its draw settings from (on a loaded system, the material
+     * record of its file): its texture (`albedoTexture`,
+     * `diffuseTexture`, `emissiveTexture` or `opacityTexture`), alpha mode, depth flags, alpha test
+     * and reflection texture. The material itself
+     * is not drawn with; particles always use quarks' own shaders. Null leaves the settings as they
+     * are.
+     */
+    get material(): any {
         return this.materialRef;
     }
 
@@ -605,7 +829,12 @@ export class ParticleSystem implements IParticleSystem {
         this.applyMaterialSettings(material);
     }
 
-    get uTileCount() {
+    /**
+     * Columns of the flipbook in {@link texture} (Unity's Texture Sheet Animation tiles). With
+     * {@link vTileCount}, a particle draws one cell, picked by {@link startTileIndex} and
+     * `FrameOverLife`. Default 1.
+     */
+    get uTileCount(): number {
         return this.rendererSettings.uTileCount;
     }
 
@@ -614,7 +843,8 @@ export class ParticleSystem implements IParticleSystem {
         this.neededToUpdateRender = true;
     }
 
-    get vTileCount() {
+    /** Rows of the flipbook in {@link texture}, see {@link uTileCount}. Default 1. */
+    get vTileCount(): number {
         return this.rendererSettings.vTileCount;
     }
 
@@ -623,7 +853,11 @@ export class ParticleSystem implements IParticleSystem {
         this.neededToUpdateRender = true;
     }
 
-    get blendTiles() {
+    /**
+     * Cross-fade between a flipbook's cells instead of cutting from one to the next (Unity's
+     * Flip-Book Blending). Default false.
+     */
+    get blendTiles(): boolean {
         return this.rendererSettings.blendTiles;
     }
 
@@ -632,7 +866,13 @@ export class ParticleSystem implements IParticleSystem {
         this.neededToUpdateRender = true;
     }
 
-    get softParticles() {
+    /**
+     * Fade particles out as they near the scene behind them (Unity's Soft Particles, Unreal's
+     * Depth Fade), between {@link softNearFade} and {@link softFarFade}. Needs a depth texture on
+     * the renderer, see `BatchedRenderer.setDepthTexture`; without one particles draw hard.
+     * Default false.
+     */
+    get softParticles(): boolean {
         return this.rendererSettings.softParticles;
     }
 
@@ -641,11 +881,6 @@ export class ParticleSystem implements IParticleSystem {
         this.neededToUpdateRender = true;
     }
 
-    /**
-     * Billboard pivot in particle-size units (Unity's renderer Pivot), see
-     * {@link VFXBatchSettings.pivot}. Assign a new vector to change it: editing
-     * the returned one in place does not reach the renderer.
-     */
     /**
      * The order this system's batch draws its particles in (Unity's Sort
      * Mode), `'none'` by default. Alpha blended smoke wants `'distance'`;
@@ -690,6 +925,11 @@ export class ParticleSystem implements IParticleSystem {
         this.neededToUpdateRender = true;
     }
 
+    /**
+     * Billboard pivot in particle-size units (Unity's renderer Pivot), see
+     * {@link VFXBatchSettings.pivot}. Assign a new vector to change it: editing
+     * the returned one in place does not reach the renderer.
+     */
     get pivot(): Vector3 | undefined {
         return this.rendererSettings.pivot;
     }
@@ -846,7 +1086,8 @@ export class ParticleSystem implements IParticleSystem {
         return v && (v.x > 0 || v.y > 0) ? v.clone() : undefined;
     }
 
-    get softNearFade() {
+    /** Distance in world units in front of the scene at which a soft particle is fully faded out. Default 0. */
+    get softNearFade(): number {
         return this.rendererSettings.softNearFade;
     }
 
@@ -855,7 +1096,8 @@ export class ParticleSystem implements IParticleSystem {
         this.neededToUpdateRender = true;
     }
 
-    get softFarFade() {
+    /** Distance in world units in front of the scene at which a soft particle is fully opaque. Default 0. */
+    get softFarFade(): number {
         return this.rendererSettings.softFarFade;
     }
 
@@ -864,16 +1106,17 @@ export class ParticleSystem implements IParticleSystem {
         this.neededToUpdateRender = true;
     }
 
-    get instancingGeometry(): Float32Array {
-        return this.rendererSettings.instancingGeometry;
-    }
-
     /**
-     * The mesh particles' positions. A new geometry with a different vertex
+     * The mesh particles' positions, three values per vertex.
+     * Setting it restarts the system. A new geometry with a different vertex
      * count drops UV sets and normals that no longer fit it: the first UV set
      * falls back to zeros, the second to none, the normals to +Z. Assign {@link instancingUVs} and
      * {@link instancingUVs2} after it.
      */
+    get instancingGeometry(): Float32Array {
+        return this.rendererSettings.instancingGeometry;
+    }
+
     set instancingGeometry(geometry: Float32Array) {
         this.restart();
         this.particles.length = 0;
@@ -918,7 +1161,12 @@ export class ParticleSystem implements IParticleSystem {
         this.neededToUpdateRender = true;
     }
 
-    get blending() {
+    /**
+     * Babylon alpha mode the particles blend with: `Constants.ALPHA_ADD` (the default) for glows,
+     * `Constants.ALPHA_COMBINE` for smoke and anything alpha blended. Systems that differ are
+     * batched apart.
+     */
+    get blending(): number {
         return this.rendererSettings.materialBlendMode;
     }
 
@@ -927,6 +1175,13 @@ export class ParticleSystem implements IParticleSystem {
         this.neededToUpdateRender = true;
     }
 
+    /**
+     * How each particle is drawn (Unity's Render Mode): a camera-facing billboard, a stretched
+     * billboard, a horizontal or vertical billboard, a mesh, a trail or a beam, see
+     * {@link RenderMode}. Changing it gives {@link rendererEmitterSettings} the new mode's
+     * defaults, and switching to or from a trail restarts the system. Switching to a mesh makes
+     * {@link startRotation} an `AxisAngleGenerator` about Y, and switching away from one sets it to 0.
+     */
     get renderMode(): RenderMode {
         return this.rendererSettings.renderMode;
     }
@@ -968,6 +1223,11 @@ export class ParticleSystem implements IParticleSystem {
         }
     }
 
+    /**
+     * The batch mesh's `alphaIndex`: among the transparent meshes of one rendering group, lower
+     * draws first, whatever the distance (Unity's Order in Layer). Default 0. Systems that differ
+     * are batched apart.
+     */
     get renderOrder(): number {
         return this.rendererSettings.renderOrder;
     }
@@ -1153,7 +1413,8 @@ export class ParticleSystem implements IParticleSystem {
             settings.followLocalOrigin = settings.followLocalOrigin ?? false;
         }
         if (parameters.renderMode === RenderMode.StretchedBillBoard) {
-            const settings = this.rendererEmitterSettings as StretchedBillBoardSettings;
+            const settings = {...this.rendererEmitterSettings} as StretchedBillBoardSettings;
+            this.rendererEmitterSettings = settings;
             if (parameters.speedFactor !== undefined) {
                 settings.speedFactor = parameters.speedFactor;
             }
@@ -1245,7 +1506,6 @@ export class ParticleSystem implements IParticleSystem {
         this.initSystemGenerators();
 
         this.emitEnded = false;
-        this.markForDestroy = false;
         this.prewarmed = false;
     }
 
@@ -1404,18 +1664,28 @@ export class ParticleSystem implements IParticleSystem {
         this.neededToUpdateRender = true;
     }
 
-    pause() {
+    /** Freezes the system where it is: particles stay and nothing is simulated until {@link play}. */
+    pause(): void {
         this.paused = true;
     }
-    play() {
+
+    /** Resumes a paused system. */
+    play(): void {
         this.paused = false;
     }
-    stop() {
+
+    /** Clears every particle, rewinds to the start ({@link restart}) and pauses until {@link play}. */
+    stop(): void {
         this.restart();
         this.pause();
     }
 
-    setQualityFactor(qualityFactor: number) {
+    /**
+     * Scales how many particles the system emits, from 0.1 to 1 (values outside are clamped), for
+     * lower quality settings or a crowded frame; the renderer's adaptive performance sets it. It
+     * multiplies with {@link emissionMultiplier}. Default 1.
+     */
+    setQualityFactor(qualityFactor: number): void {
         this.qualityFactor = Math.max(0.1, Math.min(1, qualityFactor));
     }
 
@@ -1647,11 +1917,13 @@ export class ParticleSystem implements IParticleSystem {
         }
     }
 
-    endEmit() {
+    /**
+     * Stops emission and lets the particles alive die out (Unity's `Stop` with
+     * `StopEmitting`). The system fires `emitEnd`, then `finished` when the last particle has
+     * died, and is disposed then if {@link autoDestroy} is set. {@link restart} starts it again.
+     */
+    endEmit(): void {
         this.emitEnded = true;
-        if (this.autoDestroy) {
-            this.markForDestroy = true;
-        }
         this.fire({type: 'emitEnd', particleSystem: this});
     }
 
@@ -1660,7 +1932,11 @@ export class ParticleSystem implements IParticleSystem {
         return this.destroyed;
     }
 
-    dispose() {
+    /**
+     * Removes the system from its renderer, disposes its emitter node (and the nodes under it) and
+     * fires `destroy`. A disposed system cannot be played again. Calling it twice is harmless.
+     */
+    dispose(): void {
         if (this.destroyed) {
             return;
         }
@@ -1694,7 +1970,12 @@ export class ParticleSystem implements IParticleSystem {
         }
     }
 
-    restart() {
+    /**
+     * Clears every particle and starts the system from the beginning: emission time 0, bursts and
+     * the start delay rolled again, behaviors reset, and a seeded system's generator restarted, so
+     * it replays the same effect. Also unpauses it.
+     */
+    restart(): void {
         if (this.destroyed) {
             return;
         }
@@ -1726,7 +2007,6 @@ export class ParticleSystem implements IParticleSystem {
             }
         });
         this.emitEnded = false;
-        this.markForDestroy = false;
         this.finishedEventFired = false;
         this.prewarmed = false;
         this.initSystemGenerators();
@@ -2496,7 +2776,6 @@ export class ParticleSystem implements IParticleSystem {
             this.fire({type: 'finished', particleSystem: this});
         }
         if (this.autoDestroy) {
-            this.markForDestroy = true;
             this.dispose();
         }
     }
@@ -2630,7 +2909,11 @@ export class ParticleSystem implements IParticleSystem {
         }
     }
 
-    emit(delta: number, emissionState: EmissionState, emitterMatrix: Matrix4) {
+    /**
+     * Spawns what this step's emission calls for. Called by the simulation step, and by
+     * `EmitSubParticleSystem` on a sub emitter target with the parent particle's state and matrix.
+     */
+    emit(delta: number, emissionState: EmissionState, emitterMatrix: Matrix4): void {
         if (this.destroyed) {
             return;
         }
@@ -3188,25 +3471,37 @@ export class ParticleSystem implements IParticleSystem {
         };
     }
 
-    addBehavior(behavior: Behavior) {
+    /** Appends a behavior to {@link behaviors}; it runs on existing particles from the next step. */
+    addBehavior(behavior: Behavior): void {
         this.behaviors.push(behavior);
         // A sub emitter added here changes which system has to update first.
         this._renderer?._invalidateUpdateOrder();
     }
 
+    /**
+     * The settings the renderer batches this system on. Prefer the system's setters, which move it
+     * to a matching batch; after changing a field here directly, set {@link neededToUpdateRender}.
+     */
     getRendererSettings(): VFXBatchSettings {
         return this.rendererSettings;
     }
 
+    /**
+     * Calls `callback` on each `event`: `'emitEnd'` when emission ends, `'finished'` when the last
+     * particle of an ended system dies, `'particleDied'` per particle (with `event.particle`), and
+     * `'destroy'` on dispose.
+     */
     addEventListener(event: ParticleSystemEventType, callback: (event: ParticleSystemEvent) => void): void {
         if (!this.listeners[event]) this.listeners[event] = [];
         this.listeners[event].push(callback);
     }
 
+    /** Removes every callback registered for `event`. */
     removeAllEventListeners(event: ParticleSystemEventType): void {
         if (this.listeners[event]) this.listeners[event] = [];
     }
 
+    /** Removes one callback added with {@link addEventListener}. */
     removeEventListener(event: ParticleSystemEventType, callback: (event: ParticleSystemEvent) => void): void {
         if (this.listeners[event]) {
             const index = this.listeners[event].indexOf(callback);
@@ -3230,6 +3525,12 @@ export class ParticleSystem implements IParticleSystem {
         }
     }
 
+    /**
+     * A new system with the same settings, behaviors and generators (copied, so the two roll
+     * independently), on a new emitter node with no parent. It shares the texture, material and
+     * geometry. It is not added to a renderer: call `renderer.addSystem` on it, or use
+     * `QuarksUtil.instantiate` to copy a whole effect tree.
+     */
     clone(): ParticleSystem {
         const newBehaviors: Array<Behavior> = this.behaviors.map((b) => b.clone());
         let rendererEmitterSettings: RendererEmitterSettings;

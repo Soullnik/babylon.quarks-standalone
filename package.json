@@ -15,10 +15,11 @@
         "test:coverage": "jest --coverage",
         "typecheck": "tsc -p packages/quarks.core/tsconfig.test.json && tsc -p packages/babylon.quarks/tsconfig.test.json && tsc -p packages/babylon.quarks-editor/tsconfig.test.json",
         "docs": "npm run docs --workspace=babylon.quarks",
+        "docs:check": "npm run docs:check --workspace=babylon.quarks",
         "capture:previews": "tsx ./scripts/capture-demo-previews.mts",
         "check:pack": "node ./scripts/check-pack-contents.mjs",
         "build:unitypackage": "node ./scripts/build-unitypackage.mjs",
-        "check": "npm run format:check && npm run lint && npm run build && npm run build:editor && npm run typecheck && npm run test:coverage && npm run check:smoothness && npm run build:examples && npm run check:pack",
+        "check": "npm run format:check && npm run lint && npm run build && npm run build:editor && npm run docs:check && npm run typecheck && npm run test:coverage && npm run check:smoothness && npm run build:examples && npm run check:pack",
         "examples": "npm run dev --workspace=examples",
         "dev": "npm run examples",
         "validate:wgsl": "node ./scripts/validate-wgsl.mjs",
@@ -26,7 +27,7 @@
         "check:smoothness": "tsx ./scripts/smoothness-sweep.mts",
         "format": "prettier --write .",
         "format:check": "prettier --check .",
-        "lint": "eslint . --max-warnings 467"
+        "lint": "eslint . --max-warnings 462"
     },
     "engines": {
         "node": ">=20.11.0",

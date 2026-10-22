@@ -24,7 +24,9 @@ export const QUARKS_FORMAT_VERSION = 1;
 
 /** An image a texture reads: a url, a root-relative path, or a `data:` URI. */
 export interface QuarksImageJSON {
+    /** Unique within the file; other entries refer to it by this. */
     uuid: string;
+    /** Relative to the file's base url, absolute, or a `data:` url. */
     url: string;
 }
 
@@ -34,6 +36,7 @@ export interface QuarksImageJSON {
  * repeat, 1001 clamp, 1002 mirror.
  */
 export interface QuarksTextureJSON {
+    /** Unique within the file; other entries refer to it by this. */
     uuid: string;
     /** The {@link QuarksImageJSON} uuid; absent when the texture had no url a file can point at. */
     image?: string;
@@ -55,19 +58,29 @@ export interface QuarksTextureJSON {
 
 /** Mesh data, inline. */
 export interface QuarksGeometryJSON {
+    /** Unique within the file; other entries refer to it by this. */
     uuid: string;
+    /** Always `'QuarksGeometry'`. */
     type: 'QuarksGeometry';
+    /** `x, y, z` per vertex. */
     positions: number[];
+    /** Three per triangle. */
     indices: number[];
+    /** First UV set, `u, v` per vertex. */
     uvs?: number[];
+    /** Second UV set, `u, v` per vertex. */
     uvs2?: number[];
+    /** `x, y, z` per vertex. */
     normals?: number[];
 }
 
 /** A node of an effect: a group, an emitter, a mesh or a prefab, with its children. */
 export interface QuarksNodeJSON {
+    /** Unique within the file; other entries refer to it by this. */
     uuid: string;
+    /** What the node is; a type the loader does not know loads as an empty node. */
     type: 'Group' | 'ParticleEmitter' | 'Mesh' | 'QuarksPrefab' | string;
+    /** The node's name. */
     name?: string;
     /** Local transform, column-major, as Babylon's `Matrix.asArray()`. */
     matrix: number[];
@@ -75,6 +88,7 @@ export interface QuarksNodeJSON {
     visible?: false;
     /** `Mesh`: written only when the mesh is not drawn (`isVisible`), which leaves its children drawn. */
     isVisible?: false;
+    /** Child nodes, in order. */
     children?: QuarksNodeJSON[];
     /** `ParticleEmitter`: the system. */
     ps?: ParticleSystemJSONParameters;
@@ -87,18 +101,26 @@ export interface QuarksNodeJSON {
 
 /** A whole effect, as {@link serializeEffect} writes it and `QuarksLoader` reads it. */
 export interface QuarksEffectJSON {
+    /** What wrote the file, and which format version it follows. */
     metadata: {
         /** The three.js object format version the envelope follows. */
         version: number;
+        /** Always `'Object3D'`. */
         type: 'Object3D';
+        /** The tool that wrote the file, from {@link SerializeEffectOptions.generator}. */
         generator: string;
         /** See {@link QUARKS_FORMAT_VERSION}. */
         quarksFormat: number;
     };
+    /** Meshes the nodes and particle systems use. */
     geometries: QuarksGeometryJSON[];
+    /** Materials the particle systems and `Mesh` nodes use, referred to by uuid. */
     materials: Array<Record<string, unknown>>;
+    /** Textures the particle systems use. */
     textures: QuarksTextureJSON[];
+    /** Image files the textures load. */
     images: QuarksImageJSON[];
+    /** The effect's root node. */
     object: QuarksNodeJSON;
 }
 
@@ -217,9 +239,6 @@ class EffectWriter {
             const {type: _type, name: _name, ...prefab} = node.toJSON();
             Object.assign(json, prefab);
             json.type = 'QuarksPrefab';
-            if (node.timeScale !== 1) {
-                json.timeScale = node.timeScale;
-            }
         } else if (node instanceof Mesh) {
             json.type = 'Mesh';
             json.geometry = this.meshGeometry(node);

@@ -51,7 +51,7 @@ export function init({scene, camera, batchRenderer, systems, demoState}: DemoCon
         uTileCount: 10,
         vTileCount: 10,
         renderMode: RenderMode.StretchedBillBoard,
-        speedFactor: 0.05,
+        rendererEmitterSettings: {speedFactor: 0.05},
         renderOrder: 2,
     });
     gatherParticles.addBehavior(createColorOverLifeRange(new Vector4(0.2, 0.2, 0.2, 1), new Vector4(1, 1, 1, 1)));

@@ -50,7 +50,6 @@ function createSystem({
         renderOrder: 2,
         rendererEmitterSettings:
             renderMode === RenderMode.StretchedBillBoard ? {speedFactor: speedFactor ?? 0, lengthFactor: 2} : undefined,
-        speedFactor: speedFactor ?? 0,
         startTileIndex: new ConstantValue(0),
         uTileCount: 1,
         vTileCount: 1,
@@ -87,6 +86,5 @@ export function init({scene, camera, batchRenderer, systems}: DemoContext) {
         texture,
         renderMode: RenderMode.StretchedBillBoard,
         position: new BVector3(5, 0, 0),
-        speedFactor: 0,
     });
 }

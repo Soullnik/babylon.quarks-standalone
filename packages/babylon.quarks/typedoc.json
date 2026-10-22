@@ -7,9 +7,16 @@
     "excludeInternal": true,
     "includeVersion": true,
     "hideGenerator": true,
+    "validation": {
+        "notExported": true,
+        "invalidLink": true,
+        "notDocumented": true
+    },
+    "treatWarningsAsErrors": true,
     "navigationLinks": {
         "Demos": "https://soullnik.github.io/babylon.quarks-standalone/",
         "GitHub": "https://github.com/Soullnik/babylon.quarks-standalone",
         "npm": "https://www.npmjs.com/package/babylon.quarks"
-    }
+    },
+    "plugin": ["./typedoc-accessors.mjs"]
 }

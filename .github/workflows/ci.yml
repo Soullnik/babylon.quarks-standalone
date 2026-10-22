@@ -45,6 +45,10 @@ jobs:
             - name: Build packages
               run: npm run build && npm run build:editor
 
+            # Every exported symbol needs TSDoc; internals are tagged @internal.
+            - name: Check API docs
+              run: npm run docs:check
+
             # Jest only transpiles TypeScript; type errors in sources and tests fail here.
             - name: Typecheck sources and tests
               run: npm run typecheck
