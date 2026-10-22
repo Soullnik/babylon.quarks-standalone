@@ -185,6 +185,28 @@ or duplicated something else, and nothing in the package used them.
 
 ### Fixed
 
+- **A system stopped, paused or disposed from a listener stays stopped for the rest of the
+  frame.** `stop()` from a `finished` listener (which `EffectPool` does on release), `dispose()`
+  from `particleDied` and `autoDestroy` used to be followed by the frame's remaining steps, which
+  emitted into the stopped system and could fire `finished` again.
+- **A fast playback speed runs at full speed.** The 0.1 s frame clamp now applies to the host's
+  frame before it is scaled by `playbackSpeed`, and the per-frame step cap grows with the speed, so
+  speed 10 advances 10 seconds per second; before, it was held to about 6. A host frame longer than
+  0.1 s is still simulated as 0.1 s at any speed.
+- **Prewarm runs on the fixed step directly**, not through `update()`, so it always simulates one
+  whole cycle: before, `playbackSpeed` scaled it too, so at speed 0.5 only half the cycle was
+  warmed up and at speed 0 none of it. It costs one step per 1/60 s of the cycle and no more. A
+  cycle longer than `ParticleSystem.maxPrewarmSeconds` (10 by default, a performance guard for the
+  whole app) is warmed up over its last part only, with the burst waves due before that counted as
+  fired, so a long looping effect does not stall its first frame.
+- **Invalid clock settings are normalised.** A negative, NaN or infinite `playbackSpeed` reads as
+  0 (the clock never runs backwards) and a `duration` shorter than one simulation step (1/60 s),
+  0 or NaN reads as one step, so `timeRatio` stays finite; both are accessors now and normalise
+  what is set after construction too. The constructor also reads an invalid `cullingMode` as
+  `'always'` and a negative or NaN `maxParticles` as no limit, as `fromJSON` already did. A
+  negative or NaN frame given to `update()` is no time at all.
+- **A culled `'pauseAndCatchUp'` system owes at most 0.1 s per frame it missed**, the same clamp a
+  visible system's frame gets; before, one stalled frame off screen could owe up to the 2 s cap.
 - **`QuarksPrefab.play()` after `pause()` resumes the timeline's systems and clips**; before, a
   system paused in the middle of its track stayed paused until the track ended.
 - **Setting `MeshSurfaceEmitter.mesh` to nothing, or to a mesh without positions or indices,
@@ -273,6 +295,9 @@ or duplicated something else, and nothing in the package used them.
 
 ### Internal
 
+- **`SimulationClock`** (`src/system/SimulationClock.ts`) holds the fixed-step accumulator, the
+  rounding rule that keeps the residual near zero, the start delay and the catch-up debt of a
+  culled system, as pure numbers with their own tests. `ParticleSystem.update` is a client of it.
 - **One table of `ParticleSystem` settings** (`src/system/settingsSchema.ts`) gives each plain and
   generator setting its default, its JSON form and how it is copied. `toJSON`, `fromJSON` and
   `clone` are built from it, and a test fails when a constructor parameter is in neither the table

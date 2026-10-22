@@ -85,7 +85,7 @@ const drawnU = (renderer: BatchedRenderer, k: number) => buffers(renderer).uvBuf
 
 /** Redraws the batch as if the display were `residual` seconds off the last step. */
 function drawAt(system: ParticleSystem, renderer: BatchedRenderer, residual: number) {
-    (system as any).simulationAccumulator = residual;
+    (system as any).clock.accumulator = residual;
     renderer.batches[0].update();
 }
 
@@ -135,7 +135,7 @@ describe('the live tip of a trail', () => {
 
     test('adds no tip for float noise left in the accumulator', () => {
         const {system, renderer, particle} = trail();
-        (system as any).simulationAccumulator = 3.5e-18;
+        (system as any).clock.accumulator = 3.5e-18;
         renderer.batches[0].update();
         expect(drawnPairs(renderer)).toBe(particle.historyCount);
         renderer.dispose();

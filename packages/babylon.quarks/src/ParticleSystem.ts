@@ -59,9 +59,17 @@ import {
     isFallbackUVs,
 } from './system/geometry';
 import {liveAtlas, MaterialOverrides, resolveMaterialSettings} from './system/materialResolve';
-import {nonZeroFlip, nonZeroPivot, validLighting, validSortMode} from './system/normalize';
+import {
+    nonZeroFlip,
+    nonZeroPivot,
+    validCullingMode,
+    validLighting,
+    validMaxParticles,
+    validSortMode,
+} from './system/normalize';
 import {particleSystemParametersFromJSON, particleSystemToJSON, trailCurve, trailFlags} from './system/serialization';
 import {settingsForClone} from './system/settingsSchema';
+import {SIMULATION_STEP, SimulationClock} from './system/SimulationClock';
 import {
     MeshLighting,
     MeshRim,
@@ -109,20 +117,8 @@ const tempQ = new Quaternion();
 const IDENTITY_QUATERNION = new Quaternion();
 const tempV = new Vector3();
 const tempV2 = new Vector3();
-const PREWARM_FPS = 60;
-const SIMULATION_STEP = 1 / PREWARM_FPS;
-const MAX_SIMULATION_STEPS_PER_FRAME = 8;
 /** Points sampled over the rest of the cycle when a non-Bezier rate curve is 0 now, to see if it rises later. */
 const RATE_LOOKAHEAD_SAMPLES = 64;
-/** Most off-screen time a `'pauseAndCatchUp'` system replays on coming back into view. */
-const MAX_CATCH_UP_SECONDS = 2;
-// Math.round() breaks an exact tie (accumulator sitting at precisely half a
-// step) by rounding up. At exactly 120Hz that tie is not a corner case — it is
-// every single frame — and rounding it up would run a step on every one of
-// them instead of every other one. Nudging the tie down costs nothing on a
-// real display (real frame times essentially never land on the tie exactly)
-// and keeps the well-tested "half a step is no step yet" behavior.
-const ROUND_TIE_BIAS = 1e-9;
 
 /**
  * A particle system, the counterpart of a Unity Shuriken system or a Niagara emitter: it spawns
@@ -147,8 +143,20 @@ export class ParticleSystem implements IParticleSystem {
     prewarm: boolean;
     /** Start the cycle again when {@link duration} ends instead of stopping emission. Default true. */
     looping: boolean;
-    /** Length of one emission cycle in seconds; curves over the system's time run over it. Default 1. */
-    duration: number;
+    /**
+     * Length of one emission cycle in seconds; curves over the system's time run over it. Default
+     * 1, and never shorter than one simulation step: a zero, negative or NaN duration is read as
+     * one step, so bursts at time 0 fire and the cycle ends.
+     */
+    get duration(): number {
+        return this.durationValue;
+    }
+
+    set duration(seconds: number) {
+        this.durationValue = seconds > SIMULATION_STEP ? seconds : SIMULATION_STEP;
+    }
+
+    private durationValue = 1;
     /** Seconds before the system first emits, rolled on each restart. Default 0. */
     startDelay: ValueGenerator | FunctionValueGenerator;
     /** Seconds each particle lives, rolled at birth. Default 5. */
@@ -186,7 +194,11 @@ export class ParticleSystem implements IParticleSystem {
     emissionOverDistance: ValueGenerator | FunctionValueGenerator;
     /** Bursts of particles at set times in each cycle. Default none. */
     emissionBursts: Array<BurstParameters>;
-    /** Most particles alive at once (Unity's Max Particles); emission past it is dropped. Undefined means no limit. */
+    /**
+     * Most particles alive at once (Unity's Max Particles); emission past it is dropped. Undefined
+     * means no limit, as does a negative or NaN count given to the constructor; a fraction is
+     * rounded down.
+     */
     maxParticles?: number;
     /**
      * The system emits nothing of its own and only spawns what an `EmitSubParticleSystem` on
@@ -228,7 +240,8 @@ export class ParticleSystem implements IParticleSystem {
     private prewarmed: boolean;
     private emitEnded: boolean;
     private finishedEventFired = false;
-    private startDelayTimeLeft = 0;
+    /** The fixed-step clock: whole steps per frame, start delay and catch-up time. */
+    private readonly clock = new SimulationClock();
     private previousEmitterPos?: Vector3;
     private tempEmitterPos: Vector3 = new Vector3();
     private temp: Vector3 = new Vector3();
@@ -241,7 +254,6 @@ export class ParticleSystem implements IParticleSystem {
     private materialRef: any = null;
     private sceneRef: Scene | undefined;
     private qualityFactor = 1;
-    private simulationAccumulator = 0;
     private destroyed = false;
     /** How the behaviors run each step, rebuilt when the list changes. */
     private readonly behaviorPlan = new BehaviorPlan();
@@ -801,9 +813,18 @@ export class ParticleSystem implements IParticleSystem {
     /**
      * Multiplier on the time this system is advanced by (Unity's Simulation
      * Speed): 2 runs the effect twice as fast, 0 freezes it without pausing the
-     * renderer. 1 by default; saved in the effect JSON only when it differs.
+     * renderer. 1 by default; saved in the effect JSON only when it differs. A
+     * negative or NaN speed is read as 0, and the clock does not run backwards.
      */
-    playbackSpeed = 1;
+    get playbackSpeed(): number {
+        return this.playbackSpeedValue;
+    }
+
+    set playbackSpeed(speed: number) {
+        this.playbackSpeedValue = speed > 0 && speed < Infinity ? speed : 0;
+    }
+
+    private playbackSpeedValue = 1;
 
     /**
      * Runtime multiplier on how many particles the system emits: bursts,
@@ -876,19 +897,22 @@ export class ParticleSystem implements IParticleSystem {
     culled = false;
 
     /**
-     * Time a `'pauseAndCatchUp'` system has spent off screen and not yet
-     * simulated, in seconds. Capped, so an effect hidden for a minute does not
-     * replay the minute.
-     */
-    private pendingCatchUp = 0;
-
-    /**
      * Time per frame a system coming back into view may spend on the steps it
      * missed, in milliseconds, when it is advanced without a renderer. The
      * {@link BatchedRenderer} shares its own budget among all its systems
      * instead. Steps that do not fit are dropped, not deferred.
      */
     static catchUpBudgetMs = 2;
+
+    /**
+     * A performance guard on {@link prewarm}, for every system: the most of a cycle it simulates
+     * before the first frame, in seconds. A longer cycle is warmed up over its last
+     * `maxPrewarmSeconds` only, with the burst waves before that counted as fired, so a long
+     * looping effect does not stall its first frame. 10 by default; raise it in an app whose
+     * effects have longer cycles and particles that live longer than that. It is not an effect's
+     * own warm-up time and is not saved with one.
+     */
+    static maxPrewarmSeconds = 10;
 
     /** What the system draws covers, for culling. See {@link getWorldBounds}. */
     private readonly bounds = new BoundsTracker();
@@ -918,7 +942,7 @@ export class ParticleSystem implements IParticleSystem {
         this.emissionOverTime = parameters.emissionOverTime ?? new ConstantValue(10);
         this.emissionOverDistance = parameters.emissionOverDistance ?? new ConstantValue(0);
         this.emissionBursts = parameters.emissionBursts ?? [];
-        this.maxParticles = parameters.maxParticles;
+        this.maxParticles = validMaxParticles(parameters.maxParticles);
         this.onlyUsedByOther = parameters.onlyUsedByOther ?? false;
         this.emitterShape = parameters.shape ?? new SphereEmitter();
         this.behaviors = parameters.behaviors ?? [];
@@ -985,7 +1009,7 @@ export class ParticleSystem implements IParticleSystem {
         };
         this.flip = nonZeroFlip(parameters.flip);
         this.playbackSpeed = parameters.playbackSpeed ?? 1;
-        this.cullingMode = parameters.cullingMode ?? 'always';
+        this.cullingMode = validCullingMode(parameters.cullingMode);
         this.scalingMode = parameters.scalingMode === 'hierarchy' ? 'hierarchy' : 'shape';
         this.alignToDirection = parameters.alignToDirection === true;
         this.seed = parameters.seed;
@@ -1404,7 +1428,7 @@ export class ParticleSystem implements IParticleSystem {
             this.emissionBursts.forEach((burst) => burst.count.startGen(this.memory));
             this.emissionOverDistance.startGen(this.memory);
             this.startDelay.startGen(this.memory);
-            this.startDelayTimeLeft = this.startDelay.genValue(this.memory, 0);
+            this.clock.setStartDelay(this.startDelay.genValue(this.memory, 0));
             this.emissionOverTime.startGen(this.memory);
         } finally {
             if (rng !== undefined) {
@@ -1426,7 +1450,7 @@ export class ParticleSystem implements IParticleSystem {
         this.paused = false;
         this.particleNum = 0;
         this.bounds.valid = false;
-        this.pendingCatchUp = 0;
+        this.clock.reset();
         if (this.seedValue !== undefined) {
             // The same seed again, so a restart replays the same effect.
             this.rng = createSeededRandom(this.seedValue);
@@ -1455,7 +1479,6 @@ export class ParticleSystem implements IParticleSystem {
         this.initSystemGenerators();
         this.previousEmitterPos = undefined;
         this.emitterVelocity.set(0, 0, 0);
-        this.simulationAccumulator = 0;
     }
 
     private firstTimeUpdate = true;
@@ -1474,18 +1497,20 @@ export class ParticleSystem implements IParticleSystem {
      */
     update(delta: number, stepDeadline = Infinity, catchUpDeadline?: number) {
         if (this.paused || this.destroyed) return;
-        delta *= this.playbackSpeed;
+        const speed = this.playbackSpeed;
+        delta = SimulationClock.frameSeconds(delta, speed);
 
         if (this.culled) {
             // Out of every camera's view. A paused system holds its particles
             // where they are; a catching-up one also remembers the time it missed.
             if (this.cullingMode === 'pauseAndCatchUp') {
-                this.pendingCatchUp = Math.min(MAX_CATCH_UP_SECONDS, this.pendingCatchUp + delta);
+                this.clock.deferCatchUp(delta);
             }
             return;
         }
-        if (this.pendingCatchUp > 0) {
+        if (this.clock.owesCatchUp) {
             this.catchUp(catchUpDeadline ?? performance.now() + ParticleSystem.catchUpBudgetMs);
+            if (this.paused || this.destroyed) return;
         }
 
         if (this.firstTimeUpdate) {
@@ -1499,27 +1524,13 @@ export class ParticleSystem implements IParticleSystem {
             // accumulator here desyncs it from the parent, so the next particles
             // the parent emits into it sit at age 0 / startColor until the phase
             // catches up — white flashes scattered wherever the parent was.
-            if (delta > 0.1) {
-                delta = 0.1;
-            }
-            this.simulationAccumulator += delta;
-            const stepsToRun = Math.min(
-                MAX_SIMULATION_STEPS_PER_FRAME,
-                Math.max(0, Math.round(this.simulationAccumulator / SIMULATION_STEP - ROUND_TIE_BIAS))
-            );
-            this.simulationAccumulator -= stepsToRun * SIMULATION_STEP;
+            this.clock.accrue(delta, speed);
             return;
         }
 
         if (this.looping && this.prewarm && !this.prewarmed) {
-            this.prewarmed = true;
-            for (let i = 0; i < this.duration * PREWARM_FPS; i++) {
-                this.update(1.0 / PREWARM_FPS);
-            }
-        }
-
-        if (delta > 0.1) {
-            delta = 0.1;
+            this.runPrewarm();
+            if (this.paused || this.destroyed) return;
         }
 
         if (this.neededToUpdateRender) {
@@ -1535,40 +1546,67 @@ export class ParticleSystem implements IParticleSystem {
         (this.previousEmitterPos ??= new Vector3()).copy(this.tempEmitterPos);
 
         // Start delay holds back emission once per play/restart (ignored with
-        // prewarm, matching Unity). Carry the remainder so a large frame does
-        // not lose time.
-        if (this.startDelayTimeLeft > 0 && !(this.prewarm && this.looping)) {
-            this.startDelayTimeLeft -= delta;
-            if (this.startDelayTimeLeft >= 0) return;
-            delta = Math.min(-this.startDelayTimeLeft, 0.1);
-            this.startDelayTimeLeft = 0;
+        // prewarm, matching Unity). The clock carries the remainder of the
+        // frame that ends it, so a large frame does not lose time.
+        if (this.clock.delaying && !(this.prewarm && this.looping)) {
+            delta = this.clock.consumeStartDelay(delta);
+            if (delta === 0) return;
         }
 
-        this.simulationAccumulator += delta;
-        const stepsToRun = Math.min(
-            MAX_SIMULATION_STEPS_PER_FRAME,
-            Math.max(0, Math.round(this.simulationAccumulator / SIMULATION_STEP - ROUND_TIE_BIAS))
-        );
+        const stepsToRun = this.clock.accrue(delta, speed);
         for (let i = 0; i < stepsToRun; i++) {
             this.simulateStep(SIMULATION_STEP);
+            // A listener (finished, particleDied) may have stopped, paused or disposed the system
+            // mid-frame; the remaining steps would emit into a stopped system.
+            if (this.paused || this.destroyed) break;
             if (stepDeadline !== Infinity && i + 1 < stepsToRun && performance.now() >= stepDeadline) {
                 // Over the frame's simulation budget: the remaining steps' time
-                // is consumed below without being simulated.
+                // was taken off the clock without being simulated.
                 break;
             }
         }
-        this.simulationAccumulator -= stepsToRun * SIMULATION_STEP;
     }
 
     /** Runs the steps a system missed while culled, as many as fit before `deadline`. */
     private catchUp(deadline: number): void {
-        let steps = Math.floor(this.pendingCatchUp / SIMULATION_STEP);
-        this.pendingCatchUp = 0;
+        let steps = this.clock.takeCatchUpSteps();
         while (steps-- > 0) {
             this.simulateStep(SIMULATION_STEP);
+            if (this.paused || this.destroyed) break;
             if (steps > 0 && performance.now() >= deadline) {
                 break;
             }
+        }
+    }
+
+    /**
+     * Simulates the end of a cycle before the first frame, on the fixed step directly: no frame
+     * clamp, culling or emitter velocity in the way. A cycle longer than {@link maxPrewarmSeconds}
+     * is warmed up over its last part only, with the bursts before that skipped.
+     */
+    private runPrewarm(): void {
+        this.prewarmed = true;
+        const warm = Math.min(this.duration, Math.max(0, ParticleSystem.maxPrewarmSeconds));
+        const steps = Math.round(warm / SIMULATION_STEP);
+        if (warm < this.duration) {
+            const state = this.emissionState;
+            state.time = this.duration - steps * SIMULATION_STEP;
+            const bursts = this.emissionBursts;
+            const waves = (state.burstWaves ??= []);
+            while (state.burstIndex < bursts.length && bursts[state.burstIndex].time < state.time) {
+                // The waves due before the warm-up count as fired, so the first step does not fire
+                // them late; the waves inside it still fire as the time comes.
+                const burst = bursts[state.burstIndex];
+                const cycles = ParticleSystem.burstWaveCount(burst);
+                const interval = ParticleSystem.burstInterval(burst);
+                waves[state.burstIndex] =
+                    interval > 0 ? Math.min(cycles, Math.ceil((state.time - burst.time) / interval)) : cycles;
+                state.burstIndex++;
+            }
+        }
+        for (let i = 0; i < steps; i++) {
+            this.simulateStep(SIMULATION_STEP);
+            if (this.paused || this.destroyed) return;
         }
     }
 
@@ -1656,47 +1694,29 @@ export class ParticleSystem implements IParticleSystem {
         this.bounds.setWorld(minX, minY, minZ, maxX, maxY, maxZ, padding);
     }
 
-    /**
-     * Time the display is ahead of (positive) or still ahead of the simulation
-     * (negative — the simulation ran a hair early), in seconds. Magnitude never
-     * exceeds one step.
-     *
-     * The simulation runs on a fixed 1/60 step so that emission and lifetimes
-     * stay in phase — without it a slow emitter flickers when the frame rate
-     * wobbles. But frames do not arrive on that grid: a display running at
-     * anything other than exactly 60Hz leaves some frames with no step at all
-     * (half of them at 120Hz, three in five at 144Hz) and others with two, so
-     * the particles are drawn stuttering even while the frame rate is perfect.
-     *
-     * The steps-per-frame count below is chosen by *rounding* the accumulated
-     * time to the nearest step, not flooring it. Flooring always leaves the
-     * accumulator positive, and when the real frame rate sits very close to
-     * 60Hz (as most displays do) that leftover creeps toward a full step for
-     * many consecutive frames before tipping over into a frame that runs two
-     * steps at once and resets it to near zero — a visible lurch, every particle
-     * in the system at once, with a perfectly steady frame rate the whole time.
-     * Rounding lets the leftover go negative instead, which keeps it centered
-     * near zero and stops it from ever building up toward that reset.
-     *
-     * Renderers close the gap by advancing what they draw along each particle's
-     * velocity by this much. That reproduces the straight-line part of the
-     * motion exactly — it is the same term the next step would integrate — so
-     * the simulation stays fixed-step while the picture moves continuously.
-     */
     /** Length of one simulation step, in seconds. See {@link simulationResidual}. */
     get simulationStep(): number {
         return SIMULATION_STEP;
     }
 
+    /**
+     * Time the display is ahead of (positive) or still ahead of the simulation
+     * (negative: the simulation ran a hair early), in seconds; 0 while paused.
+     * Its magnitude never exceeds one step.
+     *
+     * The simulation runs on a fixed 1/60 step so that emission and lifetimes
+     * stay in phase; without it a slow emitter flickers when the frame rate
+     * wobbles. But frames do not arrive on that grid: a display running at
+     * anything other than exactly 60 Hz leaves some frames with no step at all
+     * (half of them at 120 Hz, three in five at 144 Hz) and others with two, so
+     * the particles would be drawn stuttering even while the frame rate is
+     * perfect. Renderers close the gap by advancing what they draw along each
+     * particle's velocity by this much. That reproduces the straight-line part
+     * of the motion exactly, the same term the next step would integrate, so
+     * the simulation stays fixed-step while the picture moves continuously.
+     */
     get simulationResidual(): number {
-        if (this.paused) {
-            return 0;
-        }
-        // Magnitude never more than a step, even if a frame long enough to hit
-        // the per-frame step cap left the accumulator with more than that.
-        if (this.simulationAccumulator > SIMULATION_STEP) return SIMULATION_STEP;
-        if (this.simulationAccumulator < -SIMULATION_STEP) return -SIMULATION_STEP;
-        return this.simulationAccumulator;
+        return this.paused ? 0 : this.clock.residual;
     }
 
     /**
@@ -1718,6 +1738,7 @@ export class ParticleSystem implements IParticleSystem {
     }
 
     private stepOnce(delta: number): void {
+        if (this.destroyed) return;
         this.motionScale = this.measureMotionScale();
         if (!this.onlyUsedByOther) {
             this.emit(delta, this.emissionState, this.emitter.matrixWorld);
