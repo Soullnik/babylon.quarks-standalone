@@ -17,7 +17,6 @@ attribute vec4 velocity;
 uniform mat4 world;
 uniform mat4 view;
 uniform mat4 projection;
-uniform float speedFactor;
 
 #ifdef UV_TILE
 uniform float tileCountX;
@@ -61,7 +60,7 @@ void main() {
     float vlength = length(viewVelocity);
     // Stretch direction is the velocity direction; only a genuinely motionless particle has none.
     // Deriving it via normalize keeps the stretch aligned even when the speed contribution is ~0
-    // (e.g. speedFactor 0), instead of collapsing the whole burst onto a fixed screen axis.
+    // (e.g. a speed factor of 0), instead of collapsing the whole burst onto a fixed screen axis.
     vec3 vdir = vlength > 0.000001 ? viewVelocity / vlength : vec3(0.0, 0.0, 1.0);
 #ifdef BEAM
     // Seen straight along its length a beam has no side to face; any will do.

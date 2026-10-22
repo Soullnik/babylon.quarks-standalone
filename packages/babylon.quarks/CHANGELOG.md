@@ -8,6 +8,14 @@ and the project follows the `quarks.core` 0.x version line.
 
 ### Added
 
+- **`transparent`, `depthTest`, `depthWrite` and `alphaTest` on `ParticleSystem`**, the material
+  flags a system is built with, readable and settable afterwards like `blending`. Setting one
+  moves the system to a matching batch. `alphaTest` is kept to 0…1; the material flags were
+  only constructor parameters and JSON fields before.
+- **`instancingIndices` on `ParticleSystem`**: the mesh particles' index list, settable after
+  construction. Mesh systems that share a vertex buffer but not an index list (sub-meshes of one
+  buffer) are now batched apart; they used to share a batch and draw with the first system's
+  indices.
 - **`serializeEffect(root, options?)` writes a whole effect** as one document `QuarksLoader`
   loads back, the counterpart of `loader.load()`. It writes the node tree (groups, emitters, mesh
   nodes with their geometry, prefabs with `timeScale`), each texture with its sampler state, and a
@@ -71,6 +79,23 @@ or duplicated something else, and nothing in the package used them.
 
 ### Changed
 
+- **Batches are keyed on what the render mode draws.** The renderer used to split systems on
+  every setting, including the ones their mode ignores: two billboards with different mesh rims,
+  two meshes with different billboard pivots or size limits, two opaque systems with different
+  blend modes, two systems with different soft fade distances and soft particles off, or two
+  trails with different instanced geometry each cost a draw call. They now share a batch. The
+  settings a mode ignores are at their defaults in the batch's `settings`, so an opaque batch's
+  `materialBlendMode` reads `ALPHA_DISABLE` and a billboard batch's `rim` is unset.
+- **Live parameters change a batch's material in place.** The values that only set uniforms (the
+  soft fade distances, the alpha cutoff, the pivot, the size limits, the reflection level, the rim
+  colour, power and strength, each texture effect's numbers and each texture's tiling, offset and
+  scroll) are the batch's live parameters, as a Unity MaterialPropertyBlock's values or an
+  Unreal dynamic material instance's parameters. Changing one on a system that is alone in its
+  batch writes the material and keeps the batch; it used to make a new batch, mesh and material
+  per value, and leave the old one for 120 frames. A change that needs a different shader (a
+  cutoff or pivot switched on or off, a rim mode, a texture) still rebuilds the material, and a
+  system that shares its batch still moves to a batch with its values. `VFXBatchSettings`
+  documents the two groups.
 - **A particle system's JSON leaves out settings at their defaults.** `toJSON`, and so
   `serializeEffect` and the editor's saves, used to write every setting; now a setting is written
   only when it differs from the default, and a missing field reads as the default. The shape, the
@@ -307,6 +332,15 @@ or duplicated something else, and nothing in the package used them.
 
 ### Internal
 
+- **`batchKey.ts`** holds the batch key: `storedBatchSettings` reduces a system's settings to the
+  canonical form a batch stores, `shaderKeyEqual` and `liveParamsEqual` compare the two groups
+  and `batchSettingsEqual` both. `BatchedRenderer.updateSystem` writes live parameters through
+  `VFXBatch.applyLiveSettings`. `VFXBatch` reads the texture layouts off its settings on every
+  bind, and each batch writes its live uniforms from one place (`writeLiveUniforms`), on build and
+  on a change.
+- **The stretched-billboard shaders no longer declare a `speedFactor` uniform.** The speed factor
+  is baked into the velocity attribute on the CPU, so the uniform, which was set from
+  `softNearFade`, was never read. The per-frame sync and its tests are gone with it.
 - **`integrate.ts`** (`src/system/`) holds the passes of a simulation step after emission: the
   snapshot the renderer extrapolates from, the behavior steps, the sprite path's one pass over
   the store (newborn collapse, motion, ageing, bounds and removal) and the trail path's passes

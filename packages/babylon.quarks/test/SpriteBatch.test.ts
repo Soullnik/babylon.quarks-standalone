@@ -16,6 +16,8 @@ import {
 } from 'quarks.core';
 import {BatchedRenderer} from '../src/BatchedRenderer';
 import {ParticleSystem} from '../src/ParticleSystem';
+import stretched_bb_particle_vert from '../src/shaders/stretched_bb_particle_vert.glsl';
+import stretched_bb_particle_vert_wgsl from '../src/shaders/stretched_bb_particle_vert.wgsl';
 import {SpriteBatch} from '../src/SpriteBatch';
 import {RenderMode} from '../src/VFXBatch';
 
@@ -174,7 +176,7 @@ describe('SpriteBatch', () => {
         system.dispose();
     });
 
-    it('handles stretched billboard velocity buffers and speedFactor clamping', () => {
+    it('scales stretched billboard velocity buffers by the speed factor, with 0 kept to a hair of length', () => {
         const renderer = new BatchedRenderer('sprite-stretched', scene);
         const system = createSpriteSystem({
             renderMode: RenderMode.StretchedBillBoard,
@@ -199,7 +201,8 @@ describe('SpriteBatch', () => {
         const material = batch.mesh.material as ShaderMaterial;
         expect(velocityBuffer[0]).toBeCloseTo(0.003, 6);
         expect(velocityBuffer[3]).toBe(3);
-        expect((material as any)._floats.speedFactor).toBe(0.001);
+        // The speed is baked into the velocity attribute; the shader has no speed uniform.
+        expect((material as any)._options.uniforms).not.toContain('speedFactor');
 
         renderer.dispose();
         system.dispose();
@@ -302,24 +305,6 @@ describe('SpriteBatch', () => {
         sysH.dispose();
     });
 
-    it('uses softNearFade as stretched speedFactor when greater than zero', () => {
-        const renderer = new BatchedRenderer('sprite-stretch-softnear', scene);
-        const system = createSpriteSystem({
-            renderMode: RenderMode.StretchedBillBoard,
-            rendererEmitterSettings: {speedFactor: 0, lengthFactor: 2},
-            softNearFade: 0.4,
-            worldSpace: true,
-        });
-        renderer.addSystem(system);
-        const matBeforeUpdate = getSpriteBatch(renderer).mesh.material as ShaderMaterial;
-        expect((matBeforeUpdate as any)._floats.speedFactor).toBe(0.4);
-        renderer.update(1 / 60);
-        const mat = getSpriteBatch(renderer).mesh.material as ShaderMaterial;
-        expect((mat as any)._floats.speedFactor).toBe(0.001);
-        renderer.dispose();
-        system.dispose();
-    });
-
     it('covers mesh rotation with parent matrix in local space', () => {
         const renderer = new BatchedRenderer('sprite-mesh-parent', scene);
         const system = createSpriteSystem({
@@ -371,22 +356,9 @@ describe('SpriteBatch', () => {
         system.dispose();
     });
 
-    it('updates stretched speedFactor uniform when rendererEmitterSettings change', () => {
-        const renderer = new BatchedRenderer('sprite-stretch-speed', scene);
-        const system = createSpriteSystem({
-            renderMode: RenderMode.StretchedBillBoard,
-            rendererEmitterSettings: {speedFactor: 2, lengthFactor: 1},
-            worldSpace: true,
-        });
-        renderer.addSystem(system);
-        renderer.update(1 / 60);
-        const batch = getSpriteBatch(renderer);
-        (system.rendererEmitterSettings as any).speedFactor = 0.5;
-        renderer.update(1 / 60);
-        const mat = batch.mesh.material as ShaderMaterial;
-        expect((mat as any)._floats.speedFactor).toBe(0.5);
-        renderer.dispose();
-        system.dispose();
+    it('stretched and beam shaders declare no speedFactor uniform', () => {
+        expect(stretched_bb_particle_vert).not.toContain('speedFactor');
+        expect(stretched_bb_particle_vert_wgsl).not.toContain('speedFactor');
     });
 
     it('mesh world-space path reads particle quaternion without parent matrix', () => {

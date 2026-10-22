@@ -34,3 +34,8 @@ export function nonZeroPivot(v: Vector3 | undefined): Vector3 | undefined {
 export function nonZeroFlip(v: Vector2 | undefined): Vector2 | undefined {
     return v && (v.x > 0 || v.y > 0) ? v.clone() : undefined;
 }
+
+/** `cutoff` kept to 0…1, or 0 (no alpha test) when it is unset, NaN or negative. */
+export function validAlphaTest(cutoff: unknown): number {
+    return typeof cutoff === 'number' && cutoff > 0 ? Math.min(cutoff, 1) : 0;
+}

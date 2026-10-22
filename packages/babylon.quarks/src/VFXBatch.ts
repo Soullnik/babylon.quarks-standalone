@@ -10,6 +10,7 @@ import {Scene} from '@babylonjs/core/scene';
 import {IParticleSystem, Vector3} from 'quarks.core';
 import {VFXBatchSettings} from './BatchedRenderer';
 import type {ParticleSystem} from './ParticleSystem';
+import {storedBatchSettings} from './batchKey';
 import {DepthBinding, softDepthParams} from './softDepth';
 
 /**
@@ -446,8 +447,10 @@ export function readsUV1(settings: {
 }
 
 /**
- * A batch's copy of the {@link VFXBatchSettings} its systems share, every optional field
- * defaulted. The renderer adds a system to the batch whose settings match its own.
+ * A batch's copy of the {@link VFXBatchSettings} its systems share: every optional field
+ * defaulted, and every field the batch's render mode ignores at its default (an opaque batch's
+ * `materialBlendMode` reads `ALPHA_DISABLE`, a billboard batch's `rim` is unset). The renderer
+ * adds a system to the batch whose settings match its own.
  */
 export interface StoredBatchSettings {
     /** See {@link VFXBatchSettings.instancingGeometry}. */
@@ -535,7 +538,7 @@ export abstract class VFXBatch {
     mesh: Mesh;
     /** The systems drawn by this batch. */
     systems: Set<IParticleSystem>;
-    /** The settings every system in the batch shares. */
+    /** The settings every system in the batch shares, with what the render mode ignores at its default. */
     settings: StoredBatchSettings;
     /** @internal */
     protected maxParticles: number;
@@ -555,44 +558,7 @@ export abstract class VFXBatch {
         this.depth = depth;
         this.maxParticles = 1000;
         this.systems = new Set<IParticleSystem>();
-        this.settings = {
-            instancingGeometry: settings.instancingGeometry,
-            instancingIndices: settings.instancingIndices,
-            instancingUVs: settings.instancingUVs,
-            instancingUVs2: settings.instancingUVs2,
-            instancingNormals: settings.instancingNormals,
-            renderMode: settings.renderMode,
-            renderOrder: settings.renderOrder,
-            uTileCount: settings.uTileCount,
-            vTileCount: settings.vTileCount,
-            blendTiles: settings.blendTiles,
-            softParticles: settings.softParticles,
-            softNearFade: settings.softNearFade,
-            softFarFade: settings.softFarFade,
-            materialBlendMode: settings.materialBlendMode,
-            materialTransparent: settings.materialTransparent,
-            materialDepthTest: settings.materialDepthTest,
-            materialDepthWrite: settings.materialDepthWrite,
-            materialAlphaTest: settings.materialAlphaTest,
-            texture: settings.texture,
-            reflectionTexture: settings.reflectionTexture ?? null,
-            reflectionLevel: settings.reflectionLevel ?? 1,
-            reflectionFaces: settings.reflectionFaces ?? null,
-            reflectionAtlas: settings.reflectionAtlas ?? null,
-            pivot: settings.pivot?.clone(),
-            sortMode: settings.sortMode ?? 'none',
-            minParticleSize: settings.minParticleSize ?? 0,
-            maxParticleSize: settings.maxParticleSize ?? Infinity,
-            layerMask: settings.layerMask,
-            renderingGroupId: settings.renderingGroupId ?? 0,
-            applyFog: settings.applyFog ?? true,
-            lighting: settings.lighting,
-            rim: normalizeMeshRim(settings.rim),
-            mapUV: normalizeMapUV(settings.mapUV),
-            uvDistortion: normalizeUVDistortion(settings.uvDistortion),
-            gradientMap: normalizeGradientMap(settings.gradientMap),
-            erosion: normalizeErosion(settings.erosion),
-        };
+        this.settings = storedBatchSettings(settings);
         this.mesh = new Mesh('vfxBatch', scene);
         this.configureMesh();
     }
@@ -812,23 +778,14 @@ export abstract class VFXBatch {
         const {mapUV, uvDistortion, gradientMap, erosion} = this.settings;
         if (uvDistortion?.map) {
             material.setTexture('distortionMap', uvDistortion.map);
-            material.setFloat('distortionStrength', uvDistortion.strength);
         }
         if (gradientMap?.ramp) {
             material.setTexture('gradientMap', gradientMap.ramp);
-            const [r, g, b, a] = GRADIENT_MAP_WEIGHTS[gradientMap.channel];
-            material.setVector4('gradientMapChannel', new BVector4(r, g, b, a));
         }
-        if (erosion) {
-            if (erosion.mask) {
-                material.setTexture('erosionMask', erosion.mask);
-            }
-            material.setVector2('erosionParams', new BVector2(erosion.softness, erosion.edgeWidth));
-            material.setVector3(
-                'erosionEdgeColor',
-                new BVector3(erosion.edgeColor[0], erosion.edgeColor[1], erosion.edgeColor[2])
-            );
+        if (erosion?.mask) {
+            material.setTexture('erosionMask', erosion.mask);
         }
+        this.writeSurfaceParams(material);
         if (!mapUV && !uvDistortion && !erosion?.mask && !gradientMap) {
             return;
         }
@@ -851,9 +808,12 @@ export abstract class VFXBatch {
             );
         // Written to the material for the next bind and to the bound effect for
         // this one: ShaderMaterial uploads its values before the bind observers run.
+        // The layouts are read off the settings on every bind, so a live change
+        // to a tiling or scroll reaches the next draw.
         const write = () => {
             const time = this.time;
             const effect = material.getEffect();
+            const {mapUV, uvDistortion, gradientMap, erosion} = this.settings;
             if (mapUV) {
                 transform(mapUV, time, mapTransform);
                 material.setVector4('mapTransform', mapTransform);
@@ -881,6 +841,49 @@ export abstract class VFXBatch {
         };
         write();
         material.onBindObservable.add(write);
+    }
+
+    /** Writes the texture effects' constants (the uniforms their live parameters set). */
+    private writeSurfaceParams(material: ShaderMaterial): void {
+        const {uvDistortion, gradientMap, erosion} = this.settings;
+        if (uvDistortion?.map) {
+            material.setFloat('distortionStrength', uvDistortion.strength);
+        }
+        if (gradientMap?.ramp) {
+            const [r, g, b, a] = GRADIENT_MAP_WEIGHTS[gradientMap.channel];
+            material.setVector4('gradientMapChannel', new BVector4(r, g, b, a));
+        }
+        if (erosion) {
+            material.setVector2('erosionParams', new BVector2(erosion.softness, erosion.edgeWidth));
+            material.setVector3(
+                'erosionEdgeColor',
+                new BVector3(erosion.edgeColor[0], erosion.edgeColor[1], erosion.edgeColor[2])
+            );
+        }
+    }
+
+    /**
+     * Takes new live parameters (see {@link BatchedRenderer.updateSystem}): settings with the same
+     * shader key as the batch's, whose uniform values differ. They are copied into the batch's
+     * settings and written to its material, which is kept.
+     * @internal
+     */
+    applyLiveSettings(settings: StoredBatchSettings): void {
+        Object.assign(this.settings, settings);
+        const material = this.mesh.material;
+        if (material instanceof ShaderMaterial) {
+            this.writeLiveUniforms(material);
+        }
+    }
+
+    /**
+     * Writes every uniform a live parameter sets, from the batch's settings. The base writes the
+     * ones every render mode has; a mode adds its own.
+     * @internal
+     */
+    protected writeLiveUniforms(material: ShaderMaterial): void {
+        this.writeSoftParams(material);
+        this.writeSurfaceParams(material);
     }
 
     /** @internal */
@@ -973,15 +976,9 @@ export abstract class VFXBatch {
      * camera of each draw.
      */
     protected bindSoft(material: ShaderMaterial): void {
+        this.writeSoftParams(material);
         if (this.drawsSoft()) {
             material.setTexture('depthTexture', this.depth!.texture);
-            material.setVector2(
-                'softParams',
-                new BVector2(
-                    this.settings.softNearFade,
-                    1.0 / Math.max(this.settings.softFarFade - this.settings.softNearFade, 0.0001)
-                )
-            );
             // Reused across binds: this runs on every draw call.
             const projParams = new BVector4(1, 0, 0, 1);
             material.onBindObservable.add(() => {
@@ -991,6 +988,19 @@ export abstract class VFXBatch {
                     VFXBatch.writeBound(material, (target) => target.setVector4('projParams', projParams));
                 }
             });
+        }
+    }
+
+    /** Writes the soft-particle fade and the alpha cutoff, the live parameters every mode shares. */
+    private writeSoftParams(material: ShaderMaterial): void {
+        if (this.drawsSoft()) {
+            material.setVector2(
+                'softParams',
+                new BVector2(
+                    this.settings.softNearFade,
+                    1.0 / Math.max(this.settings.softFarFade - this.settings.softNearFade, 0.0001)
+                )
+            );
         }
         if (this.settings.materialAlphaTest > 0) {
             material.setFloat('alphaTest', this.settings.materialAlphaTest);

@@ -64,6 +64,7 @@ import {liveAtlas, MaterialOverrides, resolveMaterialSettings} from './system/ma
 import {
     nonZeroFlip,
     nonZeroPivot,
+    validAlphaTest,
     validCullingMode,
     validLighting,
     validMaxParticles,
@@ -575,7 +576,11 @@ export class ParticleSystem implements IParticleSystem {
         return (sx + sy + sz) / 3;
     }
 
-    /** Distance in world units in front of the scene at which a soft particle is fully faded out. Default 0. */
+    /**
+     * Distance in world units in front of the scene at which a soft particle is fully faded out.
+     * Default 0. A live parameter: changing it on a system alone in its batch keeps the batch and
+     * its material (see {@link VFXBatchSettings}).
+     */
     get softNearFade(): number {
         return this.rendererSettings.softNearFade;
     }
@@ -585,7 +590,7 @@ export class ParticleSystem implements IParticleSystem {
         this.neededToUpdateRender = true;
     }
 
-    /** Distance in world units in front of the scene at which a soft particle is fully opaque. Default 0. */
+    /** Distance in world units in front of the scene at which a soft particle is fully opaque. Default 0. A live parameter, like {@link softNearFade}. */
     get softFarFade(): number {
         return this.rendererSettings.softFarFade;
     }
@@ -630,6 +635,19 @@ export class ParticleSystem implements IParticleSystem {
         this.neededToUpdateRender = true;
     }
 
+    /**
+     * The mesh particles' triangle indices into {@link instancingGeometry}. Mesh systems that share
+     * positions but not indices (sub-meshes of one vertex buffer) are batched apart.
+     */
+    get instancingIndices(): Uint32Array | Uint16Array {
+        return this.rendererSettings.instancingIndices;
+    }
+
+    set instancingIndices(indices: Uint32Array | Uint16Array) {
+        this.rendererSettings.instancingIndices = indices;
+        this.neededToUpdateRender = true;
+    }
+
     /** The mesh particles' first UV set, two values per vertex. */
     get instancingUVs(): Float32Array {
         return this.rendererSettings.instancingUVs ?? fallbackUVsForPositions(this.rendererSettings.instancingGeometry);
@@ -661,6 +679,62 @@ export class ParticleSystem implements IParticleSystem {
 
     set blending(blending: number) {
         this.rendererSettings.materialBlendMode = blending;
+        this.neededToUpdateRender = true;
+    }
+
+    /**
+     * Whether the particles draw in the transparent pass, blended by {@link blending}; false
+     * draws them opaque, with blending off. Default true, or the material's `needAlphaBlending`.
+     * Systems that differ are batched apart.
+     */
+    get transparent(): boolean {
+        return this.rendererSettings.materialTransparent;
+    }
+
+    set transparent(transparent: boolean) {
+        this.rendererSettings.materialTransparent = transparent;
+        this.neededToUpdateRender = true;
+    }
+
+    /**
+     * Whether particles are hidden behind nearer geometry; false draws them over everything
+     * (Unity's `ZTest Always`), for overlays and effects seen through walls. Default true, or the
+     * material's `disableDepthTest` inverted. Systems that differ are batched apart.
+     */
+    get depthTest(): boolean {
+        return this.rendererSettings.materialDepthTest;
+    }
+
+    set depthTest(depthTest: boolean) {
+        this.rendererSettings.materialDepthTest = depthTest;
+        this.neededToUpdateRender = true;
+    }
+
+    /**
+     * Whether particles write depth, so later draws are hidden behind them. Default false, or the
+     * material's `disableDepthWrite` inverted. Systems that differ are batched apart.
+     */
+    get depthWrite(): boolean {
+        return this.rendererSettings.materialDepthWrite;
+    }
+
+    set depthWrite(depthWrite: boolean) {
+        this.rendererSettings.materialDepthWrite = depthWrite;
+        this.neededToUpdateRender = true;
+    }
+
+    /**
+     * Alpha below which a fragment is discarded (Unity's Alpha Clip Threshold), 0…1; 0 (the
+     * default, or the material's `alphaCutOff`) discards nothing. Switching it on or off rebuilds
+     * the batch's material; a change between non-zero cutoffs on a system alone in its batch is
+     * written to the material in place.
+     */
+    get alphaTest(): number {
+        return this.rendererSettings.materialAlphaTest;
+    }
+
+    set alphaTest(cutoff: number) {
+        this.rendererSettings.materialAlphaTest = validAlphaTest(cutoff);
         this.neededToUpdateRender = true;
     }
 
@@ -931,7 +1005,7 @@ export class ParticleSystem implements IParticleSystem {
             materialTransparent: parameters.transparent ?? true,
             materialDepthTest: parameters.depthTest ?? true,
             materialDepthWrite: parameters.depthWrite ?? false,
-            materialAlphaTest: parameters.alphaTest ?? 0,
+            materialAlphaTest: validAlphaTest(parameters.alphaTest),
             texture: parameters.texture ?? null,
             reflectionTexture: null,
             reflectionLevel: 1,
@@ -1068,7 +1142,7 @@ export class ParticleSystem implements IParticleSystem {
         this.rendererSettings.materialTransparent = resolved.transparent;
         this.rendererSettings.materialDepthTest = resolved.depthTest;
         this.rendererSettings.materialDepthWrite = resolved.depthWrite;
-        this.rendererSettings.materialAlphaTest = resolved.alphaTest;
+        this.rendererSettings.materialAlphaTest = validAlphaTest(resolved.alphaTest);
         if (overrides.layerMask !== undefined) {
             this.rendererSettings.layerMask = overrides.layerMask;
         }

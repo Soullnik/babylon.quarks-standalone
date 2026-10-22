@@ -7,36 +7,42 @@ import {TransformNode} from '@babylonjs/core/Meshes/transformNode';
 import type {DepthRenderer} from '@babylonjs/core/Rendering/depthRenderer';
 import {Scene} from '@babylonjs/core/scene';
 import {EmitSubParticleSystem, IParticleSystem, Vector3} from 'quarks.core';
+import {batchSettingsEqual, shaderKeyEqual, storedBatchSettings} from './batchKey';
 import {ParticleSystem} from './ParticleSystem';
 import {depthBinding, DepthBinding, DepthTextureOptions, SoftDepthEncoding} from './softDepth';
 import {SpriteBatch} from './SpriteBatch';
 import {TrailBatch} from './TrailBatch';
 import {
     defaultMeshLighting,
-    erosionEqual,
-    gradientMapEqual,
-    mapUVEqual,
     MeshLighting,
     MeshLightingSettings,
     MeshRim,
-    meshRimEqual,
     ParticleErosion,
     ParticleGradientMap,
     ParticleUVDistortion,
-    readsUV1,
     RenderMode,
     SortMode,
-    StoredBatchSettings,
     TextureUV,
-    uvDistortionEqual,
     VFXBatch,
 } from './VFXBatch';
 
 /**
  * Everything about a system that decides how it is drawn: {@link ParticleSystem.getRendererSettings}
- * returns it, and the renderer draws systems whose settings match from one batch. Prefer the
- * system's own setters, which also move it to a matching batch; after changing a field directly,
- * set {@link ParticleSystem.neededToUpdateRender}.
+ * returns it, and the renderer draws systems whose settings match from one batch. Only the
+ * settings a render mode reads count: two billboards that differ in a mesh-only setting, such as
+ * `rim`, share a batch.
+ *
+ * A batch is one draw with one material, so its settings fall into two groups, as a Unity
+ * material's keywords and texture slots against its MaterialPropertyBlock values, or an Unreal
+ * material against a dynamic material instance's parameters. The shader key (render mode,
+ * geometry, textures, blend and depth state, and which effects are on) decides the material.
+ * The live parameters (the fade distances, alpha cutoff, pivot, size limits, reflection level,
+ * rim colour, each effect's numbers, and each texture's tiling, offset and scroll) are uniforms:
+ * changing one on a system that is alone in its batch writes the material in place, with no new
+ * batch or material. A texture's UV channel is part of the shader key, so changing it rebuilds.
+ *
+ * Prefer the system's own setters, which also move it to a matching batch; after changing a
+ * field directly, set {@link ParticleSystem.neededToUpdateRender}.
  */
 export interface VFXBatchSettings {
     /** Mesh particles' vertex positions, see {@link ParticleSystem.instancingGeometry}. A quad for other modes. */
@@ -165,27 +171,6 @@ export interface AdaptivePerformanceOptions {
     decreaseStep: number;
     /** Quality regained per update within budget. Default 0.02. */
     increaseStep: number;
-}
-
-/** True when both pivots put the quad in the same place; a missing pivot is zero. */
-function pivotEqual(a: Vector3 | undefined, b: Vector3 | undefined): boolean {
-    return (a?.x ?? 0) === (b?.x ?? 0) && (a?.y ?? 0) === (b?.y ?? 0) && (a?.z ?? 0) === (b?.z ?? 0);
-}
-
-/** True when both face lists are the same six texture references (or both empty). */
-function reflectionFacesEqual(a: BaseTexture[] | null | undefined, b: BaseTexture[] | null | undefined): boolean {
-    if (a === b) {
-        return true;
-    }
-    if (!a || !b || a.length !== b.length) {
-        return false;
-    }
-    for (let i = 0; i < a.length; i++) {
-        if (a[i] !== b[i]) {
-            return false;
-        }
-    }
-    return true;
 }
 
 /** A snapshot of the renderer's adaptive performance, from {@link BatchedRenderer.getAdaptivePerformanceState}. */
@@ -360,48 +345,6 @@ export class BatchedRenderer extends TransformNode {
         return Math.max(min, Math.min(max, value));
     }
 
-    private static equals(a: StoredBatchSettings, b: VFXBatchSettings): boolean {
-        return (
-            a.materialBlendMode === b.materialBlendMode &&
-            a.materialTransparent === b.materialTransparent &&
-            a.materialDepthTest === b.materialDepthTest &&
-            a.materialDepthWrite === b.materialDepthWrite &&
-            a.materialAlphaTest === b.materialAlphaTest &&
-            a.texture === b.texture &&
-            a.reflectionTexture === b.reflectionTexture &&
-            a.reflectionLevel === b.reflectionLevel &&
-            reflectionFacesEqual(a.reflectionFaces, b.reflectionFaces) &&
-            a.reflectionAtlas === b.reflectionAtlas &&
-            a.renderMode === b.renderMode &&
-            a.blendTiles === b.blendTiles &&
-            a.softParticles === b.softParticles &&
-            a.softFarFade === b.softFarFade &&
-            a.softNearFade === b.softNearFade &&
-            a.uTileCount === b.uTileCount &&
-            a.vTileCount === b.vTileCount &&
-            a.instancingGeometry === b.instancingGeometry &&
-            // Trails draw their own strip and read none of the instanced geometry's UVs.
-            (a.renderMode === RenderMode.Trail || a.instancingUVs === b.instancingUVs) &&
-            // Normals, and the second UV set when read, only matter to meshes.
-            (a.renderMode !== RenderMode.Mesh || a.instancingNormals === b.instancingNormals) &&
-            (a.renderMode !== RenderMode.Mesh || !readsUV1(a) || a.instancingUVs2 === b.instancingUVs2) &&
-            a.renderOrder === b.renderOrder &&
-            a.layerMask === b.layerMask &&
-            a.renderingGroupId === b.renderingGroupId &&
-            a.applyFog === b.applyFog &&
-            pivotEqual(a.pivot, b.pivot) &&
-            a.sortMode === (b.sortMode ?? 'none') &&
-            a.minParticleSize === (b.minParticleSize ?? 0) &&
-            a.maxParticleSize === (b.maxParticleSize ?? Infinity) &&
-            (a.lighting ?? 'fixed') === (b.lighting ?? 'fixed') &&
-            meshRimEqual(a.rim, b.rim) &&
-            mapUVEqual(a.mapUV, b.mapUV) &&
-            uvDistortionEqual(a.uvDistortion, b.uvDistortion) &&
-            gradientMapEqual(a.gradientMap, b.gradientMap) &&
-            erosionEqual(a.erosion, b.erosion)
-        );
-    }
-
     /**
      * Starts drawing and updating `system`, in the batch whose settings match its own (a new one if
      * none does). Add each system of an effect, or use `QuarksUtil.addToBatchRenderer` on its root.
@@ -423,8 +366,9 @@ export class BatchedRenderer extends TransformNode {
     private assignToBatch(particleSystem: ParticleSystem) {
         const system = particleSystem as IParticleSystem;
         const settings = particleSystem.getRendererSettings();
+        const stored = storedBatchSettings(settings);
         for (let i = 0; i < this.batches.length; i++) {
-            if (BatchedRenderer.equals(this.batches[i].settings, settings)) {
+            if (batchSettingsEqual(this.batches[i].settings, stored)) {
                 this.batches[i].addSystem(system);
                 this.systemToBatchIndex.set(system, i);
                 return;
@@ -488,10 +432,27 @@ export class BatchedRenderer extends TransformNode {
     }
 
     /**
-     * Re-buckets a system whose render settings changed. The system keeps its
-     * place in the update order, so this is safe to call mid-frame.
+     * Takes a system's changed render settings. When only live parameters changed (see
+     * {@link VFXBatchSettings}) and the system is alone in its batch, the batch's material is
+     * written in place. Otherwise the system moves to the batch its settings now match. The
+     * system keeps its place in the update order, so this is safe to call mid-frame.
      */
     updateSystem(system: IParticleSystem) {
+        const batchIndex = this.systemToBatchIndex.get(system);
+        if (batchIndex !== undefined) {
+            const batch = this.batches[batchIndex];
+            const settings = storedBatchSettings((system as ParticleSystem).getRendererSettings());
+            if (
+                batch.systems.size === 1 &&
+                shaderKeyEqual(batch.settings, settings) &&
+                // A batch that already draws with these values takes the system instead, so two
+                // batches never hold the same settings.
+                !this.batches.some((other) => other !== batch && batchSettingsEqual(other.settings, settings))
+            ) {
+                batch.applyLiveSettings(settings);
+                return;
+            }
+        }
         this.removeFromBatch(system);
         this.addSystem(system);
     }
