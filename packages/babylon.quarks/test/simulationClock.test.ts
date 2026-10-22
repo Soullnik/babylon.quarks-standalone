@@ -2,6 +2,7 @@ import {NullEngine} from '@babylonjs/core/Engines/nullEngine';
 import {Scene} from '@babylonjs/core/scene';
 import {ConstantValue, PointEmitter} from 'quarks.core';
 import {ParticleSystem, ParticleSystemParameters} from '../src/ParticleSystem';
+import {RenderMode} from '../src/VFXBatch';
 import {
     MAX_CATCH_UP_SECONDS,
     MAX_FRAME_SECONDS,
@@ -220,6 +221,30 @@ describe('the clock in a particle system', () => {
         expect(stepsAtDestroy).toBeGreaterThan(12);
         expect(stepsAtDestroy % 6).not.toBe(0);
         expect(stepped).toHaveBeenCalledTimes(stepsAtDestroy);
+    });
+
+    it('reports a trail particle dying once its ribbon has faded', () => {
+        const ps = system({
+            renderMode: RenderMode.Trail,
+            duration: 0.1,
+            startLife: new ConstantValue(0.1),
+            emissionOverTime: new ConstantValue(60),
+            rendererEmitterSettings: {startLength: new ConstantValue(3)},
+        });
+        let died = 0;
+        let born = 0;
+        let live = 0;
+        ps.addEventListener('particleDied', () => died++);
+        for (let i = 0; i < 60; i++) {
+            const diedBefore = died;
+            ps.update(1 / 60);
+            born += ps.particleNum - (live - (died - diedBefore));
+            live = ps.particleNum;
+        }
+        expect(born).toBeGreaterThan(0);
+        expect(died).toBe(born);
+        expect(ps.particleNum).toBe(0);
+        ps.dispose();
     });
 
     it('stops simulating in the frame a particleDied listener disposes the system', () => {

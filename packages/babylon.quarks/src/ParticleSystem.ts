@@ -28,7 +28,6 @@ import {
     setRandomSource,
     SphereEmitter,
     StretchedBillBoardSettings,
-    TrailParticle,
     TrailSettings,
     ValueGenerator,
     Vector2,
@@ -52,6 +51,15 @@ import {
     isFallbackNormals,
     isFallbackUVs,
 } from './system/geometry';
+import {
+    collapseTrailNewborns,
+    integrateSprites,
+    moveTrails,
+    recordTrailHistory,
+    removeDeadTrails,
+    runBehaviorSteps,
+    snapshotPreviousState,
+} from './system/integrate';
 import {liveAtlas, MaterialOverrides, resolveMaterialSettings} from './system/materialResolve';
 import {
     nonZeroFlip,
@@ -103,11 +111,6 @@ export type {
     ParticleSystemParameters,
     ScalingMode,
 } from './system/types';
-
-/** Particle backed by a {@link ParticleStore} row, as this system always creates. */
-type StoreBackedParticle = Particle & {storeIndex: number; setStoreIndex(index: number): void};
-
-const tempV = new Vector3();
 
 /**
  * A particle system, the counterpart of a Unity Shuriken system or a Niagara emitter: it spawns
@@ -1465,331 +1468,65 @@ export class ParticleSystem implements IParticleSystem {
         const particles = this.particles;
         const behaviors = this.behaviors;
         const particleCount = this.particleNum;
-        const isTrailMode = this.rendererSettings.renderMode === RenderMode.Trail;
-        // Only stretched billboards draw from velocity, and only they pay for
-        // keeping the previous one.
-        const stretched = this.rendererSettings.renderMode === RenderMode.StretchedBillBoard;
+        const store = this.store;
+        const renderMode = this.rendererSettings.renderMode;
+        const isTrailMode = renderMode === RenderMode.Trail;
 
-        // Remember where everything starts this step, so the renderer can carry
-        // the motion the step produces on into the part of the frame that comes
-        // after it. Taken after emission on purpose: a particle born this step
-        // then starts from where it was born rather than from whatever the row
-        // held before, and so is drawn at the emitter instead of jumping.
-        const columns = this.store;
-        const vector3Rows = particleCount * 3;
+        // Taken after emission on purpose: a particle born this step then starts from where it
+        // was born rather than from whatever the row held before, and so is drawn at the emitter
+        // instead of jumping.
         const steps = this.behaviorPlan.steps(behaviors);
-        // Size and colour are only snapshotted when some behavior can change
-        // them; otherwise the columns stay what spawn wrote and the renderer
-        // reads them as they are.
         const snapshotSize = this.behaviorPlan.changesSize;
         const snapshotColor = this.behaviorPlan.changesColor;
-        columns.useSizeSnapshot(snapshotSize);
-        columns.useColorSnapshot(snapshotColor);
-        columns.previousPosition.set(columns.position.subarray(0, vector3Rows));
-        if (snapshotSize) {
-            columns.previousSize.set(columns.size.subarray(0, vector3Rows));
-        }
-        if (stretched) {
-            if (columns.keepPreviousVelocity()) {
-                this.spawner.rebind();
-            }
-            columns.previousVelocity.set(columns.velocity.subarray(0, vector3Rows));
-        }
-        if (snapshotColor) {
-            columns.previousColor.set(columns.color.subarray(0, particleCount * 4));
-        }
+        snapshotPreviousState(
+            store,
+            particleCount,
+            snapshotSize,
+            snapshotColor,
+            renderMode === RenderMode.StretchedBillBoard,
+            this.rebindParticles
+        );
 
         this.emitterShape.update(this, delta);
-        for (let s = 0; s < steps.length; s++) {
-            const step = steps[s];
-            const stepBehaviors = step.behaviors;
-            for (let j = 0; j < stepBehaviors.length; j++) {
-                stepBehaviors[j].frameUpdate(delta);
-            }
-            // Nothing to update: skip, matching what the per-particle loop did.
-            // A behavior may set up state before its loop that is only valid
-            // once it has seen a particle.
-            if (particleCount === 0) {
-                continue;
-            }
-            if (step.run !== undefined) {
-                step.run(behaviors, particles, particleCount, delta, this.store);
-                continue;
-            }
-            const behavior = stepBehaviors[0];
-            if (behavior.updateAll !== undefined) {
-                behavior.updateAll(particles, particleCount, delta);
-                continue;
-            }
-            for (let i = 0; i < particleCount; i++) {
-                const particle = particles[i];
-                // Inlined `died` — this runs once per behavior per particle.
-                if (particle.age < particle.life) {
-                    behavior.update(particle, delta);
-                }
-            }
-        }
+        runBehaviorSteps(steps, behaviors, particles, particleCount, delta, store);
 
-        const notifyDeaths = this.events.has('particleDied');
-        const store = this.store;
-        const scalars = store.scalars;
-        const stride = ParticleStore.SCALAR_STRIDE;
+        const onDied = this.events.has('particleDied') ? this.fireParticleDied : undefined;
+        // Read again: a behavior (a sub emitter aimed at this system) may have spawned more.
         let liveParticleCount = this.particleNum;
-
         if (!isTrailMode) {
-            // One pass over the columns does three things the sprite path needs,
-            // none of which touches a particle object until a death:
-            //
-            // Newborns were snapshotted above with their spawn size and colour,
-            // before SizeOverLife / ColorOverLife ran. That false jump would be
-            // extrapolated by the renderer when the residual is negative (common
-            // with the rounded fixed step) and flash the start appearance at the
-            // emitter, so the snapshot is collapsed onto the curves' t=0 value.
-            // Age is still 0 at that point; the same iteration then ages it.
-            //
-            // Position is integrated along the velocity.
-            //
-            // A particle whose age reached its life is swapped with the last live
-            // one, rows included, so slot k always owns row k and the live
-            // particles stay one contiguous range the renderer copies as is. The
-            // survivor moved into the slot has not been visited yet, so the slot
-            // is processed again.
-            const positions = store.position;
-            const velocities = store.velocity;
-            const prevSize = store.previousSize;
-            const curSize = store.size;
-            const prevColor = store.previousColor;
-            const curColor = store.color;
-            const collapseSize = snapshotSize;
-            const collapseColor = snapshotColor;
-            // The bounds fall out of the same pass. Measuring every particle on
-            // every step costs about as much as the integration itself, so the
-            // full measurement runs every few steps; in between, newborns extend
-            // the last bounds and the fastest particle seen since pads them for
-            // the motion, which keeps them conservative.
-            const measure = this.bounds.due;
-            const carriedMin = this.bounds.min;
-            const carriedMax = this.bounds.max;
-            let minX = measure ? Infinity : carriedMin.x;
-            let minY = measure ? Infinity : carriedMin.y;
-            let minZ = measure ? Infinity : carriedMin.z;
-            let maxX = measure ? -Infinity : carriedMax.x;
-            let maxY = measure ? -Infinity : carriedMax.y;
-            let maxZ = measure ? -Infinity : carriedMax.z;
-            let maxSize = measure ? 0 : this.bounds.maxSize;
-            let maxSpeedSq = measure ? 0 : this.bounds.maxSpeedSq;
-            for (let i = 0; i < liveParticleCount; i++) {
-                const scalar = i * stride;
-                let age = scalars[scalar + ParticleStore.AGE];
-                const offset = i * 3;
-                const track = measure || age === 0;
-                if (age === 0) {
-                    if (collapseSize) {
-                        prevSize[offset] = curSize[offset];
-                        prevSize[offset + 1] = curSize[offset + 1];
-                        prevSize[offset + 2] = curSize[offset + 2];
-                    }
-                    if (collapseColor) {
-                        const o4 = i * 4;
-                        prevColor[o4] = curColor[o4];
-                        prevColor[o4 + 1] = curColor[o4 + 1];
-                        prevColor[o4 + 2] = curColor[o4 + 2];
-                        prevColor[o4 + 3] = curColor[o4 + 3];
-                    }
-                }
-                const step = delta * scalars[scalar + ParticleStore.SPEED_MODIFIER];
-                const vx = velocities[offset];
-                const vy = velocities[offset + 1];
-                const vz = velocities[offset + 2];
-                const x = positions[offset] + vx * step;
-                const y = positions[offset + 1] + vy * step;
-                const z = positions[offset + 2] + vz * step;
-                positions[offset] = x;
-                positions[offset + 1] = y;
-                positions[offset + 2] = z;
-                if (track) {
-                    minX = Math.min(minX, x);
-                    maxX = Math.max(maxX, x);
-                    minY = Math.min(minY, y);
-                    maxY = Math.max(maxY, y);
-                    minZ = Math.min(minZ, z);
-                    maxZ = Math.max(maxZ, z);
-                    maxSize = Math.max(
-                        maxSize,
-                        Math.max(curSize[offset], Math.max(curSize[offset + 1], curSize[offset + 2]))
-                    );
-                }
-                // Speed is tracked every step: it bounds how far the particles
-                // can have moved since the last measurement.
-                maxSpeedSq = Math.max(maxSpeedSq, vx * vx + vy * vy + vz * vz);
-                age += delta;
-                scalars[scalar + ParticleStore.AGE] = age;
-                if (age >= scalars[scalar + ParticleStore.LIFE]) {
-                    const last = liveParticleCount - 1;
-                    const particle = particles[i];
-                    const survivor = particles[last] as StoreBackedParticle;
-                    particles[i] = survivor;
-                    particles[last] = particle;
-                    if (i !== last) {
-                        store.swapRows(i, last);
-                        survivor.setStoreIndex(i);
-                        (particle as StoreBackedParticle).setStoreIndex(last);
-                    }
-                    liveParticleCount--;
-                    i--;
-                    if (notifyDeaths) {
-                        this.events.fire({type: 'particleDied', particleSystem: this, particle: particle});
-                    }
-                }
-            }
-            // A particleDied listener may have disposed the system, which drops every particle.
-            this.particleNum = this.destroyed ? 0 : liveParticleCount;
-            this.bounds.store(
+            liveParticleCount = integrateSprites(
+                delta,
+                particles,
+                store,
                 liveParticleCount,
-                measure,
-                minX,
-                minY,
-                minZ,
-                maxX,
-                maxY,
-                maxZ,
-                maxSize,
-                maxSpeedSq,
-                this.rendererSettings,
-                this.rendererEmitterSettings,
-                this.worldSpace,
-                SIMULATION_STEP
+                snapshotSize,
+                snapshotColor,
+                this.bounds,
+                this,
+                onDied
             );
-            this.notifyFinished();
-            return;
-        }
-
-        // Trails: the newborn collapse, then motion, then the trail history,
-        // then removal, each over the particle objects the history lives on.
-        if (particleCount > 0) {
-            const prevSize = columns.previousSize;
-            const curSize = columns.size;
-            const prevColor = columns.previousColor;
-            const curColor = columns.color;
-            for (let i = 0, o3 = 0, o4 = 0, s = 0; i < particleCount; i++, o3 += 3, o4 += 4, s += stride) {
-                if (scalars[s + ParticleStore.AGE] !== 0) {
-                    continue;
-                }
-                if (snapshotSize) {
-                    prevSize[o3] = curSize[o3];
-                    prevSize[o3 + 1] = curSize[o3 + 1];
-                    prevSize[o3 + 2] = curSize[o3 + 2];
-                }
-                if (snapshotColor) {
-                    prevColor[o4] = curColor[o4];
-                    prevColor[o4 + 1] = curColor[o4 + 1];
-                    prevColor[o4 + 2] = curColor[o4 + 2];
-                    prevColor[o4 + 3] = curColor[o4 + 3];
-                }
-            }
-        }
-
-        const followLocalOrigin = (this.rendererEmitterSettings as TrailSettings).followLocalOrigin;
-        if (followLocalOrigin) {
-            const emitterMatrix = this.emitter.matrixWorld;
-            for (let i = 0; i < particleCount; i++) {
-                const particle = particles[i];
-                if ((particle as TrailParticle).localPosition) {
-                    particle.position.copy((particle as TrailParticle).localPosition!);
-                    particle.position.applyMatrix4(particle.parentMatrix ?? emitterMatrix);
-                } else {
-                    particle.position.addScaledVector(particle.velocity, delta * particle.speedModifier);
-                }
-                particle.age += delta;
-            }
         } else {
-            const positions = store.position;
-            const velocities = store.velocity;
-            for (let i = 0, offset = 0, scalar = 0; i < particleCount; i++, offset += 3, scalar += stride) {
-                const step = delta * scalars[scalar + ParticleStore.SPEED_MODIFIER];
-                positions[offset] += velocities[offset] * step;
-                positions[offset + 1] += velocities[offset + 1] * step;
-                positions[offset + 2] += velocities[offset + 2] * step;
-                scalars[scalar + ParticleStore.AGE] += delta;
-            }
-        }
-
-        {
+            // Trails: the newborn collapse, then motion, then the trail history,
+            // then removal, each over the particle objects the history lives on.
             const trailSettings = this.rendererEmitterSettings as TrailSettings;
-            const dieWithParticle = trailSettings.dieWithParticle;
-            // A world-space system records world positions already.
-            const recordWorldSpace = trailSettings.recordWorldSpace && !this.worldSpace;
             const emitterMatrix = this.emitter.matrixWorld;
-            // A swept trail records its side as the emitter holds it, in the
-            // space its positions are recorded in.
-            const sideAxis = trailSettings.sideAxis;
-            const sidesInWorld = this.worldSpace || Boolean(trailSettings.recordWorldSpace);
-            for (let i = 0; i < particleCount; i++) {
-                const trail = particles[i] as TrailParticle;
-                // Emptying the history lets the removal pass below take the
-                // particle this same step.
-                if (dieWithParticle && trail.age >= trail.life) {
-                    trail.resetHistory();
-                    continue;
-                }
-                trail.update();
-                // update() wrote a sample only while the particle is alive.
-                if (recordWorldSpace && trail.age <= trail.life) {
-                    const offset = ((trail.historyHead + trail.historyCapacity - 1) % trail.historyCapacity) * 3;
-                    const positions = trail.historyPositions;
-                    tempV.set(positions[offset], positions[offset + 1], positions[offset + 2]);
-                    tempV.applyMatrix4(trail.parentMatrix ?? emitterMatrix);
-                    positions[offset] = tempV.x;
-                    positions[offset + 1] = tempV.y;
-                    positions[offset + 2] = tempV.z;
-                }
-                if (sideAxis && trail.age <= trail.life) {
-                    trail.ensureSideHistory();
-                    const offset = ((trail.historyHead + trail.historyCapacity - 1) % trail.historyCapacity) * 3;
-                    const sides = trail.historySides;
-                    let x = sideAxis.x;
-                    let y = sideAxis.y;
-                    let z = sideAxis.z;
-                    if (sidesInWorld) {
-                        const m = (trail.parentMatrix ?? emitterMatrix).elements;
-                        const tx = m[0] * x + m[4] * y + m[8] * z;
-                        const ty = m[1] * x + m[5] * y + m[9] * z;
-                        z = m[2] * x + m[6] * y + m[10] * z;
-                        x = tx;
-                        y = ty;
-                    }
-                    sides[offset] = x;
-                    sides[offset + 1] = y;
-                    sides[offset + 2] = z;
-                }
-            }
-        }
-
-        for (let i = 0; i < liveParticleCount; i++) {
-            const particle = particles[i] as TrailParticle;
-            const scalar = i * stride;
-            const dead = scalars[scalar + ParticleStore.AGE] >= scalars[scalar + ParticleStore.LIFE];
-            if (dead && particle.historyCount === 0) {
-                const last = liveParticleCount - 1;
-                const survivor = particles[last] as StoreBackedParticle;
-                particles[i] = survivor;
-                particles[last] = particle;
-                if (i !== last) {
-                    store.swapRows(i, last);
-                    survivor.setStoreIndex(i);
-                    (particle as StoreBackedParticle).setStoreIndex(last);
-                }
-                liveParticleCount--;
-                i--;
-                if (notifyDeaths) {
-                    this.events.fire({type: 'particleDied', particleSystem: this, particle: particle});
-                }
-            }
+            collapseTrailNewborns(store, particleCount, snapshotSize, snapshotColor);
+            moveTrails(delta, particles, store, particleCount, Boolean(trailSettings.followLocalOrigin), emitterMatrix);
+            recordTrailHistory(particles, particleCount, trailSettings, this.worldSpace, emitterMatrix);
+            liveParticleCount = removeDeadTrails(particles, store, liveParticleCount, onDied);
         }
         // A particleDied listener may have disposed the system, which drops every particle.
         this.particleNum = this.destroyed ? 0 : liveParticleCount;
         this.notifyFinished();
     }
+
+    /** Re-points every particle at the store, for {@link snapshotPreviousState}. */
+    private readonly rebindParticles = (): void => this.spawner.rebind();
+
+    /** Fires `particleDied` for a particle the step retired. */
+    private readonly fireParticleDied = (particle: Particle): void => {
+        this.events.fire({type: 'particleDied', particleSystem: this, particle});
+    };
 
     private notifyFinished(): void {
         if (!this.isFinished()) {
