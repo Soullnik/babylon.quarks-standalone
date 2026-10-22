@@ -97,14 +97,9 @@ function cases(): Case[] {
         'HORIZONTAL',
         'SIZE_LIMITS',
     ]);
-    push(
-        'stretched size limits',
-        stretchedVert,
-        particleFrag,
-        [...SPRITE_ATTRS, 'velocity'],
-        [...LIMIT_UNIFORMS, 'speedFactor'],
-        ['SIZE_LIMITS']
-    );
+    push('stretched size limits', stretchedVert, particleFrag, [...SPRITE_ATTRS, 'velocity'], LIMIT_UNIFORMS, [
+        'SIZE_LIMITS',
+    ]);
     const PIVOT_UNIFORMS = [...SPRITE_UNIFORMS, 'pivot'];
     push('billboard pivot', particleVert, particleFrag, SPRITE_ATTRS, PIVOT_UNIFORMS, ['PIVOT']);
     push('vertical billboard pivot', particleVert, particleFrag, SPRITE_ATTRS, PIVOT_UNIFORMS, ['VERTICAL', 'PIVOT']);
@@ -112,36 +107,15 @@ function cases(): Case[] {
         'HORIZONTAL',
         'PIVOT',
     ]);
-    push(
-        'stretched pivot',
-        stretchedVert,
-        particleFrag,
-        [...SPRITE_ATTRS, 'velocity'],
-        [...PIVOT_UNIFORMS, 'speedFactor'],
-        ['PIVOT']
-    );
-    push(
-        'stretched',
-        stretchedVert,
-        particleFrag,
-        [...SPRITE_ATTRS, 'velocity'],
-        [...SPRITE_UNIFORMS, 'speedFactor'],
-        []
-    );
-    push(
-        'beam',
-        stretchedVert,
-        particleFrag,
-        [...SPRITE_ATTRS, 'velocity'],
-        [...SPRITE_UNIFORMS, 'speedFactor'],
-        ['BEAM']
-    );
+    push('stretched pivot', stretchedVert, particleFrag, [...SPRITE_ATTRS, 'velocity'], PIVOT_UNIFORMS, ['PIVOT']);
+    push('stretched', stretchedVert, particleFrag, [...SPRITE_ATTRS, 'velocity'], SPRITE_UNIFORMS, []);
+    push('beam', stretchedVert, particleFrag, [...SPRITE_ATTRS, 'velocity'], SPRITE_UNIFORMS, ['BEAM']);
     push(
         'beam tiled',
         stretchedVert,
         particleFrag,
         [...SPRITE_ATTRS, 'velocity'],
-        [...SPRITE_UNIFORMS, 'speedFactor', 'tileCountX', 'tileCountY'],
+        [...SPRITE_UNIFORMS, 'tileCountX', 'tileCountY'],
         ['BEAM', 'UV_TILE', 'USE_MAP']
     );
     push(
@@ -242,10 +216,7 @@ function cases(): Case[] {
             for (const map of mapOptions)
                 for (const tile of target.name === 'trail' ? [[]] : [[], ['UV_TILE', 'TILE_BLEND']]) {
                     const defines = [...target.extra, ...surface, ...map, ...tile];
-                    const uniforms =
-                        target.name === 'trail'
-                            ? ['view', 'projection']
-                            : [...SPRITE_UNIFORMS, ...(target.name === 'beam' ? ['speedFactor'] : [])];
+                    const uniforms = target.name === 'trail' ? ['view', 'projection'] : [...SPRITE_UNIFORMS];
                     const samplers: string[] = [...map.map(() => 'map')];
                     if (tile.length) uniforms.push('tileCountX', 'tileCountY');
                     if (surface.includes('MAP_TRANSFORM')) uniforms.push('mapTransform');

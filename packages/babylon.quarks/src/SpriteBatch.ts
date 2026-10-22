@@ -9,7 +9,6 @@ import {VertexData} from '@babylonjs/core/Meshes/mesh.vertexData';
 import {Scene} from '@babylonjs/core/scene';
 import {
     IParticle,
-    IParticleSystem,
     Matrix3,
     ParticleStore,
     Quaternion,
@@ -19,6 +18,7 @@ import {
     Vector4,
 } from 'quarks.core';
 import {VFXBatchSettings} from './BatchedRenderer';
+import {hasSizeLimits, takesPivotAndSizeLimits} from './batchKey';
 import {gather, sortByKey, SortScratch} from './instanceSort';
 import type {ParticleSystem} from './ParticleSystem';
 import local_particle_physics_vert from './shaders/local_particle_physics_vert.glsl';
@@ -56,7 +56,7 @@ export class SpriteBatch extends VFXBatch {
     private uvTileBuffer!: Float32Array;
     private velocityBuffer?: Float32Array;
 
-    /** Concretely typed handle on the batch material, see syncStretchedSpeedFactor. */
+    /** Concretely typed handle on the batch material, for the lighting and live-parameter writes. */
     private shaderMaterial: ShaderMaterial | null = null;
     /** Cancels the pending rebuild for an env atlas that has not loaded yet. */
     private cancelAtlasRebuild: (() => void) | null = null;
@@ -201,10 +201,7 @@ export class SpriteBatch extends VFXBatch {
     /** The screen-size limits as a uniform value, or null when the batch has none that apply. */
     private sizeLimits(): BVector2 | null {
         const {minParticleSize, maxParticleSize} = this.settings;
-        if (!SpriteBatch.takesPivotAndFlip(this.settings.renderMode)) {
-            return null;
-        }
-        if (minParticleSize <= 0 && maxParticleSize === Infinity) {
+        if (!takesPivotAndSizeLimits(this.settings.renderMode) || !hasSizeLimits(this.settings)) {
             return null;
         }
         // The shader clamps; an unlimited maximum is just a very large one.
@@ -309,7 +306,6 @@ export class SpriteBatch extends VFXBatch {
         // registered once per mode. A unique name per rebuild would leak entries in
         // Effect.ShadersStore and defeat Babylon's compiled-effect cache.
         const shaderName = `quarksParticle_${this.settings.renderMode}`;
-        this.lastStretchedSpeedFactor = Number.NaN;
         const defines: string[] = this.fogDefines();
 
         let vertexShader: ShaderSources;
@@ -353,7 +349,7 @@ export class SpriteBatch extends VFXBatch {
                 this.cancelAtlasRebuild = () => onLoad.remove(observer);
             }
         }
-        const useEnvAtlas = this.settings.renderMode === RenderMode.Mesh && !!atlas && atlas.isReady();
+        const useEnvAtlas = this.usesEnvAtlas();
         if (useEnvAtlas) {
             defines.push('USE_ENVMAP_ATLAS');
         }
@@ -373,7 +369,7 @@ export class SpriteBatch extends VFXBatch {
         if (this.settings.renderMode === RenderMode.Beam) {
             defines.push('BEAM');
         }
-        const pivot = SpriteBatch.takesPivotAndFlip(this.settings.renderMode) ? this.settings.pivot : undefined;
+        const pivot = takesPivotAndSizeLimits(this.settings.renderMode) ? this.settings.pivot : undefined;
         if (pivot) {
             defines.push('PIVOT');
         }
@@ -436,9 +432,6 @@ export class SpriteBatch extends VFXBatch {
             uniforms.push('rimParams');
         }
         this.surfaceUniforms(uniforms, samplers);
-        if (SpriteBatch.drawsAlongVelocity(this.settings.renderMode)) {
-            uniforms.push('speedFactor');
-        }
         this.softUniforms(uniforms, samplers);
         if (pivot) {
             uniforms.push('pivot');
@@ -471,11 +464,6 @@ export class SpriteBatch extends VFXBatch {
         }
         if (useEnvAtlas && atlas) {
             mat.setTexture('envAtlas', atlas);
-            mat.setFloat('reflectionLevel', this.settings.reflectionLevel);
-        }
-        if (rim) {
-            mat.setVector3('rimColor', new BVector3(rim.color[0], rim.color[1], rim.color[2]));
-            mat.setVector2('rimParams', new BVector2(rim.power, rim.strength));
         }
         if (needsEyePosition) {
             const eyePosition = new BVector3();
@@ -493,16 +481,8 @@ export class SpriteBatch extends VFXBatch {
             mat.setFloat('tileCountX', this.settings.uTileCount);
             mat.setFloat('tileCountY', this.settings.vTileCount);
         }
-        if (SpriteBatch.drawsAlongVelocity(this.settings.renderMode)) {
-            mat.setFloat('speedFactor', this.settings.softNearFade > 0 ? this.settings.softNearFade : 1.0);
-        }
         this.bindSoft(mat);
-        if (pivot) {
-            mat.setVector3('pivot', new BVector3(pivot.x, pivot.y, pivot.z));
-        }
-        if (sizeLimits) {
-            mat.setVector2('sizeLimits', sizeLimits);
-        }
+        this.writeSpriteParams(mat, useEnvAtlas);
         if (lit) {
             this.writeFixedLighting(mat);
             if (lighting === 'scene') {
@@ -543,6 +523,37 @@ export class SpriteBatch extends VFXBatch {
         this.shaderMaterial?.dispose(false, false);
         this.mesh.material = mat;
         this.shaderMaterial = mat;
+    }
+
+    /** Writes the live parameters only sprite and mesh batches have: reflection level, rim, pivot and size limits. */
+    private writeSpriteParams(material: ShaderMaterial, envAtlas: boolean): void {
+        if (envAtlas) {
+            material.setFloat('reflectionLevel', this.settings.reflectionLevel);
+        }
+        const rim = this.settings.renderMode === RenderMode.Mesh ? this.settings.rim : undefined;
+        if (rim) {
+            material.setVector3('rimColor', new BVector3(rim.color[0], rim.color[1], rim.color[2]));
+            material.setVector2('rimParams', new BVector2(rim.power, rim.strength));
+        }
+        const pivot = takesPivotAndSizeLimits(this.settings.renderMode) ? this.settings.pivot : undefined;
+        if (pivot) {
+            material.setVector3('pivot', new BVector3(pivot.x, pivot.y, pivot.z));
+        }
+        const sizeLimits = this.sizeLimits();
+        if (sizeLimits) {
+            material.setVector2('sizeLimits', sizeLimits);
+        }
+    }
+
+    protected override writeLiveUniforms(material: ShaderMaterial): void {
+        super.writeLiveUniforms(material);
+        this.writeSpriteParams(material, this.usesEnvAtlas());
+    }
+
+    /** True when the material samples the env atlas: a mesh batch whose atlas has loaded. */
+    private usesEnvAtlas(): boolean {
+        const atlas = this.settings.reflectionAtlas;
+        return this.settings.renderMode === RenderMode.Mesh && !!atlas && atlas.isReady();
     }
 
     applyMeshLighting(lighting: MeshLightingSettings): void {
@@ -613,7 +624,6 @@ export class SpriteBatch extends VFXBatch {
     private quaternion5_ = new Quaternion();
     private rotationMat_ = new Matrix3();
     private rotationMat2_ = new Matrix3();
-    private lastStretchedSpeedFactor = Number.NaN;
     /** Slot 0 holds the zero-alpha instance since the batch last went empty. */
     private clearedInstanceUploaded = false;
 
@@ -626,7 +636,7 @@ export class SpriteBatch extends VFXBatch {
         const isStretchedRender = renderMode === RenderMode.StretchedBillBoard;
         const isBeamRender = renderMode === RenderMode.Beam;
         const usesVelocity = isStretchedRender || isBeamRender;
-        const flipsSprites = SpriteBatch.takesPivotAndFlip(renderMode);
+        const flipsSprites = takesPivotAndSizeLimits(renderMode);
 
         const visibleSystems = this.getVisibleSystems();
         for (let i = 0; i < visibleSystems.length; i++) {
@@ -962,10 +972,6 @@ export class SpriteBatch extends VFXBatch {
             }
         }
 
-        if (isStretchedRender && visibleSystems.length > 0) {
-            this.syncStretchedSpeedFactor(visibleSystems[0]);
-        }
-
         // Keep the mesh enabled even when count is 0 — toggling visibility off for a
         // single frame (common with short lifetimes + low emission overlap) causes flicker.
         this.mesh.forcedInstanceCount = index;
@@ -998,27 +1004,6 @@ export class SpriteBatch extends VFXBatch {
         }
     }
 
-    /**
-     * Pushes the stretched-billboard speed factor to the shader when it changed.
-     *
-     * Deliberately kept out of `update`: touching the loosely typed
-     * `mesh.material` from inside that function gives V8 a generic property
-     * access it has no feedback for, which knocks the whole particle loop out of
-     * optimised code on every frame.
-     */
-    private syncStretchedSpeedFactor(system: IParticleSystem): void {
-        const material = this.shaderMaterial;
-        if (material === null) {
-            return;
-        }
-        const speedFactor = (system.rendererEmitterSettings as StretchedBillBoardSettings).speedFactor ?? 1.0;
-        const clampedSpeedFactor = speedFactor === 0 ? 0.001 : speedFactor;
-        if (clampedSpeedFactor !== this.lastStretchedSpeedFactor) {
-            material.setFloat('speedFactor', clampedSpeedFactor);
-            this.lastStretchedSpeedFactor = clampedSpeedFactor;
-        }
-    }
-
     /** Stretched billboards and beams: drawn along a per-instance vector, by the stretched shader. */
     private static drawsAlongVelocity(renderMode: RenderMode): boolean {
         return renderMode === RenderMode.StretchedBillBoard || renderMode === RenderMode.Beam;
@@ -1045,16 +1030,6 @@ export class SpriteBatch extends VFXBatch {
             velocities[v + 2] = hasEnd ? end.z - offsets[o + 2] : 0;
             velocities[v + 3] = 0;
         }
-    }
-
-    /** The quads that take a pivot and flip: every billboard kind, stretched included, but not meshes or beams. */
-    private static takesPivotAndFlip(renderMode: RenderMode): boolean {
-        return (
-            renderMode === RenderMode.BillBoard ||
-            renderMode === RenderMode.StretchedBillBoard ||
-            renderMode === RenderMode.VerticalBillBoard ||
-            renderMode === RenderMode.HorizontalBillBoard
-        );
     }
 
     /** Multiplies `count` RGBA colours starting at `base` by a system's {@link ParticleSystem.tint}. */

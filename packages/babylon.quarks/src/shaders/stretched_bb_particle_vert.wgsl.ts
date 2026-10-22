@@ -17,7 +17,6 @@ attribute velocity: vec4f;
 uniform world: mat4x4f;
 uniform view: mat4x4f;
 uniform projection: mat4x4f;
-uniform speedFactor: f32;
 
 #ifdef UV_TILE
 uniform tileCountX: f32;
@@ -64,7 +63,7 @@ fn main(input: VertexInputs) -> FragmentInputs {
     let vlength = length(viewVelocity);
     // Stretch direction is the velocity direction; only a genuinely motionless particle has none.
     // Deriving it via normalize keeps the stretch aligned even when the speed contribution is ~0
-    // (e.g. speedFactor 0), instead of collapsing the whole burst onto a fixed screen axis.
+    // (e.g. a speed factor of 0), instead of collapsing the whole burst onto a fixed screen axis.
     var vdir = vec3f(0.0, 0.0, 1.0);
     if (vlength > 0.000001) {
         vdir = viewVelocity / vlength;
