@@ -32,11 +32,13 @@ async function loadGeometryFromFile(file: File, scene: Scene): Promise<GeometryD
         const positions = mesh.getVerticesData(VertexBuffer.PositionKind)!;
         const normals = mesh.getVerticesData(VertexBuffer.NormalKind);
         const uvs = mesh.getVerticesData(VertexBuffer.UVKind);
+        const uvs2 = mesh.getVerticesData(VertexBuffer.UV2Kind);
         const indices = mesh.getIndices();
         return {
             positions: new Float32Array(positions),
             indices: indices ? new Uint32Array(indices) : undefined,
             uvs: uvs ? new Float32Array(uvs) : undefined,
+            uvs2: uvs2 ? new Float32Array(uvs2) : undefined,
             normals: normals ? new Float32Array(normals) : undefined,
         };
     } finally {

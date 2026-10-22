@@ -1,7 +1,19 @@
 import {Texture} from '@babylonjs/core/Materials/Textures/texture.js';
 import {Mesh} from '@babylonjs/core/Meshes/mesh.js';
 import {PlusIcon, XMarkIcon} from '@heroicons/react/24/solid';
-import type {Behavior, CullingMode, MeshLighting, MeshRim, ParticleSystem, SortMode} from 'babylon.quarks';
+import type {
+    Behavior,
+    CullingMode,
+    GradientMapChannel,
+    MeshLighting,
+    MeshRim,
+    ParticleErosionOptions,
+    ParticleSystem,
+    ParticleUVDistortionOptions,
+    ScalingMode,
+    SortMode,
+    TrailSettings,
+} from 'babylon.quarks';
 import {
     AxisAngleGenerator,
     BoxEmitFrom,
@@ -17,11 +29,13 @@ import {
     RandomQuatGenerator,
     RenderMode,
     SizeOverLife,
+    Vector2,
     Vector3,
     Vector3Function,
     Vector4,
+    normalizeTextureUV,
 } from 'babylon.quarks';
-import React, {useMemo, useState} from 'react';
+import React, {useMemo} from 'react';
 import {EffectBinding} from '../core/binding.js';
 import {
     DEFAULT_GRADIENT_STOPS,
@@ -47,7 +61,8 @@ import {CurveEditor} from './CurveEditor.js';
 import {GradientEditor} from './GradientEditor.js';
 import {InspectorInfoIcon} from './InspectorInfoIcon.js';
 import {ModuleSection} from './ModuleSection.js';
-import {PromptDialog} from './PromptDialog.js';
+import {TextureSelect} from './TextureSelect.js';
+import {TextureUVField} from './TextureUVField.js';
 import {ValueField} from './ValueField.js';
 import {CheckboxField, NumberField, Row, SelectField} from './fields.js';
 import {iconStyle} from './icons.js';
@@ -104,6 +119,49 @@ const PARAM_LABELS: {[key: string]: string} = {
     depth: 'Depth',
     speed: 'Speed (lengths/s)',
 };
+
+/** Uppercase group title inside a module, as the Renderer's "Material" heading. */
+function SubHeader(props: {title: string; hint: string}) {
+    return (
+        <div
+            style={{
+                marginTop: 10,
+                marginBottom: 2,
+                fontSize: 11,
+                fontWeight: 600,
+                color: '#7c8db5',
+                textTransform: 'uppercase',
+                letterSpacing: 0.4,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 5,
+            }}
+        >
+            {props.title}
+            <InspectorInfoIcon content={props.hint} size={12} />
+        </div>
+    );
+}
+
+/** Three number inputs editing a Vector3 by value. */
+function AxisField(props: {value: Vector3; onChange: (next: Vector3) => void}) {
+    return (
+        <div style={{display: 'flex', gap: 6}}>
+            {(['x', 'y', 'z'] as const).map((axis) => (
+                <NumberField
+                    key={axis}
+                    value={props.value[axis]}
+                    step={0.1}
+                    onChange={(v) => {
+                        const next = props.value.clone();
+                        next[axis] = v;
+                        props.onChange(next);
+                    }}
+                />
+            ))}
+        </div>
+    );
+}
 
 function ColorInput(props: {value: Vector4; onChange: (next: Vector4) => void}) {
     const {value, onChange} = props;
@@ -205,6 +263,18 @@ export function MainModule({binding}: ModuleProps) {
             <Row label="World space">
                 <CheckboxField value={system.worldSpace} onChange={(v) => binding.apply((s) => (s.worldSpace = v))} />
             </Row>
+            {system.worldSpace && (
+                <Row label="Scaling mode">
+                    <SelectField<ScalingMode>
+                        value={system.scalingMode}
+                        options={[
+                            {value: 'shape', label: 'Shape (sizes and shape only)'},
+                            {value: 'hierarchy', label: 'Hierarchy (motion scales too)'},
+                        ]}
+                        onChange={(mode) => binding.apply((s) => (s.scalingMode = mode))}
+                    />
+                </Row>
+            )}
             <Row label="Prewarm">
                 <CheckboxField value={system.prewarm} onChange={(v) => binding.apply((s) => (s.prewarm = v))} />
             </Row>
@@ -808,6 +878,8 @@ export interface GeometryOption {
     positions: Float32Array | number[];
     indices?: Uint32Array | number[];
     uvs?: Float32Array | number[];
+    /** A second UV set (glTF `TEXCOORD_1`), what textures on UV channel 1 read on the mesh. */
+    uvs2?: Float32Array | number[];
     normals?: Float32Array | number[];
 }
 
@@ -913,9 +985,15 @@ export function RendererModule({
     resolveGeometry?: (file: File) => Promise<GeometryData>;
 }) {
     const system = binding.system;
-    const currentTextureUrl = (system.texture as {url?: string} | null)?.url ?? '';
-    const [promptingTextureUrl, setPromptingTextureUrl] = useState(false);
     const materialLabel = getMaterialLabel(system.material);
+    const isMesh = system.renderMode === RenderMode.Mesh;
+    const gradientMap = system.gradientMap;
+    const erosion = system.erosion;
+    const distortion = system.uvDistortion;
+    const patchErosion = (patch: ParticleErosionOptions) =>
+        binding.apply((s) => (s.erosion = {...s.erosion, ...patch}));
+    const patchDistortion = (patch: ParticleUVDistortionOptions) =>
+        binding.apply((s) => (s.uvDistortion = {...s.uvDistortion, ...patch}));
     const loadTexture = useMemo(() => {
         return (url: string) => {
             if (resolveTexture) {
@@ -1031,6 +1109,32 @@ export function RendererModule({
                             }
                         />
                     </Row>
+                    <Row label="Swept trail">
+                        <CheckboxField
+                            value={!!(system.rendererEmitterSettings as TrailSettings).sideAxis}
+                            onChange={(v) =>
+                                binding.apply((s) => {
+                                    (s.rendererEmitterSettings as TrailSettings).sideAxis = v
+                                        ? new Vector3(0, 1, 0)
+                                        : undefined;
+                                })
+                            }
+                        />
+                    </Row>
+                    {(system.rendererEmitterSettings as TrailSettings).sideAxis && (
+                        <Row label="Side axis">
+                            <AxisField
+                                value={(system.rendererEmitterSettings as TrailSettings).sideAxis!}
+                                onChange={(axis) =>
+                                    binding.apply((s) => {
+                                        // The axis's length scales the width: keep it a unit vector.
+                                        (s.rendererEmitterSettings as TrailSettings).sideAxis =
+                                            axis.length() > 0 ? axis.normalize() : axis;
+                                    })
+                                }
+                            />
+                        </Row>
+                    )}
                 </>
             )}
             {system.renderMode === RenderMode.StretchedBillBoard && (
@@ -1059,26 +1163,7 @@ export function RendererModule({
                     </Row>
                 </>
             )}
-            <div
-                style={{
-                    marginTop: 10,
-                    marginBottom: 2,
-                    fontSize: 11,
-                    fontWeight: 600,
-                    color: '#7c8db5',
-                    textTransform: 'uppercase',
-                    letterSpacing: 0.4,
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 5,
-                }}
-            >
-                Material
-                <InspectorInfoIcon
-                    content="Shader and blending settings applied to the particle sprite or mesh."
-                    size={12}
-                />
-            </div>
+            <SubHeader title="Material" hint="Shader and blending settings applied to the particle sprite or mesh." />
             {materialLabel ? (
                 <Row label="Source">
                     <div style={{fontSize: 12, color: theme.textDim, lineHeight: 1.45}}>{materialLabel}</div>
@@ -1103,93 +1188,41 @@ export function RendererModule({
                 />
             </Row>
             <Row label="Texture">
-                <SelectField
-                    value={
-                        !currentTextureUrl
-                            ? '__none'
-                            : (textureOptions ?? []).some((o) => o.url === currentTextureUrl)
-                              ? currentTextureUrl
-                              : '__current'
-                    }
-                    options={[
-                        {value: '__none', label: '(none)'},
-                        ...(currentTextureUrl && !(textureOptions ?? []).some((o) => o.url === currentTextureUrl)
-                            ? [{value: '__current', label: `(current) ${currentTextureUrl.slice(-24)}`}]
-                            : []),
-                        ...(textureOptions ?? []).map((o) => ({value: o.url, label: o.label})),
-                        {value: '__url', label: 'Custom URL…'},
-                        {value: '__file', label: 'Load from file…'},
-                    ]}
-                    onChange={(url) => {
-                        if (url === '__current') {
-                            return;
-                        }
-                        if (url === '__none') {
-                            patchMaterial({texture: null});
-                            return;
-                        }
-                        if (url === '__url') {
-                            setPromptingTextureUrl(true);
-                            return;
-                        }
-                        if (url === '__file') {
-                            const input = document.createElement('input');
-                            input.type = 'file';
-                            input.accept = 'image/*';
-                            input.onchange = () => {
-                                const file = input.files?.[0];
-                                if (!file) {
-                                    return;
-                                }
-                                const reader = new FileReader();
-                                reader.onload = () => {
-                                    const texture = loadTexture(reader.result as string);
-                                    if (texture) {
-                                        patchMaterial({texture});
-                                    }
-                                };
-                                reader.readAsDataURL(file);
-                            };
-                            input.click();
-                            return;
-                        }
-                        const texture = loadTexture(url);
-                        if (texture) {
-                            patchMaterial({texture});
-                        }
-                    }}
+                <TextureSelect
+                    value={system.texture}
+                    textureOptions={textureOptions}
+                    loadTexture={loadTexture}
+                    onChange={(texture) => patchMaterial({texture})}
+                    preview
                 />
-                {promptingTextureUrl && (
-                    <PromptDialog
-                        title="Texture URL"
-                        defaultValue={currentTextureUrl}
-                        placeholder="https://…"
-                        onSubmit={(url) => {
-                            const texture = loadTexture(url);
-                            if (texture) {
-                                patchMaterial({texture});
-                            }
-                            setPromptingTextureUrl(false);
-                        }}
-                        onCancel={() => setPromptingTextureUrl(false)}
-                    />
-                )}
-                {currentTextureUrl && (
-                    <img
-                        src={currentTextureUrl}
-                        alt="texture preview"
-                        style={{
-                            width: 64,
-                            height: 64,
-                            marginTop: 6,
-                            objectFit: 'contain',
-                            borderRadius: 6,
-                            border: '1px solid #2b3761',
-                            background: 'repeating-conic-gradient(#2a3252 0% 25%, #171d33 0% 50%) 0 0 / 12px 12px',
-                        }}
-                    />
-                )}
             </Row>
+            <TextureUVField
+                labelPrefix="Map "
+                value={system.mapUV ?? normalizeTextureUV(undefined)}
+                onChange={(uv) => binding.apply((s) => (s.mapUV = uv))}
+            />
+            {!isMesh && (
+                <Row label="Flip U/V">
+                    <div style={{display: 'flex', gap: 6}}>
+                        {(['x', 'y'] as const).map((axis) => (
+                            <NumberField
+                                key={axis}
+                                value={system.flip?.[axis] ?? 0}
+                                min={0}
+                                max={1}
+                                step={0.1}
+                                onChange={(v) =>
+                                    binding.apply((s) => {
+                                        const next = s.flip?.clone() ?? new Vector2(0, 0);
+                                        next[axis] = Math.min(1, Math.max(0, v));
+                                        s.flip = next.x === 0 && next.y === 0 ? undefined : next;
+                                    })
+                                }
+                            />
+                        ))}
+                    </div>
+                </Row>
+            )}
             <Row label="Alpha test">
                 <NumberField
                     value={system.getRendererSettings().materialAlphaTest ?? 0}
@@ -1210,6 +1243,134 @@ export function RendererModule({
                     onChange={(v) => patchMaterial({depthTest: v})}
                 />
             </Row>
+            <SubHeader
+                title="Gradient map"
+                hint="Recolours the map through a colour ramp: one channel of the map, or its luminance, picks a colour along the ramp."
+            />
+            <Row label="Ramp">
+                <TextureSelect
+                    value={gradientMap?.ramp}
+                    textureOptions={textureOptions}
+                    loadTexture={loadTexture}
+                    promptTitle="Ramp texture URL"
+                    onChange={(ramp) =>
+                        binding.apply((s) => (s.gradientMap = ramp ? {...s.gradientMap, ramp} : undefined))
+                    }
+                />
+            </Row>
+            {gradientMap && (
+                <Row label="Ramp channel">
+                    <SelectField<GradientMapChannel>
+                        value={gradientMap.channel}
+                        options={[
+                            {value: 'r', label: 'Red'},
+                            {value: 'g', label: 'Green'},
+                            {value: 'b', label: 'Blue'},
+                            {value: 'a', label: 'Alpha (ramp alpha replaces)'},
+                            {value: 'luminance', label: 'Luminance'},
+                        ]}
+                        onChange={(channel) => binding.apply((s) => (s.gradientMap = {...s.gradientMap, channel}))}
+                    />
+                </Row>
+            )}
+            <SubHeader
+                title="Erosion"
+                hint="Alpha decides how much of the shape is left instead of how transparent it is, so a fading alpha dissolves or wipes the shape away."
+            />
+            <Row label="Erosion">
+                <CheckboxField
+                    value={!!erosion}
+                    onChange={(v) => binding.apply((s) => (s.erosion = v ? {} : undefined))}
+                />
+            </Row>
+            {erosion && (
+                <>
+                    <Row label="Erosion mask">
+                        <TextureSelect
+                            value={erosion.mask}
+                            textureOptions={textureOptions}
+                            loadTexture={loadTexture}
+                            noneLabel="(map alpha)"
+                            promptTitle="Erosion mask URL"
+                            onChange={(mask) => patchErosion({mask})}
+                        />
+                    </Row>
+                    {erosion.mask && (
+                        <TextureUVField
+                            labelPrefix="Mask "
+                            value={erosion.maskUV}
+                            onChange={(maskUV) => patchErosion({maskUV})}
+                        />
+                    )}
+                    <Row label="Softness">
+                        <NumberField
+                            value={erosion.softness}
+                            min={0.0001}
+                            step={0.01}
+                            onChange={(softness) => patchErosion({softness})}
+                        />
+                    </Row>
+                    <Row label="Edge width">
+                        <NumberField
+                            value={erosion.edgeWidth}
+                            min={0}
+                            step={0.01}
+                            onChange={(edgeWidth) => patchErosion({edgeWidth})}
+                        />
+                    </Row>
+                    {(erosion.edgeWidth > 0 || erosion.edgeColor.some((c) => c !== 1)) && (
+                        <Row label="Edge color">
+                            <div style={{display: 'flex', gap: 6}}>
+                                {[0, 1, 2].map((channel) => (
+                                    <NumberField
+                                        key={channel}
+                                        value={erosion.edgeColor[channel]}
+                                        min={0}
+                                        step={0.05}
+                                        onChange={(v) => {
+                                            const edgeColor: [number, number, number] = [...erosion.edgeColor];
+                                            edgeColor[channel] = v;
+                                            patchErosion({edgeColor});
+                                        }}
+                                    />
+                                ))}
+                            </div>
+                        </Row>
+                    )}
+                </>
+            )}
+            <SubHeader
+                title="UV distortion"
+                hint="A scrolling noise texture pushes the map's UV about, for heat shimmer and licking, breathing shapes."
+            />
+            <Row label="Noise texture">
+                <TextureSelect
+                    value={distortion?.map}
+                    textureOptions={textureOptions}
+                    loadTexture={loadTexture}
+                    promptTitle="Distortion noise URL"
+                    onChange={(map) =>
+                        binding.apply((s) => (s.uvDistortion = map ? {...s.uvDistortion, map} : undefined))
+                    }
+                />
+            </Row>
+            {distortion && (
+                <>
+                    <Row label="Distortion strength">
+                        <NumberField
+                            value={distortion.strength}
+                            min={0}
+                            step={0.01}
+                            onChange={(strength) => patchDistortion({strength})}
+                        />
+                    </Row>
+                    <TextureUVField
+                        labelPrefix="Noise "
+                        value={distortion.mapUV}
+                        onChange={(mapUV) => patchDistortion({mapUV})}
+                    />
+                </>
+            )}
             {system.renderMode === RenderMode.Mesh &&
                 (() => {
                     const preset = detectGeometryPreset(system.instancingGeometry);
@@ -1219,10 +1380,12 @@ export function RendererModule({
                     const applyGeometry = (g: GeometryData) =>
                         binding.apply((s) => {
                             const settings = s.getRendererSettings();
+                            // Positions first: the setter keeps or drops the other sets by vertex count.
+                            s.instancingGeometry = new Float32Array(g.positions);
                             settings.instancingIndices = (g.indices ? new Uint32Array(g.indices) : undefined) as never;
                             settings.instancingUVs = (g.uvs ? new Float32Array(g.uvs) : undefined) as never;
+                            settings.instancingUVs2 = (g.uvs2 ? new Float32Array(g.uvs2) : undefined) as never;
                             settings.instancingNormals = (g.normals ? new Float32Array(g.normals) : undefined) as never;
-                            s.instancingGeometry = new Float32Array(g.positions);
                         });
                     return (
                         <Row label="Geometry">
@@ -1259,6 +1422,7 @@ export function RendererModule({
                                         }
                                         binding.apply((s) => {
                                             const settings = s.getRendererSettings();
+                                            settings.instancingUVs2 = undefined;
                                             if (next === 'cube') {
                                                 settings.instancingIndices = MESH_CUBE_INDICES;
                                                 settings.instancingUVs = undefined;
@@ -1278,7 +1442,9 @@ export function RendererModule({
                                 />
                                 {preset === 'custom' && (
                                     <span style={{fontSize: 10.5, color: '#9eb9ff'}}>
-                                        {vertexCount} verts / {triangleCount} tris — picking a preset replaces this mesh
+                                        {vertexCount} verts / {triangleCount} tris
+                                        {system.getRendererSettings().instancingUVs2 ? ' / 2 UV sets' : ''} — picking a
+                                        preset replaces this mesh
                                     </span>
                                 )}
                             </div>

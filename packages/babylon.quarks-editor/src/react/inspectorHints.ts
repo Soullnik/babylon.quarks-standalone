@@ -13,6 +13,7 @@ const INSPECTOR_HINTS: Record<string, string> = {
     'Velocity over Lifetime': 'Adds linear and orbital velocity each frame in local or world space.',
     'Inherit Velocity': 'Copies the emitter’s movement into new particle velocity.',
     Gravity: 'Applies a constant downward force (Earth-like gravity by default).',
+    Attractor: 'Pulls particles towards a point, harder the nearer they are (a point gravity).',
     'Rotation over Lifetime': 'Spins particles by setting angular velocity over lifetime.',
     Noise: 'Procedural noise that jitters particle position and rotation.',
     Turbulence: '3D turbulent velocity field that swirls particles through space.',
@@ -31,6 +32,8 @@ const INSPECTOR_HINTS: Record<string, string> = {
     Duration: 'How long the particle system runs before stopping (non-looping) or one loop cycle.',
     Looping: 'When enabled, the effect restarts from the beginning after duration ends.',
     'World space': 'Simulates in world coordinates so moving the emitter does not drag existing particles.',
+    'Scaling mode':
+        'What the emitter’s scale does to a world-space system: only the shape and sizes, or speeds and forces too (Unity’s Scaling Mode).',
     Prewarm: 'Simulates the effect once at start so it already looks mid-playback when play begins.',
     'Start delay': 'Wait time before emission starts after play or restart.',
     'Start lifetime': 'How long each spawned particle lives before dying.',
@@ -76,6 +79,24 @@ const INSPECTOR_HINTS: Record<string, string> = {
     'Blend mode': 'How particle color is composited over the background.',
     Transparent: 'Enables alpha blending for soft edges and fade-outs.',
     Texture: 'Sprite or flipbook image applied to each particle.',
+    'UV channel':
+        'Which UV set the texture reads: the sprite or mesh UV, or a mesh’s second set / the length of a trail.',
+    Tiling: 'Repeats of the texture across the UV range, U and V (Unity’s material Tiling).',
+    Offset: 'Shift of the texture in UV units after tiling, U and V (Unity’s material Offset).',
+    Scroll: 'UV units per second the texture moves on the renderer’s clock (Unreal’s Panner).',
+    'Flip U/V': 'Fraction of particles mirrored horizontally and vertically, picked at birth (Unity’s renderer Flip).',
+    Ramp: 'Colour ramp read left to right; without one there is no gradient map.',
+    'Ramp channel':
+        'Which value of the map texel picks the colour along the ramp: one channel of a packed texture, or luminance.',
+    Erosion: 'Lets alpha erode the shape through a mask instead of fading it.',
+    'Erosion mask': 'Texture whose red channel orders what goes first; none uses the map’s own alpha.',
+    Softness: 'Width of the soft transition at the erosion cut, in mask units.',
+    'Edge width': 'Width of the glowing band above the erosion cut; 0 draws none.',
+    'Edge color': 'Linear RGB added in the edge band; may exceed 1 for a glow.',
+    'Noise texture': 'Texture whose red and green channels push the map’s UV about; it should repeat.',
+    'Distortion strength': 'How far the map’s UV is pushed at most, in UV units.',
+    'Swept trail': 'Spans the ribbon along a fixed axis of the emitter instead of facing the camera (a weapon trail).',
+    'Side axis': 'Local axis the swept trail spans its width along; give a unit vector.',
     'Alpha test': 'Pixels below this alpha are discarded (cutout/hard edges).',
     'Depth write': 'Writes to the depth buffer — usually off for additive particles.',
     'Depth test': 'Whether particles are occluded by scene geometry.',
@@ -90,6 +111,16 @@ const INSPECTOR_HINTS: Record<string, string> = {
     'Blend tiles': 'Smoothly blends between adjacent atlas tiles during animation.',
     'Start tile': 'Atlas cell index where playback begins (0 = top-left).',
     'Animate frames': 'Enables frame-over-lifetime curve to cycle through atlas tiles.',
+    'Time mode':
+        'Lifetime samples the curve over each particle’s life; FPS plays frames by age from the curve’s frame.',
+    FPS: 'Frames per second in FPS mode.',
+    Loop: 'In FPS mode, wrap back to the first frame of the segment, or hold the last.',
+    'Random frame': 'In FPS mode, show a random frame of the segment every tick instead of the next one.',
+    'Frame count': 'Frames in the segment that plays, from the first frame; 0 means no segment.',
+    'Start frame':
+        'Starts each particle on a random one of the first N frames (Unity’s Start Frame); editing sets a 0…N range.',
+    'attractor.center': 'Point in the system’s space particles are pulled towards.',
+    'attractor.magnitude': 'Pull strength, divided by the squared distance to the center.',
 
     // Sub emitters
     Trigger: 'When the child system is spawned: on particle birth, death, or every frame.',

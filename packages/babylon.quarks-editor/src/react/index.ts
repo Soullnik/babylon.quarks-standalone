@@ -1,6 +1,7 @@
 export {AssetsPanel} from './AssetsPanel.js';
 export type {AssetsPanelProps} from './AssetsPanel.js';
 export {
+    AttractorModule,
     CollisionModule,
     ColorBySpeedModule,
     EmitDirectionModule,
@@ -51,6 +52,8 @@ export type {PromptDialogProps} from './PromptDialog.js';
 export {ScenePanel} from './ScenePanel.js';
 export type {ScenePanelProps} from './ScenePanel.js';
 export {SubEmittersModule} from './SubEmittersModule.js';
+export {TextureSelect, textureUrlOf} from './TextureSelect.js';
+export {TextureUVField} from './TextureUVField.js';
 export {buttonStyle, inputStyle, labelStyle, rowStyle, theme} from './theme.js';
 export {TimelinePanel} from './TimelinePanel.js';
 export type {PlaybackState, TimelinePanelProps} from './TimelinePanel.js';

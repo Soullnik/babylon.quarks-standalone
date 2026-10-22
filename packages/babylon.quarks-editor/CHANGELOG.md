@@ -8,8 +8,21 @@ and the project follows the `quarks.core` 0.x version line.
 
 ### Added
 
+- **The Renderer module reaches the 0.25–0.26 texture features.** Map layout (UV channel,
+  tiling, offset, scroll), Flip, a Gradient map section (ramp and channel), an Erosion section
+  (mask with its own layout, softness, edge width and colour) and a UV distortion section (noise
+  with its layout, strength). The ramp, mask and noise are picked the way the texture is: from
+  the host's presets, a URL or a file.
+- Renderer: a swept trail's side axis. A host geometry
+  (`GeometryOption`, `resolveGeometry`) may carry a second UV set, `uvs2`, which mesh particles
+  read on UV channel 1; the demo's glTF loader passes `TEXCOORD_1` through.
+- Main: Scaling mode for world-space systems (shape only, or the hierarchy's motion too).
+- Texture Sheet Animation: time mode (lifetime or FPS), FPS, loop or hold, random frame, cycles,
+  frame count and a random start frame.
+- Attractor module: a point gravity (`GravityForce`) with its centre and strength.
 - Emitter shape wireframes for the Box and Edge shapes: the box outline with its +Z emit
   direction, and the edge line with its +Y emit direction.
+- `TextureSelect` and `TextureUVField` components, exported from `babylon.quarks-editor/react`.
 
 ### Changed
 
@@ -33,6 +46,10 @@ and the project follows the `quarks.core` 0.x version line.
   IndexedDB project store. The coverage threshold for the editor is raised to match.
 - Editor tests resolve `babylon.quarks` to its sources, so they pick up library changes made in
   the same branch without rebuilding it.
+- React modules are tested in jsdom through the DOM, and the whole `EffectEditor` is mounted in
+  every render mode.
+- The README leads with `QuarksEffectEditor.Show`, lists every peer and every module, and the
+  `EffectEditor` snippet carries all of its props.
 
 ## [0.27.0] — 2026-10-21
 
