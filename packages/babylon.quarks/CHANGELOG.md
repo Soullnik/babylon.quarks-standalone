@@ -307,6 +307,14 @@ or duplicated something else, and nothing in the package used them.
 
 ### Internal
 
+- **`integrate.ts`** (`src/system/`) holds the passes of a simulation step after emission: the
+  snapshot the renderer extrapolates from, the behavior steps, the sprite path's one pass over
+  the store (newborn collapse, motion, ageing, bounds and removal) and the trail path's passes
+  (collapse, motion, history, removal), as plain functions over the store and the particle array.
+  `ParticleSystem.stepOnce` calls them in order and is 60 lines; the file is now about 1700
+  lines, from 3641 before phase 3c. The hot loops are the same code and run the same within
+  benchmark noise (a local 88k-particle benchmark: 11.5, 11.6 and 10.4 ms before against 11.6,
+  9.2 and 10.1 ms after, in interleaved runs).
 - **`EmissionController` and `ParticleSpawner`** (`src/system/`) take emission (rates, bursts and
   their waves, emission along the emitter's path, the system-level generator memory) and the
   making of newborn particles (pool growth, start values, placement, behavior initialisation) out
