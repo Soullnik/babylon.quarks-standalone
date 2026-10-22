@@ -48,9 +48,10 @@ export class GalleryViewportPicker {
         } else if (soloRoot && !soloRoot.isDisposed()) {
             this.createHandle(soloRoot);
         }
-        const hovered = this.hoveredRoot;
-        this.hoveredRoot = null;
-        this.setHover(hovered && !hovered.isDisposed() ? hovered : null);
+        if (this.hoveredRoot?.isDisposed()) {
+            this.hoveredRoot = null;
+            this.hoverMarker.hide();
+        }
     }
 
     /** Yellow focus-style ring under the hovered effect root. */

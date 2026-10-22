@@ -20,6 +20,8 @@
         ]
     },
     "moduleNameMapper": {
+        "^babylon\\.quarks$": "<rootDir>/../babylon.quarks/src/index.ts",
         "^(\\.{1,2}/.*)\\.js$": "$1"
-    }
+    },
+    "collectCoverageFrom": ["src/core/**/*.ts"]
 }
