@@ -54,7 +54,7 @@ export async function pickAssetFolderFiles(): Promise<File[] | null | undefined>
     }
 
     try {
-        const dir = (await picker.call(window, {mode: 'read'})) as DirectoryHandleWithEntries;
+        const dir = (await picker.call(window, {mode: 'read'})) as unknown as DirectoryHandleWithEntries;
         const files = await readAssetFilesFromDirectory(dir);
         return files.sort((a, b) => relativePathOf(a).localeCompare(relativePathOf(b)));
     } catch (err) {

@@ -48,6 +48,9 @@ and the project follows the `quarks.core` 0.x version line.
 
 ### Changed
 
+- **The package compiles with TypeScript's `strict` mode.** The published declarations are the
+  same as before.
+
 - **`loadFromJSON` and `loadFromJSONAll` no longer change the document they are given.** They
   resolve urls and inline geometry files on a copy, so one document can be loaded many times, into
   several scenes or with several base urls. Code that read the resolved urls back from its own
@@ -370,13 +373,13 @@ renames below.
   unchanged and stays in the fused pass.
 - Texture effects on sprites, meshes and trails, GLSL and WGSL, each saved with the material in the
   effect JSON only when set and batched apart when they differ:
-    - `ParticleSystem.uvScroll` `[u, v]`: scrolls the map in UV units per second on the renderer's clock.
-    - `ParticleSystem.gradientMap`: recolours the map through a ramp texture picked by its red
-      channel; the particle colour still tints it.
-    - `ParticleSystem.erosion` (`ParticleErosion`: mask, softness, edgeWidth, edgeColor, maskScroll):
-      alpha erosion. The particle's alpha decides how much of the shape is left instead of how
-      transparent it is, so a `ColorOverLife` alpha curve dissolves it through a noise mask or wipes
-      it through a gradient one, with an optional glowing edge.
+  - `ParticleSystem.uvScroll` `[u, v]`: scrolls the map in UV units per second on the renderer's clock.
+  - `ParticleSystem.gradientMap`: recolours the map through a ramp texture picked by its red
+    channel; the particle colour still tints it.
+  - `ParticleSystem.erosion` (`ParticleErosion`: mask, softness, edgeWidth, edgeColor, maskScroll):
+    alpha erosion. The particle's alpha decides how much of the shape is left instead of how
+    transparent it is, so a `ColorOverLife` alpha curve dissolves it through a noise mask or wipes
+    it through a gradient one, with an optional glowing edge.
 - `RenderMode.Beam` (6) with `ParticleSystem.beamEnd` (a point or anything with a world position,
   such as a `TransformNode`, read every frame; runtime only): a quad laid from each particle to
   the end and turned about its length to face the camera, U along it, the size as its width. With

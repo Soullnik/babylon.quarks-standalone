@@ -390,11 +390,12 @@ export function EffectEditorHost(props: EffectEditorHostProps) {
     };
 
     useEffect(() => {
-        const engine = new Engine(canvasRef.current!, true);
+        const canvas = canvasRef.current!;
+        const engine = new Engine(canvas, true);
         const scene = new Scene(engine);
         scene.clearColor = new Color4(0.03, 0.04, 0.09, 1);
         const camera = new ArcRotateCamera('cam', -Math.PI / 2, 1.15, 9, new BVector3(0, 1.4, 0), scene);
-        camera.attachControl(canvasRef.current!, true);
+        camera.attachControl(canvas, true);
         camera.wheelDeltaPercentage = 0.01;
 
         // Mesh render mode particles are lit (billboard modes ignore these); the grid is visual
@@ -453,7 +454,7 @@ export function EffectEditorHost(props: EffectEditorHostProps) {
         const state = stateRef.current;
 
         const handleViewportPointerLeave = () => viewportPicker.setHover(null);
-        canvasRef.current?.addEventListener('pointerleave', handleViewportPointerLeave);
+        canvas.addEventListener('pointerleave', handleViewportPointerLeave);
 
         const pointerObserver = scene.onPointerObservable.add((pointerInfo) => {
             if (assetDragDepthRef.current > 0) {
@@ -1313,7 +1314,7 @@ export function EffectEditorHost(props: EffectEditorHostProps) {
         });
 
         const resizeObserver = new ResizeObserver(() => engine.resize());
-        resizeObserver.observe(canvasRef.current!);
+        resizeObserver.observe(canvas);
         const onKey = (e: KeyboardEvent) => {
             const key = e.key.toLowerCase();
             if ((e.ctrlKey || e.metaKey) && key === 's') {
@@ -1375,13 +1376,13 @@ export function EffectEditorHost(props: EffectEditorHostProps) {
             emitterWireframesRef.current = null;
             viewportPicker.dispose();
             viewportPickerRef.current = null;
-            canvasRef.current?.removeEventListener('pointerleave', handleViewportPointerLeave);
+            canvas.removeEventListener('pointerleave', handleViewportPointerLeave);
             scene.onPointerObservable.remove(pointerObserver);
             gizmoManager.dispose();
             gizmoUtilityLayer.dispose();
             engine.dispose();
         };
-        // eslint-disable-next-line react-hooks/exhaustive-deps
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- mount only: builds the engine and scene once
     }, []);
 
     useEffect(() => {
@@ -1527,13 +1528,6 @@ export function EffectEditorHost(props: EffectEditorHostProps) {
     }, [selectedNode, binding, isAssetsLoading]);
 
     const state = stateRef.current;
-    const gizmoNode =
-        selectedNode && !selectedNode.isDisposed()
-            ? selectedNode
-            : binding?.root && !binding.root.isDisposed()
-              ? binding.root
-              : null;
-
     const allSystems = binding ? [binding.system, ...binding.subSystems] : [];
     const activeSystem = binding ? (allSystems.find((s) => s.emitter === selectedNode) ?? binding.system) : null;
     // The inspector is the expensive part of a selection change (every module re-renders for the
@@ -1554,22 +1548,23 @@ export function EffectEditorHost(props: EffectEditorHostProps) {
     const instanceCounts = useMemo(() => countInstancesByAsset(sceneEntries), [sceneEntries]);
     const showTimeline = Boolean(binding && activeSystem && state);
     const timelinePlaybackEnabled = !focusedRoot || visibleRootIdSet.has(focusedRoot.uniqueId);
+    const {resolveTexture, resolveGeometry} = props;
     const resolveTextureForEditor = useCallback(
         (url: string) => {
             const scene = stateRef.current?.scene;
-            return scene && props.resolveTexture ? props.resolveTexture(url, scene) : undefined;
+            return scene && resolveTexture ? resolveTexture(url, scene) : undefined;
         },
-        [props.resolveTexture]
+        [resolveTexture]
     );
     const resolveGeometryForEditor = useCallback(
         (file: File) => {
             const scene = stateRef.current?.scene;
-            if (!scene || !props.resolveGeometry) {
+            if (!scene || !resolveGeometry) {
                 return Promise.reject(new Error('Geometry loader is not available.'));
             }
-            return props.resolveGeometry(file, scene);
+            return resolveGeometry(file, scene);
         },
-        [props.resolveGeometry]
+        [resolveGeometry]
     );
 
     return (

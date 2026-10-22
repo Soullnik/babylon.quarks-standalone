@@ -19,9 +19,9 @@ Pick one:
   (e.g. `Assets/QuarksExporter/Editor/`). The scripts are editor-only (guarded by the assembly
   definition), so they never ship in a build.
 - **As a local UPM package** — in `Packages/manifest.json` add:
-    ```json
-    "com.babylonquarks.unity-exporter": "file:../path/to/tools/unity-quarks-exporter"
-    ```
+  ```json
+  "com.babylonquarks.unity-exporter": "file:../path/to/tools/unity-quarks-exporter"
+  ```
 
 Requires Unity **2020.3+**.
 

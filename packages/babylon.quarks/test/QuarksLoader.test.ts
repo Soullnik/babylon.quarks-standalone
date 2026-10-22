@@ -1434,7 +1434,7 @@ describe('QuarksLoader shared resources', () => {
         expect(unshared.texture).not.toBe(a.texture);
         expect(unshared.instancingGeometry).not.toBe(a.instancingGeometry);
 
-        a.texture.dispose();
+        a.texture!.dispose();
         const afterDispose = settingsOf(new QuarksLoader(scene).parse(effect(PNG)));
         expect(afterDispose.texture).not.toBe(a.texture);
 

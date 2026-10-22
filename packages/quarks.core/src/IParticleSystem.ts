@@ -26,6 +26,7 @@ export interface EmissionState {
     inherit?: number;
 }
 
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type -- a texture or geometry a renderer stores
 export interface Resource {}
 
 export interface JsonMetaData {
@@ -56,6 +57,7 @@ export interface StretchedBillBoardSettings {
     lengthFactor: number;
 }
 
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type -- billboards take no settings yet
 export interface BillBoardSettings {}
 
 export interface TrailSettings {

@@ -70,8 +70,16 @@ package's sources counts (for the editor, `src/core`), whether a test loads it o
 untested module lowers the number. The gate needs the full suite: run on a subset of tests it fails
 for the packages that subset does not reach. New runtime code needs tests.
 
-Formatting is Prettier (`npm run prettier --workspace=babylon.quarks`); match the existing
-style — 4-space indent, single quotes in package sources.
+Formatting is Prettier: `npm run format` writes it and `npm run format:check`, part of
+`npm run check` and CI, fails on a file it would change. Code has a 4-space indent and single
+quotes; Markdown lists indent 2 spaces, and code blocks in Markdown are left as written.
+
+`npm run lint` runs ESLint (`eslint.config.mjs`, typescript-eslint's recommended rules and React's
+hook rules for the editor) and is part of `npm run check` and CI. Errors fail it. The warnings are
+explicit `any`s, kept while the JSON readers are typed; `--max-warnings` in the script is a ratchet
+like the coverage floors: a change may not add one, and a PR that removes some lowers the number.
+An `eslint-disable` comment names its rule and says why. The three packages compile with
+`strict: true`; the examples do not yet.
 
 ## Commit and PR conventions
 

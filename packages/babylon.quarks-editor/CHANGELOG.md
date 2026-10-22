@@ -6,6 +6,12 @@ and the project follows the `quarks.core` 0.x version line.
 
 ## [Unreleased]
 
+### Changed
+
+- **`TimelinePanelProps` and `TransportBarProps` take `RefObject<HTMLElement | null>` refs**, the
+  type `useRef<HTMLElement>(null)` returns, now that the editor compiles with `strict`. Code that
+  passed the old type still compiles.
+
 ### Fixed
 
 - **Saving lost mesh nodes and texture settings.** The editor now saves through `serializeEffect`:

@@ -6,6 +6,7 @@ import {
     ConstantValue,
     createSeededRandom,
     EmitSubParticleSystem,
+    getRandomSource,
     IntervalValue,
     PointEmitter,
     setRandomSource,
@@ -82,7 +83,7 @@ describe('seeded systems, instantiate and the effect pool', () => {
         setRandomSource(marker);
         system.restart();
         system.update(STEP);
-        expect(require('quarks.core').getRandomSource()).toBe(marker);
+        expect(getRandomSource()).toBe(marker);
     });
 
     it('makes unseeded systems reproducible through the global source', () => {

@@ -14,7 +14,7 @@ export interface TransportBarProps {
     renderer: BatchedRenderer;
     playbackRef: React.MutableRefObject<PlaybackState>;
     /** The host's render loop writes time and particle count here. */
-    counterRef: React.RefObject<HTMLSpanElement>;
+    counterRef: React.RefObject<HTMLSpanElement | null>;
     stagePlaying: boolean;
     setStagePlaying: (playing: boolean) => void;
     speed: number;

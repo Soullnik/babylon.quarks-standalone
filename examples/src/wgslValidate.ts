@@ -33,7 +33,8 @@ type Case = {
 const canvas = document.getElementById('c') as HTMLCanvasElement;
 const engine = new WebGPUEngine(canvas);
 await engine.initAsync();
-const scene = new Scene(engine);
+// The shaders compile against a scene's engine state.
+new Scene(engine);
 
 const SPRITE_ATTRS = ['position', 'uv', 'offset', 'color', 'size', 'rotation', 'uvTile'];
 const SPRITE_UNIFORMS = ['world', 'view', 'projection'];
