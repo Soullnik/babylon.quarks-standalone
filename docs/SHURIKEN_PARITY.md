@@ -9,6 +9,7 @@ Three tiers: ✅ shipped · 🟡 runtime supports it, editor UI missing · 🔴 
 - ✅ start delay (constant/random, ignored with prewarm, re-armed by restart)
 - ✅ 3D start size (uniform / per-axis `Vector3Function`), gradient start color (single `Gradient` and random-between-two-gradients `RandomColorBetweenGradient`)
 - ✅ max particles (`maxParticles`), simulation speed (`playbackSpeed`), culling mode (`cullingMode`: always / pause / pause and catch up), random seed (`seed`)
+- ✅ scaling mode (`scalingMode`: shape / hierarchy, for world-space systems under a scaled parent)
 - 🔴 stop action, ring buffer
 
 ## Emission
@@ -28,7 +29,7 @@ Three tiers: ✅ shipped · 🟡 runtime supports it, editor UI missing · 🔴 
 - ✅ Speed over Lifetime (curve), Limit Speed over Lifetime (curve + dampen), Force over Lifetime (XYZ), Gravity
 - ✅ Orbit over Lifetime
 - ✅ Velocity over Lifetime (linear XYZ local/world + orbital XYZ, orbital offset, radial), Inherit Velocity (initial/current)
-- 🔴 orbital offset, radial velocity, Lifetime by Emitter Speed
+- 🔴 Lifetime by Emitter Speed
 
 ## Color / size / rotation
 - ✅ Color over Lifetime (gradient), Size over Lifetime (curve), Rotation over Lifetime (billboards in their plane, meshes about their local Z; separate axes → `Rotation3DOverLife`)
@@ -52,19 +53,22 @@ Three tiers: ✅ shipped · 🟡 runtime supports it, editor UI missing · 🔴 
 ## Texture Sheet Animation
 - ✅ tiles U/V, start tile, frame-over-life curve, atlas preview with tile grid + start-tile highlight
 - ✅ tile blending
-- 🔴 sprites mode, single-row mode, cycles
+- ✅ cycles, FPS time mode, frame count / start frame, loop, random frame (`FrameOverLife` options)
+- 🔴 sprites mode, single-row mode
 
 ## Trails (Unity Trails module = ribbons attached to particles)
 - ✅ Trail *render mode* (whole system renders as trails) with length/follow-origin
 - ✅ Width over Trail
+- ✅ trail flags (`uvFromHead`, `colorFromParticle`, `dieWithParticle`, `recordWorldSpace`), swept trails (`sideAxis`), smoothing (`tessellation`, `curveTension`)
 - 🔴 per-particle ribbon trails on billboard systems (different architecture)
 
 ## Renderer
-- ✅ render modes (billboard ×4, trail, mesh), blend mode, texture picker (presets/URL/file), render order, mesh geometry presets
+- ✅ render modes (billboard ×4, trail, beam, mesh), blend mode, texture picker (presets/URL/file), render order, mesh geometry presets
 - ✅ host-provided mesh assets (`geometryOptions`) + load-your-own GLB/glTF (`resolveGeometry` host loader)
 - ✅ texture thumbnail + mesh wireframe previews in the inspector
 - ✅ soft particles (+near/far fade), alpha test, depth write/test
-- 🟡 layer mask
+- ✅ layer mask (`layerMask`)
+- ✅ texture layout (UV channel, Tiling / Offset, scroll as Unreal's Panner), flip, gradient map, alpha erosion, UV distortion, rim on mesh particles
 - ✅ sort mode (`sortMode`: distance / oldest in front / youngest in front), min/max particle size (`minParticleSize` / `maxParticleSize`, billboards and stretched), pivot (`pivot`)
 - 🔴 shadows
 

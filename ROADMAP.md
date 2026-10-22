@@ -10,18 +10,25 @@ performance and gap-closing pass; the older plan is in the git history.
   exporter (`tools/unity-quarks-exporter`, shipped as a `.unitypackage`). `quarks.core` is a
   vendored fork of the three.quarks core and is where the simulation lives.
 - Runtime: batched rendering for every render mode (billboard, stretched, horizontal, vertical,
-  mesh, trail), soft particles, texture tiles, sub emitters, mesh surface emitter, 20+
-  behaviors, native WGSL shaders for WebGPU, scene integration (render order, rendering groups,
-  layer masks, fog), bounds and frustum culling with Unity's culling modes, sort modes, screen-size
-  limits, effect pool, deterministic randomness, adaptive performance.
+  mesh, trail, beam), soft particles, texture tiles, texture effects (per-texture UV layout with
+  channel, tiling, offset and scroll; gradient map; alpha erosion; UV distortion; flip; rim on
+  meshes), smoothed trails (tessellation, curve tension, swept side axis), sub emitters, mesh
+  surface emitter, 20+ behaviors, native WGSL shaders for WebGPU, scene integration (render order,
+  rendering groups, layer masks, fog), bounds and frustum culling with Unity's culling modes, sort
+  modes, screen-size limits, effect pool, deterministic randomness, adaptive performance, a
+  versioned effect format (`docs/FORMAT.md`) written by `serializeEffect`.
 - Simulation runs on a column store (structure of arrays) with compiled behavior passes. On
   this project's CI-class VM, 50k particles simulate and upload in about 3.5 ms per frame, 5–7×
   faster than Babylon's built-in CPU `ParticleSystem` on the same scenario (see the README's
   benchmark table and `examples/benchmark.html`).
-- Editor: 19 Shuriken-style modules, hierarchy of systems, undo/redo, timeline, projects in
-  IndexedDB, import/export round-trips through `QuarksLoader`. Its core is unit tested.
-- Quality gates in CI: build of every package, unit tests of core, runtime and editor core, a
-  smoothness sweep, a tarball content check, and a headless WebGL smoke over every demo.
+- Editor: 27 Shuriken-style modules, hierarchy of systems, undo/redo, timeline, projects in
+  IndexedDB, import/export round-trips through `QuarksLoader`. Its core is unit tested with a 95%
+  coverage floor and its React modules are tested under jsdom.
+- Quality gates in CI: formatting, lint, `strict` TypeScript, build of every package, TSDoc on
+  every export, unit tests with coverage floors for core, runtime and editor, a smoothness sweep,
+  a tarball content check, and a headless WebGL smoke over every demo that also checks each has a
+  gallery preview. `npm run validate:wgsl` compiles every WGSL variant under a real compiler; it
+  runs locally, since CI has no WebGPU adapter.
 - Parity with Unity's Shuriken: see [docs/SHURIKEN_PARITY.md](docs/SHURIKEN_PARITY.md). What is
   left is collision triggers and arbitrary collider shapes, ring buffer / stop action, noise
   quality (octaves), texture-based emission, lights, custom data and renderer shadows.
@@ -31,20 +38,25 @@ performance and gap-closing pass; the older plan is in the git history.
 In rough priority order; each is a few days of work.
 
 1. **WebGPU on real hardware** ([#19](https://github.com/Soullnik/babylon.quarks-standalone/issues/19)).
-   The shaders are native WGSL and compile under a real WGSL compiler in CI, but headless
-   software adapters cannot run the demos end to end. A pass on real hardware across every
+   The shaders are native WGSL and compile under a real WGSL compiler (`npm run validate:wgsl`,
+   run locally), but headless software adapters cannot run the demos end to end. A pass on real hardware across every
    demo, with the soft-particle depth path and texture uploads checked, then `check:demos
 --webgpu` on a runner that has an adapter.
-2. **Editor to done** (the remainder of the former #16): layer mask field, a warning when the
-   exported JSON references `blob:` textures, min/max placeholders on random fields, a
-   BabylonJS Editor window host, an embedding guide, a keyboard/accessibility pass on the curve
+2. **Editor to done** (the remainder of the former #16): min/max placeholders on random fields,
+   a BabylonJS Editor window host, an embedding guide, a keyboard/accessibility pass on the curve
    and gradient editors.
-3. **Shuriken leftovers**: collision triggers and sub emitters on collision, collider shapes
+3. **Audit leftovers** (October 2026): a per-effect warm-up time (Niagara's Warmup Time) in place
+   of the static prewarm cap; `MeshSettings.rotationAxis`, which is declared but never read, to
+   implement or drop; the emitter transform interpolated across simulation sub-steps, so a trail
+   recorded in world space from a fast-moving emitter does not stair-step at low frame rates;
+   `validate:wgsl` in CI once a software WebGPU adapter is reliable; the prefab track type still
+   named `three`.
+4. **Shuriken leftovers**: collision triggers and sub emitters on collision, collider shapes
    beyond planes, stop action, ring buffer, noise quality.
-4. **Perf, round two** (from the profiling report): a shared store per batch for scenes with
+5. **Perf, round two** (from the profiling report): a shared store per batch for scenes with
    hundreds of small systems, one interleaved instance buffer (one upload instead of five), trail
    colour in RGBA8 and neighbours through the vertex id instead of `previous`/`next` attributes.
-5. **Docs**: a step-by-step effect authoring guide with screenshots, StackBlitz / CodeSandbox
+6. **Docs**: a step-by-step effect authoring guide with screenshots, StackBlitz / CodeSandbox
    starters, an integration example with react-babylonjs.
 
 ## Later

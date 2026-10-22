@@ -17,7 +17,7 @@
  *                   at a time: software WebGL is CPU-bound, so pages opened side
  *                   by side each render fewer frames instead of finishing sooner
  */
-import {readFileSync} from 'node:fs';
+import {existsSync, readFileSync} from 'node:fs';
 import {dirname, join} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {chromium} from 'playwright';
@@ -42,6 +42,19 @@ if (allKeys.length === 0) {
     process.exit(1);
 }
 const keys = allKeys.filter((_, i) => i % shards === shard - 1);
+
+// The gallery shows `previews/<key>.png` for every demo, captured by `npm run capture:previews`;
+// a demo without one is a broken image on the front page.
+const previewOf = (key) =>
+    key
+        .replace(/Demo$/u, '')
+        .replace(/([a-z0-9])([A-Z])/g, '$1-$2')
+        .toLowerCase() + '.png';
+const missingPreviews = allKeys.filter((key) => !existsSync(join(root, 'examples/public/previews', previewOf(key))));
+if (missingPreviews.length > 0) {
+    console.error(`demos without a gallery preview (run \`npm run capture:previews\`): ${missingPreviews.join(', ')}`);
+    process.exit(1);
+}
 
 // Errors any headless run produces that say nothing about the demos.
 const NOISE = /favicon|net::ERR_|404 \(|GL Driver Message|GPU stall due to ReadPixels/;

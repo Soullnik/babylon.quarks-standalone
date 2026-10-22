@@ -9,12 +9,12 @@ const base = process.env.GITHUB_ACTIONS === 'true' && repositoryName ? `/${repos
 export default defineConfig({
     base,
     server: {
-        port: 8000,
+        port: 3010,
         // Cloudflare quick tunnels hit Vite with a *.trycloudflare.com Host header.
         allowedHosts: true,
     },
     preview: {
-        port: 8000,
+        port: 3010,
     },
     resolve: {
         alias: {
@@ -31,6 +31,7 @@ export default defineConfig({
                 babylon: resolve(__dirname, 'babylonDemo.html'),
                 benchmark: resolve(__dirname, 'benchmark.html'),
                 editor: resolve(__dirname, 'editor.html'),
+                wgsl: resolve(__dirname, 'wgsl-validate.html'),
             },
         },
     },
