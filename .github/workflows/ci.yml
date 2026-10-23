@@ -82,8 +82,9 @@ jobs:
                   DOTNET_CLI_TELEMETRY_OPTOUT: 1
                   DOTNET_NOLOGO: 1
 
-    # Every demo opened in headless WebGL; any page error, console error or console warning fails the job. Software WebGL
-    # is CPU-bound, so the demos are split over two machines rather than opened side by side.
+    # Every demo opened in headless WebGL; any page error, console error or console warning fails
+    # the job. Software WebGL is CPU-bound, so the demos are split over two machines rather than
+    # opened side by side.
     demos:
         name: Demo smoke (${{ matrix.shard }}/2)
         runs-on: ubuntu-latest
