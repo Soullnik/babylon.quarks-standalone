@@ -1,4 +1,4 @@
-import {Quaternion, RandomQuatGenerator} from '../../src';
+import {GeneratorMemory, Quaternion, RandomQuatGenerator} from '../../src';
 
 describe('RandomQuatGenerator', () => {
     test('.toJSON', () => {
@@ -13,7 +13,7 @@ describe('RandomQuatGenerator', () => {
 
     test('.genValue produces a unit quaternion', () => {
         const gen = new RandomQuatGenerator();
-        const memory: any[] = [];
+        const memory: GeneratorMemory = [];
         gen.startGen(memory);
         const q = new Quaternion();
         gen.genValue(memory, q, 1, 0);
@@ -28,7 +28,7 @@ describe('RandomQuatGenerator', () => {
         const gen = new RandomQuatGenerator();
         const samples: Quaternion[] = [];
         for (let i = 0; i < 5; i++) {
-            const memory: any[] = [];
+            const memory: GeneratorMemory = [];
             gen.startGen(memory);
             const q = new Quaternion();
             gen.genValue(memory, q, 1, 0);
@@ -46,7 +46,7 @@ describe('RandomQuatGenerator', () => {
         // same memory return the same quat (rotation stays stable over the
         // particle's lifetime).
         const gen = new RandomQuatGenerator();
-        const memory: any[] = [];
+        const memory: GeneratorMemory = [];
         gen.startGen(memory);
         const q1 = new Quaternion();
         gen.genValue(memory, q1, 1, 0);

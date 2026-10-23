@@ -13,6 +13,7 @@ import {QuarksLoader} from '../src/QuarksLoader';
 import physicsFragGLSL from '../src/shaders/particle_physics_frag.glsl';
 import physicsFragWGSL from '../src/shaders/particle_physics_frag.wgsl';
 import {MeshLighting, RenderMode} from '../src/VFXBatch';
+import {emptyMeta, notifyBind} from './internals';
 
 let engine: NullEngine;
 let scene: Scene;
@@ -48,15 +49,15 @@ function material(renderer: BatchedRenderer, index = 0): ShaderMaterial {
 }
 
 function defines(mat: ShaderMaterial): string[] {
-    return (mat as any).options.defines as string[];
+    return mat['options'].defines as string[];
 }
 
 function uniformNames(mat: ShaderMaterial): string[] {
-    return (mat as any).options.uniforms as string[];
+    return mat['options'].uniforms as string[];
 }
 
 function vector3(mat: ShaderMaterial, name: string): Vector3 {
-    return (mat as any)._vectors3[name] as Vector3;
+    return mat['_vectors3'][name] as Vector3;
 }
 
 function expectVector(actual: Vector3, x: number, y: number, z: number) {
@@ -126,7 +127,7 @@ describe('mesh particle lighting', () => {
         renderer.addSystem(meshSystem({lighting: 'scene', uTileCount: 2}));
         mat = material(renderer, 1);
         // No scene light yet: the scene mode falls back to the renderer light.
-        mat.onBindObservable.notifyObservers(undefined as any);
+        notifyBind(mat);
         expectVector(vector3(mat, 'lightDirection'), 0, -1, 0);
 
         const copy = renderer.getMeshLighting();
@@ -144,14 +145,14 @@ describe('mesh particle lighting', () => {
         const renderer = new BatchedRenderer('sceneDir', scene);
         renderer.addSystem(meshSystem({lighting: 'scene'}));
         const mat = material(renderer);
-        mat.onBindObservable.notifyObservers(undefined as any);
+        notifyBind(mat);
         expectVector(vector3(mat, 'lightDirection'), 0, -1, 1);
         expectVector(vector3(mat, 'lightColor'), 2, 1.6, 1.2);
         expectVector(vector3(mat, 'ambientColor'), 0.1, 0.2, 0.3);
 
         // Every frame: a change to the light shows on the next bind.
         sun.direction = new Vector3(1, -1, 0);
-        mat.onBindObservable.notifyObservers(undefined as any);
+        notifyBind(mat);
         expectVector(vector3(mat, 'lightDirection'), 1, -1, 0);
     });
 
@@ -163,7 +164,7 @@ describe('mesh particle lighting', () => {
         const renderer = new BatchedRenderer('sceneHemi', scene);
         renderer.addSystem(meshSystem({lighting: 'scene'}));
         const mat = material(renderer);
-        mat.onBindObservable.notifyObservers(undefined as any);
+        notifyBind(mat);
         expectVector(vector3(mat, 'lightDirection'), 0, -1, 0);
         expectVector(vector3(mat, 'lightColor'), 0.5, 0.5, 0.5);
         expectVector(vector3(mat, 'ambientColor'), 0.1, 0.05, 0);
@@ -172,13 +173,13 @@ describe('mesh particle lighting', () => {
     it('round-trips through toJSON / fromJSON and clone, writing nothing for the default', () => {
         for (const lighting of ['unlit', 'scene'] as MeshLighting[]) {
             const system = meshSystem({lighting});
-            const meta = {geometries: {}, materials: {}, textures: {}} as any;
+            const meta = emptyMeta();
             const json = system.toJSON(meta);
             expect(meta.materials[json.material!].lighting).toBe(lighting);
             expect(ParticleSystem.fromJSON(json, meta, {}, scene).lighting).toBe(lighting);
             expect(system.clone().lighting).toBe(lighting);
         }
-        const meta = {geometries: {}, materials: {}, textures: {}} as any;
+        const meta = emptyMeta();
         const json = meshSystem().toJSON(meta);
         expect('lighting' in meta.materials[json.material!]).toBe(false);
     });

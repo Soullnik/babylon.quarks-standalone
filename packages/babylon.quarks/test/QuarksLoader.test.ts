@@ -15,6 +15,7 @@ import {QuarksPrefab} from '../src/QuarksPrefab';
 import {QUARKS_FORMAT_VERSION, serializeEffect} from '../src/QuarksSerializer';
 import {fileNodeId} from '../src/nodeId';
 import {textureSourceUrl} from '../src/textureSource';
+import {emptyMeta, jsonResponse} from './internals';
 
 loadPlugin(MeshSurfaceEmitterPlugin);
 
@@ -102,8 +103,8 @@ describe('QuarksLoader matrix decomposition', () => {
             },
         });
 
-        const emitter = root.getChildren()[0] as any;
-        expect(emitter.system.emissionBursts[0].cycle).toBe(3);
+        const emitter = root.getChildren()[0] as ParticleEmitter;
+        expect((emitter.system as ParticleSystem).emissionBursts[0].cycle).toBe(3);
 
         scene.dispose();
         engine.dispose();
@@ -120,13 +121,13 @@ describe('QuarksLoader matrix decomposition', () => {
             renderMode: 2, // Mesh
             instancingGeometry: customPositions,
             instancingIndices: customIndices,
-        } as any);
+        });
 
-        const meta: any = {geometries: {}, materials: {}, textures: {}, images: {}};
+        const meta = emptyMeta();
         const psJSON = ps.toJSON(meta);
         const envelope = {
             geometries: Object.values(meta.geometries),
-            materials: Object.values(meta.materials).map(({sourceMaterial: _s, ...rest}: any) => rest),
+            materials: Object.values(meta.materials).map(({sourceMaterial: _s, ...rest}) => rest),
             textures: [],
             images: [],
             object: {uuid: 'root', type: 'ParticleEmitter', ps: psJSON},
@@ -149,13 +150,13 @@ describe('QuarksLoader matrix decomposition', () => {
         const ps = new ParticleSystem({
             scene,
             blendMode: Constants.ALPHA_ADD,
-        } as any);
+        });
 
-        const meta: any = {geometries: {}, materials: {}, textures: {}, images: {}};
+        const meta = emptyMeta();
         const psJSON = ps.toJSON(meta);
         const envelope = {
             geometries: Object.values(meta.geometries),
-            materials: Object.values(meta.materials).map(({sourceMaterial: _s, ...rest}: any) => rest),
+            materials: Object.values(meta.materials).map(({sourceMaterial: _s, ...rest}) => rest),
             textures: [],
             images: [],
             object: {uuid: 'root', type: 'ParticleEmitter', ps: psJSON},
@@ -354,13 +355,13 @@ describe('QuarksLoader matrix decomposition', () => {
 
         const children = root.getChildren();
         const mesh = children.find((node) => node.name === 'mesh-1');
-        const cameraNode = children.find((node) => node.name === 'camera-1') as any;
-        const lightNode = children.find((node) => node.name === 'light-1') as any;
+        const cameraNode = children.find((node) => node.name === 'camera-1');
+        const lightNode = children.find((node) => node.name === 'light-1');
 
         expect(mesh).toBeInstanceOf(Mesh);
         expect((mesh as Mesh).getTotalVertices()).toBeGreaterThan(0);
-        expect(cameraNode.quarksOriginalType).toBe('PerspectiveCamera');
-        expect(lightNode.quarksOriginalType).toBe('DirectionalLight');
+        expect(cameraNode).toHaveProperty('quarksOriginalType', 'PerspectiveCamera');
+        expect(lightNode).toHaveProperty('quarksOriginalType', 'DirectionalLight');
 
         scene.dispose();
         engine.dispose();
@@ -370,17 +371,9 @@ describe('QuarksLoader matrix decomposition', () => {
         const engine = new NullEngine();
         const scene = new Scene(engine);
         const loader = new QuarksLoader(scene);
-        const fetchSpy = jest.spyOn(global, 'fetch').mockResolvedValue({
-            ok: true,
-            status: 200,
-            json: async () => ({
-                object: {
-                    uuid: 'root',
-                    type: 'Group',
-                    children: [],
-                },
-            }),
-        } as any);
+        const fetchSpy = jest
+            .spyOn(global, 'fetch')
+            .mockImplementation(async () => jsonResponse({object: {uuid: 'root', type: 'Group', children: []}}));
 
         const root = await loader.load('https://example.com/assets/effect.json');
         expect(root.name).toBe('Group');
@@ -407,9 +400,9 @@ describe('QuarksLoader matrix decomposition', () => {
                 uvs: [0, 0, 1, 0, 1, 1],
             },
         };
-        const fetchSpy = jest.spyOn(global, 'fetch').mockImplementation(async (input: any) => {
+        const fetchSpy = jest.spyOn(global, 'fetch').mockImplementation(async (input: string | URL | Request) => {
             const body = responses[String(input)];
-            return {ok: body !== undefined, status: body ? 200 : 404, json: async () => body} as any;
+            return jsonResponse(body, body ? 200 : 404);
         });
 
         const root = await loader.load('https://example.com/fx/sub/effect.json');
@@ -455,15 +448,15 @@ describe('QuarksLoader matrix decomposition', () => {
             positions: [0, 0, 0, 1, 0, 0, 1, 1, 0],
             indices: [0, 1, 2],
         };
-        const fetchSpy = jest.spyOn(global, 'fetch').mockImplementation(async (input: any) => {
+        const fetchSpy = jest.spyOn(global, 'fetch').mockImplementation(async (input: string | URL | Request) => {
             const url = String(input);
             if (url.endsWith('Quad.json')) {
-                return {ok: true, status: 200, json: async () => geometryBody} as any;
+                return jsonResponse(geometryBody);
             }
-            return {ok: false, status: 404, json: async () => null} as any;
+            return jsonResponse(null, 404);
         });
 
-        const json: any = {
+        const json = {
             images: [{uuid: 'img', url: 'textures/smoke.png'}],
             textures: [{uuid: 'tex', image: 'img'}],
             materials: [{uuid: 'mat', map: 'tex'}],
@@ -517,9 +510,7 @@ describe('QuarksLoader matrix decomposition', () => {
             const engine = new NullEngine();
             const scene = new Scene(engine);
             const loader = new QuarksLoader(scene, {shareResources: false});
-            const fetchSpy = jest
-                .spyOn(global, 'fetch')
-                .mockImplementation(async () => ({ok: true, status: 200, json: async () => effect()}) as any);
+            const fetchSpy = jest.spyOn(global, 'fetch').mockImplementation(async () => jsonResponse(effect()));
             await loader.load('fx/hit.json');
             await loader.loadAll(['fx/hit.json', 'fx/hit.json']);
             expect(textureUrls(scene)).toEqual(new Array(3).fill('fx/tex/a.png'));
@@ -542,16 +533,16 @@ describe('QuarksLoader matrix decomposition', () => {
             geometries: [{uuid: 'geo', type: 'QuarksGeometry', url: 'assets/geometries/Quad.json'}],
             object: {uuid: 'm', type: 'Mesh', name: 'quad', geometry: 'geo'},
         });
-        const fetchSpy = jest.spyOn(global, 'fetch').mockImplementation(async (input: any) => {
+        const fetchSpy = jest.spyOn(global, 'fetch').mockImplementation(async (input: string | URL | Request) => {
             const url = String(input);
             if (url.endsWith('effect-a.json') || url.endsWith('effect-b.json')) {
-                return {ok: true, status: 200, json: async () => effectJson()} as any;
+                return jsonResponse(effectJson());
             }
             if (url.endsWith('Quad.json')) {
                 geometryFetches++;
-                return {ok: true, status: 200, json: async () => geometryBody} as any;
+                return jsonResponse(geometryBody);
             }
-            return {ok: false, status: 404, json: async () => null} as any;
+            return jsonResponse(null, 404);
         });
 
         const [a, b] = await Promise.all([
@@ -581,7 +572,7 @@ describe('QuarksLoader matrix decomposition', () => {
             },
         });
 
-        const json: any = {
+        const json = {
             images: [{uuid: 'img', url: 'folder/tex.png'}],
             textures: [{uuid: 'tex', image: 'img'}],
             materials: [{uuid: 'mat', map: 'tex'}],
@@ -612,17 +603,17 @@ describe('QuarksLoader matrix decomposition', () => {
             geometries: [{uuid: 'geo', type: 'QuarksGeometry', url: 'assets/geometries/Shared.json'}],
             object: {uuid: name, type: 'Mesh', name, geometry: 'geo'},
         });
-        const fetchSpy = jest.spyOn(global, 'fetch').mockImplementation(async (input: any) => {
+        const fetchSpy = jest.spyOn(global, 'fetch').mockImplementation(async (input: string | URL | Request) => {
             const url = String(input);
             if (/effect-[abc]\.json$/.test(url)) {
                 const name = url.slice(url.lastIndexOf('/') + 1, -5);
-                return {ok: true, status: 200, json: async () => effectJson(name)} as any;
+                return jsonResponse(effectJson(name));
             }
             if (url.endsWith('Shared.json')) {
                 geometryFetches++;
-                return {ok: true, status: 200, json: async () => geometryBody} as any;
+                return jsonResponse(geometryBody);
             }
-            return {ok: false, status: 404, json: async () => null} as any;
+            return jsonResponse(null, 404);
         });
 
         const progress: Array<[number, number]> = [];
@@ -654,16 +645,12 @@ describe('QuarksLoader matrix decomposition', () => {
         const scene = new Scene(engine);
         const loader = new QuarksLoader(scene);
         const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
-        const fetchSpy = jest.spyOn(global, 'fetch').mockImplementation(async (input: any) => {
+        const fetchSpy = jest.spyOn(global, 'fetch').mockImplementation(async (input: string | URL | Request) => {
             const url = String(input);
             if (url.endsWith('bad.json')) {
-                return {ok: false, status: 404, json: async () => null} as any;
+                return jsonResponse(null, 404);
             }
-            return {
-                ok: true,
-                status: 200,
-                json: async () => ({object: {uuid: 'ok', type: 'Group', name: 'ok'}}),
-            } as any;
+            return jsonResponse({object: {uuid: 'ok', type: 'Group', name: 'ok'}});
         });
 
         const progress: Array<[number, number]> = [];
@@ -723,11 +710,11 @@ describe('QuarksLoader matrix decomposition', () => {
         const loader = new QuarksLoader(scene, {
             resolver: {fetchJson: async () => shared},
         });
-        const a: any = {
+        const a = {
             geometries: [{uuid: 'geo', type: 'QuarksGeometry', url: 'shared.json'}],
             object: {uuid: 'a', type: 'Group'},
         };
-        const b: any = {
+        const b = {
             geometries: [{uuid: 'geo', type: 'QuarksGeometry', url: 'shared.json'}],
             object: {uuid: 'b', type: 'Group'},
         };
@@ -816,19 +803,21 @@ describe('QuarksLoader matrix decomposition', () => {
         expect(mesh.getIndices()?.length).toBe(3);
         expect(mesh.material).toBeDefined();
 
-        const material = mesh.material as any;
+        const material = mesh.material as StandardMaterial;
+        expect(material).toBeInstanceOf(StandardMaterial);
         expect(material.alphaMode).toBe(Constants.ALPHA_SUBTRACT);
         expect(material.backFaceCulling).toBe(true);
         expect(material.alphaCutOff).toBeCloseTo(0.25, 5);
         expect(material.disableDepthWrite).toBe(false);
-        expect(material.diffuseTexture).toBeDefined();
-        expect(material.diffuseTexture.wrapU).toBe(Texture.CLAMP_ADDRESSMODE);
-        expect(material.diffuseTexture.wrapV).toBe(Texture.MIRROR_ADDRESSMODE);
-        expect(material.diffuseTexture.uScale).toBe(2);
-        expect(material.diffuseTexture.vScale).toBe(3);
-        expect(material.diffuseTexture.uOffset).toBeCloseTo(0.1, 5);
-        expect(material.diffuseTexture.vOffset).toBeCloseTo(0.2, 5);
-        expect(material.diffuseTexture.wAng).toBeCloseTo(0.5, 5);
+        expect(material.diffuseTexture).toBeInstanceOf(Texture);
+        const texture = material.diffuseTexture as Texture;
+        expect(texture.wrapU).toBe(Texture.CLAMP_ADDRESSMODE);
+        expect(texture.wrapV).toBe(Texture.MIRROR_ADDRESSMODE);
+        expect(texture.uScale).toBe(2);
+        expect(texture.vScale).toBe(3);
+        expect(texture.uOffset).toBeCloseTo(0.1, 5);
+        expect(texture.vOffset).toBeCloseTo(0.2, 5);
+        expect(texture.wAng).toBeCloseTo(0.5, 5);
 
         scene.dispose();
         engine.dispose();
@@ -843,12 +832,12 @@ describe('QuarksLoader matrix decomposition', () => {
         // with its texture intact. Do a genuine round-trip: build a system with a texture, toJSON,
         // flatten the live-texture meta into the serializable envelope, then parse it back.
         const source = new ParticleSystem({scene, texture: new Texture('textures/spark.png', scene)});
-        const meta: any = {textures: {}, materials: {}, geometries: {}};
-        const ps = source.toJSON(meta, {} as any);
+        const meta = emptyMeta();
+        const ps = source.toJSON(meta);
 
-        const images = Object.entries(meta.textures).map(([uuid, tex]: [string, any]) => ({
+        const images = Object.entries(meta.textures).map(([uuid, tex]) => ({
             uuid: `${uuid}-image`,
-            url: tex.url ?? tex.name,
+            url: tex instanceof Texture ? tex.url : tex?.name,
         }));
         const textures = Object.keys(meta.textures).map((uuid) => ({uuid, image: `${uuid}-image`}));
 
@@ -1019,12 +1008,12 @@ describe('QuarksLoader matrix decomposition', () => {
             },
         });
 
-        const emptyEmitter = root.getChildren().find((node) => node.name === 'empty-emitter') as any;
-        const mystery = root.getChildren().find((node) => node.name === 'mystery-node') as any;
-        const rotNode = root.getChildren().find((node) => node.name === 'rot-node') as any;
-        const quatNode = root.getChildren().find((node) => node.name === 'quat-node') as any;
+        const emptyEmitter = root.getChildren().find((node) => node.name === 'empty-emitter');
+        const mystery = root.getChildren().find((node) => node.name === 'mystery-node');
+        const rotNode = root.getChildren().find((node) => node.name === 'rot-node') as TransformNode;
+        const quatNode = root.getChildren().find((node) => node.name === 'quat-node') as TransformNode;
 
-        expect(emptyEmitter.quarksOriginalType).toBe('ParticleEmitter');
+        expect(emptyEmitter).toHaveProperty('quarksOriginalType', 'ParticleEmitter');
         expect(mystery).toBeDefined();
         expect(rotNode.rotation.x).toBeCloseTo(0.1, 5);
         expect(quatNode.rotationQuaternion).not.toBeNull();
@@ -1084,8 +1073,10 @@ describe('QuarksLoader matrix decomposition', () => {
 
         const emitter = root.getChildren()[1] as ParticleEmitter;
         expect(emitter).toBeInstanceOf(ParticleEmitter);
-        expect(((emitter.system as ParticleSystem).emitterShape as any).type).toBe('mesh_surface');
-        expect(((emitter.system as ParticleSystem).emitterShape as any).mesh).toBeUndefined();
+        const shape = (emitter.system as ParticleSystem).emitterShape;
+        expect(shape).toBeInstanceOf(MeshSurfaceEmitter);
+        expect((shape as MeshSurfaceEmitter).type).toBe('mesh_surface');
+        expect((shape as MeshSurfaceEmitter).mesh).toBeUndefined();
 
         scene.dispose();
         engine.dispose();
@@ -1166,8 +1157,8 @@ describe('QuarksLoader matrix decomposition', () => {
 
         const meshData = root.getChildren().find((node) => node.name === 'mesh-data') as Mesh;
         const meshRelative = root.getChildren().find((node) => node.name === 'mesh-relative') as Mesh;
-        expect((meshData.material as any).diffuseTexture.url).toBe(dataUri);
-        expect((meshRelative.material as any).diffuseTexture.url).toBe(
+        expect(((meshData.material as StandardMaterial).diffuseTexture as Texture).url).toBe(dataUri);
+        expect(((meshRelative.material as StandardMaterial).diffuseTexture as Texture).url).toBe(
             'https://cdn.example.com/base/textures/spark.png'
         );
 
@@ -1224,7 +1215,7 @@ describe('QuarksLoader matrix decomposition', () => {
         });
         const emitter = root.getChildren()[1] as ParticleEmitter;
         const mesh = root.getChildren()[0] as Mesh;
-        expect(((emitter.system as ParticleSystem).emitterShape as any).mesh).toBe(mesh);
+        expect(((emitter.system as ParticleSystem).emitterShape as MeshSurfaceEmitter).mesh).toBe(mesh);
         scene.dispose();
         engine.dispose();
     });
@@ -1345,7 +1336,7 @@ describe('QuarksLoader matrix decomposition', () => {
                 materials: [],
                 geometries: [],
                 object: {uuid: 'n0', type: 'Group', name: 'root'},
-            } as any);
+            });
             const messages = warn.mock.calls.map((c) => String(c[0]));
             expect(messages.filter((m) => m.includes('unity_builtin_extra'))).toHaveLength(1);
             expect(messages.filter((m) => m.includes('spark.png'))).toHaveLength(0);
@@ -1399,7 +1390,8 @@ describe('QuarksLoader shared resources', () => {
         },
     });
 
-    const settingsOf = (root: any) => ((root as ParticleEmitter).system as ParticleSystem).getRendererSettings();
+    const settingsOf = (root: TransformNode) =>
+        ((root as ParticleEmitter).system as ParticleSystem).getRendererSettings();
 
     it('gives every load of the same image and mesh the same Texture and geometry', () => {
         const engine = new NullEngine();

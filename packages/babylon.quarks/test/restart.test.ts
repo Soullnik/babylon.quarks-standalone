@@ -3,6 +3,7 @@ import {Scene} from '@babylonjs/core/scene';
 import {Bezier, ConstantColor, ConstantValue, IntervalValue, PiecewiseBezier, PointEmitter, Vector4} from 'quarks.core';
 import {BatchedRenderer} from '../src/BatchedRenderer';
 import {EffectPool} from '../src/EffectPool';
+import {ParticleEmitter} from '../src/ParticleEmitter';
 import {ParticleSystem} from '../src/ParticleSystem';
 import {QuarksUtil} from '../src/QuarksUtil';
 
@@ -119,7 +120,7 @@ describe('restart()', () => {
         const pool = new EffectPool(template.emitter, {renderer});
         for (let play = 0; play < 3; play++) {
             const copy = pool.acquire()!;
-            const copySystem = (copy as any).system as ParticleSystem;
+            const copySystem = (copy as ParticleEmitter).system as ParticleSystem;
             expect(run(copySystem, 0.3)).toBeGreaterThan(10);
             pool.release(copy);
         }

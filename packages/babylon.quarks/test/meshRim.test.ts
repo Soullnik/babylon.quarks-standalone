@@ -11,6 +11,7 @@ import {QuarksLoader} from '../src/QuarksLoader';
 import physicsFragGLSL from '../src/shaders/particle_physics_frag.glsl';
 import physicsFragWGSL from '../src/shaders/particle_physics_frag.wgsl';
 import {normalizeMeshRim, RenderMode} from '../src/VFXBatch';
+import {emptyMeta, notifyBind} from './internals';
 
 let engine: NullEngine;
 let scene: Scene;
@@ -45,8 +46,8 @@ function material(renderer: BatchedRenderer, index = 0): ShaderMaterial {
     return renderer.batches[index].mesh.material as ShaderMaterial;
 }
 
-const defines = (mat: ShaderMaterial) => (mat as any).options.defines as string[];
-const uniformNames = (mat: ShaderMaterial) => (mat as any).options.uniforms as string[];
+const defines = (mat: ShaderMaterial) => mat['options'].defines as string[];
+const uniformNames = (mat: ShaderMaterial) => mat['options'].uniforms as string[];
 
 describe('mesh particle rim', () => {
     it('is off unless set', () => {
@@ -78,13 +79,13 @@ describe('mesh particle rim', () => {
         const mat = material(renderer);
         expect(defines(mat)).toContain('MESH_RIM');
         expect(defines(mat)).not.toContain('MESH_RIM_MIX');
-        const color = (mat as any)._vectors3.rimColor as Vector3;
+        const color = mat['_vectors3'].rimColor as Vector3;
         expect([color.x, color.y, color.z]).toEqual([0.2, 0.6, 1]);
-        const params = (mat as any)._vectors2.rimParams;
+        const params = mat['_vectors2'].rimParams;
         expect(params.x).toBe(3);
         expect(params.y).toBeCloseTo(0.8, 6);
-        mat.onBindObservable.notifyObservers(undefined as any);
-        const eye = (mat as any)._vectors3.eyePosition as Vector3;
+        notifyBind(mat);
+        const eye = mat['_vectors3'].eyePosition as Vector3;
         expect([eye.x, eye.y, eye.z]).toEqual([1, 2, 3]);
         for (const source of [physicsFragGLSL, physicsFragWGSL]) {
             expect(source).toContain('#ifdef MESH_RIM');
@@ -137,7 +138,7 @@ describe('mesh particle rim', () => {
     it('round-trips through toJSON / fromJSON, clone and the loader', () => {
         const rim = {color: [1, 0.5, 0] as [number, number, number], power: 1.5, strength: 0.5, mode: 'mix' as const};
         const system = meshSystem({rim});
-        const meta = {geometries: {}, materials: {}, textures: {}} as any;
+        const meta = emptyMeta();
         const json = system.toJSON(meta);
         expect(meta.materials[json.material!].rim).toEqual(rim);
         expect(ParticleSystem.fromJSON(json, meta, {}, scene).rim).toEqual(rim);
@@ -155,7 +156,7 @@ describe('mesh particle rim', () => {
             mode: 'mix',
         });
 
-        const plain = {geometries: {}, materials: {}, textures: {}} as any;
+        const plain = emptyMeta();
         const plainJSON = meshSystem().toJSON(plain);
         expect('rim' in plain.materials[plainJSON.material!]).toBe(false);
     });

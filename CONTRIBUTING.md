@@ -96,10 +96,10 @@ Formatting is Prettier: `npm run format` writes it and `npm run format:check`, p
 quotes; Markdown lists indent 2 spaces, and code blocks in Markdown are left as written.
 
 `npm run lint` runs ESLint (`eslint.config.mjs`, typescript-eslint's recommended rules and React's
-hook rules for the editor) and is part of `npm run check` and CI. Errors fail it. The warnings are
-explicit `any`s, kept while the JSON readers are typed; `--max-warnings` in the script is a ratchet
-like the coverage floors: a change may not add one, and a PR that removes some lowers the number.
-An `eslint-disable` comment names its rule and says why. The three packages and the examples
+hook rules for the editor) and is part of `npm run check` and CI. It allows no warnings, and an
+explicit `any` is an error: JSON from a file is `unknown` and narrowed as it is read, and a test
+reaches a private member with `obj['member']` (or the helpers in `test/internals.ts`) instead of a
+cast where it can. An `eslint-disable` comment names its rule and says why. The three packages and the examples
 compile with `strict: true`.
 
 Everything `babylon.quarks` exports carries TSDoc, the simulation core it re-exports from

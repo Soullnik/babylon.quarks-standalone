@@ -108,7 +108,7 @@ describe('BoxEmitter', () => {
             emitFrom: BoxEmitFrom.Edge,
             boxThickness: [0.1, 0.2, 0.3],
         });
-        expect((EmitterFromJSON(json, {} as any) as BoxEmitter).toJSON()).toEqual(json);
+        expect((EmitterFromJSON(json, {textures: {}, geometries: {}}) as BoxEmitter).toJSON()).toEqual(json);
         expect(emitter.clone().toJSON()).toEqual(json);
         // The clone owns its thickness.
         (emitter.clone() as BoxEmitter).boxThickness[0] = 9;
@@ -165,7 +165,7 @@ describe('EdgeEmitter', () => {
         });
         const json = emitter.toJSON();
         expect(json.type).toBe('edge');
-        expect((EmitterFromJSON(json, {} as any) as EdgeEmitter).toJSON()).toEqual(json);
+        expect((EmitterFromJSON(json, {textures: {}, geometries: {}}) as EdgeEmitter).toJSON()).toEqual(json);
         expect(emitter.clone().toJSON()).toEqual(json);
         expect(EdgeEmitter.fromJSON({type: 'edge'}).toJSON()).toEqual(new EdgeEmitter().toJSON());
     });

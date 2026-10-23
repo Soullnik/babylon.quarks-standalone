@@ -20,6 +20,7 @@ import stretched_bb_particle_vert from '../src/shaders/stretched_bb_particle_ver
 import stretched_bb_particle_vert_wgsl from '../src/shaders/stretched_bb_particle_vert.wgsl';
 import {SpriteBatch} from '../src/SpriteBatch';
 import {RenderMode} from '../src/VFXBatch';
+import {notifyBind} from './internals';
 
 describe('SpriteBatch', () => {
     let engine: NullEngine;
@@ -89,7 +90,7 @@ describe('SpriteBatch', () => {
         expect(system.particleNum).toBe(0);
         const batch = getSpriteBatch(renderer);
         expect(batch.mesh.forcedInstanceCount).toBe(0);
-        const colorBuffer = (batch as any).colorBuffer as Float32Array;
+        const colorBuffer = batch['colorBuffer'] as Float32Array;
         expect(colorBuffer[3]).toBe(0);
 
         renderer.dispose();
@@ -111,7 +112,7 @@ describe('SpriteBatch', () => {
         }
         expect(system.particleNum).toBe(0);
         const batch = getSpriteBatch(renderer);
-        const colorUploads = jest.spyOn((batch as any).colorVB, 'update');
+        const colorUploads = jest.spyOn(batch['colorVB'], 'update');
         for (let i = 0; i < 20; i++) {
             renderer.update(1 / 60);
         }
@@ -145,7 +146,7 @@ describe('SpriteBatch', () => {
         }
 
         const batch = getSpriteBatch(renderer);
-        const sizeBuffer = (batch as any).sizeBuffer as Float32Array;
+        const sizeBuffer = batch['sizeBuffer'] as Float32Array;
         expect(system.particleNum).toBeGreaterThan(0);
         expect(batch.mesh.forcedInstanceCount).toBe(system.particleNum);
         expect(sizeBuffer[0]).toBeGreaterThan(1);
@@ -163,14 +164,14 @@ describe('SpriteBatch', () => {
         renderer.addSystem(system);
 
         const batch = getSpriteBatch(renderer);
-        expect((batch as any).maxParticles).toBe(1000);
+        expect(batch['maxParticles']).toBe(1000);
 
         for (let i = 0; i < 60; i++) {
             renderer.update(1 / 60);
         }
 
         expect(system.particleNum).toBeGreaterThan(1000);
-        expect((batch as any).maxParticles).toBeGreaterThan(1000);
+        expect(batch['maxParticles']).toBeGreaterThan(1000);
 
         renderer.dispose();
         system.dispose();
@@ -197,12 +198,12 @@ describe('SpriteBatch', () => {
         renderer.update(1 / 60);
 
         const batch = getSpriteBatch(renderer);
-        const velocityBuffer = (batch as any).velocityBuffer as Float32Array;
+        const velocityBuffer = batch['velocityBuffer'] as Float32Array;
         const material = batch.mesh.material as ShaderMaterial;
         expect(velocityBuffer[0]).toBeCloseTo(0.003, 6);
         expect(velocityBuffer[3]).toBe(3);
         // The speed is baked into the velocity attribute; the shader has no speed uniform.
-        expect((material as any)._options.uniforms).not.toContain('speedFactor');
+        expect(material['_options'].uniforms).not.toContain('speedFactor');
 
         renderer.dispose();
         system.dispose();
@@ -221,7 +222,7 @@ describe('SpriteBatch', () => {
 
         const batch = getSpriteBatch(renderer);
         const material = batch.mesh.material as ShaderMaterial;
-        const rotationBuffer = (batch as any).rotationBuffer as Float32Array;
+        const rotationBuffer = batch['rotationBuffer'] as Float32Array;
         expect(rotationBuffer.length % 4).toBe(0);
         expect(material.alphaMode).toBe(Constants.ALPHA_DISABLE);
         expect(material.forceDepthWrite).toBe(true);
@@ -258,8 +259,8 @@ describe('SpriteBatch', () => {
         renderer.update(1 / 60);
         const mat = getSpriteBatch(renderer).mesh.material as ShaderMaterial;
         expectShaderDefines(mat, ['UV_TILE', 'TILE_BLEND']);
-        expect((mat as any)._floats.tileCountX).toBe(4);
-        expect((mat as any)._floats.tileCountY).toBe(2);
+        expect(mat['_floats'].tileCountX).toBe(4);
+        expect(mat['_floats'].tileCountY).toBe(2);
         renderer.dispose();
         system.dispose();
     });
@@ -279,9 +280,9 @@ describe('SpriteBatch', () => {
         renderer.update(1 / 60);
         const mat = getSpriteBatch(renderer).mesh.material as ShaderMaterial;
         expectShaderDefines(mat, ['SOFT_PARTICLES', 'USE_ALPHATEST']);
-        expect((mat as any)._floats.alphaTest).toBeCloseTo(0.35, 5);
-        mat.onBindObservable.notifyObservers(undefined as any);
-        expect((mat as any)._vectors4.projParams).toBeDefined();
+        expect(mat['_floats'].alphaTest).toBeCloseTo(0.35, 5);
+        notifyBind(mat);
+        expect(mat['_vectors4'].projParams).toBeDefined();
         renderer.dispose();
         system.dispose();
         depthTex.dispose();
@@ -319,10 +320,10 @@ describe('SpriteBatch', () => {
         const babylonWorld = system.emitter.getWorldMatrix();
         const parentMat = new Matrix4();
         for (let i = 0; i < 16; i++) {
-            (parentMat as any).elements[i] = babylonWorld.m[i];
+            parentMat['elements'][i] = babylonWorld.m[i];
         }
         for (let i = 0; i < system.particleNum; i++) {
-            (system.particles[i] as any).parentMatrix = parentMat;
+            system.particles[i]['parentMatrix'] = parentMat;
         }
         renderer.update(1 / 60);
         expect(batch.mesh.forcedInstanceCount).toBeGreaterThan(0);
@@ -344,10 +345,10 @@ describe('SpriteBatch', () => {
         const babylonWorld = system.emitter.getWorldMatrix();
         const parentMat = new Matrix4();
         for (let i = 0; i < 16; i++) {
-            (parentMat as any).elements[i] = babylonWorld.m[i];
+            parentMat['elements'][i] = babylonWorld.m[i];
         }
         for (let i = 0; i < system.particleNum; i++) {
-            (system.particles[i] as any).parentMatrix = parentMat;
+            system.particles[i]['parentMatrix'] = parentMat;
             system.particles[i].velocity.set(0, 1, 0);
         }
         renderer.update(1 / 60);
@@ -383,15 +384,15 @@ describe('SpriteBatch', () => {
             renderer.update(1 / 60);
         }
 
-        const batch = getSpriteBatch(renderer) as any;
+        const batch = getSpriteBatch(renderer);
         expect(system.particleNum).toBeGreaterThan(1);
         for (let i = 0; i < system.particleNum; i++) {
             const particle = system.particles[i];
-            expect(batch.offsetBuffer[i * 3]).toBeCloseTo(particle.position.x, 5);
-            expect(batch.offsetBuffer[i * 3 + 1]).toBeCloseTo(particle.position.y, 5);
-            expect(batch.offsetBuffer[i * 3 + 2]).toBeCloseTo(particle.position.z, 5);
-            expect(batch.sizeBuffer[i * 3]).toBeCloseTo(particle.size.x, 5);
-            expect(batch.colorBuffer[i * 4 + 3]).toBeCloseTo(particle.color.w, 5);
+            expect(batch['offsetBuffer'][i * 3]).toBeCloseTo(particle.position.x, 5);
+            expect(batch['offsetBuffer'][i * 3 + 1]).toBeCloseTo(particle.position.y, 5);
+            expect(batch['offsetBuffer'][i * 3 + 2]).toBeCloseTo(particle.position.z, 5);
+            expect(batch['sizeBuffer'][i * 3]).toBeCloseTo(particle.size.x, 5);
+            expect(batch['colorBuffer'][i * 4 + 3]).toBeCloseTo(particle.color.w, 5);
         }
 
         renderer.dispose();
@@ -412,9 +413,9 @@ describe('SpriteBatch', () => {
         expect(system.particleNum).toBeGreaterThan(1);
 
         for (let i = 0; i < system.particleNum; i++) {
-            const particle = system.particles[i] as any;
+            const particle = system.particles[i];
             // Slot k must own row k, and its views must read that row.
-            expect(particle.storeIndex).toBe(i);
+            expect(particle).toHaveProperty('storeIndex', i);
             expect(system.store.position[i * 3]).toBeCloseTo(particle.position.x, 5);
             expect(system.store.color[i * 4 + 3]).toBeCloseTo(particle.color.w, 5);
         }
@@ -433,17 +434,17 @@ describe('SpriteBatch', () => {
             renderer.update(1 / 60);
         }
 
-        const batch = getSpriteBatch(renderer) as any;
+        const batch = getSpriteBatch(renderer);
         expect(system.particleNum).toBeGreaterThan(1);
         const expected = new QVector3();
         for (let i = 0; i < system.particleNum; i++) {
             const particle = system.particles[i];
             expected.copy(particle.position).applyMatrix4(system.emitter.matrixWorld);
-            expect(batch.offsetBuffer[i * 3]).toBeCloseTo(expected.x, 4);
-            expect(batch.offsetBuffer[i * 3 + 1]).toBeCloseTo(expected.y, 4);
-            expect(batch.offsetBuffer[i * 3 + 2]).toBeCloseTo(expected.z, 4);
+            expect(batch['offsetBuffer'][i * 3]).toBeCloseTo(expected.x, 4);
+            expect(batch['offsetBuffer'][i * 3 + 1]).toBeCloseTo(expected.y, 4);
+            expect(batch['offsetBuffer'][i * 3 + 2]).toBeCloseTo(expected.z, 4);
             // local space multiplies size by the emitter scale
-            expect(batch.sizeBuffer[i * 3]).toBeCloseTo(particle.size.x * 2, 4);
+            expect(batch['sizeBuffer'][i * 3]).toBeCloseTo(particle.size.x * 2, 4);
         }
 
         renderer.dispose();

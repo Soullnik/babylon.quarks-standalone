@@ -3,11 +3,12 @@ import {NullEngine} from '@babylonjs/core/Engines/nullEngine';
 import {ShaderMaterial} from '@babylonjs/core/Materials/shaderMaterial';
 import {RawTexture} from '@babylonjs/core/Materials/Textures/rawTexture';
 import {Scene} from '@babylonjs/core/scene';
-import {ConstantColor, ConstantValue, PointEmitter, Vector4} from 'quarks.core';
+import {ConstantColor, ConstantValue, PointEmitter, TrailParticle, Vector4} from 'quarks.core';
 import {BatchedRenderer} from '../src/BatchedRenderer';
 import {ParticleSystem} from '../src/ParticleSystem';
 import {TrailBatch} from '../src/TrailBatch';
 import {RenderMode} from '../src/VFXBatch';
+import {emptyMeta} from './internals';
 
 describe('TrailBatch', () => {
     let engine: NullEngine;
@@ -77,7 +78,7 @@ describe('TrailBatch', () => {
         }
 
         const batch = getTrailBatch(renderer);
-        const widthBuffer = (batch as any).widthBuffer as Float32Array;
+        const widthBuffer = batch['widthBuffer'] as Float32Array;
         expect(system.particleNum).toBeGreaterThan(0);
         expect(batch.mesh.isEnabled()).toBe(true);
         expect(batch.mesh.subMeshes[0].indexCount).toBeGreaterThan(0);
@@ -101,13 +102,13 @@ describe('TrailBatch', () => {
         renderer.addSystem(system);
 
         const batch = getTrailBatch(renderer);
-        const initialCapacity = (batch as any).maxParticles as number;
+        const initialCapacity = batch['maxParticles'] as number;
 
         for (let i = 0; i < 90; i++) {
             renderer.update(1 / 60);
         }
 
-        expect((batch as any).maxParticles).toBeGreaterThan(initialCapacity);
+        expect(batch['maxParticles']).toBeGreaterThan(initialCapacity);
         expect(batch.mesh.isEnabled()).toBe(true);
         expect(batch.mesh.subMeshes[0].indexCount).toBeGreaterThan(0);
 
@@ -141,7 +142,7 @@ describe('TrailBatch', () => {
         renderer.update(1 / 60);
         const mat = getTrailBatch(renderer).mesh.material as ShaderMaterial;
         expect((mat.options.defines as string[]).includes('USE_MAP')).toBe(true);
-        expect((mat as any)._textures.map).toBe(tex);
+        expect(mat['_textures'].map).toBe(tex);
         renderer.dispose();
         system.dispose();
         tex.dispose();
@@ -169,7 +170,7 @@ describe('TrailBatch', () => {
                 renderer.update(1 / 60);
             }
             // The first vertex pair is the oldest sample of the first trail.
-            const u = ((getTrailBatch(renderer) as any).uvBuffer as Float32Array)[0];
+            const u = getTrailBatch(renderer)['uvBuffer'][0];
             renderer.dispose();
             system.dispose();
             return u;
@@ -186,8 +187,8 @@ describe('TrailBatch', () => {
             for (let i = 0; i < 30; i++) {
                 renderer.update(1 / 60);
             }
-            const uv = (getTrailBatch(renderer) as any).uvBuffer as Float32Array;
-            const n = (system.particles[0] as any).historyCount as number;
+            const uv = getTrailBatch(renderer)['uvBuffer'];
+            const n = (system.particles[0] as TrailParticle).historyCount;
             const us: number[] = [];
             for (let i = 0; i < n; i++) us.push(uv[i * 4], uv[i * 4 + 2]);
             const vs = [uv[1], uv[3]];
@@ -217,8 +218,8 @@ describe('TrailBatch', () => {
         for (let i = 0; i < 30; i++) {
             renderer.update(1 / 60);
         }
-        const n = (system.particles[0] as any).historyCount as number;
-        const uv = (getTrailBatch(renderer) as any).uvBuffer as Float32Array;
+        const n = (system.particles[0] as TrailParticle).historyCount;
+        const uv = getTrailBatch(renderer)['uvBuffer'];
         expect(n).toBeGreaterThan(1);
         expect(uv[0]).toBe(1);
         expect(uv[(n - 1) * 4]).toBe(0);
@@ -244,7 +245,7 @@ describe('TrailBatch', () => {
             // Jump the emitter; points recorded before the jump stay at x = 0 only in world space.
             system.emitter.position.x = 10;
             renderer.update(1 / 60);
-            const x = ((getTrailBatch(renderer) as any).positionBuffer as Float32Array)[0];
+            const x = getTrailBatch(renderer)['positionBuffer'][0];
             renderer.dispose();
             system.dispose();
             return x;
@@ -272,7 +273,7 @@ describe('TrailBatch', () => {
                 system.particles[i].color.set(0, 1, 0, 1);
             }
             renderer.update(1 / 60);
-            const red = ((getTrailBatch(renderer) as any).colorBuffer as Float32Array)[0];
+            const red = getTrailBatch(renderer)['colorBuffer'][0];
             renderer.dispose();
             system.dispose();
             return red;
@@ -315,7 +316,7 @@ describe('TrailBatch', () => {
                 recordWorldSpace: true,
             },
         });
-        const meta: any = {textures: {}, materials: {}, geometries: {}};
+        const meta = emptyMeta();
         const json = system.toJSON(meta);
         expect(json.rendererEmitterSettings).toMatchObject({
             uvFromHead: true,
@@ -334,9 +335,7 @@ describe('TrailBatch', () => {
         }
         // Flags left off stay out of the JSON, `followLocalOrigin: false` included.
         const plain = createTrailSystem();
-        expect(
-            Object.keys(plain.toJSON({textures: {}, materials: {}, geometries: {}} as any).rendererEmitterSettings!)
-        ).toEqual(['startLength']);
+        expect(Object.keys(plain.toJSON(emptyMeta()).rendererEmitterSettings!)).toEqual(['startLength']);
         plain.dispose();
         system.dispose();
     });

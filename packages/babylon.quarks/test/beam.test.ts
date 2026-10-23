@@ -3,12 +3,14 @@ import {ShaderMaterial} from '@babylonjs/core/Materials/shaderMaterial';
 import {Vector3 as BVector3} from '@babylonjs/core/Maths/math.vector';
 import {TransformNode} from '@babylonjs/core/Meshes/transformNode';
 import {Scene} from '@babylonjs/core/scene';
-import {ConstantColor, ConstantValue, PointEmitter, Vector3, Vector4} from 'quarks.core';
+import {ConstantColor, ConstantValue, PointEmitter, Vector2, Vector3, Vector4} from 'quarks.core';
 import {BatchedRenderer} from '../src/BatchedRenderer';
 import {ParticleSystem} from '../src/ParticleSystem';
 import stretchedGLSL from '../src/shaders/stretched_bb_particle_vert.glsl';
 import stretchedWGSL from '../src/shaders/stretched_bb_particle_vert.wgsl';
+import {SpriteBatch} from '../src/SpriteBatch';
 import {RenderMode} from '../src/VFXBatch';
+import {emptyMeta} from './internals';
 
 let engine: NullEngine;
 let scene: Scene;
@@ -41,15 +43,15 @@ function beam(worldSpace = true) {
     return system;
 }
 
-const velocities = (renderer: BatchedRenderer) => (renderer.batches[0] as any).velocityBuffer as Float32Array;
+const velocities = (renderer: BatchedRenderer) => (renderer.batches[0] as SpriteBatch)['velocityBuffer']!;
 
 describe('beam render mode', () => {
     it('draws through the stretched shader under BEAM, with a velocity attribute', () => {
         const renderer = new BatchedRenderer('beam', scene);
         renderer.addSystem(beam());
         const mat = renderer.batches[0].mesh.material as ShaderMaterial;
-        expect((mat as any).options.defines).toContain('BEAM');
-        expect((mat as any).options.attributes).toContain('velocity');
+        expect(mat['options'].defines).toContain('BEAM');
+        expect(mat['options'].attributes).toContain('velocity');
         for (const source of [stretchedGLSL, stretchedWGSL]) {
             expect(source).toContain('#ifdef BEAM');
         }
@@ -104,7 +106,7 @@ describe('beam render mode', () => {
     });
 
     it('survives toJSON / fromJSON as a render mode', () => {
-        const meta = {geometries: {}, materials: {}, textures: {}} as any;
+        const meta = emptyMeta();
         const json = beam().toJSON(meta);
         expect(ParticleSystem.fromJSON(json, meta, {}, scene).renderMode).toBe(RenderMode.Beam);
     });
@@ -159,11 +161,11 @@ describe('beam review fixes', () => {
     it('ignores flip, so U always runs from the particle to the end', () => {
         const renderer = new BatchedRenderer('flip', scene);
         const system = beam();
-        (system as any).flip = {x: 1, y: 0};
+        system['flip'] = new Vector2(1, 0);
         system.beamEnd = new Vector3(1, 0, 0);
         renderer.addSystem(system);
         renderer.update(1 / 60);
-        const size = (renderer.batches[0] as any).sizeBuffer as Float32Array;
+        const size = (renderer.batches[0] as SpriteBatch)['sizeBuffer'];
         expect(size[0]).toBeGreaterThan(0);
     });
 });

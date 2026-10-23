@@ -8,6 +8,7 @@ import {ParticleEmitter} from '../src/ParticleEmitter';
 import {ParticleSystem} from '../src/ParticleSystem';
 import {QuarksPrefab} from '../src/QuarksPrefab';
 import {setQuarksNodeId} from '../src/nodeId';
+import {forceSet} from './internals';
 
 describe('QuarksPrefab', () => {
     let engine: NullEngine;
@@ -86,7 +87,7 @@ describe('QuarksPrefab', () => {
             stop: jest.fn(),
             setTime: jest.fn(),
         };
-        (animatedTarget as any).animations = [clip];
+        forceSet(animatedTarget, 'animations', [clip]);
 
         const prefab = QuarksPrefab.fromJSON(
             {
@@ -109,7 +110,7 @@ describe('QuarksPrefab', () => {
 
         expect(prefab.animationData.length).toBe(1);
         expect(prefab.animationData[0].type).toBe('three');
-        expect((prefab.animationData[0] as any).clipUUID).toBe('clip-uuid');
+        expect(prefab.animationData[0]['clipUUID']).toBe('clip-uuid');
 
         prefab.play();
         prefab.update(0.3);
@@ -268,11 +269,11 @@ describe('QuarksPrefab', () => {
 
     it('resolveTimelineClip falls back to first clip when uuid is omitted', () => {
         const prefab = QuarksPrefab.fromJSON({name: 'resolve', animationData: []}, scene);
-        const target: any = new Mesh('meta-mesh', scene);
+        const target = new Mesh('meta-mesh', scene);
         const clip = {uuid: 'c1', duration: 1, play: jest.fn()};
         target.metadata = {animations: [clip]};
-        (prefab as any)._tempAnimationJSON = [
-            {type: 'three', targetUUID: String(target.uniqueId), duration: 1, loop: false},
+        prefab['_tempAnimationJSON'] = [
+            {startTime: 0, type: 'three', targetUUID: String(target.uniqueId), duration: 1, loop: false},
         ];
         prefab.resolveReferences(target);
         expect(prefab.animationData.length).toBe(1);
@@ -280,11 +281,18 @@ describe('QuarksPrefab', () => {
 
     it('resolveTimelineClip selects clip by uuid on metadata.animationGroups', () => {
         const prefab = QuarksPrefab.fromJSON({name: 'resolve2', animationData: []}, scene);
-        const target: any = new Mesh('meta-mesh2', scene);
+        const target = new Mesh('meta-mesh2', scene);
         const clip = {uuid: 'find-me', duration: 1, play: jest.fn()};
         target.metadata = {animationGroups: [{uuid: 'other'}, clip]};
-        (prefab as any)._tempAnimationJSON = [
-            {type: 'three', targetUUID: String(target.uniqueId), clipUUID: 'find-me', duration: 1, loop: false},
+        prefab['_tempAnimationJSON'] = [
+            {
+                startTime: 0,
+                type: 'three',
+                targetUUID: String(target.uniqueId),
+                clipUUID: 'find-me',
+                duration: 1,
+                loop: false,
+            },
         ];
         prefab.resolveReferences(target);
         expect(prefab.animationData[0].clip).toBe(clip);
@@ -294,7 +302,7 @@ describe('QuarksPrefab', () => {
         const prefab = new QuarksPrefab('reg', scene);
         const renderer = new BatchedRenderer('reg-br', scene);
         prefab.registerBatchedRenderer(renderer);
-        expect((prefab as any)._batchedRenderer).toBe(renderer);
+        expect(prefab['_batchedRenderer']).toBe(renderer);
         renderer.dispose();
     });
 });

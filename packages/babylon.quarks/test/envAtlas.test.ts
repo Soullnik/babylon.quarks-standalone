@@ -12,7 +12,9 @@ import {
     getCachedEnvAtlas,
 } from '../src/envAtlas';
 import {ParticleSystem} from '../src/ParticleSystem';
+import type {ParticleMaterialSource} from '../src/system/materialResolve';
 import {RenderMode} from '../src/VFXBatch';
+import {forceSet} from './internals';
 
 const FACES = ['px', 'py', 'pz', 'nx', 'ny', 'nz'];
 
@@ -38,8 +40,8 @@ afterEach(() => {
 /** A cube texture with six face files, as a CubeTexture made from six URLs has. */
 function cube(scene: Scene): BaseTexture {
     const texture = new BaseTexture(scene);
-    (texture as any).isCube = true;
-    (texture as any)._files = FACES;
+    texture['isCube'] = true;
+    forceSet(texture, '_files', FACES);
     jest.spyOn(texture, 'isReady').mockReturnValue(true);
     return texture;
 }
@@ -159,7 +161,7 @@ describe('env atlas cache', () => {
         const second = system.getRendererSettings().reflectionAtlas as Texture;
         expect(second).not.toBe(first);
         expect(second.getScene()).toBe(scene);
-        expect((material as any).reflectionAtlas).toBe(second);
+        expect((material as ParticleMaterialSource).reflectionAtlas).toBe(second);
 
         // Disposed with the cube, the atlas is not rebuilt.
         source.dispose();

@@ -7,7 +7,9 @@ import {Scene} from '@babylonjs/core/scene';
 import {ConstantColor, ConstantValue, PointEmitter, Vector4} from 'quarks.core';
 import {BatchedRenderer} from '../src/BatchedRenderer';
 import {ParticleSystem} from '../src/ParticleSystem';
+import type {ParticleMaterialSource} from '../src/system/materialResolve';
 import {RenderMode} from '../src/VFXBatch';
+import {shaderOptions} from './internals';
 
 describe('material state', () => {
     let engine: NullEngine;
@@ -69,8 +71,8 @@ describe('material state', () => {
         const pendingAtlasSystem = () => {
             const atlas = new Texture('data:pending-atlas', scene, {noMipmap: true});
             const ready = jest.spyOn(atlas, 'isReady').mockReturnValue(false);
-            const material = new StandardMaterial('pending-env', scene);
-            (material as any).reflectionAtlas = atlas;
+            const material: StandardMaterial & ParticleMaterialSource = new StandardMaterial('pending-env', scene);
+            material.reflectionAtlas = atlas;
             const system = makeSystem({
                 renderMode: RenderMode.Mesh,
                 material,
@@ -97,7 +99,7 @@ describe('material state', () => {
 
             const after = batch.mesh.material!;
             expect(after).not.toBe(before);
-            expect((after as any).options.defines).toContain('USE_ENVMAP_ATLAS');
+            expect(shaderOptions(after).defines).toContain('USE_ENVMAP_ATLAS');
             expect(scene.materials).not.toContain(before);
             expect(scene.materials.length).toBe(materialCount);
         });

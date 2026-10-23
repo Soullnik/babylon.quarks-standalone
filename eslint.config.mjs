@@ -23,9 +23,8 @@ export default defineConfig(
                 'error',
                 {args: 'none', caughtErrors: 'none', ignoreRestSiblings: true},
             ],
-            // Typing the JSON readers and the editor's property bags is phase 3b's work; until then
-            // `--max-warnings` in `npm run lint` keeps the count from growing.
-            '@typescript-eslint/no-explicit-any': 'warn',
+            // Untrusted JSON is `unknown` and narrowed; tests reach internals with `obj['field']`.
+            '@typescript-eslint/no-explicit-any': 'error',
         },
     },
     {

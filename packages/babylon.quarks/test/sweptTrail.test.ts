@@ -5,6 +5,8 @@ import {BatchedRenderer} from '../src/BatchedRenderer';
 import {ParticleSystem} from '../src/ParticleSystem';
 import {TrailBatch} from '../src/TrailBatch';
 import {RenderMode} from '../src/VFXBatch';
+import type {TrailSettingsJSON} from '../src/system/types';
+import {emptyMeta} from './internals';
 
 let engine: NullEngine;
 let scene: Scene;
@@ -43,8 +45,8 @@ function blade(worldSpace = true, sideAxis: Vector3 | null = new Vector3(1, 0, 0
 }
 
 const buffers = (renderer: BatchedRenderer) => {
-    const batch = renderer.batches[0] as TrailBatch as any;
-    return {positions: batch.positionBuffer as Float32Array, widths: batch.widthBuffer as Float32Array};
+    const batch = renderer.batches[0] as TrailBatch;
+    return {positions: batch['positionBuffer'], widths: batch['widthBuffer']};
 };
 
 describe('swept trail', () => {
@@ -117,8 +119,8 @@ describe('swept trail', () => {
         for (let i = 0; i < 5; i++) renderer.update(0.021);
         const trail = system.particles[0] as TrailParticle;
         const {positions, widths} = buffers(renderer);
-        const pairs = trail.historyCount + ((system as any).simulationResidual ? 1 : 0);
-        expect((system as any).simulationResidual).toBeGreaterThan(0);
+        const pairs = trail.historyCount + (system['simulationResidual'] ? 1 : 0);
+        expect(system['simulationResidual']).toBeGreaterThan(0);
         const tip = (pairs - 1) * 6;
         expect(positions[tip] - positions[tip + 3]).toBeCloseTo(2, 4);
         expect(widths[(pairs - 1) * 2]).toBe(0);
@@ -152,8 +154,8 @@ describe('swept trail', () => {
     it('round-trips its axis through JSON and clone, written only when set', () => {
         const system = blade(true, new Vector3(0, 0, 2));
         const json = system.toJSON();
-        expect((json.rendererEmitterSettings as any).sideAxis).toEqual([0, 0, 2]);
-        const meta = {geometries: {}, materials: {}, textures: {}} as any;
+        expect((json.rendererEmitterSettings as TrailSettingsJSON).sideAxis).toEqual([0, 0, 2]);
+        const meta = emptyMeta();
         for (const copy of [ParticleSystem.fromJSON(system.toJSON(meta), meta, {}, scene), system.clone()]) {
             const axis = (copy.rendererEmitterSettings as TrailSettings).sideAxis!;
             expect([axis.x, axis.y, axis.z]).toEqual([0, 0, 2]);

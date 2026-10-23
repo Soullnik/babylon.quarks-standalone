@@ -322,6 +322,10 @@ and the project follows the `quarks.core` 0.x version line.
 - The toolchain moves to ESLint 10 (with `defineConfig` and react-hooks 7's React Compiler rules),
   TypeScript 6, Vite 8 (Rolldown: the examples' chunks all fit under its 500 kB warning) and
   cross-env 10. Babel stays on 7, which Jest's own preset still needs.
+- No explicit `any` is left in the repository, tests included, and ESLint now reports one as an
+  error. Tests reach private members with `obj['member']`, and use typed helpers in
+  `test/internals.ts` for shader options, empty resources, fetch responses and values the types
+  rule out.
 
 ## [0.27.1] — 2026-10-23
 

@@ -7,6 +7,7 @@ import {BatchedRenderer} from '../src/BatchedRenderer';
 import {ParticleEmitter} from '../src/ParticleEmitter';
 import {ParticleSystem, ParticleSystemParameters} from '../src/ParticleSystem';
 import {QuarksLoader} from '../src/QuarksLoader';
+import type {QuarksGeometryJSON} from '../src/QuarksSerializer';
 import meshVertGLSL from '../src/shaders/local_particle_physics_vert.glsl';
 import meshVertWGSL from '../src/shaders/local_particle_physics_vert.wgsl';
 import particleFragGLSL from '../src/shaders/particle_frag.glsl';
@@ -21,7 +22,10 @@ import trailFragGLSL from '../src/shaders/trail_frag.glsl';
 import trailFragWGSL from '../src/shaders/trail_frag.wgsl';
 import trailVertGLSL from '../src/shaders/trail_vert.glsl';
 import trailVertWGSL from '../src/shaders/trail_vert.wgsl';
+import {SpriteBatch} from '../src/SpriteBatch';
+import {TrailBatch} from '../src/TrailBatch';
 import {
+    GradientMapChannel,
     normalizeErosion,
     normalizeGradientMap,
     normalizeMapUV,
@@ -29,6 +33,7 @@ import {
     normalizeUVDistortion,
     RenderMode,
 } from '../src/VFXBatch';
+import {emptyMeta, forceSet, notifyBind, textureOf} from './internals';
 
 let engine: NullEngine;
 let scene: Scene;
@@ -60,9 +65,9 @@ function system(overrides: Partial<ParticleSystemParameters> = {}) {
 
 const materialOf = (renderer: BatchedRenderer, s: ParticleSystem) =>
     renderer.batches[renderer.systemToBatchIndex.get(s)!].mesh.material as ShaderMaterial;
-const defines = (mat: ShaderMaterial) => (mat as any).options.defines as string[];
-const uniforms = (mat: ShaderMaterial) => (mat as any).options.uniforms as string[];
-const samplers = (mat: ShaderMaterial) => (mat as any).options.samplers as string[];
+const defines = (mat: ShaderMaterial) => mat.options.defines!;
+const uniforms = (mat: ShaderMaterial) => mat['options'].uniforms as string[];
+const samplers = (mat: ShaderMaterial) => mat['options'].samplers as string[];
 
 describe('texture effects', () => {
     it('are off unless set', () => {
@@ -99,10 +104,14 @@ describe('texture effects', () => {
             offset: [0, 0],
             scroll: [0, 1],
         });
-        expect(normalizeTextureUV({channel: 3 as any}).channel).toBe(0);
+        const badUV = {};
+        forceSet(badUV, 'channel', 3);
+        expect(normalizeTextureUV(badUV).channel).toBe(0);
         const ramp = new Texture(null, scene);
         expect(normalizeGradientMap({ramp})).toEqual({ramp, channel: 'r'});
-        expect(normalizeGradientMap({ramp, channel: 'x' as any})!.channel).toBe('r');
+        const badMap = {ramp};
+        forceSet(badMap, 'channel', 'x');
+        expect(normalizeGradientMap(badMap)!.channel).toBe('r');
         expect(normalizeGradientMap({channel: 'a'})).toBeUndefined();
         expect(normalizeErosion({softness: -1, edgeWidth: -2})).toMatchObject({softness: 0.0001, edgeWidth: 0});
         expect(normalizeErosion(undefined)).toBeUndefined();
@@ -117,8 +126,8 @@ describe('texture effects', () => {
         expect(defines(mat)).toContain('MAP_TRANSFORM');
         expect(defines(mat)).not.toContain('MAP_UV1');
         expect(uniforms(mat)).toContain('mapTransform');
-        mat.onBindObservable.notifyObservers(undefined as any);
-        const t = (mat as any)._vectors4.mapTransform;
+        notifyBind(mat);
+        const t = mat['_vectors4'].mapTransform;
         expect([t.x, t.y]).toEqual([2, 1]);
         // The scroll's share wraps (1.8, and -1.5 to 0.5); the offset is kept as given.
         expect(t.z).toBeCloseTo(0.25 + 1.8, 6);
@@ -143,11 +152,11 @@ describe('texture effects', () => {
             expect(defines(mat)).toEqual(expect.arrayContaining(['GRADIENT_MAP', 'EROSION', 'EROSION_MASK']));
             expect(samplers(mat)).toEqual(expect.arrayContaining(['gradientMap', 'erosionMask']));
             expect(uniforms(mat)).toEqual(expect.arrayContaining(['erosionParams', 'erosionEdgeColor']));
-            expect((mat as any)._textures.gradientMap).toBe(ramp);
-            expect((mat as any)._textures.erosionMask).toBe(mask);
-            const params = (mat as any)._vectors2.erosionParams;
+            expect(mat['_textures'].gradientMap).toBe(ramp);
+            expect(mat['_textures'].erosionMask).toBe(mask);
+            const params = mat['_vectors2'].erosionParams;
             expect([params.x, params.y]).toEqual([0.1, 0.2].map((v) => expect.closeTo(v, 6)));
-            const channel = (mat as any)._vectors4.gradientMapChannel;
+            const channel = mat['_vectors4'].gradientMapChannel;
             expect([channel.x, channel.y, channel.z, channel.w]).toEqual([1, 0, 0, 0]);
             // Channel 0 everywhere: nothing reads the particle's own UV.
             expect(defines(mat)).not.toContain('UV1');
@@ -216,15 +225,15 @@ describe('texture effects', () => {
             gradientMap: {ramp, channel: 'a'},
             erosion: {mask, maskUV, softness: 0.2, edgeWidth: 0.1, edgeColor: [1, 0, 0]},
         });
-        const meta = {geometries: {}, materials: {}, textures: {}} as any;
+        const meta = emptyMeta();
         const json = s.toJSON(meta);
         const material = meta.materials[json.material!];
         expect(material.mapUV).toEqual({scroll: [0.5, 1]});
-        expect(meta.textures[material.gradientMap.ramp]).toBe(ramp);
-        expect(material.gradientMap.channel).toBe('a');
-        expect(meta.textures[material.erosion.mask]).toBe(mask);
+        expect(textureOf(meta, material.gradientMap?.ramp)).toBe(ramp);
+        expect(material.gradientMap?.channel).toBe('a');
+        expect(textureOf(meta, material.erosion?.mask)).toBe(mask);
         // Only the fields that differ from the default layout are written.
-        expect(material.erosion.maskUV).toEqual(maskUV);
+        expect(material.erosion?.maskUV).toEqual(maskUV);
 
         for (const copy of [ParticleSystem.fromJSON(json, meta, {}, scene), s.clone()]) {
             expect(copy.mapUV).toEqual({channel: 0, tiling: [1, 1], offset: [0, 0], scroll: [0.5, 1]});
@@ -259,25 +268,25 @@ describe('texture effects', () => {
         // A ramp the file does not carry leaves no gradient map.
         expect(loaded.gradientMap).toBeUndefined();
 
-        const plain = {geometries: {}, materials: {}, textures: {}} as any;
+        const plain = emptyMeta();
         const plainMaterial = plain.materials[system().toJSON(plain).material!];
         for (const key of ['mapUV', 'gradientMap', 'erosion']) {
             expect(key in plainMaterial).toBe(false);
         }
-        const still = {geometries: {}, materials: {}, textures: {}} as any;
+        const still = emptyMeta();
         const stillMaterial = still.materials[system({erosion: {mask}, gradientMap: {ramp}}).toJSON(still).material!];
-        expect('maskUV' in stillMaterial.erosion).toBe(false);
+        expect('maskUV' in stillMaterial.erosion!).toBe(false);
         // The default channel is not written either.
-        expect('channel' in stillMaterial.gradientMap).toBe(false);
+        expect('channel' in stillMaterial.gradientMap!).toBe(false);
     });
 
     it('look the ramp up by the channel asked for, its alpha replacing the map’s for alpha', () => {
         const ramp = new Texture(null, scene);
         const renderer = new BatchedRenderer('channels', scene);
-        const weights = (channel: any) => {
+        const weights = (channel: GradientMapChannel) => {
             const s = system({gradientMap: {ramp, channel}});
             renderer.addSystem(s);
-            const v = (materialOf(renderer, s) as any)._vectors4.gradientMapChannel;
+            const v = materialOf(renderer, s)['_vectors4'].gradientMapChannel;
             return [v.x, v.y, v.z, v.w];
         };
         expect(weights('g')).toEqual([0, 1, 0, 0]);
@@ -300,8 +309,8 @@ describe('texture effects', () => {
         renderer.update(3);
         const mat = materialOf(renderer, s);
         expect(uniforms(mat)).toContain('erosionMaskTransform');
-        mat.onBindObservable.notifyObservers(undefined as any);
-        const t = (mat as any)._vectors4.erosionMaskTransform;
+        notifyBind(mat);
+        const t = mat['_vectors4'].erosionMaskTransform;
         expect([t.x, t.y]).toEqual([0.125, 2]);
         // 0.25 + 0.5 × 3 = 1.75; 0.75 × 3 = 2.25, over two repeats 0.25.
         expect(t.z).toBeCloseTo(1.75, 6);
@@ -325,14 +334,14 @@ describe('texture effects', () => {
             expect(renderer.systemToBatchIndex.get(withUV2)).not.toBe(renderer.systemToBatchIndex.get(without));
             const mat = materialOf(renderer, withUV2);
             expect(defines(mat)).toEqual(expect.arrayContaining(['UV1', 'EROSION_MASK_UV1', 'MESH_UV2']));
-            expect((mat as any).options.attributes).toContain('uv2');
+            expect(mat['options'].attributes).toContain('uv2');
             const batch = renderer.batches[renderer.systemToBatchIndex.get(withUV2)!];
             expect(Array.from(batch.mesh.getVerticesData('uv2')!)).toEqual(Array.from(quadUVs2));
             // Without a second set, channel 1 reads the first.
             const plain = materialOf(renderer, without);
             expect(defines(plain)).toContain('UV1');
             expect(defines(plain)).not.toContain('MESH_UV2');
-            expect((plain as any).options.attributes).not.toContain('uv2');
+            expect(plain['options'].attributes).not.toContain('uv2');
         });
 
         it('takes the whole quad on billboards and beams, along and across on trails', () => {
@@ -352,8 +361,8 @@ describe('texture effects', () => {
             );
             const trailMat = materialOf(renderer, trail);
             expect(defines(trailMat)).toEqual(expect.arrayContaining(['UV1', 'EROSION_MASK_UV1']));
-            expect((trailMat as any).options.attributes).toContain('uv2');
-            const uv1 = (renderer.batches[renderer.systemToBatchIndex.get(trail)!] as any).uv1Buffer as Float32Array;
+            expect(trailMat['options'].attributes).toContain('uv2');
+            const uv1 = (renderer.batches[renderer.systemToBatchIndex.get(trail)!] as TrailBatch)['uv1Buffer']!;
             // Each pair: one vertex at V 0, its partner at V 1, both at the same U in 0…1.
             expect([uv1[1], uv1[3]]).toEqual([0, 1]);
             expect(uv1[0]).toBe(uv1[2]);
@@ -369,32 +378,34 @@ describe('texture effects', () => {
                 expect(source).toContain('varying vUV1: vec2f;');
             }
             const s = system({renderMode: RenderMode.Mesh, instancingGeometry: quad, instancingUVs2: quadUVs2});
-            const meta = {geometries: {}, materials: {}, textures: {}} as any;
+            const meta = emptyMeta();
             const json = s.toJSON(meta);
-            expect(meta.geometries[json.instancingGeometry as string].uvs2).toEqual(Array.from(quadUVs2));
+            expect((meta.geometries[json.instancingGeometry as string] as QuarksGeometryJSON).uvs2).toEqual(
+                Array.from(quadUVs2)
+            );
             const copy = ParticleSystem.fromJSON(json, meta, {}, scene);
-            expect(Array.from((copy as any).rendererSettings.instancingUVs2)).toEqual(Array.from(quadUVs2));
-            expect((s.clone() as any).rendererSettings.instancingUVs2).toBe(quadUVs2);
-            const plain = {geometries: {}, materials: {}, textures: {}} as any;
+            expect(Array.from(copy['rendererSettings'].instancingUVs2!)).toEqual(Array.from(quadUVs2));
+            expect(s.clone()['rendererSettings'].instancingUVs2).toBe(quadUVs2);
+            const plain = emptyMeta();
             const plainJSON = system({renderMode: RenderMode.Mesh, instancingGeometry: quad}).toJSON(plain);
             expect('uvs2' in plain.geometries[plainJSON.instancingGeometry as string]).toBe(false);
         });
 
         it('loads a three.js second UV set, named uv1 or uv2, plain or interleaved', () => {
-            const loader = new QuarksLoader(scene) as any;
+            const loader = new QuarksLoader(scene);
             const positions = Array.from(quad);
             const uv2 = Array.from(quadUVs2);
             for (const name of ['uv1', 'uv2']) {
-                const plain = loader.parseBufferGeometry({
+                const plain = loader['parseBufferGeometry']({
                     attributes: {position: {itemSize: 3, array: positions}, [name]: {itemSize: 2, array: uv2}},
                 });
-                expect(Array.from(plain.uvs2)).toEqual(uv2);
+                expect(Array.from(plain.uvs2!)).toEqual(uv2);
             }
             // One buffer of (x, y, z, u2, v2) per vertex.
             const interleaved: number[] = [];
             for (let i = 0; i < 4; i++)
                 interleaved.push(...positions.slice(i * 3, i * 3 + 3), ...uv2.slice(i * 2, i * 2 + 2));
-            const parsed = loader.parseBufferGeometry({
+            const parsed = loader['parseBufferGeometry']({
                 arrayBuffers: {buf: new Float32Array(interleaved).buffer},
                 interleavedBuffers: {ib: {buffer: 'buf', stride: 5}},
                 attributes: {
@@ -403,7 +414,7 @@ describe('texture effects', () => {
                 },
             });
             expect(Array.from(parsed.positions)).toEqual(positions);
-            expect(Array.from(parsed.uvs2)).toEqual(uv2);
+            expect(Array.from(parsed.uvs2!)).toEqual(uv2);
         });
 
         it('passes the varying from every vertex shader, the stretched ones from their mirrored quad', () => {
@@ -437,8 +448,8 @@ describe('texture effects', () => {
             const s = system({mapUV: {offset: [2.5, -7]}});
             renderer.addSystem(s);
             const mat = materialOf(renderer, s);
-            mat.onBindObservable.notifyObservers(undefined as any);
-            const t = (mat as any)._vectors4.mapTransform;
+            notifyBind(mat);
+            const t = mat['_vectors4'].mapTransform;
             expect([t.z, t.w]).toEqual([2.5, -7]);
         });
 
@@ -470,8 +481,8 @@ describe('texture effects', () => {
                     const mat = materialOf(renderer, s);
                     expect(defines(mat)).toContain('UV1');
                     expect(defines(mat)).not.toContain('MESH_UV2');
-                    expect((mat as any).options.attributes).not.toContain('uv2');
-                    (renderer.batches[renderer.systemToBatchIndex.get(s)!] as any).rebuildMaterial();
+                    expect(mat['options'].attributes).not.toContain('uv2');
+                    renderer.batches[renderer.systemToBatchIndex.get(s)!]['rebuildMaterial']();
                     expect(warn).toHaveBeenCalledTimes(1);
                 }
             } finally {
@@ -522,9 +533,7 @@ describe('texture effects', () => {
             s.instancingGeometry = other;
             const fresh = system({renderMode: RenderMode.Mesh, instancingGeometry: other});
             expect(s.instancingUVs).toBe(fresh.instancingUVs);
-            expect((s as any).rendererSettings.instancingNormals).toBe(
-                (fresh as any).rendererSettings.instancingNormals
-            );
+            expect(s['rendererSettings'].instancingNormals).toBe(fresh['rendererSettings'].instancingNormals);
             const renderer = new BatchedRenderer('sameSize', scene);
             [s, fresh].forEach((x) => renderer.addSystem(x));
             expect(renderer.systemToBatchIndex.get(s)).toBe(renderer.systemToBatchIndex.get(fresh));
@@ -538,11 +547,11 @@ describe('texture effects', () => {
                 erosion: {mask: mask(), maskUV: {channel: 1}},
             });
             renderer.addSystem(trail);
-            const batch = renderer.batches[renderer.systemToBatchIndex.get(trail)!] as any;
-            const before = batch.maxParticles;
+            const batch = renderer.batches[renderer.systemToBatchIndex.get(trail)!] as TrailBatch;
+            const before = batch['maxParticles'];
             batch.expandBuffers(before * 3);
-            expect(batch.uv1Buffer).toBeInstanceOf(Float32Array);
-            expect(batch.uv1Buffer.length).toBe(batch.maxParticles * 2);
+            expect(batch['uv1Buffer']).toBeInstanceOf(Float32Array);
+            expect(batch['uv1Buffer']!.length).toBe(batch['maxParticles'] * 2);
             expect(batch.mesh.getVerticesData('uv2')).toBeTruthy();
 
             const along = (uvFromHead: boolean) => {
@@ -555,7 +564,7 @@ describe('texture effects', () => {
                 r.addSystem(s);
                 r.update(0.1);
                 r.update(0.1);
-                return (r.batches[r.systemToBatchIndex.get(s)!] as any).uv1Buffer[0] as number;
+                return (r.batches[r.systemToBatchIndex.get(s)!] as TrailBatch)['uv1Buffer']![0];
             };
             expect(along(true)).toBeCloseTo(1 - along(false), 6);
         });
@@ -573,10 +582,8 @@ describe('texture effects', () => {
         }
         renderer.update(1 / 60);
         expect(renderer.systemToBatchIndex.get(tinted)).toBe(renderer.systemToBatchIndex.get(plain));
-        const batch = renderer.batches[renderer.systemToBatchIndex.get(tinted)!] as any;
-        const colors = Array.from(batch.colorBuffer.subarray(0, 8) as Float32Array).map(
-            (v) => Math.round(v * 1e4) / 1e4
-        );
+        const batch = renderer.batches[renderer.systemToBatchIndex.get(tinted)!] as SpriteBatch;
+        const colors = Array.from(batch['colorBuffer'].subarray(0, 8)).map((v) => Math.round(v * 1e4) / 1e4);
         // One particle each, in whichever order the batch draws them.
         expect([colors.slice(0, 4), colors.slice(4, 8)]).toEqual(
             expect.arrayContaining([
@@ -622,9 +629,9 @@ describe('texture effects', () => {
                 expect(defines(mat)).toContain('UV_DISTORTION');
                 expect(samplers(mat)).toContain('distortionMap');
                 expect(uniforms(mat)).toEqual(expect.arrayContaining(['distortionTransform', 'distortionStrength']));
-                mat.onBindObservable.notifyObservers(undefined as any);
-                expect((mat as any)._floats.distortionStrength).toBeCloseTo(0.1, 6);
-                const t = (mat as any)._vectors4.distortionTransform;
+                notifyBind(mat);
+                expect(mat['_floats'].distortionStrength).toBeCloseTo(0.1, 6);
+                const t = mat['_vectors4'].distortionTransform;
                 expect([t.x, t.y]).toEqual([2, 2]);
                 expect(t.z).toBeCloseTo(0.75, 6);
                 expect(t.w).toBeCloseTo(1.5, 6);
@@ -653,10 +660,10 @@ describe('texture effects', () => {
             expect(index(a)).toBe(index(b));
             expect(new Set([a, c, none].map(index)).size).toBe(3);
 
-            const meta = {geometries: {}, materials: {}, textures: {}} as any;
+            const meta = emptyMeta();
             const json = a.toJSON(meta);
             const material = meta.materials[json.material!];
-            expect(meta.textures[material.uvDistortion.map]).toBe(noise);
+            expect(textureOf(meta, material.uvDistortion?.map)).toBe(noise);
             for (const copy of [ParticleSystem.fromJSON(json, meta, {}, scene), a.clone()]) {
                 expect(copy.uvDistortion).toEqual({
                     map: noise,
@@ -666,7 +673,7 @@ describe('texture effects', () => {
             }
             {
                 const plainJSON = meta.materials[a.toJSON(meta).material!].uvDistortion;
-                expect('mapUV' in plainJSON).toBe(false);
+                expect('mapUV' in plainJSON!).toBe(false);
             }
             const loader = new QuarksLoader(scene);
             const root = loader.parse({
@@ -676,7 +683,7 @@ describe('texture effects', () => {
             });
             // A map the file does not carry leaves no distortion.
             expect(((root as ParticleEmitter).system as ParticleSystem).uvDistortion).toBeUndefined();
-            const plain = {geometries: {}, materials: {}, textures: {}} as any;
+            const plain = emptyMeta();
             expect('uvDistortion' in plain.materials[none.toJSON(plain).material!]).toBe(false);
         });
     });
