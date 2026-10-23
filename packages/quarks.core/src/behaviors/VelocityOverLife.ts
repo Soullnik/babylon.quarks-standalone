@@ -1,8 +1,9 @@
-import {IParticleSystem} from '../IParticleSystem';
-import {Particle} from '../Particle';
 import {ConstantValue, FunctionValueGenerator, ValueGenerator, ValueGeneratorFromJSON} from '../functions';
+import type {ValueGeneratorJSON, Vector3ArrayJSON} from '../functions/FunctionJSON';
+import {IParticleSystem} from '../IParticleSystem';
 import {Quaternion, Vector3} from '../math';
-import {Behavior} from './Behavior';
+import {Particle} from '../Particle';
+import {Behavior, BehaviorJSON} from './Behavior';
 import {BehaviorSpace} from './EmitterFrame';
 
 /** The space a `VelocityOverLife` is authored in; the same choice as {@link BehaviorSpace}. */
@@ -11,6 +12,28 @@ export type VelocityOverLifeSpace = BehaviorSpace;
 const UNIT_X = new Vector3(1, 0, 0);
 const UNIT_Y = new Vector3(0, 1, 0);
 const UNIT_Z = new Vector3(0, 0, 1);
+
+/** The JSON of a velocity over life: a {@link VelocityOverLife}. */
+export interface VelocityOverLifeJSON extends BehaviorJSON {
+    /** Linear velocity along X. */
+    linearX?: ValueGeneratorJSON;
+    /** Linear velocity along Y. */
+    linearY?: ValueGeneratorJSON;
+    /** Linear velocity along Z. */
+    linearZ?: ValueGeneratorJSON;
+    /** Orbital velocity around X. */
+    orbitalX?: ValueGeneratorJSON;
+    /** Orbital velocity around Y. */
+    orbitalY?: ValueGeneratorJSON;
+    /** Orbital velocity around Z. */
+    orbitalZ?: ValueGeneratorJSON;
+    /** The space the velocity is in; `'local'` when absent. */
+    space?: BehaviorSpace;
+    /** Radial velocity. */
+    radial?: ValueGeneratorJSON;
+    /** The orbit centre's offset. */
+    orbitalOffset?: Vector3ArrayJSON;
+}
 
 /**
  * Move particles with a direct velocity over their life (Unity's "Velocity over Lifetime").
@@ -183,7 +206,7 @@ export class VelocityOverLife implements Behavior {
         position.applyQuaternion(this._tempRot);
     }
 
-    toJSON(): any {
+    toJSON(): VelocityOverLifeJSON {
         return {
             type: this.type,
             linearX: this.linearX.toJSON(),
@@ -201,8 +224,8 @@ export class VelocityOverLife implements Behavior {
     /**
      * Reads {@link VelocityOverLife.toJSON} output; a field the JSON leaves out takes its default.
      */
-    static fromJSON(json: any): Behavior {
-        const readValue = (field: any) =>
+    static fromJSON(json: VelocityOverLifeJSON): Behavior {
+        const readValue = (field: ValueGeneratorJSON | undefined) =>
             field ? (ValueGeneratorFromJSON(field) as FunctionValueGenerator) : new ConstantValue(0);
         return new VelocityOverLife(
             readValue(json.linearX),

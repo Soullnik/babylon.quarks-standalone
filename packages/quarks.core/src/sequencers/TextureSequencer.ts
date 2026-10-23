@@ -1,5 +1,23 @@
+import type {Vector2JSON, Vector3ArrayJSON, Vector3JSON} from '../functions/FunctionJSON';
 import {Vector2, Vector3} from '../math';
-import {Sequencer} from './Sequencer';
+import type {Sequencer} from './Sequencer';
+
+/**
+ * The JSON of a {@link TextureSequencer}. Files before 0.28 have no `type` and write the position
+ * as an object.
+ */
+export interface TextureSequencerJSON {
+    /** The sequencer's type. */
+    type?: 'TextureSequencer';
+    /** World units per pixel along x. */
+    scaleX?: number;
+    /** World units per pixel along y. */
+    scaleY?: number;
+    /** Where the image's origin lands. */
+    position?: Vector3ArrayJSON | Vector3JSON;
+    /** The pixel coordinates of the points. */
+    locations?: Vector2JSON[];
+}
 
 /**
  * Target points read from an image: one point per pixel whose alpha passes a threshold, so
@@ -39,14 +57,14 @@ export class TextureSequencer implements Sequencer {
      * Reads {@link TextureSequencer.toJSON} output, and the object position files before 0.28
      * wrote.
      */
-    static fromJSON(json: any): Sequencer {
+    static fromJSON(json: TextureSequencerJSON): Sequencer {
         // Before 0.28 the position was written as a Vector3 object ({x, y, z}) instead of an array.
         const p = json.position;
         const position = Array.isArray(p)
             ? new Vector3(p[0], p[1], p[2])
             : new Vector3(p?.x ?? 0, p?.y ?? 0, p?.z ?? 0);
         const textureSequencer = new TextureSequencer(json.scaleX ?? 0, json.scaleY ?? 0, position);
-        textureSequencer.locations = (json.locations ?? []).map((loc: any) => new Vector2(loc.x, loc.y));
+        textureSequencer.locations = (json.locations ?? []).map((loc) => new Vector2(loc.x, loc.y));
         return textureSequencer;
     }
 
@@ -58,7 +76,7 @@ export class TextureSequencer implements Sequencer {
     }
 
     /** The JSON form, `{type: 'TextureSequencer', scaleX, scaleY, position, locations}`. */
-    toJSON(): any {
+    toJSON(): TextureSequencerJSON {
         return {
             type: 'TextureSequencer',
             scaleX: this.scaleX,

@@ -11,6 +11,7 @@ import {
     TrailParticle,
     Vector4,
     WidthOverLength,
+    type WidthOverLengthJSON,
 } from 'quarks.core';
 import {ParticleSystem} from '../src/ParticleSystem';
 import {RenderMode} from '../src/VFXBatch';
@@ -124,10 +125,8 @@ describe('WidthOverLength', () => {
     });
 
     it('loads JSON without `absolute` as absolute, the way it was authored', () => {
-        const legacy = BehaviorFromJSON(
-            {type: 'WidthOverLength', width: {type: 'ConstantValue', value: 1}},
-            null as never
-        );
+        const json: WidthOverLengthJSON = {type: 'WidthOverLength', width: {type: 'ConstantValue', value: 1}};
+        const legacy = BehaviorFromJSON(json, null as never);
         expect((legacy as WidthOverLength).absolute).toBe(true);
     });
 

@@ -1,6 +1,7 @@
-import {Particle} from '../Particle';
 import {FunctionValueGenerator, IntervalValue, ValueGenerator, ValueGeneratorFromJSON} from '../functions';
-import {Behavior} from './Behavior';
+import type {ValueGeneratorJSON} from '../functions/FunctionJSON';
+import {Particle} from '../Particle';
+import {Behavior, BehaviorJSON} from './Behavior';
 
 /**
  * How {@link FrameOverLife} plays the sheet, beyond sampling `frame` over the
@@ -42,6 +43,24 @@ export interface FrameOverLifeOptions {
      * starts each particle on a random frame (Unity's "Start Frame"). Default none.
      */
     startFrame?: ValueGenerator;
+}
+
+/** The JSON of a flipbook frame over life: a {@link FrameOverLife}. */
+export interface FrameOverLifeJSON extends BehaviorJSON {
+    /** The frame over life. */
+    frame: ValueGeneratorJSON;
+    /** Frames per second instead of over life. */
+    fps?: number;
+    /** Times the animation plays over a life. */
+    cycles?: number;
+    /** Frames the animation spans. */
+    frameCount?: number;
+    /** Whether the animation repeats. */
+    loop?: boolean;
+    /** Whether each particle starts on a random frame. */
+    random?: boolean;
+    /** The frame each particle starts on. */
+    startFrame?: ValueGeneratorJSON;
 }
 
 /**
@@ -188,7 +207,7 @@ export class FrameOverLife implements Behavior {
         this._frame.refreshTable?.();
     }
 
-    toJSON(): any {
+    toJSON(): FrameOverLifeJSON {
         return {
             type: this.type,
             frame: this.frame.toJSON(),
@@ -202,7 +221,7 @@ export class FrameOverLife implements Behavior {
     }
 
     /** Reads {@link FrameOverLife.toJSON} output; a field the JSON leaves out takes its default. */
-    static fromJSON(json: any): Behavior {
+    static fromJSON(json: FrameOverLifeJSON): Behavior {
         return new FrameOverLife(ValueGeneratorFromJSON(json.frame) as FunctionValueGenerator | ValueGenerator, {
             fps: typeof json.fps === 'number' ? json.fps : undefined,
             cycles: typeof json.cycles === 'number' ? json.cycles : undefined,

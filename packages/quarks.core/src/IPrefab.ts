@@ -4,8 +4,8 @@ export interface IAnimationData {
     startTime: number;
     /** Duration in seconds */
     duration: number;
-    /** Target object */
-    target: any;
+    /** The object the track drives; a renderer narrows it to its own node type. */
+    target: unknown;
 }
 
 /** A group of effects, with the timing of each, that plays as one. */

@@ -2,16 +2,21 @@ import type {Texture} from '@babylonjs/core/Materials/Textures/texture';
 import type {Scene} from '@babylonjs/core/scene';
 import type {
     Behavior,
+    BillBoardSettings,
     ColorGenerator,
     EmitterShape,
     FunctionColorGenerator,
     FunctionJSON,
     FunctionValueGenerator,
+    MeshSettings,
     RendererEmitterSettings,
     RotationGenerator,
+    StretchedBillBoardSettings,
     ValueGenerator,
+    ValueGeneratorJSON,
     Vector2,
     Vector3,
+    Vector3ArrayJSON,
     Vector3Generator,
 } from 'quarks.core';
 import type {
@@ -25,6 +30,19 @@ import type {
     SortMode,
     TextureUV,
 } from '../VFXBatch';
+import type {TrailOptions} from '../trailSettings';
+
+/** A trail's settings in JSON: the start length as a generator's JSON, the side axis as `[x, y, z]`. */
+export type TrailSettingsJSON = TrailOptions & {
+    /** See `TrailSettings.startLength`. */
+    startLength?: ValueGeneratorJSON;
+    /** See `TrailSettings.sideAxis`. */
+    sideAxis?: Vector3ArrayJSON;
+};
+
+/** A render mode's own settings in JSON, see {@link RendererEmitterSettings}. */
+export type RendererEmitterSettingsJSON =
+    TrailSettingsJSON | StretchedBillBoardSettings | MeshSettings | BillBoardSettings;
 
 /**
  * One burst of a system's emission (Unity's Emission Bursts): `count` particles at `time` seconds
@@ -324,7 +342,7 @@ export interface ParticleSystemJSONParameters {
      * Trail, stretched or mesh settings; a trail's `startLength` as `FunctionJSON`. Left out when
      * the render mode has none.
      */
-    rendererEmitterSettings?: RendererEmitterSettings;
+    rendererEmitterSettings?: RendererEmitterSettingsJSON;
     /** Uuid of the mesh particles' geometry entry. */
     instancingGeometry?: any;
     /** A {@link RenderMode} value. */

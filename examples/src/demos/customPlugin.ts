@@ -10,20 +10,20 @@ import {
     ValueGeneratorFromJSON,
     Vector4,
     type Behavior,
-    type FunctionJSON,
     type FunctionValueGenerator,
     type GeneratorMemory,
     type Particle,
     type Plugin,
     type ValueGenerator,
+    type ValueGeneratorJSON,
 } from 'babylon.quarks';
 import {createSharedTexture} from '../shared/common';
 import type {DemoContext} from '../types';
 
 interface SinWaveJSON {
     type: string;
-    frequency: FunctionJSON;
-    height: FunctionJSON;
+    frequency: ValueGeneratorJSON;
+    height: ValueGeneratorJSON;
     waveSize: number;
 }
 

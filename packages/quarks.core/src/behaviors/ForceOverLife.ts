@@ -1,9 +1,22 @@
-import {IParticleSystem} from '../IParticleSystem';
-import {Particle} from '../Particle';
 import {FunctionValueGenerator, ValueGenerator, ValueGeneratorFromJSON} from '../functions';
+import type {ValueGeneratorJSON} from '../functions/FunctionJSON';
+import {IParticleSystem} from '../IParticleSystem';
 import {Vector3} from '../math';
-import {Behavior} from './Behavior';
+import {Particle} from '../Particle';
+import {Behavior, BehaviorJSON} from './Behavior';
 import {BehaviorSpace, EmitterFrame, readBehaviorSpace} from './EmitterFrame';
+
+/** The JSON of a force over life: a {@link ForceOverLife}. */
+export interface ForceOverLifeJSON extends BehaviorJSON {
+    /** The X component. */
+    x: ValueGeneratorJSON;
+    /** The Y component. */
+    y: ValueGeneratorJSON;
+    /** The Z component. */
+    z: ValueGeneratorJSON;
+    /** The space the force is in; `'world'` when absent. */
+    space?: BehaviorSpace;
+}
 
 /**
  * Accelerate particles by a force that changes over their life, one curve per
@@ -96,7 +109,7 @@ export class ForceOverLife implements Behavior {
         }
     }
 
-    toJSON(): any {
+    toJSON(): ForceOverLifeJSON {
         return {
             type: this.type,
             x: this.x.toJSON(),
@@ -107,7 +120,7 @@ export class ForceOverLife implements Behavior {
     }
 
     /** Reads {@link ForceOverLife.toJSON} output; a field the JSON leaves out takes its default. */
-    static fromJSON(json: any): Behavior {
+    static fromJSON(json: ForceOverLifeJSON): Behavior {
         return new ForceOverLife(
             ValueGeneratorFromJSON(json.x) as FunctionValueGenerator,
             ValueGeneratorFromJSON(json.y) as FunctionValueGenerator,

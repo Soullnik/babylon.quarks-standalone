@@ -14,6 +14,7 @@ import {
     ApplyCollision,
     ApplyForce,
     ApplySequences,
+    type ApplySequencesJSON,
     AxisAngleGenerator,
     Behavior,
     BehaviorFromJSON,
@@ -345,8 +346,9 @@ describe('serialisation contract', () => {
                 BehaviorFromJSON({type: file.type}, system)
             )!;
             const defaultJSON = viaJSON(defaults.toJSON());
-            for (const key of Object.keys(file).filter((k) => k !== 'type')) {
-                expect([key, file[key]]).not.toEqual([key, defaultJSON[key]]);
+            const defaultFields = new Map(Object.entries(defaultJSON));
+            for (const [key, value] of Object.entries(file).filter(([k]) => k !== 'type')) {
+                expect([key, value]).not.toEqual([key, defaultFields.get(key)]);
             }
             // A behavior that needs a field (a curve) warns read from its type alone, and keeps it.
             if (warnings.length === 0) expect(BehaviorToJSON(defaults, system)).toEqual({type: file.type});
@@ -420,19 +422,17 @@ describe('serialisation contract', () => {
 
 describe('files written before 0.28', () => {
     it('loads a texture sequencer that has no type and an object position', () => {
-        const behavior = BehaviorFromJSON(
-            {
-                type: 'ApplySequences',
-                delay: 0.2,
-                sequencers: [
-                    {
-                        range: {type: 'IntervalValue', a: 0, b: 1},
-                        sequencer: {scaleX: 0.5, scaleY: 0.25, position: {x: 1, y: 2, z: 3}, locations: [{x: 1, y: 2}]},
-                    },
-                ],
-            },
-            system
-        ) as ApplySequences;
+        const json: ApplySequencesJSON = {
+            type: 'ApplySequences',
+            delay: 0.2,
+            sequencers: [
+                {
+                    range: {type: 'IntervalValue', a: 0, b: 1},
+                    sequencer: {scaleX: 0.5, scaleY: 0.25, position: {x: 1, y: 2, z: 3}, locations: [{x: 1, y: 2}]},
+                },
+            ],
+        };
+        const behavior = BehaviorFromJSON(json, system) as ApplySequences;
         const sequencer = behavior.sequencers[0][1] as TextureSequencer;
         expect(sequencer).toBeInstanceOf(TextureSequencer);
         expect(sequencer.position).toEqual(new Vector3(1, 2, 3));

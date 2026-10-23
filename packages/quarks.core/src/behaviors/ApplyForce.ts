@@ -1,10 +1,23 @@
-import {IParticleSystem} from '../IParticleSystem';
-import {Particle} from '../Particle';
 import {ConstantValue, ValueGenerator, ValueGeneratorFromJSON} from '../functions';
+import type {ValueGeneratorJSON, Vector3ArrayJSON} from '../functions/FunctionJSON';
+import {IParticleSystem} from '../IParticleSystem';
 import {Vector3} from '../math';
+import {Particle} from '../Particle';
 import {readVector3} from '../util/JSONUtil';
-import {Behavior} from './Behavior';
+import {Behavior, BehaviorJSON} from './Behavior';
 import {BehaviorSpace, EmitterFrame, readBehaviorSpace} from './EmitterFrame';
+
+/** The JSON of a force in a fixed direction: a {@link ApplyForce}. */
+export interface ApplyForceJSON extends BehaviorJSON {
+    /** The direction, normalised when read. */
+    direction?: Vector3ArrayJSON;
+    /** The strength. */
+    magnitude?: ValueGeneratorJSON;
+    /** The strength, as files before `magnitude` named it. */
+    force?: ValueGeneratorJSON;
+    /** The space the direction is in; `'world'` when absent. */
+    space?: BehaviorSpace;
+}
 
 /**
  * Apply a constant force along one direction to every particle, like gravity or wind.
@@ -93,7 +106,7 @@ export class ApplyForce implements Behavior {
         }
     }
 
-    toJSON(): any {
+    toJSON(): ApplyForceJSON {
         return {
             type: this.type,
             direction: [this.direction.x, this.direction.y, this.direction.z],
@@ -103,7 +116,7 @@ export class ApplyForce implements Behavior {
     }
 
     /** Reads {@link ApplyForce.toJSON} output; a field the JSON leaves out takes its default. */
-    static fromJSON(json: any): Behavior {
+    static fromJSON(json: ApplyForceJSON): Behavior {
         return new ApplyForce(
             readVector3(json.direction, new Vector3(0, 0, 0)),
             ValueGeneratorFromJSON(json.magnitude ?? json.force) as ValueGenerator,

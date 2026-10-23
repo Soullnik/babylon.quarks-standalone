@@ -3,7 +3,7 @@ import {Matrix4, Quaternion, Vector3} from '../math';
 import {Particle, SpriteParticle} from '../Particle';
 import {ONE_VEC3, Z_VEC3} from '../util/MathUtil';
 import {random} from '../util/random';
-import {Behavior} from './Behavior';
+import {Behavior, BehaviorJSON} from './Behavior';
 
 /** Below this, a speed counts as zero and a direction's X and Y as lying along Z. */
 const BASIS_EPSILON = 1e-6;
@@ -54,6 +54,20 @@ export function subEmitterInheritMask(inherit: ReadonlyArray<SubEmitterInheritan
     return mask;
 }
 
+/** The JSON of a sub emitter: a {@link EmitSubParticleSystem}. */
+export interface EmitSubParticleSystemJSON extends BehaviorJSON {
+    /** The uuid of the emitter to emit into. */
+    subParticleSystem?: string;
+    /** Orient along the parent's velocity. */
+    useVelocityAsBasis?: boolean;
+    /** When to emit. */
+    mode?: SubParticleEmitMode;
+    /** Chance a parent emits. */
+    emitProbability?: number;
+    /** What the sub particles inherit. */
+    inherit?: SubEmitterInheritance[];
+}
+
 /**
  * Emit a sub particle system from particles.
  */
@@ -74,8 +88,8 @@ export class EmitSubParticleSystem implements Behavior {
      * @param particleSystem - The system this behavior belongs to (the parent).
      * @param useVelocityAsBasis - Orient the sub emitter along the parent particle's velocity
      *   instead of by its rotation.
-     * @param subParticleSystem - The emitter of the system to emit into; a loader links it from a
-     *   uuid.
+     * @param subParticleSystem - The emitter of the system to emit into, or the uuid of one a loader
+     *   has yet to link.
      * @param mode - When to emit, see {@link SubParticleEmitMode}; every step by default.
      * @param emitProbability - Chance in [0, 1] that a parent particle emits at all; 1 by default.
      * @param inherit - See the property.
@@ -83,7 +97,7 @@ export class EmitSubParticleSystem implements Behavior {
     constructor(
         public particleSystem: IParticleSystem,
         public useVelocityAsBasis: boolean,
-        public subParticleSystem: IEmitter | undefined,
+        public subParticleSystem: IEmitter | string | undefined,
         public mode: SubParticleEmitMode = SubParticleEmitMode.Frame,
         public emitProbability: number = 1,
         /**
@@ -97,7 +111,7 @@ export class EmitSubParticleSystem implements Behavior {
     ) {
         const target = this.target;
         if (target) {
-            (target as any).onlyUsedByOther = true;
+            target.onlyUsedByOther = true;
         }
     }
 
@@ -223,7 +237,7 @@ export class EmitSubParticleSystem implements Behavior {
         }
     }
 
-    toJSON(): any {
+    toJSON(): EmitSubParticleSystemJSON {
         return {
             type: this.type,
             // An unresolved uuid is written back as it was read.
@@ -244,10 +258,10 @@ export class EmitSubParticleSystem implements Behavior {
      * Reads {@link EmitSubParticleSystem.toJSON} output; a field the JSON leaves out takes its
      * default.
      */
-    static fromJSON(json: any, particleSystem: IParticleSystem): Behavior {
+    static fromJSON(json: EmitSubParticleSystemJSON, particleSystem: IParticleSystem): Behavior {
         return new EmitSubParticleSystem(
             particleSystem,
-            json.useVelocityAsBasis,
+            json.useVelocityAsBasis === true,
             json.subParticleSystem,
             json.mode,
             json.emitProbability,

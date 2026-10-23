@@ -710,6 +710,6 @@ class Vector4 {
     }
 }
 
-(Vector4.prototype as any).isVector4 = true;
+Object.defineProperty(Vector4.prototype, 'isVector4', {value: true});
 
 export {Vector4};

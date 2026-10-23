@@ -1,8 +1,9 @@
 import {Vector3, Vector4} from '../math';
+import {JSONToNumber, JSONToVector3} from '../util/JSONUtil';
 import {FunctionColorGenerator} from './ColorGenerator';
 import {ColorRange} from './ColorRange';
 import {ContinuousLinearFunction} from './ContinuousLinearFunction';
-import {FunctionJSON} from './FunctionJSON';
+import type {GradientJSON} from './FunctionJSON';
 import {GeneratorMemory} from './GeneratorMemory';
 
 /** Scratch colour used while sampling the gradient into its table. */
@@ -200,7 +201,7 @@ export class Gradient implements FunctionColorGenerator {
         return color;
     }
 
-    toJSON(): FunctionJSON {
+    toJSON(): GradientJSON {
         return {
             type: 'Gradient',
             color: this.color.toJSON(),
@@ -209,21 +210,34 @@ export class Gradient implements FunctionColorGenerator {
     }
 
     /** Reads {@link Gradient.toJSON} output. */
-    static fromJSON(json: FunctionJSON): Gradient {
+    static fromJSON(json: GradientJSON): Gradient {
         // compatibility
         if (json.functions) {
-            const keys = json.functions.map((func: any) => [ColorRange.fromJSON(func.function).a, func.start]);
-            if (json.functions.length > 0) {
-                keys.push([ColorRange.fromJSON(json.functions[json.functions.length - 1].function).b, 1]);
+            const ranges = json.functions.map(
+                ({function: range, start}) => [ColorRange.fromJSON(range), start] as const
+            );
+            const keys: Array<[Vector4, number]> = ranges.map(([range, start]) => [range.a, start]);
+            if (ranges.length > 0) {
+                keys.push([ranges[ranges.length - 1][0].b, 1]);
             }
             return new Gradient(
-                keys.map((key: any) => [new Vector3(key[0].x, key[0].y, key[0].z), key[1]]),
-                keys.map((key: any) => [key[0].w, key[1]])
+                keys.map(([color, pos]) => [new Vector3(color.x, color.y, color.z), pos]),
+                keys.map(([color, pos]) => [color.w, pos])
             );
         } else {
             const gradient = new Gradient();
-            gradient.alpha = ContinuousLinearFunction.fromJSON(json.alpha);
-            gradient.color = ContinuousLinearFunction.fromJSON(json.color);
+            if (json.alpha) {
+                gradient.alpha = new ContinuousLinearFunction<number>(
+                    json.alpha.keys.map((key) => [JSONToNumber(key.value), key.pos]),
+                    'Number'
+                );
+            }
+            if (json.color) {
+                gradient.color = new ContinuousLinearFunction<Vector3>(
+                    json.color.keys.map((key) => [JSONToVector3(key.value), key.pos]),
+                    'Color'
+                );
+            }
             return gradient;
         }
     }

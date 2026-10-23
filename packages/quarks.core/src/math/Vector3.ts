@@ -856,7 +856,7 @@ class Vector3 {
     }
 }
 
-(Vector3.prototype as any).isVector3 = true;
+Object.defineProperty(Vector3.prototype, 'isVector3', {value: true});
 
 const _vector = /*@__PURE__*/ new Vector3();
 const _quaternion = /*@__PURE__*/ new Quaternion();

@@ -1,7 +1,16 @@
-import {Particle} from '../Particle';
+import type {Vector3ArrayJSON} from '../functions/FunctionJSON';
 import {Vector3} from '../math';
+import {Particle} from '../Particle';
 import {readVector3} from '../util/JSONUtil';
-import {Behavior} from './Behavior';
+import {Behavior, BehaviorJSON} from './Behavior';
+
+/** The JSON of an attraction to a point: a {@link GravityForce}. */
+export interface GravityForceJSON extends BehaviorJSON {
+    /** The point. */
+    center?: Vector3ArrayJSON;
+    /** The strength; 0 when absent. */
+    magnitude?: number;
+}
 
 /**
  * Pull particles toward a point with an inverse-square force, F = magnitude / r²
@@ -71,7 +80,7 @@ export class GravityForce implements Behavior {
 
     frameUpdate(delta: number): void {}
 
-    toJSON(): any {
+    toJSON(): GravityForceJSON {
         return {
             type: this.type,
             center: [this.center.x, this.center.y, this.center.z],
@@ -80,7 +89,7 @@ export class GravityForce implements Behavior {
     }
 
     /** Reads {@link GravityForce.toJSON} output; a field the JSON leaves out takes its default. */
-    static fromJSON(json: any): Behavior {
+    static fromJSON(json: GravityForceJSON): Behavior {
         return new GravityForce(
             readVector3(json.center, new Vector3(0, 0, 0)),
             typeof json.magnitude === 'number' ? json.magnitude : 0

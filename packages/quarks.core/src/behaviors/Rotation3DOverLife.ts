@@ -1,7 +1,14 @@
-import {Particle, SpriteParticle} from '../Particle';
 import {RotationGenerator, RotationGeneratorFromJSON} from '../functions';
+import type {RotationGeneratorJSON} from '../functions/FunctionJSON';
 import {Quaternion} from '../math';
-import {Behavior} from './Behavior';
+import {Particle, SpriteParticle} from '../Particle';
+import {Behavior, BehaviorJSON} from './Behavior';
+
+/** The JSON of a 3D rotation over life: a {@link Rotation3DOverLife}. */
+export interface Rotation3DOverLifeJSON extends BehaviorJSON {
+    /** The angular velocity. */
+    angularVelocity: RotationGeneratorJSON;
+}
 
 /**
  * Apply rotation to particles over their life.
@@ -41,7 +48,7 @@ export class Rotation3DOverLife implements Behavior {
             }
         }
     }
-    toJSON(): any {
+    toJSON(): Rotation3DOverLifeJSON {
         return {
             type: this.type,
             angularVelocity: this.angularVelocity.toJSON(),
@@ -52,7 +59,7 @@ export class Rotation3DOverLife implements Behavior {
      * Reads {@link Rotation3DOverLife.toJSON} output; a field the JSON leaves out takes its
      * default.
      */
-    static fromJSON(json: any): Behavior {
+    static fromJSON(json: Rotation3DOverLifeJSON): Behavior {
         return new Rotation3DOverLife(RotationGeneratorFromJSON(json.angularVelocity));
     }
 

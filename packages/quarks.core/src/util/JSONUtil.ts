@@ -1,42 +1,53 @@
+import type {
+    ColorJSON,
+    ContinuousLinearSubType,
+    ContinuousLinearValueJSON,
+    Vector3JSON,
+} from '../functions/FunctionJSON';
 import {Vector3, Vector4} from '../math';
 
-export const ColorToJSON = (color: Vector4) => {
+/** A colour as JSON. */
+export const ColorToJSON = (color: Vector4): ColorJSON => {
     return {r: color.x, g: color.y, b: color.z, a: color.w};
 };
 
-export const JSONToColor = (json: any) => {
+/** A colour from its JSON. */
+export const JSONToColor = (json: ColorJSON) => {
     return new Vector4(json.r, json.g, json.b, json.a);
 };
 
-export const JSONToValue = (json: any, type: string) => {
+/** A {@link ContinuousLinearFunction} key's value as JSON, in the form `type` names. */
+export function ValueToJSON(
+    value: number | Vector3 | Vector4,
+    type: ContinuousLinearSubType
+): ContinuousLinearValueJSON {
+    if (typeof value === 'number') return value;
     switch (type) {
-        case 'Vector3':
-            return new Vector3(json.x, json.y, json.z);
-        case 'Vector4':
-            return new Vector4(json.x, json.y, json.z, json.w);
-        case 'Color':
-            return new Vector3(json.r, json.g, json.b);
-        case 'Number':
-            return json;
-        default:
-            return json;
-    }
-};
-
-export const ValueToJSON = (value: any, type: string) => {
-    switch (type) {
-        case 'Vector3':
-            return {x: value.x, y: value.y, z: value.z};
-        case 'Vector4':
-            return {x: value.x, y: value.y, z: value.z, w: value.w};
         case 'Color':
             return {r: value.x, g: value.y, b: value.z};
-        case 'Number':
-            return value;
+        case 'Vector4':
+            return value instanceof Vector4 ? {x: value.x, y: value.y, z: value.z, w: value.w} : {...xyz(value), w: 0};
         default:
-            return value;
+            return xyz(value);
     }
-};
+}
+
+const xyz = (value: Vector3 | Vector4): Vector3JSON => ({x: value.x, y: value.y, z: value.z});
+
+/** A number key value from JSON; anything else reads as 0. */
+export const JSONToNumber = (json: ContinuousLinearValueJSON): number => (typeof json === 'number' ? json : 0);
+
+/** A vector or colour key value from JSON, `{x, y, z}` or `{r, g, b}`; a number reads as zero. */
+export function JSONToVector3(json: ContinuousLinearValueJSON): Vector3 {
+    if (typeof json === 'number') return new Vector3();
+    return 'r' in json ? new Vector3(json.r, json.g, json.b) : new Vector3(json.x, json.y, json.z);
+}
+
+/** A four-component key value from JSON, `{x, y, z, w}`; anything else reads its parts as 0. */
+export function JSONToVector4(json: ContinuousLinearValueJSON): Vector4 {
+    if (typeof json === 'number' || 'r' in json) return new Vector4();
+    return new Vector4(json.x, json.y, json.z, 'w' in json ? json.w : 0);
+}
 
 /**
  * Thrown for an effect document that cannot be read at all, such as one with no `object`, and, in
