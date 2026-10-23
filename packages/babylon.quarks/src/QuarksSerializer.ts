@@ -13,6 +13,7 @@ import {quarksNodeId} from './nodeId';
 import {ParticleEmitter} from './ParticleEmitter';
 import type {BabylonMetaData, ParticleSystem, ParticleSystemJSONParameters} from './ParticleSystem';
 import {QuarksPrefab} from './QuarksPrefab';
+import {textureSourceUrl} from './textureSource';
 
 /**
  * The version of the effect file format this library writes, in `metadata.quarksFormat`. It goes
@@ -141,10 +142,11 @@ export interface SerializeEffectOptions {
     /** Several roots are written as children of one group; its name. Default `'effect'`. */
     name?: string;
     /**
-     * The url written for a texture's image. Default: the texture's `url`. Return a path relative
-     * to where the file will be saved, since a texture loaded with a base url holds the joined url
-     * and the loader joins the base again; or give a texture made in code a url or a `data:` URI.
-     * Return `null` to write the texture without an image.
+     * The url written for a texture's image. Default: the url the texture's image had in the file
+     * it was loaded from (see {@link textureSourceUrl}), so a file saved next to its source loads
+     * the same images; for a texture made in code, its `url`. Return a path relative to where the
+     * file will be saved when that differs from the source, or give a texture made in code a url or
+     * a `data:` URI. Return `null` to write the texture without an image.
      */
     imageUrl?: (texture: Texture) => string | null | undefined;
 }
@@ -371,7 +373,7 @@ class EffectWriter {
                 texture instanceof Texture
                     ? this.options.imageUrl
                         ? this.options.imageUrl(texture)
-                        : texture.url
+                        : (textureSourceUrl(texture) ?? texture.url)
                     : null;
             if (isPortableUrl(url)) {
                 let image = imageIds.get(url);

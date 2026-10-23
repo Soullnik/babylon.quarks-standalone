@@ -2,11 +2,14 @@
 
 All notable changes to the Unity Quarks Exporter are documented here.
 
-## [0.27.0] — 2026-10-21
+## [0.27.0] — 2026-10-23
 
 ### Changed
 
-- Version aligned with babylon.quarks 0.27.0 (no exporter changes).
+- Version aligned with babylon.quarks 0.27.0 (no exporter code changes). The README now marks
+  the exporter as experimental and lists the Shuriken features it does not export, and its load
+  snippet uses `QuarksLoader.load` instead of `parse`, which does not fetch linked files.
+- The README no longer points at `sample-output.json`, which was not in the repository.
 
 ## [0.26.0] — 2026-10-21
 

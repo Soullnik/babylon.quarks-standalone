@@ -87,8 +87,11 @@ file can point at (made in code, a `blob:` url, an image embedded in a glTF) is 
 image and reported through `onWarning`; give it a file url or a `data:` URI before saving.
 
 A texture loaded with a base url holds the joined url (`fx/tex/a.png` for `tex/a.png` loaded from
-`fx/`), and the loader joins the base again on the next load. To save a file next to the one it was
-loaded from, pass `imageUrl` to write each image's url relative to it.
+`fx/`), but `serializeEffect` writes the url the file had (`tex/a.png`, see `textureSourceUrl`), so a
+file saved next to the one it was loaded from loads the same images. To save it elsewhere, pass
+`imageUrl` to write each image's url relative to the new place. A texture whose image was inlined
+by a resolver (`data:`), or whose `url` was changed after loading, writes its `url`; a texture
+shared between effects (`shareResources`) keeps the url of the first effect that loaded it.
 
 ## Reading bad or partial files
 

@@ -15,6 +15,7 @@ import {QuarksPrefab} from './QuarksPrefab';
 import {QUARKS_FORMAT_VERSION} from './QuarksSerializer';
 import {disposeEffect, retainEffectResources} from './effectResources';
 import {ensureTriangleIndices} from './geometryUtil';
+import {setTextureSourceUrl} from './textureSource';
 
 /** Kind of linked asset the loader asks a {@link QuarksResourceResolver} to handle. */
 export type QuarksResourceKind = 'effect' | 'geometry' | 'image';
@@ -134,6 +135,9 @@ function sceneMap<T>(maps: WeakMap<Scene, Map<string, T>>, scene: Scene): Map<st
 /** Image entries {@link QuarksLoader.resolveLinkedResources} rewrote, with the url it wrote. */
 const resolvedImageUrls = new WeakMap<object, string>();
 
+/** Image entries {@link QuarksLoader.resolveLinkedResources} rewrote, with the url the file had. */
+const sourceImageUrls = new WeakMap<object, string>();
+
 /** Content key for a geometry: two independent 32-bit hashes over every array's bytes, plus lengths. */
 function geometryKey(geometry: ParsedGeometry): string {
     let h1 = 0x811c9dc5;
@@ -183,9 +187,22 @@ function detachDocument(json: any): any {
     }
     const copy = {...json};
     if (Array.isArray(json.images)) {
-        copy.images = json.images.map((image: unknown) =>
-            image && typeof image === 'object' ? {...(image as object)} : image
-        );
+        copy.images = json.images.map((image: unknown) => {
+            if (!image || typeof image !== 'object') {
+                return image;
+            }
+            const imageCopy: {url?: unknown} = {...(image as object)};
+            // An entry resolveResources() already rewrote stays resolved in its copy, so loading the
+            // document it prepared, with the same base, does not join the base a second time.
+            if (resolvedImageUrls.get(image) === imageCopy.url && typeof imageCopy.url === 'string') {
+                resolvedImageUrls.set(imageCopy, imageCopy.url);
+                const source = sourceImageUrls.get(image);
+                if (source !== undefined) {
+                    sourceImageUrls.set(imageCopy, source);
+                }
+            }
+            return imageCopy;
+        });
     }
     if (Array.isArray(json.geometries)) {
         copy.geometries = json.geometries.map((geometry: unknown) =>
@@ -230,6 +247,8 @@ interface LoadedMeta {
     ownedMaterials: Material[];
     /** Image uuid to the url its textures load. */
     images: {[uuid: string]: string | null};
+    /** Image uuid to the url the file wrote, before any base url was joined. */
+    imageSources: {[uuid: string]: string};
     textures: {[uuid: string]: Texture | null};
     geometries: {[uuid: string]: ParsedGeometry};
     materials: {[uuid: string]: any};
@@ -449,8 +468,14 @@ export class QuarksLoader {
                 if (resolvedImageUrls.get(img) === img.url) {
                     return;
                 }
+                const source: string = img.url;
                 img.url = await QuarksLoader.resolveWith(resolver, img.url, 'image', baseUrl);
                 resolvedImageUrls.set(img, img.url);
+                // A resolver that inlined the file (`data:`, `blob:`) made the url the image itself;
+                // the file's path no longer names what the texture holds, so a save writes the url.
+                if (!/^(data|blob):/i.test(img.url)) {
+                    sourceImageUrls.set(img, source);
+                }
             })
         );
     }
@@ -490,6 +515,7 @@ export class QuarksLoader {
         const meta: LoadedMeta = {
             ownedMaterials: [],
             images: {},
+            imageSources: {},
             textures: {},
             geometries: {},
             materials: {},
@@ -994,6 +1020,12 @@ export class QuarksLoader {
             // Urls are usually already absolute after resolveResources; joinUrl is a no-op for
             // data/blob/http(s) and still supports callers that use parse() with a baseUrl only.
             meta.images[img.uuid] = img.url ? QuarksLoader.joinUrl(baseUrl, img.url) : null;
+            // The url the file wrote, for serializeEffect to write back. An inlined image
+            // (`data:`, `blob:`) has no path to write; its texture writes its url.
+            const source: string | undefined = sourceImageUrls.get(img) ?? img.url;
+            if (source && !/^(data|blob):/i.test(source)) {
+                meta.imageSources[img.uuid] = source;
+            }
         }
     }
 
@@ -1073,6 +1105,10 @@ export class QuarksLoader {
                     continue;
                 }
                 textureSettled.set(texture, settled);
+                const source = meta.imageSources[texDef.image];
+                if (source !== undefined) {
+                    setTextureSourceUrl(texture, source, imageUrl);
+                }
                 // A texture disposed before it loads never will.
                 texture.onDisposeObservable.addOnce(() => settle());
                 if (Array.isArray(texDef.wrap)) {

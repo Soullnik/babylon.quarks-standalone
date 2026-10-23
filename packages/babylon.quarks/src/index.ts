@@ -56,6 +56,7 @@ export {shaderVariants} from './shaderVariants';
 export type {ShaderVariant} from './shaderVariants';
 export {decodeSoftDepth, softDepthParams} from './softDepth';
 export type {DepthTextureOptions, SoftDepthEncoding} from './softDepth';
+export {textureSourceUrl} from './textureSource';
 export {
     MAX_TRAIL_TESSELLATION,
     trailCurveTension,

@@ -1,6 +1,6 @@
 import {Texture} from '@babylonjs/core/Materials/Textures/texture';
 import {TransformNode} from '@babylonjs/core/Meshes/transformNode';
-import {serializeEffect} from 'babylon.quarks';
+import {BatchedRenderer, serializeEffect} from 'babylon.quarks';
 import {
     assetIconUrl,
     collectJsonFiles,
@@ -14,6 +14,8 @@ import {
     removeAssets,
     resolveRelativePath,
 } from '../src/core/assets';
+import {serializeEffectTree} from '../src/core/effectTree';
+import {instantiateSceneEntry} from '../src/core/sceneEntries';
 import {makeSystem, useScene} from './helpers';
 import {fileAt, installFilePolyfills} from './polyfills';
 
@@ -151,6 +153,21 @@ describe('importing effect files', () => {
         expect(loaded.images[2].url).toBe('missing.png');
         expect(assets[0].missingFiles).toEqual(expect.arrayContaining(['missing.png', 'nowhere/cube.json']));
         expect(warn).toHaveBeenCalled();
+    });
+
+    it('saves an imported effect with its inlined image, not the path the file came with', async () => {
+        const files = [
+            fileAt('pack/fx/burst.json', JSON.stringify(effectJson())),
+            fileAt('pack/fx/textures/glow.png', 'png-bytes', 'image/png'),
+        ];
+        const [asset] = await loadEffectAssets(files, () => {});
+        const renderer = new BatchedRenderer('r', scene.get());
+        const entry = instantiateSceneEntry(scene.get(), renderer, asset, []);
+        expect(entry).not.toBeNull();
+        const saved = JSON.parse(serializeEffectTree(entry!.root, 'fx')) as {images: Array<{url: string}>};
+        expect(saved.images).toHaveLength(1);
+        expect(saved.images[0].url).toBe(`data:image/png;base64,${Buffer.from('png-bytes').toString('base64')}`);
+        renderer.dispose();
     });
 
     it('yields to the browser every few files', async () => {
