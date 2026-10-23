@@ -108,6 +108,7 @@ export function surfaceColorGLSL(tileBlend: boolean): string {
     baseColor.a = 1.0;
     float erosionMaskValue = 1.0;
 #endif
+#if defined(USE_MAP) || defined(GRADIENT_MAP)
 #ifdef USE_MAP
     vec4 texColor = texture2D(map, mapUV);
     ${
@@ -130,6 +131,10 @@ export function surfaceColorGLSL(tileBlend: boolean): string {
     #endif`
             : ''
     }
+#else
+    // No map: the ramp is looked up at white, its far end.
+    vec4 texColor = vec4(1.0);
+#endif
     #ifdef GRADIENT_MAP
         float rampAt = clamp(dot(texColor, gradientMapChannel), 0.0, 1.0);
         vec4 ramp = texture2D(gradientMap, vec2(mix(gradientMapRange.x, gradientMapRange.y, rampAt), 0.5));
@@ -221,6 +226,7 @@ export function surfaceColorWGSL(tileBlend: boolean): string {
     baseColor.a = 1.0;
     var erosionMaskValue = 1.0;
 #endif
+#if defined(USE_MAP) || defined(GRADIENT_MAP)
 #ifdef USE_MAP
     var texColor = textureSample(map, mapSampler, mapUV);
     ${
@@ -243,6 +249,10 @@ export function surfaceColorWGSL(tileBlend: boolean): string {
     #endif`
             : ''
     }
+#else
+    // No map: the ramp is looked up at white, its far end.
+    var texColor = vec4f(1.0);
+#endif
     #ifdef GRADIENT_MAP
         let rampAt = clamp(dot(texColor, uniforms.gradientMapChannel), 0.0, 1.0);
         let ramp = textureSample(gradientMap, gradientMapSampler, vec2f(mix(uniforms.gradientMapRange.x, uniforms.gradientMapRange.y, rampAt), 0.5));

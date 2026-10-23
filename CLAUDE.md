@@ -38,7 +38,8 @@ A change is done only when all of the following hold:
 3. **Tests.**
    - Jest tests cover behaviour, defaults, batching, serialisation and the shader sources.
    - Coverage thresholds in `jest.config.json` must hold.
-   - `npm run validate:wgsl` covers every new define combination, and passes.
+   - `npm run validate:shaders` compiles every variant of `shaderVariants()` in GLSL and WGSL, and
+     passes; a new define reaches it through `shaderProgram` and the axes in `shaderVariants.ts`.
 4. **Review.**
    - An independent review looks for correctness, edge cases, leaks and API design before merge.
    - Review findings are fixed or answered.

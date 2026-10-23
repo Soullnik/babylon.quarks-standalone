@@ -108,12 +108,13 @@ jobs:
                   for i in $(seq 1 60); do curl -sf http://127.0.0.1:3010/ >/dev/null && break; sleep 1; done
                   npm run check:demos -- --shard=${{ matrix.shard }}/2
 
-    # Every WGSL shader variant the library can emit, compiled by Chromium's own WGSL compiler on its
-    # software (SwiftShader) adapter; no GPU needed. A variant that fails to compile fails the job.
-    wgsl:
-        name: WGSL shader compile
+    # Every shader variant the library can emit (`shaderVariants()`), compiled in GLSL on a WebGL2
+    # engine and in WGSL by Chromium's own WGSL compiler, both on its software (SwiftShader) adapter;
+    # no GPU needed. A variant that fails to compile fails the job.
+    shaders:
+        name: Shader compile (GLSL + WGSL)
         runs-on: ubuntu-latest
-        timeout-minutes: 20
+        timeout-minutes: 25
         steps:
             - name: Checkout
               uses: actions/checkout@v4
@@ -144,11 +145,11 @@ jobs:
             - name: Install Chromium for the shader compile
               run: npx playwright install --only-shell chromium
 
-            - name: Compile every WGSL variant
+            - name: Compile every shader variant
               run: |
                   npm run preview -w examples -- --host 127.0.0.1 --port 3010 --strictPort &
                   for i in $(seq 1 60); do curl -sf http://127.0.0.1:3010/ >/dev/null && break; sleep 1; done
-                  npm run validate:wgsl
+                  npm run validate:shaders
 
     # Pages build only on main / manual dispatch. The docs are written into examples/dist, so they
     # are built after the examples.
@@ -185,7 +186,7 @@ jobs:
                   path: examples/dist
 
     deploy:
-        needs: [check, demos, wgsl, pages]
+        needs: [check, demos, shaders, pages]
         if: github.event_name != 'pull_request'
         runs-on: ubuntu-latest
         # Never cancel an in-progress Pages deployment — that leaves it in a failed state.

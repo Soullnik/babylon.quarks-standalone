@@ -1,7 +1,7 @@
 import {Constants} from '@babylonjs/core/Engines/constants';
-import {BaseTexture} from '@babylonjs/core/Materials/Textures/baseTexture';
 import type {Vector3} from 'quarks.core';
 import type {VFXBatchSettings} from './BatchedRenderer';
+import {DEFAULT_SOFT_FAR_FADE, validSoftFade, validTileCount} from './system/normalize';
 import {
     normalizeErosion,
     normalizeGradientMap,
@@ -45,6 +45,11 @@ export function takesPivotAndSizeLimits(renderMode: RenderMode): boolean {
     );
 }
 
+/** Whether the settings draw a flipbook: more than one cell in either direction. */
+export function tilesSheet(settings: {uTileCount: number; vTileCount: number}): boolean {
+    return settings.uTileCount > 1 || settings.vTileCount > 1;
+}
+
 /** Whether the settings put a screen-size limit on the particles. */
 export function hasSizeLimits(settings: {minParticleSize: number; maxParticleSize: number}): boolean {
     return settings.minParticleSize > 0 || settings.maxParticleSize !== Infinity;
@@ -67,6 +72,8 @@ export function storedBatchSettings(settings: VFXBatchSettings): StoredBatchSett
     const uvDistortion = normalizeUVDistortion(settings.uvDistortion);
     const gradientMap = normalizeGradientMap(settings.gradientMap);
     const erosion = normalizeErosion(settings.erosion);
+    const uTileCount = validTileCount(settings.uTileCount);
+    const vTileCount = validTileCount(settings.vTileCount);
     const stored: StoredBatchSettings = {
         renderMode,
         // A trail draws its own strip and reads none of the instanced geometry.
@@ -77,12 +84,13 @@ export function storedBatchSettings(settings: VFXBatchSettings): StoredBatchSett
         instancingUVs2: isMesh && readsUV1({mapUV, uvDistortion, erosion}) ? settings.instancingUVs2 : undefined,
         instancingNormals: isMesh ? settings.instancingNormals : undefined,
         renderOrder: settings.renderOrder,
-        uTileCount: settings.uTileCount,
-        vTileCount: settings.vTileCount,
-        blendTiles: !isTrail && settings.blendTiles,
+        uTileCount,
+        vTileCount,
+        // A trail cuts its cell on the CPU; a 1×1 sheet has no second cell to blend into.
+        blendTiles: !isTrail && settings.blendTiles && tilesSheet({uTileCount, vTileCount}),
         softParticles,
-        softNearFade: softParticles ? settings.softNearFade : 0,
-        softFarFade: softParticles ? settings.softFarFade : 0,
+        softNearFade: softParticles ? validSoftFade(settings.softNearFade, 0) : 0,
+        softFarFade: softParticles ? validSoftFade(settings.softFarFade, DEFAULT_SOFT_FAR_FADE) : 0,
         // An opaque batch draws with blending off, whatever mode it would blend with.
         materialBlendMode: transparent ? settings.materialBlendMode : Constants.ALPHA_DISABLE,
         materialTransparent: transparent,
@@ -92,7 +100,6 @@ export function storedBatchSettings(settings: VFXBatchSettings): StoredBatchSett
         texture: settings.texture,
         reflectionTexture: isMesh ? (settings.reflectionTexture ?? null) : null,
         reflectionLevel: isMesh ? (settings.reflectionLevel ?? 1) : 1,
-        reflectionFaces: isMesh ? (settings.reflectionFaces ?? null) : null,
         reflectionAtlas: isMesh ? (settings.reflectionAtlas ?? null) : null,
         layerMask: settings.layerMask,
         renderingGroupId: settings.renderingGroupId ?? 0,
@@ -131,7 +138,6 @@ export function shaderKeyEqual(a: StoredBatchSettings, b: StoredBatchSettings): 
         a.instancingNormals === b.instancingNormals &&
         a.texture === b.texture &&
         a.reflectionTexture === b.reflectionTexture &&
-        reflectionFacesEqual(a.reflectionFaces, b.reflectionFaces) &&
         a.reflectionAtlas === b.reflectionAtlas &&
         a.lighting === b.lighting &&
         a.rim?.mode === b.rim?.mode &&
@@ -228,20 +234,4 @@ function uvLayoutEqual(a: TextureUV | undefined, b: TextureUV | undefined): bool
         a.scroll[0] === b.scroll[0] &&
         a.scroll[1] === b.scroll[1]
     );
-}
-
-/** True when both face lists are the same six texture references (or both empty). */
-function reflectionFacesEqual(a: BaseTexture[] | null, b: BaseTexture[] | null): boolean {
-    if (a === b) {
-        return true;
-    }
-    if (!a || !b || a.length !== b.length) {
-        return false;
-    }
-    for (let i = 0; i < a.length; i++) {
-        if (a[i] !== b[i]) {
-            return false;
-        }
-    }
-    return true;
 }

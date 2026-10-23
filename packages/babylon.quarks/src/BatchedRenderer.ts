@@ -63,7 +63,7 @@ export interface VFXBatchSettings {
     uTileCount: number;
     /** See {@link ParticleSystem.vTileCount}. */
     vTileCount: number;
-    /** See {@link ParticleSystem.blendTiles}. */
+    /** See {@link ParticleSystem.blendTiles}; read with a sheet, and not by trails. */
     blendTiles: boolean;
     /** See {@link ParticleSystem.softParticles}. */
     softParticles: boolean;
@@ -84,22 +84,19 @@ export interface VFXBatchSettings {
     /** See {@link ParticleSystem.texture}. */
     texture: Texture | null;
     /**
-     * Cubemap (or other reflection texture) harvested from a Babylon material's
-     * `reflectionTexture`. Mesh batches sample it like StandardMaterial cubic
-     * reflection; other render modes ignore it.
+     * The reflection a mesh particle's material carries (a Babylon material's `reflectionTexture`
+     * or `environmentTexture`). It is not sampled itself: a cube texture is unfolded into
+     * {@link reflectionAtlas} once it has loaded and sampled from there; anything else is kept
+     * only to tell materials apart. Other render modes ignore it.
      */
     reflectionTexture: BaseTexture | null;
     /** Multiplier for the reflection sample — mirrors `texture.level`. */
     reflectionLevel: number;
     /**
-     * Optional six cube-face 2D textures (px,py,pz,nx,ny,nz). Prefer
-     * `reflectionAtlas` on iOS — many simultaneous face samplers still trip
-     * GL_INVALID_OPERATION on WebKit.
-     */
-    reflectionFaces: BaseTexture[] | null;
-    /**
-     * Single 3×2 atlas of cube faces (px py pz / nx ny nz). One sampler2D —
-     * the path that stays valid on iOS WebKit ShaderMaterial draws.
+     * A 3×2 atlas of cube faces (+X +Y +Z over -X -Y -Z) that mesh particles reflect, through one
+     * `sampler2D`: the path that stays valid on iOS WebKit ShaderMaterial draws, where a
+     * `samplerCube` or six face samplers raise GL_INVALID_OPERATION. Built from
+     * {@link reflectionTexture} when that is a cube texture. Other render modes ignore it.
      */
     reflectionAtlas: BaseTexture | null;
     /** Camera layer mask of the batch mesh, see {@link ParticleSystem.layers}. */
@@ -111,8 +108,11 @@ export interface VFXBatchSettings {
     renderingGroupId: number;
     /**
      * Whether the scene's fog applies to the particles, as it does to any other
-     * mesh; true by default. Additive particles fade toward black rather than
-     * the fog colour. Systems that differ are batched apart.
+     * mesh; true by default. Particles that add to the frame (`ALPHA_ADD`,
+     * `ALPHA_ONEONE`) fade toward black rather than the fog colour, which would
+     * fog the whole screen; every other blend mode mixes toward the fog colour,
+     * which is right for alpha blending and only approximate for a multiply or
+     * subtract. Systems that differ are batched apart.
      */
     applyFog: boolean;
     /**

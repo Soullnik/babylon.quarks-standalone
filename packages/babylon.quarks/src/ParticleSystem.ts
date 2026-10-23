@@ -64,6 +64,7 @@ import {
 } from './system/integrate';
 import {liveAtlas, MaterialOverrides, resolveMaterialSettings} from './system/materialResolve';
 import {
+    DEFAULT_SOFT_FAR_FADE,
     nonZeroFlip,
     nonZeroPivot,
     normalizeBurst,
@@ -72,7 +73,9 @@ import {
     validCullingMode,
     validLighting,
     validMaxParticles,
+    validSoftFade,
     validSortMode,
+    validTileCount,
 } from './system/normalize';
 import {ParticleSpawner} from './system/ParticleSpawner';
 import {particleSystemParametersFromJSON, particleSystemToJSON, trailCurve, trailFlags} from './system/serialization';
@@ -397,14 +400,15 @@ export class ParticleSystem implements IParticleSystem {
     /**
      * Columns of the flipbook in {@link texture} (Unity's Texture Sheet Animation tiles). With
      * {@link vTileCount}, a particle draws one cell, picked by {@link startTileIndex} and
-     * `FrameOverLife`. Default 1.
+     * `FrameOverLife`. A whole number of at least 1; anything else is 1. Default 1. Trails take
+     * their cell on the CPU, so a trail's texture is cut the same way.
      */
     get uTileCount(): number {
         return this.rendererSettings.uTileCount;
     }
 
     set uTileCount(u: number) {
-        this.rendererSettings.uTileCount = u;
+        this.rendererSettings.uTileCount = validTileCount(u);
         this.neededToUpdateRender = true;
     }
 
@@ -414,13 +418,14 @@ export class ParticleSystem implements IParticleSystem {
     }
 
     set vTileCount(v: number) {
-        this.rendererSettings.vTileCount = v;
+        this.rendererSettings.vTileCount = validTileCount(v);
         this.neededToUpdateRender = true;
     }
 
     /**
      * Cross-fade between a flipbook's cells instead of cutting from one to the next (Unity's
-     * Flip-Book Blending). Default false.
+     * Flip-Book Blending); the last cell fades into the first. Default false. Needs a sheet
+     * (`uTileCount` or `vTileCount` above 1); trails cut their cell on the CPU and do not blend.
      */
     get blendTiles(): boolean {
         return this.rendererSettings.blendTiles;
@@ -632,26 +637,31 @@ export class ParticleSystem implements IParticleSystem {
     }
 
     /**
-     * Distance in world units in front of the scene at which a soft particle is fully faded out.
-     * Default 0. A live parameter: changing it on a system alone in its batch keeps the batch and
-     * its material (see {@link VFXBatchSettings}).
+     * Distance in world units in front of the scene at which a soft particle is fully faded out,
+     * at least 0. Default 0. A live parameter: changing it on a system alone in its batch keeps
+     * the batch and its material (see {@link VFXBatchSettings}).
      */
     get softNearFade(): number {
         return this.rendererSettings.softNearFade;
     }
 
     set softNearFade(v: number) {
-        this.rendererSettings.softNearFade = v;
+        this.rendererSettings.softNearFade = validSoftFade(v, 0);
         this.neededToUpdateRender = true;
     }
 
-    /** Distance in world units in front of the scene at which a soft particle is fully opaque. Default 0. A live parameter, like {@link softNearFade}. */
+    /**
+     * Distance in world units in front of the scene at which a soft particle is fully opaque, at
+     * least 0. Default 1 (Unreal's Depth Fade distance): the particle fades over the last unit
+     * before the scene. A value at or below {@link softNearFade} cuts the particle off at that
+     * distance instead of fading it. A live parameter, like `softNearFade`.
+     */
     get softFarFade(): number {
         return this.rendererSettings.softFarFade;
     }
 
     set softFarFade(v: number) {
-        this.rendererSettings.softFarFade = v;
+        this.rendererSettings.softFarFade = validSoftFade(v, DEFAULT_SOFT_FAR_FADE);
         this.neededToUpdateRender = true;
     }
 
@@ -809,9 +819,10 @@ export class ParticleSystem implements IParticleSystem {
 
     /**
      * Alpha below which a fragment is discarded (Unity's Alpha Clip Threshold), 0…1; 0 (the
-     * default, or the material's `alphaCutOff`) discards nothing. Switching it on or off rebuilds
-     * the batch's material; a change between non-zero cutoffs on a system alone in its batch is
-     * written to the material in place.
+     * default, or the material's `alphaCutOff`) discards nothing but fragments under 0.01, which no
+     * blend mode can show except additive ones with a bright colour. Switching it on or off
+     * rebuilds the batch's material; a change between non-zero cutoffs on a system alone in its
+     * batch is written to the material in place.
      */
     get alphaTest(): number {
         return this.rendererSettings.materialAlphaTest;
@@ -1089,12 +1100,12 @@ export class ParticleSystem implements IParticleSystem {
             instancingNormals: parameters.instancingNormals,
             renderMode: parameters.renderMode ?? RenderMode.BillBoard,
             renderOrder: parameters.renderOrder ?? 0,
-            uTileCount: parameters.uTileCount ?? 1,
-            vTileCount: parameters.vTileCount ?? 1,
+            uTileCount: validTileCount(parameters.uTileCount),
+            vTileCount: validTileCount(parameters.vTileCount),
             blendTiles: parameters.blendTiles ?? false,
             softParticles: parameters.softParticles ?? false,
-            softNearFade: parameters.softNearFade ?? 0,
-            softFarFade: parameters.softFarFade ?? 0,
+            softNearFade: validSoftFade(parameters.softNearFade, 0),
+            softFarFade: validSoftFade(parameters.softFarFade, DEFAULT_SOFT_FAR_FADE),
             materialBlendMode: parameters.blendMode ?? Constants.ALPHA_ADD,
             materialTransparent: parameters.transparent ?? true,
             materialDepthTest: parameters.depthTest ?? true,
@@ -1103,7 +1114,6 @@ export class ParticleSystem implements IParticleSystem {
             texture: parameters.texture ?? null,
             reflectionTexture: null,
             reflectionLevel: 1,
-            reflectionFaces: null,
             reflectionAtlas: null,
             layerMask: parameters.layerMask ?? 0x0fffffff,
             pivot: nonZeroPivot(parameters.pivot),
@@ -1227,7 +1237,6 @@ export class ParticleSystem implements IParticleSystem {
         }
         this.rendererSettings.reflectionAtlas = resolvedAtlas;
         this.watchEnvAtlas(resolvedAtlas, material);
-        this.rendererSettings.reflectionFaces = resolved.reflectionFaces;
         this.rendererSettings.materialBlendMode = resolved.blendMode;
         this.rendererSettings.materialTransparent = resolved.transparent;
         this.rendererSettings.materialDepthTest = resolved.depthTest;

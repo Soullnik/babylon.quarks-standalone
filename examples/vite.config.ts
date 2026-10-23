@@ -31,7 +31,7 @@ export default defineConfig({
                 babylon: resolve(__dirname, 'babylonDemo.html'),
                 benchmark: resolve(__dirname, 'benchmark.html'),
                 editor: resolve(__dirname, 'editor.html'),
-                wgsl: resolve(__dirname, 'wgsl-validate.html'),
+                shaders: resolve(__dirname, 'shader-validate.html'),
             },
         },
     },

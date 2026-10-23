@@ -90,13 +90,8 @@ ${softFragmentDeclarationGLSL}
 ${surfaceFragmentDeclarationGLSL}
 void main() {
 ${surfaceColorGLSL(true)}
-#ifdef USE_ALPHATEST
-    if (baseColor.a < alphaTest) discard;
-#else
-    if (baseColor.a < 0.01) discard;
-#endif
-
-    vec3 N = normalize(vNormal);
+    // A back face lights, reflects and rims as the face the camera sees.
+    vec3 N = normalize(vNormal) * (gl_FrontFacing ? 1.0 : -1.0);
 #ifdef MESH_UNLIT
     vec3 color = baseColor.rgb;
 #else
@@ -125,6 +120,13 @@ ${surfaceColorGLSL(true)}
     #else
     color += rimColor * edgeTerm * rimParams.y;
     #endif
+#endif
+
+    // After the rim, so a fade that empties a face can discard it.
+#ifdef USE_ALPHATEST
+    if (baseColor.a < alphaTest) discard;
+#else
+    if (baseColor.a < 0.01) discard;
 #endif
 
 ${fogFragmentGLSL('color')}

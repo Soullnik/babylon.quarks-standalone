@@ -1,4 +1,5 @@
 import {fogVertexDeclarationGLSL, fogVertexGLSL} from './chunks/fog';
+import {sheetVertexDeclarationGLSL, sheetVertexGLSL} from './chunks/sheet';
 
 export default /* glsl */ `
 // Per-vertex attributes
@@ -16,12 +17,7 @@ attribute float uvTile;
 uniform mat4 world;
 uniform mat4 view;
 uniform mat4 projection;
-uniform mat4 worldViewProjection;
-
-#ifdef UV_TILE
-uniform float tileCountX;
-uniform float tileCountY;
-#endif
+${sheetVertexDeclarationGLSL}
 
 #ifdef PIVOT
 // Quad offset in particle-size units: xy in the quad's plane, z toward the camera.
@@ -34,10 +30,6 @@ varying vec4 vColor;
 #ifdef UV1
 // The particle's own UV, never moved by the sheet (UV channel 1).
 varying vec2 vUV1;
-#endif
-#ifdef TILE_BLEND
-varying vec2 vUV2;
-varying float vTileBlend;
 #endif
 #ifdef SOFT_PARTICLES
 varying vec4 projPosition;
@@ -107,22 +99,7 @@ ${fogVertexGLSL('mvPosition.xyz')}
     linearDepth = abs(mvPosition.z);
 #endif
 
-    #ifdef UV_TILE
-        vec2 tc = vec2(tileCountX, tileCountY);
-        float baseTile = floor(uvTile);
-        float tileU = mod(baseTile, tc.x) / tc.x;
-        float tileV = 1.0 - floor(baseTile / tc.x) / tc.y - 1.0 / tc.y;
-        vUV = uv / tc + vec2(tileU, tileV);
-        #ifdef TILE_BLEND
-            float nextTile = ceil(uvTile);
-            float nextU = mod(nextTile, tc.x) / tc.x;
-            float nextV = 1.0 - floor(nextTile / tc.x) / tc.y - 1.0 / tc.y;
-            vUV2 = uv / tc + vec2(nextU, nextV);
-            vTileBlend = fract(uvTile);
-        #endif
-    #else
-        vUV = uv;
-    #endif
+${sheetVertexGLSL('uv')}
 
 #ifdef UV1
     vUV1 = uv;

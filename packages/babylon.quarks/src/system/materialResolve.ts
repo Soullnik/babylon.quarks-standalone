@@ -21,7 +21,6 @@ export interface ResolvedMaterialSettings {
     reflectionLevel: number;
     /** A live atlas the material, the overrides or the current settings already have; null if none. */
     reflectionAtlas: BaseTexture | null;
-    reflectionFaces: VFXBatchSettings['reflectionFaces'];
     blendMode: number;
     transparent: boolean;
     depthTest: boolean;
@@ -108,7 +107,6 @@ export function resolveMaterialSettings(
             liveAtlas(current.reflectionAtlas),
         // Do not expand cube files into six face textures anymore — that path
         // still trips GL_INVALID_OPERATION on iOS. Prefer a single atlas.
-        reflectionFaces: material?.reflectionFaces?.length === 6 ? material.reflectionFaces : null,
         blendMode,
         transparent,
         depthTest,

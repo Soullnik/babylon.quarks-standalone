@@ -165,25 +165,6 @@ describe('batch key: only the settings a render mode reads count', () => {
         renderer.dispose();
     });
 
-    it('reflection faces count on meshes, by their texture references', () => {
-        const renderer = new BatchedRenderer('key-faces', scene);
-        const faces = [0, 1, 2, 3, 4, 5].map(() => new Texture(null, scene));
-        const mesh = () =>
-            system({renderMode: RenderMode.Mesh, instancingGeometry: cube, instancingIndices: cubeIndices});
-        const a = mesh();
-        const b = mesh();
-        const c = mesh();
-        const d = mesh();
-        a.getRendererSettings().reflectionFaces = faces;
-        b.getRendererSettings().reflectionFaces = [...faces];
-        c.getRendererSettings().reflectionFaces = [...faces.slice(0, 5), faces[0]];
-        d.getRendererSettings().reflectionFaces = faces.slice(0, 5);
-        [a, b, c, d].forEach((s) => renderer.addSystem(s));
-        expect(batchOf(renderer, a)).toBe(batchOf(renderer, b));
-        expect(new Set([a, c, d].map((s) => batchOf(renderer, s))).size).toBe(3);
-        renderer.dispose();
-    });
-
     it('soft fade distances only count while soft particles are on', () => {
         const renderer = new BatchedRenderer('key-soft', scene);
         const a = system({softNearFade: 0.1, softFarFade: 1});

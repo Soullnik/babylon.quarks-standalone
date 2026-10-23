@@ -1,4 +1,5 @@
 import {fogVertexDeclarationWGSL, fogVertexWGSL} from './chunks/fog';
+import {sheetVertexDeclarationWGSL, sheetVertexWGSL} from './chunks/sheet';
 
 export default /* wgsl */ `
 // Per-vertex attributes
@@ -16,11 +17,7 @@ attribute uvTile: f32;
 uniform world: mat4x4f;
 uniform view: mat4x4f;
 uniform projection: mat4x4f;
-
-#ifdef UV_TILE
-uniform tileCountX: f32;
-uniform tileCountY: f32;
-#endif
+${sheetVertexDeclarationWGSL}
 
 #ifdef PIVOT
 // Quad offset in particle-size units: xy in the quad's plane, z toward the camera.
@@ -33,10 +30,6 @@ varying vColor: vec4f;
 #ifdef UV1
 // The particle's own UV, never moved by the sheet (UV channel 1).
 varying vUV1: vec2f;
-#endif
-#ifdef TILE_BLEND
-varying vUV2: vec2f;
-varying vTileBlend: f32;
 #endif
 #ifdef SOFT_PARTICLES
 varying projPosition: vec4f;
@@ -109,22 +102,7 @@ ${fogVertexWGSL('mvPosition.xyz')}
     vertexOutputs.linearDepth = abs(mvPosition.z);
 #endif
 
-    #ifdef UV_TILE
-        let tc = vec2f(uniforms.tileCountX, uniforms.tileCountY);
-        let baseTile = floor(vertexInputs.uvTile);
-        let tileU = (baseTile % tc.x) / tc.x;
-        let tileV = 1.0 - floor(baseTile / tc.x) / tc.y - 1.0 / tc.y;
-        vertexOutputs.vUV = vertexInputs.uv / tc + vec2f(tileU, tileV);
-        #ifdef TILE_BLEND
-            let nextTile = ceil(vertexInputs.uvTile);
-            let nextU = (nextTile % tc.x) / tc.x;
-            let nextV = 1.0 - floor(nextTile / tc.x) / tc.y - 1.0 / tc.y;
-            vertexOutputs.vUV2 = vertexInputs.uv / tc + vec2f(nextU, nextV);
-            vertexOutputs.vTileBlend = fract(vertexInputs.uvTile);
-        #endif
-    #else
-        vertexOutputs.vUV = vertexInputs.uv;
-    #endif
+${sheetVertexWGSL('vertexInputs.uv')}
 
 #ifdef UV1
     vertexOutputs.vUV1 = vertexInputs.uv;

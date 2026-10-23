@@ -6,11 +6,9 @@ import {Scene} from '@babylonjs/core/scene';
 import {IParticleSystem, Matrix4, Quaternion, TrailParticle, TrailSettings, Vector3} from 'quarks.core';
 import {VFXBatchSettings} from './BatchedRenderer';
 import type {ParticleSystem} from './ParticleSystem';
+import {shaderProgram} from './shaderProgram';
+import {sheetCell} from './shaders/chunks/sheet';
 import {registerShaders, shaderLanguageFor} from './shaders/shaderLanguageSupport';
-import trail_frag from './shaders/trail_frag.glsl';
-import trail_frag_wgsl from './shaders/trail_frag.wgsl';
-import trail_vert from './shaders/trail_vert.glsl';
-import trail_vert_wgsl from './shaders/trail_vert.wgsl';
 import type {DepthBinding} from './softDepth';
 import {trailCurveTension, trailTessellation} from './trailCurve';
 import {VFXBatch} from './VFXBatch';
@@ -202,37 +200,13 @@ export class TrailBatch extends VFXBatch {
 
     /** @internal */
     rebuildMaterial(): void {
+        const program = shaderProgram(this.settings, {depth: this.depth, envAtlasReady: false, meshUV2: false});
+        const {defines, attributes, uniforms, samplers} = program;
         // Stable name: the trail shader source never varies, so registering it once
         // keeps Effect.ShadersStore bounded and lets Babylon reuse compiled effects.
-        const shaderName = 'quarksTrail';
-        const defines: string[] = this.fogDefines();
-
-        if (this.settings.texture) {
-            defines.push('USE_MAP');
-        }
-        defines.push(...this.surfaceDefines());
-        defines.push(...this.softDefines());
-
+        const shaderName = program.name;
         const shaderLanguage = shaderLanguageFor(this.scene.getEngine());
-        registerShaders(
-            shaderName,
-            {glsl: trail_vert, wgsl: trail_vert_wgsl},
-            {glsl: trail_frag, wgsl: trail_frag_wgsl},
-            shaderLanguage
-        );
-
-        const attributes = ['position', 'previous', 'next', 'side', 'width', 'uv', 'color'];
-        if (this.uv1Buffer) {
-            attributes.push('uv2');
-        }
-        const uniforms = ['view', 'projection', ...VFXBatch.FOG_UNIFORMS];
-        const samplers: string[] = [];
-
-        if (this.settings.texture) {
-            samplers.push('map');
-        }
-        this.surfaceUniforms(uniforms, samplers);
-        this.softUniforms(uniforms, samplers);
+        registerShaders(shaderName, program.vertex, program.fragment, shaderLanguage);
 
         const mat = new ShaderMaterial(
             shaderName,
@@ -588,11 +562,8 @@ export class TrailBatch extends VFXBatch {
                 // the particle's current row in the store.
                 const colors = colorFromParticle ? particle.store.color : particle.historyColors;
                 const particleColorIndex = particle.storeIndex * 4;
-                // The same cell as the sprite shader: frames run along the rows, uTileCount per row,
-                // with floor and a positive modulo, as the shader's floor() and mod().
-                const tile = Math.floor(particle.uvTile);
-                const col = ((tile % uTileCount) + uTileCount) % uTileCount;
-                const row = Math.floor(tile / uTileCount);
+                // The same cell as the sprite shader, wrapped into the sheet the same way.
+                const {column: col, row} = sheetCell(particle.uvTile, uTileCount, vTileCount);
                 const particleMatrix = particle.parentMatrix as unknown as Matrix4 | undefined;
                 const me = (particleMatrix ?? emitterMatrix).elements;
                 const widthScale = systemWorldSpace || particle.parentMatrix ? 1 : objectScale;
