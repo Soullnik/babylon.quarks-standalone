@@ -133,8 +133,9 @@ export const demoManifest: DemoManifestEntry[] = [
         name: 'Following Moving Objects',
         module: 'followObject',
         sourcePath: 'examples/src/demos/followObject.ts',
-        description: 'Particles attached to and following moving objects.',
-        tags: ['follow', 'gameplay'],
+        description:
+            'Emitters parented to moving objects: emission over time against emission over distance, world-space wakes and local-space halos.',
+        tags: ['follow', 'emission'],
         preview: {icon: 'FO', gradient: 'linear-gradient(135deg, #a0dcff 0%, #325f8c 100%)'},
     },
     {
@@ -152,8 +153,8 @@ export const demoManifest: DemoManifestEntry[] = [
         module: 'levelUp',
         sourcePath: 'examples/src/demos/levelUp.ts',
         description:
-            'Gather burst, dual glow layers, and orbiting cone spray inspired by the three.quarks-editor example.',
-        tags: ['burst', 'orbit'],
+            'One-shot character effect: ground shockwave, light column, spiralling trail ribbons and falling stars.',
+        tags: ['burst', 'trail'],
         preview: {icon: 'LU', gradient: 'linear-gradient(135deg, #fff08a 0%, #8a7a18 100%)'},
     },
     {
@@ -170,7 +171,8 @@ export const demoManifest: DemoManifestEntry[] = [
         name: 'Black Hole',
         module: 'blackhole',
         sourcePath: 'examples/src/demos/blackhole.ts',
-        description: 'Dark core, orbiting accretion gradient, and additive ring using atlas tiles.',
+        description:
+            'Accretion disk heated by ColorBySpeed as gravity pulls it in, a black shadow, a photon ring and polar jets.',
         tags: ['loop', 'sci-fi'],
         preview: {icon: 'BH', gradient: 'linear-gradient(135deg, #2a1a3d 0%, #6b3d9a 100%)'},
     },

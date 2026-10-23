@@ -10,7 +10,7 @@ export interface DemoState {
     explosion?: {elapsed: number; systems: ParticleSystem[]};
     subEmitter?: {elapsed: number; trackedSystems: ParticleSystem[]};
     droppedJsonPreview?: {elapsed: number; systems: ParticleSystem[]};
-    followObject?: {elapsed: number; leader: Mesh; camera: ArcRotateCamera};
+    followObject?: {phase: number; time: number; orbs: Mesh[]};
     electricBall?: {tracked: ParticleSystem[]; x: number};
     levelUp?: {tracked: ParticleSystem[]; elapsed: number};
     pickUp?: {tracked: ParticleSystem[]; elapsed: number};
