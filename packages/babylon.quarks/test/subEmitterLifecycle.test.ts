@@ -274,3 +274,69 @@ describe('a sub emitter that turns with the parent velocity', () => {
         expect(Array.from(e.slice(0, 11))).toEqual([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
     });
 });
+
+describe('a local-space sub emission', () => {
+    test('keeps its particles where they were born after the emission state is reused', () => {
+        const renderer = new BatchedRenderer('alias', scene);
+        // The child's emission lasts 0.1 s but its particles live 5 s, so the emission state (and
+        // its matrix) is recycled for the next death while the first particles are still alive.
+        const child = system({
+            onlyUsedByOther: true,
+            worldSpace: false,
+            duration: 0.1,
+            startLife: new ConstantValue(5),
+            emissionOverTime: new ConstantValue(60),
+        });
+        const parent = parentOf(child, SubParticleEmitMode.Death);
+        renderer.addSystem(parent);
+        renderer.addSystem(child);
+        renderer.update(STEP);
+        for (let i = 0; i < 40 && child.particleNum === 0; i++) renderer.update(STEP);
+        expect(child.particleNum).toBeGreaterThan(0);
+        const first = child.particles[0];
+        const bornAt = first.parentMatrix!.clone();
+        for (let i = 0; i < 60; i++) renderer.update(STEP);
+        expect(child.particleNum).toBeGreaterThan(1);
+        expect(first.parentMatrix!.elements).toEqual(bornAt.elements);
+    });
+
+    test('follows the parent particle while it lives', () => {
+        const renderer = new BatchedRenderer('follow', scene);
+        const child = system({
+            onlyUsedByOther: true,
+            worldSpace: false,
+            duration: 5,
+            startLife: new ConstantValue(5),
+            emissionOverTime: new ConstantValue(60),
+        });
+        const parent = parentOf(child, SubParticleEmitMode.Frame);
+        renderer.addSystem(parent);
+        renderer.addSystem(child);
+        for (let i = 0; i < 10 && child.particleNum === 0; i++) renderer.update(STEP);
+        expect(child.particleNum).toBeGreaterThan(0);
+        const first = child.particles[0];
+        const bornAt = first.parentMatrix!.clone();
+        for (let i = 0; i < 10; i++) renderer.update(STEP);
+        expect(first.parentMatrix!.elements).not.toEqual(bornAt.elements);
+    });
+
+    test('ends when the parent system is cleared', () => {
+        const renderer = new BatchedRenderer('cleared', scene);
+        const child = system({
+            onlyUsedByOther: true,
+            worldSpace: false,
+            duration: 5,
+            startLife: new ConstantValue(0.2),
+            emissionOverTime: new ConstantValue(60),
+        });
+        const parent = parentOf(child, SubParticleEmitMode.Frame);
+        renderer.addSystem(parent);
+        renderer.addSystem(child);
+        for (let i = 0; i < 10; i++) renderer.update(STEP);
+        expect(child.particleNum).toBeGreaterThan(0);
+        parent.clear();
+        parent.pause();
+        for (let i = 0; i < 20; i++) renderer.update(STEP);
+        expect(child.particleNum).toBe(0);
+    });
+});

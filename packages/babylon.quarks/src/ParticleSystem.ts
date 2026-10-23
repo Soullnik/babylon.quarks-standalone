@@ -38,6 +38,7 @@ import {
 } from 'quarks.core';
 import {BatchedRenderer, VFXBatchSettings} from './BatchedRenderer';
 import {ensureEnvAtlasFromCube, getCachedEnvAtlas} from './envAtlas';
+import {ensureTriangleIndices} from './geometryUtil';
 import {disposeEmitterForSystem, ParticleEmitter} from './ParticleEmitter';
 import {BehaviorPlan} from './system/BehaviorPlan';
 import {BoundsTracker} from './system/BoundsTracker';
@@ -65,6 +66,8 @@ import {liveAtlas, MaterialOverrides, resolveMaterialSettings} from './system/ma
 import {
     nonZeroFlip,
     nonZeroPivot,
+    normalizeBurst,
+    normalizeBursts,
     validAlphaTest,
     validCullingMode,
     validLighting,
@@ -291,9 +294,27 @@ export class ParticleSystem implements IParticleSystem {
     /** @internal **/
     _renderer?: BatchedRenderer;
 
-    /** Seconds into the current emission cycle. Setting it jumps emission; particles alive stay. */
+    /**
+     * Seconds into the current emission cycle. Setting it jumps emission to that point, as Unity's
+     * `Simulate(t)` does for the emission clock: the bursts before it count as fired, the ones
+     * after are due again; particles alive stay, and behaviors are not reset. A value that is not
+     * a finite, non-negative number is 0; one past the duration wraps on a looping system and is
+     * the duration otherwise. A system whose emission has ended stays ended: {@link restart} plays
+     * it again.
+     */
     set time(time: number) {
-        this.emissionState.time = time;
+        const duration = this.duration;
+        let seconds = Number.isFinite(time) && time > 0 ? time : 0;
+        if (seconds >= duration) {
+            seconds = this.looping ? seconds % duration : duration;
+        }
+        const state = this.emissionState;
+        state.time = seconds;
+        state.isBursting = false;
+        state.burstIndex = 0;
+        state.burstWaveIndex = 0;
+        state.burstWaves = undefined;
+        this.markBurstsBefore(seconds);
     }
 
     get time(): number {
@@ -637,21 +658,27 @@ export class ParticleSystem implements IParticleSystem {
     /**
      * The mesh particles' positions, three values per vertex.
      * Setting it restarts the system. A new geometry with a different vertex
-     * count drops UV sets and normals that no longer fit it: the first UV set
-     * falls back to zeros, the second to none, the normals to +Z. Assign {@link instancingUVs} and
-     * {@link instancingUVs2} after it.
+     * count drops UV sets, normals and indices that no longer fit it: the first UV set
+     * falls back to zeros, the second to none, the normals to +Z, the indices to the vertex
+     * sequence. Assign {@link instancingUVs}, {@link instancingUVs2} and {@link instancingIndices}
+     * after it.
      */
     get instancingGeometry(): Float32Array {
         return this.rendererSettings.instancingGeometry;
     }
 
     set instancingGeometry(geometry: Float32Array) {
-        this.restart();
-        this.particles.length = 0;
+        this.restartKeepingPause();
         const settings = this.rendererSettings;
         const uvLength = (geometry.length / 3) * 2;
         const previous = settings.instancingGeometry;
         settings.instancingGeometry = geometry;
+        // The indices belong to the geometry they were set with: a geometry with another vertex
+        // count, or one the indices point past, takes its own sequence. Assign
+        // {@link instancingIndices} after it for an indexed mesh.
+        if (geometry.length !== previous.length || !indicesFit(settings.instancingIndices, geometry.length / 3)) {
+            settings.instancingIndices = ensureTriangleIndices(geometry);
+        }
         // Sets that no longer fit, or that were the old geometry's fallbacks, move to the new one's.
         if (settings.instancingUVs?.length !== uvLength || isFallbackUVs(settings.instancingUVs, previous)) {
             settings.instancingUVs = fallbackUVsForPositions(geometry);
@@ -666,7 +693,30 @@ export class ParticleSystem implements IParticleSystem {
         if (settings.instancingUVs2 && settings.instancingUVs2.length !== uvLength) {
             settings.instancingUVs2 = undefined;
         }
+        this.ensureMeshNormals();
         this.neededToUpdateRender = true;
+    }
+
+    /**
+     * Gives a mesh system normals when it has none, +Z per vertex, so the mesh shader always has
+     * the attribute it reads. Called on construction and when the render mode or geometry changes.
+     */
+    private ensureMeshNormals(): void {
+        const settings = this.rendererSettings;
+        if (settings.renderMode === RenderMode.Mesh && !settings.instancingNormals) {
+            settings.instancingNormals = fallbackNormalsForPositions(settings.instancingGeometry);
+        }
+    }
+
+    /**
+     * {@link restart} for a setting that rebuilds the particles: the system is cleared and rewound,
+     * but a paused system stays paused, and a stopped one stays stopped.
+     */
+    private restartKeepingPause(): void {
+        const paused = this.paused;
+        this.restart();
+        this.particles.length = 0;
+        this.paused = paused;
     }
 
     /**
@@ -813,9 +863,9 @@ export class ParticleSystem implements IParticleSystem {
             }
             this.rendererSettings.renderMode = renderMode;
             if (needRestart) {
-                this.restart();
-                this.particles.length = 0;
+                this.restartKeepingPause();
             }
+            this.ensureMeshNormals();
             this.neededToUpdateRender = true;
         }
     }
@@ -883,9 +933,18 @@ export class ParticleSystem implements IParticleSystem {
      * emission over time and over distance alike. Unlike
      * {@link setQualityFactor}, which only ever thins an effect, it may go
      * above 1 to make a stronger version of the same effect. The two multiply.
-     * 1 by default; not saved in the effect JSON; copied by {@link clone}.
+     * 1 by default; a negative or NaN value counts as 0. Not saved in the effect JSON; copied by
+     * {@link clone}.
      */
-    emissionMultiplier = 1;
+    get emissionMultiplier(): number {
+        return this.emissionMultiplierValue;
+    }
+
+    set emissionMultiplier(multiplier: number) {
+        this.emissionMultiplierValue = Number.isFinite(multiplier) && multiplier >= 0 ? multiplier : 0;
+    }
+
+    private emissionMultiplierValue = 1;
 
     /** What this system does while off screen, see {@link CullingMode}. `'always'` by default. */
     cullingMode: CullingMode = 'always';
@@ -994,7 +1053,7 @@ export class ParticleSystem implements IParticleSystem {
         this.startColor = parameters.startColor ?? new ConstantColor(new Vector4(1, 1, 1, 1));
         this.emissionOverTime = parameters.emissionOverTime ?? new ConstantValue(10);
         this.emissionOverDistance = parameters.emissionOverDistance ?? new ConstantValue(0);
-        this.emissionBursts = parameters.emissionBursts ?? [];
+        this.emissionBursts = normalizeBursts(parameters.emissionBursts);
         this.maxParticles = validMaxParticles(parameters.maxParticles);
         this.onlyUsedByOther = parameters.onlyUsedByOther ?? false;
         this.emitterShape = parameters.shape ?? new SphereEmitter();
@@ -1066,11 +1125,7 @@ export class ParticleSystem implements IParticleSystem {
         this.scalingMode = parameters.scalingMode === 'hierarchy' ? 'hierarchy' : 'shape';
         this.alignToDirection = parameters.alignToDirection === true;
         this.seed = parameters.seed;
-        if (this.rendererSettings.renderMode === RenderMode.Mesh && !this.rendererSettings.instancingNormals) {
-            this.rendererSettings.instancingNormals = fallbackNormalsForPositions(
-                this.rendererSettings.instancingGeometry
-            );
-        }
+        this.ensureMeshNormals();
 
         this.materialRef = parameters.material ?? null;
         this.applyMaterialSettings(this.materialRef, {
@@ -1189,7 +1244,10 @@ export class ParticleSystem implements IParticleSystem {
         this.paused = true;
     }
 
-    /** Resumes a paused system. */
+    /**
+     * Resumes a paused system. It only resumes: a system that has finished ({@link isFinished})
+     * stays finished, since nothing is left to emit; {@link restart} plays it again from the start.
+     */
     play(): void {
         this.paused = false;
         // A move made while paused is a placement, not motion to spread the next frame over.
@@ -1200,6 +1258,22 @@ export class ParticleSystem implements IParticleSystem {
     stop(): void {
         this.restart();
         this.pause();
+    }
+
+    /**
+     * Removes every particle alive and nothing else (Unity's `Clear`): emission goes on from where
+     * it is, paused stays paused, and the bursts and the random generator are not rewound. The
+     * sub emissions the removed particles were driving end with them; the child systems' own
+     * particles stay, and `particleDied` is not fired.
+     */
+    clear(): void {
+        this.particleNum = 0;
+        this.bounds.valid = false;
+        for (const behavior of this.behaviors) {
+            if (behavior instanceof EmitSubParticleSystem) {
+                behavior.clearEmissions();
+            }
+        }
     }
 
     /**
@@ -1216,8 +1290,7 @@ export class ParticleSystem implements IParticleSystem {
      * @internal
      */
     emissionFactor(): number {
-        const multiplier = this.emissionMultiplier;
-        return multiplier >= 0 ? this.qualityFactor * multiplier : this.qualityFactor;
+        return this.qualityFactor * this.emissionMultiplierValue;
     }
 
     /**
@@ -1299,6 +1372,9 @@ export class ParticleSystem implements IParticleSystem {
         this.emissionState.previousWorldPos = undefined;
         this.emissionState.burstParticleIndex = 0;
         this.emissionState.burstParticleCount = 0;
+        // Bursts edited in place since the last play are put back in time order and in range.
+        this.emissionBursts.forEach((burst) => Object.assign(burst, normalizeBurst(burst)));
+        this.emissionBursts.sort((a, b) => a.time - b.time);
         this.behaviors.forEach((behavior) => {
             behavior.reset();
             if (behavior instanceof EmitSubParticleSystem) {
@@ -1451,6 +1527,32 @@ export class ParticleSystem implements IParticleSystem {
     }
 
     /**
+     * Counts the bursts, and the waves of the one in progress, due before `time` seconds into the
+     * cycle as fired, so a jump of the emission clock does not fire them late. The waves are
+     * counted with the arithmetic the emission uses, so none is lost to rounding.
+     */
+    private markBurstsBefore(time: number): void {
+        const state = this.emissionState;
+        const bursts = this.emissionBursts;
+        const waves = (state.burstWaves ??= []);
+        while (state.burstIndex < bursts.length && bursts[state.burstIndex].time < time) {
+            const burst = bursts[state.burstIndex];
+            const cycles = burstWaveCount(burst);
+            const interval = burstInterval(burst);
+            let wave = 0;
+            if (interval > 0) {
+                while (wave < cycles && burst.time + wave * interval < time) {
+                    wave++;
+                }
+            } else {
+                wave = cycles;
+            }
+            waves[state.burstIndex] = wave;
+            state.burstIndex++;
+        }
+    }
+
+    /**
      * Simulates the end of a cycle before the first frame, on the fixed step directly: no frame
      * clamp, culling or emitter velocity in the way. The cycle's last {@link prewarmTime} seconds
      * (the whole cycle when that is 0), and at most {@link maxPrewarmSeconds}, with the bursts
@@ -1464,18 +1566,9 @@ export class ParticleSystem implements IParticleSystem {
         if (warm < this.duration) {
             const state = this.emissionState;
             state.time = this.duration - steps * SIMULATION_STEP;
-            const bursts = this.emissionBursts;
-            const waves = (state.burstWaves ??= []);
-            while (state.burstIndex < bursts.length && bursts[state.burstIndex].time < state.time) {
-                // The waves due before the warm-up count as fired, so the first step does not fire
-                // them late; the waves inside it still fire as the time comes.
-                const burst = bursts[state.burstIndex];
-                const cycles = burstWaveCount(burst);
-                const interval = burstInterval(burst);
-                waves[state.burstIndex] =
-                    interval > 0 ? Math.min(cycles, Math.ceil((state.time - burst.time) / interval)) : cycles;
-                state.burstIndex++;
-            }
+            // The waves due before the warm-up count as fired, so the first step does not fire
+            // them late; the waves inside it still fire as the time comes.
+            this.markBurstsBefore(state.time);
         }
         for (let i = 0; i < steps; i++) {
             this.simulateStep(SIMULATION_STEP);
@@ -1842,4 +1935,14 @@ export class ParticleSystem implements IParticleSystem {
         }
         return copy;
     }
+}
+
+/** Whether every index points at one of `vertexCount` vertices. */
+function indicesFit(indices: Uint32Array | Uint16Array, vertexCount: number): boolean {
+    for (let i = 0; i < indices.length; i++) {
+        if (indices[i] >= vertexCount) {
+            return false;
+        }
+    }
+    return true;
 }

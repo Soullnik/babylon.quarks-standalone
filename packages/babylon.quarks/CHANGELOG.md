@@ -8,6 +8,9 @@ and the project follows the `quarks.core` 0.x version line.
 
 ### Added
 
+- **`ParticleSystem.clear()`** (Unity's `Clear`): removes the particles alive and nothing else; the
+  emission clock, the bursts and the pause stay where they were, and the sub emissions the
+  removed particles were driving end with them.
 - **`space` on `ApplyForce`, `ForceOverLife` and `OrbitOverLife`** (quarks.core), the space the
   force or the orbit is authored in (Unity's Space on Force over Lifetime): `'world'` keeps gravity
   down and wind steady however the emitter is turned, and orbits the world origin about a world
@@ -108,6 +111,41 @@ or duplicated something else, and nothing in the package used them.
 
 ### Changed
 
+- **A system belongs to one `BatchedRenderer` at a time.** `addSystem` on a second renderer takes
+  the system out of the first (both used to step and draw it), and adding a system again after
+  its settings changed moves it to the matching batch instead of leaving it in two. A disposed
+  renderer lets its systems go (they can join another renderer) and refuses `addSystem` with an
+  error; a setter on a system after its renderer was disposed used to rebuild a batch, mesh and
+  material under the dead node. The renderer warns once when it is itself transformed: particles
+  are placed by their emitters, so its transform would move them again.
+- **Opaque materials no longer draw a depth pre-pass.** `needDepthPrePass` was set whenever a
+  system wrote depth, so an opaque mesh system drew twice; it is now set only for a transparent
+  material that writes depth, which is what the pre-pass is for.
+- **Setting `renderMode` or `instancingGeometry` keeps the pause.** Both rebuild the particles
+  through `restart()`, which also unpaused a stopped system; the pause state is kept now.
+  Switching to `Mesh` at runtime gives the system normals when it has none (the mesh shader reads
+  them; a mesh without the attribute was the iOS `GL_INVALID_OPERATION`), and a geometry with a
+  different vertex count takes its own index sequence instead of keeping the old geometry's
+  indices (a cube given to a quad system drew two triangles). `play()` is documented as resuming
+  only; a finished system needs `restart()`.
+- **Bursts are normalised, in code and from a file.** A burst given to the constructor and one
+  read from JSON take the same defaults: `interval` 0.1 s when left out (the file default; the
+  constructor used to fire the waves all at once), `probability` kept to 0..1, `cycle` at least 1,
+  a non-finite `time` 0, a numeric `count` a constant; and the bursts are kept in time order, which
+  emission relies on: `restart()` puts bursts edited in place back in order, so an editor that
+  appends a burst at 0 after a later one no longer fires it late. The constructor used to keep the
+  caller's array; it now holds its own copy, so edit `emissionBursts` rather than the array that
+  was passed in. `BurstParameters.count` is documented as rolled per play and read at the wave's
+  time as a fraction of the duration, which is what the code has done since 0.27's burst fix.
+- **Setting `ParticleSystem.time` resynchronises the bursts and is normalised.** The bursts
+  before the new time count as fired and the ones after are due again (a burst the clock was set
+  past used to fire on the next step anyway); NaN or a negative value is 0 (NaN used to hang the
+  system, never finishing), a value past the duration wraps on a looping system. The waves of a
+  burst in progress are counted with the emission's own arithmetic, so a wave on a rounding edge is
+  no longer skipped (this also affected prewarm).
+- **`emissionMultiplier` is kept finite and at or above 0**; a negative, NaN or infinite value
+  counts as 0 (a negative value used to be ignored, an infinite one hung the spawner). An infinite
+  burst `cycle`, which hung the burst loop, is 1.
 - **`ApplyForce` is a world force (breaking for turned or scaled emitters in local-space systems,
   and for `motionScale`).** It used to push along its direction in whatever space the system
   simulated in, so a local-space system with a turned emitter had its "gravity" turned with it,
@@ -294,6 +332,12 @@ or duplicated something else, and nothing in the package used them.
 
 ### Fixed
 
+- **Local-space sub emitter particles jumped to the next parent.** A sub emitter target in local
+  space (`worldSpace: false`) draws each particle through the matrix of the emission that spawned
+  it; that matrix object was reused for the next emission once the first ended, so particles that
+  outlived their emission (a child whose particles live longer than its `duration`) moved to where
+  the next parent died. The matrix now stays with the particles born through it, so they keep
+  following their parent while it lives (Frame and Birth modes), and the next emission gets its own.
 - **`ChangeEmitDirection` with a random angle (`IntervalValue`) threw on every spawn**
   (`memory.push is not a function`): its scratch memory was in a format the generators no longer
   use. It is a generator memory now, cleared before each spawn, so one sample is rolled per

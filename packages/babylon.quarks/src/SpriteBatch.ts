@@ -512,7 +512,9 @@ export class SpriteBatch extends VFXBatch {
         } else {
             mat.alphaMode = Constants.ALPHA_DISABLE;
         }
-        mat.needDepthPrePass = this.settings.materialDepthWrite;
+        // A transparent surface that writes depth is drawn into the depth buffer first, so its own
+        // overlapping pieces do not fight; an opaque one writes depth as it draws.
+        mat.needDepthPrePass = this.settings.materialDepthWrite && this.settings.materialTransparent;
         mat.forceDepthWrite = this.settings.materialDepthWrite;
         mat.disableDepthWrite = !this.settings.materialDepthWrite;
         // 0 keeps the engine's depth function (LEQUAL); ALWAYS draws over everything, like ZTest Always.
