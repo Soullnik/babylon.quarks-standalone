@@ -1,6 +1,6 @@
 {
     "name": "quarks.core",
-    "version": "0.27.1",
+    "version": "0.28.0",
     "private": true,
     "description": "The simulation core of babylon.quarks: a fork of the three.quarks core, bundled into babylon.quarks and not published on its own",
     "type": "module",

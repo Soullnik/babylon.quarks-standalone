@@ -2,7 +2,7 @@
 
 All notable changes to the Unity Quarks Exporter are documented here.
 
-## [0.28.0] — unreleased
+## [0.28.0] — 2026-10-23
 
 The exporter is no longer experimental: it is tested on every change and held to the library's
 release rules.
@@ -43,7 +43,7 @@ release rules.
 - Exporting a mesh without normals no longer recalculates the normals of the mesh asset itself;
   the runtime gives such a mesh its own.
 
-## [0.27.1] — 2026-10-23
+## [0.27.1] — 2026-10-23 (not published)
 
 ### Changed
 
