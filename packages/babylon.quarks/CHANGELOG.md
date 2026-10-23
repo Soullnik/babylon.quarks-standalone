@@ -18,30 +18,45 @@ headless `createEditorSession` and WebGPU. 0.27.1 was never published to npm: it
 
 Most effects load and play unchanged. Check these, in this order:
 
-1. **Effects under additive, premultiplied, screen, subtract, max or multiply blending whose alpha
-   falls below 1** now fade with it. If one looks dimmer than you want, raise its alpha or its
-   colour; a texture authored premultiplied should be re-exported with straight alpha.
-2. **Soft particles** fade linearly instead of quadratically under `ALPHA_ADD` and
+1. **Effects under additive, premultiplied, screen, subtract or max blending whose alpha falls
+   below 1** now fade with it. If one looks dimmer than you want, raise its alpha or its colour; a
+   texture authored premultiplied should be re-exported with straight alpha. Multiply and min
+   particles lighten toward white as their alpha falls instead of staying dark.
+2. **Fog follows the blend mode.** Subtract and screen effects fade toward black with distance, like
+   additive ones, and multiply effects toward white; only those that lay over the frame still mix
+   toward the fog colour.
+3. **Soft particles** fade linearly instead of quadratically under `ALPHA_ADD` and
    `ALPHA_COMBINE`; re-tune `softFarFade` if a soft edge looks different.
-3. **Shapes with a thickness above 0, cones, and grids** spread particles differently (evenly over
+4. **Shapes with a thickness above 0, cones, and grids** spread particles differently (evenly over
    the volume, every cone particle at its start speed, grid cells centred). Re-tune an effect that
    relied on the old crowding at the centre.
-4. **`play()` on a finished system restarts it.** To undo a pause and leave a finished system
+5. **Behaviors no longer reset at every loop.** A looping `Noise` or `TurbulenceField` keeps going
+   instead of jumping back to its start once a loop, and the sub emissions of particles still alive
+   carry on into the next loop.
+6. **`play()` on a finished system restarts it.** To undo a pause and leave a finished system
    finished, call `resume()` (or `QuarksUtil.resume(root)`).
-5. **`QuarksPrefab`'s end lets the particles die out.** Call `stop()` yourself where you want them
+7. **`QuarksPrefab`'s end lets the particles die out.** Call `stop()` yourself where you want them
    cleared on the spot. `update()` with no argument now steps by the engine's frame time, and
-   `autoUpdate` drives the timeline for you.
-6. **Move emitters, not the `BatchedRenderer`.** Its transform no longer moves the particles.
-7. **Camera layers count for culling.** A system whose `layers.mask` no active camera renders
-   pauses as its `cullingMode` says; give the camera a `layerMask` that includes it.
-8. **Files are written with only their non-default fields.** babylon.quarks 0.27 and later read
-   them; three.quarks and babylon.quarks before 0.27 do not. Keep the old files if a three.quarks
-   tool must read them.
-9. **TypeScript:** `v.isVector2` instead of `Vector2.isVector2`; `setAxisAngleFromRotationMatrix`
-   takes a `Matrix4`; JSON readers and `QuarksLoader` take typed JSON or `unknown` (see the
-   `any` items below); a `VFXBatch` subclass implements `resizeBuffers()` and
-   `initialCapacity`; `EulerGenerator.eular` is now `euler` (the old name is a deprecated alias).
-10. **Editor:** a `resolveTexture` callback returns a Babylon `Texture`, and `ValueField` with
+   `autoUpdate` drives the timeline for you. A prefab saved with a `timeScale` other than 1 now
+   plays its systems at that speed, and `addParticleSystemAnimation` no longer pauses the prefab.
+8. **Move emitters, not the `BatchedRenderer`.** Its transform no longer moves the particles.
+9. **Camera layers count for culling.** Only systems with a `cullingMode` other than the default
+   `'always'` are affected: one whose `layers.mask` no active camera renders now pauses as its
+   `cullingMode` says. Give the camera a `layerMask` that includes it.
+10. **Files are written with only their non-default fields.** babylon.quarks 0.27 and later read
+    them; three.quarks and babylon.quarks before 0.27 do not. Keep the old files if a three.quarks
+    tool must read them.
+11. **TypeScript and plugins:**
+    - `v.isVector2` instead of `Vector2.isVector2`; `setAxisAngleFromRotationMatrix` takes a
+      `Matrix4`.
+    - JSON readers and `QuarksLoader` take typed JSON or `unknown` (see the `any` items below), and
+      a behavior's `toJSON` returns a `BehaviorJSON` with a `type`.
+    - A plugin's `loadJSON` must only read its JSON: saving now calls it to find the defaults.
+    - `BatchedRenderer.batches` and `systemToBatchIndex` are read-only.
+    - A `VFXBatch` subclass implements `resizeBuffers()` and `initialCapacity` and creates its own
+      `mesh` in `setupBuffers`.
+    - `EulerGenerator.eular` is now `euler` (the old name is a deprecated alias).
+12. **Editor:** a `resolveTexture` callback returns a Babylon `Texture`, and `ValueField` with
     `curve={false}` reports a `ValueGenerator` (see the editor's changelog). Install
     `babylon.quarks-editor` 0.28 with `babylon.quarks` 0.28.
 
