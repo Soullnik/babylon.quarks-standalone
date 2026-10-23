@@ -1,4 +1,5 @@
 import {Constants} from '@babylonjs/core/Engines/constants';
+import type {ColorGeneratorJSON, RotationGeneratorJSON, ValueGeneratorJSON, Vector3GeneratorJSON} from 'quarks.core';
 import {
     ColorGenerator,
     ColorGeneratorFromJSON,
@@ -26,7 +27,12 @@ import {
     validSortMode,
     validTileCount,
 } from './normalize';
-import type {BurstParameters, ParticleSystemJSONParameters, ParticleSystemParameters} from './types';
+import type {
+    BurstParameters,
+    BurstParametersJSON,
+    ParticleSystemJSONParameters,
+    ParticleSystemParameters,
+} from './types';
 
 /**
  * One setting of a {@link ParticleSystem} that is a plain value or a generator: how to read it
@@ -61,6 +67,9 @@ export interface SettingDescriptor {
 }
 
 type Generator = {toJSON(): unknown; clone(): unknown};
+
+/** A burst as files hold it, any field left out. */
+type BurstJSON = Partial<BurstParametersJSON>;
 
 /** A number, boolean or string compared by value. */
 function plain<T>(
@@ -105,11 +114,11 @@ function boolean(json: unknown): boolean | undefined {
  * A generator, compared with its default through its JSON. `read` turns the JSON back into one;
  * a bare number is read as a constant.
  */
-function generator(
+function generator<J>(
     param: keyof ParticleSystemParameters,
     get: (system: ParticleSystem) => Generator,
     defaultValue: () => Generator,
-    read: (json: any) => unknown,
+    read: (json: J) => unknown,
     always = true
 ): SettingDescriptor {
     const defaultJSON = JSON.stringify(defaultValue().toJSON());
@@ -119,7 +128,8 @@ function generator(
         get,
         isDefault: (value) => JSON.stringify((value as Generator).toJSON()) === defaultJSON,
         toJSON: (value) => (value as Generator).toJSON(),
-        fromJSON: (json) => (typeof json === 'number' ? new ConstantValue(json) : read(json)),
+        // The generator readers check the JSON they are given, and warn about what they cannot read.
+        fromJSON: (json) => (typeof json === 'number' ? new ConstantValue(json) : read(json as J)),
         clone: (value) => (value as Generator).clone(),
     };
 }
@@ -160,19 +170,21 @@ export const SETTINGS: ReadonlyArray<SettingDescriptor> = [
         'startRotation',
         (s) => s.startRotation,
         () => new ConstantValue(0),
-        (json) => GeneratorFromJSON(json) as RotationGenerator | ValueGenerator | FunctionValueGenerator
+        (json: ValueGeneratorJSON | RotationGeneratorJSON) =>
+            GeneratorFromJSON(json) as RotationGenerator | ValueGenerator | FunctionValueGenerator
     ),
     generator(
         'startSize',
         (s) => s.startSize,
         () => new ConstantValue(1),
-        (json) => GeneratorFromJSON(json) as Vector3Generator | ValueGenerator | FunctionValueGenerator
+        (json: ValueGeneratorJSON | Vector3GeneratorJSON) =>
+            GeneratorFromJSON(json) as Vector3Generator | ValueGenerator | FunctionValueGenerator
     ),
     generator(
         'startColor',
         (s) => s.startColor,
         () => new ConstantColor(new Vector4(1, 1, 1, 1)),
-        (json) => ColorGeneratorFromJSON(json) as ColorGenerator | FunctionColorGenerator
+        (json: ColorGeneratorJSON) => ColorGeneratorFromJSON(json) as ColorGenerator | FunctionColorGenerator
     ),
     generator(
         'emissionOverTime',
@@ -201,7 +213,7 @@ export const SETTINGS: ReadonlyArray<SettingDescriptor> = [
         fromJSON: (json) =>
             Array.isArray(json)
                 ? normalizeBursts(
-                      json.map((burst: any) => ({
+                      json.map((burst: BurstJSON) => ({
                           time: burst.time,
                           count:
                               typeof burst.count === 'number'

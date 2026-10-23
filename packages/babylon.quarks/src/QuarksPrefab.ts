@@ -52,13 +52,46 @@ export interface AnimationData extends IAnimationData {
     clipUUID?: string;
 }
 
-interface AnimationJSON {
+/** One track of a {@link QuarksPrefabJSON}. */
+export interface AnimationJSON {
+    /** When the track starts, in seconds. */
     startTime: number;
+    /** How long it lasts, in seconds. */
     duration: number;
+    /** What it plays; see {@link AnimationData.type}. */
     type: 'three' | 'ps';
+    /** The id of the node it drives. */
     targetUUID: string;
+    /** A `'three'` track's clip id on that node. */
     clipUUID?: string;
+    /** Whether the track restarts when it ends. */
     loop: boolean;
+}
+
+/**
+ * A {@link QuarksPrefab} as {@link QuarksPrefab.toJSON} writes it, inside its node's JSON.
+ * {@link QuarksPrefab.fromJSON} reads a missing field as its default.
+ */
+export interface QuarksPrefabJSON {
+    /** Always `'QuarksPrefab'`. */
+    type: string;
+    /** The prefab's name. */
+    name: string;
+    /** Written only when not 1. */
+    timeScale?: number;
+    /** The timeline's tracks. */
+    animationData: AnimationJSON[];
+}
+
+/** Where a host may keep a node's clips: on the node, or in its `metadata`. */
+interface ClipHolder {
+    animations?: unknown;
+    animationGroups?: unknown;
+}
+
+/** Whether `value` is a clip whose id is `uuid`. */
+function isClipWithId(value: unknown, uuid: string): value is QuarksTimelineClip {
+    return typeof value === 'object' && value !== null && (value as QuarksTimelineClip).uuid === uuid;
 }
 
 /**
@@ -493,7 +526,7 @@ export class QuarksPrefab extends TransformNode implements IPrefab {
     }
 
     /** Writes the prefab's name, time scale (when not 1) and tracks. */
-    toJSON(): any {
+    toJSON(): QuarksPrefabJSON {
         return {
             type: this.type,
             name: this.name,
@@ -510,32 +543,36 @@ export class QuarksPrefab extends TransformNode implements IPrefab {
     }
 
     /** Reads a prefab written by {@link QuarksPrefab.toJSON}; call {@link QuarksPrefab.resolveReferences} afterwards. */
-    static fromJSON(json: any, scene?: Scene): QuarksPrefab {
+    static fromJSON(json: Partial<QuarksPrefabJSON>, scene?: Scene): QuarksPrefab {
         const prefab = new QuarksPrefab(json.name || 'QuarksPrefab', scene);
         if (typeof json.timeScale === 'number') {
             prefab.timeScale = json.timeScale;
         }
         if (Array.isArray(json.animationData)) {
             prefab._tempAnimationJSON = json.animationData.filter(
-                (item: any) => item?.type === 'ps' || item?.type === 'three'
+                (item: AnimationJSON | null) => item?.type === 'ps' || item?.type === 'three'
             );
         }
         return prefab;
     }
 
     private resolveTimelineClip(target: TransformNode, clipUUID?: string): QuarksTimelineClip | undefined {
+        const node: ClipHolder = target;
+        const metadata: ClipHolder | null | undefined = target.metadata;
         const animationSources = [
-            (target as any).animations,
-            (target as any).animationGroups,
-            (target.metadata as any)?.animations,
-            (target.metadata as any)?.animationGroups,
+            node.animations,
+            node.animationGroups,
+            metadata?.animations,
+            metadata?.animationGroups,
         ];
         for (const source of animationSources) {
             if (!Array.isArray(source)) continue;
+            const clips: unknown[] = source;
             if (!clipUUID) {
-                return source[0];
+                // The host registered the clips there; without an id the first one plays.
+                return clips[0] as QuarksTimelineClip | undefined;
             }
-            const found = source.find((item: any) => item?.uuid === clipUUID);
+            const found = clips.find((item): item is QuarksTimelineClip => isClipWithId(item, clipUUID));
             if (found) {
                 return found;
             }

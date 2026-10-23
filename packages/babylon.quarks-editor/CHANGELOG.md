@@ -57,6 +57,8 @@ and the project follows the `quarks.core` 0.x version line.
 
 ### Internal
 
+- The asset import reads effect files through babylon.quarks's `EffectDocumentJSON` and checks
+  every field it reads, with no `any`.
 - The React panels follow the React Compiler's rules (eslint-plugin-react-hooks 7): no ref
   written during render, and state that follows a prop is adjusted during render instead of in an
   effect, which saves a render each time.

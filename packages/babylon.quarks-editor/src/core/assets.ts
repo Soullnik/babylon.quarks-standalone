@@ -1,4 +1,4 @@
-import type {QuarksResourceKind, QuarksResourceResolver} from 'babylon.quarks';
+import type {EffectDocumentJSON, QuarksResourceKind, QuarksResourceResolver} from 'babylon.quarks';
 import {QuarksLoader} from 'babylon.quarks';
 
 /**
@@ -82,8 +82,15 @@ function readAsDataUrl(file: File): Promise<string> {
     });
 }
 
+/** An object with fields of unknown types, as an imported file's JSON may hold anywhere. */
+type JSONRecord = {[key: string]: unknown};
+
+function isRecord(value: unknown): value is JSONRecord {
+    return value !== null && typeof value === 'object';
+}
+
 /** True for a Quarks effect envelope with at least one particle emitter. */
-export function isEffectJson(json: unknown): boolean {
+export function isEffectJson(json: unknown): json is EffectDocumentJSON {
     const object = (json as {object?: unknown} | null)?.object;
     const walk = (node: unknown): boolean => {
         if (!node || typeof node !== 'object') return false;
@@ -173,7 +180,11 @@ function createFileResolver(effectPath: string, index: ImportedFileIndex, missin
  * {@link QuarksLoader.resolveLinkedResources}, so the effect loads (and later exports) as a
  * self-contained effect. Returns the references that could not be found among the files.
  */
-async function inlineExternalFiles(json: any, effectPath: string, index: ImportedFileIndex): Promise<string[]> {
+async function inlineExternalFiles(
+    json: EffectDocumentJSON,
+    effectPath: string,
+    index: ImportedFileIndex
+): Promise<string[]> {
     const missing: string[] = [];
     // baseUrl is the effect file path so resolveRelativePath can walk from its folder; the
     // File resolver ignores HTTP join and looks up files by path/name instead.
@@ -270,22 +281,23 @@ export function assetIconUrl(asset: EffectAsset): string | null {
     if (cached !== undefined) {
         return cached;
     }
-    const json = asset.json as any;
-    const findMaterial = (node: any): string | undefined => {
-        if (!node || typeof node !== 'object') return undefined;
-        if (node.type === 'ParticleEmitter' && node.ps?.material) return node.ps.material;
+    const json = isRecord(asset.json) ? asset.json : {};
+    const findMaterial = (node: unknown): unknown => {
+        if (!isRecord(node)) return undefined;
+        if (node.type === 'ParticleEmitter' && isRecord(node.ps) && node.ps.material) return node.ps.material;
         for (const child of Array.isArray(node.children) ? node.children : []) {
             const found = findMaterial(child);
             if (found) return found;
         }
         return undefined;
     };
-    const byUuid = (list: unknown, uuid: unknown) =>
-        (Array.isArray(list) ? list : []).find((item: any) => item?.uuid === uuid) as any;
+    const byUuid = (list: unknown, uuid: unknown): JSONRecord | undefined =>
+        (Array.isArray(list) ? list : []).find((item: unknown) => isRecord(item) && item.uuid === uuid);
 
-    const material = byUuid(json?.materials, findMaterial(json?.object));
-    const texture = byUuid(json?.textures, material?.map ?? material?.texture);
-    const image = byUuid(json?.images, texture?.image) ?? (Array.isArray(json?.images) ? json.images[0] : undefined);
+    const material = byUuid(json.materials, findMaterial(json.object));
+    const texture = byUuid(json.textures, material?.map ?? material?.texture);
+    const firstImage: unknown = Array.isArray(json.images) ? json.images[0] : undefined;
+    const image = byUuid(json.images, texture?.image) ?? (isRecord(firstImage) ? firstImage : undefined);
     const url = typeof image?.url === 'string' && image.url ? image.url : null;
     iconCache.set(asset, url);
     return url;

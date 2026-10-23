@@ -17,13 +17,27 @@ import {
     readFormatPart,
     warnFormat,
 } from 'quarks.core';
+import {MeshSurfaceEmitter} from './MeshSurfaceEmitter';
 import {ParticleEmitter} from './ParticleEmitter';
 import {ParticleSystem} from './ParticleSystem';
 import {QuarksPrefab} from './QuarksPrefab';
+import type {QuarksNodeJSON, QuarksTextureJSON} from './QuarksSerializer';
 import {QUARKS_FORMAT_VERSION} from './QuarksSerializer';
+import type {
+    BufferAttributeJSON,
+    BufferGeometryDataJSON,
+    EffectDocumentJSON,
+    EffectGeometryJSON,
+    EffectImageJSON,
+    GeometryArrays,
+    MaterialTextureRef,
+    QuarksMaterialJSON,
+    SphereGeometryJSON,
+} from './effectDocumentJSON';
 import {disposeEffect, retainEffectResources} from './effectResources';
 import {ensureTriangleIndices} from './geometryUtil';
 import {fileNodeId, setQuarksNodeId} from './nodeId';
+import type {ParticleSystemJSONParameters} from './system/types';
 import {setTextureSourceUrl} from './textureSource';
 
 /** Kind of linked asset the loader asks a {@link QuarksResourceResolver} to handle. */
@@ -42,6 +56,18 @@ export interface QuarksResourceResolver {
      * fetches are shared between loads and get none.
      */
     fetchJson?(resolvedUrl: string, options?: {signal?: AbortSignal}): Promise<unknown>;
+}
+
+/** Options for {@link QuarksLoader.resolveLinkedResources}. */
+export interface QuarksResolveOptions {
+    /** Joined to relative urls. Default `''`. */
+    baseUrl?: string;
+    /** Resolves and fetches the linked files; default: join with `baseUrl` and `fetch`. */
+    resolver?: QuarksResourceResolver;
+    /** Shares the per-scene fetch cache when set. */
+    scene?: Scene;
+    /** Called for a geometry file that fails to load; default: a console warning. */
+    onResourceError?: QuarksLoaderOptions['onResourceError'];
 }
 
 /** Options for a {@link QuarksLoader}, shared by every load it does. */
@@ -134,12 +160,25 @@ export interface QuarksBatchLoadOptions extends QuarksLoadOptions {
     continueOnError?: boolean;
 }
 
-interface ParsedGeometry {
-    positions: Float32Array;
-    indices: Uint32Array | Uint16Array;
-    uvs?: Float32Array;
-    uvs2?: Float32Array;
-    normals?: Float32Array;
+/** An object with fields of unknown types, as a file's JSON may hold anywhere. */
+type JSONRecord = {[key: string]: unknown};
+
+function isRecord(value: unknown): value is JSONRecord {
+    return value !== null && typeof value === 'object';
+}
+
+/**
+ * Whether `value` has the root node an effect document needs. The other parts are checked as they
+ * are read, so a part of the wrong kind warns instead of failing the load.
+ */
+function isEffectDocument(value: unknown): value is EffectDocumentJSON {
+    return isRecord(value) && isRecord(value.object);
+}
+
+/** `json[key]` when it is an array, else an empty one. */
+function documentList(json: unknown, key: 'images' | 'geometries'): unknown[] {
+    const list = isRecord(json) ? json[key] : undefined;
+    return Array.isArray(list) ? list : [];
 }
 
 /** The uuid of the mesh each loaded system's mesh surface shape names, until the effect links it. */
@@ -149,7 +188,7 @@ const systemPaths = new WeakMap<ParticleSystem, string>();
 
 /** Textures and geometries reused across loads, per scene. See QuarksLoaderOptions.shareResources. */
 const sharedTextures = new WeakMap<Scene, Map<string, Texture>>();
-const sharedGeometries = new WeakMap<Scene, Map<string, ParsedGeometry>>();
+const sharedGeometries = new WeakMap<Scene, Map<string, GeometryArrays>>();
 /** In-flight / completed JSON fetches keyed by `json|resolvedUrl`, per scene. */
 const sharedFetches = new WeakMap<Scene, Map<string, Promise<unknown>>>();
 
@@ -169,7 +208,7 @@ const resolvedImageUrls = new WeakMap<object, string>();
 const sourceImageUrls = new WeakMap<object, string>();
 
 /** Content key for a geometry: two independent 32-bit hashes over every array's bytes, plus lengths. */
-function geometryKey(geometry: ParsedGeometry): string {
+function geometryKey(geometry: GeometryArrays): string {
     let h1 = 0x811c9dc5;
     let h2 = 0x9e3779b9;
     const parts: Array<ArrayBufferView | undefined> = [
@@ -202,11 +241,11 @@ export {QuarksFormatError};
  * A copy of an effect document that loading can rewrite (resolved image urls, inlined geometry
  * files) without touching the caller's. Only the entries that change are copied.
  */
-function detachDocument(json: any): any {
-    if (json === null || typeof json !== 'object') {
+function detachDocument(json: unknown): unknown {
+    if (!isRecord(json)) {
         return json;
     }
-    const copy = {...json};
+    const copy: JSONRecord = {...json};
     if (Array.isArray(json.images)) {
         copy.images = json.images.map((image: unknown) => {
             if (!image || typeof image !== 'object') {
@@ -271,8 +310,8 @@ interface LoadedMeta {
     /** Image uuid to the url the file wrote, before any base url was joined. */
     imageSources: {[uuid: string]: string};
     textures: {[uuid: string]: Texture | null};
-    geometries: {[uuid: string]: ParsedGeometry};
-    materials: {[uuid: string]: any};
+    geometries: {[uuid: string]: GeometryArrays};
+    materials: {[uuid: string]: QuarksMaterialJSON};
 }
 
 /**
@@ -313,18 +352,20 @@ export class QuarksLoader {
 
     /**
      * Resolves linked geometry / image urls (via {@link resolveResources}) then parses. Use when
-     * the effect JSON is already in hand (File, CDN payload, editor import). `json` itself is
+     * the effect JSON is already in hand (File, CDN payload, editor import). `json` is an
+     * {@link EffectDocumentJSON} as parsed from its file; anything else throws
+     * {@link QuarksFormatError}, and a part of the wrong kind warns. `json` itself is
      * left as it was, so the same document can be loaded again, into another scene or with
      * another base url.
      */
-    async loadFromJSON(json: any, baseUrl?: string, options: QuarksLoadOptions = {}): Promise<TransformNode> {
+    async loadFromJSON(json: unknown, baseUrl?: string, options: QuarksLoadOptions = {}): Promise<TransformNode> {
         const signal = options.signal;
         checkLoad(this.scene, signal);
         const resolvedBase = baseUrl ?? this.options.baseUrl ?? '';
-        json = detachDocument(json);
-        await untilStopped(this.resolveResources(json, resolvedBase), this.scene, signal);
+        const document = detachDocument(json);
+        await untilStopped(this.resolveResources(document, resolvedBase), this.scene, signal);
         // The urls are resolved now; joining them with the base again would load `fx/fx/...`.
-        const loaded = this.parseDocument(json, '');
+        const loaded = this.parseDocument(document, '');
         await this.finishLoad(loaded, signal);
         return loaded.root;
     }
@@ -423,7 +464,7 @@ export class QuarksLoader {
         entries: Array<QuarksJSONLoadEntry | unknown>,
         options: QuarksBatchLoadOptions = {}
     ): Promise<(TransformNode | null)[]> {
-        const docs: Array<{json: any; baseUrl: string} | null> = entries.map((entry) => {
+        const docs: Array<{json: unknown; baseUrl: string} | null> = entries.map((entry) => {
             // Copied, as loadFromJSON does, so the caller's documents stay as they were.
             if (entry !== null && typeof entry === 'object' && 'json' in (entry as object)) {
                 const typed = entry as QuarksJSONLoadEntry;
@@ -441,7 +482,7 @@ export class QuarksLoader {
      * loading the same document again does not join its base url twice. Failures warn and leave
      * the entry as is.
      */
-    async resolveResources(json: any, baseUrl: string = ''): Promise<void> {
+    async resolveResources(json: unknown, baseUrl: string = ''): Promise<void> {
         await QuarksLoader.resolveLinkedResources(json, {
             baseUrl,
             resolver: this.options.resolver,
@@ -456,15 +497,7 @@ export class QuarksLoader {
      * Like it, resolves each document once. A geometry file that fails to load goes to
      * `onResourceError` (default: a console warning) and keeps its link.
      */
-    static async resolveLinkedResources(
-        json: any,
-        options: {
-            baseUrl?: string;
-            resolver?: QuarksResourceResolver;
-            scene?: Scene;
-            onResourceError?: QuarksLoaderOptions['onResourceError'];
-        } = {}
-    ): Promise<void> {
+    static async resolveLinkedResources(json: unknown, options: QuarksResolveOptions = {}): Promise<void> {
         const baseUrl = options.baseUrl ?? '';
         const resolver = options.resolver;
         const scene = options.scene;
@@ -478,10 +511,9 @@ export class QuarksLoader {
             options.onResourceError
         );
 
-        const images: any[] = Array.isArray(json?.images) ? json.images : [];
         await Promise.all(
-            images.map(async (img) => {
-                if (typeof img?.url !== 'string' || !img.url) {
+            documentList(json, 'images').map(async (img) => {
+                if (!isRecord(img) || typeof img.url !== 'string' || !img.url) {
                     return;
                 }
                 // An entry this loader already rewrote keeps its url: resolving the same document
@@ -489,12 +521,13 @@ export class QuarksLoader {
                 if (resolvedImageUrls.get(img) === img.url) {
                     return;
                 }
-                const source: string = img.url;
-                img.url = await QuarksLoader.resolveWith(resolver, img.url, 'image', baseUrl);
-                resolvedImageUrls.set(img, img.url);
+                const source = img.url;
+                const url = await QuarksLoader.resolveWith(resolver, source, 'image', baseUrl);
+                img.url = url;
+                resolvedImageUrls.set(img, url);
                 // A resolver that inlined the file (`data:`, `blob:`) made the url the image itself;
                 // the file's path no longer names what the texture holds, so a save writes the url.
-                if (!/^(data|blob):/i.test(img.url)) {
+                if (!/^(data|blob):/i.test(url)) {
                     sourceImageUrls.set(img, source);
                 }
             })
@@ -507,7 +540,10 @@ export class QuarksLoader {
      * the loader's resolver and fetch cache. Kept for callers that already have a custom
      * `loadGeometry` and no `QuarksLoader` instance.
      */
-    static async resolveExternalGeometries(json: any, loadGeometry: (url: string) => Promise<any>): Promise<void> {
+    static async resolveExternalGeometries(
+        json: unknown,
+        loadGeometry: (url: string) => Promise<unknown>
+    ): Promise<void> {
         await QuarksLoader.inlineGeometryEntries(json, loadGeometry);
     }
 
@@ -517,12 +553,12 @@ export class QuarksLoader {
      * read warn and take their defaults; a document with no `object` throws
      * {@link QuarksFormatError}. Free the effect with {@link disposeEffect}.
      */
-    parse(json: any, baseUrl: string = ''): TransformNode {
+    parse(json: unknown, baseUrl: string = ''): TransformNode {
         return this.parseDocument(json, baseUrl).root;
     }
 
     /** {@link parse}, and the textures the effect uses. */
-    private parseDocument(json: any, baseUrl: string): {root: TransformNode; textures: Texture[]} {
+    private parseDocument(json: unknown, baseUrl: string): {root: TransformNode; textures: Texture[]} {
         const {strict, onFormatWarning} = this.options;
         const problems: string[] = [];
         const onWarning = (message: string, path: string): void => {
@@ -543,10 +579,11 @@ export class QuarksLoader {
     }
 
     /** {@link parseDocument} inside its format read. */
-    private readDocument(json: any, baseUrl: string): {root: TransformNode; textures: Texture[]} {
-        if (json === null || typeof json !== 'object' || json.object === null || typeof json.object !== 'object') {
+    private readDocument(document: unknown, baseUrl: string): {root: TransformNode; textures: Texture[]} {
+        if (!isEffectDocument(document)) {
             throw new QuarksFormatError('[QuarksLoader] Not an effect document: it has no "object" to load.');
         }
+        const json = document;
         const format = json.metadata?.quarksFormat;
         if (typeof format === 'number' && format > QUARKS_FORMAT_VERSION) {
             warnFormat(
@@ -563,11 +600,12 @@ export class QuarksLoader {
             materials: {},
         };
 
-        if (json.geometries) {
-            readFormatPart('geometries', () => this.parseGeometries(json.geometries, meta));
+        const {geometries, images} = json;
+        if (geometries) {
+            readFormatPart('geometries', () => this.parseGeometries(geometries, meta));
         }
-        if (json.images) {
-            readFormatPart('images', () => this.parseImages(json.images, baseUrl, meta));
+        if (images) {
+            readFormatPart('images', () => this.parseImages(images, baseUrl, meta));
         }
         if (json.textures) {
             this.parseTextures(json.textures, meta);
@@ -583,7 +621,7 @@ export class QuarksLoader {
         return {root, textures};
     }
 
-    private parseGeometries(geometries: any[], meta: LoadedMeta): void {
+    private parseGeometries(geometries: EffectGeometryJSON[], meta: LoadedMeta): void {
         for (const geom of geometries) {
             if (geom.type === 'PlaneGeometry') {
                 const w = geom.width || 1;
@@ -620,7 +658,7 @@ export class QuarksLoader {
     }
 
     /** The scene's copy of an identical geometry when resources are shared, else `geometry` itself. */
-    private share(geometry: ParsedGeometry): ParsedGeometry {
+    private share(geometry: GeometryArrays): GeometryArrays {
         if (this.options.shareResources === false) {
             return geometry;
         }
@@ -653,7 +691,7 @@ export class QuarksLoader {
         return baseUrl + url;
     }
 
-    private parseSphereGeometry(geom: any): ParsedGeometry {
+    private parseSphereGeometry(geom: SphereGeometryJSON): GeometryArrays {
         const radius = geom.radius ?? 0.5;
         const widthSegments = Math.max(3, Math.floor(geom.widthSegments ?? 16));
         const heightSegments = Math.max(2, Math.floor(geom.heightSegments ?? 8));
@@ -723,8 +761,8 @@ export class QuarksLoader {
         };
     }
 
-    private parseBufferGeometry(data: any): ParsedGeometry {
-        let positions = new Float32Array(0);
+    private parseBufferGeometry(data: BufferGeometryDataJSON): GeometryArrays {
+        let positions: Float32Array = new Float32Array(0);
         let indices: Uint32Array | Uint16Array = new Uint32Array(0);
         let uvs: Float32Array | undefined;
         let uvs2: Float32Array | undefined;
@@ -734,7 +772,7 @@ export class QuarksLoader {
 
         if (data.interleavedBuffers && data.arrayBuffers) {
             const buffers: {[uuid: string]: {data: Float32Array; stride: number}} = {};
-            for (const [uuid, ibDef] of Object.entries(data.interleavedBuffers) as any[]) {
+            for (const [uuid, ibDef] of Object.entries(data.interleavedBuffers)) {
                 const arrayBuffer = data.arrayBuffers[ibDef.buffer];
                 if (arrayBuffer) {
                     const floatArray = new Float32Array(
@@ -744,35 +782,17 @@ export class QuarksLoader {
                 }
             }
 
-            if (data.attributes) {
-                if (data.attributes.position?.isInterleavedBufferAttribute) {
-                    const attr = data.attributes.position;
-                    const buf = buffers[attr.data];
-                    if (buf)
-                        positions = this.extractInterleavedAttribute(buf.data, buf.stride, attr.offset, attr.itemSize);
-                }
-                if (data.attributes.uv?.isInterleavedBufferAttribute) {
-                    const attr = data.attributes.uv;
-                    const buf = buffers[attr.data];
-                    if (buf) uvs = this.extractInterleavedAttribute(buf.data, buf.stride, attr.offset, attr.itemSize);
-                }
-                if (uv2Attribute?.isInterleavedBufferAttribute) {
-                    const buf = buffers[uv2Attribute.data];
-                    if (buf)
-                        uvs2 = this.extractInterleavedAttribute(
-                            buf.data,
-                            buf.stride,
-                            uv2Attribute.offset,
-                            uv2Attribute.itemSize
-                        );
-                }
-                if (data.attributes.normal?.isInterleavedBufferAttribute) {
-                    const attr = data.attributes.normal;
-                    const buf = buffers[attr.data];
-                    if (buf)
-                        normals = this.extractInterleavedAttribute(buf.data, buf.stride, attr.offset, attr.itemSize);
-                }
-            }
+            const readInterleaved = (attr: BufferAttributeJSON | undefined): Float32Array | undefined => {
+                const buf =
+                    attr?.isInterleavedBufferAttribute && attr.data !== undefined ? buffers[attr.data] : undefined;
+                return buf
+                    ? this.extractInterleavedAttribute(buf.data, buf.stride, attr?.offset, attr?.itemSize)
+                    : undefined;
+            };
+            positions = readInterleaved(data.attributes?.position) ?? positions;
+            uvs = readInterleaved(data.attributes?.uv);
+            uvs2 = readInterleaved(uv2Attribute);
+            normals = readInterleaved(data.attributes?.normal);
         } else if (data.attributes) {
             if (data.attributes.position?.array) {
                 positions = new Float32Array(data.attributes.position.array);
@@ -801,7 +821,12 @@ export class QuarksLoader {
         return {positions, indices, uvs, uvs2, normals};
     }
 
-    private extractInterleavedAttribute(buffer: Float32Array, stride: number, offset: number, itemSize: number): any {
+    private extractInterleavedAttribute(
+        buffer: Float32Array,
+        stride: number,
+        offset: number = 0,
+        itemSize: number = 0
+    ): Float32Array {
         const count = Math.floor(buffer.length / stride);
         const result = new Float32Array(count * itemSize);
         for (let i = 0; i < count; i++) {
@@ -818,7 +843,7 @@ export class QuarksLoader {
         for (let i = 0; i < intArray.length; i++) {
             int32View[i] = intArray[i];
         }
-        return new Float32Array(buffer) as any;
+        return new Float32Array(buffer);
     }
 
     private async resolveResourceUrl(url: string, kind: QuarksResourceKind, baseUrl: string): Promise<string> {
@@ -826,7 +851,7 @@ export class QuarksLoader {
     }
 
     /** Fetches one effect JSON; documents are not fetch-cached because resolve mutates them. */
-    private async fetchEffectDocument(url: string, signal?: AbortSignal): Promise<{json: any; baseUrl: string}> {
+    private async fetchEffectDocument(url: string, signal?: AbortSignal): Promise<{json: unknown; baseUrl: string}> {
         const baseUrl = this.options.baseUrl || url.substring(0, url.lastIndexOf('/') + 1);
         const resolvedEffect = await this.resolveResourceUrl(url, 'effect', baseUrl);
         const json = await QuarksLoader.fetchJsonWith(this.options.resolver, resolvedEffect, undefined, signal);
@@ -838,7 +863,7 @@ export class QuarksLoader {
      * scene fetch cache), then parse. Each index settles exactly once for `onProgress`.
      */
     private async loadDocuments(
-        docs: Array<{json: any; baseUrl: string} | null>,
+        docs: Array<{json: unknown; baseUrl: string} | null>,
         options: QuarksBatchLoadOptions
     ): Promise<(TransformNode | null)[]> {
         const total = docs.length;
@@ -858,7 +883,7 @@ export class QuarksLoader {
     }
 
     private async loadResolvedDocuments(
-        docs: Array<{json: any; baseUrl: string} | null>,
+        docs: Array<{json: unknown; baseUrl: string} | null>,
         options: QuarksBatchLoadOptions,
         stopAll: AbortController
     ): Promise<(TransformNode | null)[]> {
@@ -1018,31 +1043,32 @@ export class QuarksLoader {
     }
 
     private static async inlineGeometryEntries(
-        json: any,
-        loadGeometry: (url: string) => Promise<any>,
+        json: unknown,
+        loadGeometry: (url: string) => Promise<unknown>,
         onResourceError: QuarksLoaderOptions['onResourceError'] = QuarksLoader.warnResourceError
     ): Promise<void> {
-        const geometries: any[] = Array.isArray(json?.geometries) ? json.geometries : [];
         await Promise.all(
-            geometries
-                .filter((geom) => typeof geom?.url === 'string' && !geom.positions)
-                .map(async (geom) => {
-                    try {
-                        const data = await loadGeometry(geom.url);
-                        // Copy arrays so a shared fetch-cache document is not aliased across
-                        // effects — mutating one effect's inlined geometry must not corrupt others.
-                        for (const key of ['positions', 'indices', 'uvs', 'uvs2', 'normals']) {
-                            const value = data?.[key];
-                            if (value === undefined) {
-                                continue;
-                            }
-                            geom[key] = Array.isArray(value) ? value.slice() : value;
+            documentList(json, 'geometries').map(async (geom) => {
+                if (!isRecord(geom) || typeof geom.url !== 'string' || geom.positions) {
+                    return;
+                }
+                const url = geom.url;
+                try {
+                    const data = await loadGeometry(url);
+                    // Copy arrays so a shared fetch-cache document is not aliased across
+                    // effects — mutating one effect's inlined geometry must not corrupt others.
+                    for (const key of ['positions', 'indices', 'uvs', 'uvs2', 'normals']) {
+                        const value = isRecord(data) ? data[key] : undefined;
+                        if (value === undefined) {
+                            continue;
                         }
-                        delete geom.url;
-                    } catch (err) {
-                        onResourceError('geometry', geom.url, err);
+                        geom[key] = Array.isArray(value) ? value.slice() : value;
                     }
-                })
+                    delete geom.url;
+                } catch (err) {
+                    onResourceError('geometry', url, err);
+                }
+            })
         );
     }
 
@@ -1054,17 +1080,18 @@ export class QuarksLoader {
         (this.options.onResourceError ?? QuarksLoader.warnResourceError)(kind, url, error);
     }
 
-    private parseImages(images: any[], baseUrl: string, meta: LoadedMeta): void {
+    private parseImages(images: EffectImageJSON[], baseUrl: string, meta: LoadedMeta): void {
         for (const [index, img] of images.entries()) {
-            if (img.url) {
-                readFormatPart(`[${index}]`, () => QuarksLoader.warnIfNotAnImageUrl(img.url));
+            const url = img.url;
+            if (url) {
+                readFormatPart(`[${index}]`, () => QuarksLoader.warnIfNotAnImageUrl(url));
             }
             // Urls are usually already absolute after resolveResources; joinUrl is a no-op for
             // data/blob/http(s) and still supports callers that use parse() with a baseUrl only.
-            meta.images[img.uuid] = img.url ? QuarksLoader.joinUrl(baseUrl, img.url) : null;
+            meta.images[img.uuid] = url ? QuarksLoader.joinUrl(baseUrl, url) : null;
             // The url the file wrote, for serializeEffect to write back. An inlined image
             // (`data:`, `blob:`) has no path to write; its texture writes its url.
-            const source: string | undefined = sourceImageUrls.get(img) ?? img.url;
+            const source = sourceImageUrls.get(img) ?? url;
             if (source && !/^(data|blob):/i.test(source)) {
                 meta.imageSources[img.uuid] = source;
             }
@@ -1090,9 +1117,9 @@ export class QuarksLoader {
         );
     }
 
-    private parseTextures(textures: any[], meta: LoadedMeta): void {
+    private parseTextures(textures: QuarksTextureJSON[], meta: LoadedMeta): void {
         for (const texDef of textures) {
-            const imageUrl = meta.images[texDef.image];
+            const imageUrl = texDef.image !== undefined ? meta.images[texDef.image] : undefined;
             if (imageUrl) {
                 const invertY = texDef.invertY !== undefined ? !!texDef.invertY : true;
                 const noMipmap = !!texDef.noMipmap;
@@ -1147,7 +1174,7 @@ export class QuarksLoader {
                     continue;
                 }
                 textureSettled.set(texture, settled);
-                const source = meta.imageSources[texDef.image];
+                const source = texDef.image !== undefined ? meta.imageSources[texDef.image] : undefined;
                 if (source !== undefined) {
                     setTextureSourceUrl(texture, source, imageUrl);
                 }
@@ -1196,9 +1223,12 @@ export class QuarksLoader {
         }
     }
 
-    private parseMaterials(materials: any[], meta: LoadedMeta): void {
+    private parseMaterials(materials: QuarksMaterialJSON[], meta: LoadedMeta): void {
+        // A file names a texture by uuid; anything else in a slot is no texture.
+        const texture = (ref: MaterialTextureRef | undefined): Texture | null =>
+            typeof ref === 'string' ? meta.textures[ref] || null : null;
         for (const matDef of materials) {
-            const matInfo: any = {
+            const matInfo: QuarksMaterialJSON = {
                 uuid: matDef.uuid,
                 transparent: matDef.transparent ?? true,
                 blending: matDef.blending ?? 1,
@@ -1213,12 +1243,12 @@ export class QuarksLoader {
             // emits) uses `texture`. Accept both so library-exported effects round-trip.
             const textureRef = matDef.map ?? matDef.texture;
             if (textureRef) {
-                matInfo.texture = meta.textures[textureRef] || null;
+                matInfo.texture = texture(textureRef);
             }
 
             const reflectionAtlasRef = matDef.reflectionAtlas;
             if (reflectionAtlasRef) {
-                matInfo.reflectionAtlas = meta.textures[reflectionAtlasRef] || null;
+                matInfo.reflectionAtlas = texture(reflectionAtlasRef);
             }
             if (typeof matDef.reflectionLevel === 'number') {
                 matInfo.reflectionLevel = matDef.reflectionLevel;
@@ -1241,20 +1271,20 @@ export class QuarksLoader {
             if (matDef.gradientMap && typeof matDef.gradientMap === 'object') {
                 matInfo.gradientMap = {
                     ...matDef.gradientMap,
-                    ramp: matDef.gradientMap.ramp ? meta.textures[matDef.gradientMap.ramp] || null : null,
+                    ramp: texture(matDef.gradientMap.ramp),
                 };
             }
             if (matDef.erosion && typeof matDef.erosion === 'object') {
                 matInfo.erosion = {
                     ...matDef.erosion,
-                    mask: matDef.erosion.mask ? meta.textures[matDef.erosion.mask] || null : null,
+                    mask: texture(matDef.erosion.mask),
                 };
             }
             // uvDistortion {map (texture uuid), mapUV {channel, tiling, offset, scroll}, strength}.
             if (matDef.uvDistortion && typeof matDef.uvDistortion === 'object') {
                 matInfo.uvDistortion = {
                     ...matDef.uvDistortion,
-                    map: matDef.uvDistortion.map ? meta.textures[matDef.uvDistortion.map] || null : null,
+                    map: texture(matDef.uvDistortion.map),
                 };
             }
 
@@ -1272,19 +1302,19 @@ export class QuarksLoader {
                     3: Constants.ALPHA_SUBTRACT,
                     4: Constants.ALPHA_MULTIPLY,
                 };
-                matInfo.alphaMode = blendingToAlphaMode[matDef.blending] || Constants.ALPHA_COMBINE;
+                matInfo.alphaMode = blendingToAlphaMode[matDef.blending ?? 1] || Constants.ALPHA_COMBINE;
             }
 
             meta.materials[matDef.uuid] = matInfo;
         }
     }
 
-    private getGeometry(meta: LoadedMeta, geometryId: string | undefined): ParsedGeometry | undefined {
+    private getGeometry(meta: LoadedMeta, geometryId: string | undefined): GeometryArrays | undefined {
         if (!geometryId) return undefined;
         return meta.geometries[geometryId];
     }
 
-    private getMaterial(meta: LoadedMeta, materialId: string | string[] | undefined): any | undefined {
+    private getMaterial(meta: LoadedMeta, materialId: string | string[] | undefined): QuarksMaterialJSON | undefined {
         if (!materialId) return undefined;
         const selectedId = Array.isArray(materialId) ? materialId[0] : materialId;
         return meta.materials[selectedId];
@@ -1292,11 +1322,12 @@ export class QuarksLoader {
 
     private createPlaceholderNode(type: string, name?: string): TransformNode {
         const node = new TransformNode(name || type || 'node', this.scene);
-        (node as any).quarksOriginalType = type;
+        // The three.js type the node stood for, which babylon.quarks has no node for.
+        Object.assign(node, {quarksOriginalType: type});
         return node;
     }
 
-    private createMeshNode(data: any, meta: LoadedMeta): Mesh {
+    private createMeshNode(data: QuarksNodeJSON, meta: LoadedMeta): Mesh {
         const mesh = new Mesh(data.name || data.type || 'mesh', this.scene);
         const geometry = this.getGeometry(meta, data.geometry);
         if (geometry && geometry.positions.length > 0 && geometry.indices.length > 0) {
@@ -1323,16 +1354,17 @@ export class QuarksLoader {
             material.backFaceCulling = materialInfo.side !== 2;
             material.alphaCutOff = materialInfo.alphaTest ?? 0;
             material.disableDepthWrite = !(materialInfo.depthWrite ?? false);
-            if (materialInfo.texture) {
-                material.diffuseTexture = materialInfo.texture;
-                material.opacityTexture = materialInfo.texture;
+            const texture = materialInfo.texture;
+            if (texture && typeof texture !== 'string') {
+                material.diffuseTexture = texture;
+                material.opacityTexture = texture;
             }
             mesh.material = material;
         }
         return mesh;
     }
 
-    private parseObject(data: any, meta: LoadedMeta): TransformNode {
+    private parseObject(data: QuarksNodeJSON, meta: LoadedMeta): TransformNode {
         let node: TransformNode;
         switch (data.type) {
             case 'QuarksPrefab':
@@ -1340,7 +1372,8 @@ export class QuarksLoader {
                 break;
             case 'ParticleEmitter':
                 if (data.ps) {
-                    const ps = readFormatPart('ps', () => this.parseParticleSystem(data.ps, meta));
+                    const psJSON = data.ps;
+                    const ps = readFormatPart('ps', () => this.parseParticleSystem(psJSON, meta));
                     node = ps.emitter;
                     break;
                 }
@@ -1409,7 +1442,7 @@ export class QuarksLoader {
         if (data.isVisible === false && node instanceof Mesh) node.isVisible = false;
 
         if (data.children) {
-            for (const [index, childData] of (data.children as any[]).entries()) {
+            for (const [index, childData] of data.children.entries()) {
                 const child = readFormatPart(`children[${index}]`, () => this.parseObject(childData, meta));
                 child.parent = node;
             }
@@ -1418,9 +1451,9 @@ export class QuarksLoader {
         return node;
     }
 
-    private parseParticleSystem(json: any, meta: LoadedMeta): ParticleSystem {
+    private parseParticleSystem(json: ParticleSystemJSONParameters, meta: LoadedMeta): ParticleSystem {
         const dependencies: {[uuid: string]: Behavior} = {};
-        const ps = ParticleSystem.fromJSON(json, meta as any, dependencies, this.scene);
+        const ps = ParticleSystem.fromJSON(json, meta, dependencies, this.scene);
         if (json?.shape?.type === 'mesh_surface' && typeof json.shape.mesh === 'string') {
             meshSurfaceLinks.set(ps, json.shape.mesh);
         }
@@ -1455,10 +1488,11 @@ export class QuarksLoader {
                 const warnAtSystem = (message: string) =>
                     path ? readFormatPart(path, () => warnFormat(message)) : warnFormat(message);
                 const meshSurfaceUUID = meshSurfaceLinks.get(system);
-                if (meshSurfaceUUID && (system.emitterShape as any).type === 'mesh_surface') {
+                const shape = system.emitterShape;
+                if (meshSurfaceUUID && shape instanceof MeshSurfaceEmitter) {
                     const targetNode = nodesMap[meshSurfaceUUID];
                     if (targetNode instanceof Mesh) {
-                        (system.emitterShape as any).mesh = targetNode;
+                        shape.mesh = targetNode;
                     } else {
                         warnAtSystem(
                             `Emitter "${node.name}" has a mesh surface shape on "${meshSurfaceUUID}", ` +
@@ -1470,13 +1504,13 @@ export class QuarksLoader {
                 for (let i = 0; i < system.behaviors.length; i++) {
                     if (system.behaviors[i] instanceof EmitSubParticleSystem) {
                         const subEmitter = system.behaviors[i] as EmitSubParticleSystem;
-                        const targetUUID = subEmitter.subParticleSystem as any;
+                        const targetUUID = subEmitter.subParticleSystem;
                         if (typeof targetUUID !== 'string') {
                             continue;
                         }
                         const resolved = nodesMap[targetUUID];
                         if (resolved instanceof ParticleEmitter) {
-                            (subEmitter as any).subParticleSystem = resolved;
+                            subEmitter.subParticleSystem = resolved;
                             (resolved.system as ParticleSystem).onlyUsedByOther = true;
                         } else {
                             // An export that dropped the target emitter, or kept only

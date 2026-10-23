@@ -136,6 +136,29 @@ and the project follows the `quarks.core` 0.x version line.
     settings.
   - The `isVector3`-style flags are set on the prototypes as non-enumerable, read-only properties,
     so they no longer show up in a `for…in` over a vector.
+- **babylon.quarks's effect format and loader have no `any` left either.** The parts of an effect
+  file have named types: `EffectDocumentJSON` for what `QuarksLoader` reads, with
+  `QuarksMaterialJSON`, `EffectGeometryJSON` (quarks' own, three.js `BufferGeometry`,
+  `PlaneGeometry` and `SphereGeometry`), `EffectImageJSON`, `QuarksPrefabJSON`,
+  `ParticleEmitterJSON` and the rest. What changes for code that compiles against them:
+  - `QuarksLoader`'s `loadFromJSON`, `parse`, `resolveResources`, `resolveLinkedResources` and
+    `resolveExternalGeometries` take the document as `unknown`, as parsed from its file: the
+    loader checks what it reads. `resolveLinkedResources` takes the new `QuarksResolveOptions`.
+  - `ParticleSystem.material` and `ParticleSystemParameters.material` are a
+    `ParticleMaterialSource`: the fields a system reads from a Babylon material or a loaded
+    material record. Any Babylon material fits.
+  - `BabylonMetaData` holds `BaseTexture | null` textures, `QuarksMaterialJSON` materials and
+    `GeometryEntry` geometries; its unused maps are `unknown`.
+  - `QuarksNodeJSON` lists its fields instead of an open record, `matrix` is optional, `visible`
+    is a boolean, and it has the prefab and three.js transform fields the loader reads.
+    `QuarksEffectJSON.materials` is `QuarksMaterialJSON[]`.
+  - `ParticleSystemJSONParameters` types its generators by group (`ValueGeneratorJSON`,
+    `ColorGeneratorJSON`, …), its `shape` as `ShapeJSON`, its `behaviors` as `BehaviorJSON[]`,
+    and `instancingGeometry` as a uuid or an entry. `BurstParametersJSON` has the older
+    `cycleCount`.
+  - `QuarksPrefab.toJSON` returns a `QuarksPrefabJSON`, `ParticleEmitter.toJSON` a
+    `ParticleEmitterJSON`, and `MeshSurfaceEmitter.fromJSON` takes a `ShapeJSON`.
+  - quarks.core's `JsonMetaData.textures` may hold null.
 
 ### Deprecated
 
@@ -208,6 +231,10 @@ and the project follows the `quarks.core` 0.x version line.
 - `PiecewiseBezier.toSVG` draws the curve itself, not its sampled table.
 - A `Gradient` read from JSON without its `color` or `alpha` keys warns, and keeps the default for
   the missing part.
+- A particle system reads its texture from the first material slot that holds a 2D texture; a cube
+  texture in a slot is passed over instead of drawn as a broken 2D one.
+- `ParticleSystem.fromJSON` with a material entry whose `reflectionAtlas` is a texture uuid
+  resolves it, as it does the other slots, instead of failing on the string.
 - The fragment's `alpha < 0.01` discard is right in every blend mode: under one-one or
   premultiplied blending a discarded fragment used to be one that would still have drawn.
 - Erosion and a mesh's rim fade no longer show a hard cut under one-one and premultiplied

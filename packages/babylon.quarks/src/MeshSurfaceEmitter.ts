@@ -155,7 +155,7 @@ export class MeshSurfaceEmitter implements EmitterShape {
     }
 
     /** Reads {@link toJSON} output; the mesh stays an id until `QuarksLoader` links it. */
-    static fromJSON(json: any): MeshSurfaceEmitter {
+    static fromJSON(json: ShapeJSON | undefined): MeshSurfaceEmitter {
         return new MeshSurfaceEmitter(undefined, json?.mesh, ShapeTransform.fromJSON(json?.transform));
     }
 
@@ -177,7 +177,7 @@ export const MeshSurfaceEmitterPlugin: Plugin = {
             type: 'mesh_surface',
             params: [['mesh', ['mesh']]],
             constructor: MeshSurfaceEmitter,
-            loadJSON: (json: any) => MeshSurfaceEmitter.fromJSON(json),
+            loadJSON: (json: ShapeJSON) => MeshSurfaceEmitter.fromJSON(json),
         },
     ],
     behaviors: [],

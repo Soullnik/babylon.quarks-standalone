@@ -97,7 +97,7 @@ describe('billboard pivot and flip', () => {
             shape: new ConeEmitter({transform: new ShapeTransform(new Vector3(0, 1, 0))}),
         });
         const {json, restored} = roundTrip(ps);
-        expect(json.shape.transform).toEqual({position: [0, 1, 0]});
+        expect(json.shape?.transform).toEqual({position: [0, 1, 0]});
         expect(restored.emitterShape.transform!.position.toArray()).toEqual([0, 1, 0]);
         expect(ps.clone().emitterShape.transform!.position.y).toBe(1);
         ps.dispose();

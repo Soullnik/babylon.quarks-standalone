@@ -53,8 +53,8 @@ export interface Resource {}
 
 /** The shared resources a serialized system refers to by uuid. */
 export interface JsonMetaData {
-    /** Textures by uuid. */
-    textures: {[uuid: string]: Resource};
+    /** Textures by uuid; null for one a renderer could not make. */
+    textures: {[uuid: string]: Resource | null};
     /** Geometries by uuid. */
     geometries: {[uuid: string]: Resource};
 }

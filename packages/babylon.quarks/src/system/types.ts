@@ -1,14 +1,18 @@
+import type {BaseTexture} from '@babylonjs/core/Materials/Textures/baseTexture';
 import type {Texture} from '@babylonjs/core/Materials/Textures/texture';
 import type {Scene} from '@babylonjs/core/scene';
 import type {
     Behavior,
+    BehaviorJSON,
     ColorGenerator,
+    ColorGeneratorJSON,
     EmitterShape,
     FunctionColorGenerator,
-    FunctionJSON,
     FunctionValueGenerator,
     RendererEmitterSettings,
     RotationGenerator,
+    RotationGeneratorJSON,
+    ShapeJSON,
     StretchedBillBoardSettings,
     ValueGenerator,
     ValueGeneratorJSON,
@@ -16,6 +20,7 @@ import type {
     Vector3,
     Vector3ArrayJSON,
     Vector3Generator,
+    Vector3GeneratorJSON,
     Vector3JSON,
 } from 'quarks.core';
 import type {
@@ -29,7 +34,9 @@ import type {
     SortMode,
     TextureUV,
 } from '../VFXBatch';
+import type {GeometryEntry, QuarksMaterialJSON} from '../effectDocumentJSON';
 import type {TrailOptions} from '../trailSettings';
+import type {ParticleMaterialSource} from './materialResolve';
 
 /** A trail's settings in JSON, each only when not its default: the start length as a generator's JSON, the side axis as `[x, y, z]`. */
 export type TrailSettingsJSON = Partial<TrailOptions> & {
@@ -195,7 +202,7 @@ export interface ParticleSystemParameters {
     /** @deprecated Set `speedFactor` in {@link rendererEmitterSettings} instead; this one wins when both are set. */
     speedFactor?: number;
     /** See {@link ParticleSystem.material}. Default none. */
-    material?: unknown;
+    material?: ParticleMaterialSource | null;
     /** See {@link ParticleSystem.texture}. Unset takes the material's texture; null draws without one. */
     texture?: Texture | null;
     /** See {@link ParticleSystem.startTileIndex}. Default 0. */
@@ -283,13 +290,15 @@ export interface BurstParametersJSON {
     /** See {@link BurstParameters.time}. */
     time: number;
     /** See {@link BurstParameters.count}. */
-    count: FunctionJSON | number;
+    count: ValueGeneratorJSON | number;
     /** See {@link BurstParameters.cycle}. */
     cycle: number;
     /** See {@link BurstParameters.interval}. */
     interval: number;
     /** See {@link BurstParameters.probability}. */
     probability: number;
+    /** `cycle`, as files before it was named wrote it; read when there is no `cycle`. */
+    cycleCount?: number;
 }
 
 /**
@@ -316,23 +325,23 @@ export interface ParticleSystemJSONParameters {
     /** See {@link ParticleSystem.duration}. */
     duration?: number;
     /** See {@link ParticleSystem.startDelay}. */
-    startDelay?: FunctionJSON;
+    startDelay?: ValueGeneratorJSON;
     /** The emitter shape, as its `toJSON` writes it. */
-    shape?: any;
+    shape?: ShapeJSON;
     /** See {@link ParticleSystem.startLife}. */
-    startLife?: FunctionJSON;
+    startLife?: ValueGeneratorJSON;
     /** See {@link ParticleSystem.startSpeed}. */
-    startSpeed?: FunctionJSON;
+    startSpeed?: ValueGeneratorJSON;
     /** See {@link ParticleSystem.startRotation}. */
-    startRotation?: FunctionJSON;
+    startRotation?: ValueGeneratorJSON | RotationGeneratorJSON;
     /** See {@link ParticleSystem.startSize}. */
-    startSize?: FunctionJSON;
+    startSize?: ValueGeneratorJSON | Vector3GeneratorJSON;
     /** See {@link ParticleSystem.startColor}. */
-    startColor?: FunctionJSON;
+    startColor?: ColorGeneratorJSON;
     /** See {@link ParticleSystem.emissionOverTime}. */
-    emissionOverTime?: FunctionJSON;
+    emissionOverTime?: ValueGeneratorJSON;
     /** See {@link ParticleSystem.emissionOverDistance}. */
-    emissionOverDistance?: FunctionJSON;
+    emissionOverDistance?: ValueGeneratorJSON;
     /** See {@link ParticleSystem.emissionBursts}. */
     emissionBursts?: Array<BurstParametersJSON>;
     /** See {@link ParticleSystem.maxParticles}. */
@@ -340,12 +349,12 @@ export interface ParticleSystemJSONParameters {
     /** See {@link ParticleSystem.onlyUsedByOther}. */
     onlyUsedByOther?: boolean;
     /**
-     * Trail, stretched or mesh settings; a trail's `startLength` as `FunctionJSON`. Left out when
+     * Trail, stretched or mesh settings; a trail's `startLength` as `ValueGeneratorJSON`. Left out when
      * the render mode has none.
      */
     rendererEmitterSettings?: RendererEmitterSettingsJSON;
-    /** Uuid of the mesh particles' geometry entry. */
-    instancingGeometry?: any;
+    /** Uuid of the mesh particles' geometry entry; a document made in code may hold the entry itself. */
+    instancingGeometry?: string | GeometryEntry;
     /** A {@link RenderMode} value. */
     renderMode?: number;
     /** See {@link ParticleSystem.renderOrder}. */
@@ -381,7 +390,7 @@ export interface ParticleSystemJSONParameters {
     /** The camera layer mask. */
     layers?: number;
     /** See {@link ParticleSystem.startTileIndex}. */
-    startTileIndex?: FunctionJSON | number;
+    startTileIndex?: ValueGeneratorJSON | number;
     /** See {@link ParticleSystem.uTileCount}. */
     uTileCount?: number;
     /** See {@link ParticleSystem.vTileCount}. */
@@ -405,7 +414,7 @@ export interface ParticleSystemJSONParameters {
     /** See {@link ParticleSystemParameters.alphaTest}. */
     alphaTest?: number;
     /** Each behavior as its `toJSON` writes it. */
-    behaviors?: Array<any>;
+    behaviors?: BehaviorJSON[];
     /** See {@link ParticleSystem.worldSpace}. */
     worldSpace?: boolean;
     /** `[x, y, z]`; written only when non-zero. */
@@ -422,19 +431,19 @@ export interface ParticleSystemJSONParameters {
  */
 export interface BabylonMetaData {
     /** Textures by uuid; null for one that could not be made. */
-    textures: {[uuid: string]: Texture | null};
+    textures: {[uuid: string]: BaseTexture | null};
     /** Material entries by uuid. */
-    materials: {[uuid: string]: any};
+    materials: {[uuid: string]: QuarksMaterialJSON};
     /** Geometry entries by uuid. */
-    geometries: {[uuid: string]: any};
-    /** Image entries by uuid. */
-    images?: {[uuid: string]: any};
+    geometries: {[uuid: string]: GeometryEntry};
     /** Not used by babylon.quarks; kept for three.js-shaped documents. */
-    shapes?: {[uuid: string]: any};
+    images?: {[uuid: string]: unknown};
     /** Not used by babylon.quarks; kept for three.js-shaped documents. */
-    skeletons?: {[uuid: string]: any};
+    shapes?: {[uuid: string]: unknown};
     /** Not used by babylon.quarks; kept for three.js-shaped documents. */
-    animations?: {[uuid: string]: any};
-    /** Nodes by uuid, which a mesh surface shape links to. */
-    nodes?: {[uuid: string]: any};
+    skeletons?: {[uuid: string]: unknown};
+    /** Not used by babylon.quarks; kept for three.js-shaped documents. */
+    animations?: {[uuid: string]: unknown};
+    /** Not used by babylon.quarks; kept for three.js-shaped documents. */
+    nodes?: {[uuid: string]: unknown};
 }
