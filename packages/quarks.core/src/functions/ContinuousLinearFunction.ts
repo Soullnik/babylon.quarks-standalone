@@ -1,17 +1,38 @@
 import {JSONToValue, ValueToJSON} from '../util/JSONUtil';
 import {FunctionJSON} from './FunctionJSON';
 
-interface ObjectValueType<T> {
+/** A value object a {@link ContinuousLinearFunction} can interpolate: a vector or a colour. */
+export interface ObjectValueType<T> {
+    /**
+     * Copies `value` into this object.
+     * @returns This object.
+     */
     copy(value: T): ObjectValueType<T>;
+    /**
+     * Moves this object toward `value` by `pos`.
+     * @returns This object.
+     */
     lerp(value: T, pos: number): ObjectValueType<T>;
+    /** A copy. */
     clone(): ObjectValueType<T>;
 }
 
+/**
+ * A piecewise linear function over [0, 1] through keys: the alpha or colour keys of a {@link
+ * Gradient}. Before the first key it holds the first value, after the last the last.
+ */
 export class ContinuousLinearFunction<T extends ObjectValueType<T> | number> {
+    /** The keys as `[value, position]`, sorted by position. */
     keys: Array<[T, number]>;
+    /** Always `'function'`. */
     type: 'function';
+    /** What the values are, for the JSON. */
     subType: 'Number' | 'Vector3' | 'Vector4' | 'Color';
     // default linear bezier
+    /**
+     * @param keys - The keys as `[value, position]`, sorted by position.
+     * @param subType - What the values are.
+     */
     constructor(keys: Array<[T, number]>, subType: 'Number' | 'Vector3' | 'Vector4' | 'Color') {
         this.subType = subType;
         this.type = 'function';
@@ -50,15 +71,18 @@ export class ContinuousLinearFunction<T extends ObjectValueType<T> | number> {
         return -1;
     }
 
+    /** The position of key `index`. */
     getStartX(index: number) {
         return this.keys[index][1];
     }
 
+    /** The position of the key after `index`, or 1 for the last. */
     getEndX(index: number) {
         if (index + 1 < this.keys.length) return this.keys[index + 1][1];
         return 1;
     }
 
+    /** The value at `t`: a number, or written into the object `value` and returned. */
     genValue(value: T, t: number): T {
         const keys = this.keys;
         const index = this.findKey(t);
@@ -90,6 +114,7 @@ export class ContinuousLinearFunction<T extends ObjectValueType<T> | number> {
         }
     }
 
+    /** The JSON form, `{type: 'CLinearFunction', subType, keys: [{value, pos}]}`. */
     toJSON(): FunctionJSON {
         return {
             type: 'CLinearFunction',
@@ -98,6 +123,7 @@ export class ContinuousLinearFunction<T extends ObjectValueType<T> | number> {
         };
     }
 
+    /** Reads {@link ContinuousLinearFunction.toJSON} output. */
     static fromJSON(json: FunctionJSON): ContinuousLinearFunction<any> {
         return new ContinuousLinearFunction(
             json.keys.map((pair: any) => [JSONToValue(pair.value, json.subType), pair.pos]),
@@ -105,6 +131,7 @@ export class ContinuousLinearFunction<T extends ObjectValueType<T> | number> {
         );
     }
 
+    /** A copy with its own keys. */
     clone(): ContinuousLinearFunction<any> {
         if (this.subType === 'Number') {
             return new ContinuousLinearFunction(

@@ -10,8 +10,13 @@ import {ShapeTransform} from './ShapeTransform';
  * A point emitter emits particles from a single point.
  */
 export class PointEmitter implements EmitterShape {
+    /** Always `'point'`. */
     type = 'point';
 
+    /**
+     * Scratch matrix.
+     * @internal
+     */
     _m1: Matrix4;
     /**
      * Offset, rotation and scale of the point within the particle system.
@@ -24,8 +29,10 @@ export class PointEmitter implements EmitterShape {
         this.transform = transform;
     }
 
+    /** Does nothing: the point has no state. */
     update(system: IParticleSystem, delta: number): void {}
 
+    /** Starts `p` at the origin, heading in a uniformly random direction at its start speed. */
     initialize(p: Particle) {
         // A direction uniform over the unit sphere; the speed is the particle's start speed as
         // it is, like every other shape (and Unity's point-like shapes).
@@ -55,6 +62,7 @@ export class PointEmitter implements EmitterShape {
         this.transform?.apply(p);
     }
 
+    /** The shape's JSON. */
     toJSON(): ShapeJSON {
         return {
             type: 'point',
@@ -62,10 +70,12 @@ export class PointEmitter implements EmitterShape {
         };
     }
 
+    /** Reads {@link PointEmitter.toJSON} output. */
     static fromJSON(json: any): PointEmitter {
         return new PointEmitter(ShapeTransform.fromJSON(json?.transform));
     }
 
+    /** A copy with the same transform. */
     clone(): EmitterShape {
         return new PointEmitter(this.transform?.clone());
     }

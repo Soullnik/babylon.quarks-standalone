@@ -1,14 +1,28 @@
 import {Vector2, Vector3} from '../math';
 import {Sequencer} from './Sequencer';
 
+/**
+ * Target points read from an image: one point per pixel whose alpha passes a threshold, so
+ * particles gather into the picture.
+ */
 export class TextureSequencer implements Sequencer {
+    /** The pixel coordinates read from the image, y up. */
     locations: Vector2[] = [];
 
+    /**
+     * @param scaleX - World units per pixel along x.
+     * @param scaleY - World units per pixel along y.
+     * @param position - Where the image's origin lands.
+     */
     constructor(
         public scaleX: number = 0,
         public scaleY: number = 0,
         public position: Vector3 = new Vector3()
     ) {}
+    /**
+     * Writes into `position` the point for particle `index`, wrapping around the points; leaves it
+     * as it is when there are none.
+     */
     transform(position: Vector3, index: number) {
         const count = this.locations.length;
         if (count === 0) {
@@ -21,6 +35,10 @@ export class TextureSequencer implements Sequencer {
         position.z = this.position.z;
     }
 
+    /**
+     * Reads {@link TextureSequencer.toJSON} output, and the object position files before 0.28
+     * wrote.
+     */
     static fromJSON(json: any): Sequencer {
         // Before 0.28 the position was written as a Vector3 object ({x, y, z}) instead of an array.
         const p = json.position;
@@ -32,12 +50,14 @@ export class TextureSequencer implements Sequencer {
         return textureSequencer;
     }
 
+    /** A copy with its own points. */
     clone(): Sequencer {
         const textureSequencer = new TextureSequencer(this.scaleX, this.scaleY, this.position.clone());
         textureSequencer.locations = this.locations.map((loc) => loc.clone());
         return textureSequencer;
     }
 
+    /** The JSON form, `{type: 'TextureSequencer', scaleX, scaleY, position, locations}`. */
     toJSON(): any {
         return {
             type: 'TextureSequencer',
@@ -51,6 +71,10 @@ export class TextureSequencer implements Sequencer {
         };
     }
 
+    /**
+     * Replaces {@link TextureSequencer.locations} with the pixels of `img` whose alpha is above
+     * `threshold` (0–255). Needs a DOM, for its canvas.
+     */
     fromImage(img: CanvasImageSource, threshold: number) {
         // Create an empty canvas element
         const canvas = document.createElement('canvas');

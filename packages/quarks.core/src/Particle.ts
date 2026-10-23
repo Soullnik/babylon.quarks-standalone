@@ -4,6 +4,10 @@ import {Matrix4, Quaternion, QuaternionView, Vector3, Vector3View, Vector4, Vect
 import {ParticleStore} from './ParticleStore';
 import {LinkedList} from './util/LinkedList';
 
+/**
+ * The state every particle has, whatever kind: where it is, how it moves, how it looks and how old
+ * it is.
+ */
 export interface IParticle {
     /**
      * Position of the particle.
@@ -56,6 +60,10 @@ export interface IParticle {
     get died(): boolean;
 }
 
+/**
+ * A particle the simulation core spawns and updates: an {@link IParticle} that can be reset for
+ * reuse.
+ */
 export interface Particle extends IParticle {
     /**
      * Where the particle was when the current simulation step began, when the
@@ -120,6 +128,10 @@ export interface Particle extends IParticle {
      */
     serial?: number;
 
+    /**
+     * Clears the per-particle state (generator memory, a trail's history) before the particle is
+     * reused.
+     */
     reset(): void;
 }
 
@@ -264,6 +276,7 @@ export class SpriteParticle implements Particle {
     size: Vector3;
     /** Row of the store's interleaved scalars this particle owns. */
     protected scalars: Float64Array;
+    /** Index of this particle's first entry in the store's interleaved scalars. */
     protected scalarOffset: number;
 
     /**
@@ -399,6 +412,7 @@ export class SpriteParticle implements Particle {
         return this.store.flip[this.storeIndex];
     }
 
+    /** Sets the mirroring bits; see the getter. */
     set flip(value: number) {
         this.store.flip[this.storeIndex] = value;
     }
@@ -465,6 +479,7 @@ export class SpriteParticle implements Particle {
         return this.age >= this.life;
     }
 
+    /** Clears the particle's generator memory before it is reused. */
     reset() {
         this.memory.length = 0;
     }
@@ -475,6 +490,10 @@ export class SpriteParticle implements Particle {
 /** Shared zero-length placeholder so trail buffers are never null. */
 const EMPTY_HISTORY = new Float32Array(0);
 
+/**
+ * One recorded sample of a trail in the old linked-list history.
+ * @deprecated Trails record into a flat ring buffer now (`TrailParticle.historyPositions` and its siblings).
+ */
 export class RecordState {
     /**
      * Creates a new record state.
@@ -559,6 +578,7 @@ export class TrailParticle implements Particle {
     size: Vector3;
     /** Row of the store's interleaved scalars this particle owns. */
     protected scalars: Float64Array;
+    /** Index of this particle's first entry in the store's interleaved scalars. */
     protected scalarOffset: number;
 
     /**
@@ -614,12 +634,17 @@ export class TrailParticle implements Particle {
      * @deprecated The trail history now lives in the flat ring buffer below
      * (`historyPositions` / `historySizes` / `historyColors`), which records a
      * sample without allocating. This list is no longer populated or rendered.
-     * @type {LinkedList<RecordState>}
+     * @internal
      */
     get previous(): LinkedList<RecordState> {
         return (this._previous ??= new LinkedList<RecordState>());
     }
 
+    /**
+     * Replaces the old history list.
+     * @deprecated See the getter.
+     * @internal
+     */
     set previous(value: LinkedList<RecordState>) {
         this._previous = value;
     }

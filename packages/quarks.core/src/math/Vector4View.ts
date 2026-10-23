@@ -10,11 +10,17 @@ const UNBOUND = new Float32Array(4);
  * inherited property with an accessor in the class body (TS2611).
  */
 export class Vector4View extends Vector4 {
+    /** The array the components live in. */
     declare data: Float32Array;
+    /** The index of the first component in {@link Vector4View.data}. */
     declare offset: number;
+    /** The x component, read from and written to {@link Vector4View.data}. */
     declare x: number;
+    /** The y component, read from and written to {@link Vector4View.data}. */
     declare y: number;
+    /** The z component, read from and written to {@link Vector4View.data}. */
     declare z: number;
+    /** The w component, read from and written to {@link Vector4View.data}. */
     declare w: number;
 
     constructor(data: Float32Array, offset: number) {

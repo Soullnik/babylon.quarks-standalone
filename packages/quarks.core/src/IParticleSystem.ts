@@ -3,6 +3,11 @@ import {Matrix4, Vector2, Vector3} from './math';
 import type {Particle} from './Particle';
 import {IParticle} from './Particle';
 import {ParticleStore} from './ParticleStore';
+/**
+ * Where a system, or one sub emission, is in its emission: the cycle time, the burst and wave
+ * counters and the rate and distance carry-over. The system owns one; `EmitSubParticleSystem` keeps
+ * one per parent particle.
+ */
 export interface EmissionState {
     /** Bursts whose first wave has fired this loop, in time order. */
     burstIndex: number;
@@ -13,12 +18,28 @@ export interface EmissionState {
      * use, so states made elsewhere (sub emitters) can leave it out.
      */
     burstWaves?: number[];
+    /**
+     * Index of the particle being spawned within the current burst wave; shapes in
+     * {@link EmitterMode.Burst} mode spread the wave by it.
+     */
     burstParticleIndex: number;
+    /** Particles in the current burst wave. */
     burstParticleCount: number;
+    /** True while a burst wave spawns, false for rate and distance emission. */
     isBursting: boolean;
+    /** Seconds into the current emission cycle (0 to `duration`). */
     time: number;
+    /**
+     * Particles owed to rate and distance emission and not spawned yet; the fraction carries into
+     * the next step.
+     */
     waitEmiting: number;
+    /** How far the emitter has moved past its last emission-over-distance mark. */
     travelDistance: number;
+    /**
+     * Where the emitter was at the previous step, for emission over distance; unset until the first
+     * step and after a restart.
+     */
     previousWorldPos?: Vector3;
     /** The particle a sub emission comes from, when it does; see `EmitSubParticleSystem.inherit`. */
     particle?: Particle;
@@ -26,14 +47,19 @@ export interface EmissionState {
     inherit?: number;
 }
 
+/** A texture or geometry a renderer stores in {@link JsonMetaData}; its shape is the renderer's. */
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type -- a texture or geometry a renderer stores
 export interface Resource {}
 
+/** The shared resources a serialized system refers to by uuid. */
 export interface JsonMetaData {
+    /** Textures by uuid. */
     textures: {[uuid: string]: Resource};
+    /** Geometries by uuid. */
     geometries: {[uuid: string]: Resource};
 }
 
+/** Options for {@link IParticleSystem.toJSON}. */
 export interface SerializationOptions {
     /**
      * Use URL for image.
@@ -42,8 +68,10 @@ export interface SerializationOptions {
     useUrlForImage?: boolean;
 }
 
+/** The render-mode-specific settings of a system: one of the shapes below, by its render mode. */
 export type RendererEmitterSettings = TrailSettings | MeshSettings | BillBoardSettings | StretchedBillBoardSettings;
 
+/** Settings of a stretched billboard system. */
 export interface StretchedBillBoardSettings {
     /**
      * how stretched the particle is in the direction of the camera based on the speed of the particle.
@@ -57,9 +85,11 @@ export interface StretchedBillBoardSettings {
     lengthFactor: number;
 }
 
+/** Settings of a billboard system; none yet. */
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type -- billboards take no settings yet
 export interface BillBoardSettings {}
 
+/** Settings of a trail system: how each particle records and draws its ribbon. */
 export interface TrailSettings {
     /**
      * How many samples the trail keeps, rolled per particle at emission. The particle records one
@@ -177,6 +207,7 @@ export interface TrailSettings {
 /** How a trail's texture runs along the ribbon, see {@link TrailSettings.textureMode}. */
 export type TrailTextureMode = 'stretch' | 'tile' | 'distributePerSegment' | 'repeatPerSegment';
 
+/** Settings of a mesh system: its start rotation about each axis. */
 export interface MeshSettings {
     /**
      * Initial rotation around the X-axis.
@@ -195,20 +226,37 @@ export interface MeshSettings {
     startRotationZ: ValueGenerator | FunctionValueGenerator;
 }
 
+/** The scene node a system emits from, as the simulation sees it. */
 export interface IEmitter {
+    /** The system emitting from this node. */
     system: IParticleSystem;
+    /** The node's id in the effect JSON. */
     uuid: string;
+    /** Whether the node, and so the system, is visible. */
     visible: boolean;
+    /** The node's world matrix, in the renderer's own matrix type. */
     matrixWorld: any; //type is annoying
 }
 
+/**
+ * The events a system fires: `'emitEnd'` when emission ends, `'finished'` when the last particle of
+ * an ended system dies, `'particleDied'` per particle and `'destroy'` on dispose.
+ */
 export type ParticleSystemEventType = 'emitEnd' | 'finished' | 'destroy' | 'particleDied';
+/** What a system passes to its event listeners. */
 export interface ParticleSystemEvent {
+    /** The event. */
     type: ParticleSystemEventType;
+    /** The system that fired it. */
     particleSystem: IParticleSystem;
+    /** The particle that died, for `'particleDied'`. */
     particle?: IParticle;
 }
 
+/**
+ * What the simulation core needs of a particle system: its emission, particles, transform and
+ * lifecycle. babylon.quarks' `ParticleSystem` implements it.
+ */
 export interface IParticleSystem {
     /**
      * Column storage backing the particles' vector attributes, when the
@@ -295,12 +343,9 @@ export interface IParticleSystem {
      * @type {IEmitter}
      */
     emitter: IEmitter;
-    /**
-     * Optional renderer.
-     * @type {BatchedRenderer}
-     */
     //_renderer?: BatchedRenderer;
     //instancingGeometry: BufferGeometry;
+    /** Settings of the renderer that draws the particles, such as the trail or beam setup. */
     rendererEmitterSettings: RendererEmitterSettings;
     /**
      * Fraction of billboard particles mirrored along U (x) and V (y), each
@@ -308,10 +353,12 @@ export interface IParticleSystem {
      * Absent: nothing is mirrored.
      */
     flip?: Vector2;
+    /** Emission progress: time in the cycle, burst and distance counters. */
     emissionState: EmissionState;
 
     //getRendererSettings(): VFXBatchSettings;
 
+    /** True while paused: the system is not simulated. */
     paused: boolean;
     /** True after `endEmit()` — emission window closed (non-looping duration elapsed). */
     readonly isEmitEnded: boolean;
@@ -319,19 +366,33 @@ export interface IParticleSystem {
     hasPendingEmission(): boolean;
     /** Non-looping system with no live particles and no pending emission. */
     isFinished(): boolean;
+    /** Freezes the system where it is until {@link IParticleSystem.play}. */
     pause(): void;
+    /** Clears every particle, rewinds to the start and pauses. */
     stop(): void;
+    /** Resumes a paused system. */
     play(): void;
+    /** Clears every particle and plays the system again from the start. */
     restart(): void;
+    /** Stops emission and lets the particles alive die out; fires `'emitEnd'`. */
     endEmit(): void;
 
+    /** A new system with the same settings, behaviors and generators. */
     clone(): IParticleSystem;
 
+    /** Writes the system's settings, putting its shared resources into `metaData`. */
     toJSON(metaData: any, options: SerializationOptions): any;
 
+    /**
+     * Spawns what `delta` seconds of emission call for, on `subEmissionState` from the emitter at
+     * `matrix`; how a sub emitter target emits for a parent particle.
+     */
     emit(delta: number, subEmissionState: EmissionState, matrix: Matrix4): void;
 
+    /** Calls `callback` on each `event`. */
     addEventListener(event: ParticleSystemEventType, callback: (event: ParticleSystemEvent) => void): void;
+    /** Removes one callback added with {@link IParticleSystem.addEventListener}. */
     removeEventListener(event: ParticleSystemEventType, callback: (event: ParticleSystemEvent) => void): void;
+    /** Removes every callback registered for `event`. */
     removeAllEventListeners(event: ParticleSystemEventType): void;
 }

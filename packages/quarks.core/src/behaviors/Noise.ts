@@ -57,8 +57,20 @@ interface NoisyParticle extends Particle {
  */
 export class Noise implements Behavior {
     type = 'Noise';
+    /**
+     * Seconds the behavior has run, which scrolls the field.
+     * @internal
+     */
     duration = 0;
 
+    /**
+     * @param frequency - How fast the noise changes along a particle's age (Unity's Frequency).
+     * @param power - How strong the noise is (Unity's Strength).
+     * @param positionAmount - How much of it moves the position; 1 by default.
+     * @param rotationAmount - How much of it turns the rotation; 0 by default.
+     * @param scrollSpeed - See the property.
+     * @param remap - See the property.
+     */
     constructor(
         public frequency: FunctionValueGenerator | ValueGenerator,
         public power: FunctionValueGenerator | ValueGenerator,
@@ -296,6 +308,7 @@ export class Noise implements Behavior {
         this._rotationAmount = Noise.constantOf(this.rotationAmount);
     }
 
+    /** Reads {@link Noise.toJSON} output; a field the JSON leaves out takes its default. */
     static fromJSON(json: any): Behavior {
         return new Noise(
             ValueGeneratorFromJSON(json.frequency),

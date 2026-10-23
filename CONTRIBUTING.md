@@ -48,7 +48,7 @@ npm run test                                   # jest suites: quarks.core, babyl
 npm run typecheck                              # tsc over sources, tests and the examples (jest only transpiles them; needs `npm run build`)
 npm run test:coverage                          # the same suites with the coverage gate (what CI runs)
 npm run docs                                   # TypeDoc API docs
-npm run docs:check                             # renders the API docs; fails on a missing TSDoc or broken {@link} (CI runs it)
+npm run docs:check                             # renders the API docs of quarks.core and babylon.quarks; fails on a missing TSDoc or broken {@link} (CI runs it)
 npm run check:demos                            # every demo in headless Chromium, fails on page/console errors or a missing gallery preview
 npm run validate:shaders                       # every shader variant, GLSL and WGSL, through a real compiler (CI runs it)
 ```
@@ -84,9 +84,10 @@ like the coverage floors: a change may not add one, and a PR that removes some l
 An `eslint-disable` comment names its rule and says why. The three packages and the examples
 compile with `strict: true`.
 
-Everything `babylon.quarks` exports carries TSDoc: `npm run docs:check`, part of `npm run check`
-and CI, fails on an exported class, function, type, member or accessor without a comment, and on a
-`{@link}` that does not resolve. A member that is public in TypeScript only so other files of the
+Everything `babylon.quarks` exports carries TSDoc, the simulation core it re-exports from
+`quarks.core` included: `npm run docs:check`, part of `npm run check` and CI, runs TypeDoc over both
+packages and fails on an exported class, function, type, member or accessor without a comment, and on
+a `{@link}` that does not resolve. A member that is public in TypeScript only so other files of the
 package can reach it is tagged `@internal`, which keeps it out of the docs and out of the contract;
 users should not rely on it.
 

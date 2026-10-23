@@ -24,7 +24,15 @@ import {BehaviorSpace, EmitterFrame, readBehaviorSpace} from './EmitterFrame';
  */
 export class OrbitOverLife implements Behavior {
     type = 'OrbitOverLife';
+    /**
+     * Scratch value.
+     * @internal
+     */
     rotation: Quaternion;
+    /**
+     * Scratch value.
+     * @internal
+     */
     temp = new Vector3();
     /** Learned in {@link initialize}, so undefined until this behavior sees a particle. */
     ps?: IParticleSystem;
@@ -133,6 +141,7 @@ export class OrbitOverLife implements Behavior {
         };
     }
 
+    /** Reads {@link OrbitOverLife.toJSON} output; a field the JSON leaves out takes its default. */
     static fromJSON(json: any): Behavior {
         return new OrbitOverLife(
             ValueGeneratorFromJSON(json.orbitSpeed) as FunctionValueGenerator,

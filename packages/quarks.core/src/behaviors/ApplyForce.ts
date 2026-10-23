@@ -102,6 +102,7 @@ export class ApplyForce implements Behavior {
         };
     }
 
+    /** Reads {@link ApplyForce.toJSON} output; a field the JSON leaves out takes its default. */
     static fromJSON(json: any): Behavior {
         return new ApplyForce(
             readVector3(json.direction, new Vector3(0, 0, 0)),

@@ -9,7 +9,9 @@ const tempColor: Vector4 = new Vector4();
 
 // generate a random color from the start two gradients
 export class RandomColorBetweenGradient implements FunctionColorGenerator {
+    /** The first gradient. */
     public gradient1: Gradient;
+    /** The second gradient. */
     public gradient2: Gradient;
     public type: 'function';
     private indexCount: number = 0;
@@ -43,6 +45,7 @@ export class RandomColorBetweenGradient implements FunctionColorGenerator {
         };
     }
 
+    /** Reads {@link RandomColorBetweenGradient.toJSON} output. */
     static fromJSON(json: FunctionJSON): RandomColorBetweenGradient {
         return new RandomColorBetweenGradient(Gradient.fromJSON(json.gradient1), Gradient.fromJSON(json.gradient2));
     }

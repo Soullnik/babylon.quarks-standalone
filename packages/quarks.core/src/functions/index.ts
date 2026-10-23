@@ -3,6 +3,7 @@ export * from './Bezier';
 export * from './ColorGenerator';
 export * from './ColorRange';
 export * from './ConstantValue';
+export * from './ContinuousLinearFunction';
 export * from './EulerGenerator';
 export * from './FunctionJSON';
 export * from './GeneratorMemory';

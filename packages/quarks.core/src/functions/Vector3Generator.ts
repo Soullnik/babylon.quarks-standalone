@@ -5,13 +5,22 @@ import {FunctionJSON} from './FunctionJSON';
 import {GeneratorMemory} from './GeneratorMemory';
 import {Vector3Function} from './Vector3Function';
 
+/** A vector for a particle, from a number generator per axis. */
 export interface Vector3Generator {
+    /** Always `'vec3function'`. */
     type: 'vec3function';
+    /** Rolls whatever the generator picks at random into `memory`. */
     startGen(memory: GeneratorMemory): void;
+    /**
+     * Writes the vector at time `t` into `vec`.
+     * @returns `vec`.
+     */
     genValue(memory: GeneratorMemory, vec: Vector3, t?: number): Vector3;
     /** See FunctionValueGenerator.refreshTable. */
     refreshTable?(): void;
+    /** The generator's JSON. */
     toJSON(): FunctionJSON;
+    /** A copy with the same settings. */
     clone(): Vector3Generator;
 }
 

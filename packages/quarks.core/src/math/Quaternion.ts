@@ -4,11 +4,32 @@ import * as MathUtils from './MathUtils';
 import {Matrix4} from './Matrix4';
 import {Vector3} from './Vector3';
 
+/**
+ * A rotation as a unit quaternion (a three.js `Quaternion` port), (x, y, z, w) with w the scalar
+ * part. Methods that change it return it, so calls chain.
+ */
 class Quaternion {
+    /**
+     * Backing field; read and write through the accessor so change listeners run.
+     * @internal
+     */
     _x: number;
+    /**
+     * Backing field; read and write through the accessor so change listeners run.
+     * @internal
+     */
     _y: number;
+    /**
+     * Backing field; read and write through the accessor so change listeners run.
+     * @internal
+     */
     _z: number;
+    /**
+     * Backing field; read and write through the accessor so change listeners run.
+     * @internal
+     */
     _w: number;
+    /** Marks the object as a {@link Quaternion}; true on every instance (set on the prototype). */
     declare readonly isQuaternion: boolean;
 
     constructor(x = 0, y = 0, z = 0, w = 1) {
@@ -18,6 +39,11 @@ class Quaternion {
         this._w = w;
     }
 
+    /**
+     * Spherical interpolation between the quaternions stored at `src0[srcOffset0]` and
+     * `src1[srcOffset1]` by `t`, written to `dst[dstOffset]`, without allocating: for flat arrays
+     * of quaternions.
+     */
     static slerpFlat(
         dst: number[],
         dstOffset: number,
@@ -94,6 +120,11 @@ class Quaternion {
         dst[dstOffset + 3] = w0;
     }
 
+    /**
+     * Multiplies the quaternions stored at `src0[srcOffset0]` and `src1[srcOffset1]` and writes the
+     * product to `dst[dstOffset]`, without allocating.
+     * @returns `dst`.
+     */
     static multiplyQuaternionsFlat(
         dst: number[],
         dstOffset: number,
@@ -120,42 +151,54 @@ class Quaternion {
         return dst;
     }
 
+    /** The x component of the vector part. */
     get x() {
         return this._x;
     }
 
+    /** The x component of the vector part. */
     set x(value) {
         this._x = value;
         this._onChangeCallback();
     }
 
+    /** The y component of the vector part. */
     get y() {
         return this._y;
     }
 
+    /** The y component of the vector part. */
     set y(value) {
         this._y = value;
         this._onChangeCallback();
     }
 
+    /** The z component of the vector part. */
     get z() {
         return this._z;
     }
 
+    /** The z component of the vector part. */
     set z(value) {
         this._z = value;
         this._onChangeCallback();
     }
 
+    /** The scalar part. */
     get w() {
         return this._w;
     }
 
+    /** The scalar part. */
     set w(value) {
         this._w = value;
         this._onChangeCallback();
     }
 
+    /**
+     * Sets the four components as given; they are not normalized.
+     * @returns This quaternion.
+     */
     set(x: number, y: number, z: number, w: number) {
         this._x = x;
         this._y = y;
@@ -167,10 +210,15 @@ class Quaternion {
         return this;
     }
 
+    /** A new quaternion with the same components. */
     clone() {
         return new Quaternion(this._x, this._y, this._z, this._w);
     }
 
+    /**
+     * Copies the components of `quaternion`.
+     * @returns This quaternion.
+     */
     copy(quaternion: Quaternion) {
         this._x = quaternion.x;
         this._y = quaternion.y;
@@ -182,6 +230,12 @@ class Quaternion {
         return this;
     }
 
+    /**
+     * Sets this quaternion to the rotation of `euler`, in its order (the six Tait–Bryan orders;
+     * another order logs a warning and leaves this quaternion as it was). `update` false skips the
+     * change listener.
+     * @returns This quaternion.
+     */
     setFromEuler(euler: Euler, update = true) {
         const x = euler._x,
             y = euler._y,
@@ -255,6 +309,10 @@ class Quaternion {
         return this;
     }
 
+    /**
+     * Sets this quaternion to a rotation of `angle` radians around the normalized `axis`.
+     * @returns This quaternion.
+     */
     setFromAxisAngle(axis: Vector3, angle: number) {
         // http://www.euclideanspace.com/maths/geometry/rotations/conversions/angleToQuaternion/index.htm
 
@@ -273,6 +331,11 @@ class Quaternion {
         return this;
     }
 
+    /**
+     * Sets this quaternion to the rotation in the upper 3×3 of `m`, which must be a pure (unscaled)
+     * rotation.
+     * @returns This quaternion.
+     */
     setFromRotationMatrix(m: Matrix4) {
         // http://www.euclideanspace.com/maths/geometry/rotations/conversions/matrixToQuaternion/index.htm
 
@@ -325,6 +388,11 @@ class Quaternion {
         return this;
     }
 
+    /**
+     * Sets this quaternion to the shortest rotation that turns the unit vector `vFrom` into the
+     * unit vector `vTo`.
+     * @returns This quaternion.
+     */
     setFromUnitVectors(vFrom: Vector3, vTo: Vector3) {
         // assumes direction vectors vFrom and vTo are normalized
 
@@ -358,10 +426,15 @@ class Quaternion {
         return this.normalize();
     }
 
+    /** The angle in radians between this rotation and `q`, in [0, π]. */
     angleTo(q: Quaternion) {
         return 2 * Math.acos(Math.abs(MathUtils.clamp(this.dot(q), -1, 1)));
     }
 
+    /**
+     * Rotates this quaternion toward `q` by at most `step` radians, stopping at `q`.
+     * @returns This quaternion.
+     */
     rotateTowards(q: Quaternion, step: number) {
         const angle = this.angleTo(q);
 
@@ -374,16 +447,28 @@ class Quaternion {
         return this;
     }
 
+    /**
+     * Sets this quaternion to the identity rotation (0, 0, 0, 1).
+     * @returns This quaternion.
+     */
     identity() {
         return this.set(0, 0, 0, 1);
     }
 
+    /**
+     * Inverts this rotation, assuming a unit quaternion (the same as {@link Quaternion.conjugate}).
+     * @returns This quaternion.
+     */
     invert() {
         // quaternion is assumed to have unit length
 
         return this.conjugate();
     }
 
+    /**
+     * Negates the vector part, which inverts a unit quaternion.
+     * @returns This quaternion.
+     */
     conjugate() {
         this._x *= -1;
         this._y *= -1;
@@ -394,18 +479,25 @@ class Quaternion {
         return this;
     }
 
+    /** The four-component dot product with `v`. */
     dot(v: Quaternion) {
         return this._x * v._x + this._y * v._y + this._z * v._z + this._w * v._w;
     }
 
+    /** The squared length of the four components. */
     lengthSq() {
         return this._x * this._x + this._y * this._y + this._z * this._z + this._w * this._w;
     }
 
+    /** The length of the four components; 1 for a rotation. */
     length() {
         return Math.sqrt(this._x * this._x + this._y * this._y + this._z * this._z + this._w * this._w);
     }
 
+    /**
+     * Scales this quaternion to length 1; a zero quaternion becomes the identity.
+     * @returns This quaternion.
+     */
     normalize() {
         let l = this.length();
 
@@ -428,14 +520,26 @@ class Quaternion {
         return this;
     }
 
+    /**
+     * Sets this quaternion to `this × q`: rotates by `q` first, then by this.
+     * @returns This quaternion.
+     */
     multiply(q: Quaternion) {
         return this.multiplyQuaternions(this, q);
     }
 
+    /**
+     * Sets this quaternion to `q × this`: rotates by this first, then by `q`.
+     * @returns This quaternion.
+     */
     premultiply(q: Quaternion) {
         return this.multiplyQuaternions(q, this);
     }
 
+    /**
+     * Sets this quaternion to the product `a × b`.
+     * @returns This quaternion.
+     */
     multiplyQuaternions(a: Quaternion, b: Quaternion) {
         // from http://www.euclideanspace.com/maths/algebra/realNormedAlgebra/quaternions/code/index.htm
 
@@ -458,6 +562,11 @@ class Quaternion {
         return this;
     }
 
+    /**
+     * Spherically interpolates this rotation toward `qb` by `t` (0 keeps it, 1 reaches `qb`), along
+     * the shorter arc.
+     * @returns This quaternion.
+     */
     slerp(qb: Quaternion, t: number) {
         if (t === 0) return this;
         if (t === 1) return this.copy(qb);
@@ -520,10 +629,18 @@ class Quaternion {
         return this;
     }
 
+    /**
+     * Sets this quaternion to the spherical interpolation from `qa` to `qb` by `t`.
+     * @returns This quaternion.
+     */
     slerpQuaternions(qa: Quaternion, qb: Quaternion, t: number) {
         return this.copy(qa).slerp(qb, t);
     }
 
+    /**
+     * Sets this quaternion to a uniformly random rotation, from the library's random source.
+     * @returns This quaternion.
+     */
     random() {
         // sets this quaternion to a uniform random unit quaternnion
 
@@ -541,6 +658,10 @@ class Quaternion {
         return this.set(r1 * Math.sin(theta1), r1 * Math.cos(theta1), r2 * Math.sin(theta2), r2 * Math.cos(theta2));
     }
 
+    /**
+     * Whether every component equals the matching component of `quaternion` exactly (q and -q, the
+     * same rotation, are not equal).
+     */
     equals(quaternion: Quaternion) {
         return (
             quaternion._x === this._x &&
@@ -550,6 +671,10 @@ class Quaternion {
         );
     }
 
+    /**
+     * Reads x, y, z, w from `array` starting at `offset`.
+     * @returns This quaternion.
+     */
     fromArray(array: number[], offset = 0) {
         this._x = array[offset];
         this._y = array[offset + 1];
@@ -561,6 +686,10 @@ class Quaternion {
         return this;
     }
 
+    /**
+     * Writes x, y, z, w into `array` starting at `offset`.
+     * @returns The array, a new one when none is given.
+     */
     toArray(array: number[] = [], offset = 0) {
         array[offset] = this._x;
         array[offset + 1] = this._y;
@@ -584,18 +713,28 @@ class Quaternion {
 
 	}*/
 
+    /** The components as `[x, y, z, w]`. */
     toJSON() {
         return this.toArray();
     }
 
+    /**
+     * Sets the listener called when a component changes through an accessor or setter.
+     * @internal
+     */
     _onChange(callback: () => void) {
         this._onChangeCallback = callback;
 
         return this;
     }
 
+    /**
+     * The change listener; does nothing until `_onChange` sets one.
+     * @internal
+     */
     _onChangeCallback() {}
 
+    /** Iterates over x, y, z, w. */
     *[Symbol.iterator]() {
         yield this._x;
         yield this._y;

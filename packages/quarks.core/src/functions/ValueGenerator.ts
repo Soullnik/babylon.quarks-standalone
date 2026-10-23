@@ -11,18 +11,36 @@ import {PiecewiseBezier} from './PiecewiseBezier';
  * no-op), then `genValue(memory)` per frame.
  */
 export interface ValueGenerator {
+    /** `'value'`: the number does not change with time. */
     type: 'value';
+    /**
+     * Rolls whatever the generator picks at random into `memory`, before the first {@link
+     * ValueGenerator.genValue}.
+     */
     startGen(memory: any): void;
+    /** The number, from what `memory` holds. */
     genValue(memory: any): number;
     /** See FunctionValueGenerator.refreshTable. */
     refreshTable?(): void;
+    /** The generator's JSON. */
     toJSON(): FunctionJSON;
+    /** A copy with the same settings. */
     clone(): ValueGenerator;
 }
 
+/**
+ * A number that changes over time `t` in [0, 1] (a particle's life fraction, or the system's
+ * cycle): a curve (Unity's Curve).
+ */
 export interface FunctionValueGenerator {
+    /** `'function'`: the number depends on `t`. */
     type: 'function';
+    /**
+     * Rolls whatever the generator picks at random into `memory`, before the first {@link
+     * FunctionValueGenerator.genValue}.
+     */
     startGen(memory: GeneratorMemory): void;
+    /** The number at `t`. */
     genValue(memory: GeneratorMemory, t: number): number;
     /**
      * Optional hook for generators that can precompute a sampled table of
@@ -31,7 +49,9 @@ export interface FunctionValueGenerator {
      * edited between frames is picked up.
      */
     refreshTable?(): void;
+    /** The generator's JSON. */
     toJSON(): FunctionJSON;
+    /** A copy with the same settings. */
     clone(): FunctionValueGenerator;
 }
 

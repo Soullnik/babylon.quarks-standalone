@@ -22,10 +22,15 @@ const UNBOUND = new Float32Array(3);
  * one shared property descriptor for every instance.
  */
 export class Vector3View extends Vector3 {
+    /** The array the components live in. */
     declare data: Float32Array;
+    /** The index of the first component in {@link Vector3View.data}. */
     declare offset: number;
+    /** The x component, read from and written to {@link Vector3View.data}. */
     declare x: number;
+    /** The y component, read from and written to {@link Vector3View.data}. */
     declare y: number;
+    /** The z component, read from and written to {@link Vector3View.data}. */
     declare z: number;
 
     constructor(data: Float32Array, offset: number) {

@@ -4,10 +4,19 @@ import {GeneratorMemory} from './GeneratorMemory';
 import {RotationGenerator} from './RotationGenerator';
 import {FunctionValueGenerator, ValueGenerator, ValueGeneratorFromJSON} from './ValueGenerator';
 
+/** A rotation from three angle generators, one per axis, applied in an Euler order. */
 export class EulerGenerator implements RotationGenerator {
+    /** Always `'rotation'`. */
     type: 'rotation';
+    /** The Euler the angles are written into; its `order` is the generator's order. */
     eular: Euler;
 
+    /**
+     * @param angleX - The angle about x, in radians.
+     * @param angleY - The angle about y, in radians.
+     * @param angleZ - The angle about z, in radians.
+     * @param eulerOrder - The order the three rotations apply in; `'XYZ'` by default.
+     */
     constructor(
         public angleX: FunctionValueGenerator | ValueGenerator,
         public angleY: FunctionValueGenerator | ValueGenerator,
@@ -18,12 +27,17 @@ export class EulerGenerator implements RotationGenerator {
         this.eular = new Euler(0, 0, 0, eulerOrder);
     }
 
+    /** Rolls the three angle generators into `memory`. */
     startGen(memory: GeneratorMemory): void {
         this.angleX.startGen(memory);
         this.angleY.startGen(memory);
         this.angleZ.startGen(memory);
     }
 
+    /**
+     * Writes into `quat` the rotation by the three angles at `t`, each times `delta`.
+     * @returns `quat`.
+     */
     genValue(memory: GeneratorMemory, quat: Quaternion, delta: number, t?: number): Quaternion {
         this.eular.set(
             this.angleX.genValue(memory, t!) * delta,
@@ -33,6 +47,7 @@ export class EulerGenerator implements RotationGenerator {
         return quat.setFromEuler(this.eular);
     }
 
+    /** The JSON form, `{type: 'Euler', angleX, angleY, angleZ, eulerOrder}`. */
     toJSON(): FunctionJSON {
         return {
             type: 'Euler',
@@ -43,6 +58,7 @@ export class EulerGenerator implements RotationGenerator {
         };
     }
 
+    /** Reads {@link EulerGenerator.toJSON} output. */
     static fromJSON(json: FunctionJSON): EulerGenerator {
         return new EulerGenerator(
             ValueGeneratorFromJSON(json.angleX) as FunctionValueGenerator,
@@ -52,6 +68,7 @@ export class EulerGenerator implements RotationGenerator {
         );
     }
 
+    /** A copy with its own angle generators and the same order. */
     clone(): RotationGenerator {
         return new EulerGenerator(this.angleX.clone(), this.angleY.clone(), this.angleZ.clone(), this.eular.order);
     }

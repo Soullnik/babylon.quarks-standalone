@@ -11,11 +11,29 @@ const UNBOUND = new Float32Array(4);
  * an accessor in the class body (TS2611).
  */
 export class QuaternionView extends Quaternion {
+    /** The array the components live in. */
     declare data: Float32Array;
+    /** The index of the first component in {@link QuaternionView.data}. */
     declare offset: number;
+    /**
+     * Backing component, read from and written to {@link QuaternionView.data}.
+     * @internal
+     */
     declare _x: number;
+    /**
+     * Backing component, read from and written to {@link QuaternionView.data}.
+     * @internal
+     */
     declare _y: number;
+    /**
+     * Backing component, read from and written to {@link QuaternionView.data}.
+     * @internal
+     */
     declare _z: number;
+    /**
+     * Backing component, read from and written to {@link QuaternionView.data}.
+     * @internal
+     */
     declare _w: number;
 
     constructor(data: Float32Array, offset: number) {

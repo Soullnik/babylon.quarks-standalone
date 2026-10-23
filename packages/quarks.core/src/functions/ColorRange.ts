@@ -6,6 +6,10 @@ import {FunctionJSON} from './FunctionJSON';
 import {GeneratorMemory} from './GeneratorMemory';
 
 export class ColorRange implements ColorGenerator {
+    /**
+     * @param a - One end of the range, linear RGBA.
+     * @param b - The other end.
+     */
     constructor(
         public a: Vector4,
         public b: Vector4
@@ -13,6 +17,10 @@ export class ColorRange implements ColorGenerator {
         this.type = 'value';
     }
 
+    /**
+     * The slot of {@link GeneratorMemory} the roll lives in; -1 before the first roll.
+     * @internal
+     */
     indexCount = -1;
 
     startGen(memory: GeneratorMemory): void {
@@ -36,6 +44,7 @@ export class ColorRange implements ColorGenerator {
         };
     }
 
+    /** Reads {@link ColorRange.toJSON} output. */
     static fromJSON(json: FunctionJSON): ColorRange {
         return new ColorRange(JSONToColor(json.a), JSONToColor(json.b));
     }

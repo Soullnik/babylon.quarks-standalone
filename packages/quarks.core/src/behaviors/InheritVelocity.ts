@@ -4,6 +4,10 @@ import {ConstantValue, FunctionValueGenerator, ValueGenerator, ValueGeneratorFro
 import {Quaternion, Vector3} from '../math';
 import {Behavior} from './Behavior';
 
+/**
+ * How {@link InheritVelocity} applies the emitter's velocity: `'initial'` once at spawn,
+ * `'current'` every step.
+ */
 export type InheritVelocityMode = 'initial' | 'current';
 
 /**
@@ -16,14 +20,35 @@ export class InheritVelocity implements Behavior {
     /** Learned in {@link initialize}, so undefined until this behavior sees a particle. */
     ps?: IParticleSystem;
 
+    /**
+     * @param multiplier - How much of the emitter's velocity the particles take, over their life; 1
+     *   by default.
+     * @param mode - When it applies, see {@link InheritVelocityMode}; `'initial'` by default.
+     */
     constructor(
         public multiplier: FunctionValueGenerator | ValueGenerator = new ConstantValue(1),
         public mode: InheritVelocityMode = 'initial'
     ) {}
 
+    /**
+     * Scratch value.
+     * @internal
+     */
     _temp = new Vector3();
+    /**
+     * Scratch value.
+     * @internal
+     */
     _tempPos = new Vector3();
+    /**
+     * Scratch value.
+     * @internal
+     */
     _tempQInv = new Quaternion();
+    /**
+     * Scratch value.
+     * @internal
+     */
     _tempScaleInv = new Vector3(1, 1, 1);
 
     initialize(particle: Particle, particleSystem: IParticleSystem): void {
@@ -76,6 +101,9 @@ export class InheritVelocity implements Behavior {
         };
     }
 
+    /**
+     * Reads {@link InheritVelocity.toJSON} output; a field the JSON leaves out takes its default.
+     */
     static fromJSON(json: any): Behavior {
         return new InheritVelocity(
             json.multiplier

@@ -55,18 +55,44 @@ export interface DonutEmitterParameters {
     transform?: ShapeTransform;
 }
 
+/**
+ * Emits from a torus around z (Unity's Donut shape): particles start in its tube, or on the tube's
+ * surface, and head out from the tube's centre line.
+ */
 export class DonutEmitter implements EmitterShape {
+    /** Always `'donut'`. */
     type = 'donut';
+    /** Radius of the torus, from its centre to the centre line of its tube. */
     radius: number;
+    /** Radius of the tube. */
     donutRadius: number;
+    /** Arc around z, in radians, that particles start in; 2π for the whole torus. */
     arc: number; // [0, Math.PI * 2]
+    /**
+     * How far in from the tube's surface particles may start, as a fraction of its radius: 0 on the
+     * surface, 1 anywhere down to the centre line.
+     */
     thickness: number;
+    /** How the start point moves along the arc, see {@link EmitterMode}. */
     mode: EmitterMode;
+    /**
+     * Snaps the start point along the arc to multiples of this fraction (Unity's Spread); 0 for
+     * none.
+     */
     spread: number;
+    /**
+     * Speed of the arc sweep in arcs per second, for the `Loop` and `PingPong` modes; sampled over
+     * the system's cycle.
+     */
     speed: ValueGenerator | FunctionValueGenerator;
+    /** State the {@link DonutEmitter.speed} generator keeps. */
     memory: GeneratorMemory;
     transform?: ShapeTransform;
 
+    /**
+     * Scratch matrix.
+     * @internal
+     */
     _m1: Matrix4;
 
     constructor(parameters: DonutEmitterParameters = {}) {
@@ -89,12 +115,17 @@ export class DonutEmitter implements EmitterShape {
         this.memory.length = 0;
     }
 
+    /** Advances the arc sweep by `delta` seconds in the `Loop` and `PingPong` modes. */
     update(system: IParticleSystem, delta: number): void {
         if (EmitterMode.Random != this.mode) {
             this.currentValue += this.speed.genValue(this.memory, system.emissionState.time / system.duration) * delta;
         }
     }
 
+    /**
+     * Starts `p` in the tube, heading out from the tube's centre line at its start speed and, when
+     * it has no start rotation, facing that way.
+     */
     initialize(p: Particle, emissionState: EmissionState) {
         const u = getValueFromEmitterMode(this.mode, this.currentValue, this.spread, emissionState);
         const v = random();
@@ -132,6 +163,7 @@ export class DonutEmitter implements EmitterShape {
         this.transform?.apply(p);
     }
 
+    /** The shape's JSON. */
     toJSON(): ShapeJSON {
         return {
             type: 'donut',
@@ -146,6 +178,7 @@ export class DonutEmitter implements EmitterShape {
         };
     }
 
+    /** Reads {@link DonutEmitter.toJSON} output; a field the JSON leaves out takes its default. */
     static fromJSON(json: any): DonutEmitter {
         return new DonutEmitter({
             radius: json.radius,
@@ -159,6 +192,7 @@ export class DonutEmitter implements EmitterShape {
         });
     }
 
+    /** A copy with the same settings. */
     clone(): EmitterShape {
         return new DonutEmitter({
             radius: this.radius,

@@ -87,13 +87,22 @@ export interface Behavior {
     reset(): void;
 }
 
+/**
+ * How a behavior type is registered in {@link BehaviorTypes}: its name, class, editor fields and
+ * JSON reader.
+ */
 export interface BehaviorPlugin {
+    /** The name the behavior's JSON uses as `type`. */
     type: string;
+    /** The behavior's class. */
     constructor: Constructable<Behavior>;
+    /** The fields an editor shows, with the kinds of value each takes. */
     params: ParameterPair[];
+    /** Reads the behavior from its JSON, for the system `particleSystem`. */
     loadJSON: (json: any, particleSystem: IParticleSystem) => Behavior;
 }
 
+/** The behavior types effect files can name, by type; plugins add more. */
 export const BehaviorTypes: {[key: string]: BehaviorPlugin} = {
     ApplyForce: {
         type: 'ApplyForce',

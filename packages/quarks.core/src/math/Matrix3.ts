@@ -2,8 +2,15 @@ import {Matrix4} from './Matrix4';
 import {Vector2} from './Vector2';
 import {Vector3} from './Vector3';
 
+/**
+ * A 3×3 matrix (a three.js `Matrix3` port), stored column-major in {@link Matrix3.elements}:
+ * rotations, normal matrices and 2D (UV) transforms. Methods that change it return it, so calls
+ * chain.
+ */
 class Matrix3 {
+    /** The nine entries in column-major order. */
     elements: number[];
+    /** Marks the object as a {@link Matrix3}; true on every instance (set on the prototype). */
     declare readonly isMatrix3: boolean;
     constructor(
         n11?: number,
@@ -23,6 +30,10 @@ class Matrix3 {
         }
     }
 
+    /**
+     * Sets the entries, given in row-major order (n11 n12 n13 is the first row).
+     * @returns This matrix.
+     */
     set(
         n11: number,
         n12: number,
@@ -49,12 +60,20 @@ class Matrix3 {
         return this;
     }
 
+    /**
+     * Sets this matrix to the identity.
+     * @returns This matrix.
+     */
     identity() {
         this.set(1, 0, 0, 0, 1, 0, 0, 0, 1);
 
         return this;
     }
 
+    /**
+     * Copies the entries of `m`.
+     * @returns This matrix.
+     */
     copy(m: Matrix3) {
         const te = this.elements;
         const me = m.elements;
@@ -72,6 +91,10 @@ class Matrix3 {
         return this;
     }
 
+    /**
+     * Writes the three columns of this matrix into `xAxis`, `yAxis` and `zAxis`.
+     * @returns This matrix.
+     */
     extractBasis(xAxis: Vector3, yAxis: Vector3, zAxis: Vector3) {
         xAxis.setFromMatrix3Column(this, 0);
         yAxis.setFromMatrix3Column(this, 1);
@@ -80,6 +103,10 @@ class Matrix3 {
         return this;
     }
 
+    /**
+     * Sets this matrix to the upper 3×3 of `m`.
+     * @returns This matrix.
+     */
     setFromMatrix4(m: Matrix4) {
         const me = m.elements;
 
@@ -88,14 +115,26 @@ class Matrix3 {
         return this;
     }
 
+    /**
+     * Sets this matrix to `this × m`.
+     * @returns This matrix.
+     */
     multiply(m: Matrix3) {
         return this.multiplyMatrices(this, m);
     }
 
+    /**
+     * Sets this matrix to `m × this`.
+     * @returns This matrix.
+     */
     premultiply(m: Matrix3) {
         return this.multiplyMatrices(m, this);
     }
 
+    /**
+     * Sets this matrix to `a × b`.
+     * @returns This matrix.
+     */
     multiplyMatrices(a: Matrix3, b: Matrix3) {
         const ae = a.elements;
         const be = b.elements;
@@ -136,6 +175,10 @@ class Matrix3 {
         return this;
     }
 
+    /**
+     * Multiplies every entry by `s`.
+     * @returns This matrix.
+     */
     multiplyScalar(s: number) {
         const te = this.elements;
 
@@ -152,6 +195,7 @@ class Matrix3 {
         return this;
     }
 
+    /** The determinant. */
     determinant() {
         const te = this.elements;
 
@@ -168,6 +212,10 @@ class Matrix3 {
         return a * e * i - a * f * h - b * d * i + b * f * g + c * d * h - c * e * g;
     }
 
+    /**
+     * Inverts this matrix; a singular matrix becomes all zeros.
+     * @returns This matrix.
+     */
     invert() {
         const te = this.elements,
             n11 = te[0],
@@ -203,6 +251,10 @@ class Matrix3 {
         return this;
     }
 
+    /**
+     * Transposes this matrix.
+     * @returns This matrix.
+     */
     transpose() {
         let tmp;
         const m = this.elements;
@@ -220,10 +272,18 @@ class Matrix3 {
         return this;
     }
 
+    /**
+     * Sets this matrix to the normal matrix of `matrix4`: the inverse transpose of its upper 3×3.
+     * @returns This matrix.
+     */
     getNormalMatrix(matrix4: Matrix4) {
         return this.setFromMatrix4(matrix4).invert().transpose();
     }
 
+    /**
+     * Writes the transpose of this matrix into `r`, leaving this matrix as it is.
+     * @returns This matrix.
+     */
     transposeIntoArray(r: number[]) {
         const m = this.elements;
 
@@ -240,6 +300,11 @@ class Matrix3 {
         return this;
     }
 
+    /**
+     * Sets this matrix to a UV transform: offset (`tx`, `ty`), repeat (`sx`, `sy`) and `rotation`
+     * in radians about the centre (`cx`, `cy`).
+     * @returns This matrix.
+     */
     setUvTransform(tx: number, ty: number, sx: number, sy: number, rotation: number, cx: number, cy: number) {
         const c = Math.cos(rotation);
         const s = Math.sin(rotation);
@@ -261,18 +326,30 @@ class Matrix3 {
 
     //
 
+    /**
+     * Scales this 2D transform by (`sx`, `sy`), applied after it.
+     * @returns This matrix.
+     */
     scale(sx: number, sy: number) {
         this.premultiply(_m3.makeScale(sx, sy));
 
         return this;
     }
 
+    /**
+     * Rotates this 2D transform clockwise by `theta` radians, applied after it.
+     * @returns This matrix.
+     */
     rotate(theta: number) {
         this.premultiply(_m3.makeRotation(-theta));
 
         return this;
     }
 
+    /**
+     * Translates this 2D transform by (`tx`, `ty`), applied after it.
+     * @returns This matrix.
+     */
     translate(tx: number, ty: number) {
         this.premultiply(_m3.makeTranslation(tx, ty));
 
@@ -281,6 +358,10 @@ class Matrix3 {
 
     // for 2D Transforms
 
+    /**
+     * Sets this matrix to a 2D translation by (`x`, `y`), or by a {@link Vector2} given as `x`.
+     * @returns This matrix.
+     */
     makeTranslation(x: number | Vector2, y: number) {
         if ((x as any).isVector2) {
             this.set(1, 0, (x as Vector2).x, 0, 1, (x as Vector2).y, 0, 0, 1);
@@ -291,6 +372,10 @@ class Matrix3 {
         return this;
     }
 
+    /**
+     * Sets this matrix to a counterclockwise 2D rotation by `theta` radians.
+     * @returns This matrix.
+     */
     makeRotation(theta: number) {
         // counterclockwise
 
@@ -302,6 +387,10 @@ class Matrix3 {
         return this;
     }
 
+    /**
+     * Sets this matrix to a 2D scale by (`x`, `y`).
+     * @returns This matrix.
+     */
     makeScale(x: number, y: number) {
         this.set(x, 0, 0, 0, y, 0, 0, 0, 1);
 
@@ -310,6 +399,7 @@ class Matrix3 {
 
     //
 
+    /** Whether every entry equals the matching entry of `matrix` exactly. */
     equals(matrix: Matrix3) {
         const te = this.elements;
         const me = matrix.elements;
@@ -321,6 +411,10 @@ class Matrix3 {
         return true;
     }
 
+    /**
+     * Reads the nine entries, column-major, from `array` starting at `offset`.
+     * @returns This matrix.
+     */
     fromArray(array: number[], offset = 0) {
         for (let i = 0; i < 9; i++) {
             this.elements[i] = array[i + offset];
@@ -329,6 +423,10 @@ class Matrix3 {
         return this;
     }
 
+    /**
+     * Writes the nine entries, column-major, into `array` starting at `offset`.
+     * @returns The array, a new one when none is given.
+     */
     toArray(array: number[] = [], offset = 0) {
         const te = this.elements;
 
@@ -347,6 +445,7 @@ class Matrix3 {
         return array;
     }
 
+    /** A new matrix with the same entries. */
     clone() {
         return new Matrix3().fromArray(this.elements);
     }

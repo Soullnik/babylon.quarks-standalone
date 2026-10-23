@@ -58,11 +58,17 @@ export class FrameOverLife implements Behavior {
 
     private _frame!: FunctionValueGenerator | ValueGenerator;
 
+    /** See {@link FrameOverLifeOptions.fps}. */
     fps: number;
+    /** See {@link FrameOverLifeOptions.cycles}. */
     cycles: number;
+    /** See {@link FrameOverLifeOptions.frameCount}. */
     frameCount: number;
+    /** See {@link FrameOverLifeOptions.loop}. */
     loop: boolean;
+    /** See {@link FrameOverLifeOptions.random}. */
     random: boolean;
+    /** See {@link FrameOverLifeOptions.startFrame}. */
     startFrame?: ValueGenerator;
 
     /** A per-particle sample that sets each particle's random sequence apart. */
@@ -78,10 +84,18 @@ export class FrameOverLife implements Behavior {
         this.startFrame = options.startFrame;
     }
 
+    /**
+     * The frame (texture tile index) over the particle's life fraction, or the first frame of the
+     * segment in FPS mode.
+     */
     get frame(): FunctionValueGenerator | ValueGenerator {
         return this._frame;
     }
 
+    /**
+     * The frame (texture tile index) over the particle's life fraction, or the first frame of the
+     * segment in FPS mode.
+     */
     set frame(frame: FunctionValueGenerator | ValueGenerator) {
         this._frame = frame;
     }
@@ -187,6 +201,7 @@ export class FrameOverLife implements Behavior {
         };
     }
 
+    /** Reads {@link FrameOverLife.toJSON} output; a field the JSON leaves out takes its default. */
     static fromJSON(json: any): Behavior {
         return new FrameOverLife(ValueGeneratorFromJSON(json.frame) as FunctionValueGenerator | ValueGenerator, {
             fps: typeof json.fps === 'number' ? json.fps : undefined,

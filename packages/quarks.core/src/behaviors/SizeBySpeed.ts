@@ -21,6 +21,11 @@ export class SizeBySpeed implements Behavior {
         this.size.startGen(particle.memory);
     }
 
+    /**
+     * @param size - The size multiplier over the speed range: one curve, or a {@link
+     *   Vector3Function} for each axis.
+     * @param speedRange - The speeds that map to 0 and 1 on the curve (`a` and `b`).
+     */
     constructor(
         public size: FunctionValueGenerator | Vector3Generator,
         public speedRange: IntervalValue
@@ -45,6 +50,7 @@ export class SizeBySpeed implements Behavior {
         };
     }
 
+    /** Reads {@link SizeBySpeed.toJSON} output; a field the JSON leaves out takes its default. */
     static fromJSON(json: any): Behavior {
         return new SizeBySpeed(
             GeneratorFromJSON(json.size) as FunctionValueGenerator,

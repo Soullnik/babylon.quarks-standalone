@@ -80,6 +80,10 @@ export class LimitSpeedOverLife implements Behavior {
         };
     }
 
+    /**
+     * Reads {@link LimitSpeedOverLife.toJSON} output; a field the JSON leaves out takes its
+     * default.
+     */
     static fromJSON(json: any): Behavior {
         return new LimitSpeedOverLife(
             ValueGeneratorFromJSON(json.speed) as FunctionValueGenerator,

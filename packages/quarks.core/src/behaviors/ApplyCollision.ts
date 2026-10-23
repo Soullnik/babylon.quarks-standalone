@@ -46,6 +46,10 @@ export function getPhysicsResolver(): PhysicsResolver | undefined {
  */
 export class ApplyCollision implements Behavior {
     type = 'ApplyCollision';
+    /**
+     * Scratch value.
+     * @internal
+     */
     tempV = new Vector3();
 
     constructor(
@@ -76,6 +80,9 @@ export class ApplyCollision implements Behavior {
         };
     }
 
+    /**
+     * Reads {@link ApplyCollision.toJSON} output; a field the JSON leaves out takes its default.
+     */
     static fromJSON(json: any): Behavior {
         // A file without a bounce keeps the full speed, as a Unity collision does by default.
         return new ApplyCollision(undefined, typeof json.bounce === 'number' ? json.bounce : 1);

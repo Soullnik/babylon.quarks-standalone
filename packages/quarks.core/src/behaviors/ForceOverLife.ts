@@ -17,6 +17,10 @@ import {BehaviorSpace, EmitterFrame, readBehaviorSpace} from './EmitterFrame';
  */
 export class ForceOverLife implements Behavior {
     type = 'ForceOverLife';
+    /**
+     * Scratch value.
+     * @internal
+     */
     _temp = new Vector3();
     /** Learned in {@link initialize}, so undefined until this behavior sees a particle. */
     ps?: IParticleSystem;
@@ -102,6 +106,7 @@ export class ForceOverLife implements Behavior {
         };
     }
 
+    /** Reads {@link ForceOverLife.toJSON} output; a field the JSON leaves out takes its default. */
     static fromJSON(json: any): Behavior {
         return new ForceOverLife(
             ValueGeneratorFromJSON(json.x) as FunctionValueGenerator,

@@ -43,11 +43,26 @@ export interface EdgeEmitterParameters {
  * single-sided Edge shape.
  */
 export class EdgeEmitter implements EmitterShape {
+    /** Always `'edge'`. */
     type = 'edge';
+    /** Half the length of the edge: it runs from -radius to radius along x. */
     radius: number;
+    /**
+     * How the start point moves along the edge, see {@link EmitterMode}; the edge is the "arc"
+     * here, run from -x to +x.
+     */
     mode: EmitterMode;
+    /**
+     * Snaps the start point along the arc to multiples of this fraction (Unity's Spread); 0 for
+     * none.
+     */
     spread: number;
+    /**
+     * Speed of the arc sweep in arcs per second, for the `Loop` and `PingPong` modes; sampled over
+     * the system's cycle.
+     */
     speed: ValueGenerator | FunctionValueGenerator;
+    /** State the {@link EdgeEmitter.speed} generator keeps. */
     memory: GeneratorMemory;
     transform?: ShapeTransform;
 
@@ -67,12 +82,14 @@ export class EdgeEmitter implements EmitterShape {
         this.transform = parameters.transform;
     }
 
+    /** Advances the arc sweep by `delta` seconds in the `Loop` and `PingPong` modes. */
     update(system: IParticleSystem, delta: number): void {
         if (EmitterMode.Random != this.mode) {
             this.currentValue += this.speed.genValue(this.memory, system.emissionState.time / system.duration) * delta;
         }
     }
 
+    /** Starts `p` on the edge, heading along +y at its start speed. */
     initialize(p: Particle, emissionState: EmissionState) {
         const u = getValueFromEmitterMode(this.mode, this.currentValue, this.spread, emissionState);
         p.position.set((u * 2 - 1) * this.radius, 0, 0);
@@ -80,6 +97,7 @@ export class EdgeEmitter implements EmitterShape {
         this.transform?.apply(p);
     }
 
+    /** The shape's JSON. */
     toJSON(): ShapeJSON {
         return {
             type: 'edge',
@@ -91,6 +109,7 @@ export class EdgeEmitter implements EmitterShape {
         };
     }
 
+    /** Reads {@link EdgeEmitter.toJSON} output; a field the JSON leaves out takes its default. */
     static fromJSON(json: any): EdgeEmitter {
         return new EdgeEmitter({
             radius: json.radius,
@@ -101,6 +120,7 @@ export class EdgeEmitter implements EmitterShape {
         });
     }
 
+    /** A copy with the same settings. */
     clone(): EmitterShape {
         return new EdgeEmitter({
             radius: this.radius,

@@ -8,6 +8,7 @@ import {Behavior} from './Behavior';
 export class ColorOverLife implements Behavior {
     type = 'ColorOverLife';
 
+    /** @param color - The colour over the particle's life, multiplying its start colour. */
     constructor(public color: FunctionColorGenerator) {}
 
     initialize(particle: Particle): void {
@@ -56,6 +57,7 @@ export class ColorOverLife implements Behavior {
         };
     }
 
+    /** Reads {@link ColorOverLife.toJSON} output; a field the JSON leaves out takes its default. */
     static fromJSON(json: any): Behavior {
         return new ColorOverLife(ColorGeneratorFromJSON(json.color) as FunctionColorGenerator);
     }

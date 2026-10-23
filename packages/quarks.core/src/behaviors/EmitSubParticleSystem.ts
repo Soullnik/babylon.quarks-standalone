@@ -8,9 +8,13 @@ import {Behavior} from './Behavior';
 /** Below this, a speed counts as zero and a direction's X and Y as lying along Z. */
 const BASIS_EPSILON = 1e-6;
 
+/** When a sub emitter emits for a parent particle (Unity's sub emitter trigger). */
 export enum SubParticleEmitMode {
+    /** Once, when the parent particle dies. */
     Death,
+    /** Once, when the parent particle is born. */
     Birth,
+    /** All the parent particle's life: the sub system's own rate and bursts run for each parent particle. */
     Frame,
 }
 
@@ -31,9 +35,13 @@ export type SubEmitterInheritance = 'color' | 'size' | 'rotation' | 'lifetime';
 
 /** Bits of `EmissionState.inherit`, one per {@link SubEmitterInheritance}. */
 export const SubEmitterInheritMask = {
+    /** Multiply the sub particles' colour by the parent's current colour. */
     color: 1,
+    /** Multiply the sub particles' size by the parent's current size. */
     size: 2,
+    /** Add the parent's rotation to the sub particles'. */
     rotation: 4,
+    /** Scale the sub particles' lifetime by the parent's remaining life fraction. */
     lifetime: 8,
 } as const;
 
@@ -62,6 +70,16 @@ export class EmitSubParticleSystem implements Behavior {
     /** Finished emission states, kept for reuse: a burst of deaths would otherwise allocate one plus a matrix each. */
     private spareEmissions = new Array<SubEmissionState>();
 
+    /**
+     * @param particleSystem - The system this behavior belongs to (the parent).
+     * @param useVelocityAsBasis - Orient the sub emitter along the parent particle's velocity
+     *   instead of by its rotation.
+     * @param subParticleSystem - The emitter of the system to emit into; a loader links it from a
+     *   uuid.
+     * @param mode - When to emit, see {@link SubParticleEmitMode}; every step by default.
+     * @param emitProbability - Chance in [0, 1] that a parent particle emits at all; 1 by default.
+     * @param inherit - See the property.
+     */
     constructor(
         public particleSystem: IParticleSystem,
         public useVelocityAsBasis: boolean,
@@ -222,6 +240,10 @@ export class EmitSubParticleSystem implements Behavior {
         };
     }
 
+    /**
+     * Reads {@link EmitSubParticleSystem.toJSON} output; a field the JSON leaves out takes its
+     * default.
+     */
     static fromJSON(json: any, particleSystem: IParticleSystem): Behavior {
         return new EmitSubParticleSystem(
             particleSystem,

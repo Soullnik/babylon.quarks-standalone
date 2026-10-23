@@ -1,4 +1,14 @@
 {
-    "extends": ["../../typedoc.package.json"],
-    "entryPoints": ["src/index.ts"]
+    "$schema": "https://typedoc.org/schema.json",
+    "name": "quarks.core",
+    "entryPoints": ["src/index.ts"],
+    "excludePrivate": true,
+    "excludeInternal": true,
+    "validation": {
+        "notExported": true,
+        "invalidLink": true,
+        "notDocumented": true
+    },
+    "treatWarningsAsErrors": true,
+    "plugin": ["../babylon.quarks/typedoc-accessors.mjs"]
 }

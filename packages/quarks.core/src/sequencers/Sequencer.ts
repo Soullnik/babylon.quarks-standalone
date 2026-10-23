@@ -2,11 +2,17 @@ import {Vector3} from '../math';
 import {describePart, warnFormat} from '../util/JSONUtil';
 import {TextureSequencer} from './TextureSequencer';
 
+/**
+ * A set of target points that {@link ApplySequences} moves particles to, one point per particle.
+ */
 export interface Sequencer {
+    /** Writes the target of the particle with index `index` into `position`. */
     transform(position: Vector3, index: number): void;
 
+    /** The sequencer's JSON. */
     toJSON(): any;
 
+    /** A copy with the same points. */
     clone(): Sequencer;
 }
 

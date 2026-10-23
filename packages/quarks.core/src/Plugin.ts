@@ -1,13 +1,22 @@
 import {BehaviorPlugin, BehaviorTypes} from './behaviors';
 import {EmitterShapePlugin, EmitterShapes} from './shape';
 
+/**
+ * A set of emitter shapes and behaviors to register with {@link loadPlugin}, so effect files can
+ * name them.
+ */
 export interface Plugin {
+    /** Identifies the plugin; loading a plugin with an id already loaded does nothing. */
     id: string;
+    /** Called once when the plugin is loaded, before its types are registered. */
     initialize: () => void;
+    /** The emitter shapes the plugin adds. */
     emitterShapes: Array<EmitterShapePlugin>;
+    /** The behaviors the plugin adds. */
     behaviors: Array<BehaviorPlugin>;
 }
 
+/** The plugins loaded, in load order. */
 export const Plugins: Array<Plugin> = [];
 
 /**

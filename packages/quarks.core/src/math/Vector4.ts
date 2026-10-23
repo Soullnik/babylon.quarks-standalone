@@ -1,15 +1,23 @@
 import {random} from '../util/random';
-import {Matrix3} from './Matrix3';
 import {Matrix4} from './Matrix4';
 import {Quaternion} from './Quaternion';
 
+/**
+ * A four-component vector (a three.js `Vector4` port): colours (r, g, b, a in x, y, z, w) and
+ * homogeneous coordinates. Methods that change it return it, so calls chain.
+ */
 class Vector4 {
+    /** The x component. */
     x: number;
+    /** The y component. */
     y: number;
+    /** The z component. */
     z: number;
+    /** The w component. */
     w: number;
     // Prototype-level marker (assigned once at the bottom of this file) so the
     // constructor only writes the four components.
+    /** Marks the object as a {@link Vector4}; true on every instance (set on the prototype). */
     declare readonly isVector4: boolean;
 
     constructor(x: number = 0, y: number = 0, z: number = 0, w: number = 1) {
@@ -19,22 +27,30 @@ class Vector4 {
         this.w = w;
     }
 
+    /** Alias of {@link Vector4.z}, for rectangles. */
     get width() {
         return this.z;
     }
 
+    /** Alias of {@link Vector4.z}, for rectangles. */
     set width(value) {
         this.z = value;
     }
 
+    /** Alias of {@link Vector4.w}, for rectangles. */
     get height() {
         return this.w;
     }
 
+    /** Alias of {@link Vector4.w}, for rectangles. */
     set height(value) {
         this.w = value;
     }
 
+    /**
+     * Sets the components to (x, y, z, w).
+     * @returns This vector.
+     */
     set(x: number, y: number, z: number, w: number): Vector4 {
         this.x = x;
         this.y = y;
@@ -44,6 +60,10 @@ class Vector4 {
         return this;
     }
 
+    /**
+     * Sets every component to `scalar`.
+     * @returns This vector.
+     */
     setScalar(scalar: number): Vector4 {
         this.x = scalar;
         this.y = scalar;
@@ -53,30 +73,50 @@ class Vector4 {
         return this;
     }
 
+    /**
+     * Sets the x component.
+     * @returns This vector.
+     */
     setX(x: number): Vector4 {
         this.x = x;
 
         return this;
     }
 
+    /**
+     * Sets the y component.
+     * @returns This vector.
+     */
     setY(y: number): Vector4 {
         this.y = y;
 
         return this;
     }
 
+    /**
+     * Sets the z component.
+     * @returns This vector.
+     */
     setZ(z: number): Vector4 {
         this.z = z;
 
         return this;
     }
 
+    /**
+     * Sets the w component.
+     * @returns This vector.
+     */
     setW(w: number): Vector4 {
         this.w = w;
 
         return this;
     }
 
+    /**
+     * Sets the component at `index` (0 for x … 3 for w); throws for any other index.
+     * @returns This vector.
+     */
     setComponent(index: number, value: number): Vector4 {
         switch (index) {
             case 0:
@@ -98,6 +138,7 @@ class Vector4 {
         return this;
     }
 
+    /** The component at `index` (0 for x … 3 for w); throws for any other index. */
     getComponent(index: number): number {
         switch (index) {
             case 0:
@@ -113,10 +154,15 @@ class Vector4 {
         }
     }
 
+    /** A new vector with the same components. */
     clone(): Vector4 {
         return new Vector4(this.x, this.y, this.z, this.w);
     }
 
+    /**
+     * Copies the components of `v` into this vector.
+     * @returns This vector.
+     */
     copy(v: Vector4): Vector4 {
         this.x = v.x;
         this.y = v.y;
@@ -126,6 +172,10 @@ class Vector4 {
         return this;
     }
 
+    /**
+     * Adds `v` to this vector.
+     * @returns This vector.
+     */
     add(v: Vector4): Vector4 {
         this.x += v.x;
         this.y += v.y;
@@ -135,6 +185,10 @@ class Vector4 {
         return this;
     }
 
+    /**
+     * Adds `s` to every component.
+     * @returns This vector.
+     */
     addScalar(scalar: number): Vector4 {
         this.x += scalar;
         this.y += scalar;
@@ -144,6 +198,10 @@ class Vector4 {
         return this;
     }
 
+    /**
+     * Sets this vector to `a + b`.
+     * @returns This vector.
+     */
     addVectors(a: Vector4, b: Vector4): Vector4 {
         this.x = a.x + b.x;
         this.y = a.y + b.y;
@@ -153,6 +211,10 @@ class Vector4 {
         return this;
     }
 
+    /**
+     * Adds `v` multiplied by `s` to this vector.
+     * @returns This vector.
+     */
     addScaledVector(v: Vector4, s: number): Vector4 {
         this.x += v.x * s;
         this.y += v.y * s;
@@ -161,6 +223,10 @@ class Vector4 {
 
         return this;
     }
+    /**
+     * Subtracts `v` from this vector.
+     * @returns This vector.
+     */
     sub(v: Vector4): Vector4 {
         this.x -= v.x;
         this.y -= v.y;
@@ -170,6 +236,10 @@ class Vector4 {
         return this;
     }
 
+    /**
+     * Subtracts `s` from every component.
+     * @returns This vector.
+     */
     subScalar(scalar: number): Vector4 {
         this.x -= scalar;
         this.y -= scalar;
@@ -179,6 +249,10 @@ class Vector4 {
         return this;
     }
 
+    /**
+     * Sets this vector to `a - b`.
+     * @returns This vector.
+     */
     subVectors(a: Vector4, b: Vector4): Vector4 {
         this.x = a.x - b.x;
         this.y = a.y - b.y;
@@ -188,6 +262,10 @@ class Vector4 {
         return this;
     }
 
+    /**
+     * Multiplies this vector by `v` component-wise.
+     * @returns This vector.
+     */
     multiply(v: Vector4): Vector4 {
         this.x *= v.x;
         this.y *= v.y;
@@ -197,6 +275,10 @@ class Vector4 {
         return this;
     }
 
+    /**
+     * Multiplies every component by `scalar`.
+     * @returns This vector.
+     */
     multiplyScalar(scalar: number): Vector4 {
         this.x *= scalar;
         this.y *= scalar;
@@ -206,6 +288,10 @@ class Vector4 {
         return this;
     }
 
+    /**
+     * Multiplies this vector by `m`.
+     * @returns This vector.
+     */
     applyMatrix4(m: Matrix4) {
         const x = this.x,
             y = this.y,
@@ -221,10 +307,19 @@ class Vector4 {
         return this;
     }
 
+    /**
+     * Divides every component by `scalar`.
+     * @returns This vector.
+     */
     divideScalar(scalar: number) {
         return this.multiplyScalar(1 / scalar);
     }
 
+    /**
+     * Sets x, y, z to the rotation axis and w to the angle in radians of the normalized quaternion
+     * `q`.
+     * @returns This vector.
+     */
     setAxisAngleFromQuaternion(q: Quaternion) {
         // http://www.euclideanspace.com/maths/geometry/rotations/conversions/quaternionToAngle/index.htm
 
@@ -247,7 +342,12 @@ class Vector4 {
         return this;
     }
 
-    setAxisAngleFromRotationMatrix(m: Matrix3) {
+    /**
+     * Sets x, y, z to the rotation axis and w to the angle in radians of the pure rotation in the upper
+     * 3×3 of `m`.
+     * @returns This vector.
+     */
+    setAxisAngleFromRotationMatrix(m: Matrix4) {
         // http://www.euclideanspace.com/maths/geometry/rotations/conversions/matrixToAngle/index.htm
 
         // assumes the upper 3x3 of m is a pure rotation matrix (i.e, unscaled)
@@ -355,6 +455,10 @@ class Vector4 {
         return this;
     }
 
+    /**
+     * Sets each component to the smaller of it and the matching component of `v`.
+     * @returns This vector.
+     */
     min(v: Vector4) {
         this.x = Math.min(this.x, v.x);
         this.y = Math.min(this.y, v.y);
@@ -364,6 +468,10 @@ class Vector4 {
         return this;
     }
 
+    /**
+     * Sets each component to the larger of it and the matching component of `v`.
+     * @returns This vector.
+     */
     max(v: Vector4) {
         this.x = Math.max(this.x, v.x);
         this.y = Math.max(this.y, v.y);
@@ -373,6 +481,11 @@ class Vector4 {
         return this;
     }
 
+    /**
+     * Clamps each component between the matching components of `min` and `max`; `min` must not
+     * exceed `max`.
+     * @returns This vector.
+     */
     clamp(min: Vector4, max: Vector4) {
         // assumes min < max, componentwise
 
@@ -384,6 +497,10 @@ class Vector4 {
         return this;
     }
 
+    /**
+     * Clamps each component between `minVal` and `maxVal`.
+     * @returns This vector.
+     */
     clampScalar(minVal: number, maxVal: number) {
         this.x = Math.max(minVal, Math.min(maxVal, this.x));
         this.y = Math.max(minVal, Math.min(maxVal, this.y));
@@ -393,12 +510,20 @@ class Vector4 {
         return this;
     }
 
+    /**
+     * Scales this vector so that its length lies between `min` and `max`, keeping its direction.
+     * @returns This vector.
+     */
     clampLength(min: number, max: number) {
         const length = this.length();
 
         return this.divideScalar(length || 1).multiplyScalar(Math.max(min, Math.min(max, length)));
     }
 
+    /**
+     * Rounds each component down.
+     * @returns This vector.
+     */
     floor() {
         this.x = Math.floor(this.x);
         this.y = Math.floor(this.y);
@@ -408,6 +533,10 @@ class Vector4 {
         return this;
     }
 
+    /**
+     * Rounds each component up.
+     * @returns This vector.
+     */
     ceil() {
         this.x = Math.ceil(this.x);
         this.y = Math.ceil(this.y);
@@ -417,6 +546,10 @@ class Vector4 {
         return this;
     }
 
+    /**
+     * Rounds each component to the nearest integer.
+     * @returns This vector.
+     */
     round() {
         this.x = Math.round(this.x);
         this.y = Math.round(this.y);
@@ -426,6 +559,10 @@ class Vector4 {
         return this;
     }
 
+    /**
+     * Rounds each component toward zero.
+     * @returns This vector.
+     */
     roundToZero() {
         this.x = Math.trunc(this.x);
         this.y = Math.trunc(this.y);
@@ -435,6 +572,10 @@ class Vector4 {
         return this;
     }
 
+    /**
+     * Negates every component.
+     * @returns This vector.
+     */
     negate() {
         this.x = -this.x;
         this.y = -this.y;
@@ -444,30 +585,46 @@ class Vector4 {
         return this;
     }
 
+    /** The dot product of this vector and `v`. */
     dot(v: Vector4) {
         return this.x * v.x + this.y * v.y + this.z * v.z + this.w * v.w;
     }
 
+    /** The squared Euclidean length; cheaper than {@link Vector4.length} for comparisons. */
     lengthSq() {
         return this.x * this.x + this.y * this.y + this.z * this.z + this.w * this.w;
     }
 
+    /** The Euclidean length. */
     length() {
         return Math.sqrt(this.x * this.x + this.y * this.y + this.z * this.z + this.w * this.w);
     }
 
+    /** The Manhattan length: the sum of the absolute components. */
     manhattanLength() {
         return Math.abs(this.x) + Math.abs(this.y) + Math.abs(this.z) + Math.abs(this.w);
     }
 
+    /**
+     * Scales this vector to length 1; a zero vector stays zero.
+     * @returns This vector.
+     */
     normalize() {
         return this.divideScalar(this.length() || 1);
     }
 
+    /**
+     * Scales this vector to `length`, keeping its direction.
+     * @returns This vector.
+     */
     setLength(length: number) {
         return this.normalize().multiplyScalar(length);
     }
 
+    /**
+     * Moves this vector toward `v` by `alpha` (0 keeps it, 1 reaches `v`).
+     * @returns This vector.
+     */
     lerp(v: Vector4, alpha: number) {
         this.x += (v.x - this.x) * alpha;
         this.y += (v.y - this.y) * alpha;
@@ -477,6 +634,10 @@ class Vector4 {
         return this;
     }
 
+    /**
+     * Sets this vector to the linear interpolation from `v1` to `v2` by `alpha`.
+     * @returns This vector.
+     */
     lerpVectors(v1: Vector4, v2: Vector4, alpha: number) {
         this.x = v1.x + (v2.x - v1.x) * alpha;
         this.y = v1.y + (v2.y - v1.y) * alpha;
@@ -486,10 +647,15 @@ class Vector4 {
         return this;
     }
 
+    /** Whether every component equals the matching component of `v` exactly. */
     equals(v: Vector4) {
         return v.x === this.x && v.y === this.y && v.z === this.z && v.w === this.w;
     }
 
+    /**
+     * Reads the 4 components from `array` starting at `offset`.
+     * @returns This vector.
+     */
     fromArray(array: number[], offset = 0) {
         this.x = array[offset];
         this.y = array[offset + 1];
@@ -499,6 +665,10 @@ class Vector4 {
         return this;
     }
 
+    /**
+     * Writes the 4 components into `array` starting at `offset`.
+     * @returns The array, a new one when none is given.
+     */
     toArray(array: number[] = [], offset = 0) {
         array[offset] = this.x;
         array[offset + 1] = this.y;
@@ -518,6 +688,10 @@ class Vector4 {
         return this;
     }*/
 
+    /**
+     * Sets each component to a random number in [0, 1), from the library's random source.
+     * @returns This vector.
+     */
     random() {
         this.x = random();
         this.y = random();
@@ -527,6 +701,7 @@ class Vector4 {
         return this;
     }
 
+    /** Iterates over the components in order (x, y, z, w). */
     *[Symbol.iterator]() {
         yield this.x;
         yield this.y;

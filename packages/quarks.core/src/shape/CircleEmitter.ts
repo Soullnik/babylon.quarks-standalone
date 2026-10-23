@@ -54,13 +54,30 @@ export interface CircleEmitterParameters {
  * a particle emitter that emits particles from a circle.
  */
 export class CircleEmitter implements EmitterShape {
+    /** Always `'circle'`. */
     type = 'circle';
+    /** Radius of the circle. */
     radius: number;
+    /** Arc, in radians, that particles start in; 2π for the whole circle. */
     arc: number; // [0, Math.PI * 2]
+    /**
+     * How far in from the rim particles may start, as a fraction of the radius: 0 on the rim, 1
+     * anywhere down to the centre.
+     */
     thickness: number; // [0, 1]
+    /** How the start point moves along the arc, see {@link EmitterMode}. */
     mode: EmitterMode;
+    /**
+     * Snaps the start point along the arc to multiples of this fraction (Unity's Spread); 0 for
+     * none.
+     */
     spread: number;
+    /**
+     * Speed of the arc sweep in arcs per second, for the `Loop` and `PingPong` modes; sampled over
+     * the system's cycle.
+     */
     speed: ValueGenerator | FunctionValueGenerator;
+    /** State the {@link CircleEmitter.speed} generator keeps. */
     memory: GeneratorMemory;
     transform?: ShapeTransform;
 
@@ -82,10 +99,12 @@ export class CircleEmitter implements EmitterShape {
         this.transform = parameters.transform;
     }
 
+    /** Advances the arc sweep by `delta` seconds in the `Loop` and `PingPong` modes. */
     update(system: IParticleSystem, delta: number): void {
         this.currentValue += this.speed.genValue(this.memory, system.emissionState.time / system.duration) * delta;
     }
 
+    /** Starts `p` on the circle, heading straight out at its start speed. */
     initialize(p: Particle, emissionState: EmissionState) {
         const u = getValueFromEmitterMode(this.mode, this.currentValue, this.spread, emissionState);
         const r = MathUtils.lerp(1 - this.thickness, 1, random());
@@ -99,6 +118,7 @@ export class CircleEmitter implements EmitterShape {
         this.transform?.apply(p);
     }
 
+    /** The shape's JSON. */
     toJSON(): ShapeJSON {
         return {
             type: 'circle',
@@ -112,6 +132,7 @@ export class CircleEmitter implements EmitterShape {
         };
     }
 
+    /** Reads {@link CircleEmitter.toJSON} output; a field the JSON leaves out takes its default. */
     static fromJSON(json: any): CircleEmitter {
         return new CircleEmitter({
             radius: json.radius,
@@ -124,6 +145,7 @@ export class CircleEmitter implements EmitterShape {
         });
     }
 
+    /** A copy with the same settings. */
     clone(): EmitterShape {
         return new CircleEmitter({
             radius: this.radius,

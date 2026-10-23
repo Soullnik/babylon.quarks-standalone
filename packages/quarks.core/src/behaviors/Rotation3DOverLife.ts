@@ -11,6 +11,10 @@ export class Rotation3DOverLife implements Behavior {
     /** Scratch for the frame's rotation step; also read by the fused pass. */
     tempQuat = new Quaternion();
 
+    /**
+     * @param angularVelocity - The turn per second over the particle's life, as a rotation
+     *   generator.
+     */
     constructor(public angularVelocity: RotationGenerator) {}
 
     initialize(particle: Particle): void {
@@ -44,6 +48,10 @@ export class Rotation3DOverLife implements Behavior {
         };
     }
 
+    /**
+     * Reads {@link Rotation3DOverLife.toJSON} output; a field the JSON leaves out takes its
+     * default.
+     */
     static fromJSON(json: any): Behavior {
         return new Rotation3DOverLife(RotationGeneratorFromJSON(json.angularVelocity));
     }

@@ -9,15 +9,34 @@ import {Behavior} from './Behavior';
  * {@link Sequencer}
  */
 export class ApplySequences implements Behavior {
+    /** The ease every move between two sequence points follows. */
     static BEZIER: Bezier = new Bezier(0, 0, 1, 1);
     type = 'ApplySequences';
+    /** The sequences in time order, each with the time range it plays in. */
     sequencers: Array<[IntervalValue, Sequencer]> = [];
 
+    /**
+     * Seconds the behavior has run.
+     * @internal
+     */
     time = 0;
+    /**
+     * The sequence playing now.
+     * @internal
+     */
     index = 0;
+    /**
+     * Particles seen so far; each takes the next point of a sequence.
+     * @internal
+     */
     pCount = 0;
 
+    /** Seconds between one particle's start of a move and the next one's. */
     delay: number;
+    /**
+     * Scratch value.
+     * @internal
+     */
     tempV: Vector3 = new Vector3();
 
     constructor(delayBetweenParticles: number) {
@@ -68,6 +87,7 @@ export class ApplySequences implements Behavior {
         this.time += delta;
     }
 
+    /** Adds `sequencer`, played over the time range `range` (its `a` to `b`, in seconds). */
     appendSequencer(range: IntervalValue, sequencer: Sequencer) {
         this.sequencers.push([range, sequencer]);
     }
@@ -83,6 +103,10 @@ export class ApplySequences implements Behavior {
         };
     }
 
+    /**
+     * Reads {@link ApplySequences.toJSON} output; a sequence of a type this version does not know
+     * is skipped.
+     */
     static fromJSON(json: any): Behavior {
         const seq = new ApplySequences(typeof json.delay === 'number' ? json.delay : 0);
         (Array.isArray(json.sequencers) ? json.sequencers : []).forEach((sequencerJson: any) => {

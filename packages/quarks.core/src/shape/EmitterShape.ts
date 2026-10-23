@@ -14,13 +14,22 @@ import {SphereEmitter} from './SphereEmitter';
 import {EmitterShape, ShapeJSON} from './EmitterUtil';
 import {RectangleEmitter} from './RectangleEmitter';
 
+/**
+ * How an emitter shape is registered in {@link EmitterShapes}: its name, class, editor fields and
+ * JSON reader.
+ */
 export interface EmitterShapePlugin {
+    /** The name the shape's JSON uses as `type`. */
     type: string;
+    /** The shape's class. */
     constructor: Constructable<EmitterShape>;
+    /** The fields an editor shows, with the kinds of value each takes. */
     params: ParameterPair[];
+    /** Reads the shape from its JSON, resolving references (a mesh) through `meta`. */
     loadJSON: (json: any, meta: JsonMetaData) => EmitterShape;
 }
 
+/** The emitter shapes effect files can name, by type; plugins add more. */
 export const EmitterShapes: {[key: string]: EmitterShapePlugin} = {
     box: {
         type: 'box',

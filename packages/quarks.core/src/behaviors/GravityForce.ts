@@ -14,6 +14,10 @@ import {Behavior} from './Behavior';
  */
 export class GravityForce implements Behavior {
     type = 'GravityForce';
+    /**
+     * Scratch value.
+     * @internal
+     */
     temp: Vector3 = new Vector3();
 
     constructor(
@@ -75,6 +79,7 @@ export class GravityForce implements Behavior {
         };
     }
 
+    /** Reads {@link GravityForce.toJSON} output; a field the JSON leaves out takes its default. */
     static fromJSON(json: any): Behavior {
         return new GravityForce(
             readVector3(json.center, new Vector3(0, 0, 0)),

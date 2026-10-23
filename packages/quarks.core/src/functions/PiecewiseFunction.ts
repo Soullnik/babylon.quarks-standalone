@@ -1,10 +1,18 @@
+/**
+ * A function over [0, 1] made of pieces, each a function of type `T` with the x it starts at; a
+ * piece runs to the next one's start, the last to 1.
+ */
 export abstract class PiecewiseFunction<T> {
+    /** The pieces as `[function, startX]`, sorted by start; the first starts at 0. */
     public functions: Array<[T, number]>;
 
     protected constructor() {
         this.functions = new Array<[T, number]>();
     }
 
+    /**
+     * The index of the piece `t` falls in, or -1 when `t` is outside [0, 1] or there are no pieces.
+     */
     findFunction(t: number): number {
         const functions = this.functions;
         const last = functions.length - 1;
@@ -27,37 +35,54 @@ export abstract class PiecewiseFunction<T> {
         return -1;
     }
 
+    /** The x where piece `index` starts. */
     getStartX(index: number) {
         return this.functions[index][1];
     }
+    /**
+     * Moves the start of piece `index`; the first piece always starts at 0, so index 0 is ignored.
+     */
     setStartX(index: number, x: number) {
         if (index > 0) this.functions[index][1] = x;
     }
+    /** The x where piece `index` ends: the next piece's start, or 1 for the last. */
     getEndX(index: number) {
         if (index + 1 < this.functions.length) return this.functions[index + 1][1];
         return 1;
     }
+    /**
+     * Moves the end of piece `index`, the next piece's start; the last piece always ends at 1, so
+     * it is ignored there.
+     */
     setEndX(index: number, x: number) {
         if (index + 1 < this.functions.length) this.functions[index + 1][1] = x;
     }
 
+    /** Inserts `func` as a piece starting at `t`, after the piece `t` falls in. */
     insertFunction(t: number, func: T): void {
         const index = this.findFunction(t);
         this.functions.splice(index + 1, 0, [func, t]);
     }
 
+    /**
+     * Removes piece `index`.
+     * @returns Its function.
+     */
     removeFunction(index: number): T {
         return this.functions.splice(index, 1)[0][0];
     }
 
+    /** The function of piece `index`. */
     getFunction(index: number) {
         return this.functions[index][0];
     }
 
+    /** Replaces the function of piece `index`. */
     setFunction(index: number, func: T) {
         this.functions[index][0] = func;
     }
 
+    /** How many pieces there are. */
     get numOfFunctions() {
         return this.functions.length;
     }

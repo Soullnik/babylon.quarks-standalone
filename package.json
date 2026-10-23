@@ -15,7 +15,7 @@
         "test:coverage": "jest --coverage",
         "typecheck": "tsc -p packages/quarks.core/tsconfig.test.json && tsc -p packages/babylon.quarks/tsconfig.test.json && tsc -p packages/babylon.quarks-editor/tsconfig.test.json && tsc -p examples/tsconfig.json",
         "docs": "npm run docs --workspace=babylon.quarks",
-        "docs:check": "npm run docs:check --workspace=babylon.quarks",
+        "docs:check": "npm run docs:check --workspace=quarks.core && npm run docs:check --workspace=babylon.quarks",
         "capture:previews": "tsx ./scripts/capture-demo-previews.mts",
         "check:pack": "node ./scripts/check-pack-contents.mjs",
         "build:unitypackage": "node ./scripts/build-unitypackage.mjs",
