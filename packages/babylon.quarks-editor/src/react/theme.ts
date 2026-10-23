@@ -1,18 +1,30 @@
 import type {CSSProperties} from 'react';
 
+/** The editor's colours and font, for hosts that style their own panels to match. */
 export const theme = {
+    /** Background of the side panels and docks. */
     panelBg: 'linear-gradient(180deg, rgba(12, 18, 38, 0.92), rgba(6, 10, 22, 0.94))',
+    /** Background of an inspector module or a framed list. */
     sectionBg: 'rgba(10, 16, 34, 0.6)',
+    /** Borders and separators. */
     border: '#2a365f',
+    /** The border of a selected or switched-on control. */
     borderActive: '#4f6fbe',
+    /** Body text. */
     text: '#eef3ff',
+    /** Labels and secondary text. */
     textDim: '#b7c6ea',
+    /** Highlights, such as a Save button with something to save. */
     accent: '#9eb9ff',
+    /** Background of inputs. */
     inputBg: 'rgba(7, 11, 22, 0.82)',
+    /** The line of curve editors. */
     curveStroke: '#78a5ff',
+    /** The editor's font stack. */
     font: 'Inter, Segoe UI, Roboto, sans-serif',
 };
 
+/** Style of a text or number input. */
 export const inputStyle: CSSProperties = {
     background: theme.inputBg,
     border: `1px solid ${theme.border}`,
@@ -26,6 +38,7 @@ export const inputStyle: CSSProperties = {
     fontFamily: theme.font,
 };
 
+/** Style of an inspector row: a label column, then the controls. */
 export const rowStyle: CSSProperties = {
     display: 'grid',
     gridTemplateColumns: '110px 1fr',
@@ -34,6 +47,7 @@ export const rowStyle: CSSProperties = {
     marginTop: 6,
 };
 
+/** Style of an inspector row's label. */
 export const labelStyle: CSSProperties = {
     color: theme.textDim,
     fontSize: 12,
@@ -42,6 +56,7 @@ export const labelStyle: CSSProperties = {
     textOverflow: 'ellipsis',
 };
 
+/** Style of a button. */
 export const buttonStyle: CSSProperties = {
     border: `1px solid #4563ad`,
     background: 'rgba(28, 48, 98, 0.55)',

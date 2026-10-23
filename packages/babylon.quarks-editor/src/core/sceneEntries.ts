@@ -12,12 +12,15 @@ import {disposeLoadedEffect, parseEffectFromJson} from './loadEffect.js';
  * that are edited separately.
  */
 export interface SceneEntry {
+    /** The instance's name in the Scene list, unique in the scene. */
     name: string;
     /** Path of the asset it came from, or a synthetic `_created/…` path for new effects. */
     path: string;
     /** Asset this instance was made from, if any. */
     assetId: number | null;
+    /** The instance's root node. */
     root: TransformNode;
+    /** Every particle system of the instance. */
     systems: ParticleSystem[];
 }
 

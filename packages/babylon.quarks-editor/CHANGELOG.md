@@ -6,16 +6,57 @@ and the project follows the `quarks.core` 0.x version line.
 
 ## [0.28.0] — unreleased
 
+### Breaking
+
+- **Texture callbacks are typed.** `resolveTexture` returns `Texture | null | undefined` instead
+  of `unknown` (on `EffectEditorHost`, `QuarksEffectEditor.Show`, `EffectEditor`,
+  `RendererModule` and `createDefaultEffect`). `TextureSelect`'s `loadTexture` and `onChange` use
+  `Texture`, and `RendererMaterialPatch` types `texture` as `Texture | null` and
+  `reflectionAtlas` as `BaseTexture | null`. A resolver that returns a Babylon `Texture` needs no
+  change; one typed to return something else must now return a `Texture`.
+- **`ValueField` has two prop shapes.** `CurveValueFieldProps` (the default, `curve` unset or
+  `true`) calls `onChange` with a `ScalarGenerator`; `ConstantValueFieldProps` (`curve: false`)
+  calls it with a `ValueGenerator`. Code that passed `curve={false}` and expected a curve back no
+  longer type-checks.
+
 ### Added
 
 - A **Render face** field (Both, Front, Back) for mesh systems, editing the library's new
   `renderFace`.
+- **`createEditorSession`** and the `EditorSession` interface, in a new
+  `babylon.quarks-editor/session` entry: the scene, camera, gizmos, history, scene entries, assets,
+  prefab mode and project save/load without React. The host passes only the view callbacks it
+  needs; none runs after `dispose()`, which also drops a project load or an import still in
+  flight. `EffectEditorHost` is now a view over a session. The session has its own entry because
+  it builds the viewport (grid, gizmos, markers), which the UI-free `.` entry does not load.
+- **`createEngine`** on `EffectEditorHostProps` (and `Show()`), to draw with a WebGPU or other
+  engine instead of the default WebGL `Engine`. It may return a promise, so a `WebGPUEngine` can
+  finish `initAsync()` first.
+- Exported types that public signatures already used: `AssetLoadProgress`, `EffectAsset`,
+  `AssetDragPayload`, `SceneEntry`, `TimelineRow` (`TimelineGroupRow | TimelineSystemRow`),
+  `AnyGenerator`, `ModuleProps`, `ConstantValueFieldProps` and `CurveValueFieldProps`, and
+  `EditorProject` from `./react`.
+- TSDoc on every public export. `npm run docs:check` now builds the editor's API docs and fails on
+  an undocumented export or a broken link.
 
 ### Fixed
 
+- A mesh from geometry without indices (a preset or a loaded GLB) no longer leaves the system
+  with no index buffer: it gets sequential indices, so it draws and exports. A mesh without UVs or
+  normals gets the library's fallback ones instead of keeping the previous mesh's.
+- Randomize Direction's angle no longer offers a curve. The angle is sampled once per particle,
+  so a curve could not apply, and a curve loaded from JSON shows as its starting value.
+- `EffectEditorHost` under React StrictMode, or remounted, no longer lets the first mount's project
+  load fill the live editor with entries from a disposed scene.
 - The transport's play resumes what pause froze and no longer replays effects or bursts that had
   already finished (it uses the library's new `resume()`, now that `play()` replays a finished
   system).
+
+### Internal
+
+- `EffectEditorHost` is split into a session and panel components under `src/react/host/`, and
+  every `as never` cast is gone. The session and the host have their own tests, and the React
+  code has a coverage floor.
 
 ## [0.27.1] — 2026-10-23
 

@@ -103,7 +103,7 @@ export function parseEffectFromJson(
     const autoplay = options.autoplay ?? registerRenderer;
 
     const loader = new QuarksLoader(scene, {baseUrl});
-    let root = loader.parse(json as never, baseUrl);
+    let root = loader.parse(json, baseUrl);
     flattenRedundantGroups(root);
     root = promoteIfSingleChildRoot(root);
 

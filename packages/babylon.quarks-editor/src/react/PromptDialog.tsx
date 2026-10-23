@@ -1,14 +1,21 @@
 import React, {useEffect, useRef, useState} from 'react';
 import {buttonStyle, inputStyle, theme} from './theme.js';
 
+/** Props of {@link PromptDialog}. */
 export interface PromptDialogProps {
+    /** What to enter. */
     title: string;
+    /** The text the field starts with, selected. */
     defaultValue?: string;
+    /** Hint shown in the empty field. */
     placeholder?: string;
+    /** The confirm button's text. Default `OK`. */
     confirmLabel?: string;
     /** Rejects empty/whitespace-only input by default (matches the old prompt() behavior). */
     allowEmpty?: boolean;
+    /** Receives the entered text, trimmed. */
     onSubmit: (value: string) => void;
+    /** Escape, the backdrop, Cancel, or an empty submit when empty is not allowed. */
     onCancel: () => void;
 }
 

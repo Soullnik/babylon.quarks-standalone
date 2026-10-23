@@ -1,22 +1,32 @@
-import type {FunctionValueGenerator, ValueGenerator} from 'babylon.quarks';
+import type {FunctionValueGenerator, RotationGenerator, ValueGenerator, Vector3Generator} from 'babylon.quarks';
 import {Bezier, ConstantValue, IntervalValue, PiecewiseBezier} from 'babylon.quarks';
 
+/** A generator of one number: a constant or random value, or a curve over the particle's life. */
 export type ScalarGenerator = ValueGenerator | FunctionValueGenerator;
+/** Any generator a value field can be pointed at; ones that are not scalar read as the default. */
+export type AnyGenerator = ScalarGenerator | Vector3Generator | RotationGenerator;
+/** How a value field produces its number: Unity's Constant, Random Between Two Constants or Curve. */
 export type ScalarMode = 'constant' | 'random' | 'curve';
 
 /** Editable snapshot of a scalar value generator. */
 export interface ScalarValueState {
+    /** Which of the fields below is the value. */
     mode: ScalarMode;
     /** Constant value (mode: constant). */
     value: number;
-    /** Random range (mode: random). */
+    /** Lower end of the random range (mode: random). */
     min: number;
+    /** Upper end of the random range (mode: random). */
     max: number;
     /** Cubic bezier control values over normalized lifetime (mode: curve). */
     curve: [number, number, number, number];
 }
 
-export function readScalar(generator: ScalarGenerator | undefined): ScalarValueState {
+/**
+ * What a value field shows for `generator`: its constant, its range or its first curve segment.
+ * Anything else, including a missing generator, reads as the constant 1.
+ */
+export function readScalar(generator: AnyGenerator | undefined): ScalarValueState {
     const state: ScalarValueState = {mode: 'constant', value: 1, min: 0.5, max: 1.5, curve: [0, 1, 1, 0]};
     if (generator instanceof ConstantValue) {
         state.mode = 'constant';
@@ -39,6 +49,9 @@ export function readScalar(generator: ScalarGenerator | undefined): ScalarValueS
     return state;
 }
 
+/** The generator a value field's state describes; a curve state builds a one-segment curve. */
+export function buildScalar(state: ScalarValueState & {mode: 'curve'}): PiecewiseBezier;
+export function buildScalar(state: ScalarValueState): ScalarGenerator;
 export function buildScalar(state: ScalarValueState): ScalarGenerator {
     switch (state.mode) {
         case 'constant':
@@ -52,12 +65,14 @@ export function buildScalar(state: ScalarValueState): ScalarGenerator {
 
 /** One segment of a piecewise bezier curve: start x (0..1) + four control values. */
 export interface CurvePiece {
+    /** Where the segment starts, 0..1 over the particle's life. */
     start: number;
+    /** The segment's four bezier control values. */
     p: [number, number, number, number];
 }
 
 /** Reads pieces from a PiecewiseBezier (or synthesizes one segment for other generators). */
-export function readPieces(generator: ScalarGenerator | undefined): CurvePiece[] {
+export function readPieces(generator: AnyGenerator | undefined): CurvePiece[] {
     if (generator instanceof PiecewiseBezier && generator.functions.length > 0) {
         return generator.functions.map(([bezier, start]) => ({
             start,
@@ -68,6 +83,7 @@ export function readPieces(generator: ScalarGenerator | undefined): CurvePiece[]
     return [{start: 0, p: fallback.curve}];
 }
 
+/** A piecewise bezier from segments, sorted by their start. */
 export function buildCurve(pieces: CurvePiece[]): PiecewiseBezier {
     const sorted = [...pieces].sort((a, b) => a.start - b.start);
     return new PiecewiseBezier(sorted.map((piece) => [new Bezier(...piece.p), piece.start] as [Bezier, number]));

@@ -1,0 +1,17 @@
+{
+    "$schema": "https://typedoc.org/schema.json",
+    "name": "babylon.quarks-editor",
+    "entryPoints": ["src/index.ts", "src/session.ts", "src/react/index.ts"],
+    "out": "../../examples/dist/docs-editor",
+    "excludePrivate": true,
+    "excludeInternal": true,
+    "excludeExternals": true,
+    "includeVersion": true,
+    "hideGenerator": true,
+    "validation": {
+        "notExported": true,
+        "invalidLink": true,
+        "notDocumented": true
+    },
+    "treatWarningsAsErrors": true
+}

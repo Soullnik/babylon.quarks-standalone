@@ -18,20 +18,27 @@ import {buttonStyle, theme} from './theme.js';
 
 const ROW_HEIGHT = 34;
 
+/** Props of {@link ScenePanel}. */
 export interface ScenePanelProps {
+    /** The effects in the scene, in list order. */
     entries: SceneEntry[];
     /** Effect shown in the inspector and timeline. */
     focusedRoot: TransformNode | null;
     /** Visible entries — they render and play with the stage transport. */
     visibleRootIds: ReadonlySet<number>;
+    /** Focuses an effect in the inspector and timeline. */
     onFocus: (entry: SceneEntry) => void;
+    /** Shows or hides an effect. */
     onToggleVisible: (entry: SceneEntry) => void;
     /** Root of the entry shown alone, or null. */
     soloRootId: number | null;
+    /** Shows an effect alone, or ends solo. */
     onToggleSolo: (entry: SceneEntry) => void;
+    /** Removes an effect from the scene. */
     onDelete: (entry: SceneEntry) => void;
     /** "Save as new asset…" in the row's right-click menu. */
     onSaveAsAsset?: (entry: SceneEntry) => void;
+    /** Adds a new default effect. */
     onCreateDefault: () => void;
     /** Node shown in the inspector; highlighted in the expanded effect trees. */
     selectedNode?: TransformNode | null;

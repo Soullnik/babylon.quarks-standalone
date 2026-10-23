@@ -69,8 +69,9 @@ The `.` export is UI-free (edit model, serialization, value/shape/gradient helpe
 The editor never loads assets itself — it defers to host-supplied callbacks so it doesn't need
 an opinion on your CDN, asset pipeline, or loader (`@babylonjs/loaders`, your own backend, etc.):
 
-- `resolveTexture(url) => Texture-like` — turns a picked URL or `data:` URI (from "Custom URL…" /
-  "Load from file…" in the Renderer module) into whatever object you assign as `system.texture`.
+- `resolveTexture(url) => Texture | null | undefined` — turns a picked URL or `data:` URI (from
+  "Custom URL…" / "Load from file…" in the Renderer module) into the Babylon `Texture` assigned as
+  `system.texture`. Return `null` or `undefined` to leave the texture unset.
 - `resolveGeometry(file) => Promise<GeometryData>` — turns a picked file (from "Load from file…"
   in the Mesh render mode's geometry dropdown) into vertex buffers: `{positions, indices?, uvs?,
 uvs2?, normals?}` (typed arrays or plain number arrays; `uvs2` is the second UV set textures on
@@ -83,10 +84,10 @@ uvs2?, normals?}[]` — preset lists shown alongside "Custom URL…" / "Load fro
 host" bugs:
 
 - `QuarksEffectEditor.Show(...)` / `<EffectEditorHost>` call your callbacks with the live
-  `Scene` as a second argument: `resolveTexture: (url, scene) => unknown`,
+  `Scene` as a second argument: `resolveTexture: (url, scene) => Texture | null | undefined`,
   `resolveGeometry: (file, scene) => Promise<GeometryData>`.
 - The lower-level `<EffectEditor>` (no Host wrapper) does **not** pass a scene:
-  `resolveTexture: (url) => unknown`, `resolveGeometry: (file) => Promise<GeometryData>`. If you
+  `resolveTexture: (url) => Texture | null | undefined`, `resolveGeometry: (file) => Promise<GeometryData>`. If you
   copy a `Show()`-style resolver that reads its `scene` parameter into a raw `<EffectEditor>`,
   `scene` is `undefined` and your resolver throws.
 
@@ -114,6 +115,29 @@ resolveGeometry: async (file, scene) => {
     // ...extract positions/indices/uvs/normals from `mesh`, dispose the imported nodes, return them
 },
 ```
+
+## Custom engines and headless use
+
+`<EffectEditorHost>` creates a WebGL `Engine` on its canvas. Pass `createEngine` to build another
+engine on that canvas instead, or a `NullEngine` in tests. It may return a promise:
+
+```ts
+createEngine: async (canvas) => {
+    const engine = new WebGPUEngine(canvas);
+    await engine.initAsync();
+    return engine;
+},
+```
+
+Build a new engine on every call: the host disposes it when it unmounts, and React StrictMode
+mounts the host twice.
+
+Everything the host does besides drawing its panels lives in an `EditorSession`, from the
+`babylon.quarks-editor/session` entry: `createEditorSession({engine, playback, view, ...})`. The
+session owns the scene, camera, gizmos, history, scene entries, assets, prefab mode and project
+save/load, and reports changes through the `view` callbacks you pass. Use it to drive the editor
+from your own UI, or to script and test editing without React. It builds the viewport (grid,
+gizmos, markers), which is why it is not part of the lighter UI-free `.` entry.
 
 ## License
 

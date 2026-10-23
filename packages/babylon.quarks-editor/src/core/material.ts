@@ -1,14 +1,24 @@
+import type {BaseTexture} from '@babylonjs/core/Materials/Textures/baseTexture.js';
+import type {Texture} from '@babylonjs/core/Materials/Textures/texture.js';
 import type {ParticleSystem} from 'babylon.quarks';
 
+/** Material settings the Renderer module changes; fields left out keep their value. */
 export interface RendererMaterialPatch {
+    /** The blend mode, see `ParticleSystem.blending`. */
     blendMode?: number;
+    /** Draws with alpha blending. */
     transparent?: boolean;
+    /** Tests against the depth buffer. */
     depthTest?: boolean;
+    /** Writes to the depth buffer. */
     depthWrite?: boolean;
+    /** Discards pixels whose alpha is below this. */
     alphaTest?: number;
-    texture?: unknown;
+    /** The main texture, or null for none. */
+    texture?: Texture | null;
     /** A 3×2 cube-face atlas mesh particles reflect, or null for none. */
-    reflectionAtlas?: unknown;
+    reflectionAtlas?: BaseTexture | null;
+    /** How strongly mesh particles reflect the atlas, 0..1. */
     reflectionLevel?: number;
 }
 
@@ -36,10 +46,10 @@ export function applyRendererMaterial(system: ParticleSystem, patch: RendererMat
         settings.materialAlphaTest = patch.alphaTest;
     }
     if (patch.texture !== undefined) {
-        system.texture = patch.texture as never;
+        system.texture = patch.texture;
     }
     if (patch.reflectionAtlas !== undefined) {
-        settings.reflectionAtlas = patch.reflectionAtlas as never;
+        settings.reflectionAtlas = patch.reflectionAtlas;
     }
     if (patch.reflectionLevel !== undefined) {
         settings.reflectionLevel = patch.reflectionLevel;

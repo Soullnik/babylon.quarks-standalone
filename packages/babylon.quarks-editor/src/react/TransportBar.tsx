@@ -8,16 +8,25 @@ import {PLAYBACK_SPEEDS, restartFocusPlayback, toggleStagePlayback} from '../cor
 import {iconStyle} from './icons.js';
 import {buttonStyle, theme} from './theme.js';
 
+/** Props of {@link TransportBar}. */
 export interface TransportBarProps {
+    /** The focused effect, which Restart and Step act on. */
     binding: EffectBinding | null;
+    /** The preview scene, redrawn after a restart. */
     scene: Scene;
+    /** The renderer the effects draw through. */
     renderer: BatchedRenderer;
+    /** Playback state shared with the host's render loop. */
     playbackRef: React.MutableRefObject<PlaybackState>;
     /** The host's render loop writes time and particle count here. */
     counterRef: React.RefObject<HTMLSpanElement | null>;
+    /** The stage is playing. */
     stagePlaying: boolean;
+    /** Plays or pauses the stage. */
     setStagePlaying: (playing: boolean) => void;
+    /** Playback speed, 1 for real time. */
     speed: number;
+    /** Sets the playback speed. */
     setSpeed: (speed: number) => void;
     /** False when the focused effect is hidden. */
     enabled: boolean;

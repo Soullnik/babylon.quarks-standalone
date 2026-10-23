@@ -2,6 +2,7 @@ import React, {useEffect, useState} from 'react';
 import {InspectorLabel} from './InspectorLabel.js';
 import {inputStyle, rowStyle} from './theme.js';
 
+/** An inspector row: a label, with an optional hint, and its controls. */
 export function Row(props: {label: string; hint?: string; hintKey?: string; children: React.ReactNode}) {
     return (
         <div style={rowStyle}>
@@ -53,6 +54,7 @@ export function NumberField(props: {
     );
 }
 
+/** A checkbox bound to a boolean. */
 export function CheckboxField(props: {value: boolean; onChange: (value: boolean) => void}) {
     return (
         <input
@@ -65,9 +67,18 @@ export function CheckboxField(props: {value: boolean; onChange: (value: boolean)
     );
 }
 
+/** A select bound to a value, from a list of options. */
 export function SelectField<T extends string | number>(props: {
+    /** The selected value. */
     value: T;
-    options: Array<{value: T; label: string}>;
+    /** The options, in menu order. */
+    options: Array<{
+        /** The option's value. */
+        value: T;
+        /** Its text. */
+        label: string;
+    }>;
+    /** Receives the picked value, a number when the values are numbers. */
     onChange: (value: T) => void;
 }) {
     const numeric = typeof props.value === 'number';

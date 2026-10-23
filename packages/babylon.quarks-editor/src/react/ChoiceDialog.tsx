@@ -1,16 +1,23 @@
 import React, {useEffect} from 'react';
 import {buttonStyle, theme} from './theme.js';
 
+/** One button of a {@link ChoiceDialog}. */
 export interface ChoiceDialogAction {
+    /** The button's text. */
     label: string;
+    /** Runs when the button is pressed. */
     onSelect: () => void;
     /** Accent button — also what Enter picks. */
     primary?: boolean;
+    /** Shows the button in red, for a destructive choice. */
     danger?: boolean;
 }
 
+/** Props of {@link ChoiceDialog}. */
 export interface ChoiceDialogProps {
+    /** The question. */
     title: string;
+    /** What the choice means. */
     message: React.ReactNode;
     /** Shown left to right; put the cancel action first. */
     actions: ChoiceDialogAction[];

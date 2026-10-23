@@ -4,12 +4,17 @@ import {ParticleEmitter, serializeEffect} from 'babylon.quarks';
 import {isEditorSceneNode} from './editorScene.js';
 
 /** A node in the editor's effect hierarchy: a Group (organizational) or a ParticleEmitter. */
+/** One node of an effect's tree: a group, or an emitter with its system. */
 export interface EffectTreeNode {
+    /** The node. */
     node: TransformNode;
+    /** The node's name, or a readable stand-in when it has none. */
     name: string;
     /** Present when the node is a ParticleEmitter. */
     system?: ParticleSystem;
+    /** How deep the node sits; the root is 0. */
     depth: number;
+    /** The node's child groups and emitters. */
     children: EffectTreeNode[];
 }
 

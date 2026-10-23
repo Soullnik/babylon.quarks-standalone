@@ -7,12 +7,21 @@ import {iconStyle} from './icons.js';
 import {PromptDialog} from './PromptDialog.js';
 import {buttonStyle, globalEditorStyles, theme} from './theme.js';
 
+/** Props of {@link ProjectsPage}. */
 export interface ProjectsPageProps {
+    /** Where the projects live. */
     store: ProjectStore;
+    /** Opens a project in the editor. */
     onOpen: (project: ProjectMeta) => void;
+    /** The page's heading. */
     title?: string;
     /** Optional link back to the page that hosts the editor (e.g. a gallery), shown above the title. */
-    backLink?: {href: string; label: string};
+    backLink?: {
+        /** Where the link goes. */
+        href: string;
+        /** The link's text. */
+        label: string;
+    };
 }
 
 type Dialog =

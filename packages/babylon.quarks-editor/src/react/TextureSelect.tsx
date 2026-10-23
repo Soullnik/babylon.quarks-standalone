@@ -1,4 +1,4 @@
-import type {BaseTexture} from '@babylonjs/core/Materials/Textures/baseTexture.js';
+import type {Texture} from '@babylonjs/core/Materials/Textures/texture.js';
 import {useState} from 'react';
 import {SelectField} from './fields.js';
 import type {TextureOption} from './modules.js';
@@ -21,10 +21,10 @@ export function TextureSelect(props: {
     /** The slot's current texture (anything with a `url`), or null for none. */
     value: unknown;
     textureOptions?: TextureOption[];
-    /** Turns a URL or `data:` URI into the host's texture object; null when it cannot. */
-    loadTexture: (url: string) => unknown;
-    /** The host's texture object, assumed to be a Babylon texture, or null for none. */
-    onChange: (texture: BaseTexture | null) => void;
+    /** Turns a URL or `data:` URI into a texture; null or undefined when it cannot. */
+    loadTexture: (url: string) => Texture | null | undefined;
+    /** The picked texture, or null for none. */
+    onChange: (texture: Texture | null) => void;
     /** Label of the "none" entry. Default "(none)". */
     noneLabel?: string;
     /** Shows a thumbnail of the current texture under the select. Default false. */
@@ -39,7 +39,7 @@ export function TextureSelect(props: {
     const apply = (url: string) => {
         const texture = props.loadTexture(url);
         if (texture) {
-            props.onChange(texture as BaseTexture);
+            props.onChange(texture);
         }
     };
     return (

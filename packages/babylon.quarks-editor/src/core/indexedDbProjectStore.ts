@@ -119,12 +119,14 @@ export class IndexedDbProjectStore implements ProjectStore {
 
     // ---- projects -------------------------------------------------------------------------
 
+    /** {@inheritDoc ProjectStore.listProjects} */
     async listProjects(): Promise<ProjectMeta[]> {
         const db = await this.db();
         const all = await request<ProjectMeta[]>(db.transaction('projects').objectStore('projects').getAll());
         return all.sort((a, b) => b.updatedAt - a.updatedAt);
     }
 
+    /** {@inheritDoc ProjectStore.getProject} */
     async getProject(id: string): Promise<ProjectMeta | null> {
         const db = await this.db();
         return (
@@ -132,6 +134,7 @@ export class IndexedDbProjectStore implements ProjectStore {
         );
     }
 
+    /** {@inheritDoc ProjectStore.createProject} */
     async createProject(name: string): Promise<ProjectMeta> {
         const now = Date.now();
         const meta: ProjectMeta = {id: newId(), name, createdAt: now, updatedAt: now, assetCount: 0, sizeBytes: 0};
@@ -142,6 +145,7 @@ export class IndexedDbProjectStore implements ProjectStore {
         return meta;
     }
 
+    /** {@inheritDoc ProjectStore.renameProject} */
     async renameProject(id: string, name: string): Promise<void> {
         const meta = await this.getProject(id);
         if (!meta) return;
@@ -151,6 +155,7 @@ export class IndexedDbProjectStore implements ProjectStore {
         await done(tx);
     }
 
+    /** {@inheritDoc ProjectStore.duplicateProject} */
     async duplicateProject(id: string, name: string): Promise<ProjectMeta> {
         const source = await this.getProject(id);
         if (!source) throw new Error('Project not found.');
@@ -172,6 +177,7 @@ export class IndexedDbProjectStore implements ProjectStore {
         return meta;
     }
 
+    /** {@inheritDoc ProjectStore.deleteProject} */
     async deleteProject(id: string): Promise<void> {
         const db = await this.db();
         const tx = db.transaction(['projects', 'assets', 'files', 'scenes'], 'readwrite');
@@ -189,6 +195,7 @@ export class IndexedDbProjectStore implements ProjectStore {
 
     // ---- assets ---------------------------------------------------------------------------
 
+    /** {@inheritDoc ProjectStore.loadAssets} */
     async loadAssets(projectId: string): Promise<StoredAsset[]> {
         const db = await this.db();
         const records = await request<AssetRecord[]>(
@@ -204,6 +211,7 @@ export class IndexedDbProjectStore implements ProjectStore {
         );
     }
 
+    /** {@inheritDoc ProjectStore.putAssets} */
     async putAssets(projectId: string, assets: StoredAsset[]): Promise<void> {
         const files = new Map<string, Blob>();
         const packed = await Promise.all(
@@ -217,6 +225,7 @@ export class IndexedDbProjectStore implements ProjectStore {
         await this.refresh(projectId);
     }
 
+    /** {@inheritDoc ProjectStore.deleteAssets} */
     async deleteAssets(projectId: string, paths: string[]): Promise<void> {
         const db = await this.db();
         const tx = db.transaction('assets', 'readwrite');
@@ -227,6 +236,7 @@ export class IndexedDbProjectStore implements ProjectStore {
 
     // ---- scene ----------------------------------------------------------------------------
 
+    /** {@inheritDoc ProjectStore.loadScene} */
     async loadScene(projectId: string): Promise<StoredScene | null> {
         const db = await this.db();
         const record = await request<SceneRecord | undefined>(
@@ -239,6 +249,7 @@ export class IndexedDbProjectStore implements ProjectStore {
         return {entries, savedAt: record.savedAt};
     }
 
+    /** {@inheritDoc ProjectStore.saveScene} */
     async saveScene(projectId: string, scene: StoredScene): Promise<void> {
         const files = new Map<string, Blob>();
         const entries: StoredSceneEntry[] = await Promise.all(
@@ -254,6 +265,7 @@ export class IndexedDbProjectStore implements ProjectStore {
 
     // ---- storage ----------------------------------------------------------------------------
 
+    /** {@inheritDoc ProjectStore.estimate} */
     async estimate(): Promise<StorageEstimate> {
         const storage = typeof navigator !== 'undefined' ? navigator.storage : undefined;
         const estimate = storage?.estimate ? await storage.estimate() : undefined;
@@ -261,6 +273,7 @@ export class IndexedDbProjectStore implements ProjectStore {
         return {usage: estimate?.usage ?? null, quota: estimate?.quota ?? null, persisted};
     }
 
+    /** {@inheritDoc ProjectStore.requestPersistence} */
     async requestPersistence(): Promise<boolean> {
         const storage = typeof navigator !== 'undefined' ? navigator.storage : undefined;
         return storage?.persist ? storage.persist() : false;

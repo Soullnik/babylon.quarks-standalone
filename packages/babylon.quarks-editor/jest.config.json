@@ -23,5 +23,5 @@
         "^babylon\\.quarks$": "<rootDir>/../babylon.quarks/src/index.ts",
         "^(\\.{1,2}/.*)\\.js$": "$1"
     },
-    "collectCoverageFrom": ["src/core/**/*.ts"]
+    "collectCoverageFrom": ["src/**/*.{ts,tsx}", "!src/index.ts", "!src/session.ts", "!src/react/index.ts"]
 }

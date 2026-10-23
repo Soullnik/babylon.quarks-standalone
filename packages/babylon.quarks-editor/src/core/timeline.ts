@@ -7,21 +7,46 @@ import type {EffectTreeNode} from './effectTree.js';
 /** Guards against a literally zero-width ruler (e.g. no tracks yet) — not a usability stretch. */
 const MIN_TIMELINE_SPAN = 0.01;
 
-export type TimelineRow =
-    | {kind: 'group'; node: TransformNode; name: string; depth: number}
-    | {
-          kind: 'track';
-          node: TransformNode;
-          system: ParticleSystem;
-          name: string;
-          depth: number;
-          isRoot: boolean;
-          removable: boolean;
-          startOffset: number;
-          startOffsetVariable: boolean;
-          duration: number;
-          looping: boolean;
-      };
+/** A timeline row for a group node: a heading over the tracks of the systems under it. */
+export interface TimelineGroupRow {
+    /** Tells group rows from track rows. */
+    kind: 'group';
+    /** The group's node. */
+    node: TransformNode;
+    /** The group's name. */
+    name: string;
+    /** How deep the group sits in the effect tree; the root's children are 0. */
+    depth: number;
+}
+
+/** A timeline row for one particle system: a bar from its start delay over its duration. */
+export interface TimelineSystemRow {
+    /** Tells group rows from track rows. */
+    kind: 'track';
+    /** The system's emitter node. */
+    node: TransformNode;
+    /** The system. */
+    system: ParticleSystem;
+    /** The emitter's name. */
+    name: string;
+    /** How deep the emitter sits in the effect tree. */
+    depth: number;
+    /** True for the effect's main system. */
+    isRoot: boolean;
+    /** False for the one system an effect cannot lose. */
+    removable: boolean;
+    /** Where the bar starts: the start delay, its lower end when random, in seconds. */
+    startOffset: number;
+    /** True when the start delay is a curve and the bar's start is only indicative. */
+    startOffsetVariable: boolean;
+    /** The bar's length, the system's duration in seconds. */
+    duration: number;
+    /** True when the system loops; its bar runs to the end of the ruler. */
+    looping: boolean;
+}
+
+/** One row of the focused effect's timeline. */
+export type TimelineRow = TimelineGroupRow | TimelineSystemRow;
 
 /**
  * Reads a representative start-delay value for display without invoking the generator's

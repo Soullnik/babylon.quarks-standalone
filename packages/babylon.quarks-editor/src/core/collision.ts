@@ -8,8 +8,12 @@ import {Vector3, getPhysicsResolver, setPhysicsResolver} from 'babylon.quarks';
  * which is exactly what ApplyCollision.update reflects the velocity against.
  */
 export class GroundPlaneResolver {
+    /** @param y - Height of the ground plane. */
     constructor(public y = 0) {}
 
+    /**
+     * True when `position` is at or below the plane, with the plane's normal written to `normal`.
+     */
     resolve(position: Vector3, normal: Vector3): boolean {
         if (position.y <= this.y) {
             normal.set(0, 1, 0);

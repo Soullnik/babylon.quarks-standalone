@@ -1,3 +1,4 @@
+import type {Texture} from '@babylonjs/core/Materials/Textures/texture.js';
 import {TransformNode} from '@babylonjs/core/Meshes/transformNode.js';
 import type {Scene} from '@babylonjs/core/scene.js';
 import {
@@ -14,14 +15,14 @@ import {DEFAULT_GRADIENT_STOPS, buildGradient} from './colors.js';
 import {uniqueEntryName, type SceneEntry} from './sceneEntries.js';
 
 export interface CreateSceneDefaultOptions {
-    resolveTexture?: (url: string, scene: Scene) => unknown;
+    resolveTexture?: (url: string, scene: Scene) => Texture | null | undefined;
     textureUrl?: string;
 }
 
 /** Creates a simple cone burst preset for new editor effects. */
 export function createDefaultEffect(
     scene: Scene,
-    resolveTexture?: (url: string, scene: Scene) => unknown,
+    resolveTexture?: (url: string, scene: Scene) => Texture | null | undefined,
     textureUrl?: string
 ): ParticleSystem {
     const system = new ParticleSystem({
@@ -35,7 +36,7 @@ export function createDefaultEffect(
         emissionOverTime: new ConstantValue(80),
         shape: new ConeEmitter({radius: 0.3, angle: 0.25}),
         renderMode: RenderMode.BillBoard,
-        texture: (textureUrl && resolveTexture ? resolveTexture(textureUrl, scene) : undefined) as never,
+        texture: textureUrl && resolveTexture ? resolveTexture(textureUrl, scene) : undefined,
         transparent: true,
         blendMode: 1,
     });

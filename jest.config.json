@@ -9,7 +9,10 @@
         "packages/babylon.quarks/src/**/*.{js,ts}",
         "!packages/babylon.quarks/src/index.ts",
         "!packages/babylon.quarks/src/shaders/index.ts",
-        "packages/babylon.quarks-editor/src/core/**/*.ts",
+        "packages/babylon.quarks-editor/src/**/*.{ts,tsx}",
+        "!packages/babylon.quarks-editor/src/index.ts",
+        "!packages/babylon.quarks-editor/src/session.ts",
+        "!packages/babylon.quarks-editor/src/react/index.ts",
         "!**/*.d.ts"
     ],
     "coverageThreshold": {
@@ -25,11 +28,17 @@
             "functions": 96,
             "lines": 94
         },
-        "./packages/babylon.quarks-editor/src/": {
+        "./packages/babylon.quarks-editor/src/core/": {
             "statements": 95,
             "branches": 88,
             "functions": 95,
             "lines": 96
+        },
+        "./packages/babylon.quarks-editor/src/react/": {
+            "statements": 54,
+            "branches": 55,
+            "functions": 41,
+            "lines": 57
         }
     }
 }

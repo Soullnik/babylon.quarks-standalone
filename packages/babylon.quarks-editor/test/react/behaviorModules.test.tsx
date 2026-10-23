@@ -1,8 +1,8 @@
 /** @jest-environment jsdom */
-import {ConstantValue, FrameOverLife, GravityForce, IntervalValue} from 'babylon.quarks';
+import {ChangeEmitDirection, ConstantValue, FrameOverLife, GravityForce, IntervalValue} from 'babylon.quarks';
 import {EffectBinding} from '../../src/core/binding';
 import {findBehavior} from '../../src/core/colors';
-import {AttractorModule, TextureSheetModule} from '../../src/react/behaviorModules';
+import {AttractorModule, EmitDirectionModule, TextureSheetModule} from '../../src/react/behaviorModules';
 import {makeSystem, useScene} from '../helpers';
 import {click, controlsOf, hasRow, moduleToggle, mount, Mounted, openModule, pick, rowOf, type} from './dom';
 
@@ -92,5 +92,30 @@ describe('Attractor module', () => {
         expect(attractor().magnitude).toBe(5);
         click(moduleToggle(section));
         expect(findBehavior(system.behaviors, 'GravityForce')).toBeUndefined();
+    });
+});
+
+describe('Randomize Direction module', () => {
+    const scene = useScene();
+    let mounted: Mounted | null = null;
+    afterEach(() => {
+        mounted?.unmount();
+        mounted = null;
+    });
+
+    it('offers no curve for the angle, which is sampled once per particle', () => {
+        const system = makeSystem(scene.get());
+        const binding = new EffectBinding(system);
+        const element = () => <EmitDirectionModule binding={binding} />;
+        mounted = mount(element());
+        binding.subscribe(() => mounted!.render(element()));
+        const section = openModule(mounted.container, 'Randomize Direction');
+        click(moduleToggle(section));
+        const direction = () => findBehavior<ChangeEmitDirection>(system.behaviors, 'ChangeEmitDirection')!;
+        expect(direction()).toBeDefined();
+        const mode = controlsOf(rowOf(mounted.container, 'Angle (rad)'))[0] as HTMLSelectElement;
+        expect(Array.from(mode.options).map((o) => o.value)).toEqual(['constant', 'random']);
+        pick(mode, 'constant');
+        expect(direction().angle).toBeInstanceOf(ConstantValue);
     });
 });

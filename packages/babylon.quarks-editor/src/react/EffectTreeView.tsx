@@ -5,10 +5,13 @@ import {buildEffectTree, type EffectTreeNode} from '../core/effectTree.js';
 import {iconStyle} from './icons.js';
 import {theme} from './theme.js';
 
+/** Props of {@link EffectTreeView}. */
 export interface EffectTreeViewProps {
+    /** The effect's root. */
     root: TransformNode;
     /** Node shown in the inspector (and moved by the gizmo). */
     selectedNode: TransformNode | null;
+    /** Selects a group or emitter. */
     onSelect: (node: TransformNode) => void;
     /** Show the root itself as the first row (default: only its descendants). */
     includeRoot?: boolean;

@@ -7,7 +7,9 @@ import {QuarksLoader} from 'babylon.quarks';
  * fresh, independent copy (see `instantiateSceneEntry`).
  */
 export interface EffectAsset {
+    /** The asset's id in this session; scene entries made from it keep it. */
     id: number;
+    /** The asset's display name, its file name without `.json`. */
     name: string;
     /** Relative path inside the imported folder (preserves subfolders). */
     path: string;
@@ -17,10 +19,15 @@ export interface EffectAsset {
     missingFiles: string[];
 }
 
+/** How far an asset import got. */
 export interface AssetLoadProgress {
+    /** JSON files read so far. */
     done: number;
+    /** JSON files in the import. */
     total: number;
+    /** Effects found so far. */
     loaded: number;
+    /** Files that could not be read. */
     failed: number;
 }
 

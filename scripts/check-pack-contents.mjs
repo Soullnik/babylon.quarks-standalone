@@ -116,6 +116,8 @@ function assertConsumersCanImport() {
             if (typeof quarks.BatchedRenderer !== 'function') throw new Error('babylon.quarks: no BatchedRenderer');
             const editor = await import('babylon.quarks-editor');
             if (typeof editor.EffectBinding !== 'function') throw new Error('babylon.quarks-editor: no EffectBinding');
+            const session = await import('babylon.quarks-editor/session');
+            if (typeof session.createEditorSession !== 'function') throw new Error('babylon.quarks-editor/session: no createEditorSession');
             const ui = await import('babylon.quarks-editor/react');
             if (typeof ui.EditorWorkspace !== 'function') throw new Error('babylon.quarks-editor/react: no EditorWorkspace');`;
         run(process.execPath, ['--input-type=module', '-e', esm], consumer);
@@ -197,6 +199,8 @@ function main() {
     assertRequiredFiles('babylon.quarks-editor', getPackResult('babylon.quarks-editor'), [
         'dist/index.js',
         'dist/index.d.ts',
+        'dist/session.js',
+        'dist/session.d.ts',
         'dist/react/index.js',
         'dist/react/index.d.ts',
         'LICENSE',

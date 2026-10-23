@@ -34,21 +34,31 @@ const iconButton: React.CSSProperties = {
 
 const ROW_HEIGHT = 28;
 
+/** Props of {@link TimelineTrackRow}. */
 export interface TimelineTrackRowProps {
+    /** The group or track the row shows. */
     row: TimelineRow;
+    /** The focused effect, edited by the row's actions. */
     binding: EffectBinding;
+    /** The row's node is the one in the inspector. */
     selected: boolean;
+    /** Selects the row's node. */
     onSelectNode: (node: TransformNode | null) => void;
+    /** The ruler's scale, pixels per second. */
     pxPerSecond: number;
     /** Matches the ruler's left gutter so bars line up under the correct tick. */
     offsetPx: number;
+    /** A group row's children are hidden. */
     collapsed: boolean;
+    /** Collapses or expands a group row. */
     onToggleCollapse?: () => void;
     /** Preview-only visibility (toggles `system.emitter.visible`); lets you isolate one track. */
     hidden?: boolean;
+    /** Shows or hides the track in the preview. */
     onToggleVisible?: () => void;
     /** Membership in the "group selected rows together" set (unrelated to inspector selection). */
     groupSelected: boolean;
+    /** Adds the row to the set, or takes it out. */
     onToggleGroupSelect: () => void;
 }
 
