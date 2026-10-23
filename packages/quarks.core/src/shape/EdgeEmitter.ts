@@ -53,6 +53,11 @@ export class EdgeEmitter implements EmitterShape {
 
     private currentValue = 0;
 
+    reset(): void {
+        this.currentValue = 0;
+        this.memory.length = 0;
+    }
+
     constructor(parameters: EdgeEmitterParameters = {}) {
         this.radius = parameters.radius ?? 1;
         this.mode = parameters.mode ?? EmitterMode.Random;

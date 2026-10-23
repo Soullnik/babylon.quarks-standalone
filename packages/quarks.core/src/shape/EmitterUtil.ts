@@ -30,48 +30,52 @@ export interface ShapeJSON {
  * Enum representing the emitter modes for particles.
  */
 export enum EmitterMode {
-    /**
-     * Emit particles randomly over the specified duration.
-     */
+    /** Each particle starts at a random point of the arc. */
     Random,
-    /**
-     * Emit particles in a continuous loop.
-     */
+    /** The start point sweeps the arc at the shape's `speed` (arcs per second) and wraps around. */
     Loop,
-    /**
-     * Emit particles back and forth in a ping-pong manner.
-     */
+    /** The start point sweeps the arc back and forth, starting at the arc's start. */
     PingPong,
-    /**
-     * Emit particles in bursts.
-     */
+    /** A burst's particles are spread evenly over the arc; particles emitted by rate start at random. */
     Burst,
 }
 
+/**
+ * Where along the shape's arc (0…1) the next particle starts, from the shape's
+ * {@link EmitterMode} (Unity's Arc Mode): random; `Loop` sweeps the arc and wraps
+ * (`currentValue` is the sweep position in arcs, any sign); `PingPong` sweeps back
+ * and forth, starting at the arc's start; `Burst` spreads a burst's particles evenly
+ * over the arc and places rate-emitted particles at random. A `spread` above 0 then
+ * snaps the result to multiples of it (Unity's Spread), so 0.25 emits from four
+ * points. The result is always within 0…1.
+ */
 export function getValueFromEmitterMode(
     mode: EmitterMode,
     currentValue: number,
     spread: number,
     emissionState: EmissionState
 ): number {
-    let u;
-    if (EmitterMode.Random === mode) {
-        currentValue = random();
-    } else if (EmitterMode.Burst === mode && emissionState.isBursting) {
-        currentValue = emissionState.burstParticleIndex / emissionState.burstParticleCount;
-    }
-    if (spread > 0) {
-        u = Math.floor(currentValue / spread) * spread;
-    } else {
-        u = currentValue;
-    }
+    let u: number;
     switch (mode) {
         case EmitterMode.Loop:
-            u = u % 1;
+            u = currentValue - Math.floor(currentValue);
             break;
-        case EmitterMode.PingPong:
-            u = Math.abs((u % 2) - 1);
+        case EmitterMode.PingPong: {
+            const phase = currentValue - 2 * Math.floor(currentValue / 2);
+            u = 1 - Math.abs(phase - 1);
             break;
+        }
+        case EmitterMode.Burst:
+            u =
+                emissionState.isBursting && emissionState.burstParticleCount > 0
+                    ? emissionState.burstParticleIndex / emissionState.burstParticleCount
+                    : random();
+            break;
+        default:
+            u = random();
+    }
+    if (spread > 0) {
+        u = Math.floor(u / spread) * spread;
     }
     return u;
 }
@@ -87,4 +91,10 @@ export interface EmitterShape {
      * by the shape itself at the end of {@link initialize}.
      */
     transform?: ShapeTransform;
+    /**
+     * Forgets the state the shape built up while emitting (the arc sweep position of
+     * `Loop`/`PingPong` shapes, generator memory), so a restarted system emits from the
+     * start of the arc again. Called by the particle system's `restart()`.
+     */
+    reset?(): void;
 }

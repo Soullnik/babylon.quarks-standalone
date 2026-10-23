@@ -1305,6 +1305,8 @@ export class ParticleSystem implements IParticleSystem {
                 behavior.clearEmissions();
             }
         });
+        // A sweeping shape (Loop, PingPong) starts its arc over, so the replay is the same.
+        this.emitterShape.reset?.();
         this.emitEnded = false;
         this.finishedEventFired = false;
         this.prewarmed = false;

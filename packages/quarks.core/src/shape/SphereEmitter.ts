@@ -79,6 +79,11 @@ export class SphereEmitter implements EmitterShape {
 
     private currentValue = 0;
 
+    reset(): void {
+        this.currentValue = 0;
+        this.memory.length = 0;
+    }
+
     update(system: IParticleSystem, delta: number): void {
         if (EmitterMode.Random != this.mode) {
             this.currentValue += this.speed.genValue(this.memory, system.emissionState.time / system.duration) * delta;

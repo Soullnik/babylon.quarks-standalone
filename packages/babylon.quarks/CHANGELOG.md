@@ -236,6 +236,35 @@ or duplicated something else, and nothing in the package used them.
 
 ### Fixed
 
+- **`ChangeEmitDirection` with a random angle (`IntervalValue`) threw on every spawn**
+  (`memory.push is not a function`): its scratch memory was in a format the generators no longer
+  use. It is a generator memory now, cleared before each spawn, so one sample is rolled per
+  particle and the memory does not grow. The behavior and `restart()` reset it.
+- **Arc modes keep their position within the arc.** `Loop` and `PingPong` at a negative speed, and
+  `Burst` for particles emitted by rate (not in a burst), gave positions outside 0…1, so the particle landed outside the arc or on the wrong side
+  of it; `PingPong` also started at the arc's far end. `Loop` wraps, `PingPong` starts at the arc's
+  start and sweeps back and forth, `Burst` places rate-emitted particles at random, and `spread`
+  snaps the result afterwards, as Unity's Arc Mode and Spread do.
+- **`restart()` starts a sweeping shape over.** A `Loop`/`PingPong` shape resumed its arc from where
+  the system stopped, so a seeded replay or a pooled copy did not spawn where the original did.
+  `EmitterShape` gained an optional `reset()`, which the built-in sweeping shapes implement and
+  `restart()` calls; a custom shape with sweep state can implement it too.
+- **`PointEmitter` emits at the start speed.** It scaled the speed by a random cube root, so with
+  `startSpeed` 5 the particles left at anything from 0.4 to 5, which no other shape and no Unity
+  shape does. Directions are uniform over the sphere as before. An effect tuned to the old spread of
+  speeds should set `startSpeed` to a random range (`IntervalValue`) to keep it.
+- **Cone `thickness` maps to the radius as Unity's Radius Thickness does.** The ring started at
+  `sqrt(1 - thickness)` (0.71 of the radius for a thickness of 0.5) instead of `1 - thickness`, and
+  the Unity exporter already wrote the value 1:1. Emission is uniform over the ring's area, and
+  the thickness is kept to 0…1 (a value above 1 used to give NaN positions).
+- **Curves and gradients hold their last key past 1.** `ContinuousLinearFunction` (vector and colour
+  curves, gradient keys) returned the _first_ key for a time past 1, so a particle that outlived its
+  curve snapped back to its start colour on the exact path while the sampled table held the end.
+  Both paths agree now.
+- **An empty or unknown sequencer no longer breaks the system.** `TextureSequencer` with no
+  locations (before `fromImage`, or `locations: []` in a file) threw on the first particle it moved;
+  it leaves the particle where it is. A sequencer of an unknown type in a file used to become a
+  silent empty one and throw the same way; it warns and is skipped, like an unknown behavior.
 - **The start colour and a burst's count curve run over the cycle like every other start curve.**
   Both were sampled in seconds, so with a 4 s cycle a start-colour gradient was read past its end
   from 1 s on, and a burst count curve was read at the burst's time in seconds. They now get the

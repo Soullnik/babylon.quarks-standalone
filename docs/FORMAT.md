@@ -96,6 +96,7 @@ loaded from, pass `imageUrl` to write each image's url relative to it.
 - A part the loader cannot read warns and takes its default, and the rest of the effect loads:
   - an unknown emitter shape: a point emitter;
   - an unknown behavior: skipped;
+  - an unknown or missing sequencer in `ApplySequences`: skipped;
   - an unknown or missing curve or colour: 0, white, a random rotation or a zero vector. A burst
     without a `count` therefore emits nothing;
   - a setting left out that has a default: that default. A system's curves and shape take the
