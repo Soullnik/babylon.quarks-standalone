@@ -27,6 +27,10 @@ export default defineConfig({
         },
     },
     build: {
+        // Babylon's engine core (engine, scene, maths, materials) and the library form one chunk of
+        // about 780 kB that every page needs and that does not split further. The limit sits above it,
+        // so a page that pulls in something heavy by accident, such as every file loader, still warns.
+        chunkSizeWarningLimit: 900,
         rollupOptions: {
             input: {
                 index: resolve(__dirname, 'index.html'),
@@ -34,6 +38,12 @@ export default defineConfig({
                 benchmark: resolve(__dirname, 'benchmark.html'),
                 editor: resolve(__dirname, 'editor.html'),
                 shaders: resolve(__dirname, 'shader-validate.html'),
+            },
+            output: {
+                // React gets a chunk of its own, so the editor page caches it apart from Babylon.
+                manualChunks(id) {
+                    return /[\\/]node_modules[\\/](react|react-dom|scheduler)[\\/]/.test(id) ? 'react' : undefined;
+                },
             },
         },
     },

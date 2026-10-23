@@ -18,7 +18,12 @@ requests are all welcome.
 
 ## Getting started
 
-Requirements: Node.js >= 20.11, npm >= 10.
+Requirements: Node.js >= 22.13, npm >= 10. CI runs the version in `.nvmrc`.
+
+`package.json` overrides two dependencies of the test toolchain whose own ranges still pull in
+deprecated packages: `test-exclude` (through Jest's coverage) gets a current `glob`, and
+`jest-environment-jsdom` gets a jsdom that no longer needs `whatwg-encoding`. Jest supports both.
+Drop an override once Jest's own range moves past it.
 
 ```bash
 npm install

@@ -1,10 +1,10 @@
 import {VertexBuffer} from '@babylonjs/core/Buffers/buffer';
 import {SceneLoader} from '@babylonjs/core/Loading/sceneLoader';
 import type {Scene} from '@babylonjs/core/scene';
-import '@babylonjs/loaders/glTF';
 import type {GeometryData} from 'babylon.quarks-editor/react';
 import {QuarksEditorWorkspace, QuarksEffectEditor} from 'babylon.quarks-editor/react';
 import {SHARED_ASSETS, createSharedTexture} from './shared/common';
+import './shared/loaders';
 
 /** ?effect=session reads a JSON stashed by the demo viewer's "Open in editor" button. */
 function resolveInitialEffect(): unknown {
