@@ -5,6 +5,13 @@ A Unity Editor utility that exports a Shuriken **Particle System** effect to the
 loads and that the [effect editor](../../packages/babylon.quarks-editor) reads. Author an effect in
 Unity, export it, and drop it straight into a Babylon.js scene.
 
+> **Status: experimental.** The exporter is versioned with babylon.quarks so that its output names
+> the library version it was written for, but it is not held to the library's release rules: it
+> has no automated tests against the loader, and Shuriken features such as Scaling Mode, separate-
+> axes rotation, the material's Tiling/Offset, a second UV set and soft/cutout materials are not
+> exported yet. Check an exported effect in the [effect editor](../../packages/babylon.quarks-editor)
+> before shipping it.
+
 ## Install
 
 Pick one:
@@ -48,15 +55,12 @@ Load the result in Babylon.js:
 ```ts
 import {QuarksLoader} from 'babylon.quarks';
 
-const loader = new QuarksLoader(scene, {baseUrl: ''});
-const root = loader.parse(await (await fetch('Explosion.json')).json());
+const loader = new QuarksLoader(scene);
+const root = await loader.load('effects/Explosion.json');
 root.parent = batchedRenderer; // your BatchedRenderer
 ```
 
 …or open it in the effect editor via **Open from JSON**.
-
-See [`sample-output.json`](./sample-output.json) for a representative export (an emitter with a
-death-triggered spark sub-emitter).
 
 ## What gets exported
 
@@ -146,5 +150,4 @@ Editor/
   ExportContext.cs        meta accumulation, texture embedding, node-uuid maps
   ParticleConverter.cs    Shuriken modules → the per-system "ps" object
   QuarksExporter.cs       menu entry + hierarchy walk + envelope assembly
-sample-output.json        example export (also used to validate the output format)
 ```

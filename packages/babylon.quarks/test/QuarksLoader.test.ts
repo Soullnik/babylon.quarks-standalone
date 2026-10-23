@@ -13,6 +13,7 @@ import {ParticleSystem} from '../src/ParticleSystem';
 import {QuarksFormatError, QuarksLoader} from '../src/QuarksLoader';
 import {QuarksPrefab} from '../src/QuarksPrefab';
 import {QUARKS_FORMAT_VERSION, serializeEffect} from '../src/QuarksSerializer';
+import {textureSourceUrl} from '../src/textureSource';
 
 loadPlugin(MeshSurfaceEmitterPlugin);
 
@@ -1529,6 +1530,81 @@ describe('QuarksLoader documents', () => {
         }
         expect(urls).toEqual(['fx/tex/a.png', 'fx/tex/a.png']);
         expect(json.images![0]).toEqual({uuid: 'img', url: 'tex/a.png'});
+    });
+
+    it('loads a document resolveResources() prepared without joining its base twice', async () => {
+        const json = textured([{uuid: 'img', url: 'tex/a.png'}]);
+        const loader = new QuarksLoader(scene, {shareResources: false});
+        await loader.resolveResources(json, 'fx/');
+        expect((json.images![0] as {url: string}).url).toBe('fx/tex/a.png');
+        const urls = [];
+        for (let i = 0; i < 2; i++) {
+            const mesh = (await loader.loadFromJSON(json, 'fx/')) as Mesh;
+            const texture = (mesh.material as StandardMaterial).diffuseTexture as Texture;
+            urls.push(texture.url);
+            expect(textureSourceUrl(texture)).toBe('tex/a.png');
+        }
+        expect(urls).toEqual(['fx/tex/a.png', 'fx/tex/a.png']);
+        const all = (await loader.loadFromJSONAll([{json, baseUrl: 'fx/'}])) as Mesh[];
+        expect(((all[0].material as StandardMaterial).diffuseTexture as Texture).url).toBe('fx/tex/a.png');
+    });
+
+    it('serializeEffect writes the url the file had, so a save next to the source loads the same image', async () => {
+        const json = textured([{uuid: 'img', url: 'tex/a.png'}]);
+        const loader = new QuarksLoader(scene, {shareResources: false});
+        const root = await loader.loadFromJSON(json, 'fx/');
+        const texture = ((root as Mesh).material as StandardMaterial).diffuseTexture as Texture;
+        expect(texture.url).toBe('fx/tex/a.png');
+        expect(textureSourceUrl(texture)).toBe('tex/a.png');
+        const saved = serializeEffect(root);
+        expect(saved.images).toEqual([{uuid: 'quarks_image_1', url: 'tex/a.png'}]);
+        // Loaded again from the same place, the image resolves to the same file.
+        const again = (await loader.loadFromJSON(saved, 'fx/')) as Mesh;
+        expect(((again.material as StandardMaterial).diffuseTexture as Texture).url).toBe('fx/tex/a.png');
+        // imageUrl still overrides; a texture made in code falls back to its url.
+        expect(serializeEffect(root, {imageUrl: () => 'other/a.png'}).images[0].url).toBe('other/a.png');
+        expect(textureSourceUrl(new Texture('code/b.png', scene))).toBeUndefined();
+    });
+
+    it('keeps the source url through a custom resolver', async () => {
+        const json = textured([{uuid: 'img', url: 'tex/a.png'}]);
+        const loader = new QuarksLoader(scene, {
+            shareResources: false,
+            resolver: {resolve: (url) => `https://cdn.example/${url}`},
+        });
+        const root = await loader.loadFromJSON(json, 'fx/');
+        const texture = ((root as Mesh).material as StandardMaterial).diffuseTexture as Texture;
+        expect(texture.url).toBe('https://cdn.example/tex/a.png');
+        expect(serializeEffect(root).images[0].url).toBe('tex/a.png');
+    });
+
+    it('writes the url itself when a resolver inlined the image or the texture was given a new url', async () => {
+        const dataUrl = 'data:image/png;base64,iVBORw0KGgo=';
+        const inlined = textured([{uuid: 'img', url: 'tex/a.png'}]);
+        const loader = new QuarksLoader(scene, {shareResources: false, resolver: {resolve: () => dataUrl}});
+        const root = (await loader.loadFromJSON(inlined, 'fx/')) as Mesh;
+        const texture = (root.material as StandardMaterial).diffuseTexture as Texture;
+        expect(texture.url).toBe(dataUrl);
+        expect(textureSourceUrl(texture)).toBeUndefined();
+        expect(serializeEffect(root).images[0].url).toBe(dataUrl);
+
+        const plain = new QuarksLoader(scene, {shareResources: false});
+        const other = (await plain.loadFromJSON(textured([{uuid: 'img', url: 'tex/a.png'}]), 'fx/')) as Mesh;
+        const changed = (other.material as StandardMaterial).diffuseTexture as Texture;
+        expect(textureSourceUrl(changed)).toBe('tex/a.png');
+        changed.url = dataUrl;
+        expect(textureSourceUrl(changed)).toBeUndefined();
+        expect(serializeEffect(other).images[0].url).toBe(dataUrl);
+    });
+
+    it('a shared texture keeps the source url of the effect that loaded it first', async () => {
+        const loader = new QuarksLoader(scene);
+        const a = (await loader.loadFromJSON(textured([{uuid: 'img', url: 'shared/a.png'}]), 'fx/')) as Mesh;
+        const b = (await loader.loadFromJSON(textured([{uuid: 'img', url: 'fx/shared/a.png'}]), '')) as Mesh;
+        const ta = (a.material as StandardMaterial).diffuseTexture as Texture;
+        const tb = (b.material as StandardMaterial).diffuseTexture as Texture;
+        expect(tb).toBe(ta);
+        expect(textureSourceUrl(tb)).toBe('shared/a.png');
     });
 
     it('loadFromJSONAll leaves its documents as they were', async () => {

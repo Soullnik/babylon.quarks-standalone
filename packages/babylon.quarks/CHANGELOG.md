@@ -4,7 +4,53 @@ All notable changes to the `babylon.quarks` package are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project follows the `quarks.core` 0.x version line.
 
-## [Unreleased]
+## [0.27.0] — 2026-10-23
+
+The release that follows the October 2026 audit: every domain (emitters, behaviors, system and
+loader, shaders, trails) was brought to the working rules in `CLAUDE.md`. A 0.27.0 dated
+2026-10-21 was prepared but never published; its entries are folded in here, so this is the only
+0.27.0 and the whole list applies when upgrading from 0.26.
+
+### Breaking changes
+
+Each item is described in full in the section it points to.
+
+- **Exports removed** that nothing in the package read: `VFXBatchSettings.reflectionFaces`,
+  `MeshSettings.rotationAxis`, the `ParticleMesh*Material` classes, the shader chunk registry and
+  GLSL string exports, `BatchedParticleRenderer`, the `SpriteBatch` / `TrailBatch` exports,
+  `ParticleEmitter.extractFromCache`, `ParticleSystemParameters.startLength` and the duplicate
+  `quarks.core` type re-exports (Removed); `ApplyForce` loses its runtime fields `magnitudeValue`
+  and `memory` (Changed).
+- **Trails stretch their texture by distance** by default; set the texture mode to
+  `'distributePerSegment'` to keep the old layout (Changed).
+- **`WidthOverLength` spans the samples the trail holds**, not its `startLength` capacity
+  (Changed).
+- **Trails face the camera in view space**; the trail material loses its `lineWidth`,
+  `resolution`, `sizeAttenuation`, `world` and `worldViewProjection` uniforms (Changed).
+- **Flipbook frames wrap into the sheet** and the last cell blends into the first (Changed).
+- **`softFarFade` defaults to 1**, so soft particles fade without a fade distance set (Changed).
+- **Soft particles name their depth encoding**: `setDepthTexture(depth, {encoding})` with
+  `'linear'` as the default; a hand-built non-linear depth needs `'nonLinear'` (Changed).
+- **`ApplyForce` is a world force**; a local-space effect that relied on the old reading sets
+  `space: 'local'` (Changed).
+- **`OrbitOverLife` orbits the emitter about the emitter's normalised axis**; set `space: 'world'`
+  for the old orbit (Changed).
+- **`Noise` turns mesh particles by `rotationAmount`** instead of ignoring it (Changed).
+- **`TurbulenceField` is deterministic**: two fields with the same settings and no `seed` swirl
+  identically (Changed).
+- **Bursts take the file defaults in code too**: `interval` is 0.1 s when left out, and the
+  system holds its own copy of `emissionBursts` (Changed).
+- **A system belongs to one `BatchedRenderer` at a time**, and a disposed renderer refuses
+  `addSystem` with an error (Changed).
+- **`ParticleSystem.toJSON()` ids are numbered per `meta`**, so two separate calls both write
+  `quarks_geometry_1`; merge outputs through one `meta` or use `serializeEffect` (Changed).
+- **A disposed system stays disposed**: `restart()` no longer brings it back (Changed).
+- **Seeded systems roll differently from 0.26**; a saved seed gives a different, still repeatable,
+  effect (Changed).
+- **`serializeEffect` writes the url a texture's image had in its source file** rather than the
+  joined url, so a save next to the source loads; a save elsewhere passes `imageUrl` (Changed).
+- **TypeScript:** the fields of `ParticleSystemJSONParameters` other than `version` are optional,
+  and `StoredBatchSettings.texture` is `BaseTexture | null` (Changed).
 
 ### Added
 
@@ -106,7 +152,6 @@ and the project follows the `quarks.core` 0.x version line.
   (`root.dispose()`, its parent's or the scene's); `QuarksLoader.disposeEffect(root)` says so in
   code. Before, those materials and textures stayed in the scene. A material or texture of a loaded
   effect handed to other code is freed with the effect.
-
 - **Soft particles and alpha test on trails.** `softParticles` and `alphaTest` now apply to trails
   as to every other render mode, in GLSL and WGSL. Before, a trail accepted them, batched on them
   and drew hard with a fixed 0.01 cutoff.
@@ -114,6 +159,26 @@ and the project follows the `quarks.core` 0.x version line.
   `BatchedRenderer.depthEncoding`, and the decode helpers `softDepthParams` and `decodeSoftDepth`
   (see Changed).
 - **`disposeEnvAtlas(cube, scene?)`** drops the env atlases built for a cube.
+- **Trail tessellation** (`TrailSettings.tessellation`, `curveTension`), like Niagara's ribbon
+  tessellation and curve tension:
+  - Each segment between two recorded samples is drawn as `tessellation + 1` segments along a
+    centripetal cardinal spline through the samples: Catmull-Rom at `curveTension` 0 (the
+    default), straight at 1. Centripetal spacing keeps the curve from overshooting where samples
+    lie unevenly apart.
+  - A fast or sharply turning trail, such as a weapon swing that moves far between frames, stays
+    round instead of showing its corners. The curve passes through every sample, so the trail
+    keeps its shape.
+  - Swept trails curve their sides with the points, keeping each side's length, so a blade's trail
+    stays as wide as the blade.
+  - Widths, colors and the texture's U are eased along the curve. The live tip drawn between
+    steps joins it with a straight segment, so the recorded part stays still as the tip moves.
+  - `tessellation` is a whole number from 0 (the default: off, no cost) to 16
+    (`MAX_TRAIL_TESSELLATION`). JSON writes both settings only when set. Helpers:
+    `trailTessellation`, `trailCurveTension`.
+- **`textureSourceUrl(texture)`**: the url a loaded texture's image had in its effect file,
+  before the loader joined a base url, which `serializeEffect` now writes by default. It is
+  `undefined` for a texture made in code, one whose image a resolver inlined as a `data:` url, or
+  one whose `url` changed since it was loaded, which all write their `url` as before.
 
 ### Removed (breaking)
 
@@ -124,7 +189,6 @@ or duplicated something else, and nothing in the package used them.
   (`material.reflectionFaces`) and kept in the batch key, but no shader ever sampled them.
   `reflectionTexture` is documented as it works: a cube texture is unfolded into `reflectionAtlas`
   and sampled from there; nothing else is sampled.
-
 - **`MeshSettings.rotationAxis`** (quarks.core), which was declared but never read, written or
   cloned: a mesh particle's rotation is its start rotation (`startRotationX/Y/Z`, or a
   `RandomQuatGenerator` / `EulerGenerator` start rotation) and `Rotation3DOverLife`. A file that
@@ -336,7 +400,6 @@ or duplicated something else, and nothing in the package used them.
   only `serializeEffect` wrote it before.
 - **The package compiles with TypeScript's `strict` mode.** The published declarations are the
   same as before.
-
 - **`loadFromJSON` and `loadFromJSONAll` no longer change the document they are given.** They
   resolve urls and inline geometry files on a copy, so one document can be loaded many times, into
   several scenes or with several base urls. Code that read the resolved urls back from its own
@@ -357,7 +420,6 @@ or duplicated something else, and nothing in the package used them.
   its ids per document, so the same effect serializes to the same file. Ids are no longer unique across
   calls: two separate `toJSON()` calls both write `quarks_geometry_1`, so merge their outputs
   through one `meta`, or use `serializeEffect`.
-
 - **Trails face the camera in view space (breaking for custom trail shaders)**, across their
   tangent and the line of sight, like Unity's View alignment and Niagara's ribbons. The width is
   the particle's size in world units, measured across the line of sight. Before, the facing was
@@ -378,7 +440,6 @@ or duplicated something else, and nothing in the package used them.
   magnitude is rolled per particle (see Fixed); read `magnitude` for the setting.
 - **Texture sequencer JSON names its type and writes `position` as `[x, y, z]`.** Files written
   before this release, with no type and an `{x, y, z}` position, still load.
-
 - **Color, Size and Rotation by Speed read the current speed**, like Unity's modules and
   Niagara's Scale by Speed: the velocity's length times the speed modifier, clamped to
   `speedRange`. Motion `VelocityOverLife` adds does not count, since it moves particles without
@@ -423,6 +484,16 @@ or duplicated something else, and nothing in the package used them.
   sooner. A system whose atlas is disposed while its cube is kept builds a new one.
 - **`BatchedRenderer.depthTexture` is an accessor**, and setting it calls `setDepthTexture`.
   `VFXBatch.applyDepthTexture` takes a depth binding as well as a texture.
+- **Seeded systems roll differently from 0.26.** A seeded system now rolls its emission rates,
+  burst counts and start delay on its own generator when it is created and on every restart, so
+  a restart replays them too. A seed saved with 0.26 gives a different, still repeatable, effect,
+  and lock-step sessions must not mix 0.26 and 0.27 clients.
+- **`serializeEffect` writes each image's url as its source file had it** (breaking for a save
+  that relied on the joined url): a texture loaded from `fx/hit.json` as `tex/a.png` holds the url
+  `fx/tex/a.png`, and the saved file used to point at that, so a save next to the source loaded
+  `fx/fx/tex/a.png` the next time. The file now gets `tex/a.png` (see `textureSourceUrl`), as
+  Unity and Unreal keep asset links relative to the project; `imageUrl` still overrides it for a
+  save elsewhere, and a texture made in code still writes its `url`.
 
 ### Fixed
 
@@ -519,7 +590,6 @@ or duplicated something else, and nothing in the package used them.
 - **`loadPlugin` did not record the plugin**, so loading it again ran `initialize` again and
   `unloadPlugin` removed nothing. `unloadPlugin` now removes only the types that plugin registered.
 - **`QuarksPrefab.timeScale` was not read from files.**
-
 - **A trail's live tip folded back over its head** on frames where the last step ran ahead of the
   display, about every other frame at 120 Hz. The head is now drawn back along its last segment
   instead. Float noise in the step accumulator no longer adds a tip of no length.
@@ -568,6 +638,38 @@ or duplicated something else, and nothing in the package used them.
   the system's seeded random source.
 - **`ApplySequences` lost its sequences in JSON.** A texture sequencer wrote no type, so loading
   the file could not tell which sequencer to build.
+- **Node ESM, webpack 5 and SSR could not import the package.** The ESM and CJS builds imported
+  `@babylonjs/core` deep paths without `.js`, which only lenient bundlers such as Vite resolve.
+  Every deep import now ends in `.js`. The `exports` map now gives `require` its own declaration
+  file (`dist/types/index.d.cts`) and lists `./package.json`, so TypeScript with
+  `node16`/`nodenext` resolution types both module kinds. `npm run check:pack` now installs the
+  packed tarballs into a scratch project and imports them with Node ESM, Node CJS and TypeScript
+  `nodenext`.
+- **`restart()` broke random emission.** It emptied the system's generator memory without
+  rolling `emissionOverTime` again, so an `IntervalValue` rate became NaN and the system emitted
+  nothing. Every pooled effect with a random emission rate was empty from its second play.
+- **`restart()` kept the emission-over-distance history.** A pooled effect placed somewhere new
+  and restarted spawned a line of particles along the jump from where it last played.
+- **Disposing an emitter node left its system running.** `root.dispose()` on an effect tree now
+  disposes every `ParticleSystem` in it and removes it from its renderer. A system that disposes
+  itself (`dispose()`, or `autoDestroy` when it finishes) still leaves the systems of its child
+  emitters playing until they finish.
+- **`depthTest: false` had no effect.** It was stored, batched and saved, but never reached the
+  material. It now draws particles over all geometry (Unity's `ZTest Always`) in every render mode.
+- **A mesh batch leaked a material when its env atlas finished loading.** The rebuild now disposes
+  the material it replaces, and does nothing when the batch was disposed before the atlas loaded.
+- **`QuarksLoader` joined a relative base url twice.** `load('fx/hit.json')` and
+  `loadFromJSON(json, 'fx/')` loaded textures from `fx/fx/...`, and from `fx/fx/fx/...` when the
+  same document was loaded again.
+- **Trails picked the wrong sprite-sheet cell.** The cell column was counted with `vTileCount`
+  and fractional frames were not rounded down, so a sheet with more columns than rows, or a
+  `FrameOverLife` curve, showed the wrong cell or a slice across two. Trails now pick the same cell
+  as billboards.
+- **`OrbitOverLife.clone()` dropped the axis**, so a cloned system orbited about Y.
+- **`loadFromJSON` after `resolveResources()` joined the base url twice.** The copy
+  `loadFromJSON` takes of the document lost the mark that its image urls were already resolved,
+  so a document prepared with `resolveResources(json, 'fx/')` and then loaded with the same base
+  got `fx/fx/tex/a.png`. The copy keeps the mark.
 
 ### Tests
 
@@ -595,6 +697,8 @@ or duplicated something else, and nothing in the package used them.
   with a stored snapshot; loaded back with `fromJSON`, it must write the same JSON and play the same.
   It was recorded before `ParticleSystem.ts` was split and pins the simulation while the rest of the
   split follows.
+- Loader: a document `resolveResources()` prepared loads with the same base once; a save next to
+  the source writes the source url, through a custom resolver too.
 
 ### Docs
 
@@ -622,7 +726,6 @@ or duplicated something else, and nothing in the package used them.
   that loads without an error, so `check:demos` had been passing on 404 pages there. Both
   `check:demos` and `validate:wgsl` now ask the server for its base path
   (`scripts/examplesBase.mjs`), and the smoke fails a page the viewer never comes up on.
-
 - **`batchKey.ts`** holds the batch key: `storedBatchSettings` reduces a system's settings to the
   canonical form a batch stores, `shaderKeyEqual` and `liveParamsEqual` compare the two groups
   and `batchSettingsEqual` both. `BatchedRenderer.updateSystem` writes live parameters through
@@ -653,7 +756,6 @@ or duplicated something else, and nothing in the package used them.
   generator setting its default, its JSON form and how it is copied. `toJSON`, `fromJSON` and
   `clone` are built from it, and a test fails when a constructor parameter is in neither the table
   nor the code that handles the meta, the shape or the behaviors.
-
 - **`ParticleSystem.ts` is being split into modules under `src/system/`.** This first part moves
   out the parameter and JSON types (`types.ts`), reading and writing JSON
   (`serialization.ts`), culling bounds (`BoundsTracker.ts`), event listeners
@@ -663,65 +765,6 @@ or duplicated something else, and nothing in the package used them.
   simulation are unchanged; the types are still exported from the package root. Still to come: one
   table of settings for the constructor, setters, JSON and `clone`, the simulation clock, emission
   and spawning, and the integration passes.
-
-## [0.27.0] — 2026-10-21
-
-### Added
-
-- **Trail tessellation** (`TrailSettings.tessellation`, `curveTension`), like Niagara's ribbon
-  tessellation and curve tension:
-  - Each segment between two recorded samples is drawn as `tessellation + 1` segments along a
-    centripetal cardinal spline through the samples: Catmull-Rom at `curveTension` 0 (the
-    default), straight at 1. Centripetal spacing keeps the curve from overshooting where samples
-    lie unevenly apart.
-  - A fast or sharply turning trail, such as a weapon swing that moves far between frames, stays
-    round instead of showing its corners. The curve passes through every sample, so the trail
-    keeps its shape.
-  - Swept trails curve their sides with the points, keeping each side's length, so a blade's trail
-    stays as wide as the blade.
-  - Widths, colors and the texture's U are eased along the curve. The live tip drawn between
-    steps joins it with a straight segment, so the recorded part stays still as the tip moves.
-  - `tessellation` is a whole number from 0 (the default: off, no cost) to 16
-    (`MAX_TRAIL_TESSELLATION`). JSON writes both settings only when set. Helpers:
-    `trailTessellation`, `trailCurveTension`.
-
-### Changed
-
-- **Seeded systems roll differently from 0.26.** A seeded system now rolls its emission rates,
-  burst counts and start delay on its own generator when it is created and on every restart, so
-  a restart replays them too. A seed saved with 0.26 gives a different, still repeatable, effect,
-  and lock-step sessions must not mix 0.26 and 0.27 clients.
-
-### Fixed
-
-- **Node ESM, webpack 5 and SSR could not import the package.** The ESM and CJS builds imported
-  `@babylonjs/core` deep paths without `.js`, which only lenient bundlers such as Vite resolve.
-  Every deep import now ends in `.js`. The `exports` map now gives `require` its own declaration
-  file (`dist/types/index.d.cts`) and lists `./package.json`, so TypeScript with
-  `node16`/`nodenext` resolution types both module kinds. `npm run check:pack` now installs the
-  packed tarballs into a scratch project and imports them with Node ESM, Node CJS and TypeScript
-  `nodenext`.
-- **`restart()` broke random emission.** It emptied the system's generator memory without
-  rolling `emissionOverTime` again, so an `IntervalValue` rate became NaN and the system emitted
-  nothing. Every pooled effect with a random emission rate was empty from its second play.
-- **`restart()` kept the emission-over-distance history.** A pooled effect placed somewhere new
-  and restarted spawned a line of particles along the jump from where it last played.
-- **Disposing an emitter node left its system running.** `root.dispose()` on an effect tree now
-  disposes every `ParticleSystem` in it and removes it from its renderer. A system that disposes
-  itself (`dispose()`, or `autoDestroy` when it finishes) still leaves the systems of its child
-  emitters playing until they finish.
-- **`depthTest: false` had no effect.** It was stored, batched and saved, but never reached the
-  material. It now draws particles over all geometry (Unity's `ZTest Always`) in every render mode.
-- **A mesh batch leaked a material when its env atlas finished loading.** The rebuild now disposes
-  the material it replaces, and does nothing when the batch was disposed before the atlas loaded.
-- **`QuarksLoader` joined a relative base url twice.** `load('fx/hit.json')` and
-  `loadFromJSON(json, 'fx/')` loaded textures from `fx/fx/...`, and from `fx/fx/fx/...` when the
-  same document was loaded again.
-- **Trails picked the wrong sprite-sheet cell.** The cell column was counted with `vTileCount`
-  and fractional frames were not rounded down, so a sheet with more columns than rows, or a
-  `FrameOverLife` curve, showed the wrong cell or a slice across two. Trails now pick the same cell
-  as billboards.
-- **`OrbitOverLife.clone()` dropped the axis**, so a cloned system orbited about Y.
 
 ## [0.26.0] — 2026-10-21
 
@@ -1072,7 +1115,6 @@ renames below.
   optional per-axis thickness, moving particles along +Z; a box with no depth is a flat rectangle.
   `EdgeEmitter` (`edge`) emits from a line along X, moving particles along +Y. Both match the
   Unity shapes of the same name.
-
 - Trail settings `uvFromHead`, `colorFromParticle`, `dieWithParticle` and `recordWorldSpace`
   (all optional, off by default) for trails that behave like Unity's: the texture runs from the
   particle back to the tail, the whole trail takes the particle's current color, the trail

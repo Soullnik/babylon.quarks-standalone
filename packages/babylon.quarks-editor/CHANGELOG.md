@@ -4,7 +4,9 @@ All notable changes to the `babylon.quarks-editor` package are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project follows the `quarks.core` 0.x version line.
 
-## [Unreleased]
+## [0.27.0] — 2026-10-23
+
+A 0.27.0 dated 2026-10-21 was prepared but never published; its entries are folded in here.
 
 ### Added
 
@@ -25,6 +27,7 @@ and the project follows the `quarks.core` 0.x version line.
 - Emitter shape wireframes for the Box and Edge shapes: the box outline with its +Z emit
   direction, and the edge line with its +Y emit direction.
 - `TextureSelect` and `TextureUVField` components, exported from `babylon.quarks-editor/react`.
+- Renderer module, trails: "Tessellation" and "Curve tension".
 
 ### Changed
 
@@ -38,11 +41,18 @@ and the project follows the `quarks.core` 0.x version line.
 
 ### Fixed
 
+- An imported effect whose images were inlined from the picked files is saved with those inlined
+  images; `serializeEffect` writes a texture's source path only while the texture still shows the
+  image it was loaded with, and an inlined image has no path. A test covers import → scene → save.
 - **Saving lost mesh nodes and texture settings.** The editor now saves through `serializeEffect`:
   mesh nodes keep their geometry (so mesh surface emitters still emit after a save and reload),
   and textures keep their wrap, sampling, repeat, offset and rotation. Textures with no url a file
   can point at are reported instead of written as an empty entry.
 - The yellow hover ring stayed on the ground after the hovered effect was removed from the scene.
+- **Node ESM and webpack 5 could not import the package.** `dist` was compiled with relative and
+  `@babylonjs` deep imports that had no file extension. Every import now ends in `.js`.
+- The `babylon.quarks` peer range was `>=0.17.0`, but the editor needs current APIs (beam mode,
+  rim fade, culling and sort settings). It is now `~0.27.0`.
 
 ### Internal
 
@@ -56,19 +66,6 @@ and the project follows the `quarks.core` 0.x version line.
   every render mode.
 - The README leads with `QuarksEffectEditor.Show`, lists every peer and every module, and the
   `EffectEditor` snippet carries all of its props.
-
-## [0.27.0] — 2026-10-21
-
-### Added
-
-- Renderer module, trails: "Tessellation" and "Curve tension".
-
-### Fixed
-
-- **Node ESM and webpack 5 could not import the package.** `dist` was compiled with relative and
-  `@babylonjs` deep imports that had no file extension. Every import now ends in `.js`.
-- The `babylon.quarks` peer range was `>=0.17.0`, but the editor needs current APIs (beam mode,
-  rim fade, culling and sort settings). It is now `~0.27.0`.
 
 ## [0.26.0] — 2026-10-21
 
