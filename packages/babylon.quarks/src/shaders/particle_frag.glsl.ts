@@ -1,3 +1,4 @@
+import {blendFragmentGLSL} from './chunks/blend';
 import {fogFragmentDeclarationGLSL, fogFragmentGLSL} from './chunks/fog';
 import {softFragmentDeclarationGLSL, softFragmentGLSL} from './chunks/soft';
 import {surfaceColorGLSL, surfaceFragmentDeclarationGLSL} from './chunks/surface';
@@ -35,7 +36,8 @@ ${surfaceColorGLSL(true)}
 #endif
 
 ${fogFragmentGLSL('baseColor.rgb')}
+${softFragmentGLSL('baseColor')}
+${blendFragmentGLSL('baseColor')}
     gl_FragColor = baseColor;
-${softFragmentGLSL('gl_FragColor')}
 }
 `;

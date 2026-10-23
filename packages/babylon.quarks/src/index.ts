@@ -49,8 +49,16 @@ export type {
     SerializeEffectOptions,
 } from './QuarksSerializer';
 export {QuarksUtil} from './QuarksUtil';
-export {shaderProgram} from './shaderProgram';
-export type {ShaderContext, ShaderDepth, ShaderProgram, ShaderSettings} from './shaderProgram';
+export {blendCategory, shaderProgram} from './shaderProgram';
+export type {
+    BlendCategory,
+    BlendOutput,
+    FogTarget,
+    ShaderContext,
+    ShaderDepth,
+    ShaderProgram,
+    ShaderSettings,
+} from './shaderProgram';
 export type {ShaderSources} from './shaders/shaderLanguageSupport';
 export {shaderVariants} from './shaderVariants';
 export type {ShaderVariant} from './shaderVariants';

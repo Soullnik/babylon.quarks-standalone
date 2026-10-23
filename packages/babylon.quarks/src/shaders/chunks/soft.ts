@@ -4,7 +4,8 @@
  * The fragment reads the scene depth behind it from `depthTexture`, turns it into view depth with
  * the coefficients in `projParams` (see `softDepthParams`), and fades out over the distance in
  * `softParams` as it nears the scene, as Unity's soft particles and Unreal's Depth Fade do. The
- * fade runs last, after fog, so both languages produce the same colour.
+ * fade lowers alpha only and runs after fog and before the blend resolve (`blend.ts`), so it reads
+ * as coverage in every blend mode and both languages produce the same colour.
  *
  * `SOFT_DEPTH_PACKED` reads a depth packed into four 8-bit channels, as a Babylon
  * `DepthRenderer` of type `UNSIGNED_BYTE` writes it.
@@ -33,14 +34,14 @@ float quarksSceneDepth(vec4 texel) {
 #endif
 `;
 
-/** Fades `target` as the fragment nears the scene behind it, GLSL. */
+/** Fades the alpha of the vec4 lvalue `target` as the fragment nears the scene behind it, GLSL. */
 export function softFragmentGLSL(target: string): string {
     return /* glsl */ `
 #ifdef SOFT_PARTICLES
     {
         vec2 softUV = 0.5 * (projPosition.xy / projPosition.w) + 0.5;
         float sceneDepth = quarksSceneDepth(texture2D(depthTexture, softUV));
-        ${target} *= clamp(softParams.y * ((sceneDepth - softParams.x) - linearDepth), 0.0, 1.0);
+        ${target}.a *= clamp(softParams.y * ((sceneDepth - softParams.x) - linearDepth), 0.0, 1.0);
     }
 #endif
 `;
@@ -70,14 +71,14 @@ fn quarksSceneDepth(texel: vec4f) -> f32 {
 #endif
 `;
 
-/** Fades `target` as the fragment nears the scene behind it, WGSL. */
+/** Fades the alpha of the `var` vec4 `target` as the fragment nears the scene behind it, WGSL. */
 export function softFragmentWGSL(target: string): string {
     return /* wgsl */ `
 #ifdef SOFT_PARTICLES
     {
         let softUV = 0.5 * (fragmentInputs.projPosition.xy / fragmentInputs.projPosition.w) + 0.5;
         let sceneDepth = quarksSceneDepth(textureSample(depthTexture, depthTextureSampler, softUV));
-        ${target} *= clamp(uniforms.softParams.y * ((sceneDepth - uniforms.softParams.x) - fragmentInputs.linearDepth), 0.0, 1.0);
+        ${target}.a *= clamp(uniforms.softParams.y * ((sceneDepth - uniforms.softParams.x) - fragmentInputs.linearDepth), 0.0, 1.0);
     }
 #endif
 `;

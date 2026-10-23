@@ -1647,9 +1647,9 @@ export class ParticleSystem implements IParticleSystem {
      * per-instance data, Unreal's user parameters). With {@link erosion},
      * alpha is the erosion level, so this wipes the shape in and out. The
      * particles' own colours are untouched, so clearing it restores them, and
-     * systems with different tints still batch together. Under additive
-     * (`ALPHA_ONEONE`) or premultiplied blending, which ignore alpha, fade
-     * with the colour instead, or with erosion on. Unset (the default): none.
+     * systems with different tints still batch together. Its alpha fades the
+     * particles in every blend mode that blends by coverage (see
+     * {@link blendCategory}). Unset (the default): none.
      * Not saved in the effect JSON; copied by {@link clone}.
      */
     tint?: Vector4;

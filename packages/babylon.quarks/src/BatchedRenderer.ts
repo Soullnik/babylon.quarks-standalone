@@ -108,11 +108,13 @@ export interface VFXBatchSettings {
     renderingGroupId: number;
     /**
      * Whether the scene's fog applies to the particles, as it does to any other
-     * mesh; true by default. Particles that add to the frame (`ALPHA_ADD`,
-     * `ALPHA_ONEONE`) fade toward black rather than the fog colour, which would
-     * fog the whole screen; every other blend mode mixes toward the fog colour,
-     * which is right for alpha blending and only approximate for a multiply or
-     * subtract. Systems that differ are batched apart.
+     * mesh; true by default. Particles that lay over the frame (`ALPHA_COMBINE`,
+     * `ALPHA_PREMULTIPLIED`, opaque ones) mix toward the fog colour; particles
+     * that add to it or subtract from it (`ALPHA_ADD`, `ALPHA_ONEONE`,
+     * `ALPHA_SCREENMODE`, `ALPHA_SUBTRACT`, …) fade toward black, since the fog
+     * colour would fog the whole screen; particles that multiply it
+     * (`ALPHA_MULTIPLY`) fade toward white. See {@link blendCategory}. Systems
+     * that differ are batched apart.
      */
     applyFog: boolean;
     /**

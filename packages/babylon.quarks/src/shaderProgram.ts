@@ -111,12 +111,94 @@ export function samplesMap(settings: {renderMode: RenderMode; texture: unknown})
     return settings.texture !== null || settings.renderMode === RenderMode.Mesh;
 }
 
-/** Whether the blend mode adds to the frame, in which case fog and fade darken instead of mixing. */
-export function blendsAdditively(settings: {materialTransparent: boolean; materialBlendMode: number}): boolean {
-    return (
-        settings.materialTransparent &&
-        (settings.materialBlendMode === Constants.ALPHA_ADD || settings.materialBlendMode === Constants.ALPHA_ONEONE)
-    );
+/**
+ * How a particle's colour has to leave the fragment shader for its blend mode, so that its alpha
+ * means coverage: alpha 0 leaves the frame as it was, alpha 1 draws the colour in full, and the
+ * fades (soft particles, erosion, a rim fade, alpha over life) only lower alpha. Unity's particle
+ * shaders do the same for their Alpha, Premultiply, Additive and Multiply modes. Alpha has no
+ * such meaning for an opaque material, nor under `ALPHA_INTERPOLATE` (constant blend colour),
+ * `ALPHA_REPLACE_COLOR` (replaces the frame) and `ALPHA_DUAL_SRC0_ADD_SRC1xDST` (reads a second
+ * shader output the particle shaders do not write); these leave the colour as it is.
+ *
+ * - `'straight'`: the blend weighs the colour by its alpha itself (Babylon's `ALPHA_COMBINE`,
+ *   `ALPHA_ADD`, `ALPHA_LAYER_ACCUMULATE`, …) or does not blend; the colour leaves as it is.
+ * - `'premultiply'`: the blend takes the colour at full weight, or the frame by one minus the
+ *   colour (`ALPHA_PREMULTIPLIED`, `ALPHA_ONEONE`, `ALPHA_SCREENMODE`, `ALPHA_SUBTRACT`,
+ *   `ALPHA_MAXIMIZED`, `ALPHA_MAX`, …), so the shader multiplies it by its alpha: black, which
+ *   these modes leave the frame alone with, at alpha 0. Textures stay straight alpha, as in
+ *   Unity's Premultiply mode. The fade is linear in alpha except under `ALPHA_MAXIMIZED`, whose
+ *   blend weighs the colour by alpha once more, and `ALPHA_MAX`.
+ * - `'multiply'`: the blend multiplies the frame by the colour (`ALPHA_MULTIPLY`, `ALPHA_MIN`), so
+ *   the shader moves it toward white, which leaves the frame alone, as alpha falls. `ALPHA_MIN`
+ *   clamps a frame brighter than 1 (an HDR target) to 1 where a particle draws, even at alpha 0.
+ */
+export type BlendOutput = 'straight' | 'premultiply' | 'multiply';
+
+/**
+ * What the scene's fog turns a particle's colour into with distance: the fog colour where the
+ * particle covers the frame (`'color'`), black where it adds to it (`'black'`, or the fog would
+ * add itself to the whole screen), white where it multiplies it (`'white'`). Unity fogs its
+ * additive and multiply particles toward black and white for the same reason.
+ */
+export type FogTarget = 'color' | 'black' | 'white';
+
+/** The {@link BlendOutput} and {@link FogTarget} of a blend mode. */
+export interface BlendCategory {
+    /** How the colour leaves the shader. */
+    output: BlendOutput;
+    /** Where the fog takes the colour. */
+    fogTarget: FogTarget;
+}
+
+const PREMULTIPLY_MODES = new Set<number>([
+    Constants.ALPHA_SUBTRACT,
+    Constants.ALPHA_MAXIMIZED,
+    Constants.ALPHA_ONEONE,
+    Constants.ALPHA_PREMULTIPLIED,
+    Constants.ALPHA_PREMULTIPLIED_PORTERDUFF,
+    Constants.ALPHA_SCREENMODE,
+    Constants.ALPHA_ONEONE_ONEONE,
+    Constants.ALPHA_ALPHATOCOLOR,
+    Constants.ALPHA_REVERSEONEMINUS,
+    Constants.ALPHA_SRC_DSTONEMINUSSRCALPHA,
+    Constants.ALPHA_ONEONE_ONEZERO,
+    Constants.ALPHA_EXCLUSION,
+    Constants.ALPHA_MAX,
+]);
+const MULTIPLY_MODES = new Set<number>([Constants.ALPHA_MULTIPLY, Constants.ALPHA_MIN]);
+/** The modes whose fog is the fog colour: those that lay the colour over the frame or replace it. */
+const OVER_MODES = new Set<number>([
+    Constants.ALPHA_COMBINE,
+    Constants.ALPHA_PREMULTIPLIED,
+    Constants.ALPHA_PREMULTIPLIED_PORTERDUFF,
+    Constants.ALPHA_INTERPOLATE,
+    Constants.ALPHA_SRC_DSTONEMINUSSRCALPHA,
+    Constants.ALPHA_LAYER_ACCUMULATE,
+    Constants.ALPHA_REPLACE_COLOR,
+]);
+
+/**
+ * The {@link BlendCategory} of a material: an opaque one (`materialTransparent` false, or
+ * `ALPHA_DISABLE`) is straight and fogs toward the fog colour; a transparent one by its Babylon
+ * alpha mode. A mode this table does not know is straight and fogs toward the fog colour.
+ */
+export function blendCategory(settings: {materialTransparent: boolean; materialBlendMode: number}): BlendCategory {
+    const mode = settings.materialBlendMode;
+    if (!settings.materialTransparent || mode === Constants.ALPHA_DISABLE) {
+        return {output: 'straight', fogTarget: 'color'};
+    }
+    const output: BlendOutput = PREMULTIPLY_MODES.has(mode)
+        ? 'premultiply'
+        : MULTIPLY_MODES.has(mode)
+          ? 'multiply'
+          : 'straight';
+    const fogTarget: FogTarget =
+        output === 'multiply'
+            ? 'white'
+            : OVER_MODES.has(mode) || (output === 'straight' && mode !== Constants.ALPHA_ADD)
+              ? 'color'
+              : 'black';
+    return {output, fogTarget};
 }
 
 /** The shader program a batch with `settings` compiles, given what it knows about its textures. */
@@ -146,7 +228,7 @@ function spriteShaderProgram(settings: ShaderSettings, context: ShaderContext): 
         fragment = {glsl: particle_frag, wgsl: particle_frag_wgsl};
     }
 
-    const defines = fogDefines(settings);
+    const defines = blendDefines(settings);
     const attributes = [...SPRITE_ATTRIBUTES];
     const uniforms = ['world', 'view', 'projection', ...FOG_UNIFORMS];
     const samplers: string[] = [];
@@ -225,7 +307,7 @@ function spriteShaderProgram(settings: ShaderSettings, context: ShaderContext): 
 
 /** The program of a trail batch. */
 function trailShaderProgram(settings: ShaderSettings, context: ShaderContext): ShaderProgram {
-    const defines = fogDefines(settings);
+    const defines = blendDefines(settings);
     const attributes = [...TRAIL_ATTRIBUTES];
     const uniforms = ['view', 'projection', ...FOG_UNIFORMS];
     const samplers: string[] = [];
@@ -251,15 +333,27 @@ function trailShaderProgram(settings: ShaderSettings, context: ShaderContext): S
 }
 
 /**
- * The fog defines: `FOG` when the settings apply the scene's fog, and `FOG_ADDITIVE` when the
- * particles add to the frame, so that they fade toward black instead of the fog colour, which
- * would fog the whole screen (what Unity does for additive materials).
+ * The blend defines: `BLEND_PREMULTIPLY` or `BLEND_MULTIPLY` for how the colour leaves the shader,
+ * and with `FOG` (when the settings apply the scene's fog) `FOG_ADDITIVE` or `FOG_MULTIPLY` for a
+ * fog toward black or white. See {@link blendCategory}.
  */
-function fogDefines(settings: ShaderSettings): string[] {
-    if (!settings.applyFog) {
-        return [];
+function blendDefines(settings: ShaderSettings): string[] {
+    const {output, fogTarget} = blendCategory(settings);
+    const defines: string[] = [];
+    if (output === 'premultiply') {
+        defines.push('BLEND_PREMULTIPLY');
+    } else if (output === 'multiply') {
+        defines.push('BLEND_MULTIPLY');
     }
-    return blendsAdditively(settings) ? ['FOG', 'FOG_ADDITIVE'] : ['FOG'];
+    if (settings.applyFog) {
+        defines.push('FOG');
+        if (fogTarget === 'black') {
+            defines.push('FOG_ADDITIVE');
+        } else if (fogTarget === 'white') {
+            defines.push('FOG_MULTIPLY');
+        }
+    }
+    return defines;
 }
 
 /** Soft particles, when on and a depth texture is there to read, and the alpha test. */

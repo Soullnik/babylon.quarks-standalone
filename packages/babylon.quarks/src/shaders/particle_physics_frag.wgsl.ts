@@ -1,3 +1,4 @@
+import {blendFragmentWGSL} from './chunks/blend';
 import {fogFragmentDeclarationWGSL, fogFragmentWGSL} from './chunks/fog';
 import {softFragmentDeclarationWGSL, softFragmentWGSL} from './chunks/soft';
 import {surfaceColorWGSL, surfaceFragmentDeclarationWGSL} from './chunks/surface';
@@ -133,6 +134,7 @@ ${surfaceColorWGSL(true)}
 
 ${fogFragmentWGSL('finalColor')}
 ${softFragmentWGSL('finalColor')}
+${blendFragmentWGSL('finalColor')}
     fragmentOutputs.color = finalColor;
 }
 `;

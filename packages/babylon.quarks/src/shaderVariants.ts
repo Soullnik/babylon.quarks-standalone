@@ -123,6 +123,21 @@ const FOG: Axis[] = [
     {name: 'fog additive', settings: {applyFog: true, materialBlendMode: Constants.ALPHA_ADD}},
 ];
 
+/** The blend resolves (see `blendCategory`), with and without the fog each one takes. */
+const BLEND: Axis[] = [
+    {name: 'premultiplied', settings: {materialBlendMode: Constants.ALPHA_PREMULTIPLIED}},
+    {name: 'premultiplied fog', settings: {materialBlendMode: Constants.ALPHA_PREMULTIPLIED, applyFog: true}},
+    {name: 'one-one', settings: {materialBlendMode: Constants.ALPHA_ONEONE}},
+    {name: 'one-one fog', settings: {materialBlendMode: Constants.ALPHA_ONEONE, applyFog: true}},
+    {name: 'multiply', settings: {materialBlendMode: Constants.ALPHA_MULTIPLY}},
+    {name: 'multiply fog', settings: {materialBlendMode: Constants.ALPHA_MULTIPLY, applyFog: true}},
+    {
+        name: 'multiply fog alpha test',
+        settings: {materialBlendMode: Constants.ALPHA_MULTIPLY, applyFog: true, materialAlphaTest: 0.5},
+    },
+    {name: 'opaque', settings: {materialTransparent: false}},
+];
+
 /** Texture effects (`chunks/surface.ts`), alone and together, on both UV channels. */
 const SURFACE: Axis[] = (() => {
     const uv0 = normalizeMapUV({tiling: [2, 2]});
@@ -174,15 +189,16 @@ const MESH_UV2: Axis = {name: 'uv2', context: {meshUV2: true}};
 
 /** Soft, alpha-tested and fogged at once, to try the effects with the rest of the fragment. */
 const EVERYTHING_ELSE: Axis = {
-    name: 'soft packed alpha test fog additive',
-    settings: {softParticles: true, materialAlphaTest: 0.5, applyFog: true, materialBlendMode: Constants.ALPHA_ADD},
+    name: 'soft packed alpha test fog one-one',
+    settings: {softParticles: true, materialAlphaTest: 0.5, applyFog: true, materialBlendMode: Constants.ALPHA_ONEONE},
     context: {depth: {packed: true}},
 };
 
 /**
  * Every shader program the library can compile, one per distinct set of defines: every render
- * mode with every combination of sheet, map, soft particles, alpha test and fog, and the texture
- * effects alone and together on each shader family. What a shader validator compiles, and what
+ * mode with every combination of sheet, map, soft particles, alpha test and fog, every blend
+ * resolve with and without fog and soft particles, and the texture effects alone and together on
+ * each shader family. What a shader validator compiles, and what
  * an application can warm the shader cache with before its first frame (Unity's
  * ShaderVariantCollection). Built by {@link shaderProgram}, so a variant here is a material a
  * batch would build.
@@ -214,6 +230,10 @@ export function shaderVariants(): ShaderVariant[] {
                     for (const soft of SOFT)
                         for (const alphaTest of ALPHA_TEST)
                             for (const fog of FOG) add([target, quad, tile, map, soft, alphaTest, fog]);
+
+    for (const target of TARGETS)
+        for (const blend of BLEND)
+            for (const soft of SOFT.slice(0, 2)) for (const map of MAP) add([target, blend, soft, map]);
 
     for (const target of TARGETS.filter((t) => SURFACE_TARGETS.includes(t.name)))
         for (const uv2 of target.settings?.renderMode === RenderMode.Mesh ? [NONE, MESH_UV2] : [NONE])

@@ -11,7 +11,8 @@
  *
  * Additive particles cannot fade toward a fog colour (that would add fog to
  * the whole screen), so under `FOG_ADDITIVE` they fade toward black instead,
- * which is what Unity does for additive materials.
+ * and multiplying particles (`FOG_MULTIPLY`) toward white, which leaves the
+ * frame as it is: what Unity does for additive and multiply materials.
  */
 
 /** Vertex-side declaration, GLSL. */
@@ -62,8 +63,10 @@ export function fogFragmentGLSL(rgb: string): string {
 #ifdef FOG
     {
         float fogFactor = quarksFogFactor();
-#ifdef FOG_ADDITIVE
+#if defined(FOG_ADDITIVE)
         ${rgb} *= fogFactor;
+#elif defined(FOG_MULTIPLY)
+        ${rgb} = mix(vec3(1.0), ${rgb}, fogFactor);
 #else
         ${rgb} = mix(vFogColor, ${rgb}, fogFactor);
 #endif
@@ -110,8 +113,10 @@ fn quarksFog(rgb: vec3f, fogDistanceVector: vec3f) -> vec3f {
         fogCoeff = exp(-fogDistance * fogDistance * fogDensity * fogDensity);
     }
     let fogFactor = clamp(fogCoeff, 0.0, 1.0);
-#ifdef FOG_ADDITIVE
+#if defined(FOG_ADDITIVE)
     return rgb * fogFactor;
+#elif defined(FOG_MULTIPLY)
+    return mix(vec3f(1.0), rgb, fogFactor);
 #else
     return mix(uniforms.vFogColor, rgb, fogFactor);
 #endif
