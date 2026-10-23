@@ -253,6 +253,9 @@ and the project follows the `quarks.core` 0.x version line.
 - A clean build and install print no warnings: the core build stops passing `declarationDir`
   without declarations, CI runs on Node 24 with current GitHub Actions, dev dependencies have no
   known vulnerabilities, and the demo smoke test fails on a console warning as well as an error.
+- The toolchain moves to ESLint 10 (with `defineConfig` and react-hooks 7's React Compiler rules),
+  TypeScript 6, Vite 8 (Rolldown: the examples' chunks all fit under its 500 kB warning) and
+  cross-env 10. Babel stays on 7, which Jest's own preset still needs.
 
 ## [0.27.1] — 2026-10-23
 
