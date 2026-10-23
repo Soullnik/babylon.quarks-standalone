@@ -19,6 +19,7 @@ export default defineConfig({
     },
     resolve: {
         alias: {
+            'babylon.quarks-editor/session': resolve(__dirname, '../packages/babylon.quarks-editor/src/session.ts'),
             'babylon.quarks-editor/react': resolve(__dirname, '../packages/babylon.quarks-editor/src/react/index.ts'),
             'babylon.quarks-editor': resolve(__dirname, '../packages/babylon.quarks-editor/src/index.ts'),
             'babylon.quarks': resolve(__dirname, '../packages/babylon.quarks/src/index.ts'),

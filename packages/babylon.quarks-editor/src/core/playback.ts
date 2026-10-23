@@ -2,11 +2,17 @@
 export interface PlaybackState {
     /** When true, all in-scene preview effects simulate. */
     stagePlaying: boolean;
+    /** Root `uniqueId` of the focused effect, whose time the timeline shows. */
     focusRootId: number | null;
+    /** Each effect's timeline time, in seconds, by root `uniqueId`. */
     focusElapsedByRoot: Map<number, number>;
+    /** Effects parked at their end, by root `uniqueId`; Play restarts them. */
     focusFinishedByRoot: Set<number>;
+    /** Playback speed, 1 for real time. */
     speed: number;
+    /** While paused: advance one frame on the next render. */
     stepQueued: boolean;
+    /** The timeline is being scrubbed; the render loop does not simulate. */
     scrubbing: boolean;
 }
 

@@ -2,18 +2,27 @@ import React, {useEffect, useLayoutEffect, useRef, useState} from 'react';
 import {createPortal} from 'react-dom';
 import {theme} from './theme.js';
 
+/** One entry of a {@link ContextMenu}. */
 export interface ContextMenuItem {
+    /** The entry's text. */
     label: string;
+    /** Runs when the entry is picked; the menu closes first. */
     onSelect: () => void;
+    /** Shows the entry in red, for a destructive action. */
     danger?: boolean;
+    /** Shows the entry greyed out and unpickable. */
     disabled?: boolean;
 }
 
+/** Props of {@link ContextMenu}. */
 export interface ContextMenuProps {
-    /** Client coordinates of the right-click. */
+    /** Client X of the right-click. */
     x: number;
+    /** Client Y of the right-click. */
     y: number;
+    /** The entries, top to bottom. */
     items: ContextMenuItem[];
+    /** Closes the menu: the host stops rendering it. */
     onClose: () => void;
 }
 

@@ -6,6 +6,7 @@ import {EffectEditorHost, type EffectEditorHostProps} from './EffectEditorHost.j
 import {ProjectsPage} from './ProjectsPage.js';
 import {theme} from './theme.js';
 
+/** Props of {@link EditorWorkspace}: the editor's, plus where projects live. */
 export interface EditorWorkspaceProps extends Omit<EffectEditorHostProps, 'project' | 'onExitProject' | 'effectJson'> {
     /** Where projects are kept; defaults to the browser's IndexedDB. */
     store?: ProjectStore;
@@ -87,7 +88,15 @@ export function EditorWorkspace(props: EditorWorkspaceProps): React.ReactElement
 
 /** Imperative entry point, like QuarksEffectEditor.Show, for the project-based workspace. */
 export const QuarksEditorWorkspace = {
-    Show(options: EditorWorkspaceProps & {hostElement: HTMLElement}): {dispose: () => void} {
+    /**
+     * Mounts an {@link EditorWorkspace} into `hostElement`.
+     *
+     * @returns A handle whose `dispose()` unmounts it.
+     */
+    Show(options: EditorWorkspaceProps & {hostElement: HTMLElement}): {
+        /** Unmounts the workspace. */
+        dispose: () => void;
+    } {
         const {hostElement, ...props} = options;
         const root = createRoot(hostElement);
         root.render(<EditorWorkspace {...props} />);

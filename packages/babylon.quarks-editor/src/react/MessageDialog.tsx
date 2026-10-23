@@ -1,10 +1,15 @@
 import React from 'react';
 import {buttonStyle, theme} from './theme.js';
 
+/** Props of {@link MessageDialog}. */
 export interface MessageDialogProps {
+    /** The dialog's title. */
     title: string;
+    /** The message; line breaks are kept. */
     message: string;
+    /** The button's text. Default `OK`. */
     confirmLabel?: string;
+    /** Closes the dialog: the button, Enter, Escape or the backdrop. */
     onClose: () => void;
 }
 

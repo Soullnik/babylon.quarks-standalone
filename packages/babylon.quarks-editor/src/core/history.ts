@@ -5,7 +5,9 @@ const MAX_DEPTH = 50;
 
 /** Undo/redo stacks of one effect, kept by the host while another effect is focused. */
 export interface HistoryStacks {
+    /** Snapshots to undo to, oldest first. */
     undo: string[];
+    /** Snapshots to redo to, most recent undo last. */
     redo: string[];
 }
 
@@ -28,14 +30,17 @@ export class EffectHistory {
         binding.onBeforeChange = () => this.capture();
     }
 
+    /** There is a change to undo. */
     get canUndo(): boolean {
         return this.undoStack.length > 0;
     }
 
+    /** There is an undone change to redo. */
     get canRedo(): boolean {
         return this.redoStack.length > 0;
     }
 
+    /** Forgets every snapshot. */
     clear(): void {
         this.undoStack = [];
         this.redoStack = [];
@@ -47,6 +52,7 @@ export class EffectHistory {
         return {undo: this.undoStack, redo: this.redoStack};
     }
 
+    /** Puts back stacks from `saveStacks`; undefined starts empty. */
     restoreStacks(stacks: HistoryStacks | undefined): void {
         this.undoStack = stacks?.undo ?? [];
         this.redoStack = stacks?.redo ?? [];

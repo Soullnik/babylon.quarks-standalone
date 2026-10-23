@@ -85,7 +85,20 @@ export function searchAssets(assets: EffectAsset[], query: string): EffectAsset[
 
 export const ASSET_DRAG_MIME = 'application/x-quarks-asset-drop';
 
-export type AssetDragPayload = {kind: 'asset'; id: number} | {kind: 'folder'; path: string};
+/** What is dragged out of the Assets panel: one asset, or every asset under a folder. */
+export type AssetDragPayload =
+    | {
+          /** One asset. */
+          kind: 'asset';
+          /** The asset's id. */
+          id: number;
+      }
+    | {
+          /** A folder. */
+          kind: 'folder';
+          /** The folder's path; every asset under it is dragged. */
+          path: string;
+      };
 
 export function writeAssetDrag(dataTransfer: DataTransfer, payload: AssetDragPayload): void {
     dataTransfer.setData(ASSET_DRAG_MIME, JSON.stringify(payload));

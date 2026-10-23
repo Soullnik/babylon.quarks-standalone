@@ -37,7 +37,6 @@ import {
     normalizeTextureUV,
 } from 'babylon.quarks';
 import React, {useMemo} from 'react';
-import {EffectBinding} from '../core/binding.js';
 import {
     DEFAULT_GRADIENT_STOPS,
     GradientStop,
@@ -61,17 +60,13 @@ import {buildCurve, buildScalar, readPieces, readScalar} from '../core/values.js
 import {CurveEditor} from './CurveEditor.js';
 import {GradientEditor} from './GradientEditor.js';
 import {InspectorInfoIcon} from './InspectorInfoIcon.js';
-import {ModuleSection} from './ModuleSection.js';
+import {ModuleSection, type ModuleProps} from './ModuleSection.js';
 import {TextureSelect} from './TextureSelect.js';
 import {TextureUVField} from './TextureUVField.js';
 import {ValueField} from './ValueField.js';
 import {CheckboxField, NumberField, Row, SelectField} from './fields.js';
 import {iconStyle} from './icons.js';
 import {theme} from './theme.js';
-
-interface ModuleProps {
-    binding: EffectBinding;
-}
 
 const MESH_QUAD_POSITIONS = new Float32Array([-0.5, -0.5, 0, 0.5, -0.5, 0, 0.5, 0.5, 0, -0.5, 0.5, 0]);
 const MESH_QUAD_INDICES = new Uint32Array([0, 1, 2, 0, 2, 3]);
@@ -195,18 +190,20 @@ function ColorInput(props: {value: Vector4; onChange: (next: Vector4) => void}) 
     );
 }
 
+/** The Main module (Unity's main module): duration, looping, start delay, life, speed, size, rotation and colour. */
 export function MainModule({binding}: ModuleProps) {
     const system = binding.system;
     const startColor = system.startColor;
     const colorMode =
         startColor instanceof RandomColor ? 'random' : startColor instanceof ColorRange ? 'range' : 'constant';
-    const twoColors = startColor instanceof RandomColor || startColor instanceof ColorRange;
-    const colorA = twoColors
-        ? (startColor as never as {a: Vector4}).a
+    const twoColor = startColor instanceof RandomColor || startColor instanceof ColorRange ? startColor : null;
+    const colorA = twoColor
+        ? twoColor.a
         : startColor instanceof ConstantColor
           ? startColor.color
           : new Vector4(1, 1, 1, 1);
-    const colorB = twoColors ? (startColor as never as {b: Vector4}).b : new Vector4(1, 0.5, 0.2, 1);
+    const colorB = twoColor ? twoColor.b : new Vector4(1, 0.5, 0.2, 1);
+    const twoColors = twoColor !== null;
     /** The two-colour generator of the current mode. */
     const makeTwoColors = (a: Vector4, b: Vector4) =>
         colorMode === 'range' ? new ColorRange(a, b) : new RandomColor(a, b);
@@ -220,17 +217,17 @@ export function MainModule({binding}: ModuleProps) {
               ? 'euler'
               : isAxisAngle
                 ? 'axisAngle'
-                : readScalar(rotation as never).mode === 'random'
+                : readScalar(rotation).mode === 'random'
                   ? 'random'
                   : 'angle';
     const rotationState = readScalar(
-        rotation instanceof RandomQuatGenerator || isEuler || isAxisAngle ? undefined : (rotation as never)
+        rotation instanceof RandomQuatGenerator || isEuler || isAxisAngle ? undefined : rotation
     );
     const axisAngle = isAxisAngle ? (rotation as AxisAngleGenerator) : undefined;
     const eulerAngles = {
-        x: isEuler ? readScalar((rotation as EulerGenerator).angleX as never).value : 0,
-        y: isEuler ? readScalar((rotation as EulerGenerator).angleY as never).value : 0,
-        z: isEuler ? readScalar((rotation as EulerGenerator).angleZ as never).value : 0,
+        x: isEuler ? readScalar((rotation as EulerGenerator).angleX).value : 0,
+        y: isEuler ? readScalar((rotation as EulerGenerator).angleY).value : 0,
+        z: isEuler ? readScalar((rotation as EulerGenerator).angleZ).value : 0,
     };
     const setEulerAxis = (axis: 'x' | 'y' | 'z', v: number) =>
         binding.apply((s) => {
@@ -241,8 +238,7 @@ export function MainModule({binding}: ModuleProps) {
                 axis === 'z' ? new ConstantValue(v) : cur.angleZ
             );
         });
-    const startSize = system.startSize as unknown as {type?: string; x?: never; y?: never; z?: never};
-    const size3D = startSize.type === 'vec3function';
+    const startSize3D = system.startSize instanceof Vector3Function ? system.startSize : null;
     const colorGenMode =
         startColor instanceof RandomColorBetweenGradient
             ? 'gradient2'
@@ -350,50 +346,50 @@ export function MainModule({binding}: ModuleProps) {
             />
             <Row label="Start size">
                 <SelectField
-                    value={size3D ? '3d' : 'uniform'}
+                    value={startSize3D ? '3d' : 'uniform'}
                     options={[
                         {value: 'uniform', label: 'Uniform'},
                         {value: '3d', label: '3D (per axis)'},
                     ]}
                     onChange={(mode) =>
                         binding.apply((s) => {
-                            const cur = s.startSize as never as {clone: () => never; x?: never};
-                            if (mode === '3d') {
+                            const cur = s.startSize;
+                            if (mode === '3d' && cur.type !== 'vec3function') {
                                 // Seed all three axes from the current uniform generator.
                                 s.startSize = new Vector3Function(cur.clone(), cur.clone(), cur.clone());
-                            } else {
+                            } else if (mode !== '3d' && cur instanceof Vector3Function) {
                                 // Collapse back to the X-axis generator.
-                                s.startSize = (s.startSize as never as {x: never}).x;
+                                s.startSize = cur.x;
                             }
                         })
                     }
                 />
             </Row>
-            {!size3D && (
+            {!startSize3D && (
                 <ValueField
                     label=""
-                    generator={system.startSize as never}
+                    generator={system.startSize}
                     min={0}
                     curveMax={5}
                     onChange={(g) => binding.apply((s) => (s.startSize = g))}
                 />
             )}
-            {size3D && (
+            {startSize3D && (
                 <>
                     {(['x', 'y', 'z'] as const).map((axis) => (
                         <ValueField
                             key={axis}
                             label={axis.toUpperCase()}
-                            generator={startSize[axis] as never}
+                            generator={startSize3D[axis]}
                             min={0}
                             curveMax={5}
                             onChange={(g) =>
                                 binding.apply((s) => {
                                     const cur = s.startSize as Vector3Function;
                                     s.startSize = new Vector3Function(
-                                        axis === 'x' ? (g as never) : cur.x,
-                                        axis === 'y' ? (g as never) : cur.y,
-                                        axis === 'z' ? (g as never) : cur.z
+                                        axis === 'x' ? g : cur.x,
+                                        axis === 'y' ? g : cur.y,
+                                        axis === 'z' ? g : cur.z
                                     );
                                 })
                             }
@@ -586,6 +582,7 @@ export function MainModule({binding}: ModuleProps) {
     );
 }
 
+/** The Emission module (Unity's Emission): rate over time and distance, and bursts. */
 export function EmissionModule({binding}: ModuleProps) {
     const system = binding.system;
     const bursts = system.emissionBursts ?? [];
@@ -635,7 +632,7 @@ export function EmissionModule({binding}: ModuleProps) {
                         </Row>
                         <Row label="Count">
                             <NumberField
-                                value={readScalar(burst.count as never).value}
+                                value={readScalar(burst.count).value}
                                 min={0}
                                 step={1}
                                 onChange={(count) =>
@@ -708,6 +705,7 @@ export function EmissionModule({binding}: ModuleProps) {
 // first texture" bug: a control that looks live but does nothing.
 const SHAPES_WITHOUT_MODE_SPREAD = new Set<ShapeType>(['point', 'grid', 'box', 'mesh_surface']);
 
+/** The Shape module (Unity's Shape): the emitter shape and its settings. */
 export function ShapeModule({binding}: ModuleProps) {
     const system = binding.system;
     const type = getShapeType(system.emitterShape);
@@ -807,12 +805,11 @@ export function ShapeModule({binding}: ModuleProps) {
     );
 }
 
+/** The Size over Lifetime module (Unity's Size over Lifetime): size by a curve over the particle's life. */
 export function SizeOverLifeModule({binding}: ModuleProps) {
     const system = binding.system;
     const behavior = findBehavior<SizeOverLife>(system.behaviors, 'SizeOverLife');
-    const curve = behavior
-        ? readScalar(behavior.size as never).curve
-        : ([0.2, 1, 1, 0.4] as [number, number, number, number]);
+    const curve = behavior ? readScalar(behavior.size).curve : ([0.2, 1, 1, 0.4] as [number, number, number, number]);
     return (
         <ModuleSection
             title="Size over Lifetime"
@@ -821,21 +818,19 @@ export function SizeOverLifeModule({binding}: ModuleProps) {
                 binding.apply((s) => {
                     removeBehavior(s, 'SizeOverLife');
                     if (enabled) {
-                        s.addBehavior(
-                            new SizeOverLife(buildScalar({mode: 'curve', value: 1, min: 0, max: 1, curve}) as never)
-                        );
+                        s.addBehavior(new SizeOverLife(buildScalar({mode: 'curve', value: 1, min: 0, max: 1, curve})));
                     }
                 })
             }
         >
             <div style={{marginTop: 6}}>
                 <CurveEditor
-                    pieces={behavior ? readPieces(behavior.size as never) : [{start: 0, p: curve}]}
+                    pieces={behavior ? readPieces(behavior.size) : [{start: 0, p: curve}]}
                     maxValue={2}
                     onChange={(pieces) =>
                         binding.apply((s) => {
                             removeBehavior(s, 'SizeOverLife');
-                            s.addBehavior(new SizeOverLife(buildCurve(pieces) as never));
+                            s.addBehavior(new SizeOverLife(buildCurve(pieces)));
                         })
                     }
                 />
@@ -844,6 +839,7 @@ export function SizeOverLifeModule({binding}: ModuleProps) {
     );
 }
 
+/** The Color over Lifetime module (Unity's Color over Lifetime): a gradient over the particle's life. */
 export function ColorOverLifeModule({binding}: ModuleProps) {
     const system = binding.system;
     const behavior = findBehavior<ColorOverLife>(system.behaviors, 'ColorOverLife');
@@ -874,8 +870,11 @@ export function ColorOverLifeModule({binding}: ModuleProps) {
     );
 }
 
+/** A texture preset the host offers in the Renderer module's texture menus. */
 export interface TextureOption {
+    /** Its label in the menu. */
     label: string;
+    /** The URL the host's texture loader receives. */
     url: string;
 }
 
@@ -885,12 +884,17 @@ export interface TextureOption {
  * them into the system's instancing geometry.
  */
 export interface GeometryOption {
+    /** Its label in the menu. */
     label: string;
+    /** Vertex positions, three values per vertex. */
     positions: Float32Array | number[];
+    /** Triangle indices; without them the vertices are drawn in sequence. */
     indices?: Uint32Array | number[];
+    /** The first UV set, two values per vertex; without it the mesh samples UV (0, 0). */
     uvs?: Float32Array | number[];
     /** A second UV set (glTF `TEXCOORD_1`), what textures on UV channel 1 read on the mesh. */
     uvs2?: Float32Array | number[];
+    /** Vertex normals, three values per vertex; without them lighting uses +Z. */
     normals?: Float32Array | number[];
 }
 
@@ -983,6 +987,7 @@ function MeshPreview({
     );
 }
 
+/** The Renderer module (Unity's Renderer): render mode, material, textures, sorting and mesh settings. */
 export function RendererModule({
     binding,
     textureOptions,
@@ -992,7 +997,7 @@ export function RendererModule({
 }: ModuleProps & {
     textureOptions?: TextureOption[];
     geometryOptions?: GeometryOption[];
-    resolveTexture?: (url: string) => unknown;
+    resolveTexture?: (url: string) => Texture | null | undefined;
     resolveGeometry?: (file: File) => Promise<GeometryData>;
 }) {
     const system = binding.system;
@@ -1432,13 +1437,20 @@ export function RendererModule({
                     const hostGeometry = geometryOptions ?? [];
                     const applyGeometry = (g: GeometryData) =>
                         binding.apply((s) => {
+                            // The previous mesh's sets go first, so the positions setter gives
+                            // this mesh the library's own fallback UVs and normals; then every set
+                            // this mesh has. An unindexed mesh draws its vertices in sequence.
                             const settings = s.getRendererSettings();
-                            // Positions first: the setter keeps or drops the other sets by vertex count.
+                            settings.instancingUVs = undefined;
+                            settings.instancingUVs2 = undefined;
+                            settings.instancingNormals = undefined;
                             s.instancingGeometry = new Float32Array(g.positions);
-                            settings.instancingIndices = (g.indices ? new Uint32Array(g.indices) : undefined) as never;
-                            settings.instancingUVs = (g.uvs ? new Float32Array(g.uvs) : undefined) as never;
-                            settings.instancingUVs2 = (g.uvs2 ? new Float32Array(g.uvs2) : undefined) as never;
-                            settings.instancingNormals = (g.normals ? new Float32Array(g.normals) : undefined) as never;
+                            s.instancingIndices = g.indices
+                                ? new Uint32Array(g.indices)
+                                : Uint32Array.from({length: g.positions.length / 3}, (_, i) => i);
+                            if (g.uvs) s.instancingUVs = new Float32Array(g.uvs);
+                            if (g.uvs2) s.instancingUVs2 = new Float32Array(g.uvs2);
+                            if (g.normals) settings.instancingNormals = new Float32Array(g.normals);
                         });
                     return (
                         <Row label="Geometry">

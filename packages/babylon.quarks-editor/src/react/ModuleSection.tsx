@@ -1,11 +1,22 @@
 import {ChevronDownIcon, ChevronRightIcon} from '@heroicons/react/24/solid';
 import React, {useState} from 'react';
+import type {EffectBinding} from '../core/binding.js';
 import {iconStyle} from './icons.js';
 import {getInspectorHint} from './inspectorHints.js';
 import {InspectorInfoIcon} from './InspectorInfoIcon.js';
 import {theme} from './theme.js';
 
 /** Unity-style module foldout with an optional enable checkbox. */
+/** Props of every inspector module: the effect binding it edits, through `binding.apply`. */
+export interface ModuleProps {
+    /** The focused effect; the module edits `binding.system`. */
+    binding: EffectBinding;
+}
+
+/**
+ * An inspector module: a foldout with a title, a hint, and an enable checkbox when `onToggle` is
+ * given. Unity's Particle System inspector modules look the same way.
+ */
 export function ModuleSection(props: {
     title: string;
     hint?: string;

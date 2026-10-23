@@ -69,8 +69,10 @@ Tests live in each package's `test/` folder. `npm run test:coverage` enforces a 
 package, set in the root `jest.config.json` under `coverageThreshold`. The floors are a ratchet: they
 sit one point under what the suites reach today, since random paths move coverage a little. A change
 may not lower them, and a PR that raises coverage raises the matching floor. Every file under each
-package's sources counts (for the editor, `src/core`), whether a test loads it or not, so a new
-untested module lowers the number. The gate needs the full suite: run on a subset of tests it fails
+package's sources counts, whether a test loads it or not, so a new untested module lowers the
+number. The editor has two floors: `src/core` (the headless edit model) and `src/react` (the
+components, driven through jsdom in `test/react`), whose floor is lower and rises as components gain
+tests. The gate needs the full suite: run on a subset of tests it fails
 for the packages that subset does not reach. New runtime code needs tests.
 
 Formatting is Prettier: `npm run format` writes it and `npm run format:check`, part of

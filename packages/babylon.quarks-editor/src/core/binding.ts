@@ -3,6 +3,7 @@ import type {ParticleSystem} from 'babylon.quarks';
 import type {EffectTreeNode} from './effectTree.js';
 import {buildEffectTree, serializeEffectTree} from './effectTree.js';
 
+/** Called after every change made through an {@link EffectBinding}. */
 export type EditorListener = () => void;
 
 /**
@@ -32,6 +33,7 @@ export class EffectBinding {
         return buildEffectTree(this.root);
     }
 
+    /** Calls `listener` after every change; returns the call that stops it. */
     subscribe(listener: EditorListener): () => void {
         this.listeners.add(listener);
         return () => this.listeners.delete(listener);
@@ -42,17 +44,23 @@ export class EffectBinding {
         return this.revision;
     }
 
+    /**
+     * Changes the main system through `mutate`: takes an undo snapshot first, then notifies
+     * subscribers. Every inspector edit goes through here.
+     */
     apply(mutate: (system: ParticleSystem) => void): void {
         this.onBeforeChange?.();
         mutate(this.system);
         this.notify();
     }
 
+    /** Adds a system to the effect's sub systems. */
     addSubSystem(sub: ParticleSystem): void {
         this.subSystems.push(sub);
         this.notify();
     }
 
+    /** Removes a system from the effect's sub systems; a system it does not have is ignored. */
     removeSubSystem(sub: ParticleSystem): void {
         const index = this.subSystems.indexOf(sub);
         if (index >= 0) {
@@ -92,6 +100,7 @@ export class EffectBinding {
         }
     }
 
+    /** Restarts every system of the effect from time 0. */
     restart(): void {
         // onlyUsedByOther systems skip self-emission in update(); play() only unpauses sim.
         for (const system of [this.system, ...this.subSystems]) {

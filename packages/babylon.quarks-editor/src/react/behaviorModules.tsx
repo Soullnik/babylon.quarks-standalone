@@ -41,13 +41,9 @@ import {CheckboxField, NumberField, Row, SelectField} from './fields.js';
 import {GradientEditor} from './GradientEditor.js';
 import {iconStyle} from './icons.js';
 import type {TextureOption} from './modules.js';
-import {ModuleSection} from './ModuleSection.js';
+import {ModuleSection, type ModuleProps} from './ModuleSection.js';
 import {theme} from './theme.js';
 import {ValueField} from './ValueField.js';
-
-interface ModuleProps {
-    binding: EffectBinding;
-}
 
 function removeBehaviorOfType(behaviors: Behavior[], type: string): void {
     for (let i = behaviors.length - 1; i >= 0; i--) {
@@ -85,6 +81,7 @@ function BehaviorModule<T extends Behavior>(props: {
     );
 }
 
+/** The Speed over Lifetime module (Unity's Speed Modifier): scales speed by a curve over the particle's life. */
 export function SpeedOverLifeModule({binding}: ModuleProps) {
     return (
         <BehaviorModule<SpeedOverLife>
@@ -92,9 +89,7 @@ export function SpeedOverLifeModule({binding}: ModuleProps) {
             title="Speed over Lifetime"
             type="SpeedOverLife"
             create={() =>
-                new SpeedOverLife(
-                    buildScalar({mode: 'curve', value: 1, min: 0, max: 1, curve: [1, 0.75, 0.5, 0]}) as never
-                )
+                new SpeedOverLife(buildScalar({mode: 'curve', value: 1, min: 0, max: 1, curve: [1, 0.75, 0.5, 0]}))
             }
         >
             {(behavior) => (
@@ -102,7 +97,7 @@ export function SpeedOverLifeModule({binding}: ModuleProps) {
                     <CurveEditor
                         pieces={readPieces(behavior.speed)}
                         maxValue={2}
-                        onChange={(pieces) => binding.apply(() => (behavior.speed = buildCurve(pieces) as never))}
+                        onChange={(pieces) => binding.apply(() => (behavior.speed = buildCurve(pieces)))}
                     />
                 </div>
             )}
@@ -110,6 +105,7 @@ export function SpeedOverLifeModule({binding}: ModuleProps) {
     );
 }
 
+/** The Limit Speed over Lifetime module (Unity's Limit Velocity over Lifetime): caps speed by a curve, with dampening. */
 export function LimitSpeedOverLifeModule({binding}: ModuleProps) {
     return (
         <BehaviorModule<LimitSpeedOverLife>
@@ -117,10 +113,7 @@ export function LimitSpeedOverLifeModule({binding}: ModuleProps) {
             title="Limit Speed over Lifetime"
             type="LimitSpeedOverLife"
             create={() =>
-                new LimitSpeedOverLife(
-                    buildScalar({mode: 'curve', value: 1, min: 0, max: 1, curve: [4, 2, 1, 1]}) as never,
-                    0.5
-                )
+                new LimitSpeedOverLife(buildScalar({mode: 'curve', value: 1, min: 0, max: 1, curve: [4, 2, 1, 1]}), 0.5)
             }
         >
             {(behavior) => (
@@ -129,7 +122,7 @@ export function LimitSpeedOverLifeModule({binding}: ModuleProps) {
                         <CurveEditor
                             pieces={readPieces(behavior.speed)}
                             maxValue={8}
-                            onChange={(pieces) => binding.apply(() => (behavior.speed = buildCurve(pieces) as never))}
+                            onChange={(pieces) => binding.apply(() => (behavior.speed = buildCurve(pieces)))}
                         />
                     </div>
                     <Row label="Dampen">
@@ -146,6 +139,7 @@ export function LimitSpeedOverLifeModule({binding}: ModuleProps) {
     );
 }
 
+/** The Force over Lifetime module (Unity's Force over Lifetime): a constant push per axis. */
 export function ForceOverLifeModule({binding}: ModuleProps) {
     return (
         <BehaviorModule<ForceOverLife>
@@ -334,6 +328,7 @@ export function AttractorModule({binding}: ModuleProps) {
     );
 }
 
+/** The Gravity module: pulls particles towards a point. */
 export function GravityModule({binding}: ModuleProps) {
     return (
         <BehaviorModule<ApplyForce>
@@ -367,6 +362,7 @@ export function GravityModule({binding}: ModuleProps) {
     );
 }
 
+/** The Rotation over Lifetime module (Unity's Rotation over Lifetime): spin rate over the particle's life. */
 export function RotationOverLifeModule({binding}: ModuleProps) {
     return (
         <BehaviorModule<RotationOverLife>
@@ -653,6 +649,7 @@ export function SequencesModule({binding, textureOptions}: ModuleProps & {textur
     );
 }
 
+/** The Noise module (Unity's Noise): moves and turns particles by a noise field. */
 export function NoiseModule({binding}: ModuleProps) {
     return (
         <BehaviorModule<Noise>
@@ -753,6 +750,7 @@ function Vector3Row(props: {
     );
 }
 
+/** The Turbulence module: a curl noise force field. */
 export function TurbulenceModule({binding}: ModuleProps) {
     return (
         <BehaviorModule<TurbulenceField>
@@ -822,6 +820,7 @@ export function TurbulenceModule({binding}: ModuleProps) {
     );
 }
 
+/** The Randomize Direction module: tilts each particle's start direction by a random angle. */
 export function EmitDirectionModule({binding}: ModuleProps) {
     return (
         <BehaviorModule<ChangeEmitDirection>
@@ -833,16 +832,17 @@ export function EmitDirectionModule({binding}: ModuleProps) {
             {(behavior) => (
                 <ValueField
                     label="Angle (rad)"
-                    generator={behavior.angle as never}
+                    generator={behavior.angle}
+                    curve={false}
                     min={0}
-                    curveMax={Math.PI}
-                    onChange={(g) => binding.apply(() => (behavior.angle = g as never))}
+                    onChange={(g) => binding.apply(() => (behavior.angle = g))}
                 />
             )}
         </BehaviorModule>
     );
 }
 
+/** The Collision module (Unity's Collision): particles bounce off or die on a ground plane. */
 export function CollisionModule({binding}: ModuleProps) {
     // Like Unity: Collision stores bounce only. Colliders are host-provided via
     // setPhysicsResolver, asked when a particle is tested — the editor never invents a ground plane.
@@ -897,6 +897,7 @@ function SpeedRangeRows({binding, behavior}: {binding: EffectBinding; behavior: 
     );
 }
 
+/** The Color by Speed module (Unity's Color by Speed): a gradient over a speed range. */
 export function ColorBySpeedModule({binding}: ModuleProps) {
     return (
         <BehaviorModule<ColorBySpeed>
@@ -924,6 +925,7 @@ export function ColorBySpeedModule({binding}: ModuleProps) {
     );
 }
 
+/** The Size by Speed module (Unity's Size by Speed): size over a speed range. */
 export function SizeBySpeedModule({binding}: ModuleProps) {
     return (
         <BehaviorModule<SizeBySpeed>
@@ -932,7 +934,7 @@ export function SizeBySpeedModule({binding}: ModuleProps) {
             type="SizeBySpeed"
             create={() =>
                 new SizeBySpeed(
-                    buildScalar({mode: 'curve', value: 1, min: 0, max: 1, curve: [0.5, 0.8, 1.2, 1.5]}) as never,
+                    buildScalar({mode: 'curve', value: 1, min: 0, max: 1, curve: [0.5, 0.8, 1.2, 1.5]}),
                     new IntervalValue(0, 5)
                 )
             }
@@ -941,9 +943,9 @@ export function SizeBySpeedModule({binding}: ModuleProps) {
                 <>
                     <div style={{marginTop: 6}}>
                         <CurveEditor
-                            pieces={readPieces(behavior.size as never)}
+                            pieces={readPieces(behavior.size)}
                             maxValue={2}
-                            onChange={(pieces) => binding.apply(() => (behavior.size = buildCurve(pieces) as never))}
+                            onChange={(pieces) => binding.apply(() => (behavior.size = buildCurve(pieces)))}
                         />
                     </div>
                     <SpeedRangeRows binding={binding} behavior={behavior} />
@@ -953,6 +955,7 @@ export function SizeBySpeedModule({binding}: ModuleProps) {
     );
 }
 
+/** The Rotation by Speed module (Unity's Rotation by Speed): spin rate over a speed range. */
 export function RotationBySpeedModule({binding}: ModuleProps) {
     return (
         <BehaviorModule<RotationBySpeed>
@@ -977,6 +980,7 @@ export function RotationBySpeedModule({binding}: ModuleProps) {
     );
 }
 
+/** The Orbit over Lifetime module (Unity's Velocity over Lifetime orbital): turns particles about an axis. */
 export function OrbitOverLifeModule({binding}: ModuleProps) {
     return (
         <BehaviorModule<OrbitOverLife>
@@ -997,6 +1001,7 @@ export function OrbitOverLifeModule({binding}: ModuleProps) {
     );
 }
 
+/** The Width over Trail module (Unity's Trails width over trail): a trail's width along its length. */
 export function WidthOverTrailModule({binding}: ModuleProps) {
     return (
         <BehaviorModule<WidthOverLength>
@@ -1004,18 +1009,16 @@ export function WidthOverTrailModule({binding}: ModuleProps) {
             title="Width over Trail"
             type="WidthOverLength"
             create={() =>
-                new WidthOverLength(
-                    buildScalar({mode: 'curve', value: 1, min: 0, max: 1, curve: [1, 0.75, 0.4, 0]}) as never
-                )
+                new WidthOverLength(buildScalar({mode: 'curve', value: 1, min: 0, max: 1, curve: [1, 0.75, 0.4, 0]}))
             }
         >
             {(behavior) => (
                 <>
                     <div style={{marginTop: 6}}>
                         <CurveEditor
-                            pieces={readPieces(behavior.width as never)}
+                            pieces={readPieces(behavior.width)}
                             maxValue={2}
-                            onChange={(pieces) => binding.apply(() => (behavior.width = buildCurve(pieces) as never))}
+                            onChange={(pieces) => binding.apply(() => (behavior.width = buildCurve(pieces)))}
                         />
                     </div>
                     {/* Off: the curve multiplies the particle size. On: it is the width in world units (files from 0.21 and earlier). */}
@@ -1033,10 +1036,11 @@ export function WidthOverTrailModule({binding}: ModuleProps) {
 
 /** How many of the first frames a start-frame generator picks from: its exclusive upper bound. */
 function startFrameCount(startFrame: FrameOverLife['startFrame']): number {
-    const state = readScalar(startFrame as never);
+    const state = readScalar(startFrame);
     return Math.round(state.mode === 'random' ? state.max : state.value);
 }
 
+/** The Texture Sheet Animation module (Unity's Texture Sheet Animation): plays the sheet's frames by life or by frame rate. */
 export function TextureSheetModule({binding}: ModuleProps) {
     const system = binding.system;
     const frameBehavior = findBehavior<FrameOverLife>(system.behaviors, 'FrameOverLife');
@@ -1045,7 +1049,7 @@ export function TextureSheetModule({binding}: ModuleProps) {
     const u = Math.max(1, system.uTileCount);
     const v = Math.max(1, system.vTileCount);
     // Start tile → cell (row-major, top-left origin — matches the shader's tile UV mapping).
-    const startIdx = Math.min(Math.max(0, Math.round(readScalar(system.startTileIndex as never).value)), tiles - 1);
+    const startIdx = Math.min(Math.max(0, Math.round(readScalar(system.startTileIndex).value)), tiles - 1);
     const startCol = startIdx % u;
     const startRow = Math.floor(startIdx / u);
     return (
@@ -1134,7 +1138,7 @@ export function TextureSheetModule({binding}: ModuleProps) {
             </Row>
             <Row label="Start tile">
                 <NumberField
-                    value={readScalar(system.startTileIndex as never).value}
+                    value={readScalar(system.startTileIndex).value}
                     min={0}
                     step={1}
                     onChange={(v) => binding.apply((s) => (s.startTileIndex = new ConstantValue(Math.round(v))))}
@@ -1158,7 +1162,7 @@ export function TextureSheetModule({binding}: ModuleProps) {
                                             min: 0,
                                             max: tiles - 1,
                                             curve: [0, (tiles - 1) / 3, (2 * (tiles - 1)) / 3, tiles - 1],
-                                        }) as never
+                                        })
                                     )
                                 );
                             }
@@ -1264,9 +1268,7 @@ export function TextureSheetModule({binding}: ModuleProps) {
                         <CurveEditor
                             pieces={readPieces(frameBehavior.frame)}
                             maxValue={Math.max(1, tiles - 1)}
-                            onChange={(pieces) =>
-                                binding.apply(() => (frameBehavior.frame = buildCurve(pieces) as never))
-                            }
+                            onChange={(pieces) => binding.apply(() => (frameBehavior.frame = buildCurve(pieces)))}
                         />
                     </div>
                 </>

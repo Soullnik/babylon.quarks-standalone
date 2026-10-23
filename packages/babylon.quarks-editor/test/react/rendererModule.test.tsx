@@ -1,4 +1,5 @@
 /** @jest-environment jsdom */
+import type {Texture} from '@babylonjs/core/Materials/Textures/texture';
 import {RenderMode, TrailSettings, Vector2} from 'babylon.quarks';
 import {EffectBinding} from '../../src/core/binding';
 import {MainModule, RendererModule} from '../../src/react/modules';
@@ -9,7 +10,7 @@ import {click, controlsOf, hasRow, mount, Mounted, openModule, pick, rowOf, type
 const xyz = (v: {x: number; y: number; z: number} | undefined) => (v ? [v.x, v.y, v.z] : undefined);
 
 /** A host texture: the editor only reads its url. */
-const fakeTexture = (url: string) => ({url});
+const fakeTexture = (url: string) => ({url}) as unknown as Texture;
 const textureOptions = [
     {label: 'Glow', url: 'tex/glow.png'},
     {label: 'Ramp', url: 'tex/ramp.png'},
@@ -199,5 +200,40 @@ describe('Main module', () => {
         pick(controlsOf(rowOf(container, 'Scaling mode'))[0], 'hierarchy');
         expect(system.worldSpace).toBe(true);
         expect(system.scalingMode).toBe('hierarchy');
+    });
+    it('takes every buffer of a host mesh, and gives one without them the library fallbacks', () => {
+        const system = makeSystem(scene.get(), {renderMode: RenderMode.Mesh});
+        const binding = new EffectBinding(system);
+        const triangle = [0, 0, 0, 1, 0, 0, 0, 1, 0];
+        const geometryOptions = [
+            {label: 'Bare', positions: [...triangle, ...triangle]},
+            {
+                label: 'Full',
+                positions: [0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0],
+                indices: [0, 1, 2, 0, 2, 3],
+                uvs: [0, 0, 1, 0, 1, 1, 0, 1],
+                uvs2: [0, 0, 0.5, 0, 0.5, 0.5, 0, 0.5],
+                normals: [0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1],
+            },
+        ];
+        const element = () => <RendererModule binding={binding} geometryOptions={geometryOptions} />;
+        mounted = mount(element());
+        binding.subscribe(() => mounted!.render(element()));
+        const geometry = () => controlsOf(rowOf(mounted!.container, 'Geometry'))[0];
+
+        pick(geometry(), 'host:1');
+        expect(Array.from(system.instancingIndices)).toEqual([0, 1, 2, 0, 2, 3]);
+        expect(Array.from(system.instancingUVs2!)).toEqual(geometryOptions[1].uvs2);
+        expect(system.getRendererSettings().instancingNormals).toHaveLength(12);
+
+        pick(geometry(), 'host:0');
+        expect(Array.from(system.instancingIndices)).toEqual([0, 1, 2, 3, 4, 5]);
+        expect(system.instancingUVs).toHaveLength(12);
+        expect(system.instancingUVs2).toBeUndefined();
+        // The mesh shader reads normals, so the system keeps the library's fallback ones.
+        expect(system.getRendererSettings().instancingNormals).toHaveLength(18);
+
+        // The mesh still saves: the indices it got are real ones.
+        expect(system.toJSON().instancingGeometry).toBeDefined();
     });
 });

@@ -17,6 +17,7 @@ import {
     SphereEmitter,
 } from 'babylon.quarks';
 
+/** The emitter shapes the Shape module offers, by the `type` they serialise with. */
 export type ShapeType =
     | 'point'
     | 'sphere'
@@ -30,7 +31,13 @@ export type ShapeType =
     | 'edge'
     | 'mesh_surface';
 
-export const SHAPE_TYPES: Array<{value: ShapeType; label: string}> = [
+/** The Shape module's shape list, in menu order, with the label each shows. */
+export const SHAPE_TYPES: Array<{
+    /** The shape's type. */
+    value: ShapeType;
+    /** Its label in the menu. */
+    label: string;
+}> = [
     {value: 'cone', label: 'Cone'},
     {value: 'sphere', label: 'Sphere'},
     {value: 'hemisphere', label: 'Hemisphere'},
@@ -44,17 +51,32 @@ export const SHAPE_TYPES: Array<{value: ShapeType; label: string}> = [
     {value: 'point', label: 'Point'},
 ];
 
+/**
+ * Every shape's settings in one flat record, so switching shapes keeps what the shapes share
+ * (a cone's radius becomes the sphere's). Each shape reads the fields it has.
+ */
 export interface ShapeParams {
+    /** Radius of a sphere, hemisphere, cone, circle or donut. */
     radius: number;
+    /** The part of the circle emitted from, in radians (2π: all of it). */
     arc: number;
+    /** 0 emits from the surface only, 1 from the whole volume. */
     thickness: number;
+    /** A cone's half angle, in radians. */
     angle: number;
+    /** The radius of a donut's tube. */
     donutRadius: number;
+    /** Width of a rectangle, grid or box (X). */
     width: number;
+    /** Height of a rectangle, grid or box (Y). */
     height: number;
+    /** How points around the arc are picked: at random, in a loop, back and forth or in bursts. */
     mode: EmitterMode;
+    /** Snaps the arc position to steps of this fraction; 0 for none. */
     spread: number;
+    /** A grid's column count. */
     column: number;
+    /** A grid's row count. */
     row: number;
     /** Box depth (Z). */
     depth: number;
@@ -62,9 +84,11 @@ export interface ShapeParams {
     emitFrom: BoxEmitFrom;
     /** How fast an edge emitter's loop / ping-pong point travels, in lengths per second. */
     speed: number;
+    /** The mesh a mesh surface emitter emits from. */
     mesh?: Mesh;
 }
 
+/** The settings a new shape starts from. */
 export const DEFAULT_SHAPE_PARAMS: ShapeParams = {
     radius: 0.3,
     arc: Math.PI * 2,
@@ -83,11 +107,13 @@ export const DEFAULT_SHAPE_PARAMS: ShapeParams = {
     mesh: undefined,
 };
 
+/** The type of a shape, as the Shape module lists it. */
 export function getShapeType(shape: EmitterShape): ShapeType {
     const type = (shape as {type?: string}).type ?? 'point';
     return (SHAPE_TYPES.some((s) => s.value === type) ? type : 'point') as ShapeType;
 }
 
+/** A shape's settings, the fields it does not have taken from {@link DEFAULT_SHAPE_PARAMS}. */
 export function readShapeParams(shape: EmitterShape): ShapeParams {
     const anyShape = shape as unknown as {[key: string]: unknown};
     const num = (key: string, fallback: number) =>
@@ -127,6 +153,7 @@ export const SHAPE_PARAM_KEYS: {[K in ShapeType]: Array<keyof ShapeParams>} = {
     mesh_surface: [],
 };
 
+/** A new shape of `type`, built from the fields of `params` it has. */
 export function createShape(type: ShapeType, params: ShapeParams): EmitterShape {
     switch (type) {
         case 'point':

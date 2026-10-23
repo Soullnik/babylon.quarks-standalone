@@ -10,6 +10,10 @@
             "types": "./dist/index.d.ts",
             "import": "./dist/index.js"
         },
+        "./session": {
+            "types": "./dist/session.d.ts",
+            "import": "./dist/session.js"
+        },
         "./react": {
             "types": "./dist/react/index.d.ts",
             "import": "./dist/react/index.js"
@@ -26,7 +30,8 @@
     "scripts": {
         "clean": "rimraf dist",
         "build": "npm run clean && tsc -p tsconfig.json",
-        "test": "jest"
+        "test": "jest",
+        "docs:check": "typedoc --out node_modules/.cache/typedoc-check"
     },
     "repository": {
         "type": "git",

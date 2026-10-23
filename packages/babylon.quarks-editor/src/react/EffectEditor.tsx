@@ -1,3 +1,4 @@
+import type {Texture} from '@babylonjs/core/Materials/Textures/texture.js';
 import type {TransformNode} from '@babylonjs/core/Meshes/transformNode.js';
 import type {ParticleSystem} from 'babylon.quarks';
 import React, {useEffect, useSyncExternalStore} from 'react';
@@ -37,17 +38,22 @@ import {ObjectModule} from './ObjectModule.js';
 import {SubEmittersModule} from './SubEmittersModule.js';
 import {theme} from './theme.js';
 
+/** Props of {@link EffectEditor}. */
 export interface EffectEditorProps {
+    /** The effect the modules edit. */
     binding: EffectBinding;
     /** Currently selected system, lifted up so the timeline panel and this module stack agree. */
     selectedSystem: ParticleSystem;
+    /** The node the Object module edits the transform of. */
     gizmoTargetNode: TransformNode;
+    /** The Object module's title for that node. */
     gizmoTargetLabel: string;
     /** Texture presets offered in the Renderer module (host supplies the loader). */
     textureOptions?: TextureOption[];
     /** Mesh presets offered for the Mesh render mode (host supplies the geometry buffers). */
     geometryOptions?: GeometryOption[];
-    resolveTexture?: (url: string) => unknown;
+    /** Host texture loader for picked URLs; a plain `Texture` is made without it. */
+    resolveTexture?: (url: string) => Texture | null | undefined;
     /** Host loader for "Load from file…" in the Mesh render mode (e.g. a GLB importer). */
     resolveGeometry?: (file: File) => Promise<GeometryData>;
 }

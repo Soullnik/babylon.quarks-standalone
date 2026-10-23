@@ -1,3 +1,5 @@
+export type {AssetLoadProgress, EffectAsset} from './core/assets.js';
+export type {AssetDragPayload} from './core/assetTree.js';
 export {EffectBinding} from './core/binding.js';
 export type {EditorListener} from './core/binding.js';
 export {GroundPlaneResolver, ensureGroundResolver} from './core/collision.js';
@@ -29,6 +31,7 @@ export type {
     StoredScene,
     StoredSceneEntry,
 } from './core/projectStore.js';
+export type {SceneEntry} from './core/sceneEntries.js';
 export {
     DEFAULT_SHAPE_PARAMS,
     SHAPE_PARAM_KEYS,
@@ -41,5 +44,6 @@ export type {ShapeParams, ShapeType} from './core/shapes.js';
 export {createChildSystem} from './core/systems.js';
 export type {ChildSystemOptions} from './core/systems.js';
 export {ensurePortableTextureUrl} from './core/textureExport.js';
+export type {TimelineGroupRow, TimelineRow, TimelineSystemRow} from './core/timeline.js';
 export {buildCurve, buildScalar, mergePieces, readPieces, readScalar, sampleCurve, splitPieces} from './core/values.js';
-export type {CurvePiece, ScalarGenerator, ScalarMode, ScalarValueState} from './core/values.js';
+export type {AnyGenerator, CurvePiece, ScalarGenerator, ScalarMode, ScalarValueState} from './core/values.js';

@@ -1,28 +1,72 @@
+import type {ValueGenerator} from 'babylon.quarks';
 import React from 'react';
-import {ScalarGenerator, ScalarValueState, buildCurve, buildScalar, readPieces, readScalar} from '../core/values.js';
+import {
+    AnyGenerator,
+    ScalarGenerator,
+    ScalarValueState,
+    buildCurve,
+    buildScalar,
+    readPieces,
+    readScalar,
+} from '../core/values.js';
 import {CurveEditor} from './CurveEditor.js';
 import {NumberField, Row, SelectField} from './fields.js';
 
-/**
- * Unity-like value field: Constant | Random Between Two Constants | Curve,
- * bound to a quarks value generator.
- */
 const captionStyle: React.CSSProperties = {fontSize: 10.5, opacity: 0.6, flex: 'none'};
 
-export function ValueField(props: {
+/** Props every {@link ValueField} takes. */
+interface ValueFieldBaseProps {
+    /** The row's label. */
     label: string;
+    /** Tooltip text of the label. */
     hint?: string;
+    /** Key into the inspector hints, used when `hint` is not given. */
     hintKey?: string;
-    generator: ScalarGenerator | undefined;
-    onChange: (generator: ScalarGenerator) => void;
+    /** The generator shown; one that is not a scalar reads as the constant 1. */
+    generator: AnyGenerator | undefined;
+    /** Smallest value the number fields accept. */
     min?: number;
+    /** Top of the curve editor's value range. */
     curveMax?: number;
-}) {
-    const state = readScalar(props.generator);
+}
 
-    const commit = (patch: Partial<ScalarValueState>) => {
-        props.onChange(buildScalar({...state, ...patch}));
+/** A value field for a setting that takes a curve over the particle's life. */
+export interface CurveValueFieldProps extends ValueFieldBaseProps {
+    /** Offers Curve beside Constant and Random (the default). */
+    curve?: true;
+    /** Receives the edited generator. */
+    onChange: (generator: ScalarGenerator) => void;
+}
+
+/** A value field for a setting sampled once, without a curve: Constant or Random. */
+export interface ConstantValueFieldProps extends ValueFieldBaseProps {
+    /** Hides Curve: the setting takes no curve. */
+    curve: false;
+    /** Receives the edited generator. */
+    onChange: (generator: ValueGenerator) => void;
+}
+
+function isValueGenerator(generator: ScalarGenerator): generator is ValueGenerator {
+    return generator.type === 'value';
+}
+
+/**
+ * Unity-like value field: Constant | Random Between Two Constants | Curve, bound to a quarks value
+ * generator. With `curve={false}` it offers only the first two, for settings sampled once.
+ */
+export function ValueField(props: CurveValueFieldProps | ConstantValueFieldProps): React.ReactElement {
+    const read = readScalar(props.generator);
+    // A setting without curves shows a curve it was loaded with as a constant, so an edit replaces it.
+    const state: ScalarValueState = props.curve === false && read.mode === 'curve' ? {...read, mode: 'constant'} : read;
+
+    const emit = (generator: ScalarGenerator) => {
+        if (props.curve !== false) {
+            props.onChange(generator);
+        } else if (isValueGenerator(generator)) {
+            props.onChange(generator);
+        }
     };
+    const commit = (patch: Partial<ScalarValueState>) => emit(buildScalar({...state, ...patch}));
 
     return (
         <>
@@ -32,7 +76,7 @@ export function ValueField(props: {
                     options={[
                         {value: 'constant', label: 'Constant'},
                         {value: 'random', label: 'Random between two'},
-                        {value: 'curve', label: 'Curve'},
+                        ...(props.curve !== false ? [{value: 'curve' as const, label: 'Curve'}] : []),
                     ]}
                     onChange={(mode) => commit({mode})}
                 />
@@ -57,7 +101,7 @@ export function ValueField(props: {
                     <CurveEditor
                         pieces={readPieces(props.generator)}
                         maxValue={props.curveMax}
-                        onChange={(pieces) => props.onChange(buildCurve(pieces))}
+                        onChange={(pieces) => emit(buildCurve(pieces))}
                     />
                 </div>
             )}

@@ -26,16 +26,23 @@ import {buttonStyle, hiddenFileInputStyle, inputStyle, theme} from './theme.js';
 const TREE_WIDTH = 200;
 const TILE_WIDTH = 92;
 
+/** Props of {@link AssetsPanel}. */
 export interface AssetsPanelProps {
+    /** The assets, shown as a folder tree by their paths. */
     assets: EffectAsset[];
     /** Scene instance count per asset id. */
     instanceCounts: ReadonlyMap<number, number>;
+    /** Import progress while importing; the import buttons are disabled meanwhile. */
     loading: AssetLoadProgress | null;
+    /** The hidden folder input, clicked by hosts whose browser has no directory picker. */
     folderInputRef: React.RefObject<HTMLInputElement | null>;
+    /** Imports picked files. */
     onImportFiles: (files: FileList | File[]) => void;
+    /** Opens a folder to import. */
     onImportFolder: () => void;
     /** Adds a new instance of each asset in the payload to the scene. */
     onAddToScene: (payload: AssetDragPayload) => void;
+    /** Deletes the assets in the payload. */
     onDelete: (payload: AssetDragPayload) => void;
     /** Opens the asset on its own to edit it (double-click). Without it, double-click adds to the scene. */
     onOpenPrefab?: (asset: EffectAsset) => void;

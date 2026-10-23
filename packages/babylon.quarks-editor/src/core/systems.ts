@@ -7,10 +7,13 @@ import {
     ParticleSystem,
     RenderMode,
     Vector4,
+    type ParticleEmitter,
 } from 'babylon.quarks';
 import type {EffectBinding} from './binding.js';
 
+/** How {@link createChildSystem} builds a new system. */
 export interface ChildSystemOptions {
+    /** The new emitter's name. */
     name?: string;
     /** One-shot burst (sub-emitter target) instead of a looping stream. */
     oneShot?: boolean;
@@ -61,10 +64,14 @@ export function createChildSystem(parent: ParticleSystem, options: ChildSystemOp
 export function unlinkSubEmitterReferences(systems: ParticleSystem[], removed: ParticleSystem[]): void {
     const removedEmitters = new Set(removed.map((system) => system.emitter));
     for (const system of systems) {
-        const behaviors = system.behaviors as Array<{type?: string; subParticleSystem?: unknown}>;
+        const behaviors = system.behaviors as Array<{type?: string; subParticleSystem?: ParticleEmitter}>;
         for (let i = behaviors.length - 1; i >= 0; i--) {
             const behavior = behaviors[i];
-            if (behavior.type === 'EmitSubParticleSystem' && removedEmitters.has(behavior.subParticleSystem as never)) {
+            if (
+                behavior.type === 'EmitSubParticleSystem' &&
+                behavior.subParticleSystem &&
+                removedEmitters.has(behavior.subParticleSystem)
+            ) {
                 behaviors.splice(i, 1);
             }
         }

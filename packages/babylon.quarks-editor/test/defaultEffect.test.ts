@@ -1,3 +1,4 @@
+import type {Texture} from '@babylonjs/core/Materials/Textures/texture';
 import {ColorOverLife, RenderMode} from 'babylon.quarks';
 import {createDefaultEffect, createSceneDefaultEntry} from '../src/core/defaultEffect';
 import {useScene} from './helpers';
@@ -15,8 +16,8 @@ describe('default effect', () => {
     });
 
     it('resolves its texture through the host', () => {
-        const resolved = {};
-        const resolveTexture = jest.fn(() => resolved);
+        const resolved = {} as Texture;
+        const resolveTexture = jest.fn((): Texture | null => resolved);
         const system = createDefaultEffect(scene.get(), resolveTexture, 'glow.png');
         expect(resolveTexture).toHaveBeenCalledWith('glow.png', scene.get());
         expect(system.texture).toBe(resolved);

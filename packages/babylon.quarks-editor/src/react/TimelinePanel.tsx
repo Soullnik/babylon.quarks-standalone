@@ -22,18 +22,31 @@ import {buttonStyle, theme} from './theme.js';
 
 export type {PlaybackState} from '../core/playback.js';
 
+/** Props of {@link TimelinePanel}. */
 export interface TimelinePanelProps {
+    /** The focused effect, whose systems are the tracks. */
     binding: EffectBinding;
+    /** The node shown in the inspector; its track is highlighted. */
     selectedNode: TransformNode | null;
+    /** Selects a track's or group's node. */
     onSelectNode: (node: TransformNode | null) => void;
+    /** The preview scene, redrawn after a scrub. */
     scene: Scene;
+    /** The renderer the effect draws through, refreshed after a scrub. */
     renderer: BatchedRenderer;
+    /** Playback state shared with the host's render loop. */
     playbackRef: React.MutableRefObject<PlaybackState>;
+    /** The playhead line, moved every frame without a re-render. */
     playheadRef: React.RefObject<HTMLDivElement | null>;
+    /** The time and particle counter in the header, written by the host's render loop. */
     counterRef: React.RefObject<HTMLSpanElement | null>;
+    /** The stage is playing. */
     stagePlaying: boolean;
+    /** Plays or pauses the stage. */
     setStagePlaying: (playing: boolean) => void;
+    /** Playback speed, 1 for real time. */
     speed: number;
+    /** Sets the playback speed. */
     setSpeed: (speed: number) => void;
     /** False when the focused effect is hidden — it has nothing to play. */
     playbackEnabled?: boolean;
