@@ -60,8 +60,10 @@ if (missingPreviews.length > 0) {
     process.exit(1);
 }
 
-// Errors and warnings any headless run produces that say nothing about the demos.
-const NOISE = /favicon|net::ERR_|404 \(|GL Driver Message|GPU stall due to ReadPixels/;
+// Errors and warnings any headless run produces that say nothing about the demos. "No
+// available adapters" is Chromium's answer to the landing page asking for WebGPU on a machine
+// without it, after which the page falls back to WebGL as designed.
+const NOISE = /favicon|net::ERR_|404 \(|GL Driver Message|GPU stall due to ReadPixels|No available adapters/;
 
 const browser = await chromium.launch({
     args: [

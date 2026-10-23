@@ -80,7 +80,7 @@ async function createStageEngine(
         let gpuEngine: AbstractEngine | null = null;
         try {
             const adapter = await gpu.requestAdapter();
-            const fallback = adapter?.info?.isFallbackAdapter ?? adapter?.isFallbackAdapter ?? false;
+            const fallback = adapter?.info?.isFallbackAdapter ?? false;
             if (adapter && (!fallback || requested === 'webgpu')) {
                 const {WebGPUEngine} = await import('@babylonjs/core/Engines/webgpuEngine');
                 await import('@babylonjs/core/Engines/WebGPU/Extensions/index');
