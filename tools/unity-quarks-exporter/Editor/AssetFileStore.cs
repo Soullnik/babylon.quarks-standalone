@@ -113,7 +113,7 @@ namespace BabylonQuarks.UnityExporter
             var file = new JObject().Set("metadata", new JObject()
                 .Set("version", 1)
                 .Set("type", "QuarksGeometry")
-                .Set("generator", "unity-quark-exporter"));
+                .Set("generator", ExporterInfo.Generator));
             foreach (var member in geometryData.Members)
             {
                 file.Members.Add(member);

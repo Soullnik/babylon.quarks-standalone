@@ -30,6 +30,17 @@ npm run dev          # start the examples app at http://localhost:3010 (open edi
 Building the Unity exporter's `.unitypackage` is separate and only needed when touching
 `tools/unity-quarks-exporter`: `npm run build:unitypackage`.
 
+The exporter's tests need no Unity: `npm run test:exporter` compiles its scripts under the
+[.NET SDK](https://dotnet.microsoft.com/download) (8 or later) against stand-ins for the Unity API
+in `tools/unity-quarks-exporter/Tests~/Stubs`, exports the effects in `Tests~/Fixtures.cs` and
+compares them with the golden files in `Tests~/golden`. After a change to what the exporter writes,
+`npm run test:exporter -- --update` rewrites the golden files; review their diff, since the
+`babylon.quarks` suite loads them with a strict `QuarksLoader` and checks what they carry. A Unity
+API the exporter starts using needs a stand-in with Unity's exact signature (C# 8, as Unity 2020.3
+compiles); the scripts are also compiled against .NET Standard 2.0, the library Unity gives them.
+`npm run check` does not run these tests, since it needs no .NET SDK; run `npm run test:exporter`
+yourself after touching `tools/unity-quarks-exporter` (CI runs it on every pull request).
+
 The examples app aliases `babylon.quarks` to the package **source** (`src/index.ts`), so
 changes to the library show up in demos without rebuilding.
 
@@ -124,6 +135,10 @@ users should not rely on it.
      its peer dependency on `babylon.quarks` is the library's own minor line, `~X.Y.0`; bump it
      with the library's minor and publish the editor in the same release. `npm run check:pack`
      fails when the two are out of step.
+   - **The Unity exporter takes every version.** Set the library's version in
+     `tools/unity-quarks-exporter/package.json` and `ExporterInfo.Version`
+     (`tools/unity-quarks-exporter/Editor/ExporterInfo.cs`), and add a
+     `tools/unity-quarks-exporter/CHANGELOG.md` entry. `npm run check:pack` fails when they differ.
 3. Verify the tarballs: `npm run check:pack` (validates both `babylon.quarks` and
    `babylon.quarks-editor`).
 4. Publish a GitHub release — the `publish.yml` workflow publishes both `babylon.quarks` and

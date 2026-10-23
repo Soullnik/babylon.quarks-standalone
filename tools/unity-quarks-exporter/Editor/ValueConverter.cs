@@ -10,6 +10,9 @@ namespace BabylonQuarks.UnityExporter
     /// </summary>
     public static class ValueConverter
     {
+        /// <summary>The system being converted, named in warnings.</summary>
+        internal static string Owner;
+
         // ---- scalar value generators -------------------------------------------------------
 
         public static JToken Constant(float v) => new JObject().Set("type", "ConstantValue").Set("value", v);
@@ -30,11 +33,16 @@ namespace BabylonQuarks.UnityExporter
                     return Bezier(c.curve, c.curveMultiplier);
                 case ParticleSystemCurveMode.TwoCurves:
                     // quarks value generators have no two-curve range; use the upper curve.
+                    WarnTwoCurves();
                     return Bezier(c.curveMax, c.curveMultiplier);
                 default:
                     return Constant(c.constant);
             }
         }
+
+        /// <summary>Random Between Two Curves has no babylon.quarks counterpart; the upper curve is exported.</summary>
+        internal static void WarnTwoCurves() =>
+            Debug.LogWarning($"[Quarks Exporter] '{Owner}': Random Between Two Curves is exported as its upper curve.");
 
         /// <summary>AnimationCurve (0..1 time domain) → PiecewiseBezier via Hermite→Bézier per segment.</summary>
         /// <param name="cycles">Replays the curve this many times across 0..1 (a sawtooth for frames).</param>

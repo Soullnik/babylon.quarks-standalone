@@ -1,0 +1,49 @@
+{
+  "metadata": {
+    "version": 1,
+    "type": "QuarksGeometry",
+    "generator": "babylon.quarks Unity exporter {version}"
+  },
+  "positions": [
+    -0.5,
+    -0.5,
+    0,
+    0.5,
+    -0.5,
+    0,
+    0.5,
+    0.5,
+    0,
+    -0.5,
+    0.5,
+    0
+  ],
+  "indices": [
+    0,
+    2,
+    1,
+    0,
+    3,
+    2
+  ],
+  "uvs": [
+    0,
+    0,
+    1,
+    0,
+    1,
+    1,
+    0,
+    1
+  ],
+  "uvs2": [
+    0,
+    0,
+    0.5,
+    0,
+    0.5,
+    0.5,
+    0,
+    0.5
+  ]
+}

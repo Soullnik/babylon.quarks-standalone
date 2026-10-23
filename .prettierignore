@@ -7,3 +7,5 @@ package-lock.json
 .claude
 examples/public
 docs
+# Written by the Unity exporter tests, byte for byte.
+tools/unity-quarks-exporter/Tests~/golden

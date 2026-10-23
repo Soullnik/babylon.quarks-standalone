@@ -12,6 +12,20 @@ namespace BabylonQuarks.UnityExporter
     {
         public static JObject BuildPs(ParticleSystem ps, ParticleSystemRenderer renderer, ExportContext ctx)
         {
+            string previousOwner = ValueConverter.Owner;
+            ValueConverter.Owner = ps.name;
+            try
+            {
+                return BuildPsUnchecked(ps, renderer, ctx);
+            }
+            finally
+            {
+                ValueConverter.Owner = previousOwner;
+            }
+        }
+
+        private static JObject BuildPsUnchecked(ParticleSystem ps, ParticleSystemRenderer renderer, ExportContext ctx)
+        {
             var main = ps.main;
             var behaviors = new JArray();
 
@@ -21,10 +35,10 @@ namespace BabylonQuarks.UnityExporter
             bool trailOnly = IsTrailOnly(ps, renderer);
             WarnAboutTrails(ps, renderer, trailOnly);
 
-            string materialUuid = ctx.AddMaterialForRenderer(renderer, trailOnly);
+            ParticleMaterial material = ctx.AddMaterialForRenderer(renderer, trailOnly);
             // The material's tint multiplies every particle (or the whole trail), so fold it into
             // the start color; the color-over-life behaviors multiply onto that.
-            Color tint = ctx.LastTint;
+            Color tint = material.Tint;
             int renderMode = trailOnly ? RenderModeTrail : MapRenderMode(renderer.renderMode);
             string geometryUuid = renderMode == 2 && renderer.mesh != null ? ctx.AddGeometryForMesh(renderer.mesh) : null;
             JToken emissionOverTime = EmissionRate(ps, true);
@@ -53,7 +67,7 @@ namespace BabylonQuarks.UnityExporter
                 .Set("renderMode", renderMode)
                 .Set("renderOrder", renderer.sortingOrder)
                 .Set("rendererEmitterSettings", trailOnly ? BuildTrailSettings(ps) : BuildRendererSettings(renderer, renderMode))
-                .Set("material", materialUuid)
+                .Set("material", material.Uuid)
                 .Set("layers", 1);
 
             if (!Mathf.Approximately(main.simulationSpeed, 1f))
@@ -114,9 +128,20 @@ namespace BabylonQuarks.UnityExporter
 
             BuildTextureSheet(ps, obj, behaviors, trailOnly);
 
-            obj.Set("blending", ctx.LastBlendMode)
-                .Set("transparent", true)
+            obj.Set("blending", material.Blending)
+                .Set("transparent", material.Transparent)
+                .Set("depthWrite", material.DepthWrite)
                 .Set("worldSpace", main.simulationSpace != ParticleSystemSimulationSpace.Local);
+            if (material.AlphaTest > 0f) obj.Set("alphaTest", material.AlphaTest);
+            // Render Face only means something for a mesh; billboards always face the camera.
+            if (renderMode == 2 && material.RenderFace != "both") obj.Set("renderFace", material.RenderFace);
+            if (material.SoftParticles)
+            {
+                obj.Set("softParticles", true);
+                if (material.SoftNearFade > 0f) obj.Set("softNearFade", material.SoftNearFade);
+                if (!Mathf.Approximately(material.SoftFarFade, 1f)) obj.Set("softFarFade", material.SoftFarFade);
+            }
+            AddScalingMode(ps, main, obj);
 
             // ---- behaviors from the over-lifetime / by-speed modules ----
             AddGravity(main, behaviors);
@@ -317,21 +342,21 @@ namespace BabylonQuarks.UnityExporter
 
         private static JObject BuildShapeType(ParticleSystem.ShapeModule shape, ExportContext ctx, string owner)
         {
-            float arc = shape.arc * Mathf.Deg2Rad;
-            float thickness = shape.radiusThickness;
             switch (shape.shapeType)
             {
                 case ParticleSystemShapeType.Cone:
+                    return ShapeBase("cone", shape).Set("angle", shape.angle * Mathf.Deg2Rad);
                 case ParticleSystemShapeType.ConeVolume:
-                    return ShapeBase("cone", shape.radius, arc, thickness).Set("angle", shape.angle * Mathf.Deg2Rad);
+                    Debug.LogWarning($"[Quarks Exporter] '{owner}': shape Cone Volume emits from the cone's base in babylon.quarks; its Length is not exported.");
+                    return ShapeBase("cone", shape).Set("angle", shape.angle * Mathf.Deg2Rad);
                 case ParticleSystemShapeType.Sphere:
-                    return ShapeBase("sphere", shape.radius, arc, thickness);
+                    return ShapeBase("sphere", shape);
                 case ParticleSystemShapeType.Hemisphere:
-                    return ShapeBase("hemisphere", shape.radius, arc, thickness);
+                    return ShapeBase("hemisphere", shape);
                 case ParticleSystemShapeType.Circle:
-                    return ShapeBase("circle", shape.radius, arc, thickness);
+                    return ShapeBase("circle", shape);
                 case ParticleSystemShapeType.Donut:
-                    return ShapeBase("donut", shape.radius, arc, thickness).Set("donutRadius", shape.donutRadius);
+                    return ShapeBase("donut", shape).Set("donutRadius", shape.donutRadius);
                 case ParticleSystemShapeType.Mesh:
                     if (shape.mesh != null)
                     {
@@ -386,17 +411,22 @@ namespace BabylonQuarks.UnityExporter
             return obj;
         }
 
-        private static JObject ShapeBase(string type, float radius, float arc, float thickness)
+        /// <summary>
+        /// The fields Unity's round shapes share: Radius, Radius Thickness (1:1, 0 = the surface,
+        /// 1 = the whole volume) and the Arc with its Mode, Spread and Speed. Unity's arc modes
+        /// (Random, Loop, Ping-Pong, Burst Spread) line up with quarks' EmitterMode, Spread is the
+        /// same fraction of the arc, and Speed is in arcs per second on both sides.
+        /// </summary>
+        private static JObject ShapeBase(string type, ParticleSystem.ShapeModule shape)
         {
             return new JObject()
                 .Set("type", type)
-                .Set("radius", radius)
-                // Unity radiusThickness maps 1:1 to quarks thickness (0 = surface shell, 1 = full volume).
-                .Set("thickness", Mathf.Clamp01(thickness))
-                .Set("arc", arc)
-                .Set("mode", 0)
-                .Set("spread", 0)
-                .Set("speed", ValueConverter.Constant(0));
+                .Set("radius", shape.radius)
+                .Set("thickness", Mathf.Clamp01(shape.radiusThickness))
+                .Set("arc", shape.arc * Mathf.Deg2Rad)
+                .Set("mode", (int)shape.arcMode)
+                .Set("spread", Mathf.Clamp01(shape.arcSpread))
+                .Set("speed", ValueConverter.Curve(shape.arcSpeed));
         }
 
         // ---- Renderer --------------------------------------------------------------------
@@ -541,6 +571,7 @@ namespace BabylonQuarks.UnityExporter
             // WidthOverLength writes absolute widths, so the particle size is folded in up front
             // (and any size-over-lifetime change is lost along a curved trail).
             float sizeScale = trails.sizeAffectsWidth ? ConstantOf(ps.main.startSize3D ? ps.main.startSizeX : ps.main.startSize) : 1f;
+            if (width.mode == ParticleSystemCurveMode.TwoCurves) ValueConverter.WarnTwoCurves();
             var curve = width.mode == ParticleSystemCurveMode.TwoCurves ? width.curveMax : width.curve;
             behaviors.Add(new JObject()
                 .Set("type", "WidthOverLength")
@@ -637,6 +668,7 @@ namespace BabylonQuarks.UnityExporter
                     || frameOverTime.mode == ParticleSystemCurveMode.TwoCurves;
                 // Cycles replay the curve that many times over the particle's life; a constant or
                 // random frame is the same in every cycle.
+                if (curved && cycles > 1 && frameOverTime.mode == ParticleSystemCurveMode.TwoCurves) ValueConverter.WarnTwoCurves();
                 JToken frame = curved && cycles > 1
                     ? ValueConverter.Bezier(
                         frameOverTime.mode == ParticleSystemCurveMode.TwoCurves ? frameOverTime.curveMax : frameOverTime.curve,
@@ -684,10 +716,67 @@ namespace BabylonQuarks.UnityExporter
         {
             var m = ps.rotationOverLifetime;
             if (!m.enabled) return;
+            if (m.separateAxes && renderMode == 2)
+            {
+                // A mesh particle turns about all three of its axes, in the same order as its
+                // start rotation (see Euler). Unity adds the rates to the particle's Euler angles;
+                // babylon.quarks turns about the particle's own axes, which differs for X and Y
+                // once the particle has turned.
+                if (!IsZero(m.x) || !IsZero(m.y))
+                {
+                    Debug.LogWarning($"[Quarks Exporter] '{ps.name}': Rotation over Lifetime turns about the particle's own X and Y axes in babylon.quarks, not Unity's Euler angles.");
+                }
+                behaviors.Add(new JObject()
+                    .Set("type", "Rotation3DOverLife")
+                    .Set("angularVelocity", Euler(
+                        ValueConverter.Curve(m.x),
+                        ValueConverter.Curve(m.y),
+                        ValueConverter.Curve(m.z))));
+                return;
+            }
+            // A billboard only turns in its own plane: about Z, whatever the separate axes say.
             // Radians/sec on both sides; only the direction differs (see SpinSign).
             behaviors.Add(new JObject()
                 .Set("type", "RotationOverLife")
                 .Set("angularVelocity", ScaleCurve(m.z, SpinSign(renderMode))));
+        }
+
+        /// <summary>
+        /// Unity's Scaling Mode. Hierarchy and babylon.quarks' 'hierarchy' both scale the whole
+        /// effect, particles and motion, with the emitter's world scale. Local is the same with
+        /// only the system's own scale, so it is exported as 'hierarchy' and warns when a parent
+        /// is scaled. Shape scales only the emission shape; babylon.quarks' 'shape' scales the
+        /// particles' size too, so a scaled Shape system warns.
+        /// </summary>
+        private static void AddScalingMode(ParticleSystem ps, ParticleSystem.MainModule main, JObject obj)
+        {
+            switch (main.scalingMode)
+            {
+                case ParticleSystemScalingMode.Hierarchy:
+                    obj.Set("scalingMode", "hierarchy");
+                    break;
+                case ParticleSystemScalingMode.Local:
+                    obj.Set("scalingMode", "hierarchy");
+                    for (Transform parent = ps.transform.parent; parent != null; parent = parent.parent)
+                    {
+                        if (parent.localScale != Vector3.one)
+                        {
+                            Debug.LogWarning($"[Quarks Exporter] '{ps.name}': Scaling Mode Local ignores the scale of '{parent.name}'; babylon.quarks applies it, as Unity's Hierarchy mode does.");
+                            break;
+                        }
+                    }
+                    break;
+                case ParticleSystemScalingMode.Shape:
+                    for (Transform t = ps.transform; t != null; t = t.parent)
+                    {
+                        if (t.localScale != Vector3.one)
+                        {
+                            Debug.LogWarning($"[Quarks Exporter] '{ps.name}': Scaling Mode Shape scales only the shape in Unity; babylon.quarks also scales the particles by the scale of '{t.name}'.");
+                            break;
+                        }
+                    }
+                    break;
+            }
         }
 
         private static void AddVelocityOverLife(ParticleSystem ps, JArray behaviors)
@@ -711,7 +800,12 @@ namespace BabylonQuarks.UnityExporter
         {
             var m = ps.limitVelocityOverLifetime;
             if (!m.enabled) return;
-            // With separate axes Unity throws on `.limit`; use the X-axis limit as representative.
+            // With separate axes Unity throws on `.limit`; the runtime limits the speed, not each
+            // axis, so the X limit stands for all three.
+            if (m.separateAxes)
+            {
+                Debug.LogWarning($"[Quarks Exporter] '{ps.name}': Limit Velocity over Lifetime limits the speed in babylon.quarks; its X limit is exported for all three axes.");
+            }
             var curve = m.separateAxes ? m.limitX : m.limit;
             behaviors.Add(new JObject()
                 .Set("type", "LimitSpeedOverLife")
@@ -784,6 +878,10 @@ namespace BabylonQuarks.UnityExporter
         {
             var m = ps.sizeBySpeed;
             if (!m.enabled) return;
+            if (m.separateAxes)
+            {
+                Debug.LogWarning($"[Quarks Exporter] '{ps.name}': Size by Speed with separate axes is exported with its X curve for all three axes.");
+            }
             var curve = m.separateAxes ? m.x : m.size;
             behaviors.Add(new JObject()
                 .Set("type", "SizeBySpeed")
@@ -855,6 +953,11 @@ namespace BabylonQuarks.UnityExporter
         private const int SubEmitDeath = 0;
         private const int SubEmitBirth = 1;
 
+        /// <summary>Whether the curve is a constant zero.</summary>
+        private static bool IsZero(ParticleSystem.MinMaxCurve c) =>
+            (c.mode == ParticleSystemCurveMode.Constant && c.constant == 0f) ||
+            (c.mode == ParticleSystemCurveMode.TwoConstants && c.constantMin == 0f && c.constantMax == 0f);
+
         private static float ConstantOf(ParticleSystem.MinMaxCurve c)
         {
             switch (c.mode)
@@ -887,7 +990,9 @@ namespace BabylonQuarks.UnityExporter
                 case ParticleSystemCurveMode.Constant: return ValueConverter.Constant(c.constant * scale);
                 case ParticleSystemCurveMode.TwoConstants: return ValueConverter.Interval(c.constantMin * scale, c.constantMax * scale);
                 case ParticleSystemCurveMode.Curve: return ValueConverter.Bezier(c.curve, c.curveMultiplier * scale);
-                case ParticleSystemCurveMode.TwoCurves: return ValueConverter.Bezier(c.curveMax, c.curveMultiplier * scale);
+                case ParticleSystemCurveMode.TwoCurves:
+                    ValueConverter.WarnTwoCurves();
+                    return ValueConverter.Bezier(c.curveMax, c.curveMultiplier * scale);
                 default: return ValueConverter.Constant(c.constant * scale);
             }
         }

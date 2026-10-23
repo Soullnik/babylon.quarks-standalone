@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    Compiles the exporter's Editor scripts against stand-ins for the Unity API (Stubs/) and runs the
+    golden export tests (Program.cs). Unity skips folders ending in "~", so none of this reaches a
+    Unity project. Run with: npm run test:exporter
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <!-- Unity 2020.3, the oldest version the package supports, compiles C# 8. -->
+    <LangVersion>8.0</LangVersion>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <RootNamespace>BabylonQuarks.UnityExporter.Tests</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../Editor/**/*.cs" />
+    <Compile Include="Stubs/**/*.cs" />
+    <Compile Include="*.cs" />
+  </ItemGroup>
+</Project>

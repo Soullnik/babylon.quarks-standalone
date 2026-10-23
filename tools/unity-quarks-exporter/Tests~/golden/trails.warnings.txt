@@ -1,0 +1,2 @@
+[Quarks Exporter] 'Rocket': Collision sub-emitter 'TrailSparks' has no quarks counterpart and is skipped.
+[Quarks Exporter] Material 'SmokeSubtract': subtractive blending is exported as ALPHA_SUBTRACT, which darkens by the particle's color and ignores its alpha.
