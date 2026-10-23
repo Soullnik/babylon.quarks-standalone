@@ -187,7 +187,7 @@ export interface ParticleSystemParameters {
      * every render mode: billboard, stretched, mesh, beam and trail.
      */
     softParticles?: boolean;
-    /** See {@link ParticleSystem.softFarFade}. Default 0. */
+    /** See {@link ParticleSystem.softFarFade}. Default 1. */
     softFarFade?: number;
     /** See {@link ParticleSystem.softNearFade}. Default 0. */
     softNearFade?: number;

@@ -40,6 +40,19 @@ export function validAlphaTest(cutoff: unknown): number {
     return typeof cutoff === 'number' && cutoff > 0 ? Math.min(cutoff, 1) : 0;
 }
 
+/** A flipbook's columns or rows: a whole number of cells, at least 1; anything else is 1. */
+export function validTileCount(count: unknown): number {
+    return typeof count === 'number' && Number.isFinite(count) && count >= 1 ? Math.floor(count) : 1;
+}
+
+/** World units in front of the scene over which a soft particle is fully faded by default. */
+export const DEFAULT_SOFT_FAR_FADE = 1;
+
+/** A soft-particle fade distance: finite and at least 0, else `fallback`. */
+export function validSoftFade(distance: unknown, fallback: number): number {
+    return typeof distance === 'number' && Number.isFinite(distance) && distance >= 0 ? distance : fallback;
+}
+
 /** Seconds between a burst's waves when a burst leaves `interval` out, in code and in a file. */
 export const DEFAULT_BURST_INTERVAL = 0.1;
 

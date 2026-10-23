@@ -49,11 +49,17 @@ export type {
     SerializeEffectOptions,
 } from './QuarksSerializer';
 export {QuarksUtil} from './QuarksUtil';
+export {shaderProgram} from './shaderProgram';
+export type {ShaderContext, ShaderDepth, ShaderProgram, ShaderSettings} from './shaderProgram';
+export type {ShaderSources} from './shaders/shaderLanguageSupport';
+export {shaderVariants} from './shaderVariants';
+export type {ShaderVariant} from './shaderVariants';
 export {decodeSoftDepth, softDepthParams} from './softDepth';
 export type {DepthTextureOptions, SoftDepthEncoding} from './softDepth';
 export {MAX_TRAIL_TESSELLATION, trailCurveTension, trailTessellation} from './trailCurve';
 export {
     defaultMeshLighting,
+    EROSION_DEFAULT_SOFTNESS,
     erosionEqual,
     GRADIENT_MAP_WEIGHTS,
     gradientMapEqual,
@@ -69,6 +75,7 @@ export {
     RenderMode,
     textureUVEqual,
     textureUVToJSON,
+    UV_DISTORTION_DEFAULT_STRENGTH,
     UV_DISTORTION_DEFAULT_UV,
     uvDistortionEqual,
     VFXBatch,

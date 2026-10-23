@@ -44,7 +44,8 @@ float quarksFogFactor() {
     float fogDensity = vFogInfos.w;
     float fogDistance = length(vFogDistance);
     if (vFogInfos.x == 3.0) {
-        fogCoeff = (fogEnd - fogDistance) / (fogEnd - fogStart);
+        // A zero-width band is a cut at its distance, not a division by zero.
+        fogCoeff = (fogEnd - fogDistance) / max(fogEnd - fogStart, 1e-6);
     } else if (vFogInfos.x == 1.0) {
         fogCoeff = exp(-fogDistance * fogDensity);
     } else if (vFogInfos.x == 2.0) {
@@ -101,7 +102,8 @@ fn quarksFog(rgb: vec3f, fogDistanceVector: vec3f) -> vec3f {
     let fogDensity = uniforms.vFogInfos.w;
     let fogDistance = length(fogDistanceVector);
     if (uniforms.vFogInfos.x == 3.0) {
-        fogCoeff = (fogEnd - fogDistance) / (fogEnd - fogStart);
+        // A zero-width band is a cut at its distance, not a division by zero.
+        fogCoeff = (fogEnd - fogDistance) / max(fogEnd - fogStart, 1e-6);
     } else if (uniforms.vFogInfos.x == 1.0) {
         fogCoeff = exp(-fogDistance * fogDensity);
     } else if (uniforms.vFogInfos.x == 2.0) {

@@ -27,8 +27,8 @@ performance and gap-closing pass; the older plan is in the git history.
 - Quality gates in CI: formatting, lint, `strict` TypeScript, build of every package, TSDoc on
   every export, unit tests with coverage floors for core, runtime and editor, a smoothness sweep,
   a tarball content check, and a headless WebGL smoke over every demo that also checks each has a
-  gallery preview. `npm run validate:wgsl` compiles every WGSL variant under a real compiler, in
-  CI too, on Chromium's software WebGPU adapter.
+  gallery preview. `npm run validate:shaders` compiles every shader variant, GLSL and WGSL, under a
+  real compiler, in CI too, on Chromium's software adapter.
 - Parity with Unity's Shuriken: see [docs/SHURIKEN_PARITY.md](docs/SHURIKEN_PARITY.md). What is
   left is collision triggers and arbitrary collider shapes, ring buffer / stop action, noise
   quality (octaves), texture-based emission, lights, custom data and renderer shadows.
@@ -38,7 +38,7 @@ performance and gap-closing pass; the older plan is in the git history.
 In rough priority order; each is a few days of work.
 
 1. **WebGPU on real hardware** ([#19](https://github.com/Soullnik/babylon.quarks-standalone/issues/19)).
-   The shaders are native WGSL and compile under a real WGSL compiler (`npm run validate:wgsl`,
+   The shaders are native WGSL and compile under a real WGSL compiler (`npm run validate:shaders`,
    in CI), but headless software adapters cannot run the demos end to end. A pass on real hardware across every
    demo, with the soft-particle depth path and texture uploads checked, then `check:demos
 --webgpu` on a runner that has an adapter.

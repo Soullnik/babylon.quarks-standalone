@@ -17,7 +17,7 @@ import {
 } from 'quarks.core';
 import type {ParticleSystem} from '../ParticleSystem';
 import {RenderMode} from '../VFXBatch';
-import {normalizeBursts, validCullingMode, validSortMode} from './normalize';
+import {DEFAULT_SOFT_FAR_FADE, normalizeBursts, validCullingMode, validSortMode, validTileCount} from './normalize';
 import type {BurstParameters, ParticleSystemJSONParameters, ParticleSystemParameters} from './types';
 
 /**
@@ -75,6 +75,16 @@ function plain<T>(
 
 function number(json: unknown): number | undefined {
     return typeof json === 'number' ? json : undefined;
+}
+
+/** A flipbook count: a whole number of at least 1, see {@link validTileCount}. */
+function tileCount(json: unknown): number | undefined {
+    return typeof json === 'number' ? validTileCount(json) : undefined;
+}
+
+/** A soft fade distance: finite and at least 0, as `validSoftFade`; an invalid one takes the default. */
+function softFade(json: unknown): number | undefined {
+    return typeof json === 'number' && Number.isFinite(json) && json >= 0 ? json : undefined;
 }
 
 /** A boolean; a number counts as true unless it is 0, as files with 0/1 flags meant it. */
@@ -233,12 +243,12 @@ export const SETTINGS: ReadonlyArray<SettingDescriptor> = [
         () => new ConstantValue(0),
         ValueGeneratorFromJSON
     ),
-    plain('uTileCount', (s) => s.uTileCount, 1, number),
-    plain('vTileCount', (s) => s.vTileCount, 1, number),
+    plain('uTileCount', (s) => s.uTileCount, 1, tileCount),
+    plain('vTileCount', (s) => s.vTileCount, 1, tileCount),
     plain('blendTiles', (s) => s.blendTiles, false, boolean),
     plain('softParticles', (s) => s.softParticles, false, boolean),
-    plain('softFarFade', (s) => s.softFarFade, 0, number),
-    plain('softNearFade', (s) => s.softNearFade, 0, number),
+    plain('softFarFade', (s) => s.softFarFade, DEFAULT_SOFT_FAR_FADE, softFade),
+    plain('softNearFade', (s) => s.softNearFade, 0, softFade),
     plain('blendMode', (s) => s.blending, Constants.ALPHA_ADD, number, {json: 'blending'}),
     plain('transparent', (s) => s.transparent, true, boolean),
     plain('depthTest', (s) => s.depthTest, true, boolean),

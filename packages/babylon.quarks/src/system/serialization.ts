@@ -13,7 +13,13 @@ import {
 } from 'quarks.core';
 import type {ParticleSystem} from '../ParticleSystem';
 import {trailCurveTension, trailTessellation} from '../trailCurve';
-import {RenderMode, textureUVToJSON, UV_DISTORTION_DEFAULT_UV} from '../VFXBatch';
+import {
+    EROSION_DEFAULT_SOFTNESS,
+    RenderMode,
+    textureUVToJSON,
+    UV_DISTORTION_DEFAULT_STRENGTH,
+    UV_DISTORTION_DEFAULT_UV,
+} from '../VFXBatch';
 import {resolveGeometryData} from './geometry';
 import {settingsFromJSON, settingsToJSON} from './settingsSchema';
 import type {BabylonMetaData, ParticleSystemJSONParameters, ParticleSystemParameters} from './types';
@@ -265,8 +271,17 @@ function materialMeta(system: ParticleSystem, meta: BabylonMetaData): string {
         serializedTextures.set(meta, written);
     }
     const textures = written;
-    const textureRef = (value: BaseTexture | null | undefined, anyKind = false): string | undefined => {
+    const textureRef = (
+        value: BaseTexture | null | undefined,
+        anyKind = false,
+        slot = 'texture'
+    ): string | undefined => {
         if (!(value instanceof Texture) && !(anyKind && value)) {
+            if (value) {
+                // A RawTexture or a render target has no url a file can point at, so the slot is left
+                // out; silently, the effect would just lose it on reload.
+                console.warn(`[quarks] ${slot} is not a url-backed Texture and is not written to the file`);
+            }
             return undefined;
         }
         let uuid = textures.get(value);
@@ -303,7 +318,7 @@ function materialMeta(system: ParticleSystem, meta: BabylonMetaData): string {
         ...(gradientMap
             ? {
                   gradientMap: {
-                      ramp: textureRef(gradientMap.ramp),
+                      ramp: textureRef(gradientMap.ramp, false, 'gradientMap.ramp'),
                       ...(gradientMap.channel !== 'r' ? {channel: gradientMap.channel} : {}),
                   },
               }
@@ -311,20 +326,23 @@ function materialMeta(system: ParticleSystem, meta: BabylonMetaData): string {
         ...(erosion
             ? {
                   erosion: {
-                      mask: textureRef(erosion.mask),
+                      ...optional('mask', textureRef(erosion.mask, false, 'erosion.mask')),
                       ...optional('maskUV', textureUVToJSON(erosion.maskUV)),
-                      softness: erosion.softness,
-                      edgeWidth: erosion.edgeWidth,
-                      edgeColor: [...erosion.edgeColor],
+                      // Written only when not the default, like every other setting.
+                      ...(erosion.softness !== EROSION_DEFAULT_SOFTNESS ? {softness: erosion.softness} : {}),
+                      ...(erosion.edgeWidth !== 0 ? {edgeWidth: erosion.edgeWidth} : {}),
+                      ...(erosion.edgeColor.some((c) => c !== 1) ? {edgeColor: [...erosion.edgeColor]} : {}),
                   },
               }
             : {}),
         ...(distortion
             ? {
                   uvDistortion: {
-                      map: textureRef(distortion.map),
+                      map: textureRef(distortion.map, false, 'uvDistortion.map'),
                       ...optional('mapUV', textureUVToJSON(distortion.mapUV, UV_DISTORTION_DEFAULT_UV)),
-                      strength: distortion.strength,
+                      ...(distortion.strength !== UV_DISTORTION_DEFAULT_STRENGTH
+                          ? {strength: distortion.strength}
+                          : {}),
                   },
               }
             : {}),

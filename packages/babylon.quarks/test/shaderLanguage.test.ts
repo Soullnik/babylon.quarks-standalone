@@ -26,7 +26,7 @@ import trailVertWgsl from '../src/shaders/trail_vert.wgsl';
  * that does not list the CDN. Shipping WGSL is what keeps that from happening.
  *
  * These tests cannot run a GPU. Whether the WGSL is *correct* is checked by
- * examples/wgsl-validate.html, which puts every shader through Babylon's own
+ * examples/shader-validate.html, which puts every shader through Babylon's own
  * WGSL processor and a browser's shader compiler.
  */
 

@@ -1,4 +1,5 @@
 import {fogVertexDeclarationWGSL, fogVertexWGSL} from './chunks/fog';
+import {sheetVertexDeclarationWGSL, sheetVertexWGSL} from './chunks/sheet';
 
 export default /* wgsl */ `
 // Per-vertex attributes
@@ -17,11 +18,7 @@ attribute velocity: vec4f;
 uniform world: mat4x4f;
 uniform view: mat4x4f;
 uniform projection: mat4x4f;
-
-#ifdef UV_TILE
-uniform tileCountX: f32;
-uniform tileCountY: f32;
-#endif
+${sheetVertexDeclarationWGSL}
 
 #ifdef PIVOT
 // Streak offset in particle-size units: x from head to tail, y across.
@@ -34,10 +31,6 @@ varying vColor: vec4f;
 #ifdef UV1
 // The particle's own UV, never moved by the sheet (UV channel 1).
 varying vUV1: vec2f;
-#endif
-#ifdef TILE_BLEND
-varying vUV2: vec2f;
-varying vTileBlend: f32;
 #endif
 #ifdef SOFT_PARTICLES
 varying projPosition: vec4f;
@@ -68,16 +61,12 @@ fn main(input: VertexInputs) -> FragmentInputs {
     if (vlength > 0.000001) {
         vdir = viewVelocity / vlength;
     }
-#ifdef BEAM
-    // Seen straight along its length a beam has no side to face; any will do.
+    // Seen straight along its length a streak has no side to face; any will do.
     let sideRaw = cross(mvPosition.xyz, vdir);
     var side = vec3f(1.0, 0.0, 0.0);
     if (dot(sideRaw, sideRaw) > 1e-12) {
         side = normalize(sideRaw);
     }
-#else
-    let side = normalize(cross(mvPosition.xyz, vdir));
-#endif
 #ifdef SIZE_LIMITS
     // The streak's width on screen as a fraction of the viewport height, held
     // between the limits; a perspective projection divides by the view depth.
@@ -116,22 +105,7 @@ ${fogVertexWGSL('mvPosition.xyz')}
     vertexOutputs.linearDepth = abs(mvPosition.z);
 #endif
 
-    #ifdef UV_TILE
-        let tc = vec2f(uniforms.tileCountX, uniforms.tileCountY);
-        let baseTile = floor(vertexInputs.uvTile);
-        let tileU = (baseTile % tc.x) / tc.x;
-        let tileV = 1.0 - floor(baseTile / tc.x) / tc.y - 1.0 / tc.y;
-        vertexOutputs.vUV = quadUV / tc + vec2f(tileU, tileV);
-        #ifdef TILE_BLEND
-            let nextTile = ceil(vertexInputs.uvTile);
-            let nextU = (nextTile % tc.x) / tc.x;
-            let nextV = 1.0 - floor(nextTile / tc.x) / tc.y - 1.0 / tc.y;
-            vertexOutputs.vUV2 = quadUV / tc + vec2f(nextU, nextV);
-            vertexOutputs.vTileBlend = fract(vertexInputs.uvTile);
-        #endif
-    #else
-        vertexOutputs.vUV = quadUV;
-    #endif
+${sheetVertexWGSL('quadUV')}
 
 #ifdef UV1
     vertexOutputs.vUV1 = quadUV;

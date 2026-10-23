@@ -8,10 +8,16 @@ import {Scene} from '@babylonjs/core/scene';
 import {ConstantColor, ConstantValue, PointEmitter, Vector4} from 'quarks.core';
 import {BatchedRenderer} from '../src/BatchedRenderer';
 import {ParticleSystem, ParticleSystemParameters} from '../src/ParticleSystem';
+import meshVertGLSL from '../src/shaders/local_particle_physics_vert.glsl';
+import meshVertWGSL from '../src/shaders/local_particle_physics_vert.wgsl';
 import particleFragGLSL from '../src/shaders/particle_frag.glsl';
 import particleFragWGSL from '../src/shaders/particle_frag.wgsl';
 import physicsFragGLSL from '../src/shaders/particle_physics_frag.glsl';
 import physicsFragWGSL from '../src/shaders/particle_physics_frag.wgsl';
+import particleVertGLSL from '../src/shaders/particle_vert.glsl';
+import particleVertWGSL from '../src/shaders/particle_vert.wgsl';
+import stretchedVertGLSL from '../src/shaders/stretched_bb_particle_vert.glsl';
+import stretchedVertWGSL from '../src/shaders/stretched_bb_particle_vert.wgsl';
 import trailFragGLSL from '../src/shaders/trail_frag.glsl';
 import trailFragWGSL from '../src/shaders/trail_frag.wgsl';
 import trailVertGLSL from '../src/shaders/trail_vert.glsl';
@@ -178,6 +184,17 @@ describe('GLSL and WGSL apply the fragment features in the same order', () => {
         const blocks = featureBlocks(glsl);
         expect(blocks[blocks.length - 1]).toBe('SOFT_PARTICLES');
         expect(blocks.lastIndexOf('FOG')).toBeLessThan(blocks.lastIndexOf('SOFT_PARTICLES'));
+    });
+});
+
+describe('GLSL and WGSL lay the vertex out through the same feature blocks', () => {
+    test.each([
+        ['particle_vert', particleVertGLSL, particleVertWGSL],
+        ['stretched_bb_particle_vert', stretchedVertGLSL, stretchedVertWGSL],
+        ['local_particle_physics_vert', meshVertGLSL, meshVertWGSL],
+        ['trail_vert', trailVertGLSL, trailVertWGSL],
+    ])('%s', (_name, glsl, wgsl) => {
+        expect(featureBlocks(glsl)).toEqual(featureBlocks(wgsl));
     });
 });
 

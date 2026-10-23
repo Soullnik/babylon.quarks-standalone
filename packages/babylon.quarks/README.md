@@ -133,7 +133,7 @@ await engine.initAsync();
 // Scene + BatchedRenderer setup is identical to WebGL.
 ```
 
-Every render mode (billboard, stretched billboard, mesh, trail, beam) and every shader variant compiles under a real WGSL compiler with zero validation errors (`npm run validate:wgsl` in the monorepo, run in CI). The [live demos](https://soullnik.github.io/babylon.quarks-standalone/) and the [benchmark page](https://soullnik.github.io/babylon.quarks-standalone/benchmark.html) accept `?engine=webgpu` in the URL to switch engines.
+Every render mode (billboard, stretched billboard, mesh, trail, beam) and every shader variant (`shaderVariants()`) compiles under a real GLSL and a real WGSL compiler with zero errors (`npm run validate:shaders` in the monorepo, run in CI). The [live demos](https://soullnik.github.io/babylon.quarks-standalone/) and the [benchmark page](https://soullnik.github.io/babylon.quarks-standalone/benchmark.html) accept `?engine=webgpu` in the URL to switch engines.
 
 ## Unity-style emitter options
 

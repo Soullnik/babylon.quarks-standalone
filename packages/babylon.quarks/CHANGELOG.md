@@ -8,6 +8,15 @@ and the project follows the `quarks.core` 0.x version line.
 
 ### Added
 
+- **`shaderProgram()` and `shaderVariants()`**: the defines, attributes, uniforms, samplers and
+  sources (GLSL and WGSL) of the material a batch builds from its settings, and every distinct
+  program the library can compile (Unity's ShaderVariantCollection), for warming the shader cache
+  before the first frame. The batches build their materials through `shaderProgram`, so the list
+  is the code's own account of what it compiles; `npm run validate:shaders` compiles every variant
+  in both languages in CI (the former `validate:wgsl` compiled a hand-written WGSL subset that
+  missed, among others, the env atlas, lit meshes with texture effects, and effects with fog, soft
+  particles or alpha test). Types `ShaderProgram`, `ShaderSettings`, `ShaderContext`,
+  `ShaderVariant`, `ShaderSources`.
 - **`ParticleSystem.clear()`** (Unity's `Clear`): removes the particles alive and nothing else; the
   emission clock, the bursts and the pause stay where they were, and the sub emissions the
   removed particles were driving end with them.
@@ -87,6 +96,11 @@ and the project follows the `quarks.core` 0.x version line.
 The public API is now what the docs describe; these exports were left over from the three.js port
 or duplicated something else, and nothing in the package used them.
 
+- **`VFXBatchSettings.reflectionFaces`**: six face textures were read off a material
+  (`material.reflectionFaces`) and kept in the batch key, but no shader ever sampled them.
+  `reflectionTexture` is documented as it works: a cube texture is unfolded into `reflectionAtlas`
+  and sampled from there; nothing else is sampled.
+
 - **`MeshSettings.rotationAxis`** (quarks.core), which was declared but never read, written or
   cloned: a mesh particle's rotation is its start rotation (`startRotationX/Y/Z`, or a
   `RandomQuatGenerator` / `EulerGenerator` start rotation) and `Rotation3DOverLife`. A file that
@@ -111,6 +125,42 @@ or duplicated something else, and nothing in the package used them.
 
 ### Changed
 
+- **Flipbook frames wrap into the sheet, and the last cell blends into the first** (breaking for a
+  frame outside the sheet). A frame past the last cell used to read outside the texture, a
+  negative one differed between GLSL (floored) and WGSL (truncated), and with `blendTiles` the last
+  frame cross-faded into a cell that does not exist. The cell is now computed by one shared chunk in
+  both languages and by the trail's CPU path (`sheetCell`), frames wrapping as Unity's Texture
+  Sheet Animation loops. `blendTiles` compiles nothing on a 1×1 sheet, where the `TILE_BLEND` shader
+  read varyings the vertex stage never wrote (undefined behaviour on some GLSL drivers; the common
+  content of imported files).
+- **`uTileCount`, `vTileCount`, `softNearFade` and `softFarFade` are normalised**: tile counts are
+  whole numbers of at least 1 (a 0 or fractional count divided by zero in the shader), fade
+  distances are finite and at least 0. **`softFarFade` defaults to 1** (breaking): with the old
+  default of 0 a soft particle was cut off hard at the scene instead of fading, so soft particles
+  did nothing unless a fade distance was set; a file that wrote neither fade now fades over one
+  unit, Unreal's Depth Fade default.
+- **Mesh particles light both faces and keep their normals under a non-uniform size.** The normal
+  is scaled by the inverse of the size, so a stretched mesh stays lit as a stretched mesh rather
+  than as its unscaled shape, and a back face (meshes draw without culling) is lit, reflected and
+  rimmed as the face the camera sees instead of as the hidden one; a mirrored size (a negative
+  component) turns the normal with the winding, so a mirrored mesh lights the same way.
+- **A stretched billboard seen along its velocity no longer vanishes**: the side vector was
+  `normalize(0)` (NaN) for a particle moving straight at the camera; it falls back as the beam's
+  already did.
+- **A rim fade can discard**: `MESH_RIM_FADE` lowered the alpha after the alpha test had run, so a
+  face faded to nothing still passed the test; the test now runs after the rim.
+- **A gradient map without a map tints every render mode the same**: sprites ignored it and meshes
+  (which sample a white placeholder) took the ramp's end colour; both now look the ramp up at white.
+- **Linear fog with `fogEnd == fogStart`** divided by zero; it is a cut at that distance.
+- **Erosion and distortion write only non-default values** to JSON (`softness`, `edgeWidth`,
+  `edgeColor`, `strength`, a missing `mask`), like every other setting; a gradient map, erosion mask
+  or distortion map that is not a url-backed `Texture` warns when it is left out of a file instead
+  of vanishing silently.
+- Documented: the fixed discard of fragments under alpha 0.01, fog on multiply and subtract blend
+  modes, `blendTiles` needing a sheet and not applying to trails, trails cutting their flipbook
+  cell on the CPU.
+- Internal: the unused `worldView` and `worldViewProjection` uniforms and the `USE_COLOR_AS_ALPHA`
+  define, which nothing set, are gone from the sprite shaders.
 - **A system belongs to one `BatchedRenderer` at a time.** `addSystem` on a second renderer takes
   the system out of the first (both used to step and draw it), and adding a system again after
   its settings changed moves it to the matching batch instead of leaving it in two. A disposed

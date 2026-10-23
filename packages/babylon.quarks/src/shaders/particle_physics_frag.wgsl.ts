@@ -90,13 +90,8 @@ ${surfaceFragmentDeclarationWGSL}
 @fragment
 fn main(input: FragmentInputs) -> FragmentOutputs {
 ${surfaceColorWGSL(true)}
-#ifdef USE_ALPHATEST
-    if (baseColor.a < uniforms.alphaTest) { discard; }
-#else
-    if (baseColor.a < 0.01) { discard; }
-#endif
-
-    let N = normalize(fragmentInputs.vNormal);
+    // A back face lights, reflects and rims as the face the camera sees.
+    let N = normalize(fragmentInputs.vNormal) * select(-1.0, 1.0, fragmentInputs.frontFacing);
 #ifdef MESH_UNLIT
     var color = baseColor.rgb;
 #else
@@ -125,6 +120,13 @@ ${surfaceColorWGSL(true)}
     #else
     color += uniforms.rimColor * edgeTerm * uniforms.rimParams.y;
     #endif
+#endif
+
+    // After the rim, so a fade that empties a face can discard it.
+#ifdef USE_ALPHATEST
+    if (baseColor.a < uniforms.alphaTest) { discard; }
+#else
+    if (baseColor.a < 0.01) { discard; }
 #endif
 
     var finalColor = vec4f(color, baseColor.a);

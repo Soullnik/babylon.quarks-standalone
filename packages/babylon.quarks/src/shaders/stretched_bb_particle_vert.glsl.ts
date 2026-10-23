@@ -1,4 +1,5 @@
 import {fogVertexDeclarationGLSL, fogVertexGLSL} from './chunks/fog';
+import {sheetVertexDeclarationGLSL, sheetVertexGLSL} from './chunks/sheet';
 
 export default /* glsl */ `
 // Per-vertex attributes
@@ -17,11 +18,7 @@ attribute vec4 velocity;
 uniform mat4 world;
 uniform mat4 view;
 uniform mat4 projection;
-
-#ifdef UV_TILE
-uniform float tileCountX;
-uniform float tileCountY;
-#endif
+${sheetVertexDeclarationGLSL}
 
 #ifdef PIVOT
 // Streak offset in particle-size units: x from head to tail, y across.
@@ -34,10 +31,6 @@ varying vec4 vColor;
 #ifdef UV1
 // The particle's own UV, never moved by the sheet (UV channel 1).
 varying vec2 vUV1;
-#endif
-#ifdef TILE_BLEND
-varying vec2 vUV2;
-varying float vTileBlend;
 #endif
 #ifdef SOFT_PARTICLES
 varying vec4 projPosition;
@@ -62,13 +55,9 @@ void main() {
     // Deriving it via normalize keeps the stretch aligned even when the speed contribution is ~0
     // (e.g. a speed factor of 0), instead of collapsing the whole burst onto a fixed screen axis.
     vec3 vdir = vlength > 0.000001 ? viewVelocity / vlength : vec3(0.0, 0.0, 1.0);
-#ifdef BEAM
-    // Seen straight along its length a beam has no side to face; any will do.
+    // Seen straight along its length a streak has no side to face; any will do.
     vec3 sideRaw = cross(mvPosition.xyz, vdir);
     vec3 side = dot(sideRaw, sideRaw) > 1e-12 ? normalize(sideRaw) : vec3(1.0, 0.0, 0.0);
-#else
-    vec3 side = normalize(cross(mvPosition.xyz, vdir));
-#endif
 #ifdef SIZE_LIMITS
     // The streak's width on screen as a fraction of the viewport height, held
     // between the limits; a perspective projection divides by the view depth.
@@ -101,22 +90,7 @@ ${fogVertexGLSL('mvPosition.xyz')}
     linearDepth = abs(mvPosition.z);
 #endif
 
-    #ifdef UV_TILE
-        vec2 tc = vec2(tileCountX, tileCountY);
-        float baseTile = floor(uvTile);
-        float tileU = mod(baseTile, tc.x) / tc.x;
-        float tileV = 1.0 - floor(baseTile / tc.x) / tc.y - 1.0 / tc.y;
-        vUV = quadUV / tc + vec2(tileU, tileV);
-        #ifdef TILE_BLEND
-            float nextTile = ceil(uvTile);
-            float nextU = mod(nextTile, tc.x) / tc.x;
-            float nextV = 1.0 - floor(nextTile / tc.x) / tc.y - 1.0 / tc.y;
-            vUV2 = quadUV / tc + vec2(nextU, nextV);
-            vTileBlend = fract(uvTile);
-        #endif
-    #else
-        vUV = quadUV;
-    #endif
+${sheetVertexGLSL('quadUV')}
 
 #ifdef UV1
     vUV1 = quadUV;

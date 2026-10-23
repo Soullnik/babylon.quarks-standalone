@@ -1,4 +1,5 @@
 import {fogVertexDeclarationGLSL, fogVertexGLSL} from './chunks/fog';
+import {sheetVertexDeclarationGLSL, sheetVertexGLSL} from './chunks/sheet';
 
 export default /* glsl */ `
 attribute vec3 position;
@@ -13,11 +14,7 @@ attribute float uvTile;
 uniform mat4 world;
 uniform mat4 view;
 uniform mat4 projection;
-
-#ifdef UV_TILE
-uniform float tileCountX;
-uniform float tileCountY;
-#endif
+${sheetVertexDeclarationGLSL}
 
 varying vec2 vUV;
 varying vec4 vColor;
@@ -31,11 +28,6 @@ varying vec2 vUV1;
 #endif
 varying vec3 vNormal;
 varying vec3 vWorldPos;
-
-#ifdef TILE_BLEND
-varying vec2 vUV2;
-varying float vTileBlend;
-#endif
 
 #ifdef SOFT_PARTICLES
 varying vec4 projPosition;
@@ -53,7 +45,15 @@ ${fogVertexDeclarationGLSL}
 void main() {
     vec3 scaledPosition = position * size;
     vec3 rotatedPosition = applyQuaternion(scaledPosition, rotation);
-    vec3 rotatedNormal = normalize(applyQuaternion(normal, rotation));
+    // A normal scales by the inverse of the size, so a stretched mesh keeps its normals
+    // perpendicular; a flat size counts as a sliver rather than dividing by zero.
+    vec3 safeSize = vec3(
+        abs(size.x) > 1e-6 ? size.x : 1e-6,
+        abs(size.y) > 1e-6 ? size.y : 1e-6,
+        abs(size.z) > 1e-6 ? size.z : 1e-6);
+    // A mirrored size (an odd number of negative components) turns the winding inside out, so the
+    // normal is turned with it and the fragment's front-face test agrees with the geometry.
+    vec3 rotatedNormal = normalize(applyQuaternion(normal / safeSize, rotation)) * sign(safeSize.x * safeSize.y * safeSize.z);
     vec3 localPos = rotatedPosition + offset;
 
     vec4 worldPos = world * vec4(localPos, 1.0);
@@ -70,22 +70,7 @@ ${fogVertexGLSL('viewPos.xyz')}
     linearDepth = abs(viewPos.z);
 #endif
 
-#ifdef UV_TILE
-    vec2 tc = vec2(tileCountX, tileCountY);
-    float baseTile = floor(uvTile);
-    float tileU = mod(baseTile, tc.x) / tc.x;
-    float tileV = 1.0 - floor(baseTile / tc.x) / tc.y - 1.0 / tc.y;
-    vUV = uv / tc + vec2(tileU, tileV);
-    #ifdef TILE_BLEND
-        float nextTile = ceil(uvTile);
-        float nextU = mod(nextTile, tc.x) / tc.x;
-        float nextV = 1.0 - floor(nextTile / tc.x) / tc.y - 1.0 / tc.y;
-        vUV2 = uv / tc + vec2(nextU, nextV);
-        vTileBlend = fract(uvTile);
-    #endif
-#else
-    vUV = uv;
-#endif
+${sheetVertexGLSL('uv')}
 
 #ifdef UV1
 #ifdef MESH_UV2

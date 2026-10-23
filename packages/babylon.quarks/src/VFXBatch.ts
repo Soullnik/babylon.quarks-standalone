@@ -1,5 +1,4 @@
 import {BoundingInfo} from '@babylonjs/core/Culling/boundingInfo';
-import {Constants} from '@babylonjs/core/Engines/constants';
 import {BaseTexture} from '@babylonjs/core/Materials/Textures/baseTexture';
 import type {Effect} from '@babylonjs/core/Materials/effect';
 import {ShaderMaterial} from '@babylonjs/core/Materials/shaderMaterial';
@@ -240,8 +239,9 @@ export type GradientMapChannel = 'r' | 'g' | 'b' | 'a' | 'luminance';
 
 /**
  * A gradient map (colour ramp): the map is recoloured by looking its
- * {@link channel} up along U of {@link ramp}. See
- * {@link VFXBatchSettings.gradientMap}.
+ * {@link channel} up along U of {@link ramp}. Without a map the lookup reads
+ * white, so the ramp's right-hand end tints every particle, in every render
+ * mode alike. See {@link VFXBatchSettings.gradientMap}.
  */
 export interface ParticleGradientMap {
     /**
@@ -322,6 +322,9 @@ export type ParticleErosionOptions = Partial<Omit<ParticleErosion, 'maskUV'>> & 
     maskUV?: Partial<TextureUV>;
 };
 
+/** The width of the soft band an erosion cut fades over when `softness` is left out, in mask units. */
+export const EROSION_DEFAULT_SOFTNESS = 0.05;
+
 /** A complete erosion from a partial one, every field defaulted, or undefined when `erosion` is unset. */
 export function normalizeErosion(erosion: ParticleErosionOptions | null | undefined): ParticleErosion | undefined {
     if (!erosion || typeof erosion !== 'object') {
@@ -333,7 +336,7 @@ export function normalizeErosion(erosion: ParticleErosionOptions | null | undefi
     return {
         mask: erosion.mask ?? null,
         maskUV: normalizeTextureUV(erosion.maskUV),
-        softness: Math.max(0.0001, num(erosion.softness, 0.05)),
+        softness: Math.max(0.0001, num(erosion.softness, EROSION_DEFAULT_SOFTNESS)),
         edgeWidth: Math.max(0, num(erosion.edgeWidth, 0)),
         edgeColor: [num(color[0], 1), num(color[1], 1), num(color[2], 1)],
     };
@@ -387,6 +390,9 @@ export type ParticleUVDistortionOptions = Partial<Omit<ParticleUVDistortion, 'ma
     mapUV?: Partial<TextureUV>;
 };
 
+/** How far a distortion pushes the map's UV at most when `strength` is left out, in UV units. */
+export const UV_DISTORTION_DEFAULT_STRENGTH = 0.05;
+
 /** A complete distortion from a partial one, or undefined when unset or without a map. */
 export function normalizeUVDistortion(
     distortion: ParticleUVDistortionOptions | null | undefined
@@ -398,7 +404,10 @@ export function normalizeUVDistortion(
     return {
         map: distortion.map,
         mapUV: normalizeTextureUV(distortion.mapUV, UV_DISTORTION_DEFAULT_UV),
-        strength: Math.max(0, typeof strength === 'number' && Number.isFinite(strength) ? strength : 0.05),
+        strength: Math.max(
+            0,
+            typeof strength === 'number' && Number.isFinite(strength) ? strength : UV_DISTORTION_DEFAULT_STRENGTH
+        ),
     };
 }
 
@@ -495,8 +504,6 @@ export interface StoredBatchSettings {
     reflectionTexture: BaseTexture | null;
     /** See {@link VFXBatchSettings.reflectionLevel}. */
     reflectionLevel: number;
-    /** See {@link VFXBatchSettings.reflectionFaces}. */
-    reflectionFaces: BaseTexture[] | null;
     /** See {@link VFXBatchSettings.reflectionAtlas}. */
     reflectionAtlas: BaseTexture | null;
     /** See {@link VFXBatchSettings.layerMask}. */
@@ -654,25 +661,6 @@ export abstract class VFXBatch {
     }
 
     /**
-     * Fog defines and uniforms for a material of this batch, and the per-bind
-     * upload of the scene's current fog. Mode 0 (none) when the scene has fog
-     * disabled, so toggling fog at runtime needs no recompile.
-     */
-    protected static readonly FOG_UNIFORMS = ['vFogInfos', 'vFogColor'];
-
-    /** @internal */
-    protected fogDefines(): string[] {
-        if (!this.settings.applyFog) {
-            return [];
-        }
-        const additive =
-            this.settings.materialTransparent &&
-            (this.settings.materialBlendMode === Constants.ALPHA_ADD ||
-                this.settings.materialBlendMode === Constants.ALPHA_ONEONE);
-        return additive ? ['FOG', 'FOG_ADDITIVE'] : ['FOG'];
-    }
-
-    /**
      * Writes a uniform that changes per bind, such as one read off the active camera, to the
      * material for the next bind and to its bound effect for this one: ShaderMaterial uploads its
      * stored values before the bind observers run, so a value written only to the material would
@@ -688,7 +676,11 @@ export abstract class VFXBatch {
         }
     }
 
-    /** @internal */
+    /**
+     * The per-bind upload of the scene's current fog. Mode 0 (none) when the scene has fog
+     * disabled, so toggling fog at runtime needs no recompile.
+     * @internal
+     */
     protected bindFog(material: ShaderMaterial): void {
         if (!this.settings.applyFog) {
             return;
@@ -714,63 +706,6 @@ export abstract class VFXBatch {
     /** True when a texture effect of this batch samples UV channel 1, see {@link UVChannel}. */
     protected usesUV1(): boolean {
         return readsUV1(this.settings);
-    }
-
-    /** Defines of the texture effects (see `shaders/chunks/surface.ts`) this batch uses. */
-    protected surfaceDefines(): string[] {
-        const defines: string[] = [];
-        const {mapUV, uvDistortion, gradientMap, erosion} = this.settings;
-        if (this.usesUV1()) {
-            defines.push('UV1');
-        }
-        if (mapUV) {
-            defines.push('MAP_TRANSFORM');
-            if (mapUV.channel === 1) {
-                defines.push('MAP_UV1');
-            }
-        }
-        if (uvDistortion) {
-            defines.push('UV_DISTORTION');
-            if (uvDistortion.mapUV.channel === 1) {
-                defines.push('UV_DISTORTION_UV1');
-            }
-        }
-        if (gradientMap) {
-            defines.push('GRADIENT_MAP');
-        }
-        if (erosion) {
-            defines.push('EROSION');
-            if (erosion.mask) {
-                defines.push('EROSION_MASK');
-                if (erosion.maskUV.channel === 1) {
-                    defines.push('EROSION_MASK_UV1');
-                }
-            }
-        }
-        return defines;
-    }
-
-    /** Adds the uniforms and samplers of the texture effects this batch uses. */
-    protected surfaceUniforms(uniforms: string[], samplers: string[]): void {
-        const {mapUV, uvDistortion, gradientMap, erosion} = this.settings;
-        if (mapUV) {
-            uniforms.push('mapTransform');
-        }
-        if (uvDistortion) {
-            samplers.push('distortionMap');
-            uniforms.push('distortionTransform', 'distortionStrength');
-        }
-        if (gradientMap) {
-            samplers.push('gradientMap');
-            uniforms.push('gradientMapRange', 'gradientMapChannel');
-        }
-        if (erosion) {
-            uniforms.push('erosionParams', 'erosionEdgeColor');
-            if (erosion.mask) {
-                samplers.push('erosionMask');
-                uniforms.push('erosionMaskTransform');
-            }
-        }
     }
 
     /** Sets the texture effects' textures and constants, and advances their scrolling on every bind. */
@@ -939,35 +874,6 @@ export abstract class VFXBatch {
         const material = this.mesh.material;
         if (depth && material instanceof ShaderMaterial) {
             material.setTexture('depthTexture', depth.texture);
-        }
-    }
-
-    /**
-     * Defines for soft particles (while a depth texture is attached) and alpha test, shared by
-     * every render mode's material.
-     */
-    protected softDefines(): string[] {
-        const defines: string[] = [];
-        if (this.drawsSoft()) {
-            defines.push('SOFT_PARTICLES');
-            if (this.depth!.packed) {
-                defines.push('SOFT_DEPTH_PACKED');
-            }
-        }
-        if (this.settings.materialAlphaTest > 0) {
-            defines.push('USE_ALPHATEST');
-        }
-        return defines;
-    }
-
-    /** The uniforms and samplers {@link softDefines} need. */
-    protected softUniforms(uniforms: string[], samplers: string[]): void {
-        if (this.drawsSoft()) {
-            uniforms.push('softParams', 'projParams');
-            samplers.push('depthTexture');
-        }
-        if (this.settings.materialAlphaTest > 0) {
-            uniforms.push('alphaTest');
         }
     }
 

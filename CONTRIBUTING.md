@@ -50,13 +50,14 @@ npm run test:coverage                          # the same suites with the covera
 npm run docs                                   # TypeDoc API docs
 npm run docs:check                             # fails on an exported symbol without TSDoc (CI runs it)
 npm run check:demos                            # every demo in headless Chromium, fails on page/console errors or a missing gallery preview
-npm run validate:wgsl                          # every WGSL shader variant through a real WGSL compiler (CI runs it)
+npm run validate:shaders                       # every shader variant, GLSL and WGSL, through a real compiler (CI runs it)
 ```
 
 The last two need the examples served on port 3010 (`npm run dev -w examples`, or
 `npm run build:examples && npm run preview -w examples` for what CI runs) and a Chromium: Playwright's
-own (`npx playwright install chromium`) or one named in `CHROMIUM_PATH`. `validate:wgsl` needs no GPU:
-Chromium's software WebGPU adapter compiles WGSL like any other, which is how CI runs it. `check:demos --webgpu` also
+own (`npx playwright install chromium`) or one named in `CHROMIUM_PATH`. `validate:shaders` needs no GPU:
+Chromium's software adapter compiles GLSL and WGSL like any other, which is how CI runs it
+(`--lang=glsl` or `--lang=wgsl` compiles one language). `check:demos --webgpu` also
 opens every demo under WebGPU and needs a real adapter; software adapters crash on texture uploads.
 `check:demos --shard=1/2` opens every other demo, which is how CI splits them over two machines.
 

@@ -28,10 +28,6 @@ ${softFragmentDeclarationGLSL}
 ${surfaceFragmentDeclarationGLSL}
 void main() {
 ${surfaceColorGLSL(true)}
-#ifdef USE_COLOR_AS_ALPHA
-    baseColor.a *= (baseColor.r + baseColor.g + baseColor.b) / 3.0;
-#endif
-
 #ifdef USE_ALPHATEST
     if (baseColor.a < alphaTest) discard;
 #else

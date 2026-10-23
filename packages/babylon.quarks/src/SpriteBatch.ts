@@ -18,20 +18,11 @@ import {
     Vector4,
 } from 'quarks.core';
 import {VFXBatchSettings} from './BatchedRenderer';
-import {hasSizeLimits, takesPivotAndSizeLimits} from './batchKey';
+import {hasSizeLimits, takesPivotAndSizeLimits, tilesSheet} from './batchKey';
 import {gather, sortByKey, SortScratch} from './instanceSort';
 import type {ParticleSystem} from './ParticleSystem';
-import local_particle_physics_vert from './shaders/local_particle_physics_vert.glsl';
-import local_particle_physics_vert_wgsl from './shaders/local_particle_physics_vert.wgsl';
-import particle_frag from './shaders/particle_frag.glsl';
-import particle_frag_wgsl from './shaders/particle_frag.wgsl';
-import particle_physics_frag from './shaders/particle_physics_frag.glsl';
-import particle_physics_frag_wgsl from './shaders/particle_physics_frag.wgsl';
-import particle_vert from './shaders/particle_vert.glsl';
-import particle_vert_wgsl from './shaders/particle_vert.wgsl';
-import {registerShaders, shaderLanguageFor, ShaderSources} from './shaders/shaderLanguageSupport';
-import stretched_bb_particle_vert from './shaders/stretched_bb_particle_vert.glsl';
-import stretched_bb_particle_vert_wgsl from './shaders/stretched_bb_particle_vert.wgsl';
+import {drawsAlongVelocity, shaderProgram} from './shaderProgram';
+import {registerShaders, shaderLanguageFor} from './shaders/shaderLanguageSupport';
 import type {DepthBinding} from './softDepth';
 import {defaultMeshLighting, MeshLightingSettings, RenderMode, VFXBatch} from './VFXBatch';
 
@@ -177,7 +168,7 @@ export class SpriteBatch extends VFXBatch {
         }
         this.mesh.setVerticesBuffer(this.rotationVB);
 
-        if (SpriteBatch.drawsAlongVelocity(this.settings.renderMode)) {
+        if (drawsAlongVelocity(this.settings.renderMode)) {
             this.velocityBuffer = new Float32Array(this.maxParticles * 4);
             this.velocityVB = new VertexBuffer(engine, this.velocityBuffer, 'velocity', true, false, 4, true);
             this.mesh.setVerticesBuffer(this.velocityVB);
@@ -302,35 +293,12 @@ export class SpriteBatch extends VFXBatch {
 
     /** @internal */
     rebuildMaterial(): void {
-        // The shader sources only depend on the render mode, so the store entry is
-        // registered once per mode. A unique name per rebuild would leak entries in
-        // Effect.ShadersStore and defeat Babylon's compiled-effect cache.
-        const shaderName = `quarksParticle_${this.settings.renderMode}`;
-        const defines: string[] = this.fogDefines();
-
-        let vertexShader: ShaderSources;
-        let fragmentShader: ShaderSources;
-        if (this.settings.renderMode === RenderMode.Mesh) {
-            vertexShader = {glsl: local_particle_physics_vert, wgsl: local_particle_physics_vert_wgsl};
-            fragmentShader = {glsl: particle_physics_frag, wgsl: particle_physics_frag_wgsl};
-        } else if (SpriteBatch.drawsAlongVelocity(this.settings.renderMode)) {
-            vertexShader = {glsl: stretched_bb_particle_vert, wgsl: stretched_bb_particle_vert_wgsl};
-            fragmentShader = {glsl: particle_frag, wgsl: particle_frag_wgsl};
-        } else {
-            vertexShader = {glsl: particle_vert, wgsl: particle_vert_wgsl};
-            fragmentShader = {glsl: particle_frag, wgsl: particle_frag_wgsl};
-        }
-
+        const isMesh = this.settings.renderMode === RenderMode.Mesh;
         // Mesh batches without a diffuse map still need a sampler2D on iOS WebKit —
         // a zero-sampler particle mesh effect often never becomes drawable there.
-        const mapTexture =
-            this.settings.texture ??
-            (this.settings.renderMode === RenderMode.Mesh ? SpriteBatch.whiteTexture(this.scene) : null);
-        if (mapTexture) {
-            defines.push('USE_MAP');
-        }
+        const mapTexture = this.settings.texture ?? (isMesh ? SpriteBatch.whiteTexture(this.scene) : null);
         const atlas = this.settings.reflectionAtlas;
-        const atlasPending = this.settings.renderMode === RenderMode.Mesh && !!atlas && !atlas.isReady();
+        const atlasPending = isMesh && !!atlas && !atlas.isReady();
         this.cancelAtlasRebuild?.();
         this.cancelAtlasRebuild = null;
         if (atlasPending && atlas) {
@@ -350,100 +318,20 @@ export class SpriteBatch extends VFXBatch {
             }
         }
         const useEnvAtlas = this.usesEnvAtlas();
-        if (useEnvAtlas) {
-            defines.push('USE_ENVMAP_ATLAS');
-        }
-        if (this.settings.uTileCount > 1 || this.settings.vTileCount > 1) {
-            defines.push('UV_TILE');
-        }
-        if (this.settings.blendTiles) {
-            defines.push('TILE_BLEND');
-        }
-        defines.push(...this.softDefines());
-        if (this.settings.renderMode === RenderMode.VerticalBillBoard) {
-            defines.push('VERTICAL');
-        }
-        if (this.settings.renderMode === RenderMode.HorizontalBillBoard) {
-            defines.push('HORIZONTAL');
-        }
-        if (this.settings.renderMode === RenderMode.Beam) {
-            defines.push('BEAM');
-        }
-        const pivot = takesPivotAndSizeLimits(this.settings.renderMode) ? this.settings.pivot : undefined;
-        if (pivot) {
-            defines.push('PIVOT');
-        }
-        const sizeLimits = this.sizeLimits();
-        if (sizeLimits) {
-            defines.push('SIZE_LIMITS');
-        }
-        const isMesh = this.settings.renderMode === RenderMode.Mesh;
+        const program = shaderProgram(this.settings, {
+            depth: this.depth,
+            envAtlasReady: useEnvAtlas,
+            meshUV2: this.meshUV2(),
+        });
+        const {defines, attributes, uniforms, samplers} = program;
+        const shaderName = program.name;
         const lighting = this.settings.lighting ?? 'fixed';
         const lit = isMesh && lighting !== 'unlit';
-        if (isMesh && !lit) {
-            defines.push('MESH_UNLIT');
-        }
         const rim = isMesh ? this.settings.rim : undefined;
-        if (rim) {
-            defines.push('MESH_RIM');
-            if (rim.mode === 'fade') {
-                defines.push('MESH_RIM_FADE');
-            } else if (rim.mode === 'mix') {
-                defines.push('MESH_RIM_MIX');
-            }
-        }
         const needsEyePosition = useEnvAtlas || !!rim;
-        defines.push(...this.surfaceDefines());
 
         const shaderLanguage = shaderLanguageFor(this.scene.getEngine());
-        registerShaders(shaderName, vertexShader, fragmentShader, shaderLanguage);
-
-        const attributes = ['position', 'uv', 'offset', 'color', 'size', 'rotation', 'uvTile'];
-        if (this.settings.renderMode === RenderMode.Mesh) {
-            attributes.push('normal');
-        }
-        if (this.usesUV1() && this.meshUV2()) {
-            defines.push('MESH_UV2');
-            attributes.push('uv2');
-        }
-        if (SpriteBatch.drawsAlongVelocity(this.settings.renderMode)) {
-            attributes.push('velocity');
-        }
-
-        const uniforms = ['world', 'view', 'projection', 'worldView', 'worldViewProjection', ...VFXBatch.FOG_UNIFORMS];
-        const samplers: string[] = [];
-
-        if (this.settings.uTileCount > 1 || this.settings.vTileCount > 1) {
-            uniforms.push('tileCountX');
-            uniforms.push('tileCountY');
-        }
-        if (mapTexture) {
-            samplers.push('map');
-        }
-        if (useEnvAtlas) {
-            samplers.push('envAtlas');
-            uniforms.push('reflectionLevel');
-        }
-        if (needsEyePosition) {
-            uniforms.push('eyePosition');
-        }
-        if (rim) {
-            uniforms.push('rimColor');
-            uniforms.push('rimParams');
-        }
-        this.surfaceUniforms(uniforms, samplers);
-        this.softUniforms(uniforms, samplers);
-        if (pivot) {
-            uniforms.push('pivot');
-        }
-        if (sizeLimits) {
-            uniforms.push('sizeLimits');
-        }
-        if (lit) {
-            uniforms.push('lightDirection');
-            uniforms.push('lightColor');
-            uniforms.push('ambientColor');
-        }
+        registerShaders(shaderName, program.vertex, program.fragment, shaderLanguage);
 
         const mat = new ShaderMaterial(
             shaderName,
@@ -477,7 +365,7 @@ export class SpriteBatch extends VFXBatch {
                 VFXBatch.writeBound(mat, (target) => target.setVector3('eyePosition', eyePosition));
             });
         }
-        if (this.settings.uTileCount > 1 || this.settings.vTileCount > 1) {
+        if (tilesSheet(this.settings)) {
             mat.setFloat('tileCountX', this.settings.uTileCount);
             mat.setFloat('tileCountY', this.settings.vTileCount);
         }
@@ -1004,11 +892,6 @@ export class SpriteBatch extends VFXBatch {
         if (usesVelocity && this.velocityVB && this.velocityBuffer) {
             this.velocityVB.update(this.velocityBuffer.subarray(0, index * 4));
         }
-    }
-
-    /** Stretched billboards and beams: drawn along a per-instance vector, by the stretched shader. */
-    private static drawsAlongVelocity(renderMode: RenderMode): boolean {
-        return renderMode === RenderMode.StretchedBillBoard || renderMode === RenderMode.Beam;
     }
 
     private readonly beamEnd_ = new Vector3();

@@ -30,10 +30,6 @@ ${surfaceFragmentDeclarationWGSL}
 @fragment
 fn main(input: FragmentInputs) -> FragmentOutputs {
 ${surfaceColorWGSL(true)}
-#ifdef USE_COLOR_AS_ALPHA
-    baseColor.a *= (baseColor.r + baseColor.g + baseColor.b) / 3.0;
-#endif
-
 #ifdef USE_ALPHATEST
     if (baseColor.a < uniforms.alphaTest) { discard; }
 #else
