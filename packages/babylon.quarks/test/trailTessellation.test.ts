@@ -6,6 +6,7 @@ import {ParticleSystem} from '../src/ParticleSystem';
 import {TrailBatch} from '../src/TrailBatch';
 import {MAX_TRAIL_TESSELLATION, trailCurveTension, trailTessellation} from '../src/trailSettings';
 import {RenderMode} from '../src/VFXBatch';
+import {emptyMeta} from './internals';
 
 let engine: NullEngine;
 let scene: Scene;
@@ -49,14 +50,14 @@ function circling(settings: Partial<TrailSettings> = {}, worldSpace = true) {
         system.emitter.computeWorldMatrix(true);
         renderer.update(1 / 60);
     }
-    const batch = renderer.batches[0] as TrailBatch as any;
+    const batch = renderer.batches[0] as TrailBatch;
     const trail = system.particles[0] as TrailParticle;
     return {system, renderer, batch, trail};
 }
 
 /** The drawn pair midpoints: where the ribbon runs. */
-function centres(batch: any, pairs: number): number[][] {
-    const p = batch.positionBuffer as Float32Array;
+function centres(batch: TrailBatch, pairs: number): number[][] {
+    const p = batch['positionBuffer'];
     const out: number[][] = [];
     for (let i = 0; i < pairs; i++) {
         const o = i * 6;
@@ -114,7 +115,7 @@ describe('trail tessellation', () => {
     it('runs U along the curve, from the head under uvFromHead, on both UV channels', () => {
         const {batch, trail} = circling({tessellation: 3, uvFromHead: true});
         const drawn = (trail.historyCount - 1) * 4 + 1;
-        const uv = batch.uvBuffer as Float32Array;
+        const uv = batch['uvBuffer'];
         expect(uv[0]).toBeCloseTo(1, 6);
         expect(uv[(drawn - 1) * 4]).toBeCloseTo(0, 6);
         for (let i = 1; i < drawn; i++) expect(uv[i * 4]).toBeLessThan(uv[(i - 1) * 4]);
@@ -124,13 +125,13 @@ describe('trail tessellation', () => {
         /** The batch's tessellate on hand-placed samples: points along X, sizes and colors given. */
         function curve(xs: number[], curved: number, steps: number, tension = 0) {
             const {batch} = circling();
-            const samples = batch.trailSamples(xs.length);
+            const samples = batch['trailSamples'](xs.length);
             xs.forEach((x, i) => {
                 samples.writePoint(i, x, 0, 0, null);
                 samples.size[i] = i;
                 samples.writeColor(i, i, 0, 0, 1);
             });
-            const out = batch.tessellate(samples, curved, xs.length, steps, tension, false);
+            const out = batch['tessellate'](samples, curved, xs.length, steps, tension, false);
             const n = (xs.length - 1) * (steps + 1) + 1;
             return {
                 xs: Array.from({length: n}, (_, k) => out.position[k * 3]),
@@ -178,7 +179,7 @@ describe('trail tessellation', () => {
 
     it('turns a swept trail’s sides with the curve, keeping their length', () => {
         const {batch, trail} = circling({tessellation: 4, sideAxis: new Vector3(1, 0, 0)});
-        const p = batch.positionBuffer as Float32Array;
+        const p = batch['positionBuffer'];
         const drawn = (trail.historyCount - 1) * 5 + 1;
         for (let i = 0; i < drawn; i++) {
             const o = i * 6;
@@ -194,20 +195,20 @@ describe('trail tessellation', () => {
     it('grows its buffers for the extra vertices', () => {
         const {batch, trail} = circling({tessellation: MAX_TRAIL_TESSELLATION});
         const drawn = (trail.historyCount - 1) * (MAX_TRAIL_TESSELLATION + 1) + 1;
-        expect(batch.positionBuffer.length).toBeGreaterThanOrEqual(drawn * 6);
+        expect(batch['positionBuffer'].length).toBeGreaterThanOrEqual(drawn * 6);
         expect(batch.mesh.subMeshes[0].verticesCount).toBe(drawn * 2);
     });
 
     it('round-trips through toJSON / fromJSON, and clone (the loader reads systems through fromJSON), writing only what is set', () => {
         const {system} = circling({tessellation: 5, curveTension: 0.25});
-        const json = system.toJSON() as any;
+        const json = system.toJSON();
         expect(json.rendererEmitterSettings).toMatchObject({tessellation: 5, curveTension: 0.25});
-        const copy = ParticleSystem.fromJSON(json, {} as any, {}, scene);
+        const copy = ParticleSystem.fromJSON(json, emptyMeta(), {}, scene);
         expect(copy.rendererEmitterSettings).toMatchObject({tessellation: 5, curveTension: 0.25});
         expect(system.clone().rendererEmitterSettings).toMatchObject({tessellation: 5, curveTension: 0.25});
 
-        const plain = circling().system.toJSON() as any;
-        expect('tessellation' in plain.rendererEmitterSettings).toBe(false);
-        expect('curveTension' in plain.rendererEmitterSettings).toBe(false);
+        const plain = circling().system.toJSON().rendererEmitterSettings ?? {};
+        expect('tessellation' in plain).toBe(false);
+        expect('curveTension' in plain).toBe(false);
     });
 });

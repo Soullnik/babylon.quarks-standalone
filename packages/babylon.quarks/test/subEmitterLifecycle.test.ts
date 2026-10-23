@@ -154,7 +154,7 @@ describe('a disposed sub emitter target', () => {
         ps.dispose();
         ps.restart();
         ps.update(STEP);
-        ps.emit(STEP, (ps as any).emissionState, ps.emitter.getWorldMatrix() as never);
+        ps.emit(STEP, ps['emissionState'], ps.emitter.getWorldMatrix() as never);
         expect(ps.particleNum).toBe(0);
     });
 });
@@ -165,7 +165,7 @@ describe('a Death sub emission', () => {
         const child = system({onlyUsedByOther: true, duration: 1, emissionOverTime: new ConstantValue(120)});
         const parent = parentOf(child, SubParticleEmitMode.Death);
         const deaths: Vector3[] = [];
-        parent.addEventListener('particleDied', (event: any) => deaths.push(event.particle.position.clone()));
+        parent.addEventListener('particleDied', (event) => deaths.push(event.particle!.position.clone()));
         renderer.addSystem(parent);
         renderer.addSystem(child);
         for (let i = 0; i < 90; i++) renderer.update(STEP);
@@ -243,7 +243,7 @@ describe('a sub emitter that turns with the parent velocity', () => {
         particle.position.set(1, 2, 3);
         particle.velocity.copy(velocity);
         const m = new Matrix4();
-        (behavior as any).setMatrixFromParticle(m, particle);
+        behavior['setMatrixFromParticle'](m, particle);
         return m;
     };
 

@@ -3,6 +3,13 @@ import {NullEngine} from '@babylonjs/core/Engines/nullEngine';
 import {StandardMaterial} from '@babylonjs/core/Materials/standardMaterial';
 import {RawTexture} from '@babylonjs/core/Materials/Textures/rawTexture';
 import {Scene} from '@babylonjs/core/scene';
+import type {
+    Behavior,
+    GeneratorMemory,
+    RotationGenerator,
+    StretchedBillBoardSettings,
+    Vector3Generator,
+} from 'quarks.core';
 import {
     AxisAngleGenerator,
     Bezier,
@@ -26,9 +33,11 @@ import {
     WidthOverLength,
 } from 'quarks.core';
 import {BatchedRenderer} from '../src/BatchedRenderer';
+import type {BabylonMetaData} from '../src/ParticleSystem';
 import {ParticleSystem} from '../src/ParticleSystem';
 import type {ParticleSystemParameters} from '../src/system/types';
 import {RenderMode} from '../src/VFXBatch';
+import {emptyMeta, forceSet} from './internals';
 
 let engine: NullEngine;
 let scene: Scene;
@@ -231,7 +240,7 @@ describe('ParticleSystem', () => {
             worldSpace: true,
         });
 
-        const meta: any = {textures: {}, materials: {}, geometries: {}};
+        const meta = emptyMeta();
         const json = ps.toJSON(meta);
         expect(json.version).toBe('3.0');
         expect(json.prewarm).toBe(true);
@@ -358,9 +367,9 @@ describe('ParticleSystem', () => {
         ps.emit(0, ps.emissionState, ps.emitter.matrixWorld);
         expect(ps.particleNum).toBe(1);
 
-        const particle = ps.particles[0] as any;
-        expect(particle.localPosition).toBeDefined();
-        expect(particle.parentMatrix).toBeDefined();
+        const particle = ps.particles[0];
+        expect(particle).toHaveProperty('localPosition');
+        expect(particle).toHaveProperty('parentMatrix');
 
         ps.update(1 / 60);
         expect(particle.position.x).toBeCloseTo(3, 5);
@@ -393,12 +402,14 @@ describe('ParticleSystem', () => {
             },
         });
 
-        const meta: any = {textures: {}, materials: {}, geometries: {}};
-        const json: any = ps.toJSON(meta);
+        const meta = emptyMeta();
+        const json = ps.toJSON(meta);
         json.rendererEmitterSettings = {};
         json.speedFactor = 0.75;
-        const geometryId = json.instancingGeometry;
+        const geometryId = json.instancingGeometry as string;
         meta.geometries[geometryId] = {
+            uuid: geometryId,
+            type: 'BufferGeometry',
             data: {
                 attributes: {
                     position: {array: [0, 0, 0, 1, 0, 0, 0, 1, 0]},
@@ -409,7 +420,7 @@ describe('ParticleSystem', () => {
         };
 
         const restored = ParticleSystem.fromJSON(json, meta, {}, scene);
-        expect((restored.rendererEmitterSettings as any).speedFactor).toBe(0.75);
+        expect((restored.rendererEmitterSettings as StretchedBillBoardSettings).speedFactor).toBe(0.75);
         expect(restored.getRendererSettings().instancingIndices).toBeInstanceOf(Uint16Array);
     });
 
@@ -519,7 +530,7 @@ describe('ParticleSystem', () => {
         ps.renderMode = RenderMode.Mesh;
         expect(ps.renderMode).toBe(RenderMode.Mesh);
         ps.renderMode = RenderMode.StretchedBillBoard;
-        expect((ps.rendererEmitterSettings as any).speedFactor).toBeDefined();
+        expect((ps.rendererEmitterSettings as StretchedBillBoardSettings).speedFactor).toBeDefined();
         ps.renderMode = RenderMode.VerticalBillBoard;
         expect(ps.renderMode).toBe(RenderMode.VerticalBillBoard);
         ps.renderMode = RenderMode.HorizontalBillBoard;
@@ -542,7 +553,7 @@ describe('ParticleSystem', () => {
             shape: new PointEmitter(),
         });
         ps.update(1 / 60);
-        expect((ps as any).prewarmed).toBe(true);
+        expect(ps['prewarmed']).toBe(true);
     });
 
     describe('prewarmTime', () => {
@@ -685,7 +696,7 @@ describe('ParticleSystem', () => {
 
         it('round-trips through JSON and clone', () => {
             const ps = capped(7);
-            const meta: any = {textures: {}, materials: {}, geometries: {}};
+            const meta = emptyMeta();
             const json = ps.toJSON(meta);
             expect(json.maxParticles).toBe(7);
             expect(ParticleSystem.fromJSON(json, meta, {}, scene).maxParticles).toBe(7);
@@ -766,7 +777,7 @@ describe('ParticleSystem', () => {
     });
 
     it('restores fromJSON with numeric startTileIndex', () => {
-        const meta: any = {textures: {}, materials: {}, geometries: {}};
+        const meta = emptyMeta();
         const ps = ParticleSystem.fromJSON(
             {
                 version: '3.0',
@@ -795,7 +806,7 @@ describe('ParticleSystem', () => {
                 vTileCount: 1,
                 behaviors: [],
                 worldSpace: true,
-            } as any,
+            },
             {
                 ...meta,
                 geometries: {
@@ -803,6 +814,7 @@ describe('ParticleSystem', () => {
                 },
                 materials: {
                     mat: {
+                        uuid: 'mat',
                         transparent: true,
                         alphaMode: Constants.ALPHA_ADD,
                         depthTest: true,
@@ -835,8 +847,8 @@ describe('ParticleSystem', () => {
         ps.emit(0.1, ps.emissionState, ps.emitter.matrixWorld);
         ps.emit(0.1, ps.emissionState, ps.emitter.matrixWorld);
         expect(ps.particleNum).toBeGreaterThan(0);
-        const rot = (ps.particles[0] as any).rotation;
-        expect(rot.w).toBeDefined();
+        const rot = ps.particles[0].rotation;
+        expect(rot).toBeInstanceOf(QRot);
     });
 
     it('WidthOverLength writes trail widths into the history ring buffer', () => {
@@ -883,7 +895,7 @@ describe('ParticleSystem', () => {
             rendererEmitterSettings: {speedFactor: 0.5, lengthFactor: 3},
         });
         const stretchedClone = stretched.clone();
-        expect((stretchedClone.rendererEmitterSettings as any).lengthFactor).toBe(3);
+        expect((stretchedClone.rendererEmitterSettings as StretchedBillBoardSettings).lengthFactor).toBe(3);
     });
 
     it('applyMaterialSettings is a no-op when rendererSettings is temporarily cleared', () => {
@@ -892,10 +904,10 @@ describe('ParticleSystem', () => {
             startLife: new ConstantValue(1),
             emissionOverTime: new ConstantValue(0),
         });
-        const saved = (ps as any).rendererSettings;
-        (ps as any).rendererSettings = null;
-        (ps as any).applyMaterialSettings(new StandardMaterial('tmp', scene));
-        (ps as any).rendererSettings = saved;
+        const saved = ps['rendererSettings'];
+        forceSet(ps, 'rendererSettings', null);
+        ps['applyMaterialSettings'](new StandardMaterial('tmp', scene));
+        ps['rendererSettings'] = saved;
     });
 
     it('toJSON with string root meta id and texture still emits version 3 payload', () => {
@@ -924,7 +936,8 @@ describe('ParticleSystem', () => {
     });
 
     it('fromJSON falls back to default instancing geometry for empty geometry meta', () => {
-        const meta: any = {textures: {}, materials: {}, geometries: {bad: {}}};
+        const meta = emptyMeta();
+        forceSet(meta.geometries, 'bad', {});
         const ps = ParticleSystem.fromJSON(
             {
                 version: '3.0',
@@ -953,11 +966,12 @@ describe('ParticleSystem', () => {
                 vTileCount: 1,
                 behaviors: [],
                 worldSpace: true,
-            } as any,
+            },
             {
                 ...meta,
                 materials: {
                     mat: {
+                        uuid: 'mat',
                         transparent: true,
                         alphaMode: Constants.ALPHA_ADD,
                         depthTest: true,
@@ -974,10 +988,11 @@ describe('ParticleSystem', () => {
 
     it('fromJSON synthesizes indices when geometry meta has positions but empty indices', () => {
         const positions = new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 1, 1, 0]);
-        const meta: any = {
+        const meta: BabylonMetaData = {
             textures: {},
             materials: {
                 mat: {
+                    uuid: 'mat',
                     transparent: true,
                     alphaMode: Constants.ALPHA_ADD,
                     depthTest: true,
@@ -1022,7 +1037,7 @@ describe('ParticleSystem', () => {
                 vTileCount: 1,
                 behaviors: [],
                 worldSpace: true,
-            } as any,
+            },
             meta,
             {},
             scene
@@ -1049,7 +1064,8 @@ describe('ParticleSystem', () => {
     });
 
     it('invokes custom behavior frameUpdate and update hooks', () => {
-        const behavior = {
+        const behavior: Behavior = {
+            type: 'Custom',
             reset: jest.fn(),
             initialize: jest.fn(),
             frameUpdate: jest.fn(),
@@ -1057,8 +1073,8 @@ describe('ParticleSystem', () => {
             clone: function () {
                 return {...this};
             },
-            toJSON: () => ({}),
-        } as any;
+            toJSON: () => ({type: 'Custom'}),
+        };
         const ps = new ParticleSystem({
             scene,
             duration: 5,
@@ -1079,12 +1095,14 @@ describe('ParticleSystem', () => {
     });
 
     it('spawn uses vec3function startSize generator when provided', () => {
-        const vec3Size: any = {
+        const vec3Size: Vector3Generator = {
             type: 'vec3function',
             startGen: jest.fn(),
-            genValue: (_mem: any, out: Vector3, _tr: number) => {
-                out.set(0.5, 1.5, 2.5);
+            genValue: (_mem: GeneratorMemory, out: Vector3) => out.set(0.5, 1.5, 2.5),
+            toJSON: () => {
+                throw new Error('not saved in this test');
             },
+            clone: () => vec3Size,
         };
         const ps = new ParticleSystem({
             scene,
@@ -1103,10 +1121,14 @@ describe('ParticleSystem', () => {
     });
 
     it('spawn maps rotation generator type rotation to numeric billboard rotation', () => {
-        const rotGen: any = {
+        const rotGen: RotationGenerator = {
             type: 'rotation',
             startGen: jest.fn(),
-            genValue: (_mem: any, _out: QRot, _a: number, _tr: number) => {},
+            genValue: (_mem: GeneratorMemory, out: QRot) => out,
+            toJSON: () => {
+                throw new Error('not saved in this test');
+            },
+            clone: () => rotGen,
         };
         const ps = new ParticleSystem({
             scene,
@@ -1122,7 +1144,7 @@ describe('ParticleSystem', () => {
         ps.emit(0.05, ps.emissionState, ps.emitter.matrixWorld);
         ps.emit(0.05, ps.emissionState, ps.emitter.matrixWorld);
         expect(ps.particleNum).toBeGreaterThan(0);
-        expect(typeof (ps.particles[0] as any).rotation).toBe('number');
+        expect(typeof ps.particles[0]['rotation']).toBe('number');
     });
 
     it('world-space mesh spawn composes quaternion with emitter basis', () => {
@@ -1140,7 +1162,7 @@ describe('ParticleSystem', () => {
         });
         ps.emit(0.05, ps.emissionState, ps.emitter.matrixWorld);
         ps.emit(0.05, ps.emissionState, ps.emitter.matrixWorld);
-        const q = (ps.particles[0] as any).rotation as QRot;
+        const q = ps.particles[0]['rotation'] as QRot;
         expect(q.w).toBeDefined();
     });
 
@@ -1158,7 +1180,7 @@ describe('ParticleSystem', () => {
         });
         ps.emit(0.05, ps.emissionState, ps.emitter.matrixWorld);
         ps.emit(0.05, ps.emissionState, ps.emitter.matrixWorld);
-        expect((ps.particles[0] as any).parentMatrix).toBeDefined();
+        expect(ps.particles[0]['parentMatrix']).toBeDefined();
     });
 
     it('emit skips endEmit for onlyUsedByOther non-looping systems', () => {
@@ -1172,7 +1194,7 @@ describe('ParticleSystem', () => {
             shape: new PointEmitter(),
         });
         ps.emit(0.02, ps.emissionState, ps.emitter.matrixWorld);
-        expect((ps as any).emitEnded).toBe(false);
+        expect(ps['emitEnded']).toBe(false);
     });
 
     it('records trail history in the ring buffer for short-lived trail particles', () => {
@@ -1220,9 +1242,9 @@ describe('ParticleSystem', () => {
         const wm = ps.emitter.getWorldMatrix();
         const pm = new Matrix4();
         for (let i = 0; i < 16; i++) {
-            (pm as any).elements[i] = wm.m[i];
+            pm['elements'][i] = wm.m[i];
         }
-        (ps.particles[0] as any).parentMatrix = pm;
+        ps.particles[0]['parentMatrix'] = pm;
         ps.update(1 / 60);
         expect(ps.particleNum).toBeGreaterThan(0);
     });
@@ -1297,7 +1319,7 @@ describe('ParticleSystem behavior batching', () => {
 });
 
 describe('ParticleSystem start delay', () => {
-    const makeDelayedSystem = (parameters: any = {}) =>
+    const makeDelayedSystem = (parameters: Partial<ParticleSystemParameters> = {}) =>
         new ParticleSystem({
             scene,
             duration: 5,
@@ -1355,7 +1377,7 @@ describe('ParticleSystem start delay', () => {
 
     it('should serialize and restore startDelay', () => {
         const ps = makeDelayedSystem();
-        const meta: any = {textures: {}, materials: {}, geometries: {}};
+        const meta = emptyMeta();
         const json = ps.toJSON(meta);
         expect(json.startDelay).toEqual({type: 'ConstantValue', value: 0.5});
 
@@ -1368,7 +1390,7 @@ describe('ParticleSystem start delay', () => {
 
     it('should default startDelay to 0 when missing from JSON', () => {
         const ps = makeDelayedSystem();
-        const meta: any = {textures: {}, materials: {}, geometries: {}};
+        const meta = emptyMeta();
         const json = ps.toJSON(meta);
         delete json.startDelay;
 
@@ -1381,7 +1403,7 @@ describe('ParticleSystem start delay', () => {
 });
 
 describe('ParticleSystem emitter velocity', () => {
-    const makeMovingSystem = (behaviors: any[] = []) =>
+    const makeMovingSystem = (behaviors: Behavior[] = []) =>
         new ParticleSystem({
             scene,
             duration: 5,
@@ -1434,7 +1456,7 @@ describe('ParticleSystem emitter velocity', () => {
             ),
             new InheritVelocity(new ConstantValue(0.5), 'current'),
         ]);
-        const meta: any = {textures: {}, materials: {}, geometries: {}};
+        const meta = emptyMeta();
         const json = ps.toJSON(meta);
         const restored = ParticleSystem.fromJSON(json, meta, {}, scene);
 

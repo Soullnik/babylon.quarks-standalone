@@ -1,6 +1,7 @@
 import {Constants} from '@babylonjs/core/Engines/constants';
 import {NullEngine} from '@babylonjs/core/Engines/nullEngine';
 import {StandardMaterial} from '@babylonjs/core/Materials/standardMaterial';
+import {BaseTexture} from '@babylonjs/core/Materials/Textures/baseTexture';
 import {Texture} from '@babylonjs/core/Materials/Textures/texture';
 import {Scene} from '@babylonjs/core/scene';
 import {ConstantColor, ConstantValue, PointEmitter, Vector4} from 'quarks.core';
@@ -9,7 +10,19 @@ import * as envAtlas from '../src/envAtlas';
 import {cacheEnvAtlas, cubeFaceUrls, getCachedEnvAtlas} from '../src/envAtlas';
 import {ParticleSystem} from '../src/ParticleSystem';
 import {SpriteBatch} from '../src/SpriteBatch';
+import type {ParticleMaterialSource} from '../src/system/materialResolve';
 import {RenderMode} from '../src/VFXBatch';
+import {forceSet, shaderOptions} from './internals';
+
+/** A ready cube texture with these face files, as a loaded `CubeTexture` has. */
+function fakeCube(scene: Scene, files: string[], level = 1): BaseTexture {
+    const cube = new BaseTexture(scene);
+    cube['isCube'] = true;
+    cube.level = level;
+    forceSet(cube, 'files', files);
+    jest.spyOn(cube, 'isReady').mockReturnValue(true);
+    return cube;
+}
 
 describe('mesh particle environment map', () => {
     let engine: NullEngine;
@@ -32,9 +45,9 @@ describe('mesh particle environment map', () => {
             samplingMode: Texture.LINEAR_LINEAR,
         });
         atlas.level = 0.8;
-        const material = new StandardMaterial('env-mat', scene);
-        (material as any).reflectionAtlas = atlas;
-        (material as any).reflectionLevel = 0.8;
+        const material: StandardMaterial & ParticleMaterialSource = new StandardMaterial('env-mat', scene);
+        material.reflectionAtlas = atlas;
+        material.reflectionLevel = 0.8;
 
         const system = new ParticleSystem({
             scene,
@@ -71,7 +84,7 @@ describe('mesh particle environment map', () => {
         renderer.update(1 / 60);
 
         const batch = renderer.batches[0] as SpriteBatch;
-        const defines = (batch.mesh.material as any).options.defines as string[];
+        const defines = shaderOptions(batch.mesh.material).defines!;
         expect(defines).toContain('USE_MAP');
         expect(defines).not.toContain('USE_ENVMAP_ATLAS');
 
@@ -87,8 +100,8 @@ describe('mesh particle environment map', () => {
         });
         jest.spyOn(atlas, 'isReady').mockReturnValue(true);
 
-        const material = new StandardMaterial('env-shader', scene);
-        (material as any).reflectionAtlas = atlas;
+        const material: StandardMaterial & ParticleMaterialSource = new StandardMaterial('env-shader', scene);
+        material.reflectionAtlas = atlas;
 
         const system = new ParticleSystem({
             scene,
@@ -106,7 +119,7 @@ describe('mesh particle environment map', () => {
         renderer.addSystem(system);
         renderer.update(1 / 60);
 
-        const defines = (renderer.batches[0].mesh.material as any).options.defines as string[];
+        const defines = shaderOptions(renderer.batches[0].mesh.material).defines!;
         expect(defines).toContain('USE_MAP');
         expect(defines).toContain('USE_ENVMAP_ATLAS');
 
@@ -125,13 +138,7 @@ describe('mesh particle environment map', () => {
         jest.spyOn(atlas, 'isReady').mockReturnValue(true);
 
         const faceUrls = ['px', 'py', 'pz', 'nx', 'ny', 'nz'];
-        const cube = {
-            isCube: true,
-            isReady: () => true,
-            level: 0.7,
-            files: faceUrls,
-            _files: faceUrls,
-        } as any;
+        const cube = fakeCube(scene, faceUrls, 0.7);
         cacheEnvAtlas(cube, atlas);
 
         const material = new StandardMaterial('cube-env', scene);
@@ -163,12 +170,7 @@ describe('mesh particle environment map', () => {
             samplingMode: Texture.LINEAR_LINEAR,
         });
         const faceUrls = ['px', 'py', 'pz', 'nx', 'ny', 'nz'];
-        const cube = {
-            isCube: true,
-            isReady: () => true,
-            files: faceUrls,
-            _files: faceUrls,
-        } as any;
+        const cube = fakeCube(scene, faceUrls);
 
         const originalBuilder = envAtlas.envAtlasBuilder.createFromFaceUrls;
         envAtlas.envAtlasBuilder.createFromFaceUrls = jest.fn().mockResolvedValue(atlas);

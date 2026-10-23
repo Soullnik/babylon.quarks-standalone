@@ -38,7 +38,6 @@ jobs:
             - name: Check formatting
               run: npm run format:check
 
-            # Warnings are explicit `any`s; --max-warnings stops their number growing.
             - name: Lint
               run: npm run lint
 

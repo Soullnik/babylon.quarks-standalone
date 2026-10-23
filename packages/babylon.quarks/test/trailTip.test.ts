@@ -16,6 +16,7 @@ import {ParticleSystem, ParticleSystemParameters} from '../src/ParticleSystem';
 import trailVertGLSL from '../src/shaders/trail_vert.glsl';
 import trailVertWGSL from '../src/shaders/trail_vert.wgsl';
 import {RenderMode} from '../src/VFXBatch';
+import {shaderOptions} from './internals';
 
 let engine: NullEngine;
 let scene: Scene;
@@ -85,7 +86,7 @@ const drawnU = (renderer: BatchedRenderer, k: number) => buffers(renderer).uvBuf
 
 /** Redraws the batch as if the display were `residual` seconds off the last step. */
 function drawAt(system: ParticleSystem, renderer: BatchedRenderer, residual: number) {
-    (system as any).clock.accumulator = residual;
+    system['clock']['accumulator'] = residual;
     renderer.batches[0].update();
 }
 
@@ -135,7 +136,7 @@ describe('the live tip of a trail', () => {
 
     test('adds no tip for float noise left in the accumulator', () => {
         const {system, renderer, particle} = trail();
-        (system as any).clock.accumulator = 3.5e-18;
+        system['clock']['accumulator'] = 3.5e-18;
         renderer.batches[0].update();
         expect(drawnPairs(renderer)).toBe(particle.historyCount);
         renderer.dispose();
@@ -266,14 +267,14 @@ describe('a trail system', () => {
     test('compiles alpha test in, and cuts at the set value', () => {
         const {renderer} = trail({alphaTest: 0.4});
         const material = renderer.batches[0].mesh.material as ShaderMaterial;
-        expect((material as any).options.defines).toContain('USE_ALPHATEST');
-        expect((material as any)._floats.alphaTest).toBeCloseTo(0.4, 5);
+        expect(material['options'].defines).toContain('USE_ALPHATEST');
+        expect(material['_floats'].alphaTest).toBeCloseTo(0.4, 5);
         renderer.dispose();
     });
 
     test('has no screen-space uniforms left', () => {
         const {renderer} = trail();
-        const uniforms = (renderer.batches[0].mesh.material as any).options.uniforms as string[];
+        const uniforms = shaderOptions(renderer.batches[0].mesh.material).uniforms!;
         for (const name of ['resolution', 'lineWidth', 'sizeAttenuation', 'world', 'worldViewProjection']) {
             expect(uniforms).not.toContain(name);
         }

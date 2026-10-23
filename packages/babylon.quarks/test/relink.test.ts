@@ -1,5 +1,6 @@
 import {NullEngine} from '@babylonjs/core/Engines/nullEngine';
 import {Mesh} from '@babylonjs/core/Meshes/mesh';
+import type {TransformNode} from '@babylonjs/core/Meshes/transformNode';
 import {Scene} from '@babylonjs/core/scene';
 import {ConstantValue, EmitSubParticleSystem, PointEmitter, SubParticleEmitMode} from 'quarks.core';
 import {MeshSurfaceEmitter} from '../src/MeshSurfaceEmitter';
@@ -7,6 +8,7 @@ import {quarksNodeId, setQuarksNodeId} from '../src/nodeId';
 import {ParticleEmitter} from '../src/ParticleEmitter';
 import {ParticleSystem} from '../src/ParticleSystem';
 import {QuarksLoader} from '../src/QuarksLoader';
+import {emptyMeta} from './internals';
 
 let engine: NullEngine;
 let scene: Scene;
@@ -21,8 +23,13 @@ afterAll(() => {
     engine.dispose();
 });
 
+/** The parts of a saved effect these tests read. */
+interface SavedEffect {
+    object: {children: Array<{uuid: string; ps: {behaviors: Array<{type: string; subParticleSystem?: string}>}}>};
+}
+
 /** An effect of a parent emitter whose sub emitter targets a second emitter, as a file. */
-function effect(): any {
+function effect(): SavedEffect {
     const child = new ParticleSystem({scene, looping: false, emissionOverTime: new ConstantValue(0)});
     const parent = new ParticleSystem({scene, shape: new PointEmitter(), emissionOverTime: new ConstantValue(5)});
     parent.addBehavior(
@@ -31,8 +38,8 @@ function effect(): any {
     return serialise([parent.emitter as ParticleEmitter, child.emitter as ParticleEmitter]);
 }
 
-function serialise(emitters: ParticleEmitter[]): any {
-    const meta: any = {geometries: {}, materials: {}, textures: {}};
+function serialise(emitters: ParticleEmitter[]): SavedEffect {
+    const meta = emptyMeta();
     const children = emitters.map((emitter) => emitter.toJSON(meta));
     return JSON.parse(
         JSON.stringify({
@@ -45,8 +52,8 @@ function serialise(emitters: ParticleEmitter[]): any {
     );
 }
 
-function emitters(root: any): ParticleEmitter[] {
-    return root.getChildren().filter((node: unknown) => node instanceof ParticleEmitter);
+function emitters(root: TransformNode): ParticleEmitter[] {
+    return root.getChildren().filter((node) => node instanceof ParticleEmitter);
 }
 
 function subEmitterOf(emitter: ParticleEmitter): EmitSubParticleSystem {
@@ -63,15 +70,15 @@ describe('links survive loading and saving again', () => {
         expect(subEmitterOf(parent).subParticleSystem).toBe(child);
 
         const resaved = serialise(emitters(first));
-        const behavior = resaved.object.children[0].ps.behaviors.find((b: any) => b.type === 'EmitSubParticleSystem');
-        expect(behavior.subParticleSystem).toBe(resaved.object.children[1].uuid);
+        const behavior = resaved.object.children[0].ps.behaviors.find((b) => b.type === 'EmitSubParticleSystem');
+        expect(behavior?.subParticleSystem).toBe(resaved.object.children[1].uuid);
 
         const second = new QuarksLoader(scene).parse(resaved);
         const [parent2, child2] = emitters(second);
         expect(subEmitterOf(parent2).subParticleSystem).toBe(child2);
         // The nodes keep their ids across the second save, and so do the links between them.
         const again = serialise(emitters(second));
-        const ids = (doc: any) => doc.object.children.map((node: any) => node.uuid);
+        const ids = (doc: SavedEffect) => doc.object.children.map((node) => node.uuid);
         expect(ids(again)).toEqual(ids(resaved));
         expect(again.object.children[0].ps.behaviors).toEqual(resaved.object.children[0].ps.behaviors);
         first.dispose();

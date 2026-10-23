@@ -24,6 +24,7 @@ import trailVertGLSL from '../src/shaders/trail_vert.glsl';
 import trailVertWGSL from '../src/shaders/trail_vert.wgsl';
 import {decodeSoftDepth, depthBinding, SoftDepthEncoding, softDepthParams} from '../src/softDepth';
 import {RenderMode} from '../src/VFXBatch';
+import {forceSet} from './internals';
 
 let engine: NullEngine;
 let scene: Scene;
@@ -100,7 +101,7 @@ describe('the soft-particle depth decode', () => {
     test.each(setups.map((setup) => [JSON.stringify(setup), setup] as const))(
         'gives back the view depth Babylon wrote, %s',
         (_name, {encoding, ortho, halfZ, reverse, rightHanded, maxZ}) => {
-            (engine as any).isNDCHalfZRange = halfZ;
+            forceSet(engine, 'isNDCHalfZRange', halfZ);
             engine.useReverseDepthBuffer = reverse;
             scene.useRightHandedSystem = rightHanded;
             const camera = new FreeCamera('camera', new Vector3(0, 0, 0), scene);
@@ -132,7 +133,7 @@ describe('the soft-particle depth decode', () => {
     });
 
     test('with a reverse depth buffer, a depth renderer cleared to 0 reads as far', () => {
-        (engine as any).isNDCHalfZRange = true;
+        forceSet(engine, 'isNDCHalfZRange', true);
         engine.useReverseDepthBuffer = true;
         const camera = new FreeCamera('camera', new Vector3(0, 0, 0), scene);
         camera.minZ = 0.5;
@@ -213,8 +214,8 @@ function softSystem(overrides: Partial<ParticleSystemParameters> = {}): Particle
 }
 
 const materialOf = (renderer: BatchedRenderer) => renderer.batches[0].mesh.material as ShaderMaterial;
-const definesOf = (renderer: BatchedRenderer) => (materialOf(renderer) as any).options.defines as string[];
-const depthTextureOf = (renderer: BatchedRenderer) => (materialOf(renderer) as any)._textures.depthTexture;
+const definesOf = (renderer: BatchedRenderer) => materialOf(renderer).options.defines!;
+const depthTextureOf = (renderer: BatchedRenderer) => materialOf(renderer)['_textures'].depthTexture;
 
 describe('soft particles and the depth texture', () => {
     test('draw hard until there is a depth texture, and soft once it is set', () => {

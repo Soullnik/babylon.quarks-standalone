@@ -16,6 +16,7 @@ import {BatchedRenderer} from '../src/BatchedRenderer';
 import {ParticleSystem} from '../src/ParticleSystem';
 import {SpriteBatch} from '../src/SpriteBatch';
 import {RenderMode} from '../src/VFXBatch';
+import {emptyMeta} from './internals';
 
 describe('billboard pivot and flip', () => {
     let engine: NullEngine;
@@ -47,7 +48,7 @@ describe('billboard pivot and flip', () => {
         });
 
     const roundTrip = (ps: ParticleSystem) => {
-        const meta: any = {textures: {}, materials: {}, geometries: {}};
+        const meta = emptyMeta();
         const json = ps.toJSON(meta);
         return {json, restored: ParticleSystem.fromJSON(json, meta, {}, scene)};
     };
@@ -119,7 +120,7 @@ describe('billboard pivot and flip', () => {
             const mat = material(renderer);
             expect(mat.options.defines).toContain('PIVOT');
             expect(mat.options.uniforms).toContain('pivot');
-            const pivot = (mat as any)._vectors3.pivot;
+            const pivot = mat['_vectors3'].pivot;
             expect([pivot.x, pivot.y, pivot.z]).toEqual([0.5, 0.25, 1]);
             renderer.dispose();
             ps.dispose();
@@ -158,7 +159,7 @@ describe('billboard pivot and flip', () => {
         const renderer = new BatchedRenderer('flip', scene);
         renderer.addSystem(ps);
         for (let i = 0; i < 10; i++) renderer.update(1 / 60);
-        const sizes = Array.from((renderer.batches[0] as any).sizeBuffer as Float32Array).slice(0, ps.particleNum * 3);
+        const sizes = Array.from((renderer.batches[0] as SpriteBatch)['sizeBuffer']).slice(0, ps.particleNum * 3);
         renderer.dispose();
         return sizes;
     };

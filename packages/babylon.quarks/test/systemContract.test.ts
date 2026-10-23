@@ -28,9 +28,11 @@ import {
     Vector3Function,
     Vector4,
 } from 'quarks.core';
+import {ParticleEmitter} from '../src/ParticleEmitter';
 import {ParticleSystem, ParticleSystemParameters} from '../src/ParticleSystem';
 import {QuarksLoader} from '../src/QuarksLoader';
 import {RenderMode} from '../src/VFXBatch';
+import {emptyMeta} from './internals';
 
 let engine: NullEngine;
 let scene: Scene;
@@ -267,7 +269,7 @@ const settingObjects = (ps: ParticleSystem) =>
         ps.tint,
     ]);
 
-const newMeta = () => ({geometries: {}, materials: {}, textures: {}}) as never;
+const newMeta = emptyMeta;
 
 describe('ParticleSystem serialisation contract', () => {
     describe.each(VARIANTS)('%s', (_name, overrides) => {
@@ -298,12 +300,12 @@ describe('ParticleSystem serialisation contract', () => {
 
         it('loads through QuarksLoader with the same settings', () => {
             const original = make();
-            const meta: any = newMeta();
+            const meta = newMeta();
             const systemJSON = original.toJSON(meta);
             const images: unknown[] = [];
             const textures: unknown[] = [];
-            for (const [uuid, tex] of Object.entries(meta.textures as Record<string, Texture>)) {
-                images.push({uuid: `img-${uuid}`, url: tex.url});
+            for (const [uuid, tex] of Object.entries(meta.textures)) {
+                images.push({uuid: `img-${uuid}`, url: tex instanceof Texture ? tex.url : undefined});
                 textures.push({uuid, image: `img-${uuid}`});
             }
             const document = JSON.parse(
@@ -316,7 +318,7 @@ describe('ParticleSystem serialisation contract', () => {
                 })
             );
             const root = new QuarksLoader(scene).parse(document);
-            const loaded = (root as unknown as {system: ParticleSystem}).system;
+            const loaded = (root as ParticleEmitter).system as ParticleSystem;
             expect(loaded).toBeInstanceOf(ParticleSystem);
             // A loaded texture gets its name from the loader; its url says which image it is.
             const strip = (s: Record<string, unknown>) =>

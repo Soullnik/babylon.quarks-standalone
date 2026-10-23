@@ -27,13 +27,13 @@ beforeEach(() => {
     warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
     images = new Map();
     const create = engine.createTexture.bind(engine);
-    jest.spyOn(engine, 'createTexture').mockImplementation(((...args: any[]) => {
+    jest.spyOn(engine, 'createTexture').mockImplementation((...args: Parameters<typeof create>) => {
         const [url, , , , , onLoad, onError] = args;
         args[5] = null;
         args[6] = null;
-        const internal = create(...(args as Parameters<typeof create>));
+        const internal = create(...args);
         internal.isReady = false;
-        images.set(url, {
+        images.set(url ?? '', {
             load: () => {
                 internal.isReady = true;
                 onLoad?.(internal);
@@ -41,7 +41,7 @@ beforeEach(() => {
             fail: (error) => onError?.('could not load', error),
         });
         return internal;
-    }) as never);
+    });
 });
 
 afterEach(() => {

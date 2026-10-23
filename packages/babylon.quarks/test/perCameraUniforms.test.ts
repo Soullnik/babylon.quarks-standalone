@@ -92,7 +92,7 @@ describe('per-camera uniforms reach the effect of the draw they are for', () => 
         } as never);
         expect(() => bind(material)).not.toThrow();
         expect(setVector3).not.toHaveBeenCalled();
-        expect((material as any)._vectors3.eyePosition.asArray()).toEqual([1, 2, 3]);
+        expect(material['_vectors3'].eyePosition.asArray()).toEqual([1, 2, 3]);
     });
 
     test('the eye position of each camera, in its own draw', () => {
@@ -110,7 +110,7 @@ describe('per-camera uniforms reach the effect of the draw they are for', () => 
         bind(material);
         expect(written.eyePosition).toEqual([-4, 5, -6]);
         // Stored for the next bind too.
-        expect((material as any)._vectors3.eyePosition.asArray()).toEqual([-4, 5, -6]);
+        expect(material['_vectors3'].eyePosition.asArray()).toEqual([-4, 5, -6]);
     });
 
     test('the depth decode for the clip planes of each camera, for soft particles', () => {

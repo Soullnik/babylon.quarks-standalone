@@ -2,16 +2,19 @@ import {NullEngine} from '@babylonjs/core/Engines/nullEngine';
 import {Vector3 as BVector3} from '@babylonjs/core/Maths/math.vector';
 import {Scene} from '@babylonjs/core/scene';
 import {
+    Bezier,
     ConeEmitter,
     ConstantColor,
     ConstantValue,
     EmitSubParticleSystem,
     ForceOverLife,
     LimitSpeedOverLife,
+    PiecewiseBezier,
     SubParticleEmitMode,
     Vector4,
 } from 'quarks.core';
 import {ParticleSystem, ScalingMode} from '../src/ParticleSystem';
+import {emptyMeta} from './internals';
 
 let engine: NullEngine;
 let scene: Scene;
@@ -68,7 +71,7 @@ describe('scaling mode', () => {
             const ps = system(mode, 0.5);
             ps.startSpeed = new ConstantValue(0);
             ps.addBehavior(new ForceOverLife(new ConstantValue(0), new ConstantValue(-10), new ConstantValue(0)));
-            ps.addBehavior(new LimitSpeedOverLife(new ConstantValue(3) as any, 1));
+            ps.addBehavior(new LimitSpeedOverLife(new PiecewiseBezier([[new Bezier(3, 3, 3, 3), 0]]), 1));
             for (let i = 0; i < 120; i++) ps.update(1 / 60);
             return speedOf(ps);
         };
@@ -89,7 +92,7 @@ describe('scaling mode', () => {
 
     it('round-trips through JSON and clone, written only when not the default', () => {
         const ps = system('hierarchy', 1);
-        const meta = {geometries: {}, materials: {}, textures: {}} as any;
+        const meta = emptyMeta();
         const json = ps.toJSON(meta);
         expect(json.scalingMode).toBe('hierarchy');
         expect(ParticleSystem.fromJSON(json, meta, {}, scene).scalingMode).toBe('hierarchy');

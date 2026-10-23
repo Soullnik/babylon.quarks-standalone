@@ -6,6 +6,7 @@ import {BatchedRenderer} from '../src/BatchedRenderer';
 import {ParticleSystem} from '../src/ParticleSystem';
 import {TrailBatch} from '../src/TrailBatch';
 import {RenderMode} from '../src/VFXBatch';
+import {forceSet} from './internals';
 
 describe('BatchedRenderer', () => {
     let engine: NullEngine;
@@ -68,8 +69,8 @@ describe('BatchedRenderer', () => {
         renderer.addSystem(a);
         renderer.addSystem(b);
 
-        const qualitySpyA = jest.spyOn(a as any, 'setQualityFactor');
-        const qualitySpyB = jest.spyOn(b as any, 'setQualityFactor');
+        const qualitySpyA = jest.spyOn(a, 'setQualityFactor');
+        const qualitySpyB = jest.spyOn(b, 'setQualityFactor');
         renderer.configureAdaptivePerformance({
             targetFrameMs: 0.1,
             minQuality: 0.4,
@@ -123,7 +124,7 @@ describe('BatchedRenderer', () => {
     it('throws for unsupported render mode when adding a system', () => {
         const renderer = new BatchedRenderer('batcher-bad-mode', scene);
         const system = createSystem();
-        (system as any).rendererSettings.renderMode = 99;
+        forceSet(system['rendererSettings'], 'renderMode', 99);
         expect(() => renderer.addSystem(system)).toThrow(/Unsupported render mode/);
         renderer.dispose();
         system.dispose();
@@ -145,7 +146,7 @@ describe('BatchedRenderer', () => {
             decreaseStep: 0.1,
             increaseStep: 0.05,
         });
-        (renderer as any).adaptivePerformanceState.currentQuality = 0.5;
+        renderer['adaptivePerformanceState'].currentQuality = 0.5;
         renderer.update(1 / 60);
         expect(renderer.getAdaptivePerformanceState().currentQuality).toBeGreaterThan(0.5);
         nowSpy.mockRestore();
@@ -171,10 +172,10 @@ describe('BatchedRenderer', () => {
         const system = createSystem();
         renderer.addSystem(system);
         renderer.configureAdaptivePerformance({targetFrameMs: 500, minQuality: 1, maxQuality: 1});
-        const spy = jest.spyOn(system as any, 'setQualityFactor');
+        const spy = jest.spyOn(system, 'setQualityFactor');
         renderer.update(1 / 60);
         spy.mockClear();
-        (renderer as any).lastAppliedQuality = (renderer as any).adaptivePerformanceState.currentQuality;
+        renderer['lastAppliedQuality'] = renderer['adaptivePerformanceState'].currentQuality;
         renderer.update(1 / 60);
         expect(spy).not.toHaveBeenCalled();
         spy.mockRestore();

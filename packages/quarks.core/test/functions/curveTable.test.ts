@@ -105,9 +105,9 @@ describe('sampled curve tables', () => {
     it('reuses the table when nothing changed', () => {
         const curve = new PiecewiseBezier([[new Bezier(0, 0.3, 0.7, 1), 0]]);
         curve.refreshTable();
-        const first = (curve as any).table;
+        const first = curve['table'];
         curve.refreshTable();
-        expect((curve as any).table).toBe(first);
+        expect(curve['table']).toBe(first);
     });
 
     // 0.2, 0.3, 0.7 have no exact float32 form. A signature kept in a Float32Array rounded them,
