@@ -29,9 +29,15 @@ export function emptyMeta(): BabylonMetaData {
     return {textures: {}, materials: {}, geometries: {}};
 }
 
-/** The texture a material entry's slot names: by uuid in `meta`, or the texture itself. */
+/**
+ * The texture a written material entry's slot names by uuid in `meta`; fails the test when the
+ * slot holds anything but a uuid, as a written entry must.
+ */
 export function textureOf(meta: BabylonMetaData, ref: MaterialTextureRef | undefined): BaseTexture | null | undefined {
-    return typeof ref === 'string' ? meta.textures[ref] : ref;
+    if (typeof ref !== 'string') {
+        throw new Error(`expected a texture uuid, got ${String(ref)}`);
+    }
+    return meta.textures[ref];
 }
 
 /** Runs what a material does when it binds for a draw, as a render would. */

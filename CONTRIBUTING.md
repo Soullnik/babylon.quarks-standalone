@@ -99,7 +99,7 @@ quotes; Markdown lists indent 2 spaces, and code blocks in Markdown are left as 
 hook rules for the editor) and is part of `npm run check` and CI. It allows no warnings, and an
 explicit `any` is an error: JSON from a file is `unknown` and narrowed as it is read, and a test
 reaches a private member with `obj['member']` (or the helpers in `test/internals.ts`) instead of a
-cast. An `eslint-disable` comment names its rule and says why. The three packages and the examples
+cast where it can. An `eslint-disable` comment names its rule and says why. The three packages and the examples
 compile with `strict: true`.
 
 Everything `babylon.quarks` exports carries TSDoc, the simulation core it re-exports from

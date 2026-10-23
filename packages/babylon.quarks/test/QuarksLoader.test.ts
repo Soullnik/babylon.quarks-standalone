@@ -373,7 +373,7 @@ describe('QuarksLoader matrix decomposition', () => {
         const loader = new QuarksLoader(scene);
         const fetchSpy = jest
             .spyOn(global, 'fetch')
-            .mockResolvedValue(jsonResponse({object: {uuid: 'root', type: 'Group', children: []}}));
+            .mockImplementation(async () => jsonResponse({object: {uuid: 'root', type: 'Group', children: []}}));
 
         const root = await loader.load('https://example.com/assets/effect.json');
         expect(root.name).toBe('Group');

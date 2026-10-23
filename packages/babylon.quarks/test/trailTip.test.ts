@@ -2,8 +2,10 @@ import {NullEngine} from '@babylonjs/core/Engines/nullEngine';
 import {ShaderMaterial} from '@babylonjs/core/Materials/shaderMaterial';
 import {Scene} from '@babylonjs/core/scene';
 import {
+    Bezier,
     ConstantColor,
     ConstantValue,
+    PiecewiseBezier,
     PointEmitter,
     TrailParticle,
     TrailSettings,
@@ -224,7 +226,7 @@ describe('the live tip of a trail', () => {
 
     test('is as wide as the head under WidthOverLength', () => {
         const {system, renderer, particle} = trail();
-        system.addBehavior(new WidthOverLength(new ConstantValue(0.2) as never));
+        system.addBehavior(new WidthOverLength(new PiecewiseBezier([[new Bezier(0.2, 0.2, 0.2, 0.2), 0]])));
         frameWithResidual(system, renderer, false);
         const count = particle.historyCount;
         const widths = buffers(renderer).widthBuffer;

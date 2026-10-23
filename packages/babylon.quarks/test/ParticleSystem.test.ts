@@ -367,9 +367,10 @@ describe('ParticleSystem', () => {
         ps.emit(0, ps.emissionState, ps.emitter.matrixWorld);
         expect(ps.particleNum).toBe(1);
 
-        const particle = ps.particles[0];
-        expect(particle).toHaveProperty('localPosition');
-        expect(particle).toHaveProperty('parentMatrix');
+        const particle = ps.particles[0] as TrailParticle;
+        expect(particle).toBeInstanceOf(TrailParticle);
+        expect(particle.localPosition).toBeDefined();
+        expect(particle.parentMatrix).toBeDefined();
 
         ps.update(1 / 60);
         expect(particle.position.x).toBeCloseTo(3, 5);

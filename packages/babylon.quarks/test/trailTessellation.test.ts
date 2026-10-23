@@ -207,7 +207,8 @@ describe('trail tessellation', () => {
         expect(copy.rendererEmitterSettings).toMatchObject({tessellation: 5, curveTension: 0.25});
         expect(system.clone().rendererEmitterSettings).toMatchObject({tessellation: 5, curveTension: 0.25});
 
-        const plain = circling().system.toJSON().rendererEmitterSettings ?? {};
+        const plain = circling().system.toJSON().rendererEmitterSettings!;
+        expect(plain).toBeDefined();
         expect('tessellation' in plain).toBe(false);
         expect('curveTension' in plain).toBe(false);
     });
