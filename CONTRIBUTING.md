@@ -48,7 +48,7 @@ npm run test                                   # jest suites: quarks.core, babyl
 npm run typecheck                              # tsc over sources and tests (jest only transpiles them)
 npm run test:coverage                          # the same suites with the coverage gate (what CI runs)
 npm run docs                                   # TypeDoc API docs
-npm run docs:check                             # fails on an exported symbol without TSDoc (CI runs it)
+npm run docs:check                             # renders the API docs; fails on a missing TSDoc or broken {@link} (CI runs it)
 npm run check:demos                            # every demo in headless Chromium, fails on page/console errors or a missing gallery preview
 npm run validate:shaders                       # every shader variant, GLSL and WGSL, through a real compiler (CI runs it)
 ```

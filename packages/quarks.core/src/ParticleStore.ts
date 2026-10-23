@@ -211,7 +211,7 @@ export class ParticleStore {
 
     /**
      * Mirrors a freshly spawned particle's generator memory into the
-     * {@link memory} column, widening the column when this spawn used more
+     * {@link ParticleStore.memory | memory} column, widening the column when this spawn used more
      * slots than any before it.
      */
     recordMemory(row: number, memory: ReadonlyArray<unknown>): void {
