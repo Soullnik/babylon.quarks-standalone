@@ -13,6 +13,7 @@ import {
     type ParticleSystemParameters,
     PiecewiseBezier,
     RandomColor,
+    RandomQuatGenerator,
     RenderMode,
     SizeOverLife,
     SphereEmitter,
@@ -22,7 +23,7 @@ import {createSharedTexture} from '../shared/common';
 import type {DemoContext} from '../types';
 
 /**
- * Four pairs of systems, each pair the same effect with one renderer option
+ * Five pairs of systems, each pair the same effect with one renderer option
  * off on the left and on on the right. Read left to right:
  *
  * 1. `sortMode`: overlapping alpha-blended discs drawn in emission order, then
@@ -34,11 +35,14 @@ import type {DemoContext} from '../types';
  *    clamped on screen to between 2% and 6% of the viewport height.
  * 4. `scalingMode`: an emitter under a parent scaled 3×. In `'shape'` mode
  *    only the shape grows; in `'hierarchy'` mode the particles grow with it.
+ * 5. `renderFace`: open bowls tumbling as mesh particles. With `'both'` their
+ *    inside shows through the opening; with `'front'` the back faces are
+ *    culled and the inside disappears, as with Unity's Render Face: Front.
  */
 export function init({scene, camera, batchRenderer, systems}: DemoContext) {
-    camera.setPosition(new BVector3(0, 6, 26));
+    camera.setPosition(new BVector3(1.5, 6, 30));
     const texture = createSharedTexture(scene);
-    const columnX = (pair: number, side: 0 | 1) => -10.5 + pair * 6 + side * 3;
+    const columnX = (pair: number, side: 0 | 1) => -13.5 + pair * 6 + side * 3;
 
     const add = (parameters: ParticleSystemParameters, x: number, parent?: TransformNode) => {
         const system = new ParticleSystem(parameters);
@@ -167,4 +171,32 @@ export function init({scene, camera, batchRenderer, systems}: DemoContext) {
         const system = add(fountain(side === 1 ? 'hierarchy' : 'shape'), 0, parent);
         system.addBehavior(new SizeOverLife(new PiecewiseBezier([[new Bezier(1, 1, 0.6, 0), 0]])));
     }
+
+    // 5. Render face: an open hemisphere, its inside visible through the opening unless culled.
+    const bowl = MeshBuilder.CreateSphere('bowl', {diameter: 1, segments: 12, slice: 0.5}, scene);
+    bowl.isVisible = false;
+    bowl.setEnabled(false);
+    const bowls = (renderFace: ParticleSystemParameters['renderFace']): ParticleSystemParameters => ({
+        scene,
+        duration: 2,
+        looping: true,
+        startLife: new ConstantValue(3),
+        startSpeed: new ConstantValue(0.4),
+        startSize: new ConstantValue(1.2),
+        startRotation: new RandomQuatGenerator(),
+        startColor: new RandomColor(new Vector4(1, 0.6, 0.3, 1), new Vector4(0.4, 0.8, 1, 1)),
+        worldSpace: false,
+        emissionOverTime: new ConstantValue(3),
+        shape: new SphereEmitter({radius: 1, thickness: 1, arc: Math.PI * 2}),
+        texture,
+        transparent: false,
+        renderMode: RenderMode.Mesh,
+        instancingGeometry: new Float32Array(bowl.getVerticesData(VertexBuffer.PositionKind)!),
+        instancingNormals: new Float32Array(bowl.getVerticesData(VertexBuffer.NormalKind)!),
+        instancingUVs: new Float32Array(bowl.getVerticesData(VertexBuffer.UVKind)!),
+        instancingIndices: new Uint32Array(bowl.getIndices()!),
+        renderFace,
+    });
+    add(bowls('both'), columnX(4, 0));
+    add(bowls('front'), columnX(4, 1));
 }

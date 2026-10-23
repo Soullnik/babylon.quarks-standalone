@@ -121,7 +121,7 @@ export class TrailBatch extends VFXBatch {
         // For a trail batch `maxParticles` counts vertices, two per drawn point: the buffers are
         // the largest per-batch allocation in the library, so start small and let expandBuffers
         // grow to whatever the batch actually needs.
-        this.maxParticles = 1024;
+        this.maxParticles = this.initialCapacity;
         this.setupBuffers();
         this.rebuildMaterial();
     }

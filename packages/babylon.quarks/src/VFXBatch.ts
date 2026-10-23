@@ -35,6 +35,10 @@ export type SortMode = 'none' | 'distance' | 'oldestInFront' | 'youngestInFront'
  * mesh shows with back-face culling on, the outside of a box or sphere. It applies to the Mesh
  * render mode only: billboards, stretched billboards, beams and trails are flat sheets whose
  * winding follows the camera or the particle's path, so they always draw both faces.
+ *
+ * The culling is set once for the whole batch. A mesh particle mirrored by a negative size on an
+ * odd number of axes turns its winding inside out, so `'front'` then shows its inside and
+ * `'back'` its outside.
  */
 export type RenderFace = 'both' | 'front' | 'back';
 
@@ -582,7 +586,7 @@ export abstract class VFXBatch {
     protected constructor(settings: VFXBatchSettings, scene: Scene, depth: DepthBinding | null = null) {
         this.scene = scene;
         this.depth = depth;
-        this.maxParticles = 1000;
+        this.maxParticles = 0;
         this.systems = new Set<IParticleSystem>();
         this.settings = storedBatchSettings(settings);
         // The subclass builds the mesh, in setupBuffers.
@@ -596,8 +600,6 @@ export abstract class VFXBatch {
     attachTo(node: Node | null): void {
         this.parentNode = node;
         this.mesh.parent = node;
-        // A new parent marks the mesh dirty, which would let its transform in once.
-        this.mesh.freezeWorldMatrix(Matrix.Identity());
     }
 
     /**
@@ -618,8 +620,12 @@ export abstract class VFXBatch {
         mesh.alwaysSelectAsActiveMesh = true;
         mesh.doNotSyncBoundingInfo = true;
         mesh.parent = this.parentNode;
-        // World-space instance data: the parent's transform must not apply, nor the bounds move with it.
+        // World-space instance data: the parent's transform must not apply, nor the bounds move
+        // with it. Frozen at identity, and kept there: a parent's markAsDirty would otherwise make
+        // the frozen mesh recompute from its parents once.
         mesh.freezeWorldMatrix(Matrix.Identity());
+        const world = mesh.getWorldMatrix();
+        mesh.computeWorldMatrix = () => world;
         mesh.setBoundingInfo(new BoundingInfo(BVector3.Zero(), BVector3.Zero()));
         mesh.layerMask = this.settings.layerMask;
         mesh.renderingGroupId = this.settings.renderingGroupId;

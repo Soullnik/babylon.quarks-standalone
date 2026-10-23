@@ -67,7 +67,7 @@ export class SpriteBatch extends VFXBatch {
     constructor(settings: VFXBatchSettings, scene: Scene, depth: DepthBinding | null = null) {
         super(settings, scene, depth);
         this.storeFixedLighting(defaultMeshLighting());
-        this.maxParticles = 1000;
+        this.maxParticles = this.initialCapacity;
         this.setupBuffers();
         this.rebuildMaterial();
     }

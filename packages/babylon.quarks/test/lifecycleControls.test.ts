@@ -1,3 +1,4 @@
+import {TransformNode} from '@babylonjs/core/Meshes/transformNode';
 import {NullEngine} from '@babylonjs/core/Engines/nullEngine';
 import {Scene} from '@babylonjs/core/scene';
 import {ConstantColor, ConstantValue, IntervalValue, PointEmitter, Vector4} from 'quarks.core';
@@ -299,6 +300,14 @@ describe('a system belongs to one renderer', () => {
         renderer.computeWorldMatrix(true);
         renderer.update(STEP);
         expect(mesh.computeWorldMatrix(true).isIdentity()).toBe(true);
+        // An explicit markAsDirty from a parent reaches the batch mesh too, and still moves nothing.
+        const holder = new TransformNode('holder', scene);
+        renderer.parent = holder;
+        holder.computeWorldMatrix(true);
+        holder.position.x = 5;
+        holder.markAsDirty('position');
+        expect(mesh.computeWorldMatrix().isIdentity()).toBe(true);
+        expect(mesh.getWorldMatrix().isIdentity()).toBe(true);
         renderer.setEnabled(false);
         expect(mesh.isEnabled()).toBe(false);
         renderer.dispose();
