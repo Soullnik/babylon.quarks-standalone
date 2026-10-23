@@ -26,12 +26,13 @@ import {TurbulenceField} from './TurbulenceField';
 import {VelocityOverLife} from './VelocityOverLife';
 import {WidthOverLength} from './WidthOverLength';
 
-/** The JSON of a behavior: `type` names it, the other fields are its settings. */
+/**
+ * The JSON of a behavior: `type` names it, the other fields are its settings. Each behavior's own
+ * JSON interface adds its fields; a plugin's behavior may declare its own interface with a `type`.
+ */
 export interface BehaviorJSON {
     /** The behavior's type, a key of {@link BehaviorTypes}. */
     type: string;
-    /** The behavior's settings, under the names of its fields. */
-    [field: string]: any;
 }
 
 /**

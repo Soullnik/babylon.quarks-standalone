@@ -1,6 +1,6 @@
 /** A class whose instances are `T`. */
 export interface Constructable<T> {
-    new (...args: any): T;
+    new (...args: never[]): T;
 }
 
 /**

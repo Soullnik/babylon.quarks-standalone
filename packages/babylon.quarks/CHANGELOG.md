@@ -108,6 +108,34 @@ and the project follows the `quarks.core` 0.x version line.
   say which cameras are tested, and that one rendering into a render target texture is not.
 - A `VFXBatch` subclass implements `resizeBuffers()` and `initialCapacity`, which the shrinking
   instance buffers call, and creates `mesh` in `setupBuffers`; the base class no longer makes one.
+- **quarks.core's JSON and data types have no `any` left.** What changes for code that
+  compiles against them:
+  - `FunctionJSON` is the union of each generator's JSON (`ConstantValueJSON`, `GradientJSON`,
+    `EulerJSON` and the rest, grouped as `ValueGeneratorJSON`, `ColorGeneratorJSON`,
+    `RotationGeneratorJSON` and `Vector3GeneratorJSON`), with `type` as the tag. It was an open
+    record of `any`. Each generator's `toJSON` and `fromJSON` use its own type, and the
+    `…GeneratorFromJSON` readers take their group's. A generator class of your own that
+    implements `ValueGenerator` or a sibling interface writes one of these, or casts its `toJSON`;
+    no reader would know its type anyway.
+  - `BehaviorJSON` is `{type: string}`, no longer an open record, and every built-in behavior has its
+    own JSON type (`ColorOverLifeJSON`, `EmitSubParticleSystemJSON`, …) for its `toJSON` and
+    `fromJSON`. A plugin's `loadJSON` may take its own JSON interface with a `type`, as
+    `examples/src/demos/customPlugin.ts` does. An object literal passed to `BehaviorFromJSON` is
+    typed as its behavior's JSON, e.g. `const json: NoiseJSON = {type: 'Noise', …}`.
+  - `GeneratorMemory` is `number[]`. `ContinuousLinearFunction`'s values are `number`, `Vector3` or
+    `Vector4`, its `subType` follows from them, and its `fromJSON` returns the matching type for
+    the `subType`. `GradientJSON`'s `color` and `alpha` say their `subType`.
+  - `IEmitter.matrixWorld` is a `Matrix4`; `IParticleSystem.toJSON` and `IAnimationData.target` are
+    `unknown`, which a renderer narrows; `Constructable` takes `never[]` arguments.
+  - `EmitSubParticleSystem.subParticleSystem` is declared `IEmitter | string | undefined`: a loaded
+    behavior holds the uuid until the loader links it, as it always has.
+  - `Sequencer.toJSON` returns `SequencerJSON`; `Euler.fromArray` and `toArray` take numbers and an
+    order.
+  - In babylon.quarks, `ParticleSystemJSONParameters.rendererEmitterSettings` is the new
+    `RendererEmitterSettingsJSON`: a trail's `TrailSettingsJSON` or a stretched billboard's
+    settings.
+  - The `isVector3`-style flags are set on the prototypes as non-enumerable, read-only properties,
+    so they no longer show up in a `for…in` over a vector.
 
 ### Deprecated
 
@@ -171,6 +199,15 @@ and the project follows the `quarks.core` 0.x version line.
 
 ### Fixed
 
+- `ApplySequences` keeps each particle's place in a `WeakMap` instead of fields added to the
+  particle, reuses that state when a pooled particle is emitted again instead of allocating two
+  vectors, and moves a particle straight to its point when a sequence's range has no length (it
+  divided by zero).
+- An `EmitSubParticleSystem` read from a file without `useVelocityAsBasis` saves without it, as a
+  default, instead of writing `false`.
+- `PiecewiseBezier.toSVG` draws the curve itself, not its sampled table.
+- A `Gradient` read from JSON without its `color` or `alpha` keys warns, and keeps the default for
+  the missing part.
 - The fragment's `alpha < 0.01` discard is right in every blend mode: under one-one or
   premultiplied blending a discarded fragment used to be one that would still have drawn.
 - Erosion and a mesh's rim fade no longer show a hard cut under one-one and premultiplied

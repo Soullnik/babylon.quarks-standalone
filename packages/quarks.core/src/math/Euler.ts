@@ -278,7 +278,7 @@ class Euler {
      * Reads x, y, z and, when present, the order from `array[0..3]`.
      * @returns This Euler.
      */
-    fromArray(array: any[]) {
+    fromArray(array: [number, number, number, EulerOrder?]) {
         this._x = array[0];
         this._y = array[1];
         this._z = array[2];
@@ -293,7 +293,7 @@ class Euler {
      * Writes x, y, z and the order into `array` starting at `offset`.
      * @returns The array, a new one when none is given.
      */
-    toArray(array: any[] = [], offset = 0) {
+    toArray(array: Array<number | EulerOrder> = [], offset = 0) {
         array[offset] = this._x;
         array[offset + 1] = this._y;
         array[offset + 2] = this._z;
@@ -327,6 +327,6 @@ class Euler {
     }
 }
 
-(Euler.prototype as any).isEuler = true;
+Object.defineProperty(Euler.prototype, 'isEuler', {value: true});
 
 export {Euler};

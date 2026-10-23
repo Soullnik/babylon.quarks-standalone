@@ -29,7 +29,7 @@
         "check:smoothness": "tsx ./scripts/smoothness-sweep.mts",
         "format": "prettier --write .",
         "format:check": "prettier --check .",
-        "lint": "eslint . --max-warnings 429"
+        "lint": "eslint . --max-warnings 330"
     },
     "engines": {
         "node": "^22.20.0 || >=24.12.0",

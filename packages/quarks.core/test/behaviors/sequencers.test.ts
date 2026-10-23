@@ -29,8 +29,9 @@ describe('TextureSequencer', () => {
 
 describe('ApplySequences.fromJSON', () => {
     test('skips a sequencer of an unknown type with a warning and keeps the rest', () => {
-        const behavior = BehaviorFromJSON(
-            {
+        // An unknown sequencer type and a missing sequencer, as a hand-edited file may hold them.
+        const json = JSON.parse(
+            JSON.stringify({
                 type: 'ApplySequences',
                 delay: 0.1,
                 sequencers: [
@@ -47,9 +48,9 @@ describe('ApplySequences.fromJSON', () => {
                     },
                     {range: {type: 'IntervalValue', a: 2, b: 3}},
                 ],
-            },
-            {} as never
-        ) as ApplySequences;
+            })
+        );
+        const behavior = BehaviorFromJSON(json, {} as never) as ApplySequences;
         expect(behavior.sequencers).toHaveLength(1);
         expect(behavior.sequencers[0][1]).toBeInstanceOf(TextureSequencer);
         expect(warn).toHaveBeenCalledWith(expect.stringContaining('"Bogus"'));

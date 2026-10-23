@@ -149,4 +149,16 @@ describe('Gradient', () => {
             expect(Number.isFinite(color.w)).toBe(true);
         }
     });
+
+    test('.fromJSON warns about missing keys and keeps the defaults', () => {
+        const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+        const gradient = Gradient.fromJSON({type: 'Gradient'});
+        expect(warn).toHaveBeenCalledTimes(2);
+        expect(warn.mock.calls[0][0]).toContain('no alpha keys');
+        expect(warn.mock.calls[1][0]).toContain('no color keys');
+        expect(gradient.genColor(memory, new Vector4(), 0.5)).toEqual(
+            new Gradient().genColor(memory, new Vector4(), 0.5)
+        );
+        warn.mockRestore();
+    });
 });

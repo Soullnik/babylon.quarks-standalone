@@ -1,6 +1,6 @@
 import {Particle} from '../Particle';
 import {Vector3} from '../math';
-import {Behavior} from './Behavior';
+import {Behavior, BehaviorJSON} from './Behavior';
 
 /**
  * What {@link ApplyCollision} asks about the world: whether a particle at
@@ -29,6 +29,12 @@ export function setPhysicsResolver(resolver: PhysicsResolver | undefined): void 
 /** The resolver registered with {@link setPhysicsResolver}, or undefined when there is none. */
 export function getPhysicsResolver(): PhysicsResolver | undefined {
     return physicsResolver;
+}
+
+/** The JSON of a collision with the ground plane: a {@link ApplyCollision}. */
+export interface ApplyCollisionJSON extends BehaviorJSON {
+    /** The share of speed kept on a bounce; 1 when absent. */
+    bounce?: number;
 }
 
 /**
@@ -73,7 +79,7 @@ export class ApplyCollision implements Behavior {
 
     frameUpdate(delta: number): void {}
 
-    toJSON(): any {
+    toJSON(): ApplyCollisionJSON {
         return {
             type: this.type,
             bounce: this.bounce,
@@ -83,7 +89,7 @@ export class ApplyCollision implements Behavior {
     /**
      * Reads {@link ApplyCollision.toJSON} output; a field the JSON leaves out takes its default.
      */
-    static fromJSON(json: any): Behavior {
+    static fromJSON(json: ApplyCollisionJSON): Behavior {
         // A file without a bounce keeps the full speed, as a Unity collision does by default.
         return new ApplyCollision(undefined, typeof json.bounce === 'number' ? json.bounce : 1);
     }

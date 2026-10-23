@@ -545,6 +545,6 @@ class Vector2 {
     }
 }
 
-(Vector2.prototype as {isVector2: boolean}).isVector2 = true;
+Object.defineProperty(Vector2.prototype, 'isVector2', {value: true});
 
 export {Vector2};

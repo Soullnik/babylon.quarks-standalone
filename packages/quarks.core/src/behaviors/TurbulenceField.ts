@@ -1,14 +1,29 @@
 import {Particle} from '../Particle';
 import {ParticleStore} from '../ParticleStore';
+import type {Vector3ArrayJSON} from '../functions/FunctionJSON';
 import {Vector3} from '../math';
 import {readVector3} from '../util/JSONUtil';
 import SimplexNoise from '../util/SimplexNoise';
 import {createSeededRandom} from '../util/random';
-import {Behavior} from './Behavior';
+import {Behavior, BehaviorJSON} from './Behavior';
 
 /** Reciprocal of a scale component; a zero scale samples the field at 0 along that axis instead of dividing by it. */
 function inverseOf(scale: number): number {
     return scale === 0 ? 0 : 1 / scale;
+}
+
+/** The JSON of a turbulence field: a {@link TurbulenceField}. */
+export interface TurbulenceFieldJSON extends BehaviorJSON {
+    /** The field's scale. */
+    scale?: Vector3ArrayJSON;
+    /** Noise octaves; 1 when absent. */
+    octaves?: number;
+    /** The velocity it adds, per axis. */
+    velocityMultiplier?: Vector3ArrayJSON;
+    /** How fast it changes, per axis. */
+    timeScale?: Vector3ArrayJSON;
+    /** The noise seed; 0 when absent. */
+    seed?: number;
 }
 
 /**
@@ -147,7 +162,7 @@ export class TurbulenceField implements Behavior {
         }
     }
 
-    toJSON(): any {
+    toJSON(): TurbulenceFieldJSON {
         return {
             type: this.type,
             scale: [this.scale.x, this.scale.y, this.scale.z],
@@ -167,7 +182,7 @@ export class TurbulenceField implements Behavior {
     /**
      * Reads {@link TurbulenceField.toJSON} output; a field the JSON leaves out takes its default.
      */
-    static fromJSON(json: any): Behavior {
+    static fromJSON(json: TurbulenceFieldJSON): Behavior {
         return new TurbulenceField(
             readVector3(json.scale, new Vector3(1, 1, 1)),
             typeof json.octaves === 'number' ? json.octaves : 1,

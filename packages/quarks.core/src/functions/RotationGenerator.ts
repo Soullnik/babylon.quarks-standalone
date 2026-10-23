@@ -2,7 +2,7 @@ import {Quaternion} from '../math';
 import {describePart, warnFormat} from '../util/JSONUtil';
 import {AxisAngleGenerator} from './AxisAngleGenerator';
 import {EulerGenerator} from './EulerGenerator';
-import {FunctionJSON} from './FunctionJSON';
+import type {RotationGeneratorJSON} from './FunctionJSON';
 import {GeneratorMemory} from './GeneratorMemory';
 import {RandomQuatGenerator} from './RandomQuatGenerator';
 
@@ -19,13 +19,13 @@ export interface RotationGenerator {
      */
     genValue(memory: GeneratorMemory, q: Quaternion, delta: number, t: number): Quaternion;
     /** The generator's JSON. */
-    toJSON(): FunctionJSON;
+    toJSON(): RotationGeneratorJSON;
     /** A copy with the same settings. */
     clone(): RotationGenerator;
 }
 
 /** Reads a rotation generator; an unknown or missing type warns and gives a random rotation. */
-export function RotationGeneratorFromJSON(json: FunctionJSON): RotationGenerator {
+export function RotationGeneratorFromJSON(json: RotationGeneratorJSON | undefined): RotationGenerator {
     switch (json?.type) {
         case 'AxisAngle':
             return AxisAngleGenerator.fromJSON(json);

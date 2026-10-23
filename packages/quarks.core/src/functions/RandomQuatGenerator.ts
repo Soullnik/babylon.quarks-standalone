@@ -1,6 +1,6 @@
 import {Quaternion} from '../math';
 import {random} from '../util/random';
-import {FunctionJSON} from './FunctionJSON';
+import type {RandomQuatJSON} from './FunctionJSON';
 import {GeneratorMemory} from './GeneratorMemory';
 import {RotationGenerator} from './RotationGenerator';
 
@@ -57,14 +57,14 @@ export class RandomQuatGenerator implements RotationGenerator {
     }
 
     /** The JSON form, `{type: 'RandomQuat'}`. */
-    toJSON(): FunctionJSON {
+    toJSON(): RandomQuatJSON {
         return {
             type: 'RandomQuat',
         };
     }
 
     /** Reads {@link RandomQuatGenerator.toJSON} output. */
-    static fromJSON(json: FunctionJSON): RotationGenerator {
+    static fromJSON(json: RandomQuatJSON): RotationGenerator {
         return new RandomQuatGenerator();
     }
 

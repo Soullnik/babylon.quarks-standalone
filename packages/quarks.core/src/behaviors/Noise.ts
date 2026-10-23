@@ -1,10 +1,11 @@
+import {ConstantValue, FunctionValueGenerator, ValueGenerator, ValueGeneratorFromJSON} from '../functions';
+import type {ValueGeneratorJSON} from '../functions/FunctionJSON';
+import {Quaternion, Vector3} from '../math';
 import {Particle} from '../Particle';
 import {ParticleStore} from '../ParticleStore';
-import {ConstantValue, FunctionValueGenerator, ValueGenerator, ValueGeneratorFromJSON} from '../functions';
-import {Quaternion, Vector3} from '../math';
 import {randomInt} from '../util/MathUtil';
 import SimplexNoise from '../util/SimplexNoise';
-import {Behavior} from './Behavior';
+import {Behavior, BehaviorJSON} from './Behavior';
 
 const GENERATOR_COUNT = 100;
 const generators: Array<SimplexNoise | undefined> = new Array(GENERATOR_COUNT);
@@ -39,6 +40,22 @@ interface NoiseState {
 
 interface NoisyParticle extends Particle {
     _noiseState?: NoiseState;
+}
+
+/** The JSON of a noise displacement: a {@link Noise}. */
+export interface NoiseJSON extends BehaviorJSON {
+    /** The noise frequency. */
+    frequency: ValueGeneratorJSON;
+    /** The noise strength. */
+    power: ValueGeneratorJSON;
+    /** How much the noise moves particles. */
+    positionAmount?: ValueGeneratorJSON;
+    /** How much the noise turns particles. */
+    rotationAmount?: ValueGeneratorJSON;
+    /** How fast the noise scrolls; 0 when absent. */
+    scrollSpeed?: ValueGeneratorJSON;
+    /** A curve the noise is remapped through. */
+    remap?: ValueGeneratorJSON;
 }
 
 /**
@@ -287,7 +304,7 @@ export class Noise implements Behavior {
         }
     }
 
-    toJSON(): any {
+    toJSON(): NoiseJSON {
         return {
             type: this.type,
             frequency: this.frequency.toJSON(),
@@ -309,7 +326,7 @@ export class Noise implements Behavior {
     }
 
     /** Reads {@link Noise.toJSON} output; a field the JSON leaves out takes its default. */
-    static fromJSON(json: any): Behavior {
+    static fromJSON(json: NoiseJSON): Behavior {
         return new Noise(
             ValueGeneratorFromJSON(json.frequency),
             ValueGeneratorFromJSON(json.power),

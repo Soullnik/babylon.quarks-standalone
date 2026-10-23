@@ -9,10 +9,14 @@ import type {
     FunctionValueGenerator,
     RendererEmitterSettings,
     RotationGenerator,
+    StretchedBillBoardSettings,
     ValueGenerator,
+    ValueGeneratorJSON,
     Vector2,
     Vector3,
+    Vector3ArrayJSON,
     Vector3Generator,
+    Vector3JSON,
 } from 'quarks.core';
 import type {
     MeshLighting,
@@ -25,6 +29,21 @@ import type {
     SortMode,
     TextureUV,
 } from '../VFXBatch';
+import type {TrailOptions} from '../trailSettings';
+
+/** A trail's settings in JSON, each only when not its default: the start length as a generator's JSON, the side axis as `[x, y, z]`. */
+export type TrailSettingsJSON = Partial<TrailOptions> & {
+    /** See `TrailSettings.startLength`. */
+    startLength?: ValueGeneratorJSON;
+    /** See `TrailSettings.sideAxis`; files may hold it as `{x, y, z}`. */
+    sideAxis?: Vector3ArrayJSON | Vector3JSON;
+};
+
+/**
+ * A render mode's own settings in JSON, see {@link RendererEmitterSettings}: a trail's or a
+ * stretched billboard's. The other render modes have none, and their systems leave the field out.
+ */
+export type RendererEmitterSettingsJSON = TrailSettingsJSON | StretchedBillBoardSettings;
 
 /**
  * One burst of a system's emission (Unity's Emission Bursts): `count` particles at `time` seconds
@@ -324,7 +343,7 @@ export interface ParticleSystemJSONParameters {
      * Trail, stretched or mesh settings; a trail's `startLength` as `FunctionJSON`. Left out when
      * the render mode has none.
      */
-    rendererEmitterSettings?: RendererEmitterSettings;
+    rendererEmitterSettings?: RendererEmitterSettingsJSON;
     /** Uuid of the mesh particles' geometry entry. */
     instancingGeometry?: any;
     /** A {@link RenderMode} value. */

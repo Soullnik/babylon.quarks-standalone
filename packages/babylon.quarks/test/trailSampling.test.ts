@@ -539,13 +539,12 @@ describe('trail settings in JSON, clones and the loader', () => {
     it('drop a side axis that is not a direction, with a warning', () => {
         const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
         const json = trailSystem().toJSON(META());
-        const load = (sideAxis: unknown) =>
-            ParticleSystem.fromJSON(
-                {...json, rendererEmitterSettings: {...json.rendererEmitterSettings, sideAxis}},
-                META(),
-                {},
-                scene
-            );
+        // A hand-edited file can hold anything as the axis.
+        const load = (sideAxis: unknown) => {
+            const rendererEmitterSettings = {...json.rendererEmitterSettings};
+            Reflect.set(rendererEmitterSettings, 'sideAxis', sideAxis);
+            return ParticleSystem.fromJSON({...json, rendererEmitterSettings}, META(), {}, scene);
+        };
         for (const bad of [[0, 0, 0], {x: 'a'}, [1, NaN, 0], 'up', [1]]) {
             const loaded = load(bad);
             expect((loaded.rendererEmitterSettings as TrailSettings).sideAxis).toBeUndefined();

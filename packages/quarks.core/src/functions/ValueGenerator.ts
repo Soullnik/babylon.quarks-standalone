@@ -1,6 +1,6 @@
 import {describePart, warnFormat} from '../util/JSONUtil';
 import {ConstantValue} from './ConstantValue';
-import {FunctionJSON} from './FunctionJSON';
+import type {ValueGeneratorJSON} from './FunctionJSON';
 import {GeneratorMemory} from './GeneratorMemory';
 import {IntervalValue} from './IntervalValue';
 import {PiecewiseBezier} from './PiecewiseBezier';
@@ -23,7 +23,7 @@ export interface ValueGenerator {
     /** See FunctionValueGenerator.refreshTable. */
     refreshTable?(): void;
     /** The generator's JSON. */
-    toJSON(): FunctionJSON;
+    toJSON(): ValueGeneratorJSON;
     /** A copy with the same settings. */
     clone(): ValueGenerator;
 }
@@ -50,13 +50,13 @@ export interface FunctionValueGenerator {
      */
     refreshTable?(): void;
     /** The generator's JSON. */
-    toJSON(): FunctionJSON;
+    toJSON(): ValueGeneratorJSON;
     /** A copy with the same settings. */
     clone(): FunctionValueGenerator;
 }
 
 /** Reads a value generator; an unknown or missing type warns and gives 0. */
-export function ValueGeneratorFromJSON(json: FunctionJSON): FunctionValueGenerator | ValueGenerator {
+export function ValueGeneratorFromJSON(json: ValueGeneratorJSON | undefined): FunctionValueGenerator | ValueGenerator {
     switch (json?.type) {
         case 'ConstantValue':
             return ConstantValue.fromJSON(json);

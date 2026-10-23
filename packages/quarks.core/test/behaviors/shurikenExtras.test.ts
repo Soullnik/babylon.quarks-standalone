@@ -214,8 +214,11 @@ describe('EmitSubParticleSystem inherit', () => {
         const some = new EmitSubParticleSystem(parent, false, undefined, SubParticleEmitMode.Death, 1, ['color']);
         const json = some.toJSON();
         expect(json.inherit).toEqual(['color']);
-        json.inherit = ['color', 'mass'];
-        const loaded = EmitSubParticleSystem.fromJSON(json, parent) as EmitSubParticleSystem;
+        // A property this version does not know, as a file could hold.
+        const loaded = EmitSubParticleSystem.fromJSON(
+            {...json, ...JSON.parse('{"inherit": ["color", "mass"]}')},
+            parent
+        ) as EmitSubParticleSystem;
         expect(loaded.inherit).toEqual(['color']);
         expect((some.clone() as EmitSubParticleSystem).inherit).toEqual(['color']);
     });

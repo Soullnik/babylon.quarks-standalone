@@ -1,9 +1,20 @@
-import {IParticleSystem} from '../IParticleSystem';
-import {Particle} from '../Particle';
 import {FunctionValueGenerator, ValueGenerator, ValueGeneratorFromJSON} from '../functions';
+import type {ValueGeneratorJSON, Vector3ArrayJSON} from '../functions/FunctionJSON';
+import {IParticleSystem} from '../IParticleSystem';
 import {Quaternion, Vector3} from '../math';
-import {Behavior} from './Behavior';
+import {Particle} from '../Particle';
+import {Behavior, BehaviorJSON} from './Behavior';
 import {BehaviorSpace, EmitterFrame, readBehaviorSpace} from './EmitterFrame';
+
+/** The JSON of an orbit over life: a {@link OrbitOverLife}. */
+export interface OrbitOverLifeJSON extends BehaviorJSON {
+    /** The angular speed. */
+    orbitSpeed: ValueGeneratorJSON;
+    /** The axis. */
+    axis?: Vector3ArrayJSON;
+    /** The space the axis is in; `'local'` when absent. */
+    space?: BehaviorSpace;
+}
 
 /**
  * Turn particles around an axis over their life, like Unity's Orbital
@@ -132,7 +143,7 @@ export class OrbitOverLife implements Behavior {
         this.refreshAxis();
     }
 
-    toJSON(): any {
+    toJSON(): OrbitOverLifeJSON {
         return {
             type: this.type,
             orbitSpeed: this.orbitSpeed.toJSON(),
@@ -142,7 +153,7 @@ export class OrbitOverLife implements Behavior {
     }
 
     /** Reads {@link OrbitOverLife.toJSON} output; a field the JSON leaves out takes its default. */
-    static fromJSON(json: any): Behavior {
+    static fromJSON(json: OrbitOverLifeJSON): Behavior {
         return new OrbitOverLife(
             ValueGeneratorFromJSON(json.orbitSpeed) as FunctionValueGenerator,
             json.axis ? new Vector3(json.axis[0], json.axis[1], json.axis[2]) : undefined,

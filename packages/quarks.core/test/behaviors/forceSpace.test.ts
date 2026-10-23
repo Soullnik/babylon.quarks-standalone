@@ -271,11 +271,12 @@ describe('force space JSON', () => {
         expect((ForceOverLife.fromJSON({...over.toJSON(), space: 'local'}) as ForceOverLife).space).toBe('local');
         expect(
             (
-                ApplyForce.fromJSON({
-                    direction: [0, 1, 0],
-                    magnitude: {type: 'ConstantValue', value: 1},
-                    space: 'up',
-                }) as ApplyForce
+                ApplyForce.fromJSON(
+                    // A space this version does not know, as a file could hold.
+                    JSON.parse(
+                        '{"type": "ApplyForce", "direction": [0, 1, 0], "magnitude": {"type": "ConstantValue", "value": 1}, "space": "up"}'
+                    )
+                ) as ApplyForce
             ).space
         ).toBe('world');
     });

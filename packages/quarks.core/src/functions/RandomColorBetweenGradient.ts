@@ -1,7 +1,7 @@
 import {Vector4} from '../math';
 import {random} from '../util/random';
 import {FunctionColorGenerator} from './ColorGenerator';
-import {FunctionJSON} from './FunctionJSON';
+import type {RandomColorBetweenGradientJSON} from './FunctionJSON';
 import {GeneratorMemory} from './GeneratorMemory';
 import {Gradient} from './Gradient';
 
@@ -46,7 +46,7 @@ export class RandomColorBetweenGradient implements FunctionColorGenerator {
     }
 
     /** The JSON form, `{type: 'RandomColorBetweenGradient', gradient1, gradient2}`. */
-    toJSON(): FunctionJSON {
+    toJSON(): RandomColorBetweenGradientJSON {
         return {
             type: 'RandomColorBetweenGradient',
             gradient1: this.gradient1.toJSON(),
@@ -55,7 +55,7 @@ export class RandomColorBetweenGradient implements FunctionColorGenerator {
     }
 
     /** Reads {@link RandomColorBetweenGradient.toJSON} output. */
-    static fromJSON(json: FunctionJSON): RandomColorBetweenGradient {
+    static fromJSON(json: RandomColorBetweenGradientJSON): RandomColorBetweenGradient {
         return new RandomColorBetweenGradient(Gradient.fromJSON(json.gradient1), Gradient.fromJSON(json.gradient2));
     }
 

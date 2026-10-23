@@ -1,5 +1,6 @@
-import {JSONToValue, ValueToJSON} from '../util/JSONUtil';
-import {FunctionJSON} from './FunctionJSON';
+import {Vector3, Vector4} from '../math';
+import {JSONToNumber, JSONToVector3, JSONToVector4, ValueToJSON} from '../util/JSONUtil';
+import type {ContinuousLinearFunctionJSON} from './FunctionJSON';
 
 /** A value object a {@link ContinuousLinearFunction} can interpolate: a vector or a colour. */
 export interface ObjectValueType<T> {
@@ -17,23 +18,30 @@ export interface ObjectValueType<T> {
     clone(): ObjectValueType<T>;
 }
 
+/** The {@link ContinuousLinearSubType} values of type `T` are written as. */
+export type ContinuousLinearSubTypeOf<T> = T extends number
+    ? 'Number'
+    : T extends Vector4
+      ? 'Vector4'
+      : 'Vector3' | 'Color';
+
 /**
  * A piecewise linear function over [0, 1] through keys: the alpha or colour keys of a {@link
  * Gradient}. Before the first key it holds the first value, after the last the last.
  */
-export class ContinuousLinearFunction<T extends ObjectValueType<T> | number> {
+export class ContinuousLinearFunction<T extends number | Vector3 | Vector4> {
     /** The keys as `[value, position]`, sorted by position. */
     keys: Array<[T, number]>;
     /** Always `'function'`. */
     type: 'function';
     /** What the values are, for the JSON. */
-    subType: 'Number' | 'Vector3' | 'Vector4' | 'Color';
+    subType: ContinuousLinearSubTypeOf<T>;
     // default linear bezier
     /**
      * @param keys - The keys as `[value, position]`, sorted by position.
      * @param subType - What the values are.
      */
-    constructor(keys: Array<[T, number]>, subType: 'Number' | 'Vector3' | 'Vector4' | 'Color') {
+    constructor(keys: Array<[T, number]>, subType: ContinuousLinearSubTypeOf<T>) {
         this.subType = subType;
         this.type = 'function';
         this.keys = keys;
@@ -115,7 +123,7 @@ export class ContinuousLinearFunction<T extends ObjectValueType<T> | number> {
     }
 
     /** The JSON form, `{type: 'CLinearFunction', subType, keys: [{value, pos}]}`. */
-    toJSON(): FunctionJSON {
+    toJSON(): ContinuousLinearFunctionJSON<ContinuousLinearSubTypeOf<T>> {
         return {
             type: 'CLinearFunction',
             subType: this.subType,
@@ -123,16 +131,37 @@ export class ContinuousLinearFunction<T extends ObjectValueType<T> | number> {
         };
     }
 
-    /** Reads {@link ContinuousLinearFunction.toJSON} output. */
-    static fromJSON(json: FunctionJSON): ContinuousLinearFunction<any> {
-        return new ContinuousLinearFunction(
-            json.keys.map((pair: any) => [JSONToValue(pair.value, json.subType), pair.pos]),
-            json.subType
-        );
+    /** Reads {@link ContinuousLinearFunction.toJSON} output; its `subType` decides the values' type. */
+    static fromJSON(json: ContinuousLinearFunctionJSON<'Number'>): ContinuousLinearFunction<number>;
+    static fromJSON(json: ContinuousLinearFunctionJSON<'Vector3' | 'Color'>): ContinuousLinearFunction<Vector3>;
+    static fromJSON(json: ContinuousLinearFunctionJSON<'Vector4'>): ContinuousLinearFunction<Vector4>;
+    static fromJSON(
+        json: ContinuousLinearFunctionJSON
+    ): ContinuousLinearFunction<number> | ContinuousLinearFunction<Vector3> | ContinuousLinearFunction<Vector4>;
+    static fromJSON(
+        json: ContinuousLinearFunctionJSON
+    ): ContinuousLinearFunction<number> | ContinuousLinearFunction<Vector3> | ContinuousLinearFunction<Vector4> {
+        switch (json.subType) {
+            case 'Number':
+                return new ContinuousLinearFunction<number>(
+                    json.keys.map((key) => [JSONToNumber(key.value), key.pos]),
+                    json.subType
+                );
+            case 'Vector4':
+                return new ContinuousLinearFunction<Vector4>(
+                    json.keys.map((key) => [JSONToVector4(key.value), key.pos]),
+                    json.subType
+                );
+            default:
+                return new ContinuousLinearFunction<Vector3>(
+                    json.keys.map((key) => [JSONToVector3(key.value), key.pos]),
+                    json.subType
+                );
+        }
     }
 
     /** A copy with its own keys. */
-    clone(): ContinuousLinearFunction<any> {
+    clone(): ContinuousLinearFunction<T> {
         if (this.subType === 'Number') {
             return new ContinuousLinearFunction(
                 this.keys.map(([value, pos]) => [value, pos]),

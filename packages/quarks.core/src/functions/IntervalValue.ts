@@ -1,6 +1,6 @@
 import {MathUtils} from '../math';
 import {random} from '../util/random';
-import {FunctionJSON} from './FunctionJSON';
+import type {IntervalValueJSON} from './FunctionJSON';
 import {GeneratorMemory} from './GeneratorMemory';
 import {ValueGenerator} from './ValueGenerator';
 
@@ -47,7 +47,7 @@ export class IntervalValue implements ValueGenerator {
     type: 'value';
 
     /** The JSON form, `{type: 'IntervalValue', a, b}`. */
-    toJSON(): FunctionJSON {
+    toJSON(): IntervalValueJSON {
         return {
             type: 'IntervalValue',
             a: this.a,
@@ -56,7 +56,7 @@ export class IntervalValue implements ValueGenerator {
     }
 
     /** Reads {@link IntervalValue.toJSON} output. */
-    static fromJSON(json: FunctionJSON): IntervalValue {
+    static fromJSON(json: IntervalValueJSON): IntervalValue {
         return new IntervalValue(json.a, json.b);
     }
 

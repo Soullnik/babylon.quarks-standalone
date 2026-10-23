@@ -1,6 +1,13 @@
-import {Particle} from '../Particle';
 import {ColorGeneratorFromJSON, FunctionColorGenerator} from '../functions';
-import {Behavior} from './Behavior';
+import type {ColorGeneratorJSON} from '../functions/FunctionJSON';
+import {Particle} from '../Particle';
+import {Behavior, BehaviorJSON} from './Behavior';
+
+/** The JSON of a colour over life: a {@link ColorOverLife}. */
+export interface ColorOverLifeJSON extends BehaviorJSON {
+    /** The colour over the particle's life. */
+    color: ColorGeneratorJSON;
+}
 
 /**
  * Color particles by their life.
@@ -50,7 +57,7 @@ export class ColorOverLife implements Behavior {
         this.color.refreshTable?.();
     }
 
-    toJSON(): any {
+    toJSON(): ColorOverLifeJSON {
         return {
             type: this.type,
             color: this.color.toJSON(),
@@ -58,7 +65,7 @@ export class ColorOverLife implements Behavior {
     }
 
     /** Reads {@link ColorOverLife.toJSON} output; a field the JSON leaves out takes its default. */
-    static fromJSON(json: any): Behavior {
+    static fromJSON(json: ColorOverLifeJSON): Behavior {
         return new ColorOverLife(ColorGeneratorFromJSON(json.color) as FunctionColorGenerator);
     }
 

@@ -1,6 +1,13 @@
-import {Particle} from '../Particle';
 import {FunctionValueGenerator, GeneratorFromJSON, Vector3Function, Vector3Generator} from '../functions';
-import {Behavior} from './Behavior';
+import type {ValueGeneratorJSON, Vector3GeneratorJSON} from '../functions/FunctionJSON';
+import {Particle} from '../Particle';
+import {Behavior, BehaviorJSON} from './Behavior';
+
+/** The JSON of a size over life: a {@link SizeOverLife}. */
+export interface SizeOverLifeJSON extends BehaviorJSON {
+    /** The size over life, uniform or per axis. */
+    size: ValueGeneratorJSON | Vector3GeneratorJSON;
+}
 
 /**
  *  Apply size to particles based on their life.
@@ -81,7 +88,7 @@ export class SizeOverLife implements Behavior {
             size.z = startSize.z * scale;
         }
     }
-    toJSON(): any {
+    toJSON(): SizeOverLifeJSON {
         return {
             type: this.type,
             size: this.size.toJSON(),
@@ -89,7 +96,7 @@ export class SizeOverLife implements Behavior {
     }
 
     /** Reads {@link SizeOverLife.toJSON} output; a field the JSON leaves out takes its default. */
-    static fromJSON(json: any): Behavior {
+    static fromJSON(json: SizeOverLifeJSON): Behavior {
         return new SizeOverLife(GeneratorFromJSON(json.size) as FunctionValueGenerator);
     }
 

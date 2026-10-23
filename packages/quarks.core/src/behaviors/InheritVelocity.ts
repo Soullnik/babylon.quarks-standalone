@@ -1,14 +1,23 @@
-import {IParticleSystem} from '../IParticleSystem';
-import {Particle} from '../Particle';
 import {ConstantValue, FunctionValueGenerator, ValueGenerator, ValueGeneratorFromJSON} from '../functions';
+import type {ValueGeneratorJSON} from '../functions/FunctionJSON';
+import {IParticleSystem} from '../IParticleSystem';
 import {Quaternion, Vector3} from '../math';
-import {Behavior} from './Behavior';
+import {Particle} from '../Particle';
+import {Behavior, BehaviorJSON} from './Behavior';
 
 /**
  * How {@link InheritVelocity} applies the emitter's velocity: `'initial'` once at spawn,
  * `'current'` every step.
  */
 export type InheritVelocityMode = 'initial' | 'current';
+
+/** The JSON of an inherited emitter velocity: a {@link InheritVelocity}. */
+export interface InheritVelocityJSON extends BehaviorJSON {
+    /** The share of the emitter velocity; 1 when absent. */
+    multiplier?: ValueGeneratorJSON;
+    /** When the velocity is taken; `'initial'` when absent. */
+    mode?: 'initial' | 'current';
+}
 
 /**
  * Make particles inherit the emitter's movement velocity (Unity's "Inherit Velocity").
@@ -93,7 +102,7 @@ export class InheritVelocity implements Behavior {
         this._tempScaleInv.set(1 / this._tempScaleInv.x, 1 / this._tempScaleInv.y, 1 / this._tempScaleInv.z);
     }
 
-    toJSON(): any {
+    toJSON(): InheritVelocityJSON {
         return {
             type: this.type,
             multiplier: this.multiplier.toJSON(),
@@ -104,7 +113,7 @@ export class InheritVelocity implements Behavior {
     /**
      * Reads {@link InheritVelocity.toJSON} output; a field the JSON leaves out takes its default.
      */
-    static fromJSON(json: any): Behavior {
+    static fromJSON(json: InheritVelocityJSON): Behavior {
         return new InheritVelocity(
             json.multiplier
                 ? (ValueGeneratorFromJSON(json.multiplier) as FunctionValueGenerator)
