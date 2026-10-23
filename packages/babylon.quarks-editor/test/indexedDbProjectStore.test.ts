@@ -44,6 +44,11 @@ describe('IndexedDB project store', () => {
     });
 
     it('creates, lists, renames and deletes projects', async () => {
+        // A clock that ticks on every read: within one millisecond the rename would tie with
+        // B's creation and the most-recent-first order would be left to chance.
+        let clock = 1_000;
+        const now = jest.spyOn(Date, 'now').mockImplementation(() => ++clock);
+        afterNavigator = () => now.mockRestore();
         const a = await store.createProject('A');
         const b = await store.createProject('B');
         await store.renameProject(a.id, 'A2');
