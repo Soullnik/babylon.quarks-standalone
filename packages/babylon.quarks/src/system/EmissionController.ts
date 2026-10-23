@@ -167,10 +167,8 @@ export class EmissionController {
                 if (emissionState.burstWaves !== undefined) {
                     emissionState.burstWaves.length = 0;
                 }
-                const behaviors = system.behaviors;
-                for (let i = 0; i < behaviors.length; i++) {
-                    behaviors[i].reset();
-                }
+                // Behaviors carry on across the loop (a noise field keeps scrolling, sub emissions
+                // of live particles keep going); they reset only when the system restarts.
             } else {
                 if (!system.isEmitEnded && !system.onlyUsedByOther) {
                     system.endEmit();

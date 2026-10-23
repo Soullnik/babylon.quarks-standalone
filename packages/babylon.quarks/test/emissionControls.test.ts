@@ -62,15 +62,18 @@ describe('bursts after endEmit', () => {
         expect(system.isFinished()).toBe(true);
     });
 
-    it('stop() followed by endEmit() leaves a looping system finished', () => {
+    it('stop() followed by endEmit() leaves a looping system finished, and play() replays it', () => {
         const system = burstSystem({looping: true});
         run(system, 0.3);
         system.stop();
         system.endEmit();
-        system.play();
-        run(system, 1.5);
         expect(system.particleNum).toBe(0);
         expect(system.isFinished()).toBe(true);
+        // Unity's Play on a finished system starts it over.
+        system.play();
+        expect(system.isEmitEnded).toBe(false);
+        run(system, 0.1);
+        expect(system.particleNum).toBeGreaterThan(0);
     });
 
     it('a burst due on the step that crosses the end of a one-shot still fires', () => {

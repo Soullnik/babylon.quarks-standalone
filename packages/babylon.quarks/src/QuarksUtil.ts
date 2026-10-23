@@ -1,8 +1,11 @@
+import {InstancedMesh} from '@babylonjs/core/Meshes/instancedMesh';
+import {Mesh} from '@babylonjs/core/Meshes/mesh';
 import {TransformNode} from '@babylonjs/core/Meshes/transformNode';
 import {Node} from '@babylonjs/core/node';
 import {ConstantValue, EmitSubParticleSystem, FunctionValueGenerator, IntervalValue, ValueGenerator} from 'quarks.core';
 import {BatchedRenderer} from './BatchedRenderer';
 import {shareEffectResources} from './effectResources';
+import {MeshSurfaceEmitter} from './MeshSurfaceEmitter';
 import {ParticleEmitter} from './ParticleEmitter';
 import {ParticleSystem} from './ParticleSystem';
 
@@ -90,16 +93,28 @@ export class QuarksUtil {
     /**
      * A deep copy of an effect: the node tree under `root` with every particle
      * system cloned, sub emitter links pointing at the copies, and the same
-     * transforms and enabled state. The copy is not added to any renderer.
-     * Nodes that are neither transform nodes nor emitters are skipped.
+     * transforms and enabled state. Meshes are cloned as meshes that share
+     * the source's geometry and material, and a mesh surface shape that emits
+     * from a mesh in the tree emits from its copy. The copy holds the
+     * source's textures and materials, so disposing the source leaves the copy
+     * whole. It is not added to any renderer. Nodes that are neither transform
+     * nodes nor emitters, such as lights and cameras, are skipped.
      */
     static instantiate(root: TransformNode, name?: string): TransformNode {
         const copies = new Map<ParticleEmitter, ParticleEmitter>();
+        const meshCopies = new Map<Node, Mesh>();
         const copyNode = (node: Node, parent: TransformNode | null, copyName?: string): TransformNode | null => {
             let copy: TransformNode;
             if (node instanceof ParticleEmitter) {
                 copy = node.clone(copyName);
                 copies.set(node, copy as ParticleEmitter);
+            } else if (node instanceof Mesh || node instanceof InstancedMesh) {
+                // Its children are copied below, as every node's are.
+                copy = node.clone(copyName ?? node.name, null, true)!;
+                if (copy instanceof Mesh) {
+                    meshCopies.set(node, copy);
+                }
+                copy.setEnabled(node.isEnabled(false));
             } else if (node instanceof TransformNode) {
                 copy = new TransformNode(copyName ?? node.name, node.getScene());
                 copy.position.copyFrom(node.position);
@@ -119,16 +134,25 @@ export class QuarksUtil {
             return copy;
         };
         const copy = copyNode(root, null, name) as TransformNode;
-        // The copy draws with the source's textures, so QuarksLoader.disposeEffect(source) keeps them.
+        // The copy draws with the source's textures and materials, so disposeEffect(source) keeps them.
         shareEffectResources(root, copy);
-        // Sub emitter behaviors on the copies still target the original emitters.
         for (const emitter of copies.values()) {
-            for (const behavior of (emitter.system as unknown as ParticleSystem).behaviors) {
+            const system = emitter.system as unknown as ParticleSystem;
+            // Sub emitter behaviors on the copies still target the original emitters.
+            for (const behavior of system.behaviors) {
                 if (behavior instanceof EmitSubParticleSystem) {
                     const target = copies.get(behavior.subParticleSystem as unknown as ParticleEmitter);
                     if (target !== undefined) {
                         behavior.subParticleSystem = target as unknown as typeof behavior.subParticleSystem;
                     }
+                }
+            }
+            // So does a mesh surface shape: it emits from the copy of its mesh when the tree has one.
+            const shape = system.emitterShape;
+            if (shape instanceof MeshSurfaceEmitter && shape.mesh !== undefined) {
+                const meshCopy = meshCopies.get(shape.mesh);
+                if (meshCopy !== undefined) {
+                    shape.mesh = meshCopy;
                 }
             }
         }

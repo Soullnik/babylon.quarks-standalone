@@ -2,26 +2,41 @@ import type {ParticleSystemEvent, ParticleSystemEventType} from 'quarks.core';
 
 type Listener = (event: ParticleSystemEvent) => void;
 
-/** The callbacks registered on a {@link ParticleSystem}, by event type. */
+/**
+ * The callbacks registered on a {@link ParticleSystem}, by event type.
+ *
+ * The lists are copied on write, not on fire: adding or removing a callback while an event is
+ * being fired (a listener removing itself, say) changes the next firing and never the one in
+ * progress, so every callback registered when the event fired is called once.
+ */
 export class EventDispatcher {
-    private readonly listeners: {[event: string]: Listener[]} = {};
+    private readonly listeners: {[event: string]: readonly Listener[]} = {};
 
     /** Registers `callback` for `event`. */
     add(event: ParticleSystemEventType, callback: Listener): void {
-        if (!this.listeners[event]) this.listeners[event] = [];
-        this.listeners[event].push(callback);
+        this.listeners[event] = [...(this.listeners[event] ?? []), callback];
     }
 
-    /** Drops every callback for `event`. */
-    removeAll(event: ParticleSystemEventType): void {
-        if (this.listeners[event]) this.listeners[event] = [];
+    /** Drops every callback for `event`, or for every event when it is left out. */
+    removeAll(event?: ParticleSystemEventType): void {
+        if (event === undefined) {
+            for (const key of Object.keys(this.listeners)) {
+                delete this.listeners[key];
+            }
+            return;
+        }
+        delete this.listeners[event];
     }
 
     /** Drops one callback for `event`. */
     remove(event: ParticleSystemEventType, callback: Listener): void {
-        if (this.listeners[event]) {
-            const index = this.listeners[event].indexOf(callback);
-            if (index !== -1) this.listeners[event].splice(index, 1);
+        const callbacks = this.listeners[event];
+        if (callbacks === undefined) {
+            return;
+        }
+        const index = callbacks.indexOf(callback);
+        if (index !== -1) {
+            this.listeners[event] = callbacks.filter((_, i) => i !== index);
         }
     }
 
@@ -33,6 +48,7 @@ export class EventDispatcher {
 
     /** Calls the callbacks registered for the event's type, in the order they were added. */
     fire(event: ParticleSystemEvent): void {
+        // The list as it is now: a callback added or removed by a listener does not shift it.
         const callbacks = this.listeners[event.type];
         if (callbacks === undefined) {
             return;

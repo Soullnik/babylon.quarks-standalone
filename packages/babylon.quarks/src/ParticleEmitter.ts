@@ -117,7 +117,12 @@ export class ParticleEmitter extends TransformNode {
         return clonedEmitter;
     }
 
-    /** The node and its system in effect-file form; `serializeEffect` writes whole effects. @internal */
+    /**
+     * The node and its system in effect-file form: one entry of an effect file's `object` tree,
+     * without its children. Geometry, materials and textures go into `meta` when it is given.
+     * `visible` is the node's own enabled flag, not the one it inherits from its parents. To write
+     * a whole effect, with its children and resources, use `serializeEffect`.
+     */
     toJSON(meta?: any, options: SerializationOptions = {}): any {
         return {
             uuid: quarksNodeId(this),
@@ -134,7 +139,7 @@ export class ParticleEmitter extends TransformNode {
                   ]
                 : undefined,
             scale: [this.scaling.x, this.scaling.y, this.scaling.z],
-            visible: this.isEnabled(),
+            visible: this.isEnabled(false),
             ps: this.system.toJSON(meta, options),
         };
     }

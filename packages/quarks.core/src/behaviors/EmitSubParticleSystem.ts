@@ -265,7 +265,10 @@ export class EmitSubParticleSystem implements Behavior {
             this.inherit.slice()
         );
     }
-    reset(): void {}
+    /** Drops the emissions still running ({@link clearEmissions}), as the parent system restarts. */
+    reset(): void {
+        this.clearEmissions();
+    }
 
     /**
      * Drops the emissions still running, as when the parent system restarts or stops: a Death
