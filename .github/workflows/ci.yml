@@ -62,6 +62,26 @@ jobs:
             - name: Verify package tarball contents
               run: npm run check:pack
 
+    # The Unity exporter's C# compiled under .NET against stand-ins for the Unity API, its fixtures
+    # exported and compared with the golden files the babylon.quarks suite loads.
+    exporter:
+        name: Unity exporter
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v4
+
+            - name: Setup .NET
+              uses: actions/setup-dotnet@v4
+              with:
+                  dotnet-version: 8.0.x
+
+            - name: Export the fixtures and compare with the golden files
+              run: npm run test:exporter
+              env:
+                  DOTNET_CLI_TELEMETRY_OPTOUT: 1
+                  DOTNET_NOLOGO: 1
+
     # Every demo opened in headless WebGL; any page or console error fails the job. Software WebGL
     # is CPU-bound, so the demos are split over two machines rather than opened side by side.
     demos:

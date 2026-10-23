@@ -22,7 +22,7 @@ namespace BabylonQuarks.UnityExporter
 
         public static implicit operator JToken(double v) => new JNumber(v);
         public static implicit operator JToken(float v) => new JNumber(v);
-        public static implicit operator JToken(int v) => new JNumber(v);
+        public static implicit operator JToken(int v) => new JNumber((double)v);
         public static implicit operator JToken(bool v) => new JBool(v);
         public static implicit operator JToken(string v) => v == null ? (JToken)JNull.Instance : new JString(v);
 
@@ -49,7 +49,15 @@ namespace BabylonQuarks.UnityExporter
     public sealed class JNumber : JToken
     {
         private readonly double _v;
+        private readonly bool _single;
+
         public JNumber(double v) { _v = v; }
+
+        /// <summary>
+        /// A float is written with the fewest digits that read back as the same float, so 0.1f is
+        /// written as 0.1 rather than as the double it widens to (0.10000000149011612).
+        /// </summary>
+        public JNumber(float v) { _v = v; _single = true; }
 
         internal override void Write(StringBuilder sb, int indent)
         {
@@ -62,6 +70,10 @@ namespace BabylonQuarks.UnityExporter
             if (_v == System.Math.Floor(_v) && System.Math.Abs(_v) < 1e15)
             {
                 sb.Append(((long)_v).ToString(CultureInfo.InvariantCulture));
+            }
+            else if (_single)
+            {
+                sb.Append(((float)_v).ToString("R", CultureInfo.InvariantCulture));
             }
             else
             {

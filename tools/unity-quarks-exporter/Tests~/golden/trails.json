@@ -1,0 +1,841 @@
+{
+  "metadata": {
+    "version": 4.5,
+    "type": "Object3D",
+    "generator": "babylon.quarks Unity exporter {version}",
+    "quarksFormat": 1
+  },
+  "geometries": [
+    {
+      "uuid": "quarks_geometry-6",
+      "type": "QuarksGeometry",
+      "positions": [
+        -0.5,
+        -0.5,
+        0,
+        0.5,
+        -0.5,
+        0,
+        0.5,
+        0.5,
+        0,
+        -0.5,
+        0.5,
+        0
+      ],
+      "indices": [
+        0,
+        2,
+        1,
+        0,
+        3,
+        2
+      ],
+      "uvs": [
+        0,
+        0,
+        1,
+        0,
+        1,
+        1,
+        0,
+        1
+      ]
+    }
+  ],
+  "materials": [
+    {
+      "uuid": "quarks_material-5",
+      "type": "QuarksMaterial",
+      "transparent": true,
+      "alphaMode": 7,
+      "blending": 7,
+      "depthTest": true,
+      "depthWrite": false,
+      "alphaTest": 0,
+      "texture": "quarks_texture-4",
+      "map": "quarks_texture-4"
+    },
+    {
+      "uuid": "quarks_material-8",
+      "type": "QuarksMaterial",
+      "transparent": true,
+      "alphaMode": 3,
+      "blending": 3,
+      "depthTest": true,
+      "depthWrite": false,
+      "alphaTest": 0
+    },
+    {
+      "uuid": "quarks_material-10",
+      "type": "QuarksMaterial",
+      "transparent": true,
+      "alphaMode": 6,
+      "blending": 6,
+      "depthTest": true,
+      "depthWrite": false,
+      "alphaTest": 0,
+      "texture": "quarks_texture-9",
+      "map": "quarks_texture-9"
+    }
+  ],
+  "textures": [
+    {
+      "uuid": "quarks_texture-4",
+      "name": "spark",
+      "image": "quarks_image-3",
+      "wrap": [
+        1000,
+        1000
+      ]
+    },
+    {
+      "uuid": "quarks_texture-9",
+      "name": "spark",
+      "image": "quarks_image-3",
+      "wrap": [
+        1000,
+        1000
+      ]
+    }
+  ],
+  "images": [
+    {
+      "uuid": "quarks_image-3",
+      "url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFBQIAX8jx0gAAAABJRU5ErkJggg=="
+    }
+  ],
+  "object": {
+    "uuid": "node-0",
+    "name": "Rocket",
+    "layers": 1,
+    "matrix": [
+      1,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      1
+    ],
+    "type": "ParticleEmitter",
+    "ps": {
+      "version": "3.0",
+      "autoDestroy": false,
+      "looping": true,
+      "prewarm": false,
+      "duration": 5,
+      "startDelay": {
+        "type": "ConstantValue",
+        "value": 0
+      },
+      "shape": {
+        "type": "mesh_surface",
+        "mesh": "node-7"
+      },
+      "startLife": {
+        "type": "ConstantValue",
+        "value": 2.0166667
+      },
+      "startSpeed": {
+        "type": "ConstantValue",
+        "value": 6
+      },
+      "startRotation": {
+        "type": "ConstantValue",
+        "value": 0
+      },
+      "startSize": {
+        "type": "ConstantValue",
+        "value": 1
+      },
+      "startColor": {
+        "type": "ConstantColor",
+        "color": {
+          "r": 1,
+          "g": 1,
+          "b": 1,
+          "a": 1
+        }
+      },
+      "emissionOverTime": {
+        "type": "ConstantValue",
+        "value": 10
+      },
+      "emissionOverDistance": {
+        "type": "ConstantValue",
+        "value": 0
+      },
+      "emissionBursts": [],
+      "maxParticles": 1000,
+      "onlyUsedByOther": false,
+      "renderMode": 1,
+      "renderOrder": 0,
+      "rendererEmitterSettings": {
+        "speedFactor": 0.1,
+        "lengthFactor": 3
+      },
+      "material": "quarks_material-5",
+      "layers": 1,
+      "maxParticleSize": 0.5,
+      "pivot": [
+        -1,
+        0,
+        0
+      ],
+      "flip": [
+        0.5,
+        1
+      ],
+      "startTileIndex": {
+        "type": "ConstantValue",
+        "value": 0
+      },
+      "uTileCount": 1,
+      "vTileCount": 1,
+      "blendTiles": false,
+      "blending": 7,
+      "transparent": true,
+      "depthWrite": false,
+      "worldSpace": false,
+      "scalingMode": "hierarchy",
+      "behaviors": [
+        {
+          "type": "VelocityOverLife",
+          "linearX": {
+            "type": "ConstantValue",
+            "value": 0
+          },
+          "linearY": {
+            "type": "ConstantValue",
+            "value": 1
+          },
+          "linearZ": {
+            "type": "ConstantValue",
+            "value": 0
+          },
+          "orbitalX": {
+            "type": "ConstantValue",
+            "value": 0
+          },
+          "orbitalY": {
+            "type": "ConstantValue",
+            "value": 0
+          },
+          "orbitalZ": {
+            "type": "ConstantValue",
+            "value": 0.5
+          },
+          "space": "world",
+          "radial": {
+            "type": "ConstantValue",
+            "value": -0.25
+          },
+          "orbitalOffset": [
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "type": "InheritVelocity",
+          "multiplier": {
+            "type": "ConstantValue",
+            "value": 0.5
+          },
+          "mode": "current"
+        },
+        {
+          "type": "ForceOverLife",
+          "x": {
+            "type": "ConstantValue",
+            "value": 0
+          },
+          "y": {
+            "type": "ConstantValue",
+            "value": -2
+          },
+          "z": {
+            "type": "ConstantValue",
+            "value": 0
+          }
+        },
+        {
+          "type": "ColorBySpeed",
+          "color": {
+            "type": "Gradient",
+            "functions": [
+              {
+                "function": {
+                  "type": "ColorRange",
+                  "a": {
+                    "r": 1,
+                    "g": 1,
+                    "b": 1,
+                    "a": 1
+                  },
+                  "b": {
+                    "r": 0.8,
+                    "g": 0.8,
+                    "b": 0.8,
+                    "a": 1
+                  }
+                },
+                "start": 0
+              },
+              {
+                "function": {
+                  "type": "ColorRange",
+                  "a": {
+                    "r": 0.8,
+                    "g": 0.8,
+                    "b": 0.8,
+                    "a": 1
+                  },
+                  "b": {
+                    "r": 0,
+                    "g": 0,
+                    "b": 0,
+                    "a": 1
+                  }
+                },
+                "start": 0.2
+              }
+            ]
+          },
+          "speedRange": {
+            "type": "IntervalValue",
+            "a": 0,
+            "b": 10
+          }
+        },
+        {
+          "type": "ApplyCollision",
+          "bounce": 0.4
+        },
+        {
+          "type": "EmitSubParticleSystem",
+          "subParticleSystem": "node-1",
+          "useVelocityAsBasis": false,
+          "mode": 0,
+          "emitProbability": 1,
+          "inherit": [
+            "color",
+            "size"
+          ]
+        },
+        {
+          "type": "EmitSubParticleSystem",
+          "subParticleSystem": "node-2",
+          "useVelocityAsBasis": false,
+          "mode": 1,
+          "emitProbability": 0.5
+        }
+      ]
+    },
+    "children": [
+      {
+        "uuid": "node-1",
+        "name": "Smoke",
+        "layers": 1,
+        "matrix": [
+          1,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          1
+        ],
+        "type": "ParticleEmitter",
+        "ps": {
+          "version": "3.0",
+          "autoDestroy": false,
+          "looping": true,
+          "prewarm": false,
+          "duration": 5,
+          "startDelay": {
+            "type": "ConstantValue",
+            "value": 0
+          },
+          "shape": {
+            "type": "cone",
+            "radius": 1,
+            "thickness": 1,
+            "arc": 6.2831855,
+            "mode": 0,
+            "spread": 0,
+            "speed": {
+              "type": "ConstantValue",
+              "value": 1
+            },
+            "angle": 0.43633232
+          },
+          "startLife": {
+            "type": "ConstantValue",
+            "value": 1
+          },
+          "startSpeed": {
+            "type": "ConstantValue",
+            "value": 5
+          },
+          "startRotation": {
+            "type": "ConstantValue",
+            "value": 0
+          },
+          "startSize": {
+            "type": "ConstantValue",
+            "value": 0.3
+          },
+          "startColor": {
+            "type": "ConstantColor",
+            "color": {
+              "r": 0.2,
+              "g": 0.2,
+              "b": 0.2,
+              "a": 1
+            }
+          },
+          "emissionOverTime": {
+            "type": "ConstantValue",
+            "value": 0
+          },
+          "emissionOverDistance": {
+            "type": "ConstantValue",
+            "value": 0
+          },
+          "emissionBursts": [
+            {
+              "time": 0,
+              "count": {
+                "type": "ConstantValue",
+                "value": 8
+              },
+              "probability": 1,
+              "interval": 0.01,
+              "cycle": 1
+            }
+          ],
+          "maxParticles": 1000,
+          "onlyUsedByOther": true,
+          "renderMode": 3,
+          "renderOrder": 0,
+          "rendererEmitterSettings": {
+            "startLength": {
+              "type": "ConstantValue",
+              "value": 30
+            },
+            "followLocalOrigin": false,
+            "uvFromHead": true,
+            "colorFromParticle": true,
+            "dieWithParticle": true,
+            "recordWorldSpace": true
+          },
+          "material": "quarks_material-8",
+          "layers": 1,
+          "startTileIndex": {
+            "type": "ConstantValue",
+            "value": 0
+          },
+          "uTileCount": 1,
+          "vTileCount": 1,
+          "blendTiles": false,
+          "blending": 3,
+          "transparent": true,
+          "depthWrite": false,
+          "worldSpace": false,
+          "scalingMode": "hierarchy",
+          "behaviors": [
+            {
+              "type": "ColorOverLife",
+              "color": {
+                "type": "Gradient",
+                "functions": [
+                  {
+                    "function": {
+                      "type": "ColorRange",
+                      "a": {
+                        "r": 1,
+                        "g": 1,
+                        "b": 1,
+                        "a": 1
+                      },
+                      "b": {
+                        "r": 1,
+                        "g": 1,
+                        "b": 1,
+                        "a": 1
+                      }
+                    },
+                    "start": 0
+                  },
+                  {
+                    "function": {
+                      "type": "ColorRange",
+                      "a": {
+                        "r": 1,
+                        "g": 1,
+                        "b": 1,
+                        "a": 1
+                      },
+                      "b": {
+                        "r": 1,
+                        "g": 1,
+                        "b": 1,
+                        "a": 1
+                      }
+                    },
+                    "start": 0.1
+                  },
+                  {
+                    "function": {
+                      "type": "ColorRange",
+                      "a": {
+                        "r": 1,
+                        "g": 1,
+                        "b": 1,
+                        "a": 1
+                      },
+                      "b": {
+                        "r": 1,
+                        "g": 1,
+                        "b": 1,
+                        "a": 1
+                      }
+                    },
+                    "start": 0.2
+                  },
+                  {
+                    "function": {
+                      "type": "ColorRange",
+                      "a": {
+                        "r": 1,
+                        "g": 1,
+                        "b": 1,
+                        "a": 1
+                      },
+                      "b": {
+                        "r": 1,
+                        "g": 1,
+                        "b": 1,
+                        "a": 1
+                      }
+                    },
+                    "start": 0.3
+                  },
+                  {
+                    "function": {
+                      "type": "ColorRange",
+                      "a": {
+                        "r": 1,
+                        "g": 1,
+                        "b": 1,
+                        "a": 1
+                      },
+                      "b": {
+                        "r": 1,
+                        "g": 1,
+                        "b": 1,
+                        "a": 1
+                      }
+                    },
+                    "start": 0.4
+                  },
+                  {
+                    "function": {
+                      "type": "ColorRange",
+                      "a": {
+                        "r": 1,
+                        "g": 1,
+                        "b": 1,
+                        "a": 1
+                      },
+                      "b": {
+                        "r": 1,
+                        "g": 1,
+                        "b": 1,
+                        "a": 1
+                      }
+                    },
+                    "start": 0.5
+                  },
+                  {
+                    "function": {
+                      "type": "ColorRange",
+                      "a": {
+                        "r": 1,
+                        "g": 1,
+                        "b": 1,
+                        "a": 1
+                      },
+                      "b": {
+                        "r": 1,
+                        "g": 1,
+                        "b": 1,
+                        "a": 1
+                      }
+                    },
+                    "start": 0.6
+                  },
+                  {
+                    "function": {
+                      "type": "ColorRange",
+                      "a": {
+                        "r": 1,
+                        "g": 1,
+                        "b": 1,
+                        "a": 1
+                      },
+                      "b": {
+                        "r": 1,
+                        "g": 1,
+                        "b": 1,
+                        "a": 1
+                      }
+                    },
+                    "start": 0.7
+                  },
+                  {
+                    "function": {
+                      "type": "ColorRange",
+                      "a": {
+                        "r": 1,
+                        "g": 1,
+                        "b": 1,
+                        "a": 1
+                      },
+                      "b": {
+                        "r": 1,
+                        "g": 1,
+                        "b": 1,
+                        "a": 1
+                      }
+                    },
+                    "start": 0.8
+                  },
+                  {
+                    "function": {
+                      "type": "ColorRange",
+                      "a": {
+                        "r": 1,
+                        "g": 1,
+                        "b": 1,
+                        "a": 1
+                      },
+                      "b": {
+                        "r": 1,
+                        "g": 1,
+                        "b": 1,
+                        "a": 1
+                      }
+                    },
+                    "start": 0.9
+                  }
+                ]
+              }
+            },
+            {
+              "type": "WidthOverLength",
+              "width": {
+                "type": "PiecewiseBezier",
+                "functions": [
+                  {
+                    "function": {
+                      "p0": 0.3,
+                      "p1": 0.2,
+                      "p2": 0.10000001,
+                      "p3": 0
+                    },
+                    "start": 0
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      {
+        "uuid": "node-2",
+        "name": "TrailSparks",
+        "layers": 1,
+        "matrix": [
+          1,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          1
+        ],
+        "type": "ParticleEmitter",
+        "ps": {
+          "version": "3.0",
+          "autoDestroy": false,
+          "looping": true,
+          "prewarm": false,
+          "duration": 5,
+          "startDelay": {
+            "type": "ConstantValue",
+            "value": 0
+          },
+          "shape": {
+            "type": "cone",
+            "radius": 1,
+            "thickness": 1,
+            "arc": 6.2831855,
+            "mode": 0,
+            "spread": 0,
+            "speed": {
+              "type": "ConstantValue",
+              "value": 1
+            },
+            "angle": 0.43633232
+          },
+          "startLife": {
+            "type": "ConstantValue",
+            "value": 0.3166667
+          },
+          "startSpeed": {
+            "type": "ConstantValue",
+            "value": 5
+          },
+          "startRotation": {
+            "type": "ConstantValue",
+            "value": 0
+          },
+          "startSize": {
+            "type": "ConstantValue",
+            "value": 1
+          },
+          "startColor": {
+            "type": "ConstantColor",
+            "color": {
+              "r": 1,
+              "g": 1,
+              "b": 1,
+              "a": 1
+            }
+          },
+          "emissionOverTime": {
+            "type": "ConstantValue",
+            "value": 30
+          },
+          "emissionOverDistance": {
+            "type": "ConstantValue",
+            "value": 0
+          },
+          "emissionBursts": [],
+          "maxParticles": 1000,
+          "onlyUsedByOther": true,
+          "renderMode": 0,
+          "renderOrder": 0,
+          "rendererEmitterSettings": {},
+          "material": "quarks_material-10",
+          "layers": 1,
+          "maxParticleSize": 0.5,
+          "startTileIndex": {
+            "type": "ConstantValue",
+            "value": 0
+          },
+          "uTileCount": 1,
+          "vTileCount": 1,
+          "blendTiles": false,
+          "blending": 6,
+          "transparent": true,
+          "depthWrite": false,
+          "worldSpace": false,
+          "scalingMode": "hierarchy",
+          "behaviors": [
+            {
+              "type": "SizeBySpeed",
+              "size": {
+                "type": "PiecewiseBezier",
+                "functions": [
+                  {
+                    "function": {
+                      "p0": 0.5,
+                      "p1": 0.6666667,
+                      "p2": 0.8333333,
+                      "p3": 1
+                    },
+                    "start": 0
+                  }
+                ]
+              },
+              "speedRange": {
+                "type": "IntervalValue",
+                "a": 0,
+                "b": 5
+              }
+            },
+            {
+              "type": "RotationBySpeed",
+              "angularVelocity": {
+                "type": "ConstantValue",
+                "value": -3
+              },
+              "speedRange": {
+                "type": "IntervalValue",
+                "a": 0,
+                "b": 1
+              }
+            }
+          ]
+        }
+      },
+      {
+        "uuid": "node-7",
+        "name": "Quad (emitter source)",
+        "layers": 1,
+        "matrix": [
+          1,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          1
+        ],
+        "type": "Mesh",
+        "isVisible": false,
+        "geometry": "quarks_geometry-6"
+      }
+    ]
+  }
+}

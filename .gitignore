@@ -7,3 +7,7 @@
 .DS_Store
 npm-debug.log*
 **/*.tsbuildinfo
+tools/unity-quarks-exporter/Tests~/bin/
+tools/unity-quarks-exporter/Tests~/obj/
+tools/unity-quarks-exporter/Tests~/NetStandard/bin/
+tools/unity-quarks-exporter/Tests~/NetStandard/obj/

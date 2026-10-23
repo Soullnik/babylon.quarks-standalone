@@ -21,12 +21,6 @@ namespace BabylonQuarks.UnityExporter
         public readonly JArray Textures = new JArray();
         public readonly JArray Images = new JArray();
 
-        /// <summary>Blend mode of the most recently built material — read straight after AddMaterialForRenderer.</summary>
-        public int LastBlendMode = 2;
-
-        /// <summary>Tint color of the most recently built material — read straight after AddMaterialForRenderer.</summary>
-        public Color LastTint = Color.white;
-
         public bool EmbedTextures = true;
 
         /// <summary>Which assets go to separate files. Ignored while <see cref="Store"/> is null.</summary>
@@ -83,14 +77,17 @@ namespace BabylonQuarks.UnityExporter
 
         // ---- material / texture --------------------------------------------------------
 
+        /// <summary>
+        /// Writes the renderer's material into the envelope's materials and returns what the
+        /// system's own settings take from it.
+        /// </summary>
         /// <param name="trail">Use the renderer's trail material rather than its particle material.</param>
-        public string AddMaterialForRenderer(ParticleSystemRenderer renderer, bool trail = false)
+        public ParticleMaterial AddMaterialForRenderer(ParticleSystemRenderer renderer, bool trail = false)
         {
             Material mat = renderer == null ? null : trail ? renderer.trailMaterial : renderer.sharedMaterial;
+            ParticleMaterial info = MaterialReader.Read(mat);
             Texture tex = mat != null ? mat.mainTexture : null;
             string textureUuid = tex != null ? AddTexture(tex) : null;
-            LastBlendMode = DetectBlend(mat);
-            LastTint = ReadTint(mat);
 
             string reflectionAtlasUuid = null;
             float reflectionLevel = 1f;
@@ -101,21 +98,30 @@ namespace BabylonQuarks.UnityExporter
                 reflectionLevel = ReadReflectionLevel(mat);
             }
 
-            string uuid = NewId("quarks_material");
+            info.Uuid = NewId("quarks_material");
             var m = new JObject()
-                .Set("uuid", uuid)
+                .Set("uuid", info.Uuid)
                 .Set("type", "QuarksMaterial")
-                .Set("transparent", true)
-                .Set("alphaMode", LastBlendMode)
-                .Set("blending", LastBlendMode)
+                .Set("transparent", info.Transparent)
+                .Set("alphaMode", info.Blending)
+                .Set("blending", info.Blending)
                 .Set("depthTest", true)
-                .Set("depthWrite", false)
-                .Set("alphaTest", 0);
+                .Set("depthWrite", info.DepthWrite)
+                .Set("alphaTest", info.AlphaTest);
             if (textureUuid != null)
             {
                 // Write both keys: `texture` for QuarksMaterial and `map` for three.js compatibility.
                 m.Set("texture", textureUuid);
                 m.Set("map", textureUuid);
+                // The map's Tiling / Offset; Unity applies them to the flipbook cell's UV, as
+                // babylon.quarks does on UV channel 0.
+                Vector2 tiling = mat.mainTextureScale, offset = mat.mainTextureOffset;
+                if (tiling != Vector2.one || offset != Vector2.zero)
+                {
+                    m.Set("mapUV", new JObject()
+                        .Set("tiling", new JArray().Add(tiling.x).Add(tiling.y))
+                        .Set("offset", new JArray().Add(offset.x).Add(offset.y)));
+                }
             }
             if (reflectionAtlasUuid != null)
             {
@@ -123,7 +129,19 @@ namespace BabylonQuarks.UnityExporter
                 m.Set("reflectionLevel", reflectionLevel);
             }
             Materials.Add(m);
-            return uuid;
+            return info;
+        }
+
+        /// <summary>Unity's wrap mode as the three.js constant the loader reads.</summary>
+        private static int WrapOf(TextureWrapMode mode)
+        {
+            switch (mode)
+            {
+                case TextureWrapMode.Repeat: return 1000;
+                case TextureWrapMode.Mirror:
+                case TextureWrapMode.MirrorOnce: return 1002;
+                default: return 1001;
+            }
         }
 
         private string AddTexture(Texture tex, bool envAtlas = false, string url = null)
@@ -140,7 +158,14 @@ namespace BabylonQuarks.UnityExporter
                 .Set("uuid", texUuid)
                 .Set("name", tex.name)
                 .Set("image", imageUuid)
-                .Set("wrap", new JArray().Add(1001).Add(1001));
+                .Set("wrap", envAtlas
+                    // The six faces sit side by side; repeating would bleed one face into another.
+                    ? new JArray().Add(1001).Add(1001)
+                    : new JArray().Add(WrapOf(tex.wrapModeU)).Add(WrapOf(tex.wrapModeV)));
+            if (!envAtlas && (tex.wrapModeU == TextureWrapMode.MirrorOnce || tex.wrapModeV == TextureWrapMode.MirrorOnce))
+            {
+                Debug.LogWarning($"[Quarks Exporter] Texture '{tex.name}': Mirror Once has no babylon.quarks counterpart and is exported as Mirror.");
+            }
             if (envAtlas)
             {
                 // Match babylon.quarks env-atlas sampling (invertY:false, no mips).
@@ -422,20 +447,13 @@ namespace BabylonQuarks.UnityExporter
             foreach (var idx in mesh.triangles) { indices.Add(idx); }
             var g = new JObject().Set("positions", positions).Set("indices", indices);
 
-            Vector2[] uv = mesh.uv;
-            if (uv.Length > 0)
-            {
-                var uvs = new JArray();
-                foreach (var t in uv) { uvs.Add(t.x); uvs.Add(t.y); }
-                g.Set("uvs", uvs);
-            }
+            AddUVs(g, "uvs", mesh.uv);
+            // The second UV set, read by textures on UV channel 1 (a mask or lightmap-style layout).
+            AddUVs(g, "uvs2", mesh.uv2);
 
+            // A mesh without normals is left so: the runtime gives it its own, and the export
+            // never changes the mesh asset it reads.
             Vector3[] normals = mesh.normals;
-            if (normals == null || normals.Length == 0)
-            {
-                mesh.RecalculateNormals();
-                normals = mesh.normals;
-            }
             if (normals != null && normals.Length > 0)
             {
                 var n = new JArray();
@@ -445,10 +463,18 @@ namespace BabylonQuarks.UnityExporter
             return g;
         }
 
+        private static void AddUVs(JObject geometry, string key, Vector2[] uv)
+        {
+            if (uv == null || uv.Length == 0) return;
+            var uvs = new JArray();
+            foreach (var t in uv) { uvs.Add(t.x); uvs.Add(t.y); }
+            geometry.Set(key, uvs);
+        }
+
         /// <summary>
-        /// Emits a Mesh node (+ its geometry) so a mesh-shape emitter can reference it by uuid.
-        /// QuarksLoader.linkReferences resolves the emitter's `mesh_surface.mesh` to this node.
-        /// The node is a real (visible) Mesh in the loaded scene — hide it if only used for emission.
+        /// Emits a hidden Mesh node (+ its geometry) so a mesh-shape emitter can reference it by
+        /// uuid: QuarksLoader resolves the emitter's `mesh_surface.mesh` to this node. Unity's Mesh
+        /// shape only emits from the mesh, so the node is not drawn.
         /// </summary>
         public string AddMeshSourceNode(Mesh mesh)
         {
@@ -460,49 +486,11 @@ namespace BabylonQuarks.UnityExporter
                 .Set("layers", 1)
                 .Set("matrix", new JArray().Add(1).Add(0).Add(0).Add(0).Add(0).Add(1).Add(0).Add(0).Add(0).Add(0).Add(1).Add(0).Add(0).Add(0).Add(0).Add(1))
                 .Set("type", "Mesh")
+                .Set("isVisible", false)
                 .Set("geometry", geometryUuid));
             return nodeUuid;
         }
 
-        /// <summary>
-        /// The color the material's shader multiplies every particle by: URP's _BaseColor, the
-        /// built-in particle and Standard shaders' _Color, or the legacy particle shaders'
-        /// _TintColor, which they double (its neutral value is mid-grey).
-        /// </summary>
-        private static Color ReadTint(Material mat)
-        {
-            if (mat == null) return Color.white;
-            if (mat.HasProperty("_BaseColor")) return mat.GetColor("_BaseColor");
-            if (mat.HasProperty("_Color")) return mat.GetColor("_Color");
-            if (mat.HasProperty("_TintColor")) return mat.GetColor("_TintColor") * 2f;
-            return Color.white;
-        }
-
-        private static int DetectBlend(Material mat)
-        {
-            // quarks/Babylon blend ints: 1 = additive, 2 = alpha blend, 3 = subtract, 4 = multiply.
-            if (mat == null) return 2;
-            string sn = mat.shader != null ? mat.shader.name.ToLowerInvariant() : "";
-
-            // Name checks — order matters: "Alpha Blended Premultiply" contains "multiply"
-            // as a substring and must NOT be treated as multiply.
-            if (sn.Contains("additive")) return 1;
-            if (sn.Contains("premultiply") || sn.Contains("alpha blend") || sn.Contains("alphablend"))
-                return 2;
-            if (sn.Contains("multiply") || sn.Contains("modulate")) return 4;
-
-            // Fall back to GPU blend factors when the shader name is uninformative
-            // (e.g. Particles/Standard Unlit).
-            if (mat.HasProperty("_DstBlend"))
-            {
-                int dst = (int)mat.GetFloat("_DstBlend");
-                int src = mat.HasProperty("_SrcBlend") ? (int)mat.GetFloat("_SrcBlend") : -1;
-                // UnityEngine.Rendering.BlendMode: One=1, DstColor=2, Zero=0
-                if (dst == 1) return 1; // DstBlend == One → additive
-                if (src == 2) return 4; // Src = DstColor → multiply/modulate
-            }
-            return 2;
-        }
     }
 
     /// <summary>Texture helpers shared by inline embedding and the file asset store.</summary>

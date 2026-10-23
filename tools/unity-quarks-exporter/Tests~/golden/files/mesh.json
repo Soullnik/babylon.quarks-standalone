@@ -1,0 +1,370 @@
+{
+  "metadata": {
+    "version": 4.5,
+    "type": "Object3D",
+    "generator": "babylon.quarks Unity exporter {version}",
+    "quarksFormat": 1
+  },
+  "geometries": [
+    {
+      "uuid": "quarks_geometry-6",
+      "type": "QuarksGeometry",
+      "url": "shared/geometries/Quad.json"
+    }
+  ],
+  "materials": [
+    {
+      "uuid": "quarks_material-5",
+      "type": "QuarksMaterial",
+      "transparent": false,
+      "alphaMode": 0,
+      "blending": 0,
+      "depthTest": true,
+      "depthWrite": true,
+      "alphaTest": 0.3,
+      "texture": "quarks_texture-4",
+      "map": "quarks_texture-4"
+    },
+    {
+      "uuid": "quarks_material-8",
+      "type": "QuarksMaterial",
+      "transparent": true,
+      "alphaMode": 2,
+      "blending": 2,
+      "depthTest": true,
+      "depthWrite": false,
+      "alphaTest": 0,
+      "texture": "quarks_texture-7",
+      "map": "quarks_texture-7"
+    }
+  ],
+  "textures": [
+    {
+      "uuid": "quarks_texture-4",
+      "name": "spark",
+      "image": "quarks_image-3",
+      "wrap": [
+        1000,
+        1000
+      ]
+    },
+    {
+      "uuid": "quarks_texture-7",
+      "name": "spark",
+      "image": "quarks_image-3",
+      "wrap": [
+        1000,
+        1000
+      ]
+    }
+  ],
+  "images": [
+    {
+      "uuid": "quarks_image-3",
+      "url": "shared/textures/spark.png"
+    }
+  ],
+  "object": {
+    "uuid": "node-0",
+    "name": "Debris",
+    "layers": 1,
+    "matrix": [
+      2,
+      0,
+      0,
+      0,
+      0,
+      2,
+      0,
+      0,
+      0,
+      0,
+      2,
+      0,
+      0,
+      0,
+      0,
+      1
+    ],
+    "type": "Group",
+    "children": [
+      {
+        "uuid": "node-1",
+        "name": "Chunks",
+        "layers": 1,
+        "matrix": [
+          5.9604645E-08,
+          0,
+          -0.99999994,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0.99999994,
+          0,
+          5.9604645E-08,
+          0,
+          0,
+          1,
+          0,
+          1
+        ],
+        "type": "ParticleEmitter",
+        "ps": {
+          "version": "3.0",
+          "autoDestroy": false,
+          "looping": false,
+          "prewarm": false,
+          "duration": 5,
+          "startDelay": {
+            "type": "ConstantValue",
+            "value": 0
+          },
+          "shape": {
+            "type": "box",
+            "width": 1,
+            "height": 0.5,
+            "depth": 2,
+            "emitFrom": 0
+          },
+          "startLife": {
+            "type": "ConstantValue",
+            "value": 5.016667
+          },
+          "startSpeed": {
+            "type": "IntervalValue",
+            "a": 2,
+            "b": 5
+          },
+          "startRotation": {
+            "type": "Euler",
+            "angleX": {
+              "type": "IntervalValue",
+              "a": 0,
+              "b": 3.1415927
+            },
+            "angleY": {
+              "type": "ConstantValue",
+              "value": 0.5
+            },
+            "angleZ": {
+              "type": "ConstantValue",
+              "value": 0
+            },
+            "eulerOrder": "YXZ"
+          },
+          "startSize": {
+            "type": "Vector3Function",
+            "x": {
+              "type": "ConstantValue",
+              "value": 0.5
+            },
+            "y": {
+              "type": "IntervalValue",
+              "a": 0.25,
+              "b": 0.75
+            },
+            "z": {
+              "type": "ConstantValue",
+              "value": 0.5
+            }
+          },
+          "startColor": {
+            "type": "ConstantColor",
+            "color": {
+              "r": 1,
+              "g": 1,
+              "b": 1,
+              "a": 1
+            }
+          },
+          "emissionOverTime": {
+            "type": "ConstantValue",
+            "value": 10
+          },
+          "emissionOverDistance": {
+            "type": "ConstantValue",
+            "value": 0
+          },
+          "emissionBursts": [],
+          "maxParticles": 1000,
+          "onlyUsedByOther": false,
+          "renderMode": 2,
+          "renderOrder": 0,
+          "rendererEmitterSettings": {},
+          "material": "quarks_material-5",
+          "layers": 1,
+          "playbackSpeed": 1.5,
+          "instancingGeometry": "quarks_geometry-6",
+          "startTileIndex": {
+            "type": "ConstantValue",
+            "value": 0
+          },
+          "uTileCount": 1,
+          "vTileCount": 1,
+          "blendTiles": false,
+          "blending": 0,
+          "transparent": false,
+          "depthWrite": true,
+          "worldSpace": true,
+          "alphaTest": 0.3,
+          "renderFace": "front",
+          "scalingMode": "hierarchy",
+          "behaviors": [
+            {
+              "type": "Rotation3DOverLife",
+              "angularVelocity": {
+                "type": "Euler",
+                "angleX": {
+                  "type": "ConstantValue",
+                  "value": 1
+                },
+                "angleY": {
+                  "type": "IntervalValue",
+                  "a": -2,
+                  "b": 2
+                },
+                "angleZ": {
+                  "type": "ConstantValue",
+                  "value": 0.5
+                },
+                "eulerOrder": "YXZ"
+              }
+            },
+            {
+              "type": "LimitSpeedOverLife",
+              "speed": {
+                "type": "ConstantValue",
+                "value": 3
+              },
+              "dampen": 0.2
+            }
+          ]
+        }
+      },
+      {
+        "uuid": "node-2",
+        "name": "Dust",
+        "layers": 1,
+        "matrix": [
+          1,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          1
+        ],
+        "type": "ParticleEmitter",
+        "ps": {
+          "version": "3.0",
+          "autoDestroy": false,
+          "looping": true,
+          "prewarm": false,
+          "duration": 5,
+          "startDelay": {
+            "type": "ConstantValue",
+            "value": 0
+          },
+          "shape": {
+            "type": "cone",
+            "radius": 1,
+            "thickness": 1,
+            "arc": 6.2831855,
+            "mode": 0,
+            "spread": 0,
+            "speed": {
+              "type": "ConstantValue",
+              "value": 1
+            },
+            "angle": 0.43633232
+          },
+          "startLife": {
+            "type": "ConstantValue",
+            "value": 5.016667
+          },
+          "startSpeed": {
+            "type": "PiecewiseBezier",
+            "functions": [
+              {
+                "function": {
+                  "p0": 1,
+                  "p1": 1.3333334,
+                  "p2": 1.6666666,
+                  "p3": 2
+                },
+                "start": 0
+              }
+            ]
+          },
+          "startRotation": {
+            "type": "ConstantValue",
+            "value": 0
+          },
+          "startSize": {
+            "type": "ConstantValue",
+            "value": 1
+          },
+          "startColor": {
+            "type": "ConstantColor",
+            "color": {
+              "r": 1,
+              "g": 1,
+              "b": 1,
+              "a": 1
+            }
+          },
+          "emissionOverTime": {
+            "type": "ConstantValue",
+            "value": 10
+          },
+          "emissionOverDistance": {
+            "type": "ConstantValue",
+            "value": 0
+          },
+          "emissionBursts": [],
+          "maxParticles": 1000,
+          "onlyUsedByOther": false,
+          "renderMode": 0,
+          "renderOrder": 0,
+          "rendererEmitterSettings": {},
+          "material": "quarks_material-8",
+          "layers": 1,
+          "maxParticleSize": 0.5,
+          "startTileIndex": {
+            "type": "ConstantValue",
+            "value": 0
+          },
+          "uTileCount": 1,
+          "vTileCount": 1,
+          "blendTiles": false,
+          "blending": 2,
+          "transparent": true,
+          "depthWrite": false,
+          "worldSpace": false,
+          "scalingMode": "hierarchy",
+          "behaviors": [
+            {
+              "type": "LimitSpeedOverLife",
+              "speed": {
+                "type": "ConstantValue",
+                "value": 2
+              },
+              "dampen": 1
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

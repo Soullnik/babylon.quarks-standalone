@@ -1,0 +1,332 @@
+{
+  "metadata": {
+    "version": 4.5,
+    "type": "Object3D",
+    "generator": "babylon.quarks Unity exporter {version}",
+    "quarksFormat": 1
+  },
+  "geometries": [],
+  "materials": [
+    {
+      "uuid": "quarks_material-3",
+      "type": "QuarksMaterial",
+      "transparent": true,
+      "alphaMode": 1,
+      "blending": 1,
+      "depthTest": true,
+      "depthWrite": false,
+      "alphaTest": 0,
+      "texture": "quarks_texture-2",
+      "map": "quarks_texture-2",
+      "mapUV": {
+        "tiling": [
+          2,
+          1
+        ],
+        "offset": [
+          0.5,
+          0
+        ]
+      }
+    }
+  ],
+  "textures": [
+    {
+      "uuid": "quarks_texture-2",
+      "name": "sparkTiled",
+      "image": "quarks_image-1",
+      "wrap": [
+        1000,
+        1000
+      ]
+    }
+  ],
+  "images": [
+    {
+      "uuid": "quarks_image-1",
+      "url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFBQIAX8jx0gAAAABJRU5ErkJggg=="
+    }
+  ],
+  "object": {
+    "uuid": "node-0",
+    "name": "Sparks",
+    "layers": 1,
+    "matrix": [
+      1,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      1
+    ],
+    "type": "ParticleEmitter",
+    "ps": {
+      "version": "3.0",
+      "autoDestroy": false,
+      "looping": true,
+      "prewarm": false,
+      "duration": 2,
+      "startDelay": {
+        "type": "ConstantValue",
+        "value": 0
+      },
+      "shape": {
+        "type": "cone",
+        "radius": 0.5,
+        "thickness": 0.25,
+        "arc": 3.1415927,
+        "mode": 1,
+        "spread": 0.25,
+        "speed": {
+          "type": "ConstantValue",
+          "value": 2
+        },
+        "angle": 0.5235988,
+        "transform": {
+          "rotation": [
+            -0.70710677,
+            0,
+            0,
+            0.70710677
+          ]
+        }
+      },
+      "startLife": {
+        "type": "IntervalValue",
+        "a": 0.5,
+        "b": 1.5
+      },
+      "startSpeed": {
+        "type": "ConstantValue",
+        "value": 4
+      },
+      "startRotation": {
+        "type": "IntervalValue",
+        "a": 0,
+        "b": -3.1415927
+      },
+      "startSize": {
+        "type": "PiecewiseBezier",
+        "functions": [
+          {
+            "function": {
+              "p0": 0.4,
+              "p1": 0.3,
+              "p2": 0.2,
+              "p3": 0.1
+            },
+            "start": 0
+          }
+        ]
+      },
+      "startColor": {
+        "type": "RandomColor",
+        "a": {
+          "r": 1,
+          "g": 0.8,
+          "b": 0.3,
+          "a": 0.5
+        },
+        "b": {
+          "r": 1,
+          "g": 0.4,
+          "b": 0.1,
+          "a": 0.5
+        }
+      },
+      "emissionOverTime": {
+        "type": "ConstantValue",
+        "value": 20
+      },
+      "emissionOverDistance": {
+        "type": "ConstantValue",
+        "value": 0
+      },
+      "emissionBursts": [
+        {
+          "time": 0.25,
+          "count": {
+            "type": "IntervalValue",
+            "a": 10,
+            "b": 20
+          },
+          "probability": 0.75,
+          "interval": 0.5,
+          "cycle": 3
+        }
+      ],
+      "maxParticles": 200,
+      "onlyUsedByOther": false,
+      "renderMode": 0,
+      "renderOrder": 0,
+      "rendererEmitterSettings": {},
+      "material": "quarks_material-3",
+      "layers": 1,
+      "seed": 4000000001,
+      "cullingMode": "pause",
+      "sortMode": "distance",
+      "minParticleSize": 0.01,
+      "maxParticleSize": 0.25,
+      "startTileIndex": {
+        "type": "ConstantValue",
+        "value": 0
+      },
+      "uTileCount": 2,
+      "vTileCount": 2,
+      "blendTiles": false,
+      "blending": 1,
+      "transparent": true,
+      "depthWrite": false,
+      "worldSpace": true,
+      "softParticles": true,
+      "softNearFade": 0.1,
+      "softFarFade": 2,
+      "scalingMode": "hierarchy",
+      "behaviors": [
+        {
+          "type": "FrameOverLife",
+          "frame": {
+            "type": "PiecewiseBezier",
+            "functions": [
+              {
+                "function": {
+                  "p0": 0,
+                  "p1": 1.3330001,
+                  "p2": 2.666,
+                  "p3": 3.999
+                },
+                "start": 0
+              }
+            ]
+          }
+        },
+        {
+          "type": "ForceOverLife",
+          "x": {
+            "type": "ConstantValue",
+            "value": 0
+          },
+          "y": {
+            "type": "ConstantValue",
+            "value": -4.905
+          },
+          "z": {
+            "type": "ConstantValue",
+            "value": 0
+          }
+        },
+        {
+          "type": "ColorOverLife",
+          "color": {
+            "type": "Gradient",
+            "functions": [
+              {
+                "function": {
+                  "type": "ColorRange",
+                  "a": {
+                    "r": 1,
+                    "g": 1,
+                    "b": 1,
+                    "a": 1
+                  },
+                  "b": {
+                    "r": 1,
+                    "g": 0.84,
+                    "b": 0.8,
+                    "a": 1
+                  }
+                },
+                "start": 0
+              },
+              {
+                "function": {
+                  "type": "ColorRange",
+                  "a": {
+                    "r": 1,
+                    "g": 0.84,
+                    "b": 0.8,
+                    "a": 1
+                  },
+                  "b": {
+                    "r": 1,
+                    "g": 0.19999999,
+                    "b": 0,
+                    "a": 0
+                  }
+                },
+                "start": 0.2
+              }
+            ]
+          }
+        },
+        {
+          "type": "SizeOverLife",
+          "size": {
+            "type": "PiecewiseBezier",
+            "functions": [
+              {
+                "function": {
+                  "p0": 0,
+                  "p1": 0.33333334,
+                  "p2": 1,
+                  "p3": 1
+                },
+                "start": 0
+              },
+              {
+                "function": {
+                  "p0": 1,
+                  "p1": 1,
+                  "p2": 0,
+                  "p3": 0
+                },
+                "start": 0.25
+              }
+            ]
+          }
+        },
+        {
+          "type": "RotationOverLife",
+          "angularVelocity": {
+            "type": "IntervalValue",
+            "a": 1,
+            "b": -1
+          }
+        },
+        {
+          "type": "Noise",
+          "frequency": {
+            "type": "ConstantValue",
+            "value": 0.8
+          },
+          "power": {
+            "type": "ConstantValue",
+            "value": 0.5
+          },
+          "positionAmount": {
+            "type": "ConstantValue",
+            "value": 1
+          },
+          "rotationAmount": {
+            "type": "ConstantValue",
+            "value": 0
+          },
+          "scrollSpeed": {
+            "type": "ConstantValue",
+            "value": 0.2
+          }
+        }
+      ]
+    }
+  }
+}

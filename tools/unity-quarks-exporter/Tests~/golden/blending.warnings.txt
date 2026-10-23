@@ -1,0 +1,3 @@
+[Quarks Exporter] Material 'UrpOdd': blend DstAlpha OneMinusDstAlpha (Add) has no babylon.quarks counterpart and is exported as alpha blending.
+[Quarks Exporter] Material 'StdSubtractive': subtractive blending is exported as ALPHA_SUBTRACT, which darkens by the particle's color and ignores its alpha.
+[Quarks Exporter] Texture 'mirrorOnce': Mirror Once has no babylon.quarks counterpart and is exported as Mirror.

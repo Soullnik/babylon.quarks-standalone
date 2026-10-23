@@ -2,6 +2,47 @@
 
 All notable changes to the Unity Quarks Exporter are documented here.
 
+## [0.28.0] — unreleased
+
+The exporter is no longer experimental: it is tested on every change and held to the library's
+release rules.
+
+### Added
+
+- **Tests without Unity.** `npm run test:exporter` compiles the exporter under .NET against
+  stand-ins for the Unity API, exports effects built in code and compares them with golden files;
+  the babylon.quarks suite loads those files with a strict `QuarksLoader`. CI runs both.
+- **Materials** are read from their properties, as the URP, HDRP and Standard Particles shaders
+  define them: the blend from `_SrcBlend` / `_DstBlend` / `_BlendOp` (Alpha, Premultiply, Additive,
+  Multiply, Modulate, Subtractive), an Opaque surface (`transparent: false`, writing depth), Alpha Clipping
+  → `alphaTest`, `_ZWrite` → `depthWrite`, Render Face → `renderFace` on mesh particles and Soft
+  Particles → `softParticles` with its near and far fade.
+- The main texture's **Tiling / Offset** → `mapUV`, and its **wrap mode** (it was always Clamp).
+- A mesh's **second UV set** → the geometry's `uvs2`.
+- The **Arc's Mode, Spread and Speed** of round shapes (they were always Random).
+- **Scaling Mode** Hierarchy and Local → `scalingMode: 'hierarchy'`.
+- **Rotation over Lifetime** with Separate Axes on mesh particles → `Rotation3DOverLife` (it was
+  Z only).
+- `metadata.generator` names the exporter and its version, and `metadata.quarksFormat` the JSON
+  format.
+- Warnings for what is approximated: Random Between Two Curves, Cone Volume, Scaling Mode Local
+  under a scaled parent and a scaled Shape system, Rotation over Lifetime about X and Y on meshes,
+  Subtractive blending, Mirror Once, separate-axes Limit Velocity and Size by Speed. The README
+  lists them.
+
+### Changed
+
+- **Premultiply** materials export as `ALPHA_PREMULTIPLIED` (they were alpha blended), and the
+  legacy Additive (Soft) shader as `ALPHA_SCREENMODE`.
+- The source mesh of a Mesh shape is hidden (`isVisible: false`): Unity only emits from it.
+- Numbers are written from the float Unity stores (`0.1`, not `0.10000000149011612`), and read
+  back the same.
+
+### Fixed
+
+- Exporting a mesh without normals no longer recalculates the normals of the mesh asset itself;
+  the runtime gives such a mesh its own.
+
 ## [0.27.1] — 2026-10-23
 
 ### Changed

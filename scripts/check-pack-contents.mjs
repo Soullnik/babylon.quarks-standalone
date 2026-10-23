@@ -67,6 +67,31 @@ function assertEditorPeerInLockstep() {
 }
 
 /**
+ * The Unity exporter names the babylon.quarks release it writes for in every file it exports
+ * (`ExporterInfo.Version`, checked against its own package.json by `npm run test:exporter`), so its
+ * version moves with the library's.
+ */
+function assertExporterInLockstep() {
+    const library = JSON.parse(
+        readFileSync(new URL('../packages/babylon.quarks/package.json', import.meta.url), 'utf8')
+    );
+    const exporter = JSON.parse(
+        readFileSync(new URL('../tools/unity-quarks-exporter/package.json', import.meta.url), 'utf8')
+    );
+    const info = readFileSync(
+        new URL('../tools/unity-quarks-exporter/Editor/ExporterInfo.cs', import.meta.url),
+        'utf8'
+    );
+    const csharp = /const string Version = "([^"]+)"/.exec(info)?.[1];
+    if (exporter.version !== library.version || csharp !== library.version) {
+        throw new Error(
+            `The Unity exporter is at ${exporter.version} (package.json) and ${csharp} (ExporterInfo.cs); ` +
+                `with babylon.quarks at ${library.version} both must be ${library.version}.`
+        );
+    }
+}
+
+/**
  * Peer dependencies the consumer project links from the repo's own node_modules, so the smoke
  * test runs offline against the same versions the packages are built with.
  */
@@ -186,6 +211,7 @@ export const binding: typeof EffectBinding = EffectBinding;
  */
 function main() {
     assertEditorPeerInLockstep();
+    assertExporterInLockstep();
     assertRequiredFiles('babylon.quarks', getPackResult('babylon.quarks'), [
         'dist/babylon.quarks.esm.js',
         'dist/babylon.quarks.cjs',
