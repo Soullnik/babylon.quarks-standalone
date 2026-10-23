@@ -1,15 +1,9 @@
-import {ArcRotateCamera} from '@babylonjs/core/Cameras/arcRotateCamera';
 import {Constants} from '@babylonjs/core/Engines/constants';
-import {Engine} from '@babylonjs/core/Engines/engine';
-import {HemisphericLight} from '@babylonjs/core/Lights/hemisphericLight';
-import {Color4} from '@babylonjs/core/Maths/math.color';
 import {Vector3 as BVector3} from '@babylonjs/core/Maths/math.vector';
-import {Scene} from '@babylonjs/core/scene';
 // Side-effect import: registers Scene.createPickingRay, used to project the cursor into the world.
 import '@babylonjs/core/Culling/ray';
 import {
     ApplyForce,
-    BatchedRenderer,
     Bezier,
     ColorOverLife,
     ConstantColor,
@@ -35,14 +29,13 @@ import {
     Vector4,
     WidthOverLength,
 } from 'babylon.quarks';
-import {SHARED_ASSETS, createSharedTexture} from './shared/common';
+import {SHARED_ASSETS, createSharedTexture} from '../shared/common';
+import type {DemoContext, DemoModule} from '../types';
 
-/** 10×10 `texture1.png`: soft circle / glow / cloud live at 90 / 91 / 93; tile 0 is the default round particle. */
+/** 10×10 `texture1.png`, tiles counted from the top left: 0 is a hard round dot, 1 a soft radial glow. */
 const T1 = {
     round: 0,
-    softCircle: 90,
-    softGlow: 91,
-    softCloud: 93,
+    softGlow: 1,
 };
 
 /** 10×10 `texture2.png`: tile 1 is a large orb glow; 53–62 is the animated electric-arc strip (see electricBall demo). */
@@ -78,62 +71,54 @@ function constantCurve(value: number) {
     return new PiecewiseBezier([[new Bezier(value, value, value, value), 0]]);
 }
 
-function heroTextureUrl(relativePath: string) {
-    const path = relativePath.replace(/^\//, '');
-    const base = import.meta.env?.BASE_URL;
-    if (typeof window === 'undefined' || base == null || base === '' || base === '/' || base === './') {
-        return path;
-    }
-    const prefix = base.endsWith('/') ? base : `${base}/`;
-    const rootRelative = `${prefix}${path}`.replace(/([^:]\/)\/+/g, '$1');
-    try {
-        return new URL(rootRelative, window.location.origin).href;
-    } catch {
-        return rootRelative;
-    }
+/** Where the pointer is over the stage, in normalised device coordinates (-1..1, +y up). */
+export interface StagePointer {
+    x: number;
+    y: number;
+    /** False until the pointer has moved over the stage at least once. */
+    seen: boolean;
 }
 
 /**
- * Full-screen hero: a single art-directed subject — a slowly turning accretion vortex sitting
- * right of the headline — built from six coordinated layers (nebula bed, breathing core, orbital
- * disk with gravity inspiral, comet trail ribbons, and stretched stardust). Doubles as a live
- * showcase of babylon.quarks: Trail + WidthOverLength, StretchedBillBoard, OrbitOverLife,
- * GravityForce, TurbulenceField + LimitSpeedOverLife, gradient Color/SizeOverLife, and the
- * BatchedRenderer. Reacts to the cursor (parallax + dust lean) and page scroll.
+ * The landing page's signature effect: a slowly turning accretion vortex built from seven
+ * coordinated layers (nebula bed, breathing core, accretion disk, comet ribbons, stretched stardust and cursor
+ * comets). It shows Trail + WidthOverLength, StretchedBillBoard, OrbitOverLife, GravityForce,
+ * TurbulenceField + LimitSpeedOverLife and gradient Color/SizeOverLife, all in one
+ * BatchedRenderer. Moving the pointer over the stage sheds ribbons that the vortex captures.
  */
-export function mountIndexHeroBackground() {
-    if (typeof window === 'undefined') {
-        return () => {};
-    }
-    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
-        return () => {};
-    }
+export function createVortex(pointer: StagePointer): DemoModule {
+    let state: VortexState | null = null;
+    return {
+        init(ctx) {
+            state = initVortex(ctx);
+        },
+        update(ctx, delta) {
+            if (state) {
+                updateVortex(ctx, state, pointer, delta);
+            }
+        },
+    };
+}
 
-    const canvas = document.getElementById('hero-bg');
-    if (!(canvas instanceof HTMLCanvasElement)) {
-        return () => {};
-    }
+interface VortexState {
+    cursorForce: ApplyForce;
+    cursorComets: ParticleSystem;
+    cursorEmission: ConstantValue;
+    pointerX: number;
+    pointerY: number;
+    prevPointerX: number;
+    prevPointerY: number;
+    cursorEmitRate: number;
+    planeNormal: BVector3;
+    cursorWorld: BVector3;
+}
 
-    const engine = new Engine(canvas, true);
-    engine.resize();
-
-    const scene = new Scene(engine);
-    scene.useRightHandedSystem = true;
-    scene.clearColor = new Color4(0.04, 0.045, 0.09, 1);
-    scene.autoClear = true;
-
-    const camera = new ArcRotateCamera('heroCam', -Math.PI / 2, Math.PI / 3, 26, BVector3.Zero(), scene);
-    camera.minZ = 0.1;
-    camera.setPosition(new BVector3(0, 9.5, 26));
-
-    new HemisphericLight('heroLight', new BVector3(0.35, 1, -0.2), scene);
-
-    const batchRenderer = new BatchedRenderer('heroVfx', scene);
-    const systems: ParticleSystem[] = [];
-
-    const atlasPath = heroTextureUrl(SHARED_ASSETS.atlas);
-    const tex1 = createSharedTexture(scene, atlasPath);
-    const tex2 = createSharedTexture(scene, heroTextureUrl(SHARED_ASSETS.atlasSecondary));
+function initVortex({scene, camera, batchRenderer, systems}: DemoContext): VortexState {
+    camera.setPosition(new BVector3(0, 8, 22));
+    // The slow layers prewarm a whole 8 s cycle, so the stage opens on a formed vortex instead of
+    // an empty frame filling in.
+    const tex1 = createSharedTexture(scene, SHARED_ASSETS.atlas);
+    const tex2 = createSharedTexture(scene, SHARED_ASSETS.atlasSecondary);
 
     // The disk lies almost flat (XZ) but tips slightly toward the camera so more of the swirl is
     // visible. The donut emitter generates its ring in XY, so the emitters are rotated by
@@ -148,8 +133,9 @@ export function mountIndexHeroBackground() {
     // --- Layer 0: nebula bed — huge soft clouds far behind the vortex (ambient depth) ---
     const nebula = new ParticleSystem({
         scene,
-        duration: 1,
+        duration: 8,
         looping: true,
+        prewarm: true,
         startLife: new IntervalValue(12, 18),
         startSpeed: new IntervalValue(0.05, 0.2),
         startSize: new IntervalValue(12, 22),
@@ -161,7 +147,7 @@ export function mountIndexHeroBackground() {
         texture: tex1,
         transparent: true,
         blendMode: Constants.ALPHA_COMBINE,
-        startTileIndex: new ConstantValue(T1.softCloud),
+        startTileIndex: new ConstantValue(T1.softGlow),
         uTileCount: 10,
         vTileCount: 10,
         renderMode: RenderMode.BillBoard,
@@ -177,8 +163,9 @@ export function mountIndexHeroBackground() {
     // deliberately a different sprite from the disk so the heart of the effect reads as a body ---
     const coreGlow = new ParticleSystem({
         scene,
-        duration: 1,
+        duration: 8,
         looping: true,
+        prewarm: true,
         startLife: new IntervalValue(3.5, 5),
         startSpeed: new IntervalValue(0.02, 0.12),
         startSize: new IntervalValue(8, 12),
@@ -215,7 +202,7 @@ export function mountIndexHeroBackground() {
         texture: tex1,
         transparent: true,
         blendMode: Constants.ALPHA_ADD,
-        startTileIndex: new ConstantValue(T1.softCircle),
+        startTileIndex: new ConstantValue(T1.softGlow),
         uTileCount: 10,
         vTileCount: 10,
         renderMode: RenderMode.BillBoard,
@@ -226,11 +213,41 @@ export function mountIndexHeroBackground() {
     batchRenderer.addSystem(coreHeart);
     systems.push(coreHeart);
 
+    // --- Layer 3: accretion disk — soft glows orbiting the core, slowly drawn inward ---
+    const disk = new ParticleSystem({
+        scene,
+        duration: 8,
+        looping: true,
+        prewarm: true,
+        startLife: new IntervalValue(5, 8),
+        startSpeed: new IntervalValue(0, 0.1),
+        startSize: new IntervalValue(0.6, 1.6),
+        startColor: new RandomColor(new Vector4(0.4, 0.75, 1, 0.3), new Vector4(0.8, 0.5, 1, 0.4)),
+        worldSpace: true,
+        emissionOverTime: new ConstantValue(40),
+        shape: new DonutEmitter({radius: 7, donutRadius: 3.2, thickness: 1, arc: Math.PI * 2}),
+        texture: tex1,
+        transparent: true,
+        blendMode: Constants.ALPHA_ADD,
+        startTileIndex: new ConstantValue(T1.softGlow),
+        uTileCount: 10,
+        vTileCount: 10,
+        renderMode: RenderMode.BillBoard,
+        renderOrder: 3,
+    });
+    disk.addBehavior(new ColorOverLife(fadeEnvelope(0.2, 0.7)));
+    disk.addBehavior(new OrbitOverLife(new IntervalValue(0.25, 0.5), diskAxis, 'world'));
+    disk.addBehavior(new GravityForce(new QVector3(0, 0, 0), 4));
+    layFlat(disk);
+    batchRenderer.addSystem(disk);
+    systems.push(disk);
+
     // --- Layer 4: comet ribbons — a few Trail particles sweep luminous arcs around the disk ---
     const comets = new ParticleSystem({
         scene,
-        duration: 1,
+        duration: 8,
         looping: true,
+        prewarm: true,
         startLife: new IntervalValue(4.5, 6.5),
         startSpeed: new IntervalValue(0.02, 0.1),
         startSize: new IntervalValue(0.3, 0.5),
@@ -260,8 +277,9 @@ export function mountIndexHeroBackground() {
     // turbulence field and leaning toward the cursor ---
     const dust = new ParticleSystem({
         scene,
-        duration: 1,
+        duration: 8,
         looping: true,
+        prewarm: true,
         startLife: new IntervalValue(6, 10),
         startSpeed: new IntervalValue(0.05, 0.25),
         startSize: new IntervalValue(0.08, 0.22),
@@ -327,120 +345,80 @@ export function mountIndexHeroBackground() {
     batchRenderer.addSystem(cursorComets);
     systems.push(cursorComets);
 
-    scene.whenReadyAsync().then(() => {
-        for (const system of systems) {
-            system.play();
+    // Named so the hierarchy reads well when the vortex is opened in the editor.
+    const names: [ParticleSystem, string][] = [
+        [nebula, 'Nebula'],
+        [coreGlow, 'Core glow'],
+        [coreHeart, 'Core heart'],
+        [disk, 'Accretion disk'],
+        [comets, 'Comet ribbons'],
+        [dust, 'Stardust'],
+        [cursorComets, 'Cursor comets'],
+    ];
+    for (const [system, name] of names) {
+        system.emitter.name = name;
+    }
+    for (const system of systems) {
+        system.play();
+    }
+
+    return {
+        cursorForce,
+        cursorComets,
+        cursorEmission,
+        pointerX: 0,
+        pointerY: 0,
+        prevPointerX: 0,
+        prevPointerY: 0,
+        cursorEmitRate: 0,
+        planeNormal: new BVector3(),
+        cursorWorld: new BVector3(),
+    };
+}
+
+function updateVortex({scene, camera}: DemoContext, state: VortexState, pointer: StagePointer, delta: number) {
+    const ease = Math.min(delta * 3.5, 1);
+    state.pointerX += (pointer.x - state.pointerX) * ease;
+    state.pointerY += (pointer.y - state.pointerY) * ease;
+
+    // Slow orbital drift around the vortex, with a little pointer parallax.
+    camera.alpha += delta * 0.03;
+    camera.beta += Math.sin(performance.now() * 0.00035) * delta * 0.012;
+    camera.target.x = state.pointerX * 1.5;
+    camera.target.y = state.pointerY * 1;
+
+    // Steer the dust lean toward where the pointer points (kept unit-length).
+    const lx = state.pointerX;
+    const ly = state.pointerY * 0.65;
+    const lz = -0.18;
+    const len = Math.hypot(lx, ly, lz) || 1;
+    state.cursorForce.direction.set(lx / len, ly / len, lz / len);
+
+    // Ride the pointer: project it onto the plane through the vortex centre facing the camera,
+    // park the comet emitter there, and scale emission with pointer speed so ribbons only appear
+    // while the pointer moves.
+    const speedNdc =
+        delta > 0 ? Math.hypot(state.pointerX - state.prevPointerX, state.pointerY - state.prevPointerY) / delta : 0;
+    state.prevPointerX = state.pointerX;
+    state.prevPointerY = state.pointerY;
+    if (!pointer.seen) {
+        return;
+    }
+    const engine = scene.getEngine();
+    const px = ((state.pointerX + 1) / 2) * engine.getRenderWidth();
+    const py = ((1 - state.pointerY) / 2) * engine.getRenderHeight();
+    const ray = scene.createPickingRay(px, py, null, camera);
+    state.planeNormal.copyFrom(camera.position).subtractInPlace(camera.target).normalize();
+    const denom = BVector3.Dot(state.planeNormal, ray.direction);
+    if (Math.abs(denom) > 1e-4) {
+        const t = -BVector3.Dot(state.planeNormal, ray.origin) / denom;
+        if (t > 0) {
+            state.cursorWorld.copyFrom(ray.direction).scaleInPlace(t).addInPlace(ray.origin);
+            state.cursorComets.emitter.position.copyFrom(state.cursorWorld);
         }
-    });
-
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    engine.setHardwareScalingLevel(1 / dpr);
-    engine.resize();
-
-    // --- pointer + scroll state (smoothed) ---
-    let pointerX = 0;
-    let pointerY = 0;
-    let targetX = 0;
-    let targetY = 0;
-    let scrollN = 0;
-    let targetScroll = 0;
-    // On wide screens the camera target shifts left so the vortex sits right of the headline;
-    // on narrow screens it stays centered behind the stacked hero copy.
-    let baseTargetX = 0;
-    const updateComposition = () => {
-        baseTargetX = window.innerWidth >= 900 ? -4 : 0;
-    };
-    updateComposition();
-
-    const onPointerMove = (e: PointerEvent) => {
-        targetX = (e.clientX / Math.max(window.innerWidth, 1)) * 2 - 1;
-        targetY = -((e.clientY / Math.max(window.innerHeight, 1)) * 2 - 1);
-    };
-    const onScroll = () => {
-        targetScroll = Math.min((window.scrollY || 0) / Math.max(window.innerHeight, 1), 1.6);
-    };
-    window.addEventListener('pointermove', onPointerMove, {passive: true});
-    window.addEventListener('scroll', onScroll, {passive: true});
-
-    const onResize = () => {
-        updateComposition();
-        engine.resize();
-    };
-    window.addEventListener('resize', onResize);
-
-    // Cursor-comet steering state: previous smoothed pointer (for speed) and reusable vectors.
-    let prevPointerX = 0;
-    let prevPointerY = 0;
-    let cursorEmitRate = 0;
-    let pointerSeen = false;
-    const planeNormal = new BVector3();
-    const cursorWorld = new BVector3();
-    const onFirstPointer = () => {
-        pointerSeen = true;
-    };
-    window.addEventListener('pointermove', onFirstPointer, {passive: true, once: true});
-
-    engine.runRenderLoop(() => {
-        const delta = Math.min(engine.getDeltaTime() / 1000, 0.05);
-        const ease = Math.min(delta * 3.5, 1);
-        pointerX += (targetX - pointerX) * ease;
-        pointerY += (targetY - pointerY) * ease;
-        scrollN += (targetScroll - scrollN) * Math.min(delta * 3, 1);
-
-        // Slow orbital drift around the vortex + cursor/scroll parallax.
-        camera.alpha += delta * 0.03;
-        camera.beta += Math.sin(performance.now() * 0.00035) * delta * 0.012;
-        camera.target.x = baseTargetX + pointerX * 2.0;
-        camera.target.y = pointerY * 1.2 - scrollN * 3.5;
-        camera.radius = 26 + scrollN * 4;
-
-        // Steer the dust lean toward where the cursor points (kept unit-length).
-        const lx = pointerX;
-        const ly = pointerY * 0.65;
-        const lz = -0.18;
-        const len = Math.hypot(lx, ly, lz) || 1;
-        cursorForce.direction.set(lx / len, ly / len, lz / len);
-
-        // Ride the cursor: project the smoothed pointer onto the plane through the vortex center
-        // facing the camera, park the comet emitter there, and scale emission with cursor speed
-        // so ribbons only appear while the mouse is moving.
-        const speedNdc = delta > 0 ? Math.hypot(pointerX - prevPointerX, pointerY - prevPointerY) / delta : 0;
-        prevPointerX = pointerX;
-        prevPointerY = pointerY;
-        if (pointerSeen) {
-            const px = ((pointerX + 1) / 2) * engine.getRenderWidth();
-            const py = ((1 - pointerY) / 2) * engine.getRenderHeight();
-            const ray = scene.createPickingRay(px, py, null, camera);
-            planeNormal.copyFrom(camera.position).subtractInPlace(camera.target).normalize();
-            const denom = BVector3.Dot(planeNormal, ray.direction);
-            if (Math.abs(denom) > 1e-4) {
-                const t = -BVector3.Dot(planeNormal, ray.origin) / denom;
-                if (t > 0) {
-                    cursorWorld.copyFrom(ray.direction).scaleInPlace(t).addInPlace(ray.origin);
-                    cursorComets.emitter.position.copyFrom(cursorWorld);
-                }
-            }
-            const targetRate = Math.min(speedNdc * 11, 15);
-            const rateEase = Math.min(delta * (targetRate > cursorEmitRate ? 8 : 4), 1);
-            cursorEmitRate += (targetRate - cursorEmitRate) * rateEase;
-            cursorEmission.value = cursorEmitRate;
-        }
-
-        batchRenderer.update(delta);
-        scene.render();
-    });
-
-    return () => {
-        window.removeEventListener('resize', onResize);
-        window.removeEventListener('pointermove', onPointerMove);
-        window.removeEventListener('pointermove', onFirstPointer);
-        window.removeEventListener('scroll', onScroll);
-        engine.stopRenderLoop();
-        for (const system of systems) {
-            system.dispose();
-        }
-        batchRenderer.dispose();
-        scene.dispose();
-        engine.dispose();
-    };
+    }
+    const targetRate = Math.min(speedNdc * 11, 15);
+    const rateEase = Math.min(delta * (targetRate > state.cursorEmitRate ? 8 : 4), 1);
+    state.cursorEmitRate += (targetRate - state.cursorEmitRate) * rateEase;
+    state.cursorEmission.value = state.cursorEmitRate;
 }

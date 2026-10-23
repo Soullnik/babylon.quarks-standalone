@@ -1,3 +1,4 @@
+import {readFileSync} from 'fs';
 import {resolve} from 'path';
 import {fileURLToPath} from 'url';
 import {defineConfig} from 'vite';
@@ -5,6 +6,11 @@ import {defineConfig} from 'vite';
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
 const repositoryName = process.env.GITHUB_REPOSITORY?.split('/')[1] ?? '';
 const base = process.env.GITHUB_ACTIONS === 'true' && repositoryName ? `/${repositoryName}/` : '/';
+
+// The landing page prints the published version (`%VITE_QUARKS_VERSION%` in index.html, and
+// `import.meta.env.VITE_QUARKS_VERSION` in scripts), read from the package so it never goes stale.
+const quarksPackage = JSON.parse(readFileSync(resolve(__dirname, '../packages/babylon.quarks/package.json'), 'utf8'));
+process.env.VITE_QUARKS_VERSION = quarksPackage.version;
 
 export default defineConfig({
     base,

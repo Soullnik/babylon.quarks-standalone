@@ -1,7 +1,8 @@
 /**
  * Opens every demo of the examples app in headless Chromium and fails on any
  * page error or console error: the regression guard for "a demo stopped
- * rendering", which unit tests on a NullEngine cannot see.
+ * rendering", which unit tests on a NullEngine cannot see. The first shard also
+ * opens the landing page and waits for its live stage to start.
  *
  * Serve the examples first (`npm run dev -w examples`, or `npm run preview -w
  * examples` after `npm run build:examples`), then `node scripts/demo-smoke.mjs`.
@@ -101,8 +102,39 @@ for (const engine of engines) {
         await page.close();
     }
 }
+// The landing page: its gallery and live stage must come up without errors.
+let landingPages = 0;
+if (shard === 1) {
+    for (const engine of engines) {
+        landingPages++;
+        const page = await browser.newPage({viewport: {width: 1280, height: 800}});
+        const problems = [];
+        page.on('pageerror', (e) => problems.push('pageerror: ' + e.message.slice(0, 300)));
+        page.on('console', (m) => {
+            if (m.type() === 'error') problems.push('console: ' + m.text().slice(0, 300));
+        });
+        try {
+            await page.goto(`${base}${engine}`, {waitUntil: 'load', timeout: 60000});
+            await page.waitForFunction(() => window.__quarksLanding?.ready === true, {timeout: 60000});
+            const stage = await page.evaluate(() => window.__quarksLanding.stage);
+            if (stage !== 'live') problems.push(`stage: expected 'live', got '${stage}'`);
+            const cards = await page.locator('#demos-grid .demo').count();
+            if (cards !== allKeys.length) problems.push(`gallery: ${cards} cards for ${allKeys.length} demos`);
+            await page.waitForTimeout(settle);
+        } catch (e) {
+            problems.push('navigation: ' + String(e).slice(0, 300));
+        }
+        const real = problems.filter((p) => !NOISE.test(p));
+        const label = `landing page${engine ? ' (webgpu)' : ''}`;
+        console.log(
+            `${real.length === 0 ? 'ok  ' : 'FAIL'} ${label}${real.length ? '\n    ' + real.slice(0, 4).join('\n    ') : ''}`
+        );
+        if (real.length) failures++;
+        await page.close();
+    }
+}
 await browser.close();
 console.log(
-    `${keys.length * engines.length} demo pages${shards > 1 ? ` (shard ${shard}/${shards})` : ''}, ${failures} with errors`
+    `${keys.length * engines.length + landingPages} pages${shards > 1 ? ` (shard ${shard}/${shards})` : ''}, ${failures} with errors`
 );
 process.exit(failures === 0 ? 0 : 1);

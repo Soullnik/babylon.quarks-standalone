@@ -121,8 +121,23 @@ users should not rely on it.
    `npm run capture:previews` (requires the dev server running; `CHROMIUM_PATH` as above). The
    gallery shows `examples/public/previews/<key>.png`, and `npm run check:demos` fails on a demo
    without one.
+   `npm run capture:previews -- --only=YourDemo` captures just the new one.
 4. Add it to the demo table in the root `README.md` and bump the demo count in
    `packages/babylon.quarks/README.md`.
+
+## Landing page
+
+The site's front page is `examples/index.html`, styled by `examples/src/landing/landing.css` and
+driven by `examples/src/landing/main.ts`. Its live stage (`landing/heroStage.ts`) runs on the
+library itself: WebGPU when the browser has a hardware adapter, WebGL otherwise (`?engine=webgl`
+or `?engine=webgpu` force one), and it renders only while on screen. The stage's tabs load the
+landing-only vortex (`landing/vortex.ts`) or a demo module from `examples/src/demos/`.
+
+Its still images, the stage poster shown before the stage starts (and to visitors who prefer
+reduced motion) and the editor screenshot, are captured with `npm run capture:previews -- --landing`
+into `examples/public/landing/`. Recapture them when the vortex or the editor changes visibly.
+`npm run check:demos` also opens the landing page and fails if the stage does not start or the
+gallery misses a demo.
 
 ## Releases (maintainers)
 
