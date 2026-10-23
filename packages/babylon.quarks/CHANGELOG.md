@@ -65,7 +65,9 @@ and the project follows the `quarks.core` 0.x version line.
   read, since saving calls them to find the defaults.
 - **`play()` on a finished system plays it again**, as Unity's `Play` does: it restarts it from
   the beginning. Before, it only unpaused, and a finished system stayed empty. A paused or stopped
-  system still resumes where it was.
+  system still resumes where it was. `QuarksUtil.play(root)` does the same for each system, so a
+  short burst that had finished inside a longer effect plays again; to undo a pause without that,
+  use the new `resume()` and `QuarksUtil.resume(root)`.
 - **Behaviors no longer reset at every loop.** A looping system called each behavior's `reset()`
   as it began its next loop, so a `Noise` or `TurbulenceField` jumped back to its start offset
   once a loop and the sub emissions of particles still alive were dropped. `reset()` now runs only
@@ -79,7 +81,14 @@ and the project follows the `quarks.core` 0.x version line.
   - `update()` with no argument advances by the engine's frame time (game time) instead of the
     wall clock.
   - `addParticleSystemAnimation` no longer pauses the prefab.
-  - A looping track that ends with the timeline does not start over.
+  - A looping track that ends with the timeline does not start over, and one restarted earlier
+    ends its emission with the timeline too.
+  - `timeScale` now speeds up and slows down the particle systems on the timeline (see Added), and
+    a negative, NaN or infinite one is read as 0. A prefab saved with a `timeScale` other than 1
+    plays its systems at that speed now.
+  - `pause()` then `play()` resumes exactly the systems the pause paused, those dying out after
+    their window included (they stayed frozen before), and `setTime` on a paused prefab leaves the
+    systems it starts paused.
 - `ParticleEmitter.toJSON` writes `visible` from the emitter's own enabled flag, as `clone()` and
   `serializeEffect` do, not from its parents': an emitter under a disabled template is saved
   visible.
@@ -124,13 +133,16 @@ and the project follows the `quarks.core` 0.x version line.
 - **`EffectPool.acquire` takes a placement** (`EffectPlacement`: `position`, `rotation` or
   `rotationQuaternion`, `scaling`, `parent`), so a hit can face its surface normal or a muzzle
   flash its barrel. Every acquire first puts the copy back to the template's transform, so a
-  rotation or scale from its last use does not stay. `acquire(position, parent)` still works.
+  rotation or scale from its last use does not stay. `acquire(position, parent)` still works, with
+  any vector that has `x`, `y` and `z`.
 - **`ParticleSystem.timeDilation`**, a runtime multiplier on `playbackSpeed` that is not part of
   the effect (never saved, cloned or loaded), like Unreal's Custom Time Dilation or Unity's
   `VisualEffect.playRate`: for slow motion, a pause menu, or a timeline.
 - **`QuarksPrefab.timeScale` reaches the systems**: it sets the `timeDilation` of each track's
   system, so they slow down and speed up with the timeline; it is normalised like
-  `playbackSpeed`. Removing a track sets it back to 1.
+  `playbackSpeed`. Removing a system's last track sets it back to 1. Clips keep their own speed.
+- **`ParticleSystem.resume()` and `QuarksUtil.resume(root)`** undo a pause and leave a finished
+  system finished, for a pause button over a scene; the editor's transport uses them.
 - **`QuarksPrefab.autoUpdate`** advances the timeline before every render by the engine's frame
   time, as a Unity `PlayableDirector` on Game Time does; it is turned off on dispose.
 - `removeAllEventListeners()` with no event type removes every listener.
@@ -175,16 +187,15 @@ and the project follows the `quarks.core` 0.x version line.
   `ps.version` is written for three.quarks only.
 - **`QuarksPrefab` plays a window a single frame steps over.** A track shorter than a frame (a
   release burst, say) was never entered when one update jumped from before its start to after its
-  end; its system now restarts and ends its emission on the next update, and its clip plays and
-  stops.
-- `QuarksPrefab.play()` resumes the systems of the tracks it is inside but no longer replays one
-  that has finished.
+  end; its system now restarts and ends its emission once it has simulated a step (checked on
+  each update and after each render), and its clip plays and stops.
 - **An `EffectPool` never hands out a disposed copy.** A copy disposed from outside, by its own
   `dispose()` or with a parent it was placed under, leaves the pool, which makes a new one when
   it needs it; before, `acquire` handed out the disposed node and it never came back.
 - **`QuarksUtil.instantiate` copies meshes as meshes**, sharing the source's geometry and
-  material, where it made plain transform nodes of them; a `MeshSurfaceEmitter` whose mesh is in
-  the copied tree emits from the copy. The copy holds the source's materials as it held its
+  material, where it made plain transform nodes of them; an instance of a mesh in the tree becomes
+  an instance of its copy, and a `MeshSurfaceEmitter` whose mesh is in the copied tree emits from
+  the copy. The copy holds the source's materials as it held its
   textures, so `disposeEffect(source)` leaves a copy's meshes and materials whole.
 - **`MeshSurfaceEmitter` emits from a mesh without indices**, read as a triangle list, instead of
   from the origin. A stray vertex count past the last whole triangle is ignored.

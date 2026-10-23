@@ -1,6 +1,7 @@
 import {NullEngine} from '@babylonjs/core/Engines/nullEngine';
 import {StandardMaterial} from '@babylonjs/core/Materials/standardMaterial';
 import {Quaternion as BQuaternion, Vector3 as BVector3} from '@babylonjs/core/Maths/math.vector';
+import {InstancedMesh} from '@babylonjs/core/Meshes/instancedMesh';
 import {Mesh} from '@babylonjs/core/Meshes/mesh';
 import {VertexData} from '@babylonjs/core/Meshes/mesh.vertexData';
 import {MeshBuilder} from '@babylonjs/core/Meshes/meshBuilder';
@@ -557,6 +558,165 @@ describe('lifecycle API', () => {
             prefab.stop();
             prefab.update(0.01);
             expect(burst.isEmitEnded).toBe(false);
+        });
+    });
+
+    describe('review follow-ups', () => {
+        function looping(parameters: Partial<ConstructorParameters<typeof ParticleSystem>[0]> = {}): ParticleSystem {
+            return makeSystem({
+                looping: true,
+                duration: 1,
+                emissionBursts: [],
+                emissionOverTime: new ConstantValue(60),
+                startLife: new ConstantValue(0.5),
+                ...parameters,
+            });
+        }
+
+        it('resume() and QuarksUtil.resume leave a finished system finished; QuarksUtil.play replays it', () => {
+            const root = new TransformNode('fx', scene);
+            const short = makeSystem();
+            const long = looping();
+            short.emitter.parent = root;
+            long.emitter.parent = root;
+            for (let i = 0; i < 60; i++) {
+                short.update(STEP);
+                long.update(STEP);
+            }
+            expect(short.isFinished()).toBe(true);
+            QuarksUtil.pause(root);
+            QuarksUtil.resume(root);
+            short.update(STEP);
+            expect(short.particleNum).toBe(0);
+            expect(long.paused).toBe(false);
+            QuarksUtil.play(root);
+            short.update(STEP);
+            expect(short.particleNum).toBe(4);
+            short.dispose();
+            short.resume();
+            expect(short.paused).toBe(false);
+        });
+
+        it('copies an instance of a mesh in the tree as an instance of its copy', () => {
+            const root = new TransformNode('fx', scene);
+            const box = MeshBuilder.CreateBox('box', {size: 1}, scene);
+            box.parent = root;
+            const instance = box.createInstance('instance');
+            instance.parent = root;
+            const system = makeSystem();
+            system.emitter.parent = instance;
+            const copy = QuarksUtil.instantiate(root);
+            const copiedInstance = copy.getChildren().find((node) => node instanceof InstancedMesh) as InstancedMesh;
+            expect(copiedInstance.sourceMesh).not.toBe(box);
+            expect(copy.getChildren()).toContain(copiedInstance.sourceMesh);
+            disposeEffect(root);
+            expect(copiedInstance.isDisposed()).toBe(false);
+            let emitters = 0;
+            QuarksUtil.runOnAllParticleEmitters(copy, () => emitters++);
+            expect(emitters).toBe(1);
+        });
+
+        it('keeps an instance of a mesh outside the tree on that mesh', () => {
+            const outside = MeshBuilder.CreateBox('outside', {size: 1}, scene);
+            const root = new TransformNode('fx', scene);
+            const instance = outside.createInstance('instance');
+            instance.parent = root;
+            const copy = QuarksUtil.instantiate(root);
+            const copiedInstance = copy.getChildren().find((node) => node instanceof InstancedMesh) as InstancedMesh;
+            expect(copiedInstance.sourceMesh).toBe(outside);
+        });
+
+        it('ends a looping track restarted before the end of the timeline when the timeline ends', () => {
+            const a = looping();
+            const b = looping();
+            const prefab = new QuarksPrefab('loops', scene);
+            prefab.addParticleSystemAnimation(a.emitter as ParticleEmitter, 0, 0.5, true);
+            prefab.addParticleSystemAnimation(b.emitter as ParticleEmitter, 0, 2);
+            prefab.play();
+            for (let i = 0; i < 200 && prefab.isPlaying; i++) prefab.update(STEP);
+            expect(prefab.isPlaying).toBe(false);
+            expect(a.isEmitEnded).toBe(true);
+            expect(b.isEmitEnded).toBe(true);
+        });
+
+        it('resumes a system dying out after its window when the prefab is paused and played', () => {
+            const a = looping({startLife: new ConstantValue(2)});
+            const prefab = new QuarksPrefab('dying', scene);
+            prefab.addParticleSystemAnimation(a.emitter as ParticleEmitter, 0, 0.3);
+            prefab.addThreeAnimation(new TransformNode('t', scene), {}, 0, 3);
+            prefab.play();
+            for (let i = 0; i < 30; i++) {
+                prefab.update(STEP);
+                a.update(STEP);
+            }
+            expect(a.isEmitEnded).toBe(true);
+            prefab.pause();
+            expect(a.paused).toBe(true);
+            prefab.play();
+            expect(a.paused).toBe(false);
+        });
+
+        it('setTime on a paused prefab leaves the system it starts paused until play', () => {
+            const a = looping();
+            const prefab = new QuarksPrefab('scrub', scene);
+            prefab.addParticleSystemAnimation(a.emitter as ParticleEmitter, 0.5, 1);
+            prefab.setTime(0.75);
+            expect(a.paused).toBe(true);
+            prefab.play();
+            expect(a.paused).toBe(false);
+        });
+
+        it('removing a track ends an emission still due, and keeps the dilation of a system on another track', () => {
+            const burst = looping();
+            const prefab = new QuarksPrefab('remove', scene);
+            prefab.timeScale = 0.5;
+            prefab.addParticleSystemAnimation(burst.emitter as ParticleEmitter, 0.1, 0.05);
+            prefab.addParticleSystemAnimation(burst.emitter as ParticleEmitter, 2, 0.5);
+            prefab.play();
+            prefab.update(1);
+            prefab.removeAnimation(0);
+            expect(burst.timeDilation).toBe(0.5);
+            prefab.removeAnimation(0);
+            expect(burst.timeDilation).toBe(1);
+            expect(burst.isEmitEnded).toBe(true);
+        });
+
+        it('ends a window stepped over on the last frame after the next render, without another update', () => {
+            const burst = looping();
+            const prefab = new QuarksPrefab('last', scene);
+            prefab.addParticleSystemAnimation(burst.emitter as ParticleEmitter, 0.1, 0.01);
+            prefab.play();
+            prefab.update(1);
+            expect(prefab.isPlaying).toBe(false);
+            scene.onAfterRenderObservable.notifyObservers(scene);
+            expect(burst.isEmitEnded).toBe(false);
+            burst.update(STEP);
+            expect(burst.particleNum).toBeGreaterThan(0);
+            scene.onAfterRenderObservable.notifyObservers(scene);
+            expect(burst.isEmitEnded).toBe(true);
+            expect(scene.onAfterRenderObservable.hasObservers()).toBe(false);
+        });
+
+        it('ends a pending emission when disposed', () => {
+            const burst = looping();
+            const prefab = new QuarksPrefab('dispose', scene);
+            prefab.addParticleSystemAnimation(burst.emitter as ParticleEmitter, 0.1, 0.01);
+            prefab.addThreeAnimation(new TransformNode('t', scene), {}, 0, 1);
+            prefab.play();
+            prefab.update(0.5);
+            prefab.dispose();
+            expect(burst.isEmitEnded).toBe(true);
+        });
+
+        it('acquire takes a position from any vector with x, y and z', () => {
+            const renderer = new BatchedRenderer('r', scene);
+            const root = new TransformNode('fx', scene);
+            looping().emitter.parent = root;
+            const pool = new EffectPool(root, {renderer});
+            const copy = pool.acquire({x: 3, y: 2, z: 1} as unknown as BVector3)!;
+            expect(copy.position.asArray()).toEqual([3, 2, 1]);
+            pool.dispose();
+            renderer.dispose();
         });
     });
 });

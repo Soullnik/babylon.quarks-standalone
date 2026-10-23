@@ -109,8 +109,11 @@ export class EffectPool {
         if (copy === null) {
             return null;
         }
+        // Told apart by shape, not class: a vector from another copy of Babylon is still a position.
         const place: EffectPlacement =
-            placement === undefined || placement instanceof Vector3 ? {position: placement, parent} : placement;
+            placement === undefined || typeof (placement as Vector3).x === 'number'
+                ? {position: placement as Vector3 | undefined, parent}
+                : (placement as EffectPlacement);
         this.placeCopy(copy, place);
         copy.setEnabled(true);
         this.playing.add(copy);
@@ -190,13 +193,16 @@ export class EffectPool {
     private placeCopy(copy: TransformNode, place: EffectPlacement): void {
         const rest = this.restOf.get(copy)!;
         copy.parent = place.parent ?? null;
-        copy.position.copyFrom(place.position ?? rest.position);
-        copy.scaling.copyFrom(place.scaling ?? rest.scaling);
+        // By components: Babylon's copyFrom reads private fields, which a vector from elsewhere lacks.
+        const position = place.position ?? rest.position;
+        const scaling = place.scaling ?? rest.scaling;
+        copy.position.copyFromFloats(position.x, position.y, position.z);
+        copy.scaling.copyFromFloats(scaling.x, scaling.y, scaling.z);
         if (place.rotationQuaternion !== undefined) {
             copy.rotationQuaternion = place.rotationQuaternion.clone();
         } else if (place.rotation !== undefined) {
             copy.rotationQuaternion = null;
-            copy.rotation.copyFrom(place.rotation);
+            copy.rotation.copyFromFloats(place.rotation.x, place.rotation.y, place.rotation.z);
         } else {
             copy.rotationQuaternion = rest.rotationQuaternion?.clone() ?? null;
             copy.rotation.copyFrom(rest.rotation);

@@ -73,8 +73,9 @@ interface AnimationJSON {
  * timeline passes its end, the systems still emitting end their emission, the clips stop, the
  * prefab stops playing and rewinds, and {@link QuarksPrefab.play} plays it again.
  *
- * A window shorter than a frame is not missed: a frame that steps over it whole starts its system
- * (which ends its emission on the next update) or plays and stops its clip.
+ * A window shorter than a frame is not missed: a frame that steps over it whole starts its system,
+ * which ends its emission once it has simulated a step (so it still fires what its window began
+ * with), or plays and stops its clip.
  */
 export class QuarksPrefab extends TransformNode implements IPrefab {
     /** Always `'QuarksPrefab'`; written to JSON. */
@@ -92,8 +93,13 @@ export class QuarksPrefab extends TransformNode implements IPrefab {
     private _batchedRenderer?: BatchedRenderer;
     private _tempAnimationJSON: Array<AnimationJSON> = [];
     private _autoUpdate: Observer<Scene> | null = null;
-    /** Systems whose window a single update stepped over: they end their emission on the next one. */
+    /** Systems whose window a single update stepped over: they end their emission once they have stepped. */
     private readonly _pendingEndEmit = new Set<ParticleSystem>();
+    private _pendingObserver: Observer<Scene> | null = null;
+    /** Systems the timeline started this play; their emission ends with the timeline. */
+    private readonly _started = new Set<ParticleSystem>();
+    /** Systems {@link QuarksPrefab.pause} paused, which {@link QuarksPrefab.play} resumes. */
+    private readonly _pausedSystems = new Set<ParticleSystem>();
 
     constructor(name = 'QuarksPrefab', scene?: Scene) {
         super(name, scene);
@@ -102,8 +108,10 @@ export class QuarksPrefab extends TransformNode implements IPrefab {
     /**
      * Playback speed of the timeline and of the particle systems on it: 1 is real time, 2 twice as
      * fast, 0 frozen. It sets each track's system's {@link ParticleSystem.timeDilation}, so the
-     * systems keep pace with the timeline without their own `playbackSpeed` changing. Negative or
-     * NaN is read as 0. Saved in JSON when not 1.
+     * systems keep pace with the timeline without their own `playbackSpeed` changing. Clips are
+     * started and stopped on the scaled timeline but play at their own speed; scale them yourself
+     * (an `AnimationGroup`'s `speedRatio`). Negative, NaN or infinite is read as 0. Saved in JSON
+     * when not 1.
      */
     get timeScale(): number {
         return this._timeScale;
@@ -197,46 +205,54 @@ export class QuarksPrefab extends TransformNode implements IPrefab {
     }
 
     /**
-     * Removes the track at `index` in {@link QuarksPrefab.animationData}. A particle system's
-     * {@link ParticleSystem.timeDilation} goes back to 1.
+     * Removes the track at `index` in {@link QuarksPrefab.animationData}. When no other track plays
+     * its particle system, the system's {@link ParticleSystem.timeDilation} goes back to 1, and an
+     * end of emission still due from a stepped-over window happens now.
      */
     removeAnimation(index: number): void {
         const [removed] = this.animationData.splice(index, 1);
         const system = removed && particleSystemOf(removed);
-        if (system !== undefined) {
+        if (system !== undefined && !this.animationData.some((other) => particleSystemOf(other) === system)) {
             system.timeDilation = 1;
-            this._pendingEndEmit.delete(system);
+            if (this._pendingEndEmit.delete(system)) {
+                system.endEmit();
+            }
+            this._started.delete(system);
+            this._pausedSystems.delete(system);
         }
         this.updateDuration();
     }
 
     /**
-     * Starts or resumes the timeline from {@link QuarksPrefab.currentTime}, resuming the systems and
-     * clips of the tracks it is inside, which {@link QuarksPrefab.pause} paused. A system on such a
-     * track that has already finished stays finished.
+     * Starts or resumes the timeline from {@link QuarksPrefab.currentTime}. The systems
+     * {@link QuarksPrefab.pause} paused resume where they were (those dying out after their window
+     * included), and the clips of the tracks the timeline is inside play again.
      */
     play(): void {
         if (this.isPlaying) return;
         this.isPlaying = true;
+        for (const system of this._pausedSystems) {
+            system.resume();
+        }
+        this._pausedSystems.clear();
         this.animationData.forEach((animation) => {
-            if (!this.isInside(animation, this.currentTime)) return;
-            const system = particleSystemOf(animation);
-            if (system !== undefined) {
-                if (!system.isFinished()) system.play();
-                return;
+            if (animation.type === 'three' && this.isInside(animation, this.currentTime)) {
+                animation.clip?.play?.();
             }
-            animation.clip?.play?.();
         });
     }
 
-    /** Pauses the timeline and every system and clip on it. */
+    /** Pauses the timeline, every system on it that is running and every clip. */
     pause(): void {
         if (!this.isPlaying) return;
         this.isPlaying = false;
         this.animationData.forEach((animation) => {
             const system = particleSystemOf(animation);
             if (system !== undefined) {
-                system.pause();
+                if (!system.paused) {
+                    system.pause();
+                    this._pausedSystems.add(system);
+                }
                 return;
             }
             animation.clip?.pause?.();
@@ -247,7 +263,9 @@ export class QuarksPrefab extends TransformNode implements IPrefab {
     stop(): void {
         this.pause();
         this.currentTime = -0.00001;
-        this._pendingEndEmit.clear();
+        this.clearPending();
+        this._started.clear();
+        this._pausedSystems.clear();
         this.animationData.forEach((animation) => {
             const system = particleSystemOf(animation);
             if (system !== undefined) {
@@ -266,10 +284,7 @@ export class QuarksPrefab extends TransformNode implements IPrefab {
      *   scene's frame time. Call it once a frame, or use {@link QuarksPrefab.autoUpdate}.
      */
     update(forceDelta?: number): void {
-        for (const system of this._pendingEndEmit) {
-            system.endEmit();
-        }
-        this._pendingEndEmit.clear();
+        this.flushPending();
         if (!this.isPlaying) return;
         const delta = forceDelta ?? this.getScene().getEngine().getDeltaTime() / 1000;
         const previousTime = this.currentTime;
@@ -290,8 +305,8 @@ export class QuarksPrefab extends TransformNode implements IPrefab {
                 this.enterTrack(animation);
                 const system = particleSystemOf(animation);
                 if (system !== undefined) {
-                    // Ended on the next update, so that the system emits what its window began with.
-                    this._pendingEndEmit.add(system);
+                    // Ended once it has stepped, so that it emits what its window began with.
+                    this.addPending(system);
                 } else {
                     animation.clip?.stop?.();
                 }
@@ -301,12 +316,23 @@ export class QuarksPrefab extends TransformNode implements IPrefab {
         });
 
         if (ended) {
+            // Looping tracks restarted after their window, and anything else still emitting, end with the timeline.
+            for (const system of this._started) {
+                if (!this._pendingEndEmit.has(system) && !system.isEmitEnded) {
+                    system.endEmit();
+                }
+            }
+            this._started.clear();
             this.isPlaying = false;
             this.currentTime = -0.00001;
         }
     }
 
-    /** Jumps to `time` seconds, starting and ending tracks it crosses and scrubbing clips to it. */
+    /**
+     * Jumps to `time` seconds, starting the tracks whose windows it lands in, ending those it
+     * leaves, and scrubbing clips to it. A scrub that jumps over a whole window does not play it.
+     * While the prefab is paused, a system it starts stays paused until {@link QuarksPrefab.play}.
+     */
     setTime(time: number): void {
         const previousTime = this.currentTime;
         this.currentTime = time;
@@ -325,11 +351,44 @@ export class QuarksPrefab extends TransformNode implements IPrefab {
         });
     }
 
-    /** Stops advancing with the scene, and disposes the node. */
+    /** Stops advancing with the scene, ends an emission still due, and disposes the node. */
     override dispose(doNotRecurse?: boolean, disposeMaterialAndTextures?: boolean): void {
         this.autoUpdate = false;
-        this._pendingEndEmit.clear();
+        for (const system of this._pendingEndEmit) {
+            system.endEmit();
+        }
+        this.clearPending();
+        this._started.clear();
+        this._pausedSystems.clear();
         super.dispose(doNotRecurse, disposeMaterialAndTextures);
+    }
+
+    /** Marks a system to end its emission once it has simulated a step since it restarted. */
+    private addPending(system: ParticleSystem): void {
+        this._pendingEndEmit.add(system);
+        // Also checked after each render, so it ends even when update() is no longer called.
+        this._pendingObserver ??= this.getScene().onAfterRenderObservable.add(() => this.flushPending());
+    }
+
+    /** Ends the emission of the pending systems that have stepped (or were disposed). */
+    private flushPending(): void {
+        for (const system of this._pendingEndEmit) {
+            if (system.emissionState.time > 0 || system.isDisposed) {
+                system.endEmit();
+                this._pendingEndEmit.delete(system);
+            }
+        }
+        if (this._pendingEndEmit.size === 0) {
+            this.clearPending();
+        }
+    }
+
+    private clearPending(): void {
+        this._pendingEndEmit.clear();
+        if (this._pendingObserver !== null) {
+            this.getScene().onAfterRenderObservable.remove(this._pendingObserver);
+            this._pendingObserver = null;
+        }
     }
 
     /** Whether `time` is inside the track's window, the end excluded. */
@@ -343,6 +402,12 @@ export class QuarksPrefab extends TransformNode implements IPrefab {
         if (system !== undefined) {
             this._pendingEndEmit.delete(system);
             system.restart();
+            this._started.add(system);
+            if (!this.isPlaying) {
+                // Scrubbed into while paused: it waits for play().
+                system.pause();
+                this._pausedSystems.add(system);
+            }
             this._batchedRenderer?.addSystem(system);
             return;
         }

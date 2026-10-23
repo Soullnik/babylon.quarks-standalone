@@ -951,8 +951,8 @@ export class ParticleSystem implements IParticleSystem {
      * A runtime multiplier on {@link playbackSpeed} that is not part of the effect: what a
      * timeline, a slow-motion moment or a game's pause menu sets on a system it plays, like
      * Unreal's Custom Time Dilation or Unity's `VisualEffect.playRate`. The system runs at
-     * `playbackSpeed * timeDilation`. 1 by default; never saved, cloned or loaded. A negative or
-     * NaN value is read as 0. A `QuarksPrefab` sets it to its `timeScale` on the systems of
+     * `playbackSpeed * timeDilation`. 1 by default; never saved, cloned or loaded. A negative,
+     * NaN or infinite value is read as 0. A `QuarksPrefab` sets it to its `timeScale` on the systems of
      * its tracks.
      */
     get timeDilation(): number {
@@ -1282,7 +1282,8 @@ export class ParticleSystem implements IParticleSystem {
     /**
      * Plays the system, like Unity's `Play`: a paused or stopped system resumes from where it is,
      * and one that has finished ({@link isFinished}) starts over from the beginning, as
-     * {@link restart} does. A playing system that has not finished is left as it is.
+     * {@link restart} does. A playing system that has not finished is left as it is. To undo a
+     * {@link pause} without replaying a system that had finished, use {@link resume}.
      */
     play(): void {
         if (this.destroyed) {
@@ -1290,6 +1291,18 @@ export class ParticleSystem implements IParticleSystem {
         }
         if (this.isFinished()) {
             this.restart();
+        }
+        this.resume();
+    }
+
+    /**
+     * Undoes {@link pause}: the system goes on from where it is, and one that has finished stays
+     * finished. For a pause button over a whole scene, where {@link play} would replay the
+     * effects that had already ended.
+     */
+    resume(): void {
+        if (this.destroyed) {
+            return;
         }
         this.paused = false;
         // A move made while paused is a placement, not motion to spread the next frame over.
