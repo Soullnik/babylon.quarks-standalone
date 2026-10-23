@@ -1,5 +1,5 @@
 import {Bezier} from './Bezier';
-import {FunctionJSON} from './FunctionJSON';
+import type {PiecewiseBezierJSON} from './FunctionJSON';
 import {GeneratorMemory} from './GeneratorMemory';
 import {PiecewiseFunction} from './PiecewiseFunction';
 import {FunctionValueGenerator} from './ValueGenerator';
@@ -163,7 +163,7 @@ export class PiecewiseBezier extends PiecewiseFunction<Bezier> implements Functi
         if (segments < 1) return '';
         let result = ['M', 0, this.functions[0][0].p[0]].join(' ');
         for (let i = 1.0 / segments; i <= 1; i += 1.0 / segments) {
-            result = [result, 'L', i * length, this.genValue(undefined as any, i)].join(' ');
+            result = [result, 'L', i * length, this.genValueExact(i)].join(' ');
         }
         return result;
     }
@@ -172,7 +172,7 @@ export class PiecewiseBezier extends PiecewiseFunction<Bezier> implements Functi
     type: 'function';
 
     /** The JSON form, `{type: 'PiecewiseBezier', functions: [{function, start}]}`. */
-    toJSON(): FunctionJSON {
+    toJSON(): PiecewiseBezierJSON {
         return {
             type: 'PiecewiseBezier',
             functions: this.functions.map(([bezier, start]) => ({function: bezier.toJSON(), start: start})),
@@ -180,9 +180,9 @@ export class PiecewiseBezier extends PiecewiseFunction<Bezier> implements Functi
     }
 
     /** Reads {@link PiecewiseBezier.toJSON} output. */
-    static fromJSON(json: FunctionJSON): PiecewiseBezier {
+    static fromJSON(json: PiecewiseBezierJSON): PiecewiseBezier {
         return new PiecewiseBezier(
-            json.functions.map((piecewiseFunction: any) => [
+            json.functions.map((piecewiseFunction): [Bezier, number] => [
                 Bezier.fromJSON(piecewiseFunction.function),
                 piecewiseFunction.start,
             ])

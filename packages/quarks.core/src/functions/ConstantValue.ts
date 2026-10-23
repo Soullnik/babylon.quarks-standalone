@@ -1,4 +1,4 @@
-import {FunctionJSON} from './FunctionJSON';
+import type {ConstantValueJSON} from './FunctionJSON';
 import {GeneratorMemory} from './GeneratorMemory';
 import {ValueGenerator} from './ValueGenerator';
 
@@ -20,7 +20,7 @@ export class ConstantValue implements ValueGenerator {
     }
 
     /** The JSON form, `{type: 'ConstantValue', value}`. */
-    toJSON(): FunctionJSON {
+    toJSON(): ConstantValueJSON {
         return {
             type: 'ConstantValue',
             value: this.value,
@@ -28,7 +28,7 @@ export class ConstantValue implements ValueGenerator {
     }
 
     /** Reads {@link ConstantValue.toJSON} output. */
-    static fromJSON(json: FunctionJSON): ConstantValue {
+    static fromJSON(json: ConstantValueJSON): ConstantValue {
         return new ConstantValue(json.value);
     }
 

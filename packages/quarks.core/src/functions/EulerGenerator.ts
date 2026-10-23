@@ -1,5 +1,5 @@
 import {Euler, EulerOrder, Quaternion} from '../math';
-import {FunctionJSON} from './FunctionJSON';
+import type {EulerJSON} from './FunctionJSON';
 import {GeneratorMemory} from './GeneratorMemory';
 import {RotationGenerator} from './RotationGenerator';
 import {FunctionValueGenerator, ValueGenerator, ValueGeneratorFromJSON} from './ValueGenerator';
@@ -48,7 +48,7 @@ export class EulerGenerator implements RotationGenerator {
     }
 
     /** The JSON form, `{type: 'Euler', angleX, angleY, angleZ, eulerOrder}`. */
-    toJSON(): FunctionJSON {
+    toJSON(): EulerJSON {
         return {
             type: 'Euler',
             angleX: this.angleX.toJSON(),
@@ -59,12 +59,12 @@ export class EulerGenerator implements RotationGenerator {
     }
 
     /** Reads {@link EulerGenerator.toJSON} output. */
-    static fromJSON(json: FunctionJSON): EulerGenerator {
+    static fromJSON(json: EulerJSON): EulerGenerator {
         return new EulerGenerator(
             ValueGeneratorFromJSON(json.angleX) as FunctionValueGenerator,
             ValueGeneratorFromJSON(json.angleY) as FunctionValueGenerator,
             ValueGeneratorFromJSON(json.angleZ) as FunctionValueGenerator,
-            json.eulerOrder as EulerOrder
+            json.eulerOrder
         );
     }
 

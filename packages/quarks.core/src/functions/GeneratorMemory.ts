@@ -45,4 +45,4 @@
  *   its own array, so two particles can hold different samples at the same
  *   slot without interference.
  */
-export type GeneratorMemory = any[];
+export type GeneratorMemory = number[];

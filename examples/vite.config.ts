@@ -33,13 +33,19 @@ export default defineConfig({
         },
     },
     build: {
-        rollupOptions: {
+        rolldownOptions: {
             input: {
                 index: resolve(__dirname, 'index.html'),
                 babylon: resolve(__dirname, 'babylonDemo.html'),
                 benchmark: resolve(__dirname, 'benchmark.html'),
                 editor: resolve(__dirname, 'editor.html'),
                 shaders: resolve(__dirname, 'shader-validate.html'),
+            },
+            output: {
+                // React gets a chunk of its own, so the editor page caches it apart from Babylon.
+                codeSplitting: {
+                    groups: [{name: 'react', test: /[\\/]node_modules[\\/](react|react-dom|scheduler)[\\/]/}],
+                },
             },
         },
     },

@@ -3,8 +3,7 @@ import {relativePathOf} from '../src/core/assets';
 import {pickAssetFolderFiles} from '../src/core/pickAssetFiles';
 
 type Entry =
-    | {kind: 'file'; getFile(): Promise<File>}
-    | {kind: 'directory'; entries(): AsyncIterableIterator<[string, Entry]>};
+    {kind: 'file'; getFile(): Promise<File>} | {kind: 'directory'; entries(): AsyncIterableIterator<[string, Entry]>};
 
 function directory(tree: Record<string, string | Record<string, unknown>>): Entry {
     return {

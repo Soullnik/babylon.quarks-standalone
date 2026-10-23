@@ -1,4 +1,4 @@
-import type {FunctionJSON} from '../functions/FunctionJSON';
+import type {ValueGeneratorJSON} from '../functions/FunctionJSON';
 import {EmissionState, IParticleSystem} from '../IParticleSystem';
 import {Particle} from '../Particle';
 import {random} from '../util/random';
@@ -47,7 +47,7 @@ export interface ShapeJSON {
     /** Spread of the arc: emission points snap to multiples of it; 0 for none. */
     spread?: number;
     /** Speed of the arc sweep in arcs per second, a value generator's JSON. */
-    speed?: FunctionJSON;
+    speed?: ValueGeneratorJSON;
     /** Local offset / rotation / scale of the shape; omitted when there is none. */
     transform?: ShapeTransformJSON;
 }

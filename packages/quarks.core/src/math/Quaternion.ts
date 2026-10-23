@@ -743,6 +743,6 @@ class Quaternion {
     }
 }
 
-(Quaternion.prototype as any).isQuaternion = true;
+Object.defineProperty(Quaternion.prototype, 'isQuaternion', {value: true});
 
 export {Quaternion};

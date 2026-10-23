@@ -13,8 +13,10 @@ import {
     TrailSettings,
     ValueGeneratorFromJSON,
     Vector3,
+    Vector3ArrayJSON,
     warnFormat,
 } from 'quarks.core';
+import type {MaterialTextureRef} from '../effectDocumentJSON';
 import type {ParticleSystem} from '../ParticleSystem';
 import {
     trailCurveTension,
@@ -23,6 +25,7 @@ import {
     trailTessellation,
     trailTextureMode,
     trailTextureScale,
+    type TrailOptions,
 } from '../trailSettings';
 import {
     EROSION_DEFAULT_SOFTNESS,
@@ -32,8 +35,15 @@ import {
     UV_DISTORTION_DEFAULT_UV,
 } from '../VFXBatch';
 import {resolveGeometryData} from './geometry';
+import type {ParticleMaterialSource} from './materialResolve';
 import {settingsFromJSON, settingsToJSON} from './settingsSchema';
-import type {BabylonMetaData, ParticleSystemJSONParameters, ParticleSystemParameters} from './types';
+import type {
+    BabylonMetaData,
+    ParticleSystemJSONParameters,
+    ParticleSystemParameters,
+    RendererEmitterSettingsJSON,
+    TrailSettingsJSON,
+} from './types';
 
 // Reading and writing a ParticleSystem's JSON. The class's toJSON and fromJSON call these.
 
@@ -53,8 +63,8 @@ function nextSerializationId(meta: BabylonMetaData, prefix: string): string {
 }
 
 /** The optional trail flags that are switched on, so JSON and clones only carry the ones in use. */
-export function trailFlags(settings: TrailSettings | undefined): Partial<TrailSettings> {
-    const flags: Partial<TrailSettings> = {};
+export function trailFlags(settings: Partial<TrailOptions> | undefined): Partial<TrailOptions> {
+    const flags: Partial<TrailOptions> = {};
     if (settings?.uvFromHead) flags.uvFromHead = true;
     if (settings?.colorFromParticle) flags.colorFromParticle = true;
     if (settings?.dieWithParticle) flags.dieWithParticle = true;
@@ -63,8 +73,8 @@ export function trailFlags(settings: TrailSettings | undefined): Partial<TrailSe
 }
 
 /** A trail's tessellation and curve tension, normalised, each only when it differs from the default. */
-export function trailCurve(settings: TrailSettings | undefined): Partial<TrailSettings> {
-    const curve: Partial<TrailSettings> = {};
+export function trailCurve(settings: Partial<TrailOptions> | undefined): Partial<TrailOptions> {
+    const curve: Partial<TrailOptions> = {};
     const tessellation = trailTessellation(settings);
     const curveTension = trailCurveTension(settings);
     if (tessellation > 0) curve.tessellation = tessellation;
@@ -76,8 +86,8 @@ export function trailCurve(settings: TrailSettings | undefined): Partial<TrailSe
  * A trail's texture mode and scale, minimum vertex distance and lifetime, normalised, each only
  * when it differs from the default.
  */
-export function trailSampling(settings: TrailSettings | undefined): Partial<TrailSettings> {
-    const out: Partial<TrailSettings> = {};
+export function trailSampling(settings: Partial<TrailOptions> | undefined): Partial<TrailOptions> {
+    const out: Partial<TrailOptions> = {};
     const textureMode = trailTextureMode(settings);
     const textureScale = trailTextureScale(settings);
     const minVertexDistance = trailMinVertexDistance(settings);
@@ -90,12 +100,12 @@ export function trailSampling(settings: TrailSettings | undefined): Partial<Trai
 }
 
 /** A trail's `followLocalOrigin`, only when on: off is the default. */
-export function trailFollowLocalOrigin(settings: TrailSettings | undefined): Partial<TrailSettings> {
+export function trailFollowLocalOrigin(settings: Partial<TrailOptions> | undefined): Partial<TrailOptions> {
     return settings?.followLocalOrigin ? {followLocalOrigin: true} : {};
 }
 
 /** A trail's side axis as JSON `[x, y, z]`, or nothing when unset. */
-function trailSideAxisJSON(settings: TrailSettings | undefined): {sideAxis?: number[]} {
+function trailSideAxisJSON(settings: TrailSettings | undefined): {sideAxis?: Vector3ArrayJSON} {
     const axis = settings?.sideAxis;
     return axis ? {sideAxis: [axis.x, axis.y, axis.z]} : {};
 }
@@ -161,7 +171,7 @@ export function particleSystemToJSON(
         shape: EmitterToJSON(system.emitterShape),
         ...settingsToJSON(system),
         instancingGeometry: geometryUUID,
-        ...(Object.keys(rendererSettingsJSON).length > 0 ? {rendererEmitterSettings: rendererSettingsJSON} : {}),
+        ...(rendererSettingsJSON ? {rendererEmitterSettings: rendererSettingsJSON} : {}),
         material: materialUUID,
         behaviors: system.behaviors.map((b) => BehaviorToJSON(b, system)),
     };
@@ -178,10 +188,10 @@ export function particleSystemParametersFromJSON(
     scene?: Scene
 ): ParticleSystemParameters {
     // A part the file leaves out takes the constructor's default, as a system made in code does.
-    const shape = json.shape ? readFormatPart('shape', () => EmitterFromJSON(json.shape!, meta as any)) : undefined;
+    const shape = json.shape ? readFormatPart('shape', () => EmitterFromJSON(json.shape!, meta)) : undefined;
     let rendererEmitterSettings: RendererEmitterSettings;
     if (json.renderMode === RenderMode.Trail) {
-        const trailSettings = json.rendererEmitterSettings as TrailSettings;
+        const trailSettings = json.rendererEmitterSettings as TrailSettingsJSON | undefined;
         rendererEmitterSettings = {
             startLength:
                 trailSettings?.startLength !== undefined
@@ -191,26 +201,31 @@ export function particleSystemParametersFromJSON(
             ...trailFlags(trailSettings),
             ...trailCurve(trailSettings),
             ...trailSampling(trailSettings),
-            ...trailSideAxisFromJSON((trailSettings as {sideAxis?: unknown} | undefined)?.sideAxis),
+            ...trailSideAxisFromJSON(trailSettings?.sideAxis),
         };
     } else if (json.renderMode === RenderMode.StretchedBillBoard) {
-        rendererEmitterSettings = {...(json.rendererEmitterSettings ?? {})};
+        // The render mode says which settings the file holds.
+        const stretched: Partial<StretchedBillBoardSettings> = {
+            ...(json.rendererEmitterSettings as StretchedBillBoardSettings | undefined),
+        };
         if (json.speedFactor !== undefined) {
-            (rendererEmitterSettings as StretchedBillBoardSettings).speedFactor = json.speedFactor;
+            stretched.speedFactor = json.speedFactor;
         }
+        rendererEmitterSettings = stretched;
     } else {
         rendererEmitterSettings = {};
     }
 
     const materialMeta = json.material ? meta.materials?.[json.material] : undefined;
-    const materialTextureRef = materialMeta?.texture ?? json.texture;
-    const texture =
-        typeof materialTextureRef === 'string'
-            ? (meta.textures?.[materialTextureRef] ?? null)
-            : (materialTextureRef ?? null);
-    // Texture effects reference textures by uuid in a serialised meta, or hold them once a loader resolved them.
-    const resolveTexture = (ref: unknown): BaseTexture | null =>
-        typeof ref === 'string' ? (meta.textures?.[ref] ?? null) : ((ref as BaseTexture | null) ?? null);
+    // Texture slots reference textures by uuid in a serialised meta, or hold them once a loader resolved them.
+    const resolveTexture = (ref: MaterialTextureRef | undefined): BaseTexture | null =>
+        typeof ref === 'string' ? (meta.textures?.[ref] ?? null) : (ref ?? null);
+    const mainTexture = resolveTexture(materialMeta?.texture ?? json.texture);
+    // Particles sample a 2D texture.
+    const texture = mainTexture instanceof Texture ? mainTexture : null;
+    const material: ParticleMaterialSource | undefined =
+        materialMeta?.sourceMaterial ??
+        (materialMeta ? {...materialMeta, reflectionAtlas: resolveTexture(materialMeta.reflectionAtlas)} : undefined);
     const erosionMeta = materialMeta?.erosion;
     const gradientMeta = materialMeta?.gradientMap;
     const distortionMeta = materialMeta?.uvDistortion;
@@ -232,7 +247,7 @@ export function particleSystemParametersFromJSON(
         instancingNormals: resolvedGeometry.normals,
         rendererEmitterSettings,
         texture,
-        material: materialMeta?.sourceMaterial ?? materialMeta,
+        material,
         // The material entry wins over the system's own fields, which older files wrote too.
         blendMode: materialMeta?.alphaMode ?? settings.blendMode ?? Constants.ALPHA_ADD,
         transparent: materialMeta?.transparent ?? settings.transparent ?? true,
@@ -259,7 +274,7 @@ export function particleSystemParametersFromJSON(
 }
 
 /** The render mode's own settings as JSON: a trail's or a stretched billboard's, else none. */
-function rendererEmitterSettingsJSON(system: ParticleSystem): RendererEmitterSettings {
+function rendererEmitterSettingsJSON(system: ParticleSystem): RendererEmitterSettingsJSON | undefined {
     if (system.renderMode === RenderMode.Trail) {
         const settings = system.rendererEmitterSettings as TrailSettings;
         // `startLength` always, for loaders that read it without a default; the rest only when on.
@@ -269,8 +284,8 @@ function rendererEmitterSettingsJSON(system: ParticleSystem): RendererEmitterSet
             ...trailFlags(settings),
             ...trailCurve(settings),
             ...trailSampling(settings),
-            ...(trailSideAxisJSON(settings) as {sideAxis?: any}),
-        } as TrailSettings;
+            ...trailSideAxisJSON(settings),
+        };
     }
     if (system.renderMode === RenderMode.StretchedBillBoard) {
         return {
@@ -278,7 +293,7 @@ function rendererEmitterSettingsJSON(system: ParticleSystem): RendererEmitterSet
             lengthFactor: (system.rendererEmitterSettings as StretchedBillBoardSettings).lengthFactor,
         };
     }
-    return {};
+    return undefined;
 }
 
 /** Writes the system's geometry into `meta` once per document, and returns its uuid. */
@@ -343,7 +358,7 @@ function materialMeta(system: ParticleSystem, meta: BabylonMetaData): string {
         if (uuid === undefined) {
             uuid = nextSerializationId(meta, 'quarks_texture');
             textures.set(value, uuid);
-            meta.textures[uuid] = value as Texture;
+            meta.textures[uuid] = value;
         }
         return uuid;
     };

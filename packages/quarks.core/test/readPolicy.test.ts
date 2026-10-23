@@ -3,6 +3,7 @@
  * default, and no raw TypeError escapes, so one bad behavior or curve costs only itself.
  */
 import {
+    type ApplyForceJSON,
     BehaviorFromJSON,
     BehaviorTypes,
     ColorGeneratorFromJSON,
@@ -13,6 +14,7 @@ import {
     GeneratorFromJSON,
     loadPlugin,
     Noise,
+    type NoiseJSON,
     Plugins,
     PointEmitter,
     RandomQuatGenerator,
@@ -78,19 +80,25 @@ describe('reading an unknown or missing part', () => {
     });
 
     test('Noise written before the amounts existed takes the constructor defaults', () => {
-        const noise = BehaviorFromJSON(
-            {type: 'Noise', frequency: {type: 'ConstantValue', value: 1}, power: {type: 'ConstantValue', value: 1}},
-            system
-        ) as Noise;
+        const json: NoiseJSON = {
+            type: 'Noise',
+            frequency: {type: 'ConstantValue', value: 1},
+            power: {type: 'ConstantValue', value: 1},
+        };
+        const noise = BehaviorFromJSON(json, system) as Noise;
         expect(noise.positionAmount.toJSON()).toEqual(new ConstantValue(1).toJSON());
         expect(noise.rotationAmount.toJSON()).toEqual(new ConstantValue(0).toJSON());
         expect(warn).not.toHaveBeenCalled();
     });
 
     test('ApplyForce and TurbulenceField read their vectors with defaults', () => {
-        const force = BehaviorFromJSON({type: 'ApplyForce', magnitude: {type: 'ConstantValue', value: 1}}, system);
+        const forceJSON: ApplyForceJSON = {type: 'ApplyForce', magnitude: {type: 'ConstantValue', value: 1}};
+        const force = BehaviorFromJSON(forceJSON, system);
         expect((force as unknown as {direction: Vector3}).direction).toEqual(new Vector3(0, 0, 0));
-        const turbulence = BehaviorFromJSON({type: 'TurbulenceField', scale: [2, 2]}, system) as unknown as {
+        const turbulence = BehaviorFromJSON(
+            JSON.parse('{"type": "TurbulenceField", "scale": [2, 2]}'),
+            system
+        ) as unknown as {
             scale: Vector3;
             velocityMultiplier: Vector3;
         };

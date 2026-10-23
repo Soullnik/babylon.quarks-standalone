@@ -643,14 +643,14 @@ class Matrix4 {
     setPosition(x: number | Vector3, y?: number, z?: number) {
         const te = this.elements;
 
-        if ((x as any).isVector3) {
-            te[12] = (x as Vector3).x;
-            te[13] = (x as Vector3).y;
-            te[14] = (x as Vector3).z;
-        } else {
-            te[12] = x as number;
+        if (typeof x === 'number') {
+            te[12] = x;
             te[13] = y!;
             te[14] = z!;
+        } else {
+            te[12] = x.x;
+            te[13] = x.y;
+            te[14] = x.z;
         }
 
         return this;
@@ -863,10 +863,10 @@ class Matrix4 {
      * @returns This matrix.
      */
     makeTranslation(x: number | Vector3, y?: number, z?: number) {
-        if ((x as any).isVector3) {
-            this.set(1, 0, 0, (x as Vector3).x, 0, 1, 0, (x as Vector3).y, 0, 0, 1, (x as Vector3).z, 0, 0, 0, 1);
+        if (typeof x === 'number') {
+            this.set(1, 0, 0, x, 0, 1, 0, y!, 0, 0, 1, z!, 0, 0, 0, 1);
         } else {
-            this.set(1, 0, 0, x as number, 0, 1, 0, y!, 0, 0, 1, z!, 0, 0, 0, 1);
+            this.set(1, 0, 0, x.x, 0, 1, 0, x.y, 0, 0, 1, x.z, 0, 0, 0, 1);
         }
 
         return this;
@@ -1233,7 +1233,7 @@ class Matrix4 {
     }
 }
 
-(Matrix4.prototype as any).isMatrix4 = true;
+Object.defineProperty(Matrix4.prototype, 'isMatrix4', {value: true});
 
 const _v1 = /*@__PURE__*/ new Vector3();
 const _m1 = /*@__PURE__*/ new Matrix4();

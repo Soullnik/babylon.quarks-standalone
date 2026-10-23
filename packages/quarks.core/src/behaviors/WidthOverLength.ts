@@ -1,6 +1,15 @@
-import {Particle, TrailParticle} from '../Particle';
+import type {ValueGeneratorJSON} from '../functions/FunctionJSON';
 import {FunctionValueGenerator, ValueGeneratorFromJSON} from '../functions/ValueGenerator';
-import {Behavior} from './Behavior';
+import {Particle, TrailParticle} from '../Particle';
+import {Behavior, BehaviorJSON} from './Behavior';
+
+/** The JSON of a trail width over length: a {@link WidthOverLength}. */
+export interface WidthOverLengthJSON extends BehaviorJSON {
+    /** The width along the trail. */
+    width: ValueGeneratorJSON;
+    /** Whether the width is in world units; true when absent. */
+    absolute?: boolean;
+}
 
 /**
  * Shapes a trail's width along its length — Unity's Width over Trail.
@@ -67,7 +76,7 @@ export class WidthOverLength implements Behavior {
 
     frameUpdate(delta: number): void {}
 
-    toJSON(): any {
+    toJSON(): WidthOverLengthJSON {
         return {
             type: this.type,
             width: this.width.toJSON(),
@@ -78,7 +87,7 @@ export class WidthOverLength implements Behavior {
     /**
      * Reads {@link WidthOverLength.toJSON} output; a field the JSON leaves out takes its default.
      */
-    static fromJSON(json: any): Behavior {
+    static fromJSON(json: WidthOverLengthJSON): Behavior {
         // JSON from before `absolute` existed was authored against absolute widths.
         return new WidthOverLength(ValueGeneratorFromJSON(json.width) as FunctionValueGenerator, json.absolute ?? true);
     }

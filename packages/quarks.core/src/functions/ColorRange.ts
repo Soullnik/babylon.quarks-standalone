@@ -2,7 +2,7 @@ import {Vector4} from '../math';
 import {ColorToJSON, JSONToColor} from '../util/JSONUtil';
 import {random} from '../util/random';
 import {ColorGenerator} from './ColorGenerator';
-import {FunctionJSON} from './FunctionJSON';
+import type {ColorRangeJSON} from './FunctionJSON';
 import {GeneratorMemory} from './GeneratorMemory';
 
 export class ColorRange implements ColorGenerator {
@@ -36,7 +36,7 @@ export class ColorRange implements ColorGenerator {
 
     type: 'value';
 
-    toJSON(): FunctionJSON {
+    toJSON(): ColorRangeJSON {
         return {
             type: 'ColorRange',
             a: ColorToJSON(this.a),
@@ -45,7 +45,7 @@ export class ColorRange implements ColorGenerator {
     }
 
     /** Reads {@link ColorRange.toJSON} output. */
-    static fromJSON(json: FunctionJSON): ColorRange {
+    static fromJSON(json: ColorRangeJSON): ColorRange {
         return new ColorRange(JSONToColor(json.a), JSONToColor(json.b));
     }
 

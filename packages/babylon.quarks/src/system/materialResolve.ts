@@ -1,5 +1,5 @@
 import type {BaseTexture} from '@babylonjs/core/Materials/Textures/baseTexture';
-import type {Texture} from '@babylonjs/core/Materials/Textures/texture';
+import {Texture} from '@babylonjs/core/Materials/Textures/texture';
 import type {VFXBatchSettings} from '../BatchedRenderer';
 
 /** Settings given next to a material, which win over what is read from it. */
@@ -12,6 +12,52 @@ export interface MaterialOverrides {
     texture?: Texture | null;
     reflectionAtlas?: BaseTexture | null;
     layerMask?: number;
+}
+
+/**
+ * What a {@link ParticleSystem} reads its draw settings from: a Babylon material (`StandardMaterial`,
+ * `PBRMaterial`, a node material, …), or a material entry of an effect file once its texture slots
+ * are resolved to textures, as `ParticleSystem.fromJSON` does. Each field is read only when it is
+ * there, so any material fits; the particles are still drawn with quarks' own shaders. The particle
+ * texture is the first slot that holds a `Texture`.
+ */
+export interface ParticleMaterialSource {
+    /** A PBR material's base colour texture. */
+    albedoTexture?: BaseTexture | null;
+    /** A standard material's diffuse texture. */
+    diffuseTexture?: BaseTexture | null;
+    /** An emissive texture, read when there is no albedo or diffuse texture. */
+    emissiveTexture?: BaseTexture | null;
+    /** An opacity texture, read when there is none of the above. */
+    opacityTexture?: BaseTexture | null;
+    /** A base texture, read last. */
+    baseTexture?: BaseTexture | null;
+    /** The reflection texture; a cube is drawn through a 3×2 atlas built from it. */
+    reflectionTexture?: BaseTexture | null;
+    /** A PBR material's environment texture, read when there is no reflection texture. */
+    environmentTexture?: BaseTexture | null;
+    /** How strong the reflection is; the reflection texture's `level` when unset. */
+    reflectionLevel?: number;
+    /** A 3×2 env atlas for the reflection; the system stores the atlas it builds from a cube here. */
+    reflectionAtlas?: BaseTexture | null;
+    /** A Babylon alpha mode constant. */
+    alphaMode?: number;
+    /** Whether the material blends; decides `transparent`. */
+    needAlphaBlending?(): boolean;
+    /** Opacity, read for `transparent` when there is no `needAlphaBlending`. */
+    alpha?: number;
+    /** Inverted into `depthTest`. */
+    disableDepthTest?: boolean;
+    /** Inverted into `depthWrite`. */
+    disableDepthWrite?: boolean;
+    /** Read for `depthWrite` when there is no `disableDepthWrite`. */
+    forceDepthWrite?: boolean;
+    /** The alpha test cutoff is read only in an alpha-test mode (1 or 3). */
+    transparencyMode?: number | null;
+    /** The alpha test cutoff. */
+    alphaCutOff?: number;
+    /** The alpha test cutoff, as some materials name it. */
+    alphaCutOffValue?: number;
 }
 
 /** The draw settings a {@link ParticleSystem} takes from a material, before the env atlas is built. */
@@ -39,18 +85,21 @@ export function liveAtlas<T extends BaseTexture>(atlas: T | null | undefined): T
  * material does not have keeps its `current` value.
  */
 export function resolveMaterialSettings(
-    material: any,
+    material: ParticleMaterialSource | null | undefined,
     overrides: MaterialOverrides,
     current: VFXBatchSettings
 ): ResolvedMaterialSettings {
+    // The particle texture is a `Texture`: the first slot that holds one, so a cube in a slot is passed over.
     const texture =
         overrides.texture !== undefined
             ? overrides.texture
-            : (material?.albedoTexture ??
-              material?.diffuseTexture ??
-              material?.emissiveTexture ??
-              material?.opacityTexture ??
-              material?.baseTexture ??
+            : ([
+                  material?.albedoTexture,
+                  material?.diffuseTexture,
+                  material?.emissiveTexture,
+                  material?.opacityTexture,
+                  material?.baseTexture,
+              ].find((slot): slot is Texture => slot instanceof Texture) ??
               current.texture ??
               null);
     const reflectionTexture =

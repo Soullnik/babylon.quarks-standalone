@@ -1,8 +1,9 @@
 /**
  * Opens every demo of the examples app in headless Chromium and fails on any
- * page error or console error: the regression guard for "a demo stopped
- * rendering", which unit tests on a NullEngine cannot see. The first shard also
- * opens the landing page and waits for its live stage to start.
+ * page error, console error or console warning: the regression guard for "a
+ * demo stopped rendering" or "a demo started warning", which unit tests on a
+ * NullEngine cannot see. The first shard also opens the landing page and waits
+ * for its live stage to start.
  *
  * Serve the examples first (`npm run dev -w examples`, or `npm run preview -w
  * examples` after `npm run build:examples`), then `node scripts/demo-smoke.mjs`.
@@ -59,7 +60,7 @@ if (missingPreviews.length > 0) {
     process.exit(1);
 }
 
-// Errors any headless run produces that say nothing about the demos.
+// Errors and warnings any headless run produces that say nothing about the demos.
 const NOISE = /favicon|net::ERR_|404 \(|GL Driver Message|GPU stall due to ReadPixels/;
 
 const browser = await chromium.launch({
@@ -81,7 +82,8 @@ for (const engine of engines) {
         const problems = [];
         page.on('pageerror', (e) => problems.push('pageerror: ' + e.message.slice(0, 300)));
         page.on('console', (m) => {
-            if (m.type() === 'error') problems.push('console: ' + m.text().slice(0, 300));
+            if (m.type() === 'error' || m.type() === 'warning')
+                problems.push(`console ${m.type()}: ` + m.text().slice(0, 300));
         });
         const url = `${base}babylonDemo.html${engine}#${key}`;
         try {
@@ -102,7 +104,7 @@ for (const engine of engines) {
         await page.close();
     }
 }
-// The landing page: its gallery and live stage must come up without errors.
+// The landing page: its gallery and live stage must come up without errors or warnings.
 let landingPages = 0;
 if (shard === 1) {
     for (const engine of engines) {
@@ -111,7 +113,8 @@ if (shard === 1) {
         const problems = [];
         page.on('pageerror', (e) => problems.push('pageerror: ' + e.message.slice(0, 300)));
         page.on('console', (m) => {
-            if (m.type() === 'error') problems.push('console: ' + m.text().slice(0, 300));
+            if (m.type() === 'error' || m.type() === 'warning')
+                problems.push(`console ${m.type()}: ` + m.text().slice(0, 300));
         });
         try {
             await page.goto(`${base}${engine}`, {waitUntil: 'load', timeout: 60000});

@@ -1,7 +1,7 @@
 import {Vector3} from '../math';
 import {describePart, warnFormat} from '../util/JSONUtil';
 import {ConstantValue} from './ConstantValue';
-import {FunctionJSON} from './FunctionJSON';
+import type {Vector3GeneratorJSON} from './FunctionJSON';
 import {GeneratorMemory} from './GeneratorMemory';
 import {Vector3Function} from './Vector3Function';
 
@@ -19,13 +19,13 @@ export interface Vector3Generator {
     /** See FunctionValueGenerator.refreshTable. */
     refreshTable?(): void;
     /** The generator's JSON. */
-    toJSON(): FunctionJSON;
+    toJSON(): Vector3GeneratorJSON;
     /** A copy with the same settings. */
     clone(): Vector3Generator;
 }
 
 /** Reads a vector generator; an unknown or missing type warns and gives a zero vector. */
-export function Vector3GeneratorFromJSON(json: FunctionJSON): Vector3Generator {
+export function Vector3GeneratorFromJSON(json: Vector3GeneratorJSON | undefined): Vector3Generator {
     switch (json?.type) {
         case 'Vector3Function':
             return Vector3Function.fromJSON(json);

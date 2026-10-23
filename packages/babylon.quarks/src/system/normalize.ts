@@ -1,5 +1,5 @@
 import {ConstantValue, FunctionValueGenerator, ValueGenerator, Vector2, Vector3} from 'quarks.core';
-import type {MeshLighting, RenderFace, SortMode} from '../VFXBatch';
+import type {MeshLighting, RenderFace, SortMode} from '../batchSettings';
 import type {BurstParameters, CullingMode} from './types';
 
 // Normalisers shared by the ParticleSystem constructor, its setters and its JSON reader, so a

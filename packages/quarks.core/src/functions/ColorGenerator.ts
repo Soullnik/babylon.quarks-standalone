@@ -1,7 +1,7 @@
 import {Vector4} from '../math';
 import {ColorToJSON, describePart, JSONToColor, warnFormat} from '../util/JSONUtil';
 import {ColorRange} from './ColorRange';
-import {FunctionJSON} from './FunctionJSON';
+import type {ColorGeneratorJSON, ConstantColorJSON} from './FunctionJSON';
 import {GeneratorMemory} from './GeneratorMemory';
 import {Gradient} from './Gradient';
 import {RandomColor} from './RandomColor';
@@ -25,7 +25,7 @@ export interface ColorGenerator {
      */
     genColor(memory: GeneratorMemory, color: Vector4): Vector4;
     /** The generator's JSON. */
-    toJSON(): FunctionJSON;
+    toJSON(): ColorGeneratorJSON;
     /** A copy with the same settings. */
     clone(): ColorGenerator;
 }
@@ -50,7 +50,7 @@ export interface FunctionColorGenerator {
     /** See FunctionValueGenerator.refreshTable. */
     refreshTable?(): void;
     /** The generator's JSON. */
-    toJSON(): FunctionJSON;
+    toJSON(): ColorGeneratorJSON;
     /** A copy with the same settings. */
     clone(): FunctionColorGenerator;
 }
@@ -75,7 +75,7 @@ export class ConstantColor implements ColorGenerator {
     type: 'value';
 
     /** The JSON form, `{type: 'ConstantColor', color}`. */
-    toJSON(): FunctionJSON {
+    toJSON(): ConstantColorJSON {
         return {
             type: 'ConstantColor',
             color: ColorToJSON(this.color),
@@ -83,7 +83,7 @@ export class ConstantColor implements ColorGenerator {
     }
 
     /** Reads {@link ConstantColor.toJSON} output. */
-    static fromJSON(json: FunctionJSON): ConstantColor {
+    static fromJSON(json: ConstantColorJSON): ConstantColor {
         return new ConstantColor(JSONToColor(json.color));
     }
 
@@ -94,7 +94,7 @@ export class ConstantColor implements ColorGenerator {
 }
 
 /** Reads a colour generator; an unknown or missing type warns and gives opaque white. */
-export function ColorGeneratorFromJSON(json: FunctionJSON) {
+export function ColorGeneratorFromJSON(json: ColorGeneratorJSON | undefined) {
     switch (json?.type) {
         case 'ConstantColor':
             return ConstantColor.fromJSON(json);

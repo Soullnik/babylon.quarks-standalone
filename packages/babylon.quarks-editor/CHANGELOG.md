@@ -51,9 +51,16 @@ and the project follows the `quarks.core` 0.x version line.
 - The transport's play resumes what pause froze and no longer replays effects or bursts that had
   already finished (it uses the library's new `resume()`, now that `play()` replays a finished
   system).
+- A node deleted by an undo while selected hands the selection back to its effect's root on the
+  next render. The host only checked when the selection or the session changed, so the inspector
+  and timeline could keep showing the deleted node.
 
 ### Internal
 
+- The asset import checks every field it reads from an effect file, with no `any`.
+- The React panels follow the React Compiler's rules (eslint-plugin-react-hooks 7): no ref
+  written during render, and state that follows a prop is adjusted during render instead of in an
+  effect, which saves a render each time.
 - `EffectEditorHost` is split into a session and panel components under `src/react/host/`, and
   every `as never` cast is gone. The session and the host have their own tests, and the React
   code has a coverage floor.

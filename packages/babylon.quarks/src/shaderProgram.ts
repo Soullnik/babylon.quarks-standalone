@@ -1,5 +1,6 @@
 import {Constants} from '@babylonjs/core/Engines/constants';
 import {hasSizeLimits, takesPivotAndSizeLimits, tilesSheet} from './batchKey';
+import {readsUV1, RenderMode, StoredBatchSettings} from './batchSettings';
 import local_particle_physics_vert from './shaders/local_particle_physics_vert.glsl';
 import local_particle_physics_vert_wgsl from './shaders/local_particle_physics_vert.wgsl';
 import particle_frag from './shaders/particle_frag.glsl';
@@ -15,7 +16,6 @@ import trail_frag from './shaders/trail_frag.glsl';
 import trail_frag_wgsl from './shaders/trail_frag.wgsl';
 import trail_vert from './shaders/trail_vert.glsl';
 import trail_vert_wgsl from './shaders/trail_vert.wgsl';
-import {readsUV1, RenderMode, StoredBatchSettings} from './VFXBatch';
 
 /**
  * The part of a batch's settings that decides its shader: the render mode, which textures and

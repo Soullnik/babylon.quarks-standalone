@@ -1,10 +1,19 @@
+import {FunctionValueGenerator, ValueGeneratorFromJSON} from '../functions';
+import type {ValueGeneratorJSON} from '../functions/FunctionJSON';
 import {IParticleSystem} from '../IParticleSystem';
 import {Particle} from '../Particle';
-import {FunctionValueGenerator, ValueGeneratorFromJSON} from '../functions';
-import {Behavior} from './Behavior';
+import {Behavior, BehaviorJSON} from './Behavior';
 
 /** The step rate `dampen` was defined at: 1/3 of the excess per step at 60 Hz. */
 const REFERENCE_RATE = 60;
+
+/** The JSON of a speed limit over life: a {@link LimitSpeedOverLife}. */
+export interface LimitSpeedOverLifeJSON extends BehaviorJSON {
+    /** The limit. */
+    speed: ValueGeneratorJSON;
+    /** How much excess speed goes per step; 1 when absent. */
+    dampen?: number;
+}
 
 /**
  * Limits the speed of particles over their life, like Unity's Limit Velocity over Lifetime: a
@@ -72,7 +81,7 @@ export class LimitSpeedOverLife implements Behavior {
             }
         }
     }
-    toJSON(): any {
+    toJSON(): LimitSpeedOverLifeJSON {
         return {
             type: this.type,
             speed: this.speed.toJSON(),
@@ -84,7 +93,7 @@ export class LimitSpeedOverLife implements Behavior {
      * Reads {@link LimitSpeedOverLife.toJSON} output; a field the JSON leaves out takes its
      * default.
      */
-    static fromJSON(json: any): Behavior {
+    static fromJSON(json: LimitSpeedOverLifeJSON): Behavior {
         return new LimitSpeedOverLife(
             ValueGeneratorFromJSON(json.speed) as FunctionValueGenerator,
             typeof json.dampen === 'number' ? json.dampen : 1

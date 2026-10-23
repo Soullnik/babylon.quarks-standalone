@@ -2,6 +2,29 @@ import {TransformNode} from '@babylonjs/core/Meshes/transformNode';
 import {Scene} from '@babylonjs/core/scene';
 import {IParticleSystem, Matrix4, SerializationOptions} from 'quarks.core';
 import {quarksNodeId} from './nodeId';
+import type {BabylonMetaData} from './system/types';
+
+/** A {@link ParticleEmitter} as its `toJSON` writes it: the node, its transform and its system. */
+export interface ParticleEmitterJSON {
+    /** The node's id in the effect. */
+    uuid: string;
+    /** Always `'ParticleEmitter'`. */
+    type: 'ParticleEmitter';
+    /** The node's name. */
+    name: string;
+    /** `[x, y, z]`. */
+    position: number[];
+    /** Euler angles `[x, y, z]` in radians. */
+    rotation: number[];
+    /** `[x, y, z, w]`, when the node has a rotation quaternion. */
+    quaternion?: number[];
+    /** `[x, y, z]`. */
+    scale: number[];
+    /** The node's own enabled flag. */
+    visible: boolean;
+    /** The system's JSON, as its `toJSON` writes it. */
+    ps: unknown;
+}
 
 /**
  * Above 0 while a particle system disposes its own emitter (`ParticleSystem.dispose()`, which
@@ -123,7 +146,7 @@ export class ParticleEmitter extends TransformNode {
      * `visible` is the node's own enabled flag, not the one it inherits from its parents. To write
      * a whole effect, with its children and resources, use `serializeEffect`.
      */
-    toJSON(meta?: any, options: SerializationOptions = {}): any {
+    toJSON(meta?: BabylonMetaData, options: SerializationOptions = {}): ParticleEmitterJSON {
         return {
             uuid: quarksNodeId(this),
             type: 'ParticleEmitter',

@@ -1,9 +1,18 @@
-import {Particle} from '../Particle';
 import {IntervalValue} from '../functions';
+import type {IntervalValueJSON, ValueGeneratorJSON} from '../functions/FunctionJSON';
 import {FunctionValueGenerator, ValueGenerator, ValueGeneratorFromJSON} from '../functions/ValueGenerator';
 import {Quaternion} from '../math';
-import {Behavior} from './Behavior';
+import {Particle} from '../Particle';
+import {Behavior, BehaviorJSON} from './Behavior';
 import {speedFraction} from './speedFraction';
+
+/** The JSON of a rotation by speed: a {@link RotationBySpeed}. */
+export interface RotationBySpeedJSON extends BehaviorJSON {
+    /** The angular velocity over the speed range. */
+    angularVelocity: ValueGeneratorJSON;
+    /** The speeds it spans; 0 to 1 when absent. */
+    speedRange?: IntervalValueJSON;
+}
 
 /**
  * Turns particles at a rate read off their current speed, like Unity's Rotation by Speed: the
@@ -39,7 +48,7 @@ export class RotationBySpeed implements Behavior {
         }
     }
 
-    toJSON(): any {
+    toJSON(): RotationBySpeedJSON {
         return {
             type: this.type,
             angularVelocity: this.angularVelocity.toJSON(),
@@ -50,7 +59,7 @@ export class RotationBySpeed implements Behavior {
     /**
      * Reads {@link RotationBySpeed.toJSON} output; a field the JSON leaves out takes its default.
      */
-    static fromJSON(json: any): Behavior {
+    static fromJSON(json: RotationBySpeedJSON): Behavior {
         return new RotationBySpeed(
             ValueGeneratorFromJSON(json.angularVelocity) as FunctionValueGenerator,
             json.speedRange ? IntervalValue.fromJSON(json.speedRange) : new IntervalValue(0, 1)

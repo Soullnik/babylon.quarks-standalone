@@ -1,15 +1,16 @@
 // @ts-check
 import js from '@eslint/js';
 import reactHooks from 'eslint-plugin-react-hooks';
+import {defineConfig} from 'eslint/config';
 import globals from 'globals';
 import tseslint from 'typescript-eslint';
 
-export default tseslint.config(
+export default defineConfig(
     {
-        ignores: ['**/dist/**', '**/dist-types/**', '**/node_modules/**', '**/coverage/**', '**/*.d.ts'],
+        ignores: ['**/dist/**', '**/dist-types/**', '**/node_modules/**', '**/coverage/**', '**/*.d.ts', '.claude/**'],
     },
     js.configs.recommended,
-    ...tseslint.configs.recommended,
+    tseslint.configs.recommended,
     {
         languageOptions: {
             globals: {...globals.browser, ...globals.node},
@@ -29,8 +30,7 @@ export default tseslint.config(
     },
     {
         files: ['packages/babylon.quarks-editor/src/**/*.tsx', 'examples/**/*.tsx'],
-        plugins: {'react-hooks': reactHooks},
-        rules: reactHooks.configs.recommended.rules,
+        extends: [reactHooks.configs.flat.recommended],
     },
     {
         files: ['**/test/**', '**/*.test.ts'],

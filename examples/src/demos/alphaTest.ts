@@ -6,7 +6,6 @@ import {StandardMaterial} from '@babylonjs/core/Materials/standardMaterial';
 import {Texture} from '@babylonjs/core/Materials/Textures/texture';
 import {Vector3 as BVector3} from '@babylonjs/core/Maths/math.vector';
 import {Mesh} from '@babylonjs/core/Meshes/mesh';
-import '@babylonjs/loaders';
 import {
     AxisAngleGenerator,
     Bezier,
@@ -23,6 +22,7 @@ import {
     Vector3,
     Vector4,
 } from 'babylon.quarks';
+import '../shared/loaders';
 import type {DemoContext} from '../types';
 
 const alphaTestConfig = {

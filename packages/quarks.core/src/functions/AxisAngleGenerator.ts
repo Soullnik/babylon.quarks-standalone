@@ -1,5 +1,5 @@
 import {Quaternion, Vector3} from '../math';
-import {FunctionJSON} from './FunctionJSON';
+import type {AxisAngleJSON} from './FunctionJSON';
 import {GeneratorMemory} from './GeneratorMemory';
 import {RotationGenerator} from './RotationGenerator';
 import {FunctionValueGenerator, ValueGenerator, ValueGeneratorFromJSON} from './ValueGenerator';
@@ -43,7 +43,7 @@ export class AxisAngleGenerator implements RotationGenerator {
     }
 
     /** The JSON form, `{type: 'AxisAngle', axis, angle}`. */
-    toJSON(): FunctionJSON {
+    toJSON(): AxisAngleJSON {
         return {
             type: 'AxisAngle',
             axis: {x: this.axis.x, y: this.axis.y, z: this.axis.z},
@@ -52,7 +52,7 @@ export class AxisAngleGenerator implements RotationGenerator {
     }
 
     /** Reads {@link AxisAngleGenerator.toJSON} output. */
-    static fromJSON(json: FunctionJSON): AxisAngleGenerator {
+    static fromJSON(json: AxisAngleJSON): AxisAngleGenerator {
         return new AxisAngleGenerator(
             new Vector3(json.axis.x, json.axis.y, json.axis.z),
             ValueGeneratorFromJSON(json.angle) as FunctionValueGenerator

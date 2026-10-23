@@ -24,10 +24,7 @@ export function EditorWorkspace(props: EditorWorkspaceProps): React.ReactElement
     const [resolving, setResolving] = useState(Boolean(projectId));
 
     useEffect(() => {
-        if (!projectId) {
-            setResolving(false);
-            return;
-        }
+        if (!projectId) return;
         let cancelled = false;
         void store.getProject(projectId).then((meta) => {
             if (cancelled) return;

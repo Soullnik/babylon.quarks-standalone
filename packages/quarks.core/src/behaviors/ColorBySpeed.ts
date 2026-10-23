@@ -1,7 +1,16 @@
-import {Particle} from '../Particle';
 import {ColorGeneratorFromJSON, FunctionColorGenerator, IntervalValue} from '../functions';
-import {Behavior} from './Behavior';
+import type {ColorGeneratorJSON, IntervalValueJSON} from '../functions/FunctionJSON';
+import {Particle} from '../Particle';
+import {Behavior, BehaviorJSON} from './Behavior';
 import {speedFraction} from './speedFraction';
+
+/** The JSON of a colour by speed: a {@link ColorBySpeed}. */
+export interface ColorBySpeedJSON extends BehaviorJSON {
+    /** The colour over the speed range. */
+    color: ColorGeneratorJSON;
+    /** The speeds the colour spans; 0 to 1 when absent. */
+    speedRange?: IntervalValueJSON;
+}
 
 /**
  * Colors particles by their current speed, like Unity's Color by Speed: the speed (velocity
@@ -34,7 +43,7 @@ export class ColorBySpeed implements Behavior {
 
     frameUpdate(delta: number): void {}
 
-    toJSON(): any {
+    toJSON(): ColorBySpeedJSON {
         return {
             type: this.type,
             color: this.color.toJSON(),
@@ -43,7 +52,7 @@ export class ColorBySpeed implements Behavior {
     }
 
     /** Reads {@link ColorBySpeed.toJSON} output; a field the JSON leaves out takes its default. */
-    static fromJSON(json: any): Behavior {
+    static fromJSON(json: ColorBySpeedJSON): Behavior {
         return new ColorBySpeed(
             ColorGeneratorFromJSON(json.color) as FunctionColorGenerator,
             json.speedRange ? IntervalValue.fromJSON(json.speedRange) : new IntervalValue(0, 1)

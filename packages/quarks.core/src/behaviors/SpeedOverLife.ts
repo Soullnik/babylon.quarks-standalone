@@ -1,6 +1,13 @@
-import {Particle} from '../Particle';
+import type {ValueGeneratorJSON} from '../functions/FunctionJSON';
 import {FunctionValueGenerator, ValueGeneratorFromJSON} from '../functions/ValueGenerator';
-import {Behavior} from './Behavior';
+import {Particle} from '../Particle';
+import {Behavior, BehaviorJSON} from './Behavior';
+
+/** The JSON of a speed over life: a {@link SpeedOverLife}. */
+export interface SpeedOverLifeJSON extends BehaviorJSON {
+    /** The speed multiplier over life. */
+    speed: ValueGeneratorJSON;
+}
 
 /**
  * Apply speed to particles based on their life.
@@ -29,7 +36,7 @@ export class SpeedOverLife implements Behavior {
             particle.speedModifier = generator.genValue(particle.memory, particle.age / particle.life);
         }
     }
-    toJSON(): any {
+    toJSON(): SpeedOverLifeJSON {
         return {
             type: this.type,
             speed: this.speed.toJSON(),
@@ -37,7 +44,7 @@ export class SpeedOverLife implements Behavior {
     }
 
     /** Reads {@link SpeedOverLife.toJSON} output; a field the JSON leaves out takes its default. */
-    static fromJSON(json: any): Behavior {
+    static fromJSON(json: SpeedOverLifeJSON): Behavior {
         return new SpeedOverLife(ValueGeneratorFromJSON(json.speed) as FunctionValueGenerator);
     }
 

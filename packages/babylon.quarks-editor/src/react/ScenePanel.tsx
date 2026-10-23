@@ -8,7 +8,7 @@ import {
     TrashIcon,
     ViewfinderCircleIcon,
 } from '@heroicons/react/24/solid';
-import React, {useEffect, useState} from 'react';
+import React, {useState} from 'react';
 import {buildEffectTree} from '../core/effectTree.js';
 import type {SceneEntry} from '../core/sceneEntries.js';
 import {ContextMenu, type ContextMenuItem} from './ContextMenu.js';
@@ -220,11 +220,13 @@ export function ScenePanel(props: ScenePanelProps): React.ReactElement {
     const [menu, setMenu] = useState<{x: number; y: number; items: ContextMenuItem[]} | null>(null);
     const [expanded, setExpanded] = useState<Set<number>>(() => new Set());
     // The focused effect opens its tree, so its sub-emitters are one click away.
-    useEffect(() => {
-        if (focusedRoot) {
-            setExpanded((prev) => (prev.has(focusedRoot.uniqueId) ? prev : new Set(prev).add(focusedRoot.uniqueId)));
+    const [expandedFocus, setExpandedFocus] = useState<TransformNode | null>(null);
+    if (focusedRoot !== expandedFocus) {
+        setExpandedFocus(focusedRoot);
+        if (focusedRoot && !expanded.has(focusedRoot.uniqueId)) {
+            setExpanded(new Set(expanded).add(focusedRoot.uniqueId));
         }
-    }, [focusedRoot]);
+    }
     const toggleExpanded = (entry: SceneEntry) =>
         setExpanded((prev) => {
             const next = new Set(prev);

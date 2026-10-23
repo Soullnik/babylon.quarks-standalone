@@ -1,9 +1,16 @@
-import {Particle} from '../Particle';
+import type {ValueGeneratorJSON} from '../functions/FunctionJSON';
 import {GeneratorMemory} from '../functions/GeneratorMemory';
 import {ValueGenerator, ValueGeneratorFromJSON} from '../functions/ValueGenerator';
 import {Quaternion, Vector3} from '../math';
+import {Particle} from '../Particle';
 import {random} from '../util/random';
-import {Behavior} from './Behavior';
+import {Behavior, BehaviorJSON} from './Behavior';
+/** The JSON of a turn of the start direction: a {@link ChangeEmitDirection}. */
+export interface ChangeEmitDirectionJSON extends BehaviorJSON {
+    /** The angle to turn by, in radians. */
+    angle: ValueGeneratorJSON;
+}
+
 /**
  * Turns each new particle's velocity away from its emit direction by `angle` (radians), about
  * a random axis perpendicular to it, keeping its speed. `angle` may be a constant or a
@@ -53,7 +60,7 @@ export class ChangeEmitDirection implements Behavior {
 
     frameUpdate(delta: number): void {}
 
-    toJSON(): any {
+    toJSON(): ChangeEmitDirectionJSON {
         return {
             type: this.type,
             angle: this.angle.toJSON(),
@@ -64,7 +71,7 @@ export class ChangeEmitDirection implements Behavior {
      * Reads {@link ChangeEmitDirection.toJSON} output; a field the JSON leaves out takes its
      * default.
      */
-    static fromJSON(json: any): Behavior {
+    static fromJSON(json: ChangeEmitDirectionJSON): Behavior {
         return new ChangeEmitDirection(ValueGeneratorFromJSON(json.angle) as ValueGenerator);
     }
 

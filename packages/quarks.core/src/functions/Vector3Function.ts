@@ -1,5 +1,5 @@
 import {Vector3} from '../math';
-import {FunctionJSON} from './FunctionJSON';
+import type {Vector3FunctionJSON} from './FunctionJSON';
 import {GeneratorMemory} from './GeneratorMemory';
 import {FunctionValueGenerator, ValueGenerator, ValueGeneratorFromJSON} from './ValueGenerator';
 import {Vector3Generator} from './Vector3Generator';
@@ -38,7 +38,7 @@ export class Vector3Function implements Vector3Generator {
     }
 
     /** The JSON form, `{type: 'Vector3Function', x, y, z}`. */
-    toJSON(): FunctionJSON {
+    toJSON(): Vector3FunctionJSON {
         return {
             type: 'Vector3Function',
             x: this.x.toJSON(),
@@ -48,7 +48,7 @@ export class Vector3Function implements Vector3Generator {
     }
 
     /** Reads {@link Vector3Function.toJSON} output. */
-    static fromJSON(json: FunctionJSON): Vector3Generator {
+    static fromJSON(json: Vector3FunctionJSON): Vector3Generator {
         return new Vector3Function(
             ValueGeneratorFromJSON(json.x) as FunctionValueGenerator,
             ValueGeneratorFromJSON(json.y) as FunctionValueGenerator,

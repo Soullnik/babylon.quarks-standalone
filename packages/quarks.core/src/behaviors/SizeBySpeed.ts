@@ -1,4 +1,3 @@
-import {Particle} from '../Particle';
 import {
     FunctionValueGenerator,
     GeneratorFromJSON,
@@ -6,8 +5,18 @@ import {
     Vector3Function,
     Vector3Generator,
 } from '../functions';
-import {Behavior} from './Behavior';
+import type {IntervalValueJSON, ValueGeneratorJSON, Vector3GeneratorJSON} from '../functions/FunctionJSON';
+import {Particle} from '../Particle';
+import {Behavior, BehaviorJSON} from './Behavior';
 import {speedFraction} from './speedFraction';
+
+/** The JSON of a size by speed: a {@link SizeBySpeed}. */
+export interface SizeBySpeedJSON extends BehaviorJSON {
+    /** The size over the speed range, uniform or per axis. */
+    size: ValueGeneratorJSON | Vector3GeneratorJSON;
+    /** The speeds it spans; 0 to 1 when absent. */
+    speedRange?: IntervalValueJSON;
+}
 
 /**
  * Sizes particles by their current speed, like Unity's Size by Speed: the speed (velocity length
@@ -42,7 +51,7 @@ export class SizeBySpeed implements Behavior {
         }
     }
 
-    toJSON(): any {
+    toJSON(): SizeBySpeedJSON {
         return {
             type: this.type,
             size: this.size.toJSON(),
@@ -51,7 +60,7 @@ export class SizeBySpeed implements Behavior {
     }
 
     /** Reads {@link SizeBySpeed.toJSON} output; a field the JSON leaves out takes its default. */
-    static fromJSON(json: any): Behavior {
+    static fromJSON(json: SizeBySpeedJSON): Behavior {
         return new SizeBySpeed(
             GeneratorFromJSON(json.size) as FunctionValueGenerator,
             json.speedRange ? IntervalValue.fromJSON(json.speedRange) : new IntervalValue(0, 1)

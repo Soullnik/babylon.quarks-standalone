@@ -88,27 +88,18 @@ export class Bezier {
      * interpolated values of each step, ten in all; the last is the value at `t`.
      */
     hull(t: number) {
-        let p = this.p;
-        let _p = [],
-            pt,
-            idx = 0,
-            i = 0,
-            l = 0;
-        const q = [];
-        q[idx++] = p[0];
-        q[idx++] = p[1];
-        q[idx++] = p[2];
-        q[idx++] = p[3];
+        let p: number[] = this.p;
+        const q = [p[0], p[1], p[2], p[3]];
 
         // we lerp between all points at each iteration, until we have 1 point left.
         while (p.length > 1) {
-            _p = [];
-            for (i = 0, l = p.length - 1; i < l; i++) {
-                pt = (1 - t) * p[i] + t * p[i + 1];
-                q[idx++] = pt;
-                _p.push(pt);
+            const next: number[] = [];
+            for (let i = 0; i < p.length - 1; i++) {
+                const pt = (1 - t) * p[i] + t * p[i + 1];
+                q.push(pt);
+                next.push(pt);
             }
-            p = _p;
+            p = next;
         }
         return q;
     }

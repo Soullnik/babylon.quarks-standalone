@@ -70,12 +70,32 @@ export interface ViewportPaneProps {
 }
 
 /** The 3D viewport and what floats over it: toolbars, transport, drag and import feedback. */
-export function ViewportPane(props: ViewportPaneProps): React.ReactElement {
-    const {inset, dragHover, assetsLoading, prefabInfo} = props;
+export function ViewportPane({
+    canvasRef,
+    fpsRef,
+    inset,
+    transport,
+    dragHover,
+    assetsLoading,
+    prefabInfo,
+    prefabDirty,
+    backLink,
+    canUndo,
+    canRedo,
+    hasFocus,
+    gizmoMode,
+    showWireframes,
+    dragHandlers,
+    onHistoryStep,
+    onGizmoMode,
+    onToggleWireframes,
+    onExitPrefab,
+    onSavePrefab,
+}: ViewportPaneProps): React.ReactElement {
     return (
-        <div style={{position: 'relative', flex: 1, minWidth: 0}} {...props.dragHandlers}>
+        <div style={{position: 'relative', flex: 1, minWidth: 0}} {...dragHandlers}>
             <canvas
-                ref={props.canvasRef}
+                ref={canvasRef}
                 style={{width: '100%', height: '100%', display: 'block', touchAction: 'none', outline: 'none'}}
             />
             <div
@@ -92,11 +112,11 @@ export function ViewportPane(props: ViewportPaneProps): React.ReactElement {
                     fontFamily: theme.font,
                 }}
             >
-                <span ref={props.fpsRef}>— FPS</span>
+                <span ref={fpsRef}>— FPS</span>
             </div>
-            {props.transport && (
+            {transport && (
                 <div style={{position: 'absolute', bottom: 12 + inset, left: '50%', transform: 'translateX(-50%)'}}>
-                    {props.transport}
+                    {transport}
                 </div>
             )}
             {dragHover && (
@@ -172,30 +192,30 @@ export function ViewportPane(props: ViewportPaneProps): React.ReactElement {
                         className="qe-hover"
                         title="Back to the scene"
                         style={{...buttonStyle, padding: '3px 10px'}}
-                        onClick={props.onExitPrefab}
+                        onClick={onExitPrefab}
                     >
                         ← Scene
                     </button>
                     <span style={{color: theme.textDim}}>›</span>
                     <span style={{fontWeight: 600, whiteSpace: 'nowrap'}}>
                         {prefabInfo.name}
-                        {props.prefabDirty ? ' *' : ''}
+                        {prefabDirty ? ' *' : ''}
                     </span>
                     <button
                         type="button"
                         className="qe-hover"
                         title="Overwrite the prefab asset (Ctrl+S)"
-                        style={saveButtonStyle(props.prefabDirty, '3px 12px')}
-                        onClick={props.onSavePrefab}
+                        style={saveButtonStyle(prefabDirty, '3px 12px')}
+                        onClick={onSavePrefab}
                     >
                         Save
                     </button>
                 </div>
             )}
-            {props.backLink && !prefabInfo && (
+            {backLink && !prefabInfo && (
                 <a
                     className="qe-hover"
-                    href={props.backLink.href}
+                    href={backLink.href}
                     style={{
                         ...floatingPanelStyle,
                         position: 'absolute',
@@ -213,7 +233,7 @@ export function ViewportPane(props: ViewportPaneProps): React.ReactElement {
                     }}
                 >
                     <ArrowLeftIcon style={iconStyle(14)} />
-                    {props.backLink.label.replace(/^←\s*/, '')}
+                    {backLink.label.replace(/^←\s*/, '')}
                 </a>
             )}
             <div
@@ -232,8 +252,8 @@ export function ViewportPane(props: ViewportPaneProps): React.ReactElement {
                         className="qe-hover"
                         style={squareButtonStyle}
                         title="Undo (Ctrl+Z)"
-                        disabled={!props.canUndo || !props.hasFocus}
-                        onClick={() => props.onHistoryStep(false)}
+                        disabled={!canUndo || !hasFocus}
+                        onClick={() => onHistoryStep(false)}
                     >
                         <ArrowUturnLeftIcon style={iconStyle(14)} />
                     </button>
@@ -241,8 +261,8 @@ export function ViewportPane(props: ViewportPaneProps): React.ReactElement {
                         className="qe-hover"
                         style={squareButtonStyle}
                         title="Redo (Ctrl+Shift+Z)"
-                        disabled={!props.canRedo || !props.hasFocus}
-                        onClick={() => props.onHistoryStep(true)}
+                        disabled={!canRedo || !hasFocus}
+                        onClick={() => onHistoryStep(true)}
                     >
                         <ArrowUturnRightIcon style={iconStyle(14)} />
                     </button>
@@ -254,10 +274,10 @@ export function ViewportPane(props: ViewportPaneProps): React.ReactElement {
                             className="qe-hover"
                             style={{
                                 ...squareButtonStyle,
-                                ...(props.gizmoMode === m.value ? activeSquareButtonStyle : {}),
+                                ...(gizmoMode === m.value ? activeSquareButtonStyle : {}),
                             }}
                             title={m.title}
-                            onClick={() => props.onGizmoMode(m.value)}
+                            onClick={() => onGizmoMode(m.value)}
                         >
                             <m.Icon style={iconStyle(14)} />
                         </button>
@@ -266,10 +286,10 @@ export function ViewportPane(props: ViewportPaneProps): React.ReactElement {
                 <div style={{...floatingPanelStyle, display: 'flex', flexDirection: 'column', gap: 4, padding: 4}}>
                     <button
                         className="qe-hover"
-                        style={{...squareButtonStyle, ...(props.showWireframes ? activeSquareButtonStyle : {})}}
+                        style={{...squareButtonStyle, ...(showWireframes ? activeSquareButtonStyle : {})}}
                         title="Show emitter shape wireframes"
-                        disabled={!props.hasFocus}
-                        onClick={props.onToggleWireframes}
+                        disabled={!hasFocus}
+                        onClick={onToggleWireframes}
                     >
                         <CubeTransparentIcon style={iconStyle(14)} />
                     </button>

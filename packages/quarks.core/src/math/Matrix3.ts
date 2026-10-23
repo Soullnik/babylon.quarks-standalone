@@ -363,10 +363,10 @@ class Matrix3 {
      * @returns This matrix.
      */
     makeTranslation(x: number | Vector2, y: number) {
-        if ((x as any).isVector2) {
-            this.set(1, 0, (x as Vector2).x, 0, 1, (x as Vector2).y, 0, 0, 1);
+        if (typeof x === 'number') {
+            this.set(1, 0, x, 0, 1, y, 0, 0, 1);
         } else {
-            this.set(1, 0, x as number, 0, 1, y, 0, 0, 1);
+            this.set(1, 0, x.x, 0, 1, x.y, 0, 0, 1);
         }
 
         return this;
@@ -451,7 +451,7 @@ class Matrix3 {
     }
 }
 
-(Matrix3.prototype as any).isMatrix3 = true;
+Object.defineProperty(Matrix3.prototype, 'isMatrix3', {value: true});
 
 const _m3 = /*@__PURE__*/ new Matrix3();
 

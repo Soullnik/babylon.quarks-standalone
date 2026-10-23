@@ -53,8 +53,8 @@ export interface Resource {}
 
 /** The shared resources a serialized system refers to by uuid. */
 export interface JsonMetaData {
-    /** Textures by uuid. */
-    textures: {[uuid: string]: Resource};
+    /** Textures by uuid; null for one a renderer could not make. */
+    textures: {[uuid: string]: Resource | null};
     /** Geometries by uuid. */
     geometries: {[uuid: string]: Resource};
 }
@@ -238,8 +238,8 @@ export interface IEmitter {
     uuid: string;
     /** Whether the node, and so the system, is visible. */
     visible: boolean;
-    /** The node's world matrix, in the renderer's own matrix type. */
-    matrixWorld: any; //type is annoying
+    /** The node's world matrix. */
+    matrixWorld: Matrix4;
 }
 
 /**
@@ -384,8 +384,11 @@ export interface IParticleSystem {
     /** A new system with the same settings, behaviors and generators. */
     clone(): IParticleSystem;
 
-    /** Writes the system's settings, putting its shared resources into `metaData`. */
-    toJSON(metaData: any, options: SerializationOptions): any;
+    /**
+     * Writes the system's settings, putting its shared resources into `metaData`; the shapes of both
+     * are the renderer's.
+     */
+    toJSON(metaData: unknown, options: SerializationOptions): unknown;
 
     /**
      * Spawns what `delta` seconds of emission call for, on `subEmissionState` from the emitter at

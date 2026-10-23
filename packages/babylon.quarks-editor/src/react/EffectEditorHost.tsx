@@ -3,7 +3,16 @@ import {Engine} from '@babylonjs/core/Engines/engine.js';
 import type {Texture} from '@babylonjs/core/Materials/Textures/texture.js';
 import type {TransformNode} from '@babylonjs/core/Meshes/transformNode.js';
 import type {Scene} from '@babylonjs/core/scene.js';
-import React, {useCallback, useDeferredValue, useEffect, useMemo, useReducer, useRef, useState} from 'react';
+import React, {
+    useCallback,
+    useDeferredValue,
+    useEffect,
+    useLayoutEffect,
+    useMemo,
+    useReducer,
+    useRef,
+    useState,
+} from 'react';
 import {createRoot} from 'react-dom/client';
 import {collectJsonFiles, type AssetLoadProgress, type EffectAsset} from '../core/assets.js';
 import {ASSET_DRAG_MIME} from '../core/assetTree.js';
@@ -93,7 +102,6 @@ export function EffectEditorHost(props: EffectEditorHostProps): React.ReactEleme
     const assetDragDepthRef = useRef(0);
     const playbackRef = useRef<PlaybackState>(createPlaybackState());
     const propsRef = useRef(props);
-    propsRef.current = props;
 
     const [session, setSession] = useState<EditorSession | null>(null);
     const [binding, setBinding] = useState<EffectBinding | null>(null);
@@ -103,7 +111,6 @@ export function EffectEditorHost(props: EffectEditorHostProps): React.ReactEleme
     const [gizmoMode, setGizmoMode] = useState<GizmoMode>('none');
     const [selectedNode, setSelectedNode] = useState<TransformNode | null>(null);
     const selectedNodeRef = useRef<TransformNode | null>(null);
-    selectedNodeRef.current = selectedNode;
     const [sceneEntries, setSceneEntries] = useState<SceneEntry[]>([]);
     const [assets, setAssets] = useState<EffectAsset[]>([]);
     const [assetsLoading, setAssetsLoading] = useState<AssetLoadProgress | null>(null);
@@ -136,36 +143,6 @@ export function EffectEditorHost(props: EffectEditorHostProps): React.ReactEleme
         toastTimerRef.current = window.setTimeout(() => setToast(null), 2600);
     }, []);
     const showMessage = (title: string, text: string) => setMessage({title, message: text});
-
-    useEffect(() => {
-        const canvas = canvasRef.current!;
-        let unmounted = false;
-        let teardown: (() => void) | null = null;
-        const mount = (engine: AbstractEngine) => {
-            if (unmounted) {
-                engine.dispose();
-                return;
-            }
-            teardown = mountSession(canvas, engine);
-        };
-        const built = props.createEngine ? props.createEngine(canvas) : new Engine(canvas, true);
-        if (built instanceof Promise) {
-            built.then(mount, (err: unknown) => {
-                console.error('[Quarks editor] Could not create the engine:', err);
-                if (!unmounted) {
-                    setMessage({title: 'Engine', message: err instanceof Error ? err.message : String(err)});
-                }
-            });
-        } else {
-            mount(built);
-        }
-        return () => {
-            unmounted = true;
-            window.clearTimeout(toastTimerRef.current);
-            teardown?.();
-        };
-        // eslint-disable-next-line react-hooks/exhaustive-deps -- mount only: builds the engine and scene once
-    }, []);
 
     /** Builds the session on `engine` and starts it; returns what undoes it, engine included. */
     function mountSession(canvas: HTMLCanvasElement, engine: AbstractEngine): () => void {
@@ -229,6 +206,36 @@ export function EffectEditorHost(props: EffectEditorHostProps): React.ReactEleme
     }
 
     useEffect(() => {
+        const canvas = canvasRef.current!;
+        let unmounted = false;
+        let teardown: (() => void) | null = null;
+        const mount = (engine: AbstractEngine) => {
+            if (unmounted) {
+                engine.dispose();
+                return;
+            }
+            teardown = mountSession(canvas, engine);
+        };
+        const built = props.createEngine ? props.createEngine(canvas) : new Engine(canvas, true);
+        if (built instanceof Promise) {
+            built.then(mount, (err: unknown) => {
+                console.error('[Quarks editor] Could not create the engine:', err);
+                if (!unmounted) {
+                    setMessage({title: 'Engine', message: err instanceof Error ? err.message : String(err)});
+                }
+            });
+        } else {
+            mount(built);
+        }
+        return () => {
+            unmounted = true;
+            window.clearTimeout(toastTimerRef.current);
+            teardown?.();
+        };
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- mount only: builds the engine and scene once
+    }, []);
+
+    useEffect(() => {
         playbackRef.current.stagePlaying = stagePlaying;
         session?.syncPlayback();
     }, [session, stagePlaying, visibleRootIds, sceneEntries]);
@@ -246,15 +253,17 @@ export function EffectEditorHost(props: EffectEditorHostProps): React.ReactEleme
     );
     useUnsavedChangesGuard(Boolean(props.project) && sceneDirty);
 
-    // The gizmo follows the selection; a node gone with an undo falls back to the effect's root.
-    useEffect(() => {
-        if (selectedNode && selectedNode.isDisposed()) {
-            setSelectedNode(session?.binding?.root ?? null);
-        }
-    }, [session, selectedNode]);
+    // The selection, with a node gone with an undo falling back to the effect's root; the gizmo
+    // follows it.
+    const liveSelection = selectedNode?.isDisposed() ? (session?.binding?.root ?? null) : selectedNode;
+    // The session's callbacks read the latest props and selection through these refs.
+    useLayoutEffect(() => {
+        propsRef.current = props;
+        selectedNodeRef.current = liveSelection;
+    });
     const gizmoTarget =
-        selectedNode && !selectedNode.isDisposed()
-            ? selectedNode
+        liveSelection && !liveSelection.isDisposed()
+            ? liveSelection
             : binding?.root && !binding.root.isDisposed()
               ? binding.root
               : null;
@@ -345,12 +354,12 @@ export function EffectEditorHost(props: EffectEditorHostProps): React.ReactEleme
     };
 
     const allSystems = binding ? [binding.system, ...binding.subSystems] : [];
-    const activeSystem = binding ? (allSystems.find((s) => s.emitter === selectedNode) ?? binding.system) : null;
+    const activeSystem = binding ? (allSystems.find((s) => s.emitter === liveSelection) ?? binding.system) : null;
     // The inspector is the expensive part of a selection change (every module re-renders for the
     // new system). It renders from deferred values, so the click, tree highlight and gizmo update
     // at once and the inspector catches up in an interruptible render instead of stalling frames.
     const deferredBinding = useDeferredValue(binding);
-    const deferredNode = useDeferredValue(selectedNode);
+    const deferredNode = useDeferredValue(liveSelection);
     const inspectorBinding = deferredBinding && !deferredBinding.root.isDisposed() ? deferredBinding : binding;
     const inspectorNode =
         deferredNode && !deferredNode.isDisposed() && inspectorBinding === deferredBinding
@@ -416,7 +425,7 @@ export function EffectEditorHost(props: EffectEditorHostProps): React.ReactEleme
                         focusedRoot={focusedRoot}
                         visibleRootIds={visibleRootIdSet}
                         soloRootId={soloRootId}
-                        selectedNode={selectedNode}
+                        selectedNode={liveSelection}
                         onExitProject={requestExitProject}
                         onSave={savePrefabOrScene}
                         onExitPrefab={requestPrefabExit}
@@ -561,7 +570,7 @@ export function EffectEditorHost(props: EffectEditorHostProps): React.ReactEleme
                         docked
                         showTransport={false}
                         binding={binding}
-                        selectedNode={selectedNode}
+                        selectedNode={liveSelection}
                         onSelectNode={setSelectedNode}
                         scene={session.scene}
                         renderer={session.renderer}

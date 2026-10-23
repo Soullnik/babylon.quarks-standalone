@@ -108,6 +108,56 @@ and the project follows the `quarks.core` 0.x version line.
   say which cameras are tested, and that one rendering into a render target texture is not.
 - A `VFXBatch` subclass implements `resizeBuffers()` and `initialCapacity`, which the shrinking
   instance buffers call, and creates `mesh` in `setupBuffers`; the base class no longer makes one.
+- **quarks.core's JSON and data types have no `any` left.** What changes for code that
+  compiles against them:
+  - `FunctionJSON` is the union of each generator's JSON (`ConstantValueJSON`, `GradientJSON`,
+    `EulerJSON` and the rest, grouped as `ValueGeneratorJSON`, `ColorGeneratorJSON`,
+    `RotationGeneratorJSON` and `Vector3GeneratorJSON`), with `type` as the tag. It was an open
+    record of `any`. Each generator's `toJSON` and `fromJSON` use its own type, and the
+    `…GeneratorFromJSON` readers take their group's. A generator class of your own that
+    implements `ValueGenerator` or a sibling interface writes one of these, or casts its `toJSON`;
+    no reader would know its type anyway.
+  - `BehaviorJSON` is `{type: string}`, no longer an open record, and every built-in behavior has its
+    own JSON type (`ColorOverLifeJSON`, `EmitSubParticleSystemJSON`, …) for its `toJSON` and
+    `fromJSON`. A plugin's `loadJSON` may take its own JSON interface with a `type`, as
+    `examples/src/demos/customPlugin.ts` does. An object literal passed to `BehaviorFromJSON` is
+    typed as its behavior's JSON, e.g. `const json: NoiseJSON = {type: 'Noise', …}`.
+  - `GeneratorMemory` is `number[]`. `ContinuousLinearFunction`'s values are `number`, `Vector3` or
+    `Vector4`, its `subType` follows from them, and its `fromJSON` returns the matching type for
+    the `subType`. `GradientJSON`'s `color` and `alpha` say their `subType`.
+  - `IEmitter.matrixWorld` is a `Matrix4`; `IParticleSystem.toJSON` and `IAnimationData.target` are
+    `unknown`, which a renderer narrows; `Constructable` takes `never[]` arguments.
+  - `EmitSubParticleSystem.subParticleSystem` is declared `IEmitter | string | undefined`: a loaded
+    behavior holds the uuid until the loader links it, as it always has.
+  - `Sequencer.toJSON` returns `SequencerJSON`; `Euler.fromArray` and `toArray` take numbers and an
+    order.
+  - In babylon.quarks, `ParticleSystemJSONParameters.rendererEmitterSettings` is the new
+    `RendererEmitterSettingsJSON`: a trail's `TrailSettingsJSON` or a stretched billboard's
+    settings.
+  - The `isVector3`-style flags are set on the prototypes as non-enumerable, read-only properties,
+    so they no longer show up in a `for…in` over a vector.
+- **babylon.quarks's effect format and loader have no `any` left either.** The parts of an effect
+  file have named types: `EffectDocumentJSON` for what `QuarksLoader` reads, with
+  `QuarksMaterialJSON`, `EffectGeometryJSON` (quarks' own, three.js `BufferGeometry`,
+  `PlaneGeometry` and `SphereGeometry`), `EffectImageJSON`, `QuarksPrefabJSON`,
+  `ParticleEmitterJSON` and the rest. What changes for code that compiles against them:
+  - `QuarksLoader`'s `loadFromJSON`, `parse`, `resolveResources`, `resolveLinkedResources` and
+    `resolveExternalGeometries` take the document as `unknown`, as parsed from its file. `resolveLinkedResources` takes the new `QuarksResolveOptions`.
+  - `ParticleSystem.material` and `ParticleSystemParameters.material` are a
+    `ParticleMaterialSource`: the fields a system reads from a Babylon material or a loaded
+    material record. Any Babylon material fits.
+  - `BabylonMetaData` holds `BaseTexture | null` textures, `QuarksMaterialJSON` materials and
+    `GeometryEntry` geometries; its unused maps are `unknown`.
+  - `QuarksNodeJSON` lists its fields instead of an open record, `matrix` is optional, `visible`
+    is a boolean, and it has the prefab and three.js transform fields the loader reads.
+    `QuarksEffectJSON.materials` is `QuarksMaterialJSON[]`.
+  - `ParticleSystemJSONParameters` types its generators by group (`ValueGeneratorJSON`,
+    `ColorGeneratorJSON`, …), its `shape` as `ShapeJSON`, its `behaviors` as `BehaviorJSON[]`,
+    and `instancingGeometry` as a uuid or an entry. `BurstParametersJSON` has the older
+    `cycleCount`.
+  - `QuarksPrefab.toJSON` returns a `QuarksPrefabJSON`, `ParticleEmitter.toJSON` a
+    `ParticleEmitterJSON`, and `MeshSurfaceEmitter.fromJSON` takes a `ShapeJSON`.
+  - quarks.core's `JsonMetaData.textures` may hold null.
 
 ### Deprecated
 
@@ -171,6 +221,22 @@ and the project follows the `quarks.core` 0.x version line.
 
 ### Fixed
 
+- `ApplySequences` keeps each particle's place in a `WeakMap` instead of fields added to the
+  particle, reuses that state when a pooled particle is emitted again instead of allocating two
+  vectors, and moves a particle straight to its point when a sequence's range has no length (it
+  divided by zero).
+- An `EmitSubParticleSystem` read from a file without `useVelocityAsBasis` saves without it, as a
+  default, instead of writing `false`.
+- `PiecewiseBezier.toSVG` draws the curve itself, not its sampled table.
+- A `Gradient` read from JSON without its `color` or `alpha` keys warns, and keeps the default for
+  the missing part.
+- A particle system reads its texture from the first material slot that holds a `Texture`; a cube
+  or other non-`Texture` in a slot is passed over instead of drawn as a broken 2D texture.
+- A list of an effect file (`images`, `textures`, `materials`, `geometries`, a node's `children`)
+  that is not a list, or an entry in one that is not an object, warns and is skipped, like any
+  other part the loader cannot read, instead of failing the load with a `TypeError`.
+- `ParticleSystem.fromJSON` with a material entry whose `reflectionAtlas` is a texture uuid
+  resolves it, as it does the other slots, instead of failing on the string.
 - The fragment's `alpha < 0.01` discard is right in every blend mode: under one-one or
   premultiplied blending a discarded fragment used to be one that would still have drawn.
 - Erosion and a mesh's rim fade no longer show a hard cut under one-one and premultiplied
@@ -247,6 +313,15 @@ and the project follows the `quarks.core` 0.x version line.
   written from.
 - Loaded node ids and mesh surface links live in module `WeakMap`s instead of `as any` fields on
   nodes and systems.
+- The batch settings, their defaults and the helpers that normalise and compare them move from
+  `VFXBatch.ts` to `batchSettings.ts`, which `VFXBatch.ts` re-exports; the batch key reads them
+  there, so the build no longer reports a circular import. Exports are unchanged.
+- A clean build and install print no warnings: the core build stops passing `declarationDir`
+  without declarations, CI runs on Node 24 with current GitHub Actions, dev dependencies have no
+  known vulnerabilities, and the demo smoke test fails on a console warning as well as an error.
+- The toolchain moves to ESLint 10 (with `defineConfig` and react-hooks 7's React Compiler rules),
+  TypeScript 6, Vite 8 (Rolldown: the examples' chunks all fit under its 500 kB warning) and
+  cross-env 10. Babel stays on 7, which Jest's own preset still needs.
 
 ## [0.27.1] — 2026-10-23
 
