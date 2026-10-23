@@ -39,7 +39,7 @@ export function EditorWorkspace(props: EditorWorkspaceProps): React.ReactElement
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [store]);
 
-    if (resolving && projectId) {
+    if (resolving) {
         return (
             <div
                 style={{

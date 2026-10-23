@@ -60,7 +60,6 @@ and the project follows the `quarks.core` 0.x version line.
 - The React panels follow the React Compiler's rules (eslint-plugin-react-hooks 7): no ref
   written during render, and state that follows a prop is adjusted during render instead of in an
   effect, which saves a render each time.
-
 - `EffectEditorHost` is split into a session and panel components under `src/react/host/`, and
   every `as never` cast is gone. The session and the host have their own tests, and the React
   code has a coverage floor.
