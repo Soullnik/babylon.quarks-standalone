@@ -922,9 +922,9 @@ export class ParticleSystem implements IParticleSystem {
      * multiplayer and reproducible tests. Systems this one emits into roll on
      * its generator too. Unset (the default), rolls come from the global source
      * (`setRandomSource` in quarks.core). Saved in the effect JSON when set.
-     *
-     * Not covered: randomness outside the step, such as a `TurbulenceField`'s
-     * offsets, which are rolled when the behavior is created.
+     * The behaviors roll on the same generator, and the ones with their own
+     * randomness (a `TurbulenceField`'s noise) are built from their own seed,
+     * so the whole effect is covered.
      */
     get seed(): number | undefined {
         return this.seedValue;

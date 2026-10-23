@@ -42,7 +42,18 @@ interface NoisyParticle extends Particle {
 }
 
 /**
- * Apply noise to particles.
+ * Jitter particles with smooth noise over their life (Unity's Noise module).
+ *
+ * Each particle reads its own one-dimensional simplex curves at its age times
+ * `frequency`; `power` scales what they return, `positionAmount` and
+ * `rotationAmount` say how much of it goes into the position and the
+ * rotation. The offset applied last step is removed before this step's is
+ * added, so the noise rides on top of the other behaviors instead of
+ * accumulating. A billboard's angle turns by W noise × π × amount; a mesh
+ * particle turns by the same angle around an axis the X, Y and Z noise choose.
+ * The generators are picked per particle from the random source, so a seeded
+ * system (see the `Behavior` contract) replays the same noise. Applies in
+ * every render mode.
  */
 export class Noise implements Behavior {
     type = 'Noise';
@@ -125,6 +136,37 @@ export class Noise implements Behavior {
         return generator instanceof ConstantValue ? generator.value : NaN;
     }
 
+    /**
+     * Replaces the noise turn applied last step with this step's: an axis-angle
+     * turn whose axis comes from the X, Y and Z generators and whose angle, as
+     * for a billboard's angle, is the W generator's value times π times
+     * `amount`, so `rotationAmount` sets how far a mesh particle wobbles.
+     */
+    private rotateByNoise(
+        rotation: Quaternion,
+        state: NoiseState,
+        noiseTime: number,
+        amount: number,
+        memory: number[]
+    ): void {
+        const last = state.lastRotQ as Quaternion;
+        rotation.multiply(last.invert());
+        tempV.set(
+            this.sample(state.generatorX, noiseTime, memory),
+            this.sample(state.generatorY, noiseTime, memory),
+            this.sample(state.generatorZ, noiseTime, memory)
+        );
+        const length = tempV.length();
+        if (length > 0) {
+            tempV.multiplyScalar(1 / length);
+            tempQ.setFromAxisAngle(tempV, this.sample(state.generatorW, noiseTime, memory) * Math.PI * amount);
+        } else {
+            tempQ.set(0, 0, 0, 1);
+        }
+        rotation.multiply(tempQ);
+        last.copy(tempQ);
+    }
+
     update(particle: Particle, _: number): void {
         const state = (particle as NoisyParticle)._noiseState;
         if (state === undefined) {
@@ -161,19 +203,7 @@ export class Noise implements Behavior {
                 particle.rotation = particle.rotation - state.lastRot + noise;
                 state.lastRot = noise;
             } else if (state.lastRotQ !== null) {
-                const rotation = particle.rotation as Quaternion;
-                state.lastRotQ.invert();
-                rotation.multiply(state.lastRotQ);
-                tempQ
-                    .set(
-                        this.sample(state.generatorX, noiseTime, memory) * amount,
-                        this.sample(state.generatorY, noiseTime, memory) * amount,
-                        this.sample(state.generatorZ, noiseTime, memory) * amount,
-                        this.sample(state.generatorW, noiseTime, memory) * amount
-                    )
-                    .normalize();
-                rotation.multiply(tempQ);
-                state.lastRotQ.copy(tempQ);
+                this.rotateByNoise(particle.rotation as Quaternion, state, noiseTime, amount, memory);
             }
         }
     }
@@ -239,19 +269,7 @@ export class Noise implements Behavior {
                     rotations[i] = rotations[i] - state.lastRot + noise;
                     state.lastRot = noise;
                 } else if (state.lastRotQ !== null) {
-                    const rotation = particle.rotation as Quaternion;
-                    state.lastRotQ.invert();
-                    rotation.multiply(state.lastRotQ);
-                    tempQ
-                        .set(
-                            this.sample(state.generatorX, noiseTime, memory) * amount,
-                            this.sample(state.generatorY, noiseTime, memory) * amount,
-                            this.sample(state.generatorZ, noiseTime, memory) * amount,
-                            this.sample(state.generatorW, noiseTime, memory) * amount
-                        )
-                        .normalize();
-                    rotation.multiply(tempQ);
-                    state.lastRotQ.copy(tempQ);
+                    this.rotateByNoise(particle.rotation as Quaternion, state, noiseTime, amount, memory);
                 }
             }
         }

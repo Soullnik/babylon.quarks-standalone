@@ -4,14 +4,14 @@ exports[`seeded simulation snapshot beam keeps its particles, bounds and JSON 1`
 {
   "bounds": {
     "max": [
-      16.1313,
-      11.22383,
-      16.78185,
+      16.33474,
+      10.62354,
+      17.01173,
     ],
     "min": [
-      -19.21945,
-      -9.51271,
-      -17.91544,
+      -18.793,
+      -9.7566,
+      -17.39749,
     ],
   },
   "frames": [
@@ -26,8 +26,8 @@ exports[`seeded simulation snapshot beam keeps its particles, bounds and JSON 1`
         ],
         "position": [
           -19.1138,
-          -3.68054,
-          -22.25465,
+          -4.41937,
+          -21.13018,
         ],
         "size": [
           7.61714,
@@ -36,8 +36,8 @@ exports[`seeded simulation snapshot beam keeps its particles, bounds and JSON 1`
         ],
         "velocity": [
           -5.04539,
-          -16.61362,
-          -8.06012,
+          -20.66208,
+          -1.89853,
         ],
       },
       "frame": 30,
@@ -54,8 +54,8 @@ exports[`seeded simulation snapshot beam keeps its particles, bounds and JSON 1`
           "life": 1.37644,
           "position": [
             2.49946,
-            3.59792,
-            3.61322,
+            3.51248,
+            3.74325,
           ],
           "rotation": -0.42472,
           "size": [
@@ -65,8 +65,8 @@ exports[`seeded simulation snapshot beam keeps its particles, bounds and JSON 1`
           ],
           "velocity": [
             1.5534,
-            0.90954,
-            2.24559,
+            0.59886,
+            2.71842,
           ],
         },
         {
@@ -80,8 +80,8 @@ exports[`seeded simulation snapshot beam keeps its particles, bounds and JSON 1`
           "life": 1.39539,
           "position": [
             -1.63371,
-            0.57385,
-            -0.01348,
+            0.49861,
+            0.10103,
           ],
           "rotation": 1.74383,
           "size": [
@@ -91,8 +91,8 @@ exports[`seeded simulation snapshot beam keeps its particles, bounds and JSON 1`
           ],
           "velocity": [
             -1.68636,
-            -0.50767,
-            -0.01392,
+            -0.79893,
+            0.42936,
           ],
         },
         {
@@ -106,8 +106,8 @@ exports[`seeded simulation snapshot beam keeps its particles, bounds and JSON 1`
           "life": 1.38857,
           "position": [
             -3.47601,
-            -4.43644,
-            -4.11211,
+            -4.50214,
+            -4.01213,
           ],
           "rotation": 0.93415,
           "size": [
@@ -117,8 +117,8 @@ exports[`seeded simulation snapshot beam keeps its particles, bounds and JSON 1`
           ],
           "velocity": [
             -1.28746,
-            -2.91787,
-            -1.52306,
+            -3.18971,
+            -1.10933,
           ],
         },
         {
@@ -132,8 +132,8 @@ exports[`seeded simulation snapshot beam keeps its particles, bounds and JSON 1`
           "life": 0.85942,
           "position": [
             -4.80558,
-            9.24253,
-            4.20097,
+            9.18574,
+            4.28741,
           ],
           "rotation": 1.57209,
           "size": [
@@ -143,8 +143,8 @@ exports[`seeded simulation snapshot beam keeps its particles, bounds and JSON 1`
           ],
           "velocity": [
             -1.64897,
-            1.97183,
-            1.44151,
+            1.7194,
+            1.82569,
           ],
         },
         {
@@ -158,8 +158,8 @@ exports[`seeded simulation snapshot beam keeps its particles, bounds and JSON 1`
           "life": 1.11276,
           "position": [
             -0.21011,
-            -1.04583,
-            -1.1519,
+            -1.10262,
+            -1.06546,
           ],
           "rotation": 2.72879,
           "size": [
@@ -169,8 +169,8 @@ exports[`seeded simulation snapshot beam keeps its particles, bounds and JSON 1`
           ],
           "velocity": [
             -0.15964,
-            -1.8724,
-            -0.87523,
+            -2.12482,
+            -0.49106,
           ],
         },
         {
@@ -184,8 +184,8 @@ exports[`seeded simulation snapshot beam keeps its particles, bounds and JSON 1`
           "life": 1.18734,
           "position": [
             -3.25878,
-            -0.46009,
-            0.21862,
+            -0.50863,
+            0.2925,
           ],
           "rotation": 2.05762,
           "size": [
@@ -195,8 +195,8 @@ exports[`seeded simulation snapshot beam keeps its particles, bounds and JSON 1`
           ],
           "velocity": [
             -1.17534,
-            -1.27577,
-            0.07885,
+            -1.50878,
+            0.43347,
           ],
         },
       ],
@@ -212,8 +212,8 @@ exports[`seeded simulation snapshot beam keeps its particles, bounds and JSON 1`
         ],
         "position": [
           8.33663,
-          -14.39121,
-          -42.21934,
+          -19.77962,
+          -34.01837,
         ],
         "size": [
           10.16828,
@@ -222,8 +222,8 @@ exports[`seeded simulation snapshot beam keeps its particles, bounds and JSON 1`
         ],
         "velocity": [
           9.42202,
-          -69.70966,
-          -9.06983,
+          -84.42783,
+          13.33059,
         ],
       },
       "frame": 60,
@@ -240,8 +240,8 @@ exports[`seeded simulation snapshot beam keeps its particles, bounds and JSON 1`
           "life": 1.37644,
           "position": [
             3.35383,
-            3.63066,
-            4.8483,
+            3.28358,
+            5.37654,
           ],
           "rotation": -1.24424,
           "size": [
@@ -251,8 +251,8 @@ exports[`seeded simulation snapshot beam keeps its particles, bounds and JSON 1`
           ],
           "velocity": [
             1.5534,
-            -0.74046,
-            2.24559,
+            -1.37152,
+            3.20603,
           ],
         },
         {
@@ -266,8 +266,8 @@ exports[`seeded simulation snapshot beam keeps its particles, bounds and JSON 1`
           "life": 1.39539,
           "position": [
             -2.56121,
-            -0.17287,
-            -0.02114,
+            -0.49908,
+            0.47533,
           ],
           "rotation": 2.74979,
           "size": [
@@ -277,8 +277,8 @@ exports[`seeded simulation snapshot beam keeps its particles, bounds and JSON 1`
           ],
           "velocity": [
             -1.68636,
-            -2.15767,
-            -0.01392,
+            -2.76931,
+            0.91697,
           ],
         },
         {
@@ -292,8 +292,8 @@ exports[`seeded simulation snapshot beam keeps its particles, bounds and JSON 1`
           "life": 1.38857,
           "position": [
             -4.18411,
-            -6.50877,
-            -4.9498,
+            -6.81476,
+            -4.4841,
           ],
           "rotation": 1.15475,
           "size": [
@@ -303,8 +303,8 @@ exports[`seeded simulation snapshot beam keeps its particles, bounds and JSON 1`
           ],
           "velocity": [
             -1.28746,
-            -4.56787,
-            -1.52306,
+            -5.1601,
+            -0.62172,
           ],
         },
         {
@@ -318,8 +318,8 @@ exports[`seeded simulation snapshot beam keeps its particles, bounds and JSON 1`
           "life": 0.61126,
           "position": [
             3.82425,
-            -2.61524,
-            -0.76525,
+            -2.62252,
+            -0.75416,
           ],
           "rotation": 2.51503,
           "size": [
@@ -329,8 +329,8 @@ exports[`seeded simulation snapshot beam keeps its particles, bounds and JSON 1`
           ],
           "velocity": [
             1.42469,
-            -1.41031,
-            -0.28508,
+            -1.49769,
+            -0.1521,
           ],
         },
         {
@@ -344,8 +344,8 @@ exports[`seeded simulation snapshot beam keeps its particles, bounds and JSON 1`
           "life": 1.11276,
           "position": [
             -0.29791,
-            -2.54315,
-            -1.63328,
+            -2.82955,
+            -1.19738,
           ],
           "rotation": 2.29353,
           "size": [
@@ -355,8 +355,8 @@ exports[`seeded simulation snapshot beam keeps its particles, bounds and JSON 1`
           ],
           "velocity": [
             -0.15964,
-            -3.52239,
-            -0.87523,
+            -4.0952,
+            -0.00345,
           ],
         },
         {
@@ -370,8 +370,8 @@ exports[`seeded simulation snapshot beam keeps its particles, bounds and JSON 1`
           "life": 1.18734,
           "position": [
             -3.90522,
-            -1.62926,
-            0.26198,
+            -1.89673,
+            0.66906,
           ],
           "rotation": 2.57961,
           "size": [
@@ -381,8 +381,8 @@ exports[`seeded simulation snapshot beam keeps its particles, bounds and JSON 1`
           ],
           "velocity": [
             -1.17534,
-            -2.92577,
-            0.07885,
+            -3.47916,
+            0.92108,
           ],
         },
       ],
@@ -398,8 +398,8 @@ exports[`seeded simulation snapshot beam keeps its particles, bounds and JSON 1`
         ],
         "position": [
           23.87632,
-          -13.53305,
-          -8.30446,
+          -19.06677,
+          0.11763,
         ],
         "size": [
           7.36751,
@@ -408,8 +408,8 @@ exports[`seeded simulation snapshot beam keeps its particles, bounds and JSON 1`
         ],
         "velocity": [
           2.40177,
-          -56.51431,
-          2.31438,
+          -70.25191,
+          23.22242,
         ],
       },
       "frame": 90,
@@ -426,8 +426,8 @@ exports[`seeded simulation snapshot beam keeps its particles, bounds and JSON 1`
           "life": 0.61823,
           "position": [
             -1.35045,
-            2.42684,
-            -1.22438,
+            2.40483,
+            -1.19089,
           ],
           "rotation": 1.76543,
           "size": [
@@ -437,8 +437,8 @@ exports[`seeded simulation snapshot beam keeps its particles, bounds and JSON 1`
           ],
           "velocity": [
             -1.13299,
-            1.33113,
-            -1.02722,
+            1.1758,
+            -0.7908,
           ],
         },
         {
@@ -452,8 +452,8 @@ exports[`seeded simulation snapshot beam keeps its particles, bounds and JSON 1`
           "life": 0.85086,
           "position": [
             -0.21163,
-            7.89634,
-            -1.39718,
+            7.87935,
+            -1.37132,
           ],
           "rotation": 0.48047,
           "size": [
@@ -463,8 +463,8 @@ exports[`seeded simulation snapshot beam keeps its particles, bounds and JSON 1`
           ],
           "velocity": [
             -0.04441,
-            0.97554,
-            -0.29322,
+            0.83962,
+            -0.08636,
           ],
         },
         {
@@ -478,8 +478,8 @@ exports[`seeded simulation snapshot beam keeps its particles, bounds and JSON 1`
           "life": 1.36198,
           "position": [
             -3.72553,
-            -0.78384,
-            -4.2514,
+            -0.84954,
+            -4.15142,
           ],
           "rotation": -0.59169,
           "size": [
@@ -489,8 +489,8 @@ exports[`seeded simulation snapshot beam keeps its particles, bounds and JSON 1`
           ],
           "velocity": [
             -0.78589,
-            -1.49398,
-            -0.89682,
+            -1.76582,
+            -0.48309,
           ],
         },
         {
@@ -504,8 +504,8 @@ exports[`seeded simulation snapshot beam keeps its particles, bounds and JSON 1`
           "life": 0.69356,
           "position": [
             -1.35154,
-            0.44743,
-            0.4215,
+            0.44403,
+            0.42667,
           ],
           "rotation": -0.0643,
           "size": [
@@ -515,8 +515,8 @@ exports[`seeded simulation snapshot beam keeps its particles, bounds and JSON 1`
           ],
           "velocity": [
             -1.28712,
-            0.14277,
-            0.4014,
+            0.08452,
+            0.49006,
           ],
         },
         {
@@ -530,8 +530,8 @@ exports[`seeded simulation snapshot beam keeps its particles, bounds and JSON 1`
           "life": 1.29961,
           "position": [
             -7.94249,
-            -2.85676,
-            -1.90542,
+            -2.91355,
+            -1.81898,
           ],
           "rotation": -0.38028,
           "size": [
@@ -541,8 +541,8 @@ exports[`seeded simulation snapshot beam keeps its particles, bounds and JSON 1`
           ],
           "velocity": [
             -2.84368,
-            -2.21809,
-            -0.68221,
+            -2.47051,
+            -0.29803,
           ],
         },
         {
@@ -556,8 +556,8 @@ exports[`seeded simulation snapshot beam keeps its particles, bounds and JSON 1`
           "life": 1.33788,
           "position": [
             -1.3841,
-            0.47936,
-            -0.26681,
+            0.44862,
+            -0.22002,
           ],
           "rotation": 2.77741,
           "size": [
@@ -567,8 +567,8 @@ exports[`seeded simulation snapshot beam keeps its particles, bounds and JSON 1`
           ],
           "velocity": [
             -2.15787,
-            0.04419,
-            -0.41596,
+            -0.14027,
+            -0.13522,
           ],
         },
       ],
@@ -798,14 +798,14 @@ exports[`seeded simulation snapshot billboard, local space keeps its particles, 
 {
   "bounds": {
     "max": [
-      16.1313,
-      11.22383,
-      16.78185,
+      16.33474,
+      10.62354,
+      17.01173,
     ],
     "min": [
-      -19.21945,
-      -9.51271,
-      -17.91544,
+      -18.793,
+      -9.7566,
+      -17.39749,
     ],
   },
   "frames": [
@@ -820,8 +820,8 @@ exports[`seeded simulation snapshot billboard, local space keeps its particles, 
         ],
         "position": [
           -19.1138,
-          -3.68054,
-          -22.25465,
+          -4.41937,
+          -21.13018,
         ],
         "size": [
           7.61714,
@@ -830,8 +830,8 @@ exports[`seeded simulation snapshot billboard, local space keeps its particles, 
         ],
         "velocity": [
           -5.04539,
-          -16.61362,
-          -8.06012,
+          -20.66208,
+          -1.89853,
         ],
       },
       "frame": 30,
@@ -848,8 +848,8 @@ exports[`seeded simulation snapshot billboard, local space keeps its particles, 
           "life": 1.37644,
           "position": [
             2.49946,
-            3.59792,
-            3.61322,
+            3.51248,
+            3.74325,
           ],
           "rotation": -0.42472,
           "size": [
@@ -859,8 +859,8 @@ exports[`seeded simulation snapshot billboard, local space keeps its particles, 
           ],
           "velocity": [
             1.5534,
-            0.90954,
-            2.24559,
+            0.59886,
+            2.71842,
           ],
         },
         {
@@ -874,8 +874,8 @@ exports[`seeded simulation snapshot billboard, local space keeps its particles, 
           "life": 1.39539,
           "position": [
             -1.63371,
-            0.57385,
-            -0.01348,
+            0.49861,
+            0.10103,
           ],
           "rotation": 1.74383,
           "size": [
@@ -885,8 +885,8 @@ exports[`seeded simulation snapshot billboard, local space keeps its particles, 
           ],
           "velocity": [
             -1.68636,
-            -0.50767,
-            -0.01392,
+            -0.79893,
+            0.42936,
           ],
         },
         {
@@ -900,8 +900,8 @@ exports[`seeded simulation snapshot billboard, local space keeps its particles, 
           "life": 1.38857,
           "position": [
             -3.47601,
-            -4.43644,
-            -4.11211,
+            -4.50214,
+            -4.01213,
           ],
           "rotation": 0.93415,
           "size": [
@@ -911,8 +911,8 @@ exports[`seeded simulation snapshot billboard, local space keeps its particles, 
           ],
           "velocity": [
             -1.28746,
-            -2.91787,
-            -1.52306,
+            -3.18971,
+            -1.10933,
           ],
         },
         {
@@ -926,8 +926,8 @@ exports[`seeded simulation snapshot billboard, local space keeps its particles, 
           "life": 0.85942,
           "position": [
             -4.80558,
-            9.24253,
-            4.20097,
+            9.18574,
+            4.28741,
           ],
           "rotation": 1.57209,
           "size": [
@@ -937,8 +937,8 @@ exports[`seeded simulation snapshot billboard, local space keeps its particles, 
           ],
           "velocity": [
             -1.64897,
-            1.97183,
-            1.44151,
+            1.7194,
+            1.82569,
           ],
         },
         {
@@ -952,8 +952,8 @@ exports[`seeded simulation snapshot billboard, local space keeps its particles, 
           "life": 1.11276,
           "position": [
             -0.21011,
-            -1.04583,
-            -1.1519,
+            -1.10262,
+            -1.06546,
           ],
           "rotation": 2.72879,
           "size": [
@@ -963,8 +963,8 @@ exports[`seeded simulation snapshot billboard, local space keeps its particles, 
           ],
           "velocity": [
             -0.15964,
-            -1.8724,
-            -0.87523,
+            -2.12482,
+            -0.49106,
           ],
         },
         {
@@ -978,8 +978,8 @@ exports[`seeded simulation snapshot billboard, local space keeps its particles, 
           "life": 1.18734,
           "position": [
             -3.25878,
-            -0.46009,
-            0.21862,
+            -0.50863,
+            0.2925,
           ],
           "rotation": 2.05762,
           "size": [
@@ -989,8 +989,8 @@ exports[`seeded simulation snapshot billboard, local space keeps its particles, 
           ],
           "velocity": [
             -1.17534,
-            -1.27577,
-            0.07885,
+            -1.50878,
+            0.43347,
           ],
         },
       ],
@@ -1006,8 +1006,8 @@ exports[`seeded simulation snapshot billboard, local space keeps its particles, 
         ],
         "position": [
           8.33663,
-          -14.39121,
-          -42.21934,
+          -19.77962,
+          -34.01837,
         ],
         "size": [
           10.16828,
@@ -1016,8 +1016,8 @@ exports[`seeded simulation snapshot billboard, local space keeps its particles, 
         ],
         "velocity": [
           9.42202,
-          -69.70966,
-          -9.06983,
+          -84.42783,
+          13.33059,
         ],
       },
       "frame": 60,
@@ -1034,8 +1034,8 @@ exports[`seeded simulation snapshot billboard, local space keeps its particles, 
           "life": 1.37644,
           "position": [
             3.35383,
-            3.63066,
-            4.8483,
+            3.28358,
+            5.37654,
           ],
           "rotation": -1.24424,
           "size": [
@@ -1045,8 +1045,8 @@ exports[`seeded simulation snapshot billboard, local space keeps its particles, 
           ],
           "velocity": [
             1.5534,
-            -0.74046,
-            2.24559,
+            -1.37152,
+            3.20603,
           ],
         },
         {
@@ -1060,8 +1060,8 @@ exports[`seeded simulation snapshot billboard, local space keeps its particles, 
           "life": 1.39539,
           "position": [
             -2.56121,
-            -0.17287,
-            -0.02114,
+            -0.49908,
+            0.47533,
           ],
           "rotation": 2.74979,
           "size": [
@@ -1071,8 +1071,8 @@ exports[`seeded simulation snapshot billboard, local space keeps its particles, 
           ],
           "velocity": [
             -1.68636,
-            -2.15767,
-            -0.01392,
+            -2.76931,
+            0.91697,
           ],
         },
         {
@@ -1086,8 +1086,8 @@ exports[`seeded simulation snapshot billboard, local space keeps its particles, 
           "life": 1.38857,
           "position": [
             -4.18411,
-            -6.50877,
-            -4.9498,
+            -6.81476,
+            -4.4841,
           ],
           "rotation": 1.15475,
           "size": [
@@ -1097,8 +1097,8 @@ exports[`seeded simulation snapshot billboard, local space keeps its particles, 
           ],
           "velocity": [
             -1.28746,
-            -4.56787,
-            -1.52306,
+            -5.1601,
+            -0.62172,
           ],
         },
         {
@@ -1112,8 +1112,8 @@ exports[`seeded simulation snapshot billboard, local space keeps its particles, 
           "life": 0.61126,
           "position": [
             3.82425,
-            -2.61524,
-            -0.76525,
+            -2.62252,
+            -0.75416,
           ],
           "rotation": 2.51503,
           "size": [
@@ -1123,8 +1123,8 @@ exports[`seeded simulation snapshot billboard, local space keeps its particles, 
           ],
           "velocity": [
             1.42469,
-            -1.41031,
-            -0.28508,
+            -1.49769,
+            -0.1521,
           ],
         },
         {
@@ -1138,8 +1138,8 @@ exports[`seeded simulation snapshot billboard, local space keeps its particles, 
           "life": 1.11276,
           "position": [
             -0.29791,
-            -2.54315,
-            -1.63328,
+            -2.82955,
+            -1.19738,
           ],
           "rotation": 2.29353,
           "size": [
@@ -1149,8 +1149,8 @@ exports[`seeded simulation snapshot billboard, local space keeps its particles, 
           ],
           "velocity": [
             -0.15964,
-            -3.52239,
-            -0.87523,
+            -4.0952,
+            -0.00345,
           ],
         },
         {
@@ -1164,8 +1164,8 @@ exports[`seeded simulation snapshot billboard, local space keeps its particles, 
           "life": 1.18734,
           "position": [
             -3.90522,
-            -1.62926,
-            0.26198,
+            -1.89673,
+            0.66906,
           ],
           "rotation": 2.57961,
           "size": [
@@ -1175,8 +1175,8 @@ exports[`seeded simulation snapshot billboard, local space keeps its particles, 
           ],
           "velocity": [
             -1.17534,
-            -2.92577,
-            0.07885,
+            -3.47916,
+            0.92108,
           ],
         },
       ],
@@ -1192,8 +1192,8 @@ exports[`seeded simulation snapshot billboard, local space keeps its particles, 
         ],
         "position": [
           23.87632,
-          -13.53305,
-          -8.30446,
+          -19.06677,
+          0.11763,
         ],
         "size": [
           7.36751,
@@ -1202,8 +1202,8 @@ exports[`seeded simulation snapshot billboard, local space keeps its particles, 
         ],
         "velocity": [
           2.40177,
-          -56.51431,
-          2.31438,
+          -70.25191,
+          23.22242,
         ],
       },
       "frame": 90,
@@ -1220,8 +1220,8 @@ exports[`seeded simulation snapshot billboard, local space keeps its particles, 
           "life": 0.61823,
           "position": [
             -1.35045,
-            2.42684,
-            -1.22438,
+            2.40483,
+            -1.19089,
           ],
           "rotation": 1.76543,
           "size": [
@@ -1231,8 +1231,8 @@ exports[`seeded simulation snapshot billboard, local space keeps its particles, 
           ],
           "velocity": [
             -1.13299,
-            1.33113,
-            -1.02722,
+            1.1758,
+            -0.7908,
           ],
         },
         {
@@ -1246,8 +1246,8 @@ exports[`seeded simulation snapshot billboard, local space keeps its particles, 
           "life": 0.85086,
           "position": [
             -0.21163,
-            7.89634,
-            -1.39718,
+            7.87935,
+            -1.37132,
           ],
           "rotation": 0.48047,
           "size": [
@@ -1257,8 +1257,8 @@ exports[`seeded simulation snapshot billboard, local space keeps its particles, 
           ],
           "velocity": [
             -0.04441,
-            0.97554,
-            -0.29322,
+            0.83962,
+            -0.08636,
           ],
         },
         {
@@ -1272,8 +1272,8 @@ exports[`seeded simulation snapshot billboard, local space keeps its particles, 
           "life": 1.36198,
           "position": [
             -3.72553,
-            -0.78384,
-            -4.2514,
+            -0.84954,
+            -4.15142,
           ],
           "rotation": -0.59169,
           "size": [
@@ -1283,8 +1283,8 @@ exports[`seeded simulation snapshot billboard, local space keeps its particles, 
           ],
           "velocity": [
             -0.78589,
-            -1.49398,
-            -0.89682,
+            -1.76582,
+            -0.48309,
           ],
         },
         {
@@ -1298,8 +1298,8 @@ exports[`seeded simulation snapshot billboard, local space keeps its particles, 
           "life": 0.69356,
           "position": [
             -1.35154,
-            0.44743,
-            0.4215,
+            0.44403,
+            0.42667,
           ],
           "rotation": -0.0643,
           "size": [
@@ -1309,8 +1309,8 @@ exports[`seeded simulation snapshot billboard, local space keeps its particles, 
           ],
           "velocity": [
             -1.28712,
-            0.14277,
-            0.4014,
+            0.08452,
+            0.49006,
           ],
         },
         {
@@ -1324,8 +1324,8 @@ exports[`seeded simulation snapshot billboard, local space keeps its particles, 
           "life": 1.29961,
           "position": [
             -7.94249,
-            -2.85676,
-            -1.90542,
+            -2.91355,
+            -1.81898,
           ],
           "rotation": -0.38028,
           "size": [
@@ -1335,8 +1335,8 @@ exports[`seeded simulation snapshot billboard, local space keeps its particles, 
           ],
           "velocity": [
             -2.84368,
-            -2.21809,
-            -0.68221,
+            -2.47051,
+            -0.29803,
           ],
         },
         {
@@ -1350,8 +1350,8 @@ exports[`seeded simulation snapshot billboard, local space keeps its particles, 
           "life": 1.33788,
           "position": [
             -1.3841,
-            0.47936,
-            -0.26681,
+            0.44862,
+            -0.22002,
           ],
           "rotation": 2.77741,
           "size": [
@@ -1361,8 +1361,8 @@ exports[`seeded simulation snapshot billboard, local space keeps its particles, 
           ],
           "velocity": [
             -2.15787,
-            0.04419,
-            -0.41596,
+            -0.14027,
+            -0.13522,
           ],
         },
       ],

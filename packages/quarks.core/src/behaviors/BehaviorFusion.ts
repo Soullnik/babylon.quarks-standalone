@@ -264,13 +264,18 @@ function fragmentFor(behavior: Behavior, k: number): Fragment | null {
             };
         case 'ApplyForce':
             return {
-                // The magnitude is rolled per particle; a constant one is read once.
-                setup: `const d${k} = behaviors[${k}].direction;
+                // The direction is already in the simulation space (the behavior's
+                // frameUpdate converts it), and the step carries the system's
+                // motionScale. The magnitude is rolled per particle; a constant one
+                // is read once.
+                setup: `const b${k} = behaviors[${k}];
+                    const d${k} = b${k}._direction;
                     const dx${k} = d${k}.x, dy${k} = d${k}.y, dz${k} = d${k}.z;
-                    ${scalarSetup(`g${k}`, `behaviors[${k}].magnitude`)}`,
+                    const step${k} = b${k}._step(delta);
+                    ${scalarSetup(`g${k}`, `b${k}.magnitude`)}`,
                 body: `{
                         ${scalarValue(`g${k}`, 'm', 't')}
-                        const s = m * delta;
+                        const s = m * step${k};
                         vel[o3] += dx${k} * s; vel[o3 + 1] += dy${k} * s; vel[o3 + 2] += dz${k} * s;
                     }`,
             };
@@ -320,25 +325,32 @@ function fragmentFor(behavior: Behavior, k: number): Fragment | null {
             };
         case 'ForceOverLife':
             return {
+                // The force is authored in b.space and converted into the simulation
+                // space with the emitter frame b.frameUpdate decomposed, exactly as
+                // EmitterFrame.toSimulation does; the step carries motionScale.
                 setup: `const b${k} = behaviors[${k}];
                     ${scalarSetup(`gx${k}`, `b${k}.x`)}
                     ${scalarSetup(`gy${k}`, `b${k}.y`)}
                     ${scalarSetup(`gz${k}`, `b${k}.z`)}
-                    const local${k} = b${k}.ps !== undefined && !b${k}.ps.worldSpace;
-                    const ms${k} = !local${k} && b${k}.ps !== undefined ? (b${k}.ps.motionScale ?? 1) : 1;
-                    ${vectorSetup(`sc${k}`, `b${k}._tempScale`)}
-                    ${quaternionSetup(`q${k}`, `b${k}._tempQ`)}`,
+                    const world${k} = b${k}.ps === undefined || b${k}.ps.worldSpace;
+                    const toWorld${k} = world${k} && b${k}.space === 'local';
+                    const toLocal${k} = !world${k} && b${k}.space === 'world';
+                    const step${k} = b${k}._step(delta);
+                    const fr${k} = b${k}._frame;
+                    ${vectorSetup(`sc${k}`, `toWorld${k} ? fr${k}.scale : fr${k}.scaleInverse`)}
+                    ${quaternionSetup(`q${k}`, `toWorld${k} ? fr${k}.quaternion : fr${k}.quaternionInverse`)}`,
                 body: `{
                     ${scalarValue(`gx${k}`, 'fx', 't')}
                     ${scalarValue(`gy${k}`, 'fy', 't')}
                     ${scalarValue(`gz${k}`, 'fz', 't')}
-                    if (local${k}) {
+                    if (toWorld${k}) {
                         fx *= sc${k}x; fy *= sc${k}y; fz *= sc${k}z;
                         ${rotateInPlace('fx', 'fy', 'fz', `q${k}x`, `q${k}y`, `q${k}z`, `q${k}w`)}
-                    } else if (ms${k} !== 1) {
-                        fx *= ms${k}; fy *= ms${k}; fz *= ms${k};
+                    } else if (toLocal${k}) {
+                        ${rotateInPlace('fx', 'fy', 'fz', `q${k}x`, `q${k}y`, `q${k}z`, `q${k}w`)}
+                        fx *= sc${k}x; fy *= sc${k}y; fz *= sc${k}z;
                     }
-                    vel[o3] += fx * delta; vel[o3 + 1] += fy * delta; vel[o3 + 2] += fz * delta;}`,
+                    vel[o3] += fx * step${k}; vel[o3 + 1] += fy * step${k}; vel[o3 + 2] += fz * step${k};}`,
             };
         case 'LimitSpeedOverLife':
             return {
@@ -410,22 +422,25 @@ function fragmentFor(behavior: Behavior, k: number): Fragment | null {
             };
         case 'OrbitOverLife':
             return {
-                // A constant orbit speed turns every particle by the same
-                // quaternion, built once here instead of a sin/cos per particle.
+                // The unit axis and the pivot in the simulation space come from the
+                // behavior's frameUpdate. A constant orbit speed turns every particle
+                // by the same quaternion, built once here instead of a sin/cos per
+                // particle. A zero axis orbits nothing.
                 setup: `const b${k} = behaviors[${k}];
                     ${scalarSetup(`g${k}`, `b${k}.orbitSpeed`)}
-                    ${vectorSetup(`ax${k}`, `b${k}.axis`)}
+                    ${vectorSetup(`ax${k}`, `b${k}._axis`)}
+                    ${vectorSetup(`c${k}`, `b${k}._center`)}
                     const alen${k} = ax${k}x * ax${k}x + ax${k}y * ax${k}y + ax${k}z * ax${k}z;
+                    const orbit${k} = alen${k} !== 0;
                     const chalf${k} = (g${k}_cv * delta) / 2;
                     const csn${k} = Math.sin(chalf${k});
                     const cqx${k} = ax${k}x * csn${k}, cqy${k} = ax${k}y * csn${k}, cqz${k} = ax${k}z * csn${k};
                     const cqw${k} = Math.cos(chalf${k});`,
-                body: `{let px = pos[o3], py = pos[o3 + 1], pz = pos[o3 + 2];
-                    let tx = 0, ty = 0, tz = 0;
-                    if (alen${k} !== 0) {
-                        const f = (ax${k}x * px + ax${k}y * py + ax${k}z * pz) / alen${k};
-                        tx = ax${k}x * f; ty = ax${k}y * f; tz = ax${k}z * f;
-                    }
+                body: `if (orbit${k}) {
+                    let px = Math.fround(pos[o3] - c${k}x), py = Math.fround(pos[o3 + 1] - c${k}y), pz = Math.fround(pos[o3 + 2] - c${k}z);
+                    // Divided by the squared length as projectOnVector does, so the bits match.
+                    const f = (ax${k}x * px + ax${k}y * py + ax${k}z * pz) / alen${k};
+                    const tx = ax${k}x * f, ty = ax${k}y * f, tz = ax${k}z * f;
                     let qx, qy, qz, qw;
                     if (g${k}_const) {
                         qx = cqx${k}; qy = cqy${k}; qz = cqz${k}; qw = cqw${k};
@@ -437,9 +452,10 @@ function fragmentFor(behavior: Behavior, k: number): Fragment | null {
                     }
                     px = Math.fround(px - tx); py = Math.fround(py - ty); pz = Math.fround(pz - tz);
                     ${rotateInPlace('px', 'py', 'pz', 'qx', 'qy', 'qz', 'qw')}
-                    pos[o3] = Math.fround(px) + tx;
-                    pos[o3 + 1] = Math.fround(py) + ty;
-                    pos[o3 + 2] = Math.fround(pz) + tz;}`,
+                    px = Math.fround(Math.fround(px) + tx); py = Math.fround(Math.fround(py) + ty); pz = Math.fround(Math.fround(pz) + tz);
+                    pos[o3] = px + c${k}x;
+                    pos[o3 + 1] = py + c${k}y;
+                    pos[o3 + 2] = pz + c${k}z;}`,
             };
         case 'Rotation3DOverLife':
             return {

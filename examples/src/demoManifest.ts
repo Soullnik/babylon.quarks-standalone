@@ -65,6 +65,16 @@ export const demoManifest: DemoManifestEntry[] = [
         preview: {icon: 'SE', gradient: 'linear-gradient(135deg, #ff7dc4 0%, #7d2e75 100%)'},
     },
     {
+        key: 'ForceSpaceDemo',
+        name: 'Force Space',
+        module: 'forceSpace',
+        sourcePath: 'examples/src/demos/forceSpace.ts',
+        description:
+            'Two turning emitters: a world-space gravity keeps falling down, a local-space thrust turns with its emitter.',
+        tags: ['force', 'space'],
+        preview: {icon: 'FS', gradient: 'linear-gradient(135deg, #ffd166 0%, #8c4a1a 100%)'},
+    },
+    {
         key: 'TurbulenceDemo',
         name: 'Noise Turbulence',
         module: 'turbulence',

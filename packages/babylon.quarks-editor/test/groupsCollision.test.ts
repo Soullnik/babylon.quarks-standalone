@@ -39,7 +39,7 @@ describe('grouping', () => {
 });
 
 describe('ground collision', () => {
-    afterEach(() => setPhysicsResolver(null as never));
+    afterEach(() => setPhysicsResolver(undefined));
 
     it('reflects at and below the plane', () => {
         const resolver = new GroundPlaneResolver(1);

@@ -421,4 +421,53 @@ describe('behavior fusion', () => {
             expect(actual[i]).toBeCloseTo(expected[i], 6);
         }
     });
+
+    it.each([
+        ['world-space', true],
+        ['local-space', false],
+    ])(
+        'matches the separate path for forces in both spaces, %s system, emitter turned and scaled',
+        (_name, worldSpace) => {
+            const matrixWorld = new Matrix4().compose(
+                new Vector3(3, -1, 2),
+                new Quaternion().setFromAxisAngle(new Vector3(1, 1, 0).normalize(), 0.9),
+                new Vector3(2, 0.5, 1.5)
+            );
+            const turned = {worldSpace, emitter: {matrixWorld}, motionScale: 1.5} as unknown as IParticleSystem;
+            const build = (): Behavior[] => [
+                new ForceOverLife(new ConstantValue(1), new ConstantValue(-2), new ConstantValue(0.5), 'local'),
+                new ForceOverLife(
+                    new PiecewiseBezier([[new Bezier(0, 1, 2, 3), 0]]),
+                    new ConstantValue(0),
+                    new ConstantValue(1)
+                ),
+                new ApplyForce(new Vector3(1, 0, 0), new IntervalValue(1, 3), 'local'),
+                new ApplyForce(new Vector3(0, -1, 0), new ConstantValue(2)),
+            ];
+            const fusedBehaviors = build();
+            const separateBehaviors = build();
+            const fused = makePool(COUNT);
+            const separate = makePool(COUNT);
+            withRandomSource(createSeededRandom(5), () => {
+                for (const p of fused) for (const b of fusedBehaviors) b.initialize(p, turned);
+            });
+            withRandomSource(createSeededRandom(5), () => {
+                for (const p of separate) for (const b of separateBehaviors) b.initialize(p, turned);
+            });
+            expect(planBehaviorFusion(fusedBehaviors)).toHaveLength(1);
+            const before = snapshot(separate);
+
+            for (let frame = 0; frame < 3; frame++) {
+                runPlan(fusedBehaviors, fused, DELTA);
+                runSeparately(separateBehaviors, separate, DELTA);
+            }
+
+            const expected = snapshot(separate);
+            const actual = snapshot(fused);
+            expect(expected).not.toEqual(before);
+            for (let i = 0; i < expected.length; i++) {
+                expect(actual[i]).toBeCloseTo(expected[i], 6);
+            }
+        }
+    );
 });

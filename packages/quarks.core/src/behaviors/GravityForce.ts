@@ -4,16 +4,22 @@ import {readVector3} from '../util/JSONUtil';
 import {Behavior} from './Behavior';
 
 /**
- * Apply a gravity force to particles.
- * the gravity force is calculated as:
- * F = G * m1 * m2 / r^2
+ * Pull particles toward a point with an inverse-square force, F = magnitude / r²
+ * (Niagara's Point Attraction Force).
+ *
+ * `center` is a point in the space the system simulates in: the emitter's own
+ * space for a local-space system, the world for a world-space one. A particle
+ * exactly on the centre is left alone rather than given an infinite pull.
+ * Applies in every render mode.
  */
 export class GravityForce implements Behavior {
     type = 'GravityForce';
     temp: Vector3 = new Vector3();
 
     constructor(
+        /** The point pulled toward, in the simulation space. */
         public center: Vector3,
+        /** Strength of the pull at distance 1, in units per second squared. */
         public magnitude: number
     ) {}
 

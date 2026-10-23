@@ -27,12 +27,42 @@ import {VelocityOverLife} from './VelocityOverLife';
 import {WidthOverLength} from './WidthOverLength';
 
 /**
- * Interface for particle behaviors.
- * a behavior is a function that modifies a particle's properties over time.
+ * A behavior changes particles over time; a particle system runs a list of
+ * them every simulation step. Each method is called by the host (the system
+ * that owns the behavior), in this order:
+ *
+ * 1. {@link initialize} once per particle, when it is emitted. The particle is
+ *    already in the system's pool, placed and given its start values by the
+ *    emitter shape, and converted to the simulation space; `particleSystem` is
+ *    the system it belongs to. A behavior that reads a per-particle random
+ *    sample starts its generators on `particle.memory` here.
+ * 2. {@link frameUpdate} once per step, before any particle is updated that
+ *    step, with the step's length. Per-step work (decomposing the emitter's
+ *    transform, advancing a time offset) belongs here.
+ * 3. {@link update} once per live particle, or {@link updateAll} once for the
+ *    whole pool when it is implemented. The particle's `age` is the age at the
+ *    start of the step; the host adds `delta` and integrates the velocity
+ *    after every behavior has run.
+ * 4. {@link reset} when the system restarts, before it emits again: state
+ *    accumulated across steps goes back to how it was before the first one.
+ *
+ * Randomness is drawn through `random()` from `quarks.core`'s `util/random`,
+ * never `Math.random`, so a host that runs its steps inside `setRandomSource`
+ * (or `withRandomSource`) with a seeded generator replays the same effect, as
+ * babylon.quarks does for a system with a `seed`. Any other state a behavior
+ * keeps must be derived from its settings, so a `clone()` or a saved and
+ * reloaded copy behaves the same.
+ *
+ * {@link toJSON} writes the behavior's settings as plain data, the `type` and
+ * every non-default field; `BehaviorTypes[type].loadJSON` reads it back. The
+ * `params` of that entry list the fields an editor shows.
  */
 export interface Behavior {
+    /** The name the behavior is registered under in {@link BehaviorTypes}. */
     type: string;
+    /** Called once per particle when it is emitted; see the interface's description for when. */
     initialize(particle: Particle, particleSystem: IParticleSystem): void;
+    /** Called once per live particle per step, with the step's length in seconds. */
     update(particle: Particle, delta: number): void;
     /**
      * Optional bulk form of {@link update}, applied to `particles[0..count)`.
@@ -41,15 +71,19 @@ export interface Behavior {
      * behavior type, which leaves it megamorphic: V8 can neither inline it nor
      * specialise the generator calls inside. A behavior that implements this
      * instead gets one call per frame and a loop it owns, where those calls are
-     * monomorphic. Implementations must skip dead particles exactly as the
-     * per-particle path does, and must produce identical results.
+     * monomorphic. Implementations must skip dead particles (`age >= life`)
+     * exactly as the per-particle path does, and must produce identical results.
      *
      * Behaviors that do not implement it keep working unchanged.
      */
     updateAll?(particles: Array<Particle>, count: number, delta: number): void;
+    /** Called once per step before the particles are updated, with the step's length in seconds. */
     frameUpdate(delta: number): void;
+    /** The behavior's settings as plain data, with its `type`; see the interface's description. */
     toJSON(): any;
+    /** A copy with the same settings that shares nothing mutable with this one. */
     clone(): Behavior;
+    /** Called when the system restarts: forget state accumulated across steps. */
     reset(): void;
 }
 
@@ -67,6 +101,7 @@ export const BehaviorTypes: {[key: string]: BehaviorPlugin} = {
         params: [
             ['direction', ['vec3']],
             ['magnitude', ['value']],
+            ['space', ['string']],
         ],
         loadJSON: ApplyForce.fromJSON,
     },
@@ -78,6 +113,8 @@ export const BehaviorTypes: {[key: string]: BehaviorPlugin} = {
             ['power', ['value']],
             ['positionAmount', ['value']],
             ['rotationAmount', ['value']],
+            ['scrollSpeed', ['value']],
+            ['remap', ['valueFunc']],
         ],
         loadJSON: Noise.fromJSON,
     },
@@ -89,6 +126,7 @@ export const BehaviorTypes: {[key: string]: BehaviorPlugin} = {
             ['octaves', ['number']],
             ['velocityMultiplier', ['vec3']],
             ['timeScale', ['vec3']],
+            ['seed', ['number']],
         ],
         loadJSON: TurbulenceField.fromJSON,
     },
@@ -161,7 +199,15 @@ export const BehaviorTypes: {[key: string]: BehaviorPlugin} = {
     FrameOverLife: {
         type: 'FrameOverLife',
         constructor: FrameOverLife,
-        params: [['frame', ['value', 'valueFunc']]],
+        params: [
+            ['frame', ['value', 'valueFunc']],
+            ['fps', ['number']],
+            ['cycles', ['number']],
+            ['frameCount', ['number']],
+            ['loop', ['boolean']],
+            ['random', ['boolean']],
+            ['startFrame', ['value']],
+        ],
         loadJSON: FrameOverLife.fromJSON,
     },
     ForceOverLife: {
@@ -171,6 +217,7 @@ export const BehaviorTypes: {[key: string]: BehaviorPlugin} = {
             ['x', ['value', 'valueFunc']],
             ['y', ['value', 'valueFunc']],
             ['z', ['value', 'valueFunc']],
+            ['space', ['string']],
         ],
         loadJSON: ForceOverLife.fromJSON,
     },
@@ -185,6 +232,8 @@ export const BehaviorTypes: {[key: string]: BehaviorPlugin} = {
             ['orbitalY', ['value', 'valueFunc']],
             ['orbitalZ', ['value', 'valueFunc']],
             ['space', ['string']],
+            ['radial', ['value', 'valueFunc']],
+            ['orbitalOffset', ['vec3']],
         ],
         loadJSON: VelocityOverLife.fromJSON,
     },
@@ -203,13 +252,17 @@ export const BehaviorTypes: {[key: string]: BehaviorPlugin} = {
         params: [
             ['orbitSpeed', ['value', 'valueFunc']],
             ['axis', ['vec3']],
+            ['space', ['string']],
         ],
         loadJSON: OrbitOverLife.fromJSON,
     },
     WidthOverLength: {
         type: 'WidthOverLength',
         constructor: WidthOverLength,
-        params: [['width', ['value', 'valueFunc']]],
+        params: [
+            ['width', ['value', 'valueFunc']],
+            ['absolute', ['boolean']],
+        ],
         loadJSON: WidthOverLength.fromJSON,
     },
     ChangeEmitDirection: {
@@ -234,6 +287,7 @@ export const BehaviorTypes: {[key: string]: BehaviorPlugin} = {
             ['subParticleSystem', ['particleSystem']],
             ['mode', ['number']],
             ['emitProbability', ['number']],
+            // `inherit` is a list of property names; no FieldType describes one yet.
         ],
         loadJSON: EmitSubParticleSystem.fromJSON,
     },
