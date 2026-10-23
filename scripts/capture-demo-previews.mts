@@ -5,15 +5,24 @@ import {demoManifest} from '../examples/src/demoManifest.ts';
 
 /**
  * Screenshots every demo into `examples/public/previews/<key>.png`, what the gallery shows
- * and what `check:demos` requires. Serve the examples first (`npm run dev`).
+ * and what `check:demos` requires, plus the landing page's still images in
+ * `examples/public/landing/` (the stage poster and the editor shot). Serve the examples first
+ * (`npm run dev`).
  *
  *   EXAMPLES_BASE_URL  where the examples are served (default http://localhost:3010)
  *   CHROMIUM_PATH      a Chromium to use instead of Playwright's own
  *   --only=A,B         capture only these demo keys (default every demo in the manifest)
+ *   --landing          capture only the landing page's images
+ *   --wait=MS          how long each demo runs before its screenshot (default 3000)
  */
 const VIEWPORT = {width: 1280, height: 720};
 const BASE_URL = process.env.EXAMPLES_BASE_URL ?? 'http://localhost:3010';
 const OUTPUT_DIR = path.resolve('examples/public/previews');
+const LANDING_DIR = path.resolve('examples/public/landing');
+const landingOnly = process.argv.includes('--landing');
+const waitMs = Number(process.argv.find((a) => a.startsWith('--wait='))?.slice('--wait='.length) ?? 3000);
+// The viewer's toolbar, hint and drop overlay are UI, not the effect; previews show the effect only.
+const HIDE_VIEWER_UI = '.hud, .hint, .drop-overlay { display: none !important; }';
 const only = process.argv
     .find((a) => a.startsWith('--only='))
     ?.slice('--only='.length)
@@ -40,10 +49,46 @@ async function captureDemoPreview(page: import('playwright').Page, demo: (typeof
     const demoUrl = `${BASE_URL}/babylonDemo.html#${demo.key}`;
 
     await page.goto(demoUrl, {waitUntil: 'networkidle'});
-    await page.waitForTimeout(3000);
+    await page.addStyleTag({content: HIDE_VIEWER_UI});
+    await page.waitForTimeout(waitMs);
     await page.screenshot({path: previewPath});
 
     return previewFilename;
+}
+
+/**
+ * Captures the landing page's stage poster (the vortex, shown until the live stage starts and
+ * to visitors who prefer reduced motion) and the editor screenshot.
+ */
+async function captureLanding(browser: import('playwright').Browser) {
+    await mkdir(LANDING_DIR, {recursive: true});
+
+    const stagePage = await browser.newPage({viewport: {width: 1440, height: 900}, deviceScaleFactor: 2});
+    await stagePage.goto(`${BASE_URL}/?engine=webgl`, {waitUntil: 'networkidle'});
+    await stagePage.waitForFunction(() => document.querySelector('[data-stage]')?.getAttribute('data-live') === 'true');
+    await stagePage.waitForTimeout(6000);
+    await stagePage
+        .locator('.stage-view canvas')
+        .screenshot({path: path.join(LANDING_DIR, 'stage-poster.jpg'), quality: 82});
+    console.log('Captured landing/stage-poster.jpg');
+
+    // The editor shot opens the same vortex through the stage's "Open in editor", so it shows a
+    // real effect in the hierarchy and inspector rather than the empty project list.
+    await Promise.all([stagePage.waitForURL(/editor\.html/), stagePage.click('[data-stage-editor]')]);
+    const effect = await stagePage.evaluate(() => sessionStorage.getItem('quarks-editor-effect'));
+    await stagePage.close();
+
+    const editorPage = await browser.newPage({viewport: {width: 1440, height: 900}});
+    await editorPage.addInitScript((json) => {
+        if (json) {
+            sessionStorage.setItem('quarks-editor-effect', json);
+        }
+    }, effect);
+    await editorPage.goto(`${BASE_URL}/editor.html?effect=session`, {waitUntil: 'networkidle'});
+    await editorPage.waitForTimeout(6000);
+    await editorPage.screenshot({path: path.join(LANDING_DIR, 'editor.jpg'), quality: 80});
+    await editorPage.close();
+    console.log('Captured landing/editor.jpg');
 }
 
 /**
@@ -58,6 +103,14 @@ async function main() {
         args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'],
         ...(process.env.CHROMIUM_PATH ? {executablePath: process.env.CHROMIUM_PATH} : {}),
     });
+    if (landingOnly) {
+        try {
+            await captureLanding(browser);
+        } finally {
+            await browser.close();
+        }
+        return;
+    }
     const page = await browser.newPage({viewport: VIEWPORT});
 
     try {
