@@ -9,7 +9,16 @@ export class EulerGenerator implements RotationGenerator {
     /** Always `'rotation'`. */
     type: 'rotation';
     /** The Euler the angles are written into; its `order` is the generator's order. */
-    eular: Euler;
+    euler: Euler;
+
+    /** @deprecated Misspelt; use {@link euler}. Removed in a later minor release. */
+    get eular(): Euler {
+        return this.euler;
+    }
+    /** @deprecated Misspelt; use {@link euler}. */
+    set eular(value: Euler) {
+        this.euler = value;
+    }
 
     /**
      * @param angleX - The angle about x, in radians.
@@ -24,7 +33,7 @@ export class EulerGenerator implements RotationGenerator {
         eulerOrder?: EulerOrder
     ) {
         this.type = 'rotation';
-        this.eular = new Euler(0, 0, 0, eulerOrder);
+        this.euler = new Euler(0, 0, 0, eulerOrder);
     }
 
     /** Rolls the three angle generators into `memory`. */
@@ -39,12 +48,12 @@ export class EulerGenerator implements RotationGenerator {
      * @returns `quat`.
      */
     genValue(memory: GeneratorMemory, quat: Quaternion, delta: number, t?: number): Quaternion {
-        this.eular.set(
+        this.euler.set(
             this.angleX.genValue(memory, t!) * delta,
             this.angleY.genValue(memory, t!) * delta,
             this.angleZ.genValue(memory, t!) * delta
         );
-        return quat.setFromEuler(this.eular);
+        return quat.setFromEuler(this.euler);
     }
 
     /** The JSON form, `{type: 'Euler', angleX, angleY, angleZ, eulerOrder}`. */
@@ -54,7 +63,7 @@ export class EulerGenerator implements RotationGenerator {
             angleX: this.angleX.toJSON(),
             angleY: this.angleY.toJSON(),
             angleZ: this.angleZ.toJSON(),
-            eulerOrder: this.eular.order,
+            eulerOrder: this.euler.order,
         };
     }
 
@@ -70,6 +79,6 @@ export class EulerGenerator implements RotationGenerator {
 
     /** A copy with its own angle generators and the same order. */
     clone(): RotationGenerator {
-        return new EulerGenerator(this.angleX.clone(), this.angleY.clone(), this.angleZ.clone(), this.eular.order);
+        return new EulerGenerator(this.angleX.clone(), this.angleY.clone(), this.angleZ.clone(), this.euler.order);
     }
 }

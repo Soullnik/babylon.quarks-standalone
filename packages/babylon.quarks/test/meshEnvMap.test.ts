@@ -188,6 +188,33 @@ describe('mesh particle environment map', () => {
         }
     });
 
+    it('does not try a cube whose atlas failed again, and warns once', async () => {
+        const cube = fakeCube(scene, ['px', 'py', 'pz', 'nx', 'ny', 'nz']);
+        const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+        const originalBuilder = envAtlas.envAtlasBuilder.createFromFaceUrls;
+        const build = jest.fn().mockRejectedValue(new Error('no faces'));
+        envAtlas.envAtlasBuilder.createFromFaceUrls = build;
+        try {
+            const onReady = jest.fn();
+            envAtlas.ensureEnvAtlasFromCube(cube, scene, onReady);
+            await new Promise((resolve) => setTimeout(resolve, 0));
+            envAtlas.ensureEnvAtlasFromCube(cube, scene, onReady);
+            await new Promise((resolve) => setTimeout(resolve, 0));
+            expect(build).toHaveBeenCalledTimes(1);
+            expect(warn).toHaveBeenCalledTimes(1);
+            expect(onReady).not.toHaveBeenCalled();
+            // New faces are tried again.
+            forceSet(cube, 'files', ['a', 'b', 'c', 'd', 'e', 'f']);
+            envAtlas.ensureEnvAtlasFromCube(cube, scene, onReady);
+            await new Promise((resolve) => setTimeout(resolve, 0));
+            expect(build).toHaveBeenCalledTimes(2);
+        } finally {
+            envAtlas.envAtlasBuilder.createFromFaceUrls = originalBuilder;
+            warn.mockRestore();
+            cube.dispose();
+        }
+    });
+
     it('sizes fallback UVs to custom mesh geometry so the uv attribute is complete', () => {
         // A capsule-sized position buffer with the old DEFAULT_UVS (4 verts) left the
         // uv attribute short — iOS WebKit then raised GL_INVALID_OPERATION on draw.

@@ -10,6 +10,8 @@ const atlasesByCube = new WeakMap<BaseTexture, Map<Scene, Texture>>();
 const pendingByCube = new WeakMap<BaseTexture, Map<Scene, Promise<Texture | null>>>();
 /** Atlases this module built, which it disposes; an atlas given to {@link cacheEnvAtlas} stays the caller's. */
 const builtAtlases = new WeakSet<Texture>();
+/** The faces each cube's atlas failed to build from: not tried, or warned about, again. */
+const failedFaces = new WeakMap<BaseTexture, string>();
 /** Atlases whose dispose this module already listens to. */
 const watchedAtlases = new WeakSet<Texture>();
 /** Cubes whose dispose this module already listens to. */
@@ -66,6 +68,7 @@ export function cacheEnvAtlas(cube: BaseTexture, atlas: Texture): void {
  * @param scene - Only the atlas for this scene. Defaults to every scene.
  */
 export function disposeEnvAtlas(cube: BaseTexture, scene?: Scene): void {
+    failedFaces.delete(cube);
     const atlases = atlasesByCube.get(cube);
     if (!atlases) {
         return;
@@ -146,7 +149,9 @@ export const envAtlasBuilder = {
 /**
  * Ensures a 3×2 env atlas exists for a CubeTexture in `scene`. Returns a cached atlas
  * synchronously when available; otherwise starts (or joins) an async build and invokes onReady
- * when the atlas is usable. A cube disposed before its build finishes gets no atlas.
+ * when the atlas is usable. A cube disposed before its build finishes gets no atlas. A build that
+ * fails warns once and is not tried again until the cube's faces change or
+ * {@link disposeEnvAtlas} is called for it; {@link cacheEnvAtlas} still supplies an atlas.
  */
 export function ensureEnvAtlasFromCube(
     cube: BaseTexture,
@@ -178,7 +183,7 @@ export function ensureEnvAtlasFromCube(
         }
 
         const urls = cubeFaceUrls(cube);
-        if (!urls) {
+        if (!urls || failedFaces.get(cube) === urls.join('\n')) {
             return;
         }
 
@@ -206,6 +211,7 @@ export function ensureEnvAtlasFromCube(
             })
             .catch((err) => {
                 settle();
+                failedFaces.set(cube, urls.join('\n'));
                 console.warn('[babylon.quarks] Failed to build env atlas from cubemap faces', err);
                 return null;
             });

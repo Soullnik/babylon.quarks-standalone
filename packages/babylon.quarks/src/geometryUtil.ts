@@ -1,4 +1,4 @@
-/** Sequential 0..N-1 indices for non-indexed triangle-list BufferGeometry (Three.js drawArrays). */
+/** `indices` when there are some, else `0..N-1`: each three vertices of `positions` one triangle. */
 export function ensureTriangleIndices(
     positions: Float32Array,
     indices?: Uint32Array | Uint16Array

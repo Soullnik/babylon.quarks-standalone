@@ -377,6 +377,10 @@ export class BatchedRenderer extends TransformNode {
             throw new Error('BatchedRenderer.addSystem: the renderer has been disposed');
         }
         const particleSystem = system as ParticleSystem;
+        if (particleSystem.emitter.getScene() !== this.getScene()) {
+            // Its batch would hold meshes and materials of two scenes.
+            throw new Error('BatchedRenderer.addSystem: the system belongs to another scene');
+        }
         const previous = particleSystem._renderer;
         if (previous !== undefined && previous !== this) {
             // One renderer at a time, or two would step and draw it.
@@ -570,7 +574,7 @@ export class BatchedRenderer extends TransformNode {
      */
     configureAdaptivePerformance(options: Partial<AdaptivePerformanceOptions> = {}): void {
         const state = this.adaptivePerformanceState;
-        const minQuality = BatchedRenderer.clamp(options.minQuality ?? state.minQuality, 0.05, 1);
+        const minQuality = BatchedRenderer.clamp(options.minQuality ?? state.minQuality, 0.1, 1);
         const maxQuality = BatchedRenderer.clamp(options.maxQuality ?? state.maxQuality, minQuality, 1);
         state.targetFrameMs = Math.max(options.targetFrameMs ?? state.targetFrameMs, 0.1);
         state.minQuality = minQuality;

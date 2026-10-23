@@ -15,11 +15,11 @@ export class Gradient implements FunctionColorGenerator {
     color: ContinuousLinearFunction<Vector3>;
     /** The alpha keys: alpha at positions in [0, 1], interpolated linearly. */
     alpha: ContinuousLinearFunction<number>;
-    // default linear bezier
+    // Unity's default: opaque white from 0 to 1.
     constructor(
         color: Array<[Vector3, number]> = [
-            [new Vector3(0, 0, 0), 0],
             [new Vector3(1, 1, 1), 0],
+            [new Vector3(1, 1, 1), 1],
         ],
         alpha: Array<[number, number]> = [
             [1, 0],

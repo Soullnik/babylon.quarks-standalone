@@ -53,6 +53,15 @@ describe('SpriteBatch', () => {
 
     const getSpriteBatch = (renderer: BatchedRenderer): SpriteBatch => renderer.batches[0] as SpriteBatch;
 
+    it('makes a new white map when the shared one was disposed', () => {
+        const white = SpriteBatch['whiteTexture'](scene);
+        expect(SpriteBatch['whiteTexture'](scene)).toBe(white);
+        white.dispose();
+        const again = SpriteBatch['whiteTexture'](scene);
+        expect(again).not.toBe(white);
+        expect(again.getInternalTexture()).not.toBeNull();
+    });
+
     it('skips hidden emitter systems during update', () => {
         const renderer = new BatchedRenderer('sprite-hidden', scene);
         const system = createSpriteSystem();
