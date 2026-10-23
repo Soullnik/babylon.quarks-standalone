@@ -1,7 +1,7 @@
 import {IParticleSystem} from '../IParticleSystem';
 import {Particle} from '../Particle';
 import {Constructable, ParameterPair} from '../TypeUtil';
-import {describePart, warnFormat} from '../util/JSONUtil';
+import {describePart, warnFormat, withoutDefaults} from '../util/JSONUtil';
 import {ApplyCollision} from './ApplyCollision';
 import {ApplyForce} from './ApplyForce';
 import {ApplySequences} from './ApplySequences';
@@ -25,6 +25,14 @@ import {SpeedOverLife} from './SpeedOverLife';
 import {TurbulenceField} from './TurbulenceField';
 import {VelocityOverLife} from './VelocityOverLife';
 import {WidthOverLength} from './WidthOverLength';
+
+/** The JSON of a behavior: `type` names it, the other fields are its settings. */
+export interface BehaviorJSON {
+    /** The behavior's type, a key of {@link BehaviorTypes}. */
+    type: string;
+    /** The behavior's settings, under the names of its fields. */
+    [field: string]: any;
+}
 
 /**
  * A behavior changes particles over time; a particle system runs a list of
@@ -54,8 +62,10 @@ import {WidthOverLength} from './WidthOverLength';
  * reloaded copy behaves the same.
  *
  * {@link toJSON} writes the behavior's settings as plain data, the `type` and
- * every non-default field; `BehaviorTypes[type].loadJSON` reads it back. The
- * `params` of that entry list the fields an editor shows.
+ * every field (a few leave out a zero or empty value); `BehaviorTypes[type].loadJSON` reads it back, and reads a missing
+ * field as its default. An effect file holds {@link BehaviorToJSON}, which leaves
+ * out the fields at their defaults. The `params` of that entry list the fields an
+ * editor shows.
  */
 export interface Behavior {
     /** The name the behavior is registered under in {@link BehaviorTypes}. */
@@ -80,7 +90,7 @@ export interface Behavior {
     /** Called once per step before the particles are updated, with the step's length in seconds. */
     frameUpdate(delta: number): void;
     /** The behavior's settings as plain data, with its `type`; see the interface's description. */
-    toJSON(): any;
+    toJSON(): BehaviorJSON;
     /** A copy with the same settings that shares nothing mutable with this one. */
     clone(): Behavior;
     /** Called when the system restarts: forget state accumulated across steps. */
@@ -98,8 +108,12 @@ export interface BehaviorPlugin {
     constructor: Constructable<Behavior>;
     /** The fields an editor shows, with the kinds of value each takes. */
     params: ParameterPair[];
-    /** Reads the behavior from its JSON, for the system `particleSystem`. */
-    loadJSON: (json: any, particleSystem: IParticleSystem) => Behavior;
+    /**
+     * Reads the behavior from its JSON, for the system `particleSystem`. It is also called, twice per save, by
+     * {@link BehaviorToJSON} to find the fields at their defaults, so it must only read: no
+     * registration with the system, no resources that need freeing.
+     */
+    loadJSON(json: BehaviorJSON, particleSystem: IParticleSystem): Behavior; // Method syntax: a plugin may type its own JSON.
 }
 
 /** The behavior types effect files can name, by type; plugins add more. */
@@ -296,7 +310,7 @@ export const BehaviorTypes: {[key: string]: BehaviorPlugin} = {
             ['subParticleSystem', ['particleSystem']],
             ['mode', ['number']],
             ['emitProbability', ['number']],
-            // `inherit` is a list of property names; no FieldType describes one yet.
+            ['inherit', ['subEmitterInherit']],
         ],
         loadJSON: EmitSubParticleSystem.fromJSON,
     },
@@ -322,11 +336,24 @@ export const BehaviorTypes: {[key: string]: BehaviorPlugin} = {
  * Reads a behavior. A type no plugin registered warns and gives `null`; the system loads without
  * that behavior.
  */
-export function BehaviorFromJSON(json: any, particleSystem: IParticleSystem): Behavior | null {
+export function BehaviorFromJSON(json: BehaviorJSON, particleSystem: IParticleSystem): Behavior | null {
     const behavior = json ? BehaviorTypes[json.type] : undefined;
     if (behavior) {
         return behavior.loadJSON(json, particleSystem);
     }
     warnFormat(`${describePart('behavior', json)}; it is skipped.`);
     return null;
+}
+
+/**
+ * The JSON an effect file holds for `behavior`: its {@link Behavior.toJSON}, which writes every
+ * field, without the fields equal to the defaults {@link BehaviorFromJSON} reads a missing field as.
+ * A field is left out only when the smaller JSON reads back, without a warning, to the same
+ * behavior; a plugin behavior that cannot be read from its type alone keeps every field.
+ */
+export function BehaviorToJSON(behavior: Behavior, particleSystem: IParticleSystem): BehaviorJSON {
+    const full = behavior.toJSON();
+    const plugin = BehaviorTypes[full?.type];
+    if (!plugin) return full;
+    return withoutDefaults(full, (json) => plugin.loadJSON(json, particleSystem).toJSON());
 }

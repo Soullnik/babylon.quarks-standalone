@@ -7,6 +7,7 @@ import {
     FunctionColorGenerator,
     FunctionValueGenerator,
     GeneratorFromJSON,
+    readFormatPart,
     RotationGenerator,
     ValueGenerator,
     ValueGeneratorFromJSON,
@@ -299,7 +300,8 @@ export function settingsFromJSON(json: ParticleSystemJSONParameters): Partial<Pa
         if (value === undefined || value === null) {
             continue;
         }
-        const read = setting.fromJSON(value);
+        const key = settingJSONKey(setting);
+        const read = readFormatPart(key, () => setting.fromJSON(value));
         if (read !== undefined) {
             parameters[setting.param] = read;
         }

@@ -3,7 +3,7 @@ import {Scene} from '@babylonjs/core/scene';
 import {IAnimationData, IPrefab} from 'quarks.core';
 import {BatchedRenderer} from './BatchedRenderer';
 import {ParticleEmitter} from './ParticleEmitter';
-import {quarksNodeId} from './nodeId';
+import {fileNodeId, quarksNodeId} from './nodeId';
 
 /**
  * A clip a {@link QuarksPrefab} timeline can drive, such as a Babylon `AnimationGroup`. Every
@@ -285,7 +285,7 @@ export class QuarksPrefab extends TransformNode implements IPrefab {
             // A file's uuid names the node it was loaded as; a Babylon uniqueId, which older files
             // wrote for nodes made in code, only names a node that has no file uuid, and never
             // takes over an id already claimed.
-            const fileId = (node as any)._quarksUUID as string | undefined;
+            const fileId = fileNodeId(node);
             if (fileId) {
                 nodesMap[fileId] = node;
             } else {

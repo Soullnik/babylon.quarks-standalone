@@ -113,7 +113,7 @@ describe('the step that emits a particle', () => {
                     state.current = 0;
                 }
             }
-            toJSON(): unknown {
+            toJSON() {
                 return {type: this.type};
             }
             clone(): Behavior {

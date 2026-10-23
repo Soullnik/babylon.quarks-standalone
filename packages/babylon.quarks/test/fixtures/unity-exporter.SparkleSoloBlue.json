@@ -1,0 +1,239 @@
+{
+    "metadata": {"version": 4.5, "type": "Object3D", "generator": "unity-quark-exporter"},
+    "geometries": [],
+    "materials": [
+        {
+            "uuid": "quarks_material-4",
+            "type": "QuarksMaterial",
+            "transparent": true,
+            "alphaMode": 1,
+            "blending": 1,
+            "depthTest": true,
+            "depthWrite": false,
+            "alphaTest": 0,
+            "texture": "quarks_texture-3",
+            "map": "quarks_texture-3"
+        },
+        {
+            "uuid": "quarks_material-7",
+            "type": "QuarksMaterial",
+            "transparent": true,
+            "alphaMode": 4,
+            "blending": 4,
+            "depthTest": true,
+            "depthWrite": false,
+            "alphaTest": 0,
+            "texture": "quarks_texture-6",
+            "map": "quarks_texture-6"
+        }
+    ],
+    "textures": [
+        {"uuid": "quarks_texture-3", "name": "sparkle3", "image": "quarks_image-2", "wrap": [1001, 1001]},
+        {"uuid": "quarks_texture-6", "name": "Default-Particle", "image": "quarks_image-5", "wrap": [1001, 1001]}
+    ],
+    "images": [
+        {"uuid": "quarks_image-2", "url": "textures/SparkleSoloBlue-quarks_i.png"},
+        {"uuid": "quarks_image-5", "url": "Resources/unity_builtin_extra"}
+    ],
+    "object": {
+        "uuid": "node-0",
+        "name": "SparkleSoloBlue",
+        "layers": 1,
+        "matrix": [
+            1, 0, 0, 0, 0, -1.1920928955078125e-7, -1.0000001192092896, 0, 0, 1.0000001192092896,
+            -1.1920928955078125e-7, 0, 0, 0, 0, 1
+        ],
+        "type": "ParticleEmitter",
+        "ps": {
+            "version": "3.0",
+            "autoDestroy": false,
+            "looping": true,
+            "prewarm": false,
+            "duration": 1,
+            "startDelay": {"type": "ConstantValue", "value": 0},
+            "shape": {"type": "point"},
+            "startLife": {"type": "IntervalValue", "a": 0.25, "b": 0.4000000059604645},
+            "startSpeed": {"type": "ConstantValue", "value": 0},
+            "startRotation": {"type": "ConstantValue", "value": 0},
+            "startSize": {"type": "IntervalValue", "a": 0.30000001192092896, "b": 0.4000000059604645},
+            "startColor": {"type": "ConstantColor", "color": {"r": 1, "g": 1, "b": 1, "a": 1}},
+            "emissionOverTime": {"type": "ConstantValue", "value": 0},
+            "emissionOverDistance": {"type": "ConstantValue", "value": 0},
+            "emissionBursts": [
+                {
+                    "time": 0,
+                    "count": {"type": "ConstantValue", "value": 1},
+                    "probability": 1,
+                    "interval": 0.009999999776482582,
+                    "cycle": 1
+                }
+            ],
+            "onlyUsedByOther": false,
+            "renderMode": 0,
+            "renderOrder": 0,
+            "rendererEmitterSettings": {},
+            "material": "quarks_material-4",
+            "layers": 1,
+            "startTileIndex": {"type": "ConstantValue", "value": 0},
+            "uTileCount": 1,
+            "vTileCount": 1,
+            "blendTiles": false,
+            "blending": 1,
+            "transparent": true,
+            "worldSpace": false,
+            "behaviors": [
+                {
+                    "type": "ColorOverLife",
+                    "color": {
+                        "type": "Gradient",
+                        "functions": [
+                            {
+                                "function": {
+                                    "type": "ColorRange",
+                                    "a": {"r": 1, "g": 1, "b": 1, "a": 1},
+                                    "b": {"r": 1, "g": 1, "b": 1, "a": 1}
+                                },
+                                "start": 0
+                            },
+                            {
+                                "function": {
+                                    "type": "ColorRange",
+                                    "a": {"r": 1, "g": 1, "b": 1, "a": 1},
+                                    "b": {"r": 0, "g": 1, "b": 1, "a": 1}
+                                },
+                                "start": 0.2529640793800354
+                            },
+                            {
+                                "function": {
+                                    "type": "ColorRange",
+                                    "a": {"r": 0, "g": 1, "b": 1, "a": 1},
+                                    "b": {"r": 0, "g": 0.3372548818588257, "b": 1, "a": 1}
+                                },
+                                "start": 0.7011826038360596
+                            }
+                        ]
+                    }
+                },
+                {
+                    "type": "SizeOverLife",
+                    "size": {
+                        "type": "PiecewiseBezier",
+                        "functions": [
+                            {"function": {"p0": 0, "p1": 0.28313031792640686, "p2": 1, "p3": 1}, "start": 0},
+                            {
+                                "function": {"p0": 1, "p1": 1, "p2": 0.31080377101898193, "p3": 0.14777103066444397},
+                                "start": 0.2948299050331116
+                            },
+                            {
+                                "function": {
+                                    "p0": 0.14777103066444397,
+                                    "p1": 0.06720903515815735,
+                                    "p2": 0.7457450032234192,
+                                    "p3": 0.6928304433822632
+                                },
+                                "start": 0.5351845026016235
+                            },
+                            {
+                                "function": {"p0": 0.6928304433822632, "p1": 0.5386604070663452, "p2": 0, "p3": 0},
+                                "start": 0.653954803943634
+                            }
+                        ]
+                    }
+                }
+            ]
+        },
+        "children": [
+            {
+                "uuid": "node-1",
+                "name": "SparkleGlow",
+                "layers": 1,
+                "matrix": [1, 0, 0, 0, 0, 1, -2.3841855067985307e-7, 0, 0, 2.3841855067985307e-7, 1, 0, 0, 0, 0, 1],
+                "type": "ParticleEmitter",
+                "ps": {
+                    "version": "3.0",
+                    "autoDestroy": false,
+                    "looping": true,
+                    "prewarm": false,
+                    "duration": 1,
+                    "startDelay": {"type": "ConstantValue", "value": 0},
+                    "shape": {
+                        "type": "sphere",
+                        "radius": 0.009999999776482582,
+                        "thickness": 1,
+                        "arc": 6.2831854820251465,
+                        "mode": 0,
+                        "spread": 0,
+                        "speed": {"type": "ConstantValue", "value": 0}
+                    },
+                    "startLife": {"type": "IntervalValue", "a": 0.30000001192092896, "b": 0.4000000059604645},
+                    "startSpeed": {"type": "ConstantValue", "value": 0},
+                    "startRotation": {"type": "ConstantValue", "value": 0},
+                    "startSize": {"type": "ConstantValue", "value": 1.2000000476837158},
+                    "startColor": {
+                        "type": "ConstantColor",
+                        "color": {"r": 1, "g": 1, "b": 1, "a": 0.48627451062202454}
+                    },
+                    "emissionOverTime": {"type": "ConstantValue", "value": 0},
+                    "emissionOverDistance": {"type": "ConstantValue", "value": 0},
+                    "emissionBursts": [
+                        {
+                            "time": 0,
+                            "count": {"type": "ConstantValue", "value": 1},
+                            "probability": 1,
+                            "interval": 0.009999999776482582,
+                            "cycle": 1
+                        }
+                    ],
+                    "onlyUsedByOther": false,
+                    "renderMode": 0,
+                    "renderOrder": 0,
+                    "rendererEmitterSettings": {},
+                    "material": "quarks_material-7",
+                    "layers": 1,
+                    "startTileIndex": {"type": "ConstantValue", "value": 0},
+                    "uTileCount": 1,
+                    "vTileCount": 1,
+                    "blendTiles": false,
+                    "blending": 4,
+                    "transparent": true,
+                    "worldSpace": false,
+                    "behaviors": [
+                        {
+                            "type": "ColorOverLife",
+                            "color": {
+                                "type": "Gradient",
+                                "functions": [
+                                    {
+                                        "function": {
+                                            "type": "ColorRange",
+                                            "a": {"r": 1, "g": 1, "b": 1, "a": 1},
+                                            "b": {"r": 1, "g": 1, "b": 1, "a": 0.9911803007125854}
+                                        },
+                                        "start": 0
+                                    },
+                                    {
+                                        "function": {
+                                            "type": "ColorRange",
+                                            "a": {"r": 1, "g": 1, "b": 1, "a": 0.9911803007125854},
+                                            "b": {"r": 0, "g": 1, "b": 1, "a": 0}
+                                        },
+                                        "start": 0.00881971511989832
+                                    }
+                                ]
+                            }
+                        },
+                        {
+                            "type": "SizeOverLife",
+                            "size": {
+                                "type": "PiecewiseBezier",
+                                "functions": [
+                                    {"function": {"p0": 1, "p1": 1, "p2": 0.6666666865348816, "p3": 0}, "start": 0}
+                                ]
+                            }
+                        }
+                    ]
+                }
+            }
+        ]
+    }
+}

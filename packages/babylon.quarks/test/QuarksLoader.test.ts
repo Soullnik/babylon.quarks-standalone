@@ -13,6 +13,7 @@ import {ParticleSystem} from '../src/ParticleSystem';
 import {QuarksFormatError, QuarksLoader} from '../src/QuarksLoader';
 import {QuarksPrefab} from '../src/QuarksPrefab';
 import {QUARKS_FORMAT_VERSION, serializeEffect} from '../src/QuarksSerializer';
+import {fileNodeId} from '../src/nodeId';
 import {textureSourceUrl} from '../src/textureSource';
 
 loadPlugin(MeshSurfaceEmitterPlugin);
@@ -324,7 +325,7 @@ describe('QuarksLoader matrix decomposition', () => {
             },
         });
 
-        const subEmitter = root.getChildren().find((c) => (c as any)._quarksUUID === 'sub-emitter') as ParticleEmitter;
+        const subEmitter = root.getChildren().find((c) => fileNodeId(c) === 'sub-emitter') as ParticleEmitter;
         expect(subEmitter).toBeInstanceOf(ParticleEmitter);
         expect((subEmitter.system as ParticleSystem).onlyUsedByOther).toBe(true);
 

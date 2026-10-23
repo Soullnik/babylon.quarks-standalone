@@ -23,6 +23,7 @@ import {
     ParticleSystemEventType,
     Quaternion,
     RandomSource,
+    readFormatPart,
     RendererEmitterSettings,
     RotationGenerator,
     SerializationOptions,
@@ -1850,10 +1851,11 @@ export class ParticleSystem implements IParticleSystem {
     ): ParticleSystem {
         const ps = new ParticleSystem(particleSystemParametersFromJSON(json, meta, scene));
         ps.behaviors = (json.behaviors ?? [])
-            .map((behaviorJson) => {
-                const behavior = BehaviorFromJSON(behaviorJson, ps);
-                if (behavior && behavior.type === 'EmitSubParticleSystem') {
-                    dependencies[(behaviorJson as {subParticleSystem: string}).subParticleSystem] = behavior;
+            .map((behaviorJson, index) => {
+                const behavior = readFormatPart(`behaviors[${index}]`, () => BehaviorFromJSON(behaviorJson, ps));
+                const target = (behaviorJson as {subParticleSystem?: unknown}).subParticleSystem;
+                if (behavior && behavior.type === 'EmitSubParticleSystem' && typeof target === 'string') {
+                    dependencies[target] = behavior;
                 }
                 return behavior;
             })

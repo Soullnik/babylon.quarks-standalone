@@ -207,23 +207,27 @@ export interface TrailSettings {
 /** How a trail's texture runs along the ribbon, see {@link TrailSettings.textureMode}. */
 export type TrailTextureMode = 'stretch' | 'tile' | 'distributePerSegment' | 'repeatPerSegment';
 
-/** Settings of a mesh system: its start rotation about each axis. */
+/**
+ * Settings of a mesh system; none are read. A mesh particle's start rotation about each axis is the
+ * system's `startRotation`, a rotation generator such as an `EulerGenerator` (Unity's 3D Start
+ * Rotation).
+ */
 export interface MeshSettings {
     /**
-     * Initial rotation around the X-axis.
-     * @type {ValueGenerator | FunctionValueGenerator}
+     * Never read.
+     * @deprecated Set the system's `startRotation` to an `EulerGenerator` instead.
      */
-    startRotationX: ValueGenerator | FunctionValueGenerator;
+    startRotationX?: ValueGenerator | FunctionValueGenerator;
     /**
-     * Initial rotation around the Y-axis.
-     * @type {ValueGenerator | FunctionValueGenerator}
+     * Never read.
+     * @deprecated Set the system's `startRotation` to an `EulerGenerator` instead.
      */
-    startRotationY: ValueGenerator | FunctionValueGenerator;
+    startRotationY?: ValueGenerator | FunctionValueGenerator;
     /**
-     * Initial rotation around the Z-axis.
-     * @type {ValueGenerator | FunctionValueGenerator}
+     * Never read.
+     * @deprecated Set the system's `startRotation` to an `EulerGenerator` instead.
      */
-    startRotationZ: ValueGenerator | FunctionValueGenerator;
+    startRotationZ?: ValueGenerator | FunctionValueGenerator;
 }
 
 /** The scene node a system emits from, as the simulation sees it. */

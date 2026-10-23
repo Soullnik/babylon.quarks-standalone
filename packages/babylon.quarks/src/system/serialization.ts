@@ -3,13 +3,17 @@ import type {BaseTexture} from '@babylonjs/core/Materials/Textures/baseTexture';
 import {Texture} from '@babylonjs/core/Materials/Textures/texture';
 import type {Scene} from '@babylonjs/core/scene';
 import {
+    BehaviorToJSON,
     ConstantValue,
     EmitterFromJSON,
+    EmitterToJSON,
+    readFormatPart,
     RendererEmitterSettings,
     StretchedBillBoardSettings,
     TrailSettings,
     ValueGeneratorFromJSON,
     Vector3,
+    warnFormat,
 } from 'quarks.core';
 import type {ParticleSystem} from '../ParticleSystem';
 import {
@@ -120,7 +124,7 @@ function trailSideAxisFromJSON(value: unknown): {sideAxis?: Vector3} {
     if (Number.isFinite(nx) && Number.isFinite(ny) && Number.isFinite(nz) && nx * nx + ny * ny + nz * nz > 0) {
         return {sideAxis: new Vector3(nx, ny, nz)};
     }
-    console.warn(`[quarks] sideAxis ${JSON.stringify(value)} is not a direction and is ignored`);
+    warnFormat(`sideAxis ${JSON.stringify(value)} is not a direction and is ignored`);
     return {};
 }
 
@@ -149,15 +153,17 @@ export function particleSystemToJSON(
 
     // Only what differs from the defaults the constructor and fromJSON give a setting left out.
     // The shape, the settings the table marks `always`, the geometry, the material and the
-    // behaviors are always written: the loaders of 0.27 and earlier, and three.quarks, need them.
+    // behaviors list are always written: the loaders of 0.27 and earlier need them. Within the
+    // shape and each behavior, only the fields that differ from their defaults, which 0.27 reads
+    // and three.quarks may not (see docs/FORMAT.md).
     return {
         version: '3.0',
-        shape: system.emitterShape.toJSON(),
+        shape: EmitterToJSON(system.emitterShape),
         ...settingsToJSON(system),
         instancingGeometry: geometryUUID,
         ...(Object.keys(rendererSettingsJSON).length > 0 ? {rendererEmitterSettings: rendererSettingsJSON} : {}),
         material: materialUUID,
-        behaviors: system.behaviors.map((b) => b.toJSON()),
+        behaviors: system.behaviors.map((b) => BehaviorToJSON(b, system)),
     };
 }
 
@@ -172,7 +178,7 @@ export function particleSystemParametersFromJSON(
     scene?: Scene
 ): ParticleSystemParameters {
     // A part the file leaves out takes the constructor's default, as a system made in code does.
-    const shape = json.shape ? EmitterFromJSON(json.shape, meta as any) : undefined;
+    const shape = json.shape ? readFormatPart('shape', () => EmitterFromJSON(json.shape!, meta as any)) : undefined;
     let rendererEmitterSettings: RendererEmitterSettings;
     if (json.renderMode === RenderMode.Trail) {
         const trailSettings = json.rendererEmitterSettings as TrailSettings;

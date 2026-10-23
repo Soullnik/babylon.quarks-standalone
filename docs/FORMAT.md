@@ -20,8 +20,8 @@ three.js object layout the format grew from, with quarks' own entries inside it.
 release writes something an older loader would read wrongly, and the change is listed in the
 changelog.
 
-- A file **without** `quarksFormat` was written before the field existed (babylon.quarks 0.27 and
-  earlier, three.quarks, the Unity exporter). The loader reads it.
+- A file **without** `quarksFormat` was written before the field existed (babylon.quarks before
+  0.27, three.quarks, the Unity exporter). The loader reads it.
 - A file with an **older** version loads. The readers keep accepting every older form: a burst's
   `cycleCount`, a numeric burst `count` or `startTileIndex`, a Gradient's `functions`, a texture
   sequencer's `{x, y, z}` position, `map` for `texture` on a material, `uv1`/`uv2` attributes.
@@ -30,7 +30,12 @@ changelog.
 
 | Version | Release | Change |
 | --- | --- | --- |
-| 1 | 0.28 | First numbered version. `serializeEffect` writes whole documents. |
+| 1 | 0.27 | First numbered version. `serializeEffect` writes whole documents. |
+
+What older writers produced is checked against real files in `packages/babylon.quarks/test/fixtures`:
+effects written by three.quarks, by the Unity exporter and by babylon.quarks 0.27.0. Each must load,
+save to the format its snapshot holds, and the 0.27.0 files must load as the files they were written
+from.
 
 ## Nodes
 
@@ -56,6 +61,19 @@ and emission curves (`startLife`, `startSpeed`, `startRotation`, `startSize`, `s
 file without them. A curve written as a bare number reads as a constant; a flag written as a number
 reads as true unless it is 0. Files that write every setting, as earlier
 releases did, still load.
+
+The shape and each behavior write their `type` and each field only when it differs from the default
+the type reads a missing field as (`EmitterToJSON`, `BehaviorToJSON`); a field the type needs, such
+as a behavior's curve, is always written. babylon.quarks 0.27 and later read these files;
+three.quarks and babylon.quarks before 0.27 do not, since they read some fields without a default.
+A shape's or behavior's own `toJSON()` still writes every field.
+
+`ps.version` (`'3.0'`) is written for three.quarks, which reads it; babylon.quarks does not.
+
+A system's blend mode is its material entry's `alphaMode`, which babylon.quarks always writes. A
+material entry without one, as three.js writes, reads its three.js `blending`, and alpha blending
+(`ALPHA_COMBINE`) when it has neither, as for a mesh node's material. A system with no material
+entry reads its own `blendMode`, and additive (`ALPHA_ADD`) when it has none.
 
 Links between nodes use the target's `uuid`: a sub emitter's `subParticleSystem`, a mesh surface
 shape's `mesh` and a prefab animation's `targetUUID`. `quarksNodeId(node)` gives the id a node is
@@ -96,6 +114,10 @@ shared between effects (`shareResources`) keeps the url of the first effect that
 ## Reading bad or partial files
 
 - A document with no `object` throws `QuarksFormatError`.
+- Each warning names the JSON path of the part it is about, such as
+  `object.children[2].ps.behaviors[3]`. The loader's `onFormatWarning` option takes them instead of
+  the console, and its `strict` option makes a load throw `QuarksFormatError` for them, after reading
+  the whole effect and freeing what it built, for checks that a set of assets loads cleanly.
 - A part the loader cannot read warns and takes its default, and the rest of the effect loads:
   - an unknown emitter shape: a point emitter;
   - an unknown behavior: skipped;

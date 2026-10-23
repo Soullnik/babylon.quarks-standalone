@@ -9,4 +9,12 @@ export * from './Plugin';
 export * from './sequencers/';
 export * from './shape/';
 export * from './TypeUtil';
+export {
+    QuarksFormatError,
+    currentFormatPath,
+    readFormat,
+    readFormatPart,
+    warnFormat,
+    type FormatReadOptions,
+} from './util/JSONUtil';
 export * from './util/random';

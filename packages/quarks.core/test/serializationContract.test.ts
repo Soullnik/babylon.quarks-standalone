@@ -17,6 +17,7 @@ import {
     AxisAngleGenerator,
     Behavior,
     BehaviorFromJSON,
+    BehaviorToJSON,
     BehaviorTypes,
     Bezier,
     BoxEmitter,
@@ -35,6 +36,7 @@ import {
     EmitterMode,
     EmitterShape,
     EmitterShapes,
+    EmitterToJSON,
     EulerGenerator,
     ForceOverLife,
     FrameOverLife,
@@ -54,6 +56,7 @@ import {
     RandomColor,
     RandomColorBetweenGradient,
     RandomQuatGenerator,
+    readFormat,
     RectangleEmitter,
     Rotation3DOverLife,
     RotationBySpeed,
@@ -312,6 +315,11 @@ describe('serialisation contract', () => {
         expect(Object.keys(EmitterShapes).sort()).toEqual(Object.keys(shapes).sort());
     });
 
+    it.each(Object.keys(BehaviorTypes))('%s lists only fields its behavior has in BehaviorTypes params', (type) => {
+        const behavior = readFormat({onWarning: () => {}}, () => BehaviorFromJSON({type}, system)) as unknown as object;
+        for (const [name] of BehaviorTypes[type].params) expect([name, name in behavior]).toEqual([name, true]);
+    });
+
     describe.each(Object.entries(behaviors))('behavior %s', (_type, make) => {
         it('survives toJSON and fromJSON', () => {
             const original = make();
@@ -325,6 +333,23 @@ describe('serialisation contract', () => {
             const copy = original.clone();
             expect(state(copy)).toEqual(state(original));
             expect(sharedObjects(original, copy)).toEqual([]);
+        });
+
+        it('writes to a file only the fields that differ from their defaults, and reads back the same', () => {
+            const original = make();
+            const file = viaJSON(BehaviorToJSON(original, system));
+            const loaded = BehaviorFromJSON(file, system)!;
+            expect(viaJSON(loaded.toJSON())).toEqual(viaJSON(original.toJSON()));
+            const warnings: string[] = [];
+            const defaults = readFormat({onWarning: (m) => warnings.push(m)}, () =>
+                BehaviorFromJSON({type: file.type}, system)
+            )!;
+            const defaultJSON = viaJSON(defaults.toJSON());
+            for (const key of Object.keys(file).filter((k) => k !== 'type')) {
+                expect([key, file[key]]).not.toEqual([key, defaultJSON[key]]);
+            }
+            // A behavior that needs a field (a curve) warns read from its type alone, and keeps it.
+            if (warnings.length === 0) expect(BehaviorToJSON(defaults, system)).toEqual({type: file.type});
         });
 
         it('lists every field it writes in BehaviorTypes params, so an editor shows it', () => {
@@ -342,6 +367,18 @@ describe('serialisation contract', () => {
             const original = transformed(make());
             const loaded = EmitterFromJSON(viaJSON(original.toJSON()), {} as never);
             expect(state(loaded)).toEqual(state(original));
+        });
+
+        it('writes to a file only the fields that differ from their defaults, and reads back the same', () => {
+            const original = transformed(make());
+            const file = viaJSON(EmitterToJSON(original, {} as never));
+            expect(state(EmitterFromJSON(file, {} as never))).toEqual(state(original));
+            const defaults = EmitterFromJSON({type: file.type}, {} as never);
+            const defaultJSON = viaJSON(defaults.toJSON()) as unknown as Record<string, unknown>;
+            for (const [key, value] of Object.entries(file).filter(([k]) => k !== 'type')) {
+                expect([key, value]).not.toEqual([key, defaultJSON[key]]);
+            }
+            expect(EmitterToJSON(defaults, {} as never)).toEqual({type: file.type});
         });
 
         it('clones to an equal, independent copy', () => {
