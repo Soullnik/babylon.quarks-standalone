@@ -1,4 +1,4 @@
-import type {EffectDocumentJSON, QuarksResourceKind, QuarksResourceResolver} from 'babylon.quarks';
+import type {QuarksResourceKind, QuarksResourceResolver} from 'babylon.quarks';
 import {QuarksLoader} from 'babylon.quarks';
 
 /**
@@ -90,7 +90,7 @@ function isRecord(value: unknown): value is JSONRecord {
 }
 
 /** True for a Quarks effect envelope with at least one particle emitter. */
-export function isEffectJson(json: unknown): json is EffectDocumentJSON {
+export function isEffectJson(json: unknown): boolean {
     const object = (json as {object?: unknown} | null)?.object;
     const walk = (node: unknown): boolean => {
         if (!node || typeof node !== 'object') return false;
@@ -180,11 +180,7 @@ function createFileResolver(effectPath: string, index: ImportedFileIndex, missin
  * {@link QuarksLoader.resolveLinkedResources}, so the effect loads (and later exports) as a
  * self-contained effect. Returns the references that could not be found among the files.
  */
-async function inlineExternalFiles(
-    json: EffectDocumentJSON,
-    effectPath: string,
-    index: ImportedFileIndex
-): Promise<string[]> {
+async function inlineExternalFiles(json: unknown, effectPath: string, index: ImportedFileIndex): Promise<string[]> {
     const missing: string[] = [];
     // baseUrl is the effect file path so resolveRelativePath can walk from its folder; the
     // File resolver ignores HTTP join and looks up files by path/name instead.

@@ -16,9 +16,10 @@ export interface MaterialOverrides {
 
 /**
  * What a {@link ParticleSystem} reads its draw settings from: a Babylon material (`StandardMaterial`,
- * `PBRMaterial`, a node material, …) or the material record of a loaded effect file. Each field is
- * read only when it is there, so any material fits; the particles are still drawn with quarks' own
- * shaders.
+ * `PBRMaterial`, a node material, …), or a material entry of an effect file once its texture slots
+ * are resolved to textures, as `ParticleSystem.fromJSON` does. Each field is read only when it is
+ * there, so any material fits; the particles are still drawn with quarks' own shaders. The particle
+ * texture is the first slot that holds a `Texture`.
  */
 export interface ParticleMaterialSource {
     /** A PBR material's base colour texture. */
@@ -88,7 +89,7 @@ export function resolveMaterialSettings(
     overrides: MaterialOverrides,
     current: VFXBatchSettings
 ): ResolvedMaterialSettings {
-    // Particles sample a 2D texture: the first slot that holds one, so a cube in a slot is passed over.
+    // The particle texture is a `Texture`: the first slot that holds one, so a cube in a slot is passed over.
     const texture =
         overrides.texture !== undefined
             ? overrides.texture

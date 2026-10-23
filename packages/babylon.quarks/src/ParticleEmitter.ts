@@ -17,7 +17,7 @@ export interface ParticleEmitterJSON {
     /** Euler angles `[x, y, z]` in radians. */
     rotation: number[];
     /** `[x, y, z, w]`, when the node has a rotation quaternion. */
-    quaternion: number[] | undefined;
+    quaternion?: number[];
     /** `[x, y, z]`. */
     scale: number[];
     /** The node's own enabled flag. */

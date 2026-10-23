@@ -142,8 +142,7 @@ and the project follows the `quarks.core` 0.x version line.
   `PlaneGeometry` and `SphereGeometry`), `EffectImageJSON`, `QuarksPrefabJSON`,
   `ParticleEmitterJSON` and the rest. What changes for code that compiles against them:
   - `QuarksLoader`'s `loadFromJSON`, `parse`, `resolveResources`, `resolveLinkedResources` and
-    `resolveExternalGeometries` take the document as `unknown`, as parsed from its file: the
-    loader checks what it reads. `resolveLinkedResources` takes the new `QuarksResolveOptions`.
+    `resolveExternalGeometries` take the document as `unknown`, as parsed from its file. `resolveLinkedResources` takes the new `QuarksResolveOptions`.
   - `ParticleSystem.material` and `ParticleSystemParameters.material` are a
     `ParticleMaterialSource`: the fields a system reads from a Babylon material or a loaded
     material record. Any Babylon material fits.
@@ -231,8 +230,11 @@ and the project follows the `quarks.core` 0.x version line.
 - `PiecewiseBezier.toSVG` draws the curve itself, not its sampled table.
 - A `Gradient` read from JSON without its `color` or `alpha` keys warns, and keeps the default for
   the missing part.
-- A particle system reads its texture from the first material slot that holds a 2D texture; a cube
-  texture in a slot is passed over instead of drawn as a broken 2D one.
+- A particle system reads its texture from the first material slot that holds a `Texture`; a cube
+  or other non-`Texture` in a slot is passed over instead of drawn as a broken 2D texture.
+- A list of an effect file (`images`, `textures`, `materials`, `geometries`, a node's `children`)
+  that is not a list, or an entry in one that is not an object, warns and is skipped, like any
+  other part the loader cannot read, instead of failing the load with a `TypeError`.
 - `ParticleSystem.fromJSON` with a material entry whose `reflectionAtlas` is a texture uuid
   resolves it, as it does the other slots, instead of failing on the string.
 - The fragment's `alpha < 0.01` discard is right in every blend mode: under one-one or

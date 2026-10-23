@@ -77,6 +77,22 @@ describe('format warnings', () => {
         expect(new QuarksLoader(scene, {strict: true}).parse(json).getChildren()).toHaveLength(2);
     });
 
+    it('skip a document list or entry of the wrong kind instead of throwing', () => {
+        const seen: Array<[string, string]> = [];
+        const root = new QuarksLoader(scene, {onFormatWarning: (message, path) => seen.push([message, path])}).parse({
+            images: {},
+            materials: [7],
+            object: {uuid: 'root', type: 'Group', children: [null, {uuid: 'a', type: 'Group', children: {}}]},
+        });
+        expect(root.getChildren()).toHaveLength(1);
+        expect(seen).toEqual([
+            ['This part is not a list; it is skipped.', 'images'],
+            ['This entry is not an object; it is skipped.', 'materials[0]'],
+            ['A child is not an object; it is skipped.', 'object.children[0]'],
+            ['"children" is not a list; the node loads without them.', 'object.children[1].children'],
+        ]);
+    });
+
     it('name the system a link it cannot make belongs to', () => {
         const json = effect();
         json.object.children[1].ps.behaviors = [{type: 'EmitSubParticleSystem', subParticleSystem: 'gone'}] as never;

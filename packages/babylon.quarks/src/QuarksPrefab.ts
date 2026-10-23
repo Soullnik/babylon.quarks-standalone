@@ -89,9 +89,14 @@ interface ClipHolder {
     animationGroups?: unknown;
 }
 
+/** Whether `value` can be a clip: every member of one is optional, so any object. */
+function isClip(value: unknown): value is QuarksTimelineClip {
+    return typeof value === 'object' && value !== null;
+}
+
 /** Whether `value` is a clip whose id is `uuid`. */
 function isClipWithId(value: unknown, uuid: string): value is QuarksTimelineClip {
-    return typeof value === 'object' && value !== null && (value as QuarksTimelineClip).uuid === uuid;
+    return isClip(value) && value.uuid === uuid;
 }
 
 /**
@@ -570,7 +575,7 @@ export class QuarksPrefab extends TransformNode implements IPrefab {
             const clips: unknown[] = source;
             if (!clipUUID) {
                 // The host registered the clips there; without an id the first one plays.
-                return clips[0] as QuarksTimelineClip | undefined;
+                return clips.find(isClip);
             }
             const found = clips.find((item): item is QuarksTimelineClip => isClipWithId(item, clipUUID));
             if (found) {

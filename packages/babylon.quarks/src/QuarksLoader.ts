@@ -175,6 +175,31 @@ function isEffectDocument(value: unknown): value is EffectDocumentJSON {
     return isRecord(value) && isRecord(value.object);
 }
 
+/** Whether `value` can be read as a node; its fields are checked as they are read. */
+function isNodeJSON(value: unknown): value is QuarksNodeJSON {
+    return isRecord(value);
+}
+
+/**
+ * The entries of a list in an effect document. A list that is not an array, or an entry that is
+ * not an object, warns and is left out; the fields of each entry are checked as they are read.
+ */
+function documentEntries<T>(list: unknown): T[] {
+    if (!Array.isArray(list)) {
+        warnFormat('This part is not a list; it is skipped.');
+        return [];
+    }
+    const entries: T[] = [];
+    list.forEach((entry: unknown, index) => {
+        if (isRecord(entry)) {
+            entries.push(entry as T);
+        } else {
+            readFormatPart(`[${index}]`, () => warnFormat('This entry is not an object; it is skipped.'));
+        }
+    });
+    return entries;
+}
+
 /** `json[key]` when it is an array, else an empty one. */
 function documentList(json: unknown, key: 'images' | 'geometries'): unknown[] {
     const list = isRecord(json) ? json[key] : undefined;
@@ -600,18 +625,18 @@ export class QuarksLoader {
             materials: {},
         };
 
-        const {geometries, images} = json;
+        const {geometries, images, textures: textureList, materials} = json;
         if (geometries) {
-            readFormatPart('geometries', () => this.parseGeometries(geometries, meta));
+            readFormatPart('geometries', () => this.parseGeometries(documentEntries(geometries), meta));
         }
         if (images) {
-            readFormatPart('images', () => this.parseImages(images, baseUrl, meta));
+            readFormatPart('images', () => this.parseImages(documentEntries(images), baseUrl, meta));
         }
-        if (json.textures) {
-            this.parseTextures(json.textures, meta);
+        if (textureList) {
+            readFormatPart('textures', () => this.parseTextures(documentEntries(textureList), meta));
         }
-        if (json.materials) {
-            this.parseMaterials(json.materials, meta);
+        if (materials) {
+            readFormatPart('materials', () => this.parseMaterials(documentEntries(materials), meta));
         }
 
         const root = readFormatPart('object', () => this.parseObject(json.object, meta));
@@ -1442,9 +1467,18 @@ export class QuarksLoader {
         if (data.isVisible === false && node instanceof Mesh) node.isVisible = false;
 
         if (data.children) {
-            for (const [index, childData] of data.children.entries()) {
-                const child = readFormatPart(`children[${index}]`, () => this.parseObject(childData, meta));
-                child.parent = node;
+            const children: unknown = data.children;
+            if (!Array.isArray(children)) {
+                readFormatPart('children', () => warnFormat('"children" is not a list; the node loads without them.'));
+            } else {
+                children.forEach((childData: unknown, index) => {
+                    const child = readFormatPart(`children[${index}]`, () =>
+                        isNodeJSON(childData)
+                            ? this.parseObject(childData, meta)
+                            : warnFormat('A child is not an object; it is skipped.')
+                    );
+                    if (child) child.parent = node;
+                });
             }
         }
 
