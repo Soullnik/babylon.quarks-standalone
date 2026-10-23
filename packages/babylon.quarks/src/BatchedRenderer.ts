@@ -195,8 +195,15 @@ export interface AdaptivePerformanceState extends AdaptivePerformanceOptions {
  * ```
  *
  * Systems step on a fixed 60 Hz clock, so an effect plays out the same at any frame rate.
+ *
+ * The renderer is a node so the batches have a parent to live under; leave it at the origin,
+ * unturned and unscaled. Particles are placed in the world by their emitters, and a transform on
+ * the renderer would move every one of them again (it warns once when it finds one). A system
+ * belongs to one renderer at a time: adding it to another takes it out of the first.
  */
 export class BatchedRenderer extends TransformNode {
+    /** Whether the renderer has warned about its own transform; see the class description. */
+    private warnedAboutTransform = false;
     /** The batches, one draw each. Read to inspect what is drawn; the renderer owns them. */
     batches: Array<VFXBatch> = [];
     /** Seconds this renderer has been updated for; the clock UV and erosion scrolling run on. */
@@ -350,9 +357,20 @@ export class BatchedRenderer extends TransformNode {
      * none does). Add each system of an effect, or use `QuarksUtil.addToBatchRenderer` on its root.
      */
     addSystem(system: IParticleSystem): void {
+        if (this.isDisposed()) {
+            throw new Error('BatchedRenderer.addSystem: the renderer has been disposed');
+        }
         const particleSystem = system as ParticleSystem;
+        const previous = particleSystem._renderer;
+        if (previous !== undefined && previous !== this) {
+            // One renderer at a time, or two would step and draw it.
+            previous.deleteSystem(system);
+        }
         particleSystem._renderer = this;
-        if (!this.systemToBatchIndex.has(system) && this.systems.indexOf(system) === -1) {
+        // Added again after its settings changed: out of the old batch first, so it lands in the
+        // one that matches now rather than in both.
+        this.removeFromBatch(system);
+        if (this.systems.indexOf(system) === -1) {
             this.systems.push(system);
             this.orderedSystemsStale = true;
         }
@@ -638,6 +656,12 @@ export class BatchedRenderer extends TransformNode {
      */
     update(delta: number): void {
         this.elapsed += delta;
+        if (!this.warnedAboutTransform && !this.getWorldMatrix().isIdentity()) {
+            this.warnedAboutTransform = true;
+            console.warn(
+                `[babylon.quarks] BatchedRenderer "${this.name}" is transformed; particles are placed in the world by their emitters, so the renderer's own transform moves them again. Keep the renderer at the origin.`
+            );
+        }
         const adaptiveState = this.adaptivePerformanceState;
         const frameStart = adaptiveState.enabled ? performance.now() : 0;
         if (adaptiveState.enabled) {
@@ -761,13 +785,24 @@ export class BatchedRenderer extends TransformNode {
         });
     }
 
+    /**
+     * Disposes the batches and their meshes and materials, and lets the systems go: they keep
+     * their particles and can be added to another renderer. The renderer cannot be used again.
+     */
     dispose(): void {
         for (const batch of this.batches) {
             batch.dispose();
         }
         this.batches = [];
         this.batchEmptyFrames.length = 0;
+        for (const system of this.systems) {
+            if ((system as ParticleSystem)._renderer === this) {
+                (system as ParticleSystem)._renderer = undefined;
+            }
+        }
         this.systems.length = 0;
+        this.orderedSystems = [];
+        this.orderedSystemsStale = true;
         this.systemToBatchIndex.clear();
         super.dispose();
     }

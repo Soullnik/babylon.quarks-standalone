@@ -17,7 +17,7 @@ import {
 } from 'quarks.core';
 import type {ParticleSystem} from '../ParticleSystem';
 import {RenderMode} from '../VFXBatch';
-import {validCullingMode, validSortMode} from './normalize';
+import {normalizeBursts, validCullingMode, validSortMode} from './normalize';
 import type {BurstParameters, ParticleSystemJSONParameters, ParticleSystemParameters} from './types';
 
 /**
@@ -182,16 +182,18 @@ export const SETTINGS: ReadonlyArray<SettingDescriptor> = [
             })),
         fromJSON: (json) =>
             Array.isArray(json)
-                ? json.map((burst: any) => ({
-                      time: burst.time,
-                      count:
-                          typeof burst.count === 'number'
-                              ? new ConstantValue(burst.count)
-                              : ValueGeneratorFromJSON(burst.count),
-                      probability: burst.probability ?? 1,
-                      interval: burst.interval ?? 0.1,
-                      cycle: burst.cycle ?? burst.cycleCount ?? 1,
-                  }))
+                ? normalizeBursts(
+                      json.map((burst: any) => ({
+                          time: burst.time,
+                          count:
+                              typeof burst.count === 'number'
+                                  ? new ConstantValue(burst.count)
+                                  : ValueGeneratorFromJSON(burst.count),
+                          probability: burst.probability,
+                          interval: burst.interval,
+                          cycle: burst.cycle ?? burst.cycleCount,
+                      }))
+                  )
                 : undefined,
         clone: (value) => (value as BurstParameters[]).map((burst) => ({...burst, count: burst.count.clone()})),
     },

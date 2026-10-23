@@ -177,6 +177,10 @@ export class EmitSubParticleSystem implements Behavior {
             if (this.subEmissions[i].time >= target.duration) {
                 const finished = this.subEmissions[i];
                 finished.particle = undefined;
+                // Local-space particles of the child share this matrix so that they follow the
+                // parent; the ones that outlive the emission keep it where the parent last was,
+                // and the next emission gets a matrix of its own.
+                finished.matrix = new Matrix4();
                 this.spareEmissions.push(finished);
                 this.subEmissions[i] = this.subEmissions[this.subEmissions.length - 1];
                 this.subEmissions.length = this.subEmissions.length - 1;

@@ -28,19 +28,22 @@ import type {
 /**
  * One burst of a system's emission (Unity's Emission Bursts): `count` particles at `time` seconds
  * into each loop, repeated `cycle` times `interval` seconds apart, each wave with the chance
- * `probability`.
+ * `probability`. A burst given to the constructor or read from a file is normalised (a missing
+ * `interval` is 0.1 s, `probability` is kept to 0..1, `cycle` to at least 1) and the bursts are
+ * kept in time order.
  */
 export interface BurstParameters {
     /** Seconds into the system's duration the first wave fires at. */
     time: number;
     /**
-     * Particles each wave spawns, rolled once per loop. A curve is read at the seconds into the
-     * cycle the wave fires, not at the 0 to 1 fraction of the duration the start curves use.
+     * Particles each wave spawns. The generator is rolled when the system plays or restarts, so
+     * a random count is the same for every loop of one play; a curve is read at the wave's time
+     * as a fraction of the duration, 0 to 1, like the start curves.
      */
     count: ValueGenerator | FunctionValueGenerator;
     /** How many waves the burst fires, at least 1. */
     cycle: number;
-    /** Seconds between waves; 0 or less fires them all at once. */
+    /** Seconds between waves; 0 fires them all at once. 0.1 when left out. */
     interval: number;
     /** Chance from 0 to 1 that a wave spawns at all, rolled per wave. */
     probability: number;
