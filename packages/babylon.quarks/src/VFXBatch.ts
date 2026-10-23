@@ -3,8 +3,9 @@ import {BaseTexture} from '@babylonjs/core/Materials/Textures/baseTexture';
 import type {Effect} from '@babylonjs/core/Materials/effect';
 import {ShaderMaterial} from '@babylonjs/core/Materials/shaderMaterial';
 import {Color3} from '@babylonjs/core/Maths/math.color';
-import {Vector2 as BVector2, Vector3 as BVector3, Vector4 as BVector4} from '@babylonjs/core/Maths/math.vector';
+import {Vector2 as BVector2, Vector3 as BVector3, Vector4 as BVector4, Matrix} from '@babylonjs/core/Maths/math.vector';
 import {Mesh} from '@babylonjs/core/Meshes/mesh';
+import type {Node} from '@babylonjs/core/node';
 import {Scene} from '@babylonjs/core/scene';
 import {IParticleSystem, Vector3} from 'quarks.core';
 import {VFXBatchSettings} from './BatchedRenderer';
@@ -17,13 +18,29 @@ import {DepthBinding, softDepthParams} from './softDepth';
  * blended particles cover what was drawn before them, so the order shows.
  *
  * - `'none'`: as they are, system by system. Right for additive blending.
- * - `'distance'`: farthest from the active camera first, so nearer particles
- *   cover farther ones.
+ * - `'distance'`: farthest from the camera first, so nearer particles cover
+ *   farther ones. The order is computed once a frame, from the first of the
+ *   scene's active cameras (`scene.activeCameras[0]`, else `activeCamera`);
+ *   other cameras, a second viewport or a render target, draw the same order.
  * - `'oldestInFront'` / `'youngestInFront'`: by age.
  *
  * Sorting runs over the whole batch after each fill. Trails are not sorted.
  */
 export type SortMode = 'none' | 'distance' | 'oldestInFront' | 'youngestInFront';
+
+/**
+ * Which faces of a mesh particle are drawn (Unity's Render Face, Unreal's Two Sided): `'both'`
+ * (the default), `'front'` (back faces culled, the usual choice for a closed mesh) or `'back'`
+ * (front faces culled, to see the inside of a dome or a shell). Front faces are the ones a Babylon
+ * mesh shows with back-face culling on, the outside of a box or sphere. It applies to the Mesh
+ * render mode only: billboards, stretched billboards, beams and trails are flat sheets whose
+ * winding follows the camera or the particle's path, so they always draw both faces.
+ *
+ * The culling is set once for the whole batch. A mesh particle mirrored by a negative size on an
+ * odd number of axes turns its winding inside out, so `'front'` then shows its inside and
+ * `'back'` its outside.
+ */
+export type RenderFace = 'both' | 'front' | 'back';
 
 /** How a system draws its particles (Unity's Render Mode), see {@link ParticleSystem.renderMode}. */
 export enum RenderMode {
@@ -515,6 +532,8 @@ export interface StoredBatchSettings {
     pivot?: Vector3;
     /** Draw order within the batch, see {@link SortMode}. */
     sortMode: SortMode;
+    /** Which faces a mesh particle draws, see {@link RenderFace}; `'both'` outside the Mesh render mode. */
+    renderFace: RenderFace;
     /** Smallest size a particle may have on screen, see {@link VFXBatchSettings.minParticleSize}. */
     minParticleSize: number;
     /** Largest size a particle may have on screen, see {@link VFXBatchSettings.maxParticleSize}. */
@@ -540,8 +559,13 @@ export interface StoredBatchSettings {
  * what is drawn, not to change it.
  */
 export abstract class VFXBatch {
-    /** The Babylon mesh the batch draws with. */
-    mesh: Mesh;
+    /**
+     * The Babylon mesh the batch draws with. Its world matrix is frozen at identity: the instance
+     * data is already in world space, so no parent's transform moves the particles again.
+     */
+    mesh!: Mesh;
+    /** The node the batch mesh lives under, kept across the meshes the batch rebuilds. */
+    private parentNode: Node | null = null;
     /** The systems drawn by this batch. */
     systems: Set<IParticleSystem>;
     /** The settings every system in the batch shares, with what the render mode ignores at its default. */
@@ -562,11 +586,20 @@ export abstract class VFXBatch {
     protected constructor(settings: VFXBatchSettings, scene: Scene, depth: DepthBinding | null = null) {
         this.scene = scene;
         this.depth = depth;
-        this.maxParticles = 1000;
+        this.maxParticles = 0;
         this.systems = new Set<IParticleSystem>();
         this.settings = storedBatchSettings(settings);
-        this.mesh = new Mesh('vfxBatch', scene);
-        this.configureMesh();
+        // The subclass builds the mesh, in setupBuffers.
+    }
+
+    /**
+     * Puts the batch mesh under `node` (the renderer), for the scene graph and the node's enabled
+     * state; the node's transform does not reach the particles.
+     * @internal
+     */
+    attachTo(node: Node | null): void {
+        this.parentNode = node;
+        this.mesh.parent = node;
     }
 
     /**
@@ -586,6 +619,13 @@ export abstract class VFXBatch {
         // world space, so the bounds never need the mesh's own matrix.
         mesh.alwaysSelectAsActiveMesh = true;
         mesh.doNotSyncBoundingInfo = true;
+        mesh.parent = this.parentNode;
+        // World-space instance data: the parent's transform must not apply, nor the bounds move
+        // with it. Frozen at identity, and kept there: a parent's markAsDirty would otherwise make
+        // the frozen mesh recompute from its parents once.
+        mesh.freezeWorldMatrix(Matrix.Identity());
+        const world = mesh.getWorldMatrix();
+        mesh.computeWorldMatrix = () => world;
         mesh.setBoundingInfo(new BoundingInfo(BVector3.Zero(), BVector3.Zero()));
         mesh.layerMask = this.settings.layerMask;
         mesh.renderingGroupId = this.settings.renderingGroupId;
@@ -927,6 +967,46 @@ export abstract class VFXBatch {
     abstract setupBuffers(): void;
     /** @internal */
     abstract expandBuffers(target: number): void;
+
+    /** Rebuilds the instance buffers at the current {@link maxParticles}, after a shrink. @internal */
+    protected abstract resizeBuffers(): void;
+
+    /** The capacity a batch starts with and never shrinks below. @internal */
+    protected abstract readonly initialCapacity: number;
+
+    /** Fills in a row that used under a quarter of the buffers. */
+    private underusedFills = 0;
+
+    /**
+     * How many fills in a row a batch may use under a quarter of its buffers before it halves
+     * them: about five seconds at 60 frames per second. A burst that grew the buffers does not
+     * hold that memory for the rest of the session, and a batch whose count swings does not
+     * reallocate every few frames.
+     */
+    static readonly SHRINK_AFTER_FILLS = 300;
+
+    /**
+     * Grows the buffers to hold `count`, or halves them once the batch has used under a quarter of
+     * them for {@link SHRINK_AFTER_FILLS} fills, never below {@link initialCapacity}. Called by each
+     * fill with what it is about to write. @internal
+     */
+    protected fitBuffers(count: number): void {
+        if (count > this.maxParticles) {
+            this.underusedFills = 0;
+            this.expandBuffers(count);
+            return;
+        }
+        if (this.maxParticles > this.initialCapacity && count < this.maxParticles / 4) {
+            if (++this.underusedFills >= VFXBatch.SHRINK_AFTER_FILLS) {
+                this.underusedFills = 0;
+                this.maxParticles = Math.max(this.initialCapacity, this.maxParticles / 2);
+                this.resizeBuffers();
+            }
+            return;
+        }
+        this.underusedFills = 0;
+    }
+
     /** @internal */
     abstract rebuildMaterial(): void;
     /** @internal */

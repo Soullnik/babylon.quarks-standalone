@@ -1,4 +1,5 @@
 import {NullEngine} from '@babylonjs/core/Engines/nullEngine';
+import {TransformNode} from '@babylonjs/core/Meshes/transformNode';
 import {Scene} from '@babylonjs/core/scene';
 import {ConstantColor, ConstantValue, IntervalValue, PointEmitter, Vector4} from 'quarks.core';
 import {BatchedRenderer} from '../src/BatchedRenderer';
@@ -283,18 +284,35 @@ describe('a system belongs to one renderer', () => {
         ps.dispose();
     });
 
-    it('warns once when the renderer itself is transformed', () => {
+    it('draws in world space whatever the renderer transform, under the renderer for enabled state', () => {
         const renderer = new BatchedRenderer('moved', scene);
-        const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
-        renderer.update(STEP);
-        expect(warn).not.toHaveBeenCalled();
         renderer.position.x = 10;
+        renderer.rotation.y = 1;
+        renderer.scaling.set(3, 3, 3);
+        const ps = system();
+        renderer.addSystem(ps);
+        renderer.update(STEP);
+        const mesh = renderer.batches[0].mesh;
+        expect(mesh.parent).toBe(renderer);
+        expect(mesh.computeWorldMatrix(true).isIdentity()).toBe(true);
+        expect(mesh.isWorldMatrixFrozen).toBe(true);
+        renderer.position.set(-4, 2, 7);
         renderer.computeWorldMatrix(true);
         renderer.update(STEP);
-        renderer.update(STEP);
-        expect(warn).toHaveBeenCalledTimes(1);
-        warn.mockRestore();
+        expect(mesh.computeWorldMatrix(true).isIdentity()).toBe(true);
+        // An explicit markAsDirty from a parent reaches the batch mesh too, and still moves nothing.
+        const holder = new TransformNode('holder', scene);
+        renderer.parent = holder;
+        holder.computeWorldMatrix(true);
+        holder.position.x = 5;
+        holder.markAsDirty('position');
+        expect(mesh.computeWorldMatrix().isIdentity()).toBe(true);
+        expect(mesh.getWorldMatrix().isIdentity()).toBe(true);
+        renderer.setEnabled(false);
+        expect(mesh.isEnabled()).toBe(false);
         renderer.dispose();
+        expect(mesh.isDisposed()).toBe(true);
+        ps.dispose();
     });
 });
 

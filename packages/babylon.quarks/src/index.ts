@@ -107,6 +107,7 @@ export type {
     ParticleGradientMap,
     ParticleUVDistortion,
     ParticleUVDistortionOptions,
+    RenderFace,
     SortMode,
     StoredBatchSettings,
     TextureUV,

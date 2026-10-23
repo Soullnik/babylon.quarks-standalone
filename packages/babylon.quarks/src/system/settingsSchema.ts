@@ -18,7 +18,14 @@ import {
 } from 'quarks.core';
 import type {ParticleSystem} from '../ParticleSystem';
 import {RenderMode} from '../VFXBatch';
-import {DEFAULT_SOFT_FAR_FADE, normalizeBursts, validCullingMode, validSortMode, validTileCount} from './normalize';
+import {
+    DEFAULT_SOFT_FAR_FADE,
+    normalizeBursts,
+    validCullingMode,
+    validRenderFace,
+    validSortMode,
+    validTileCount,
+} from './normalize';
 import type {BurstParameters, ParticleSystemJSONParameters, ParticleSystemParameters} from './types';
 
 /**
@@ -229,6 +236,7 @@ export const SETTINGS: ReadonlyArray<SettingDescriptor> = [
     ),
     plain('seed', (s) => s.seed, undefined, number),
     plain('sortMode', (s) => s.sortMode, 'none', validSortMode),
+    plain('renderFace', (s) => s.renderFace, 'both', validRenderFace),
     plain(
         'alignToDirection',
         (s) => s.alignToDirection,

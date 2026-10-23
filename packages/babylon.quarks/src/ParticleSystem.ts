@@ -75,6 +75,7 @@ import {
     validCullingMode,
     validLighting,
     validMaxParticles,
+    validRenderFace,
     validSoftFade,
     validSortMode,
     validTileCount,
@@ -102,6 +103,7 @@ import {
     ParticleGradientMap,
     ParticleUVDistortion,
     ParticleUVDistortionOptions,
+    RenderFace,
     RenderMode,
     SortMode,
     TextureUV,
@@ -471,6 +473,21 @@ export class ParticleSystem implements IParticleSystem {
 
     set sortMode(mode: SortMode) {
         this.rendererSettings.sortMode = validSortMode(mode);
+        this.neededToUpdateRender = true;
+    }
+
+    /**
+     * Which faces of a mesh particle are drawn (Unity's Render Face): `'both'` by default,
+     * `'front'` to cull the back faces of a closed mesh, `'back'` to see only its inside. Applies
+     * to the Mesh render mode; the other modes draw both faces. See {@link RenderFace}. Saved in
+     * the effect JSON only when not `'both'`.
+     */
+    get renderFace(): RenderFace {
+        return this.rendererSettings.renderFace ?? 'both';
+    }
+
+    set renderFace(face: RenderFace) {
+        this.rendererSettings.renderFace = validRenderFace(face);
         this.neededToUpdateRender = true;
     }
 
@@ -1144,6 +1161,7 @@ export class ParticleSystem implements IParticleSystem {
             layerMask: parameters.layerMask ?? 0x0fffffff,
             pivot: nonZeroPivot(parameters.pivot),
             sortMode: validSortMode(parameters.sortMode),
+            renderFace: validRenderFace(parameters.renderFace),
             minParticleSize: Math.max(0, parameters.minParticleSize ?? 0),
             maxParticleSize: parameters.maxParticleSize ?? Infinity,
             renderingGroupId: parameters.renderingGroupId ?? 0,

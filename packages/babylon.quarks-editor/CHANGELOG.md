@@ -4,6 +4,19 @@ All notable changes to the `babylon.quarks-editor` package are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project follows the `quarks.core` 0.x version line.
 
+## [0.28.0] — unreleased
+
+### Added
+
+- A **Render face** field (Both, Front, Back) for mesh systems, editing the library's new
+  `renderFace`.
+
+### Fixed
+
+- The transport's play resumes what pause froze and no longer replays effects or bursts that had
+  already finished (it uses the library's new `resume()`, now that `play()` replays a finished
+  system).
+
 ## [0.27.1] — 2026-10-23
 
 ### Changed
