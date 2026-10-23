@@ -13,12 +13,14 @@ import {demoManifest} from '../examples/src/demoManifest.ts';
  *   CHROMIUM_PATH      a Chromium to use instead of Playwright's own
  *   --only=A,B         capture only these demo keys (default every demo in the manifest)
  *   --landing          capture only the landing page's images
+ *   --wait=MS          how long each demo runs before its screenshot (default 3000)
  */
 const VIEWPORT = {width: 1280, height: 720};
 const BASE_URL = process.env.EXAMPLES_BASE_URL ?? 'http://localhost:3010';
 const OUTPUT_DIR = path.resolve('examples/public/previews');
 const LANDING_DIR = path.resolve('examples/public/landing');
 const landingOnly = process.argv.includes('--landing');
+const waitMs = Number(process.argv.find((a) => a.startsWith('--wait='))?.slice('--wait='.length) ?? 3000);
 // The viewer's toolbar, hint and drop overlay are UI, not the effect; previews show the effect only.
 const HIDE_VIEWER_UI = '.hud, .hint, .drop-overlay { display: none !important; }';
 const only = process.argv
@@ -48,7 +50,7 @@ async function captureDemoPreview(page: import('playwright').Page, demo: (typeof
 
     await page.goto(demoUrl, {waitUntil: 'networkidle'});
     await page.addStyleTag({content: HIDE_VIEWER_UI});
-    await page.waitForTimeout(3000);
+    await page.waitForTimeout(waitMs);
     await page.screenshot({path: previewPath});
 
     return previewFilename;

@@ -1,4 +1,5 @@
 import {ArcRotateCamera} from '@babylonjs/core/Cameras/arcRotateCamera';
+import type {ArcRotateCameraPointersInput} from '@babylonjs/core/Cameras/Inputs/arcRotateCameraPointersInput';
 import type {AbstractEngine} from '@babylonjs/core/Engines/abstractEngine';
 import {Engine} from '@babylonjs/core/Engines/engine';
 import {HemisphericLight} from '@babylonjs/core/Lights/hemisphericLight';
@@ -9,6 +10,7 @@ import {Scene} from '@babylonjs/core/scene';
 // Side-effect import: registers Scene.createPickingRay, used to project the pointer into the world.
 import '@babylonjs/core/Culling/ray';
 import {BatchedRenderer, BehaviorTypes, EmitterShapes} from 'babylon.quarks';
+import {demoManifest} from '../demoManifest';
 import type {DemoContext, DemoModule, DemoState} from '../types';
 import {createVortex, type StagePointer} from './vortex';
 
@@ -17,7 +19,7 @@ interface StageEffect {
     /** The effect's demo key in the gallery, or null for the landing-only vortex. */
     demoKey: string | null;
     load: () => Promise<DemoModule>;
-    /** Whether dragging orbits the camera; the vortex uses the pointer itself. */
+    /** Whether dragging orbits the camera; the vortex follows the pointer instead. */
     orbit: boolean;
 }
 
@@ -33,6 +35,13 @@ interface StageElements {
     editorButton: HTMLButtonElement | null;
 }
 
+/** A scene with one effect running in it. */
+interface LoadedEffect {
+    id: string;
+    ctx: DemoContext;
+    module: DemoModule;
+}
+
 const pointer: StagePointer = {x: 0, y: 0, seen: false};
 
 const EFFECTS: Record<string, StageEffect> = {
@@ -43,6 +52,12 @@ const EFFECTS: Record<string, StageEffect> = {
     forces: {demoKey: 'ForceSpaceDemo', load: () => import('../demos/forceSpace'), orbit: true},
 };
 
+/** The effect's display name: the gallery's name for a demo, "Vortex" for the landing effect. */
+function effectName(id: string) {
+    const key = EFFECTS[id]?.demoKey;
+    return key ? (demoManifest.find((demo) => demo.key === key)?.name ?? key) : 'Vortex';
+}
+
 type GPUAdapterLike = {isFallbackAdapter?: boolean; info?: {isFallbackAdapter?: boolean}};
 type NavigatorWithGPU = Navigator & {gpu?: {requestAdapter(): Promise<GPUAdapterLike | null>}};
 
@@ -50,28 +65,42 @@ type NavigatorWithGPU = Navigator & {gpu?: {requestAdapter(): Promise<GPUAdapter
  * Creates the stage's engine: WebGPU when the browser has a hardware adapter, WebGL otherwise.
  * `?engine=webgl` or `?engine=webgpu` in the page URL forces one (the latter still falls back
  * when WebGPU is missing). A software (fallback) adapter is skipped unless forced: it renders
- * slower than WebGL on the same machine.
+ * slower than WebGL on the same machine. A canvas that WebGPU touched cannot give WebGL a
+ * context, so a failed WebGPU start swaps in a fresh canvas.
  */
-async function createStageEngine(canvas: HTMLCanvasElement): Promise<{engine: AbstractEngine; label: string}> {
+async function createStageEngine(
+    canvas: HTMLCanvasElement
+): Promise<{engine: AbstractEngine; canvas: HTMLCanvasElement; label: string}> {
+    // Babylon sets `touch-action: none` on its canvas by default, which would stop a swipe on the
+    // stage from scrolling the page; the stylesheet's `pan-y` keeps vertical swipes for the page.
+    const options = {doNotHandleTouchAction: true};
     const requested = new URLSearchParams(window.location.search).get('engine');
     const gpu = (navigator as NavigatorWithGPU).gpu;
     if (requested !== 'webgl' && gpu) {
+        let gpuEngine: AbstractEngine | null = null;
         try {
             const adapter = await gpu.requestAdapter();
             const fallback = adapter?.info?.isFallbackAdapter ?? adapter?.isFallbackAdapter ?? false;
             if (adapter && (!fallback || requested === 'webgpu')) {
                 const {WebGPUEngine} = await import('@babylonjs/core/Engines/webgpuEngine');
                 await import('@babylonjs/core/Engines/WebGPU/Extensions/index');
-                const engine = new WebGPUEngine(canvas, {antialias: true});
+                const engine = new WebGPUEngine(canvas, {...options, antialias: true});
+                gpuEngine = engine;
                 await engine.initAsync();
-                return {engine, label: 'WebGPU'};
+                return {engine, canvas, label: 'WebGPU'};
             }
         } catch (error) {
             console.warn('WebGPU is unavailable here; the stage falls back to WebGL.', error);
+            if (gpuEngine) {
+                gpuEngine.dispose();
+                const fresh = canvas.cloneNode(false) as HTMLCanvasElement;
+                canvas.replaceWith(fresh);
+                canvas = fresh;
+            }
         }
     }
-    const engine = new Engine(canvas, true);
-    return {engine, label: engine.webGLVersion >= 2 ? 'WebGL 2' : 'WebGL'};
+    const engine = new Engine(canvas, true, options);
+    return {engine, canvas, label: engine.webGLVersion >= 2 ? 'WebGL 2' : 'WebGL'};
 }
 
 function queryStage(root: HTMLElement): StageElements | null {
@@ -101,75 +130,114 @@ export function libraryCounts() {
 
 /**
  * Mounts the hero stage: a live babylon.quarks scene inside `root`, with effect tabs, a stats
- * readout and an "Open in editor" action. Renders only while the stage is on screen. Returns a
- * function that tears everything down.
+ * readout and an "Open in editor" action. It starts on the tab marked `aria-pressed="true"`,
+ * renders only while the stage is on screen, and sets `data-live` on `root` once the first
+ * effect runs. Rejects, with everything released, when that first effect cannot start.
+ * Resolves to a function that tears everything down.
  */
 export async function mountHeroStage(root: HTMLElement): Promise<() => void> {
     const el = queryStage(root);
     if (!el) {
         return () => {};
     }
-    const {engine, label} = await createStageEngine(el.canvas);
+    const created = await createStageEngine(el.canvas);
+    const {engine, label} = created;
+    el.canvas = created.canvas;
     engine.setHardwareScalingLevel(1 / Math.min(window.devicePixelRatio || 1, 2));
     if (el.engineLabel) {
         el.engineLabel.textContent = label;
     }
 
-    let scene: Scene | null = null;
-    let ctx: DemoContext | null = null;
-    let effect: DemoModule | null = null;
-    let effectId = '';
+    let current: LoadedEffect | null = null;
     let loadToken = 0;
 
-    const showEffect = async (id: string) => {
-        const entry = EFFECTS[id];
-        if (!entry || id === effectId) {
-            return;
-        }
-        effectId = id;
-        const token = ++loadToken;
+    const markTabs = (id: string) => {
         for (const tab of el.tabs) {
-            tab.setAttribute('aria-pressed', String(tab.dataset.effect === id));
-        }
-        if (el.demoLink) {
-            el.demoLink.href = entry.demoKey ? `./babylonDemo.html#${entry.demoKey}` : '#demos';
-            el.demoLink.textContent = entry.demoKey ? 'Full-screen demo' : 'All demos';
-        }
-        const module = await entry.load();
-        if (token !== loadToken) {
-            return;
-        }
-
-        scene?.dispose();
-        effect = null;
-        const next = new Scene(engine);
-        next.useRightHandedSystem = true;
-        next.clearColor = new Color4(0.035, 0.04, 0.06, 1);
-        const camera = new ArcRotateCamera('stageCamera', -Math.PI / 2, Math.PI / 3, 20, BVector3.Zero(), next);
-        camera.minZ = 0.1;
-        if (entry.orbit) {
-            camera.attachControl(el.canvas, true);
-            // Wheel and pinch would steal the page's scroll; dragging still orbits.
-            camera.inputs.removeByType('ArcRotateCameraMouseWheelInput');
-        }
-        new HemisphericLight('stageLight', new BVector3(0.35, 1, -0.2), next);
-        const batchRenderer = new BatchedRenderer('stageVfx', next);
-        const demoState: DemoState = {totalTime: 0, refreshIndex: 0};
-        const nextCtx: DemoContext = {scene: next, camera, batchRenderer, systems: [], demoState};
-        scene = next;
-        ctx = nextCtx;
-        try {
-            await module.init(nextCtx);
-            if (token === loadToken) {
-                effect = module;
-            }
-        } catch (error) {
-            console.error('The stage effect could not start:', error);
+            const pressed = tab.dataset.effect === id;
+            tab.setAttribute('aria-pressed', String(pressed));
+            tab.tabIndex = pressed ? 0 : -1;
         }
     };
 
+    const describe = (id: string) => {
+        const entry = EFFECTS[id];
+        el.canvas.setAttribute(
+            'aria-label',
+            `Live babylon.quarks effect: ${effectName(id)}.${entry?.orbit ? ' Drag to orbit the camera.' : ''}`
+        );
+        if (el.demoLink && entry) {
+            el.demoLink.href = entry.demoKey ? `./babylonDemo.html#${entry.demoKey}` : '#demos';
+            el.demoLink.textContent = entry.demoKey ? 'Full-screen demo' : 'All demos';
+        }
+    };
+
+    /**
+     * Builds the effect in a new scene while the current one keeps rendering, then swaps them.
+     * A newer request wins: a stale load disposes its own scene. Returns whether it swapped.
+     */
+    const showEffect = async (id: string): Promise<boolean> => {
+        const entry = EFFECTS[id];
+        if (!entry || id === current?.id) {
+            return false;
+        }
+        const token = ++loadToken;
+        markTabs(id);
+        el.root.dataset.loading = 'true';
+
+        let scene: Scene | null = null;
+        try {
+            const module = await entry.load();
+            if (token !== loadToken) {
+                return false;
+            }
+            scene = new Scene(engine);
+            scene.useRightHandedSystem = true;
+            scene.clearColor = new Color4(0.035, 0.04, 0.06, 1);
+            const camera = new ArcRotateCamera('stageCamera', -Math.PI / 2, Math.PI / 3, 20, BVector3.Zero(), scene);
+            camera.minZ = 0.1;
+            new HemisphericLight('stageLight', new BVector3(0.35, 1, -0.2), scene);
+            const batchRenderer = new BatchedRenderer('stageVfx', scene);
+            const demoState: DemoState = {totalTime: 0, refreshIndex: 0};
+            const ctx: DemoContext = {scene, camera, batchRenderer, systems: [], demoState};
+            await module.init(ctx);
+            if (token !== loadToken) {
+                scene.dispose();
+                return false;
+            }
+            if (entry.orbit) {
+                camera.attachControl(el.canvas, true);
+                // The wheel and pinch would steal the page's scroll and zoom; dragging still orbits.
+                camera.inputs.removeByType('ArcRotateCameraMouseWheelInput');
+                const pointers = camera.inputs.attached.pointers as ArcRotateCameraPointersInput | undefined;
+                if (pointers) {
+                    pointers.pinchZoom = false;
+                }
+            }
+            const previous = current;
+            current = {id, ctx, module};
+            previous?.ctx.scene.dispose();
+            describe(id);
+            return true;
+        } catch (error) {
+            console.error(`The stage could not start "${id}":`, error);
+            scene?.dispose();
+            if (token === loadToken && current) {
+                markTabs(current.id);
+            }
+            return false;
+        } finally {
+            if (token === loadToken) {
+                delete el.root.dataset.loading;
+            }
+        }
+    };
+
+    const onTabClick = (event: Event) => {
+        const id = (event.currentTarget as HTMLButtonElement).dataset.effect ?? '';
+        void showEffect(id);
+    };
     for (const tab of el.tabs) {
-        tab.addEventListener('click', () => void showEffect(tab.dataset.effect ?? ''));
+        tab.addEventListener('click', onTabClick);
     }
 
     const onPointerMove = (event: PointerEvent) => {
@@ -180,20 +248,30 @@ export async function mountHeroStage(root: HTMLElement): Promise<() => void> {
     };
     el.canvas.addEventListener('pointermove', onPointerMove, {passive: true});
 
-    const onEditor = () => void openInEditor(ctx, effectId);
+    let handingOff = false;
+    const onEditor = () => {
+        if (handingOff || !current) {
+            return;
+        }
+        handingOff = true;
+        void openInEditor(current).finally(() => {
+            handingOff = false;
+        });
+    };
     el.editorButton?.addEventListener('click', onEditor);
 
     let frames = 0;
     let lastStat = performance.now();
     const renderFrame = () => {
-        if (!scene || !ctx) {
+        if (!current) {
             return;
         }
+        const {ctx, module} = current;
         const delta = Math.min(engine.getDeltaTime() / 1000, 0.05);
         try {
-            effect?.update?.(ctx, delta);
+            module.update?.(ctx, delta);
             ctx.batchRenderer.update(delta);
-            scene.render();
+            ctx.scene.render();
         } catch (error) {
             console.error('Stage render error:', error);
         }
@@ -231,51 +309,60 @@ export async function mountHeroStage(root: HTMLElement): Promise<() => void> {
     const observer = new IntersectionObserver((entries) => setRunning(entries.some((e) => e.isIntersecting)));
     observer.observe(el.root);
 
-    const onResize = () => engine.resize();
-    const resizeObserver = new ResizeObserver(onResize);
+    const resizeObserver = new ResizeObserver(() => engine.resize());
     resizeObserver.observe(el.canvas);
 
-    const initial = el.tabs.find((tab) => tab.getAttribute('aria-pressed') === 'true')?.dataset.effect ?? 'vortex';
-    await showEffect(initial);
-    el.root.dataset.live = 'true';
-
-    return () => {
+    const teardown = () => {
         observer.disconnect();
         resizeObserver.disconnect();
+        for (const tab of el.tabs) {
+            tab.removeEventListener('click', onTabClick);
+        }
         el.canvas.removeEventListener('pointermove', onPointerMove);
         el.editorButton?.removeEventListener('click', onEditor);
         setRunning(false);
         loadToken++;
-        scene?.dispose();
+        current?.ctx.scene.dispose();
+        current = null;
         engine.dispose();
         delete el.root.dataset.live;
+        delete el.root.dataset.loading;
     };
+
+    const initial = el.tabs.find((tab) => tab.getAttribute('aria-pressed') === 'true')?.dataset.effect ?? 'vortex';
+    if (!(await showEffect(initial))) {
+        teardown();
+        throw new Error(`the stage's first effect "${initial}" did not start`);
+    }
+    el.root.dataset.live = 'true';
+    return teardown;
 }
 
 /**
  * Hands the running effect to the editor page, the way the demo viewer does: serialise every
  * effect root under the renderer into session storage and open `editor.html?effect=session`.
  */
-async function openInEditor(ctx: DemoContext | null, effectId: string) {
-    if (!ctx || ctx.systems.length === 0) {
+async function openInEditor({id, ctx}: LoadedEffect) {
+    try {
+        const {ensurePortableTextureUrl, serializeEffectForest} = await import('babylon.quarks-editor');
+        const roots = new Set<TransformNode>();
+        for (const system of ctx.systems) {
+            let node: TransformNode = system.emitter;
+            while (node.parent && node.parent !== ctx.batchRenderer) {
+                node = node.parent as TransformNode;
+            }
+            roots.add(node);
+        }
+        for (const system of ctx.systems) {
+            if (system.texture) {
+                await ensurePortableTextureUrl(system.texture);
+            }
+        }
+        sessionStorage.setItem('quarks-editor-effect', serializeEffectForest([...roots], effectName(id)));
+        window.location.href = './editor.html?effect=session';
+    } catch (error) {
+        // Storage full or blocked: open the editor on its own rather than doing nothing.
+        console.warn('Could not hand the effect to the editor:', error);
         window.location.href = './editor.html';
-        return;
     }
-    const {ensurePortableTextureUrl, serializeEffectForest} = await import('babylon.quarks-editor');
-    const roots = new Set<TransformNode>();
-    for (const system of ctx.systems) {
-        let node: TransformNode = system.emitter;
-        while (node.parent && node.parent !== ctx.batchRenderer) {
-            node = node.parent as TransformNode;
-        }
-        roots.add(node);
-    }
-    for (const system of ctx.systems) {
-        if (system.texture) {
-            await ensurePortableTextureUrl(system.texture);
-        }
-    }
-    const name = effectId === 'vortex' ? 'Vortex' : (EFFECTS[effectId]?.demoKey ?? 'Effect').replace(/Demo$/, '');
-    sessionStorage.setItem('quarks-editor-effect', serializeEffectForest([...roots], name));
-    window.location.href = './editor.html?effect=session';
 }

@@ -196,10 +196,18 @@
                     <figure class="stage" data-stage>
                         <div class="stage-bar" role="toolbar" aria-label="Choose an effect">
                             <button type="button" data-effect="vortex" aria-pressed="true">Vortex</button>
-                            <button type="button" data-effect="electric" aria-pressed="false">Electric ball</button>
-                            <button type="button" data-effect="weapons" aria-pressed="false">Weapon trails</button>
-                            <button type="button" data-effect="explosion" aria-pressed="false">Unity explosion</button>
-                            <button type="button" data-effect="forces" aria-pressed="false">Force space</button>
+                            <button type="button" data-effect="electric" aria-pressed="false" tabindex="-1">
+                                Electric ball
+                            </button>
+                            <button type="button" data-effect="weapons" aria-pressed="false" tabindex="-1">
+                                Weapon trails
+                            </button>
+                            <button type="button" data-effect="explosion" aria-pressed="false" tabindex="-1">
+                                Unity explosion
+                            </button>
+                            <button type="button" data-effect="forces" aria-pressed="false" tabindex="-1">
+                                Force space
+                            </button>
                         </div>
                         <div class="stage-view">
                             <img
@@ -207,24 +215,25 @@
                                 src="./landing/stage-poster.jpg"
                                 width="1200"
                                 height="750"
-                                alt="A glowing particle vortex rendered with babylon.quarks"
+                                alt=""
+                                aria-hidden="true"
                             />
-                            <canvas aria-label="Live babylon.quarks effect. Drag to orbit the camera."></canvas>
+                            <canvas role="img" aria-label="Live babylon.quarks effect: Vortex."></canvas>
                             <button type="button" class="stage-play" data-stage-play hidden>
                                 Play the live effect
                             </button>
                         </div>
-                        <figcaption class="stage-hud">
-                            <span class="stat"><span class="stat-label">Engine</span> <b data-stat="engine">…</b></span>
+                        <div class="stage-hud">
+                            <span class="stat"><span class="stat-label">Engine</span> <b data-stat="engine">—</b></span>
                             <span class="stat"
-                                ><span class="stat-label">Particles</span> <b data-stat="particles">…</b></span
+                                ><span class="stat-label">Particles</span> <b data-stat="particles">—</b></span
                             >
-                            <span class="stat"><span class="stat-label">FPS</span> <b data-stat="fps">…</b></span>
+                            <span class="stat"><span class="stat-label">FPS</span> <b data-stat="fps">—</b></span>
                             <span class="stage-actions">
                                 <a data-stage-demo href="#demos">All demos</a>
                                 <button type="button" data-stage-editor>Open in editor</button>
                             </span>
-                        </figcaption>
+                        </div>
                     </figure>
                 </div>
 
@@ -336,7 +345,7 @@
                             </div>
                             <img
                                 src="./previews/sub-emitter.png"
-                                alt="Fireworks built from sub-emitters"
+                                alt="Particles spawning secondary systems as they die"
                                 loading="lazy"
                                 width="640"
                                 height="360"
@@ -566,6 +575,7 @@ const sparks = new ParticleSystem({
     emissionOverTime: new ConstantValue(120),
     shape: new ConeEmitter({radius: 0.2, angle: 0.3}),
     renderMode: RenderMode.StretchedBillBoard,
+    rendererEmitterSettings: {speedFactor: 0.05},
     texture: new Texture('spark.png', scene),
 });
 sparks.addBehavior(new SizeOverLife(new PiecewiseBezier([[new Bezier(1, 0.8, 0.4, 0), 0]])));

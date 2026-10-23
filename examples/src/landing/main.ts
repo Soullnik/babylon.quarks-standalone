@@ -38,6 +38,13 @@ function applyTheme(choice: ThemeChoice) {
         button.setAttribute('aria-label', `${label}. Switch theme`);
         button.title = label;
     }
+    // The browser chrome follows an explicit choice; with "system" each meta's media query decides.
+    for (const meta of Array.from(document.querySelectorAll<HTMLMetaElement>('meta[name="theme-color"]'))) {
+        meta.dataset.media ??= meta.media;
+        meta.dataset.content ??= meta.content;
+        meta.media = choice === 'system' ? meta.dataset.media : 'all';
+        meta.content = choice === 'system' ? meta.dataset.content : choice === 'dark' ? '#0a0c11' : '#f4f5f8';
+    }
 }
 
 function setupTheme() {
@@ -76,7 +83,18 @@ function setupMenu() {
         }
     });
     document.addEventListener('keydown', (event) => {
-        if (event.key === 'Escape') {
+        if (event.key !== 'Escape' || nav.dataset.open !== 'true') {
+            return;
+        }
+        const focusInside = nav.contains(document.activeElement);
+        setOpen(false);
+        if (focusInside) {
+            toggle.focus();
+        }
+    });
+    document.addEventListener('click', (event) => {
+        const target = event.target as Node;
+        if (nav.dataset.open === 'true' && !nav.contains(target) && !toggle.contains(target)) {
             setOpen(false);
         }
     });
@@ -106,7 +124,7 @@ function setupCopyButtons() {
         button.addEventListener('click', () => {
             const text = copySource(button);
             const done = (ok: boolean) => {
-                button.textContent = ok ? 'Copied' : 'Press Ctrl+C';
+                button.textContent = ok ? 'Copied' : 'Copy failed';
                 window.setTimeout(() => (button.textContent = original), 1400);
             };
             if (navigator.clipboard?.writeText) {
@@ -121,7 +139,23 @@ function setupCopyButtons() {
     }
 }
 
-/** Tab lists: `[role=tablist]` buttons with `aria-controls` panels; arrow keys move between tabs. */
+/** The index arrow keys, Home and End move to in a row of `count` items, or -1 for other keys. */
+function rovingIndex(key: string, index: number, count: number) {
+    switch (key) {
+        case 'ArrowRight':
+            return (index + 1) % count;
+        case 'ArrowLeft':
+            return (index - 1 + count) % count;
+        case 'Home':
+            return 0;
+        case 'End':
+            return count - 1;
+        default:
+            return -1;
+    }
+}
+
+/** Tab lists: `[role=tablist]` buttons with `aria-controls` panels; arrows, Home and End move between tabs. */
 function setupTabs() {
     for (const list of Array.from(document.querySelectorAll<HTMLElement>('[role="tablist"][data-panels]'))) {
         const tabs = Array.from(list.querySelectorAll<HTMLButtonElement>('[role="tab"]'));
@@ -142,28 +176,55 @@ function setupTabs() {
         for (const [index, tab] of tabs.entries()) {
             tab.addEventListener('click', () => select(tab, false));
             tab.addEventListener('keydown', (event) => {
-                const step = event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0;
-                if (step) {
+                const next = rovingIndex(event.key, index, tabs.length);
+                if (next >= 0) {
                     event.preventDefault();
-                    select(tabs[(index + step + tabs.length) % tabs.length], true);
+                    select(tabs[next], true);
                 }
             });
         }
     }
 }
 
-/** Effect tabs on the stage are a toolbar of toggle buttons; keep arrow-key movement there too. */
-function setupStageTabs() {
-    const tabs = Array.from(document.querySelectorAll<HTMLButtonElement>('[data-stage] [data-effect]'));
+/**
+ * The stage's effect buttons are a toolbar with one Tab stop (roving tabindex); arrows, Home and
+ * End move between them. Until the live stage is up, a click marks the effect it should open on,
+ * and on the poster (reduced motion, or a stage that failed) it starts the stage with that effect.
+ */
+function setupStageControls() {
+    const root = document.querySelector<HTMLElement>('[data-stage]');
+    if (!root) {
+        return;
+    }
+    const tabs = Array.from(root.querySelectorAll<HTMLButtonElement>('[data-effect]'));
     for (const [index, tab] of tabs.entries()) {
+        tab.tabIndex = tab.getAttribute('aria-pressed') === 'true' ? 0 : -1;
         tab.addEventListener('keydown', (event) => {
-            const step = event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0;
-            if (step) {
+            const next = rovingIndex(event.key, index, tabs.length);
+            if (next >= 0) {
                 event.preventDefault();
-                tabs[(index + step + tabs.length) % tabs.length].focus();
+                tabs[next].focus();
+            }
+        });
+        tab.addEventListener('click', () => {
+            if (root.dataset.live === 'true') {
+                return; // the live stage handles it
+            }
+            for (const other of tabs) {
+                other.setAttribute('aria-pressed', String(other === tab));
+                other.tabIndex = other === tab ? 0 : -1;
+            }
+            if (root.dataset.mode === 'poster') {
+                startLiveStage(root);
             }
         });
     }
+    root.querySelector('[data-stage-editor]')?.addEventListener('click', () => {
+        if (root.dataset.live !== 'true') {
+            window.location.href = './editor.html';
+        }
+    });
+    root.querySelector('[data-stage-play]')?.addEventListener('click', () => startLiveStage(root));
 }
 
 function setupCode() {
@@ -269,28 +330,21 @@ function setCount(name: string, value: number) {
     }
 }
 
-async function startStage() {
-    const root = document.querySelector<HTMLElement>('[data-stage]');
-    const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-    if (!root) {
-        hook.stage = 'none';
+let stageStarting = false;
+
+/** Leaves poster mode and mounts the live stage, once. */
+function startLiveStage(root: HTMLElement) {
+    if (stageStarting) {
         return;
     }
-    if (reducedMotion) {
-        root.dataset.mode = 'poster';
-        hook.stage = 'poster';
-        const play = root.querySelector<HTMLButtonElement>('[data-stage-play]');
-        if (play) {
-            play.hidden = false;
-            play.addEventListener('click', () => {
-                play.hidden = true;
-                root.dataset.mode = '';
-                void runStage(root);
-            });
-        }
-        return;
+    stageStarting = true;
+    const play = root.querySelector<HTMLElement>('[data-stage-play]');
+    if (play) {
+        play.hidden = true;
     }
-    await runStage(root);
+    delete root.dataset.mode;
+    hook.stage = 'pending';
+    void runStage(root);
 }
 
 async function runStage(root: HTMLElement) {
@@ -303,16 +357,41 @@ async function runStage(root: HTMLElement) {
         hook.stage = 'live';
     } catch (error) {
         console.warn('The live stage could not start; showing the poster instead.', error);
-        root.dataset.mode = 'poster';
+        showPoster(root);
         hook.stage = 'failed';
+        stageStarting = false;
     }
+}
+
+/** The still poster with a Play button, for reduced motion or after the stage failed to start. */
+function showPoster(root: HTMLElement) {
+    root.dataset.mode = 'poster';
+    const play = root.querySelector<HTMLElement>('[data-stage-play]');
+    if (play) {
+        play.hidden = false;
+    }
+}
+
+async function startStage() {
+    const root = document.querySelector<HTMLElement>('[data-stage]');
+    if (!root) {
+        hook.stage = 'none';
+        return;
+    }
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
+        showPoster(root);
+        hook.stage = 'poster';
+        return;
+    }
+    stageStarting = true;
+    await runStage(root);
 }
 
 setupTheme();
 setupMenu();
 setupCopyButtons();
 setupTabs();
-setupStageTabs();
+setupStageControls();
 setupCode();
 setupGallery();
 setCount('demos', demoManifest.length);

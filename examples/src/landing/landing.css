@@ -11,10 +11,12 @@
     --surface: #ffffff;
     --line: #d6dbe4;
     --line-strong: #b9c1cf;
+    /* Form field edges need 3:1 against the page. */
+    --input-line: #8a94a6;
     --fg: #10131a;
     --muted: #525b6e;
-    --accent: #c24a12;
-    --accent-hover: #a63c0b;
+    --accent: #b0400c;
+    --accent-hover: #943508;
     --accent-fg: #ffffff;
     --accent-soft: #fbe6da;
     --plasma: #0b6f9c;
@@ -31,7 +33,7 @@
     --tok-number: #f2c879;
     --tok-type: #8fd3ff;
     --tok-call: #d9c2ff;
-    --tok-comment: #6c7689;
+    --tok-comment: #7d879b;
 
     --shadow: 0 1px 2px rgb(16 19 26 / 6%), 0 12px 32px -12px rgb(16 19 26 / 18%);
 
@@ -60,6 +62,7 @@
         --surface: #12161e;
         --line: #232a37;
         --line-strong: #343d4e;
+        --input-line: #5d6779;
         --fg: #e8ebf1;
         --muted: #9aa3b5;
         --accent: #ff8a3d;
@@ -79,6 +82,7 @@
     --surface: #12161e;
     --line: #232a37;
     --line-strong: #343d4e;
+    --input-line: #5d6779;
     --fg: #e8ebf1;
     --muted: #9aa3b5;
     --accent: #ff8a3d;
@@ -1129,7 +1133,7 @@ h3 {
     min-height: 44px;
     padding: 0 14px;
     border-radius: 10px;
-    border: 1px solid var(--line-strong);
+    border: 1px solid var(--input-line);
     background: var(--surface);
     color: var(--fg);
     font: inherit;
