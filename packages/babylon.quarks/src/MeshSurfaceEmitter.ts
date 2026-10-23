@@ -1,6 +1,7 @@
 import {VertexBuffer} from '@babylonjs/core/Buffers/buffer';
 import {Mesh} from '@babylonjs/core/Meshes/mesh';
 import {EmitterShape, IParticleSystem, Particle, Plugin, random, ShapeJSON, ShapeTransform, Vector3} from 'quarks.core';
+import {ensureTriangleIndices} from './geometryUtil';
 import {quarksNodeId} from './nodeId';
 
 /**
@@ -8,8 +9,9 @@ import {quarksNodeId} from './nodeId';
  * Location): a point picked at random over the triangles, weighted by their area, moving along the
  * triangle's normal at the particle's start speed. The mesh's vertices are read once, when it is
  * set, in the mesh's own space, and laid in the emitter's space as they are, moved by
- * {@link transform}; moving the mesh node afterwards does not move the shape. A shape without a
- * mesh emits from the origin along +Z.
+ * {@link transform}; moving the mesh node afterwards does not move the shape. A mesh without an
+ * index buffer is read as a plain triangle list. A shape without a mesh emits from the origin
+ * along +Z.
  */
 export class MeshSurfaceEmitter implements EmitterShape {
     /** The shape's type in effect files. */
@@ -23,7 +25,11 @@ export class MeshSurfaceEmitter implements EmitterShape {
     /** Offset, rotation and scale of the mesh within the particle system. */
     transform?: ShapeTransform;
 
-    /** The mesh emitted from. Setting it reads its positions and indices; a mesh without both emits from the origin. */
+    /**
+     * The mesh emitted from. Setting it reads its positions and indices; a mesh without indices is
+     * read as a triangle list (vertices 0-1-2, 3-4-5, ...), and a mesh without positions, or with
+     * no whole triangle, emits from the origin.
+     */
     get mesh(): Mesh | undefined {
         return this._mesh;
     }
@@ -36,20 +42,26 @@ export class MeshSurfaceEmitter implements EmitterShape {
         if (!mesh) return;
 
         const positions = mesh.getVerticesData(VertexBuffer.PositionKind);
-        const indices = mesh.getIndices();
-        if (!positions || !indices) return;
+        if (!positions || positions.length < 9) return;
+        const vertexPositions = new Float32Array(positions);
+        const read = mesh.getIndices();
+        const indices = ensureTriangleIndices(
+            vertexPositions,
+            read && read.length > 0 ? Uint32Array.from(read) : undefined
+        );
+        const triCount = Math.floor(indices.length / 3);
+        if (triCount === 0) return;
 
-        this._positions = new Float32Array(positions);
-        this._indices = new Int32Array(indices);
+        this._positions = vertexPositions;
+        this._indices = new Int32Array(indices.subarray(0, triCount * 3));
 
-        this._triangleIndexToArea.length = 0;
         let area = 0;
-        const triCount = indices.length / 3;
         this._triangleIndexToArea.push(0);
 
         const a = new Vector3();
         const b = new Vector3();
         const c = new Vector3();
+        const cross = new Vector3();
 
         for (let i = 0; i < triCount; i++) {
             const i0 = indices[i * 3];
@@ -62,7 +74,6 @@ export class MeshSurfaceEmitter implements EmitterShape {
 
             b.sub(a);
             c.sub(a);
-            const cross = new Vector3();
             cross.crossVectors(b, c);
             area += cross.length() * 0.5;
             this._triangleIndexToArea.push(area);

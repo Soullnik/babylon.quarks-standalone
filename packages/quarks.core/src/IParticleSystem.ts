@@ -253,7 +253,7 @@ export interface ParticleSystemEvent {
     type: ParticleSystemEventType;
     /** The system that fired it. */
     particleSystem: IParticleSystem;
-    /** The particle that died, for `'particleDied'`. */
+    /** The particle that died, for `'particleDied'`; valid only while the listener runs. */
     particle?: IParticle;
 }
 
@@ -397,6 +397,6 @@ export interface IParticleSystem {
     addEventListener(event: ParticleSystemEventType, callback: (event: ParticleSystemEvent) => void): void;
     /** Removes one callback added with {@link IParticleSystem.addEventListener}. */
     removeEventListener(event: ParticleSystemEventType, callback: (event: ParticleSystemEvent) => void): void;
-    /** Removes every callback registered for `event`. */
-    removeAllEventListeners(event: ParticleSystemEventType): void;
+    /** Removes every callback registered for `event`, or every callback when it is left out. */
+    removeAllEventListeners(event?: ParticleSystemEventType): void;
 }

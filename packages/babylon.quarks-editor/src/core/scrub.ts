@@ -7,10 +7,10 @@ function bindingSystems(binding: EffectBinding): ParticleSystem[] {
     return [binding.system, ...binding.subSystems];
 }
 
-/** Unpauses every system in the focused effect. */
+/** Unpauses every system in the focused effect; one that has finished stays finished. */
 export function playFocus(binding: EffectBinding): void {
     for (const system of bindingSystems(binding)) {
-        system.play();
+        system.resume();
     }
 }
 

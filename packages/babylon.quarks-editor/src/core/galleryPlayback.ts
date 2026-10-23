@@ -30,7 +30,8 @@ export function applyGalleryPlayback(
             continue;
         }
         for (const system of entry.systems) {
-            system.play();
+            // Undoes the pause above; a finished effect stays finished.
+            system.resume();
         }
     }
 }

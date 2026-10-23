@@ -205,6 +205,16 @@ export const demoManifest: DemoManifestEntry[] = [
         preview: {icon: 'PH', gradient: 'linear-gradient(135deg, #ffb347 0%, #3a2d6b 100%)'},
     },
     {
+        key: 'TimelineDemo',
+        name: 'Timeline (QuarksPrefab)',
+        module: 'timeline',
+        sourcePath: 'examples/src/demos/timeline.ts',
+        description:
+            'A charge, a release burst and lingering smoke scheduled on a QuarksPrefab timeline that advances with the scene; the end of the timeline lets particles die out, and every other blast plays in slow motion through timeScale.',
+        tags: ['timeline', 'gameplay'],
+        preview: {icon: 'TL', gradient: 'linear-gradient(135deg, #7fb2ff 0%, #2a2f5e 100%)'},
+    },
+    {
         key: 'RendererOptionsDemo',
         name: 'Renderer Options',
         module: 'rendererOptions',

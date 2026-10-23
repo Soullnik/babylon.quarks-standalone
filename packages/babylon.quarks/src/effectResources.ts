@@ -3,46 +3,46 @@ import type {BaseTexture} from '@babylonjs/core/Materials/Textures/baseTexture';
 import type {TransformNode} from '@babylonjs/core/Meshes/transformNode';
 import type {Node} from '@babylonjs/core/node';
 
-/** What an effect root owns: the textures it holds a count on, and the materials made for it alone. */
+/** What an effect root holds a count on: the textures it draws with and the materials made for the effect. */
 interface EffectResources {
     textures: Set<BaseTexture>;
-    materials: Material[];
+    materials: Set<Material>;
 }
 
 const owned = new WeakMap<Node, EffectResources>();
-/** How many effect roots hold each texture. */
-const holders = new WeakMap<BaseTexture, number>();
+/** How many effect roots hold each texture and material. */
+const holders = new WeakMap<BaseTexture | Material, number>();
 
 /**
- * Records that `root` uses `textures` and owns `materials`. They are freed when the root is
- * disposed, however that happens: {@link disposeEffect}, `root.dispose()`, a parent's dispose or
- * the scene's.
+ * Records that `root` uses `textures` and the `materials` made for the effect. Each is freed once
+ * the last root holding it is disposed, however that happens: {@link disposeEffect},
+ * `root.dispose()`, a parent's dispose or the scene's.
  */
 export function retainEffectResources(
     root: TransformNode,
     textures: Iterable<BaseTexture>,
-    materials: Material[]
+    materials: Iterable<Material>
 ): void {
     if (owned.has(root)) {
         return;
     }
-    const resources: EffectResources = {textures: new Set(textures), materials};
-    for (const texture of resources.textures) {
-        holders.set(texture, (holders.get(texture) ?? 0) + 1);
+    const resources: EffectResources = {textures: new Set(textures), materials: new Set(materials)};
+    for (const resource of [...resources.textures, ...resources.materials]) {
+        holders.set(resource, (holders.get(resource) ?? 0) + 1);
     }
     owned.set(root, resources);
     root.onDisposeObservable.addOnce(() => releaseEffectResources(root));
 }
 
 /**
- * Gives `copy` a hold on the textures the effect `source` belongs to holds, as a copy of the
- * effect, or of a node in it, draws with them too.
+ * Gives `copy` a hold on the textures and materials the effect `source` belongs to holds, as a
+ * copy of the effect, or of a node in it, draws with them too.
  */
 export function shareEffectResources(source: TransformNode, copy: TransformNode): void {
     for (let node: Node | null = source; node !== null; node = node.parent) {
         const resources = owned.get(node);
         if (resources !== undefined) {
-            retainEffectResources(copy, resources.textures, []);
+            retainEffectResources(copy, resources.textures, resources.materials);
             return;
         }
     }
@@ -54,23 +54,20 @@ function releaseEffectResources(root: Node): void {
         return;
     }
     owned.delete(root);
-    for (const material of resources.materials) {
-        material.dispose();
-    }
-    for (const texture of resources.textures) {
-        const count = (holders.get(texture) ?? 1) - 1;
+    for (const resource of [...resources.materials, ...resources.textures]) {
+        const count = (holders.get(resource) ?? 1) - 1;
         if (count > 0) {
-            holders.set(texture, count);
+            holders.set(resource, count);
         } else {
-            holders.delete(texture);
-            texture.dispose();
+            holders.delete(resource);
+            resource.dispose();
         }
     }
 }
 
 /**
- * Disposes an effect root and its nodes and systems, the materials made for it, and each texture it
- * holds once no other effect root holds it. A root nothing was recorded for is only disposed.
+ * Disposes an effect root and its nodes and systems, and each material and texture it holds once no
+ * other effect root holds it. A root nothing was recorded for is only disposed.
  */
 export function disposeEffect(root: TransformNode): void {
     root.dispose();

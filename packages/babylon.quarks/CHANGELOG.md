@@ -63,6 +63,37 @@ and the project follows the `quarks.core` 0.x version line.
   `EmitterShapePlugin.loadJSON` and `BehaviorPlugin.loadJSON` are declared to take `ShapeJSON` and
   `BehaviorJSON`, as methods, so a plugin that types its own JSON still compiles; they must only
   read, since saving calls them to find the defaults.
+- **`play()` on a finished system plays it again**, as Unity's `Play` does: it restarts it from
+  the beginning. Before, it only unpaused, and a finished system stayed empty. A paused or stopped
+  system still resumes where it was. `QuarksUtil.play(root)` does the same for each system, so a
+  short burst that had finished inside a longer effect plays again; to undo a pause without that,
+  use the new `resume()` and `QuarksUtil.resume(root)`.
+- **Behaviors no longer reset at every loop.** A looping system called each behavior's `reset()`
+  as it began its next loop, so a `Noise` or `TurbulenceField` jumped back to its start offset
+  once a loop and the sub emissions of particles still alive were dropped. `reset()` now runs only
+  on `restart()` (and `stop()`), as `Behavior.reset` documents.
+- **`QuarksPrefab` timeline:**
+  - The end of the timeline ends the emission of the systems still playing and lets their
+    particles die out, stops the clips, stops the prefab and rewinds it; it used to call `stop()`,
+    which cleared every particle on the spot. Call `stop()` yourself for that.
+  - A track's window excludes its end in `update` too, as `setTime` did: a system whose track ends
+    at 0.5 s stops emitting at 0.5 s, not one frame later.
+  - `update()` with no argument advances by the engine's frame time (game time) instead of the
+    wall clock.
+  - `addParticleSystemAnimation` no longer pauses the prefab.
+  - A looping track that ends with the timeline does not start over, and one restarted earlier
+    ends its emission with the timeline too.
+  - `timeScale` now speeds up and slows down the particle systems on the timeline (see Added), and
+    a negative, NaN or infinite one is read as 0. A prefab saved with a `timeScale` other than 1
+    plays its systems at that speed now.
+  - `pause()` then `play()` resumes exactly the systems the pause paused, those dying out after
+    their window included (they stayed frozen before), and `setTime` on a paused prefab leaves the
+    systems it starts paused.
+- `ParticleEmitter.toJSON` writes `visible` from the emitter's own enabled flag, as `clone()` and
+  `serializeEffect` do, not from its parents': an emitter under a disabled template is saved
+  visible.
+- `retainEffectResources` takes the effect's materials as any iterable, and counts holders of a
+  material as it does of a texture.
 
 ### Deprecated
 
@@ -99,6 +130,24 @@ and the project follows the `quarks.core` 0.x version line.
   readers and other hosts the same.
 - `BehaviorTypes.EmitSubParticleSystem` lists `inherit`, with the new `'subEmitterInherit'` field
   type.
+- **`EffectPool.acquire` takes a placement** (`EffectPlacement`: `position`, `rotation` or
+  `rotationQuaternion`, `scaling`, `parent`), so a hit can face its surface normal or a muzzle
+  flash its barrel. Every acquire first puts the copy back to the template's transform, so a
+  rotation or scale from its last use does not stay. `acquire(position, parent)` still works, with
+  any vector that has `x`, `y` and `z`.
+- **`ParticleSystem.timeDilation`**, a runtime multiplier on `playbackSpeed` that is not part of
+  the effect (never saved, cloned or loaded), like Unreal's Custom Time Dilation or Unity's
+  `VisualEffect.playRate`: for slow motion, a pause menu, or a timeline.
+- **`QuarksPrefab.timeScale` reaches the systems**: it sets the `timeDilation` of each track's
+  system, so they slow down and speed up with the timeline; it is normalised like
+  `playbackSpeed`. Removing a system's last track sets it back to 1. Clips keep their own speed.
+- **`ParticleSystem.resume()` and `QuarksUtil.resume(root)`** undo a pause and leave a finished
+  system finished, for a pause button over a scene; the editor's transport uses them.
+- **`QuarksPrefab.autoUpdate`** advances the timeline before every render by the engine's frame
+  time, as a Unity `PlayableDirector` on Game Time does; it is turned off on dispose.
+- `removeAllEventListeners()` with no event type removes every listener.
+- A **Timeline** demo: a charge, a release burst on a window shorter than a frame and lingering
+  smoke on a `QuarksPrefab`, every other blast in slow motion.
 
 ### Fixed
 
@@ -136,6 +185,27 @@ and the project follows the `quarks.core` 0.x version line.
 - `docs/FORMAT.md` gave 0.28 as the release of format version 1; 0.27.0 is. It now says how a
   system's blend mode is read when its material entry, or the system, has none, and that
   `ps.version` is written for three.quarks only.
+- **`QuarksPrefab` plays a window a single frame steps over.** A track shorter than a frame (a
+  release burst, say) was never entered when one update jumped from before its start to after its
+  end; its system now restarts and ends its emission once it has simulated a step (checked on
+  each update and after each render), and its clip plays and stops.
+- **An `EffectPool` never hands out a disposed copy.** A copy disposed from outside, by its own
+  `dispose()` or with a parent it was placed under, leaves the pool, which makes a new one when
+  it needs it; before, `acquire` handed out the disposed node and it never came back.
+- **`QuarksUtil.instantiate` copies meshes as meshes**, sharing the source's geometry and
+  material, where it made plain transform nodes of them; an instance of a mesh in the tree becomes
+  an instance of its copy, and a `MeshSurfaceEmitter` whose mesh is in the copied tree emits from
+  the copy. The copy holds the source's materials as it held its
+  textures, so `disposeEffect(source)` leaves a copy's meshes and materials whole.
+- **`MeshSurfaceEmitter` emits from a mesh without indices**, read as a triangle list, instead of
+  from the origin. A stray vertex count past the last whole triangle is ignored.
+- **A listener removed while an event fires no longer makes the next one skip**: the listener
+  lists are copied on write, so every listener registered when the event fired is called once,
+  and one added during it waits for the next event.
+- `particleDied` allocates nothing per death: one event object is reused, its `particle` set only
+  while the listeners run (documented, as is when a trail's death fires).
+- `EmitSubParticleSystem.reset()` drops the running sub emissions, as `ParticleSystem.restart`
+  did through a special case it no longer needs; any host gets the same reset.
 
 ### Internal
 

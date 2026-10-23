@@ -948,6 +948,24 @@ export class ParticleSystem implements IParticleSystem {
     private playbackSpeedValue = 1;
 
     /**
+     * A runtime multiplier on {@link playbackSpeed} that is not part of the effect: what a
+     * timeline, a slow-motion moment or a game's pause menu sets on a system it plays, like
+     * Unreal's Custom Time Dilation or Unity's `VisualEffect.playRate`. The system runs at
+     * `playbackSpeed * timeDilation`. 1 by default; never saved, cloned or loaded. A negative,
+     * NaN or infinite value is read as 0. A `QuarksPrefab` sets it to its `timeScale` on the systems of
+     * its tracks.
+     */
+    get timeDilation(): number {
+        return this.timeDilationValue;
+    }
+
+    set timeDilation(dilation: number) {
+        this.timeDilationValue = dilation > 0 && dilation < Infinity ? dilation : 0;
+    }
+
+    private timeDilationValue = 1;
+
+    /**
      * Runtime multiplier on how many particles the system emits: bursts,
      * emission over time and over distance alike. Unlike
      * {@link setQualityFactor}, which only ever thins an effect, it may go
@@ -1262,10 +1280,30 @@ export class ParticleSystem implements IParticleSystem {
     }
 
     /**
-     * Resumes a paused system. It only resumes: a system that has finished ({@link isFinished})
-     * stays finished, since nothing is left to emit; {@link restart} plays it again from the start.
+     * Plays the system, like Unity's `Play`: a paused or stopped system resumes from where it is,
+     * and one that has finished ({@link isFinished}) starts over from the beginning, as
+     * {@link restart} does. A playing system that has not finished is left as it is. To undo a
+     * {@link pause} without replaying a system that had finished, use {@link resume}.
      */
     play(): void {
+        if (this.destroyed) {
+            return;
+        }
+        if (this.isFinished()) {
+            this.restart();
+        }
+        this.resume();
+    }
+
+    /**
+     * Undoes {@link pause}: the system goes on from where it is, and one that has finished stays
+     * finished. For a pause button over a whole scene, where {@link play} would replay the
+     * effects that had already ended.
+     */
+    resume(): void {
+        if (this.destroyed) {
+            return;
+        }
         this.paused = false;
         // A move made while paused is a placement, not motion to spread the next frame over.
         this.previousEmitterMatrix = undefined;
@@ -1407,12 +1445,7 @@ export class ParticleSystem implements IParticleSystem {
         // Bursts edited in place since the last play are put back in time order and in range.
         this.emissionBursts.forEach((burst) => Object.assign(burst, normalizeBurst(burst)));
         this.emissionBursts.sort((a, b) => a.time - b.time);
-        this.behaviors.forEach((behavior) => {
-            behavior.reset();
-            if (behavior instanceof EmitSubParticleSystem) {
-                behavior.clearEmissions();
-            }
-        });
+        this.behaviors.forEach((behavior) => behavior.reset());
         // A sweeping shape (Loop, PingPong) starts its arc over, so the replay is the same.
         this.emitterShape.reset?.();
         this.emitEnded = false;
@@ -1440,7 +1473,7 @@ export class ParticleSystem implements IParticleSystem {
      */
     update(delta: number, stepDeadline = Infinity, catchUpDeadline?: number) {
         if (this.paused || this.destroyed) return;
-        const speed = this.playbackSpeed;
+        const speed = this.playbackSpeed * this.timeDilationValue;
         delta = SimulationClock.frameSeconds(delta, speed);
 
         if (this.culled) {
@@ -1800,9 +1833,15 @@ export class ParticleSystem implements IParticleSystem {
     /** Re-points every particle at the store, for {@link snapshotPreviousState}. */
     private readonly rebindParticles = (): void => this.spawner.rebind();
 
+    /** The one `particleDied` event, filled in for each death so a death allocates nothing. */
+    private readonly particleDiedEvent: ParticleSystemEvent = {type: 'particleDied', particleSystem: this};
+
     /** Fires `particleDied` for a particle the step retired. */
     private readonly fireParticleDied = (particle: Particle): void => {
-        this.events.fire({type: 'particleDied', particleSystem: this, particle});
+        const event = this.particleDiedEvent;
+        event.particle = particle;
+        this.events.fire(event);
+        event.particle = undefined;
     };
 
     private notifyFinished(): void {
@@ -1882,13 +1921,21 @@ export class ParticleSystem implements IParticleSystem {
      * Calls `callback` on each `event`: `'emitEnd'` when emission ends, `'finished'` when the last
      * particle of an ended system dies, `'particleDied'` per particle (with `event.particle`), and
      * `'destroy'` on dispose.
+     *
+     * A `'particleDied'` event and the particle on it are reused: read what you need inside the
+     * callback and keep neither, since the particle's slot goes to the next one spawned. In trail
+     * mode a particle dies when its trail is gone, so with a trail lifetime the event comes after
+     * the head stopped, once the last sample has faded.
+     *
+     * A callback added or removed while an event is firing takes effect from the next event; the
+     * callbacks of the one firing are all called.
      */
     addEventListener(event: ParticleSystemEventType, callback: (event: ParticleSystemEvent) => void): void {
         this.events.add(event, callback);
     }
 
-    /** Removes every callback registered for `event`. */
-    removeAllEventListeners(event: ParticleSystemEventType): void {
+    /** Removes every callback registered for `event`, or every callback of every event when it is left out. */
+    removeAllEventListeners(event?: ParticleSystemEventType): void {
         this.events.removeAll(event);
     }
 

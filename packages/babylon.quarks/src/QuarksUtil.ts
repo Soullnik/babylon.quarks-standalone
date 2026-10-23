@@ -1,8 +1,11 @@
+import {InstancedMesh} from '@babylonjs/core/Meshes/instancedMesh';
+import {Mesh} from '@babylonjs/core/Meshes/mesh';
 import {TransformNode} from '@babylonjs/core/Meshes/transformNode';
 import {Node} from '@babylonjs/core/node';
 import {ConstantValue, EmitSubParticleSystem, FunctionValueGenerator, IntervalValue, ValueGenerator} from 'quarks.core';
 import {BatchedRenderer} from './BatchedRenderer';
 import {shareEffectResources} from './effectResources';
+import {MeshSurfaceEmitter} from './MeshSurfaceEmitter';
 import {ParticleEmitter} from './ParticleEmitter';
 import {ParticleSystem} from './ParticleSystem';
 
@@ -27,10 +30,23 @@ export class QuarksUtil {
         });
     }
 
-    /** Resumes every system under `root`, see {@link ParticleSystem.play}. */
+    /**
+     * Plays every system under `root`, see {@link ParticleSystem.play}: paused ones resume and
+     * finished ones, a short burst inside a longer effect included, start over.
+     */
     static play(root: Node): void {
         QuarksUtil.runOnAllParticleEmitters(root, (emitter) => {
             (emitter.system as unknown as ParticleSystem).play();
+        });
+    }
+
+    /**
+     * Undoes {@link pause} on every system under `root`, see {@link ParticleSystem.resume}: the
+     * finished ones stay finished.
+     */
+    static resume(root: Node): void {
+        QuarksUtil.runOnAllParticleEmitters(root, (emitter) => {
+            (emitter.system as unknown as ParticleSystem).resume();
         });
     }
 
@@ -90,16 +106,46 @@ export class QuarksUtil {
     /**
      * A deep copy of an effect: the node tree under `root` with every particle
      * system cloned, sub emitter links pointing at the copies, and the same
-     * transforms and enabled state. The copy is not added to any renderer.
-     * Nodes that are neither transform nodes nor emitters are skipped.
+     * transforms and enabled state. Meshes are cloned as meshes that share
+     * the source's geometry and material, instances of a mesh in the tree as
+     * instances of its copy, and a mesh surface shape that emits from a mesh
+     * in the tree emits from its copy. An instance of a mesh outside the tree
+     * stays an instance of that mesh, and goes when it is disposed. The copy holds the
+     * source's textures and materials, so disposing the source leaves the copy
+     * whole. It is not added to any renderer. Nodes that are neither transform
+     * nodes nor emitters, such as lights and cameras, are skipped.
      */
     static instantiate(root: TransformNode, name?: string): TransformNode {
         const copies = new Map<ParticleEmitter, ParticleEmitter>();
+        const meshCopies = new Map<Node, Mesh>();
+        const inTree = new Set<Node>([root, ...root.getDescendants(false)]);
+        // A mesh is copied when first needed: where it sits in the tree, or earlier, as the source
+        // of an instance copied before it. Its children are copied as every node's are.
+        const meshCopyOf = (mesh: Mesh): Mesh => {
+            let copy = meshCopies.get(mesh);
+            if (copy === undefined) {
+                copy = mesh.clone(mesh.name, null, true);
+                copy.setEnabled(mesh.isEnabled(false));
+                meshCopies.set(mesh, copy);
+            }
+            return copy;
+        };
         const copyNode = (node: Node, parent: TransformNode | null, copyName?: string): TransformNode | null => {
             let copy: TransformNode;
             if (node instanceof ParticleEmitter) {
                 copy = node.clone(copyName);
                 copies.set(node, copy as ParticleEmitter);
+            } else if (node instanceof Mesh) {
+                copy = meshCopyOf(node);
+                if (copyName !== undefined) {
+                    copy.name = copyName;
+                }
+            } else if (node instanceof InstancedMesh) {
+                // An instance of a mesh in the tree becomes an instance of its copy, so the copy
+                // does not go when the source effect is disposed (a mesh disposes its instances).
+                const source = inTree.has(node.sourceMesh) ? meshCopyOf(node.sourceMesh) : undefined;
+                copy = node.clone(copyName ?? node.name, null, true, source)!;
+                copy.setEnabled(node.isEnabled(false));
             } else if (node instanceof TransformNode) {
                 copy = new TransformNode(copyName ?? node.name, node.getScene());
                 copy.position.copyFrom(node.position);
@@ -119,16 +165,25 @@ export class QuarksUtil {
             return copy;
         };
         const copy = copyNode(root, null, name) as TransformNode;
-        // The copy draws with the source's textures, so QuarksLoader.disposeEffect(source) keeps them.
+        // The copy draws with the source's textures and materials, so disposeEffect(source) keeps them.
         shareEffectResources(root, copy);
-        // Sub emitter behaviors on the copies still target the original emitters.
         for (const emitter of copies.values()) {
-            for (const behavior of (emitter.system as unknown as ParticleSystem).behaviors) {
+            const system = emitter.system as unknown as ParticleSystem;
+            // Sub emitter behaviors on the copies still target the original emitters.
+            for (const behavior of system.behaviors) {
                 if (behavior instanceof EmitSubParticleSystem) {
                     const target = copies.get(behavior.subParticleSystem as unknown as ParticleEmitter);
                     if (target !== undefined) {
                         behavior.subParticleSystem = target as unknown as typeof behavior.subParticleSystem;
                     }
+                }
+            }
+            // So does a mesh surface shape: it emits from the copy of its mesh when the tree has one.
+            const shape = system.emitterShape;
+            if (shape instanceof MeshSurfaceEmitter && shape.mesh !== undefined) {
+                const meshCopy = meshCopies.get(shape.mesh);
+                if (meshCopy !== undefined) {
+                    shape.mesh = meshCopy;
                 }
             }
         }
@@ -145,7 +200,8 @@ export class QuarksUtil {
      * {@link endEmit}, or when one is frozen at playback speed 0.
      *
      * Random values count at their maximum, so this is an upper bound; curves
-     * are sampled. Particles cut short by collisions or culling only make the
+     * are sampled. A runtime {@link ParticleSystem.timeDilation} is not counted:
+     * this is the effect's own length. Particles cut short by collisions or culling only make the
      * real effect shorter.
      */
     static getDuration(root: Node): number {

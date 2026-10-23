@@ -93,7 +93,10 @@ export interface Behavior {
     toJSON(): BehaviorJSON;
     /** A copy with the same settings that shares nothing mutable with this one. */
     clone(): Behavior;
-    /** Called when the system restarts: forget state accumulated across steps. */
+    /**
+     * Called when the system restarts (not when a looping system starts its next loop): forget
+     * state accumulated across steps, so the replay starts as the first play did.
+     */
     reset(): void;
 }
 
