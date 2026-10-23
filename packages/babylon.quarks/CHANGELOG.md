@@ -12,9 +12,10 @@ Packaging and release checks; the runtime is the same as 0.27.0.
 
 - **`@babylonjs/core` peer range is `^9.0.0`** instead of `>=9.0.0`. The package is built and
   tested against Babylon 9; a future major is a separate release, so npm no longer accepts it
-  silently.
-- **`"sideEffects": false`.** Importing the package registers nothing (shaders are registered
-  when a batch is built), so bundlers may drop the modules an app does not use.
+  silently. No Babylon 10 exists yet, so no install that worked stops working.
+- **`sideEffects` names the built bundles**, the only files with import-time work (they register
+  the mesh-surface emitter with the shape table, so a bare `import 'babylon.quarks'` keeps doing
+  that); bundlers may treat everything else in the package as side-effect free.
 - The README says what `require('babylon.quarks')` needs: `@babylonjs/core` is ES modules only, so
   CommonJS consumers need a Node that can `require` ES modules (20.19 or 22.12 and later).
 

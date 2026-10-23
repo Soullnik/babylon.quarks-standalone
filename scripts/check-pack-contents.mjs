@@ -55,7 +55,8 @@ function assertEditorPeerInLockstep() {
     const library = read('babylon.quarks');
     const editor = read('babylon.quarks-editor');
     const [major, minor] = library.version.split('.');
-    const expected = `~${major}.${minor}.0`;
+    // A prerelease (0.28.0-beta.1) is outside `~0.28.0`, so the editor then names it exactly.
+    const expected = library.version.includes('-') ? `~${library.version}` : `~${major}.${minor}.0`;
     const actual = editor.peerDependencies?.['babylon.quarks'];
     if (actual !== expected) {
         throw new Error(
@@ -182,6 +183,7 @@ export const binding: typeof EffectBinding = EffectBinding;
  * Main entrypoint for pack verification script.
  */
 function main() {
+    assertEditorPeerInLockstep();
     assertRequiredFiles('babylon.quarks', getPackResult('babylon.quarks'), [
         'dist/babylon.quarks.esm.js',
         'dist/babylon.quarks.cjs',
@@ -201,7 +203,6 @@ function main() {
         'README.md',
     ]);
     assertNoRuntimeDependencies('babylon.quarks-editor');
-    assertEditorPeerInLockstep();
 
     assertConsumersCanImport();
 

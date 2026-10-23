@@ -9,7 +9,7 @@ and the project follows the `quarks.core` 0.x version line.
 ### Changed
 
 - **Peer ranges:** `@babylonjs/core` and `@babylonjs/materials` are `^9.0.0` instead of
-  `>=9.0.0`. `babylon.quarks` stays `~0.27.0`: the editor follows the library's minor line, and
+  `>=9.0.0` (no Babylon 10 exists yet, so no install that worked stops working). `babylon.quarks` stays `~0.27.0`: the editor follows the library's minor line, and
   the release check now enforces it.
 - The `exports` map lists `types` first and exports `./package.json`. The README says the package
   is ES modules only.
