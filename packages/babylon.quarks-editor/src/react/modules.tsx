@@ -1107,14 +1107,56 @@ export function RendererModule({
                             }
                         />
                     </Row>
-                    <Row label="Head width scale">
+                    <Row label="Texture mode">
+                        <SelectField
+                            value={(system.rendererEmitterSettings as TrailSettings).textureMode ?? 'stretch'}
+                            options={[
+                                {value: 'stretch', label: 'Stretch (once, by distance)'},
+                                {value: 'distributePerSegment', label: 'Distribute per segment'},
+                                {value: 'tile', label: 'Tile (per world unit)'},
+                                {value: 'repeatPerSegment', label: 'Repeat per segment'},
+                            ]}
+                            onChange={(mode) =>
+                                binding.apply((s) => {
+                                    (s.rendererEmitterSettings as TrailSettings).textureMode =
+                                        mode === 'stretch' ? undefined : mode;
+                                })
+                            }
+                        />
+                    </Row>
+                    <Row label="Texture scale">
                         <NumberField
-                            value={(system.rendererEmitterSettings as {headWidthScale?: number}).headWidthScale ?? 1}
+                            value={(system.rendererEmitterSettings as TrailSettings).textureScale ?? 1}
+                            min={0.01}
+                            step={0.1}
+                            onChange={(v) =>
+                                binding.apply((s) => {
+                                    (s.rendererEmitterSettings as TrailSettings).textureScale = v === 1 ? undefined : v;
+                                })
+                            }
+                        />
+                    </Row>
+                    <Row label="Min vertex distance">
+                        <NumberField
+                            value={(system.rendererEmitterSettings as TrailSettings).minVertexDistance ?? 0}
+                            min={0}
+                            step={0.05}
+                            onChange={(v) =>
+                                binding.apply((s) => {
+                                    (s.rendererEmitterSettings as TrailSettings).minVertexDistance =
+                                        v > 0 ? v : undefined;
+                                })
+                            }
+                        />
+                    </Row>
+                    <Row label="Trail time">
+                        <NumberField
+                            value={(system.rendererEmitterSettings as TrailSettings).lifetime ?? 0}
                             min={0}
                             step={0.1}
                             onChange={(v) =>
                                 binding.apply((s) => {
-                                    (s.rendererEmitterSettings as {headWidthScale?: number}).headWidthScale = v;
+                                    (s.rendererEmitterSettings as TrailSettings).lifetime = v > 0 ? v : undefined;
                                 })
                             }
                         />

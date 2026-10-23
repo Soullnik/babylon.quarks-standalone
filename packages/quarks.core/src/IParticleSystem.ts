@@ -129,7 +129,53 @@ export interface TrailSettings {
      * @type {number}
      */
     curveTension?: number;
+    /**
+     * How the texture's U runs along the ribbon (Unity's Texture Mode):
+     * - `'stretch'` (the default): once along the ribbon, by distance, so a fast stretch of the
+     *   trail shows more of the texture than a slow one.
+     * - `'distributePerSegment'`: once along the ribbon, each recorded segment an equal share
+     *   whatever its length (Niagara's Scaled Uniformly).
+     * - `'tile'`: repeated every world unit along the ribbon, scaled by `textureScale`
+     *   (Niagara's Tiling Distance). A sample keeps its U for as long as it lives, so the texture
+     *   stays put on the trail as the trail grows. The unit is the space the trail is recorded
+     *   in, scaled by the emitter for a local-space trail (as the width is).
+     * - `'repeatPerSegment'`: once per recorded segment.
+     *
+     * `uvFromHead` runs any of them from the particle back. The sprite sheet's cell is the
+     * texture's U range, so the repeating modes want a sheet of 1×1 (the default); on a larger
+     * sheet they run into the next cell.
+     * @type {TrailTextureMode}
+     */
+    textureMode?: TrailTextureMode;
+    /**
+     * Repeats of the texture along the ribbon (Unity's Texture Scale, Niagara's UV Scale): per
+     * world unit in `'tile'`, per recorded segment in `'repeatPerSegment'` and over the whole
+     * ribbon in the other modes. Finite and above 0; the default is 1. For repeats across the
+     * ribbon use the texture's own UV layout (`mapUV.tiling`).
+     * @type {number}
+     */
+    textureScale?: number;
+    /**
+     * A new sample is only recorded once the particle has moved this far from the last one, in
+     * the space the trail is recorded in; until then the last sample follows the particle
+     * (Unity's Min Vertex Distance). Keeps a slow or standing particle from filling its history
+     * with points on one spot, so the trail keeps its length in distance rather than in steps.
+     * 0, the default: a sample every simulation step.
+     * @type {number}
+     */
+    minVertexDistance?: number;
+    /**
+     * How long each recorded sample of the trail is kept, in seconds (Unity's Time): the ribbon
+     * reaches that far back in time, however many samples that is, up to `startLength`. Unset or
+     * 0, the default: samples are kept until the history is full, `startLength` samples. The
+     * `WidthOverLength` curve spans the samples kept.
+     * @type {number}
+     */
+    lifetime?: number;
 }
+
+/** How a trail's texture runs along the ribbon, see {@link TrailSettings.textureMode}. */
+export type TrailTextureMode = 'stretch' | 'tile' | 'distributePerSegment' | 'repeatPerSegment';
 
 export interface MeshSettings {
     /**

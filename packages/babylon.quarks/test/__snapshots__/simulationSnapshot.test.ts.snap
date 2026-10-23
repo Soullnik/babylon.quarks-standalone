@@ -4794,7 +4794,6 @@ exports[`seeded simulation snapshot trail keeps its particles, bounds and JSON 1
     "material": "quarks_material_2",
     "renderMode": 3,
     "rendererEmitterSettings": {
-      "followLocalOrigin": false,
       "startLength": {
         "type": "ConstantValue",
         "value": 12,

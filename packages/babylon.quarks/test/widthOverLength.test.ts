@@ -141,3 +141,53 @@ describe('WidthOverLength', () => {
         expect((absolute.clone() as WidthOverLength).absolute).toBe(true);
     });
 });
+
+describe('WidthOverLength over the samples held', () => {
+    it('reaches the curve’s end at the tail of a trail cut short by its lifetime', () => {
+        const system = trailSystem(1, 60);
+        (system.rendererEmitterSettings as {lifetime?: number}).lifetime = 0.1;
+        system.addBehavior(new WidthOverLength(taper()));
+        system.play();
+        run(system, 0.5);
+        const trail = system.particles[0] as TrailParticle;
+        const w = widths(trail);
+        // Seven samples a step apart, give or take the step the behavior runs ahead of the record.
+        expect(w.length).toBeGreaterThanOrEqual(6);
+        expect(w.length).toBeLessThanOrEqual(7);
+        // Tapers to the curve's end over those samples, not over the 60 the history could hold.
+        expect(w[0]).toBeLessThan(0.3);
+        expect(w[w.length - 1]).toBeCloseTo(1, 5);
+        for (let i = 1; i < w.length; i++) expect(w[i]).toBeGreaterThan(w[i - 1]);
+    });
+
+    it('shows the whole curve on a trail still growing', () => {
+        const system = trailSystem(1, 60);
+        system.addBehavior(new WidthOverLength(taper()));
+        system.play();
+        run(system, 0.05);
+        const w = widths(system.particles[0] as TrailParticle);
+        expect(w.length).toBeLessThan(60);
+        expect(w[0]).toBeCloseTo(0, 5);
+    });
+});
+
+describe('WidthOverLength on odd lengths', () => {
+    it.each([
+        ['a fractional length', 10.5],
+        ['a zero length', 0],
+    ])('keeps every width finite and within the curve for %s', (_name, length) => {
+        const system = trailSystem(1, length);
+        system.addBehavior(new WidthOverLength(new PiecewiseBezier([[new Bezier(1, 0.8, 0.4, 0), 0]]) as never));
+        system.play();
+        run(system, 0.5);
+        const particle = system.particles[0] as TrailParticle;
+        expect(particle.historyCapacity).toBe(Math.max(1, Math.ceil(length)));
+        const w = widths(particle);
+        expect(w.length).toBe(particle.historyCount);
+        for (const width of w) {
+            expect(Number.isFinite(width)).toBe(true);
+            expect(width).toBeGreaterThanOrEqual(0);
+            expect(width).toBeLessThanOrEqual(1);
+        }
+    });
+});

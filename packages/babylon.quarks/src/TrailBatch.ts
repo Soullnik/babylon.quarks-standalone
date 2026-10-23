@@ -10,19 +10,35 @@ import {shaderProgram} from './shaderProgram';
 import {sheetCell} from './shaders/chunks/sheet';
 import {registerShaders, shaderLanguageFor} from './shaders/shaderLanguageSupport';
 import type {DepthBinding} from './softDepth';
-import {trailCurveTension, trailTessellation} from './trailCurve';
+import {
+    trailCurveTension,
+    trailMinVertexDistance,
+    trailTessellation,
+    trailTextureMode,
+    trailTextureScale,
+} from './trailSettings';
 import {VFXBatch} from './VFXBatch';
+
+/** The texture modes as the vertex loop tells them apart, see `TrailSettings.textureMode`. */
+const enum TextureMode {
+    Stretch,
+    Tile,
+    DistributePerSegment,
+    RepeatPerSegment,
+}
 
 /**
  * One trail's points for a frame, in world space: where each lies, its side
- * when the trail is swept, its width and its color. Grown as needed and kept,
- * so drawing a trail allocates nothing.
+ * when the trail is swept, its width, its color and its distance along the
+ * trail. Grown as needed and kept, so drawing a trail allocates nothing.
  */
 class TrailSamples {
     position = new Float32Array(0);
     side = new Float32Array(0);
     size = new Float32Array(0);
     color = new Float32Array(0);
+    /** Distance along the trail, as recorded (`TrailParticle.historyDistances`). */
+    distance = new Float32Array(0);
 
     reserve(count: number): this {
         if (count > this.size.length) {
@@ -31,6 +47,7 @@ class TrailSamples {
             this.side = new Float32Array(capacity * 3);
             this.size = new Float32Array(capacity);
             this.color = new Float32Array(capacity * 4);
+            this.distance = new Float32Array(capacity);
         }
         return this;
     }
@@ -73,6 +90,13 @@ class TrailSamples {
     }
 }
 
+/** Knot spacing of a centripetal spline: the square root of the length between two points of `p`. */
+function knot(p: Float32Array, from: number, to: number): number {
+    return Math.sqrt(
+        Math.sqrt((p[to] - p[from]) ** 2 + (p[to + 1] - p[from + 1]) ** 2 + (p[to + 2] - p[from + 2]) ** 2)
+    );
+}
+
 /** The batch of trail particles. @internal */
 export class TrailBatch extends VFXBatch {
     private positionBuffer!: Float32Array;
@@ -94,9 +118,9 @@ export class TrailBatch extends VFXBatch {
 
     constructor(settings: VFXBatchSettings, scene: Scene, depth: DepthBinding | null = null) {
         super(settings, scene, depth);
-        // Trail buffers hold two vertices per recorded sample and are the largest
-        // per-batch allocation in the library, so start small and let
-        // expandBuffers grow to whatever the batch actually needs.
+        // For a trail batch `maxParticles` counts vertices, two per drawn point: the buffers are
+        // the largest per-batch allocation in the library, so start small and let expandBuffers
+        // grow to whatever the batch actually needs.
         this.maxParticles = 1024;
         this.setupBuffers();
         this.rebuildMaterial();
@@ -111,15 +135,17 @@ export class TrailBatch extends VFXBatch {
     }
 
     private buildGeometryBuffers(): void {
-        this.positionBuffer = new Float32Array(this.maxParticles * 6);
-        this.previousBuffer = new Float32Array(this.maxParticles * 6);
-        this.nextBuffer = new Float32Array(this.maxParticles * 6);
-        this.uvBuffer = new Float32Array(this.maxParticles * 4);
-        this.uv1Buffer = this.usesUV1() ? new Float32Array(this.maxParticles * 4) : null;
-        this.sideBuffer = new Float32Array(this.maxParticles * 2);
-        this.widthBuffer = new Float32Array(this.maxParticles * 2);
-        this.colorBuffer = new Float32Array(this.maxParticles * 8);
-        this.indexBuffer = new Uint32Array(this.maxParticles * 6);
+        // `maxParticles` vertices; a ribbon of n points is 2n vertices and 6(n - 1) indices.
+        const vertices = this.maxParticles;
+        this.positionBuffer = new Float32Array(vertices * 3);
+        this.previousBuffer = new Float32Array(vertices * 3);
+        this.nextBuffer = new Float32Array(vertices * 3);
+        this.uvBuffer = new Float32Array(vertices * 2);
+        this.uv1Buffer = this.usesUV1() ? new Float32Array(vertices * 2) : null;
+        this.sideBuffer = new Float32Array(vertices);
+        this.widthBuffer = new Float32Array(vertices);
+        this.colorBuffer = new Float32Array(vertices * 4);
+        this.indexBuffer = new Uint32Array(vertices * 3);
         // Vertices come in pairs, one per side of the ribbon, so the side never
         // changes: written once here and never uploaded again.
         for (let i = 0; i < this.sideBuffer.length; i += 2) {
@@ -184,13 +210,13 @@ export class TrailBatch extends VFXBatch {
         }
     }
 
-    /** @internal */
+    /** Grows the buffers to hold more than `target` vertices. @internal */
     expandBuffers(target: number): void {
         while (target >= this.maxParticles) {
             this.maxParticles *= 2;
         }
-        // Release the previous custom attribute buffers; setVerticesBuffer only
-        // replaces the reference, so skipping this leaks GPU memory on every grow.
+        // `Geometry.setVerticesBuffer` disposes the buffer it replaces; these custom attributes
+        // are not in the geometry's map, so they are released here.
         this.previousVB?.dispose();
         this.nextVB?.dispose();
         this.sideVB?.dispose();
@@ -253,15 +279,6 @@ export class TrailBatch extends VFXBatch {
     private vector3_ = new Vector3();
     private quaternion_ = new Quaternion();
 
-    /**
-     * Brings the emitter's world matrix up to date when its transform changed.
-     *
-     * Babylon only recomputes a world matrix once per render id, so a frame that
-     * moves the emitter after that (or a step driven without rendering) would
-     * draw the ribbon against the old one. Recomputing unconditionally every
-     * frame costs a matrix compose per system; checking the transform cache
-     * first makes a still emitter free.
-     */
     private readonly samples_ = new TrailSamples();
     private readonly curve_ = new TrailSamples();
 
@@ -270,17 +287,6 @@ export class TrailBatch extends VFXBatch {
         return this.samples_.reserve(count);
     }
 
-    /**
-     * The curve through a trail's `count` samples, each segment drawn as
-     * `steps + 1`: through the first `curved` (the recorded samples) a
-     * centripetal cardinal spline (Catmull-Rom at tension 0, straight at 1),
-     * the same through the sides of a swept trail with each side's length
-     * eased between its ends'; past them (the live tip) a straight segment,
-     * so the recorded part does not move as the tip does. Widths and colors
-     * are eased along. The curve passes through every sample, so the trail
-     * keeps its shape and only loses its corners; centripetal spacing keeps
-     * it from overshooting where samples lie unevenly apart.
-     */
     /**
      * Shortens the last segment of a drawn ribbon to `keep` of its length, along the points already
      * drawn for it, so it stays a prefix of that same curve. Every channel follows.
@@ -292,6 +298,7 @@ export class TrailBatch extends VFXBatch {
         scratch.side.set(drawn.side.subarray(first * 3, count * 3));
         scratch.size.set(drawn.size.subarray(first, count));
         scratch.color.set(drawn.color.subarray(first * 4, count * 4));
+        scratch.distance.set(drawn.distance.subarray(first, count));
         for (let j = 1; j <= perSegment; j++) {
             const at = keep * j;
             const i = Math.min(perSegment - 1, Math.floor(at));
@@ -304,6 +311,7 @@ export class TrailBatch extends VFXBatch {
                 }
             }
             drawn.size[d] = scratch.size[i] * (1 - t) + scratch.size[i + 1] * t;
+            drawn.distance[d] = scratch.distance[i] * (1 - t) + scratch.distance[i + 1] * t;
             for (let c = 0; c < 4; c++) {
                 drawn.color[d * 4 + c] = scratch.color[i * 4 + c] * (1 - t) + scratch.color[i * 4 + 4 + c] * t;
             }
@@ -312,6 +320,17 @@ export class TrailBatch extends VFXBatch {
 
     private readonly cutScratch_ = new TrailSamples();
 
+    /**
+     * The curve through a trail's `count` samples, each segment drawn as
+     * `steps + 1`: through the first `curved` (the recorded samples) a
+     * centripetal cardinal spline (Catmull-Rom at tension 0, straight at 1),
+     * the same through the sides of a swept trail with each side's length
+     * eased between its ends'; past them (the live tip) a straight segment,
+     * so the recorded part does not move as the tip does. Widths, colors and
+     * distances are eased along. The curve passes through every sample, so
+     * the trail keeps its shape and only loses its corners; centripetal
+     * spacing keeps it from overshooting where samples lie unevenly apart.
+     */
     private tessellate(
         samples: TrailSamples,
         curved: number,
@@ -326,11 +345,6 @@ export class TrailBatch extends VFXBatch {
         const op = out.position;
         const os = out.side;
         const tangent = 1 - tension;
-        // Knot spacing: the square root of a segment's length.
-        const knot = (from: number, to: number) =>
-            Math.sqrt(
-                Math.sqrt((p[to] - p[from]) ** 2 + (p[to + 1] - p[from + 1]) ** 2 + (p[to + 2] - p[from + 2]) ** 2)
-            );
         let k = 0;
         for (let i = 0; i + 1 < count; i++) {
             const a = i * 3;
@@ -348,10 +362,10 @@ export class TrailBatch extends VFXBatch {
             if (i + 1 < curved) {
                 before = (i > 0 ? i - 1 : i) * 3;
                 after = (i + 2 < curved ? i + 2 : i + 1) * 3;
-                const t12 = knot(a, b);
+                const t12 = knot(p, a, b);
                 if (t12 > 1e-6) {
-                    const t01 = knot(before, a);
-                    const t23 = knot(b, after);
+                    const t01 = knot(p, before, a);
+                    const t23 = knot(p, b, after);
                     w1c = tangent;
                     w2a = tangent;
                     if (t01 > 1e-6) {
@@ -366,15 +380,18 @@ export class TrailBatch extends VFXBatch {
             }
             // m1 = w1a (A - Before) + w1b (B - Before) + w1c (B - A);
             // m2 = w2a (B - A) + w2b (After - A) + w2c (After - B).
+            // With no tangents (the tip's segment, or tension 1) the curve is the straight segment
+            // itself: walk it evenly, as the widths, colors and distances are, rather than easing.
+            const straight = w1a === 0 && w1b === 0 && w1c === 0 && w2a === 0 && w2b === 0 && w2c === 0;
             const la = swept ? Math.sqrt(sd[a] * sd[a] + sd[a + 1] * sd[a + 1] + sd[a + 2] * sd[a + 2]) : 0;
             const lb = swept ? Math.sqrt(sd[b] * sd[b] + sd[b + 1] * sd[b + 1] + sd[b + 2] * sd[b + 2]) : 0;
             for (let step = 0; step <= steps; step++, k++) {
                 const t = step / (steps + 1);
                 const t2 = t * t;
                 const t3 = t2 * t;
-                const h00 = 2 * t3 - 3 * t2 + 1;
+                const h00 = straight ? 1 - t : 2 * t3 - 3 * t2 + 1;
                 const h10 = t3 - 2 * t2 + t;
-                const h01 = -2 * t3 + 3 * t2;
+                const h01 = straight ? t : -2 * t3 + 3 * t2;
                 const h11 = t3 - t2;
                 const o = k * 3;
                 for (let c = 0; c < 3; c++) {
@@ -415,6 +432,7 @@ export class TrailBatch extends VFXBatch {
                     os[o + 2] = z * fit;
                 }
                 out.size[k] = samples.size[i] + (samples.size[i + 1] - samples.size[i]) * t;
+                out.distance[k] = samples.distance[i] + (samples.distance[i + 1] - samples.distance[i]) * t;
                 const ca = i * 4;
                 const co = k * 4;
                 for (let c = 0; c < 4; c++) {
@@ -430,6 +448,7 @@ export class TrailBatch extends VFXBatch {
             os[o + c] = sd[last + c];
         }
         out.size[k] = samples.size[count - 1];
+        out.distance[k] = samples.distance[count - 1];
         for (let c = 0; c < 4; c++) out.color[k * 4 + c] = samples.color[(count - 1) * 4 + c];
         return out;
     }
@@ -458,6 +477,15 @@ export class TrailBatch extends VFXBatch {
         positions[pi + 5] = z - sz * half;
     }
 
+    /**
+     * Brings the emitter's world matrix up to date when its transform changed.
+     *
+     * Babylon only recomputes a world matrix once per render id, so a frame that
+     * moves the emitter after that (or a step driven without rendering) would
+     * draw the ribbon against the old one. Recomputing unconditionally every
+     * frame costs a matrix compose per system; checking the transform cache
+     * first makes a still emitter free.
+     */
     private static ensureWorldMatrix(system: IParticleSystem): void {
         const emitter = system.emitter as {
             computeWorldMatrix?: (force: boolean) => void;
@@ -546,6 +574,18 @@ export class TrailBatch extends VFXBatch {
 
             const tessellation = trailTessellation(trailSettings);
             const curveTension = trailCurveTension(trailSettings);
+            const textureModeName = trailTextureMode(trailSettings);
+            const textureMode =
+                textureModeName === 'stretch'
+                    ? TextureMode.Stretch
+                    : textureModeName === 'tile'
+                      ? TextureMode.Tile
+                      : textureModeName === 'repeatPerSegment'
+                        ? TextureMode.RepeatPerSegment
+                        : TextureMode.DistributePerSegment;
+            const textureScale = trailTextureScale(trailSettings);
+            // With a minimum vertex distance the last recorded segment is not one step of travel.
+            const samplesFollow = trailMinVertexDistance(trailSettings) > 0;
 
             for (let j = 0; j < particleNum; j++) {
                 const particle = particles[j] as TrailParticle;
@@ -556,8 +596,9 @@ export class TrailBatch extends VFXBatch {
                 const historyCapacity = particle.historyCapacity;
                 const historyPositions = particle.historyPositions;
                 const historySizes = particle.historySizes;
+                const historyDistances = particle.historyDistances;
                 const historySides = particle.historySides;
-                const swept = sideAxis !== undefined && historySides.length === historyCapacity * 3;
+                const swept = sideAxis !== undefined && historySides.length >= historyCapacity * 3;
                 // Every sample takes its color from one place: its own recorded slot, or
                 // the particle's current row in the store.
                 const colors = colorFromParticle ? particle.store.color : particle.historyColors;
@@ -567,9 +608,11 @@ export class TrailBatch extends VFXBatch {
                 const particleMatrix = particle.parentMatrix as unknown as Matrix4 | undefined;
                 const me = (particleMatrix ?? emitterMatrix).elements;
                 const widthScale = systemWorldSpace || particle.parentMatrix ? 1 : objectScale;
-                // A particle past its life records nothing more (TrailParticle.update), so its trail
-                // ends at the last sample: a tip would follow the particle on as a growing spike.
-                const recording = particle.age <= particle.life;
+                // Recorded distances are world lengths once the samples are, a local trail's scale with the emitter.
+                const distanceScale = samplesInWorld || particle.parentMatrix ? 1 : objectScale;
+                // A particle at the end of its life records nothing more (TrailParticle.update), so
+                // its trail ends at the last sample: a tip would follow the particle on as a growing spike.
+                const recording = particle.age < particle.life;
                 // The display runs ahead of the last step: draw a tip that far past the head.
                 const tipAhead = recording && stepFraction > 0;
                 const sampleCount = particleHistoryLength + (tipAhead ? 1 : 0);
@@ -585,6 +628,7 @@ export class TrailBatch extends VFXBatch {
                         samples.writeSide(i, s[slot * 3], s[slot * 3 + 1], s[slot * 3 + 2], samplesInWorld ? null : me);
                     }
                     samples.size[i] = historySizes[slot];
+                    samples.distance[i] = historyDistances[slot];
                     const ci = colorFromParticle ? particleColorIndex : slot * 4;
                     samples.writeColor(i, colors[ci], colors[ci + 1], colors[ci + 2], colors[ci + 3]);
                     slot = slot + 1 === historyCapacity ? 0 : slot + 1;
@@ -596,13 +640,25 @@ export class TrailBatch extends VFXBatch {
                     const previousHead = particle.previousPosition;
                     const position = particle.position;
                     const tip = particleHistoryLength;
-                    samples.writePoint(
-                        tip,
-                        position.x + (position.x - previousHead.x) * stepFraction,
-                        position.y + (position.y - previousHead.y) * stepFraction,
-                        position.z + (position.z - previousHead.z) * stepFraction,
-                        systemWorldSpace ? null : me
-                    );
+                    let tx = position.x + (position.x - previousHead.x) * stepFraction;
+                    let ty = position.y + (position.y - previousHead.y) * stepFraction;
+                    let tz = position.z + (position.z - previousHead.z) * stepFraction;
+                    samples.writePoint(tip, tx, ty, tz, systemWorldSpace ? null : me);
+                    // The tip's distance along the trail, measured in the space the samples are
+                    // recorded in, as theirs are.
+                    if (samplesInWorld && !systemWorldSpace) {
+                        const w = 1 / (me[3] * tx + me[7] * ty + me[11] * tz + me[15]);
+                        const wx = (me[0] * tx + me[4] * ty + me[8] * tz + me[12]) * w;
+                        const wy = (me[1] * tx + me[5] * ty + me[9] * tz + me[13]) * w;
+                        tz = (me[2] * tx + me[6] * ty + me[10] * tz + me[14]) * w;
+                        tx = wx;
+                        ty = wy;
+                    }
+                    const headSlot = particle.getHistoryIndex(particleHistoryLength - 1) * 3;
+                    const hx = tx - historyPositions[headSlot];
+                    const hy = ty - historyPositions[headSlot + 1];
+                    const hz = tz - historyPositions[headSlot + 2];
+                    samples.distance[tip] = samples.distance[tip - 1] + Math.sqrt(hx * hx + hy * hy + hz * hz);
                     if (swept) {
                         // The side as the emitter holds it now.
                         samples.writeSide(tip, sideAxis!.x, sideAxis!.y, sideAxis!.z, me);
@@ -632,16 +688,54 @@ export class TrailBatch extends VFXBatch {
                 // time, back along the drawn last segment, rather than a tip folding back over it.
                 // Cut from the drawn curve, so the rest of the ribbon is the same as on any frame.
                 const pullBack = recording && stepFraction < 0 && particleHistoryLength > 1;
-                if (pullBack) {
-                    this.cutLastSegment(drawn, drawnCount, perSegment, 1 + stepFraction, swept);
+                // How much of the last drawn segment is kept: all but the step's share that ran
+                // ahead. The segment is one step of travel, unless the head has been following the
+                // particle (minVertexDistance), when it is that step's share of its length.
+                let keep = 1 + stepFraction;
+                if (pullBack && samplesFollow) {
+                    const dd = drawn.distance;
+                    const segmentLength = dd[drawnCount - 1] - dd[drawnCount - 1 - perSegment];
+                    if (segmentLength > 1e-9) {
+                        const previousHead = particle.previousPosition;
+                        const position = particle.position;
+                        let sx = position.x - previousHead.x;
+                        let sy = position.y - previousHead.y;
+                        let sz = position.z - previousHead.z;
+                        if (samplesInWorld && !systemWorldSpace) {
+                            const wx = me[0] * sx + me[4] * sy + me[8] * sz;
+                            const wy = me[1] * sx + me[5] * sy + me[9] * sz;
+                            sz = me[2] * sx + me[6] * sy + me[10] * sz;
+                            sx = wx;
+                            sy = wy;
+                        }
+                        const stepTravel = Math.sqrt(sx * sx + sy * sy + sz * sz);
+                        keep = 1 + stepFraction * Math.min(1, stepTravel / segmentLength);
+                    }
                 }
-                // The texture spans the ribbon end to end, measured in samples: the recorded ones,
-                // plus the part of a step the tip runs ahead or the head was drawn back. So a sample's
-                // U changes smoothly from frame to frame whichever way the residual falls.
-                const spanFraction = tipAhead || pullBack ? stepFraction : 0;
-                const invLength = 1 / Math.max(1e-3, particleHistoryLength - 1 + spanFraction);
+                if (pullBack) {
+                    this.cutLastSegment(drawn, drawnCount, perSegment, keep, swept);
+                }
+                // The per-segment texture modes span the ribbon in samples: the recorded ones, plus
+                // the part of a step the tip runs ahead or the head was drawn back, so a sample's U
+                // changes smoothly from frame to frame whichever way the residual falls. The others
+                // read each point's distance along the trail, tile mode in world units.
+                const spanFraction = tipAhead ? stepFraction : pullBack ? keep - 1 : 0;
+                const spanSamples = particleHistoryLength - 1 + spanFraction;
+                const invLength = 1 / Math.max(1e-3, spanSamples);
                 const lastSegment = (sampleCount - 2) * perSegment;
                 const dp = drawn.position;
+                const dd = drawn.distance;
+                const tailDistance = dd[0];
+                const headDistance = dd[drawnCount - 1];
+                // A ribbon that has not gone anywhere has no distance to stretch over: lay the
+                // texture out per segment instead, which at least keeps its ends where they belong.
+                const stretch = textureMode === TextureMode.Stretch && headDistance - tailDistance > 1e-6;
+                const invSpanDistance = 1 / Math.max(1e-6, headDistance - tailDistance);
+                // Tile mode: U in repeats of the texture along the trail, anchored where the particle
+                // was born, less the whole repeats behind the tail so U stays small (a texture that
+                // wraps cannot tell) however far the particle has travelled.
+                const tileScale = distanceScale * textureScale;
+                const tileOffset = Math.floor(tailDistance * tileScale);
                 const vTop = (vTileCount - row - 1) * tileHeight;
                 const vBottom = (vTileCount - row) * tileHeight;
 
@@ -687,16 +781,29 @@ export class TrailBatch extends VFXBatch {
                     this.nextBuffer[pi + 5] = dp[next + 2];
 
                     const ui = index * 2;
-                    // Where this point sits along the ribbon, in samples.
-                    let at = k / perSegment;
-                    if (k > lastSegment && (tipAhead || pullBack)) {
-                        const into = (k - lastSegment) / perSegment;
-                        at = tipAhead
-                            ? particleHistoryLength - 1 + stepFraction * into
-                            : particleHistoryLength - 2 + (1 + stepFraction) * into;
+                    let u1: number;
+                    if (stretch) {
+                        const along = (dd[k] - tailDistance) * invSpanDistance;
+                        u1 = (uvFromHead ? 1 - along : along) * textureScale;
+                    } else if (textureMode === TextureMode.Tile) {
+                        // A sample's U holds while it lives; from the particle back with uvFromHead.
+                        u1 = uvFromHead ? (headDistance - dd[k]) * tileScale : dd[k] * tileScale - tileOffset;
+                    } else {
+                        // Where this point sits along the ribbon, in samples.
+                        let at = k / perSegment;
+                        if (k > lastSegment && (tipAhead || pullBack)) {
+                            const into = (k - lastSegment) / perSegment;
+                            at = tipAhead
+                                ? particleHistoryLength - 1 + stepFraction * into
+                                : particleHistoryLength - 2 + keep * into;
+                        }
+                        if (textureMode !== TextureMode.RepeatPerSegment) {
+                            const along = Math.min(1, at * invLength);
+                            u1 = (uvFromHead ? 1 - along : along) * textureScale;
+                        } else {
+                            u1 = (uvFromHead ? spanSamples - at : at) * textureScale;
+                        }
                     }
-                    const along = Math.min(1, at * invLength);
-                    const u1 = uvFromHead ? 1 - along : along;
                     const u = (u1 + col) * tileWidth;
                     this.uvBuffer[ui] = u;
                     this.uvBuffer[ui + 1] = vTop;

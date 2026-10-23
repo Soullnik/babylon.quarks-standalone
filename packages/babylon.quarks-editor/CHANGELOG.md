@@ -28,6 +28,10 @@ and the project follows the `quarks.core` 0.x version line.
 
 ### Changed
 
+- Renderer, trails: "Texture mode" (stretch, distribute per segment, tile, repeat per segment),
+  "Texture scale", "Min vertex distance" and "Trail time", each left unset at its default so the
+  JSON stays sparse. The "Head width scale" row is gone: it wrote a `headWidthScale` field no
+  runtime read (the head's width comes from the Width over Trail module).
 - **`TimelinePanelProps` and `TransportBarProps` take `RefObject<HTMLElement | null>` refs**, the
   type `useRef<HTMLElement>(null)` returns, now that the editor compiles with `strict`. Code that
   passed the old type still compiles.

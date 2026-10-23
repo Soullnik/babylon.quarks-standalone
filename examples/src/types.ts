@@ -15,6 +15,7 @@ export interface DemoState {
     levelUp?: {tracked: ParticleSystem[]; elapsed: number};
     pickUp?: {tracked: ParticleSystem[]; elapsed: number};
     pooledHits?: {pool: EffectPool; targets: BVector3[]; elapsed: number; period: number; index: number};
+    trailTexture?: {elapsed: number; trails: ParticleSystem[]; nextJump: number};
 }
 
 export interface DemoContext {

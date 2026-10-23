@@ -225,6 +225,16 @@ export const demoManifest: DemoManifestEntry[] = [
         preview: {icon: 'TS', gradient: 'linear-gradient(135deg, #8fd3ff 0%, #2a1f5c 100%)'},
     },
     {
+        key: 'TrailTextureDemo',
+        name: 'Trail Texture Modes and Sampling',
+        module: 'trailTexture',
+        sourcePath: 'examples/src/demos/trailTexture.ts',
+        description:
+            'Five trails of a moving emitter: the texture stretched by distance, distributed per segment, tiled per world unit with a minimum vertex distance and a lifetime, repeated per segment; and a teleporting emitter cleared with clearTrails().',
+        tags: ['trail', 'material'],
+        preview: {icon: 'TX', gradient: 'linear-gradient(135deg, #ffb27f 0%, #6a2e8e 100%)'},
+    },
+    {
         key: 'MagicZoneUnityExample',
         name: 'MagicZone: Unity exported by unity-quarks-exporter example',
         module: 'MagicZoneUnityExample',

@@ -75,6 +75,13 @@ const INSPECTOR_HINTS: Record<string, string> = {
     'Render mode': 'Orientation and geometry used to draw each particle.',
     'Trail length': 'Maximum number of trail segments per particle (trail mode).',
     'Follow origin': 'Keeps the trail anchored to the emitter origin instead of the particle head.',
+    'Texture mode':
+        'How the texture runs along the ribbon: once by distance, once with each segment an equal share, repeated per world unit, or once per segment.',
+    'Texture scale': 'Repeats of the texture: per world unit (tile), per segment (repeat), or over the ribbon.',
+    'Min vertex distance':
+        'The particle has to move this far before a new point is fixed; the last point follows it meanwhile. 0: a point every step.',
+    'Trail time':
+        'How long a point is kept, in seconds, within the trail length. 0: until the trail length is reached.',
     'Speed factor': 'How much particle speed stretches the billboard (stretched billboard mode).',
     'Length factor': 'Base stretch multiplier for stretched billboards.',
     Source: 'Material preset loaded from the effect JSON (read-only reference).',

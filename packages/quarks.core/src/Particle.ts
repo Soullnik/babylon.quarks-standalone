@@ -597,10 +597,11 @@ export class TrailParticle implements Particle {
         this.scalars[this.scalarOffset + 2] = value;
     }
     /**
-     * Length of the trail.
+     * How many samples the trail keeps, the capacity of the history below; `TrailSettings.startLength`
+     * rolls it at emission. 30, babylon.quarks's default, until then.
      * @type {number}
      */
-    length = 100;
+    length = 30;
     // GPU properties
     /**
      * Color of the particle.
@@ -660,7 +661,15 @@ export class TrailParticle implements Particle {
      * axis (`TrailSettings.sideAxis`); see {@link ensureSideHistory}.
      */
     historySides: Float32Array = EMPTY_HISTORY;
-    /** Number of samples the ring buffers can hold. */
+    /** Ring buffer of the particle's age when each sample was recorded, 1 float per sample. */
+    historyAges: Float32Array = EMPTY_HISTORY;
+    /**
+     * Ring buffer of each sample's distance along the trail, 1 float per sample: the straight
+     * distances between the samples added up from the particle's first sample, in the space the
+     * positions are recorded in. See {@link measureHeadDistance}.
+     */
+    historyDistances: Float32Array = EMPTY_HISTORY;
+    /** Number of samples the ring buffers hold; the buffers themselves may be longer. */
     historyCapacity = 0;
     /** Slot the next sample is written to. */
     historyHead = 0;
@@ -720,7 +729,9 @@ export class TrailParticle implements Particle {
     }
 
     /**
-     * Allocates the trail ring buffers, reusing them when the capacity is unchanged.
+     * Sets how many samples the history holds and empties it. The ring buffers are only
+     * allocated when they are too short, so a particle re-emitted with a shorter or a random
+     * length keeps the buffers it has.
      * @param {number} capacity - Number of samples to hold.
      */
     ensureHistoryCapacity(capacity: number): void {
@@ -728,12 +739,16 @@ export class TrailParticle implements Particle {
             return;
         }
         this.historyCapacity = capacity;
-        this.historyPositions = new Float32Array(capacity * 3);
-        this.historySizes = new Float32Array(capacity);
-        this.historyBaseSizes = new Float32Array(capacity);
-        this.historyColors = new Float32Array(capacity * 4);
-        if (this.historySides.length > 0) {
-            this.historySides = new Float32Array(capacity * 3);
+        if (this.historySizes.length < capacity) {
+            this.historyPositions = new Float32Array(capacity * 3);
+            this.historySizes = new Float32Array(capacity);
+            this.historyBaseSizes = new Float32Array(capacity);
+            this.historyColors = new Float32Array(capacity * 4);
+            this.historyAges = new Float32Array(capacity);
+            this.historyDistances = new Float32Array(capacity);
+            if (this.historySides.length > 0) {
+                this.historySides = new Float32Array(capacity * 3);
+            }
         }
         this.historyHead = 0;
         this.historyCount = 0;
@@ -741,7 +756,7 @@ export class TrailParticle implements Particle {
 
     /** Allocates {@link historySides} for the current capacity, once a trail is swept. */
     ensureSideHistory(): void {
-        if (this.historySides.length !== this.historyCapacity * 3) {
+        if (this.historySides.length < this.historyCapacity * 3) {
             this.historySides = new Float32Array(this.historyCapacity * 3);
         }
     }
@@ -762,10 +777,16 @@ export class TrailParticle implements Particle {
     }
 
     /**
-     * Records the current state into the trail ring buffer, or retires the
-     * oldest sample once the particle is dead. Allocation free.
+     * Records the current state into the trail ring buffer as a new sample, or over the newest
+     * one with `replaceHead` (the head following the particle until it has moved far enough for
+     * a sample of its own, see `TrailSettings.minVertexDistance`). Once the particle is dead
+     * (`age >= life`) it drops the oldest sample instead, so the trail fades from the tail.
+     * Allocation free.
+     * @param replaceHead - Overwrite the newest sample rather than append one; appends when there is none.
+     * @param measureDistance - Set the sample's distance along the trail; a host that moves the sample
+     * after recording it passes false and calls {@link measureHeadDistance} itself.
      */
-    update() {
+    update(replaceHead = false, measureDistance = true) {
         // Sized at spawn; this only catches a particle driven without one.
         if (this.historyCapacity === 0) {
             this.ensureHistoryCapacity(Math.max(1, Math.ceil(this.length)));
@@ -774,16 +795,16 @@ export class TrailParticle implements Particle {
         const store = this.store;
         const row = this.storeIndex;
         const scalar = row * ParticleStore.SCALAR_STRIDE;
+        const age = store.scalars[scalar + ParticleStore.AGE];
 
-        if (store.scalars[scalar + ParticleStore.AGE] > store.scalars[scalar + ParticleStore.LIFE]) {
-            if (this.historyCount > 0) {
-                this.historyCount--;
-            }
+        if (age >= store.scalars[scalar + ParticleStore.LIFE]) {
+            this.dropOldest();
             return;
         }
 
         // Straight off the store's columns rather than through the vector views.
-        const head = this.historyHead;
+        const replacing = replaceHead && this.historyCount > 0;
+        const head = replacing ? (this.historyHead + capacity - 1) % capacity : this.historyHead;
         const positionIndex = head * 3;
         const positions = this.historyPositions;
         const storePositions = store.position;
@@ -802,10 +823,48 @@ export class TrailParticle implements Particle {
         colors[colorIndex + 1] = storeColors[o4 + 1];
         colors[colorIndex + 2] = storeColors[o4 + 2];
         colors[colorIndex + 3] = storeColors[o4 + 3];
+        this.historyAges[head] = age;
 
-        this.historyHead = (head + 1) % capacity;
-        if (this.historyCount < capacity) {
-            this.historyCount++;
+        if (!replacing) {
+            this.historyHead = (head + 1) % capacity;
+            if (this.historyCount < capacity) {
+                this.historyCount++;
+            }
+        }
+        if (measureDistance) {
+            this.measureHeadDistance();
+        }
+    }
+
+    /**
+     * Sets the newest sample's distance along the trail: the sample before it plus the straight
+     * distance between the two, in the space the positions are recorded in; 0 for a trail's
+     * first sample. {@link update} does this; a host that moves the sample after recording it
+     * (babylon.quarks's world-space recording) calls it again.
+     */
+    measureHeadDistance(): void {
+        const count = this.historyCount;
+        if (count === 0) {
+            return;
+        }
+        const capacity = this.historyCapacity;
+        const head = (this.historyHead + capacity - 1) % capacity;
+        if (count === 1) {
+            this.historyDistances[head] = 0;
+            return;
+        }
+        const previous = (head + capacity - 1) % capacity;
+        const p = this.historyPositions;
+        const dx = p[head * 3] - p[previous * 3];
+        const dy = p[head * 3 + 1] - p[previous * 3 + 1];
+        const dz = p[head * 3 + 2] - p[previous * 3 + 2];
+        this.historyDistances[head] = this.historyDistances[previous] + Math.sqrt(dx * dx + dy * dy + dz * dz);
+    }
+
+    /** Drops the oldest sample, the one the tail is drawn from, keeping the rest. */
+    dropOldest(): void {
+        if (this.historyCount > 0) {
+            this.historyCount--;
         }
     }
 

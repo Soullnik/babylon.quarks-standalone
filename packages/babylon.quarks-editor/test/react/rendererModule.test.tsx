@@ -139,6 +139,30 @@ describe('Renderer module', () => {
         expect(system.uvDistortion).toBeUndefined();
     });
 
+    it("lays a trail's texture out and samples its path, keeping the defaults unset", () => {
+        const {system, container} = setup(RenderMode.Trail);
+        const settings = () => system.rendererEmitterSettings as TrailSettings;
+        expect(hasRow(container, 'Head width scale')).toBe(false);
+        pick(controlsOf(rowOf(container, 'Texture mode'))[0], 'tile');
+        type(controlsOf(rowOf(container, 'Texture scale'))[0], '0.5');
+        type(controlsOf(rowOf(container, 'Min vertex distance'))[0], '0.2');
+        type(controlsOf(rowOf(container, 'Trail time'))[0], '1.5');
+        expect(settings()).toMatchObject({
+            textureMode: 'tile',
+            textureScale: 0.5,
+            minVertexDistance: 0.2,
+            lifetime: 1.5,
+        });
+        pick(controlsOf(rowOf(container, 'Texture mode'))[0], 'stretch');
+        type(controlsOf(rowOf(container, 'Texture scale'))[0], '1');
+        type(controlsOf(rowOf(container, 'Min vertex distance'))[0], '0');
+        type(controlsOf(rowOf(container, 'Trail time'))[0], '0');
+        expect(settings().textureMode).toBeUndefined();
+        expect(settings().textureScale).toBeUndefined();
+        expect(settings().minVertexDistance).toBeUndefined();
+        expect(settings().lifetime).toBeUndefined();
+    });
+
     it('sweeps a trail along a side axis', () => {
         const {system, container} = setup(RenderMode.Trail);
         const settings = () => system.rendererEmitterSettings as TrailSettings;

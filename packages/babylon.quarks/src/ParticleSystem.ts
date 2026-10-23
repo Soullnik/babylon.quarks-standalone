@@ -29,6 +29,7 @@ import {
     setRandomSource,
     SphereEmitter,
     StretchedBillBoardSettings,
+    TrailParticle,
     TrailSettings,
     ValueGenerator,
     Vector2,
@@ -78,7 +79,13 @@ import {
     validTileCount,
 } from './system/normalize';
 import {ParticleSpawner} from './system/ParticleSpawner';
-import {particleSystemParametersFromJSON, particleSystemToJSON, trailCurve, trailFlags} from './system/serialization';
+import {
+    particleSystemParametersFromJSON,
+    particleSystemToJSON,
+    trailCurve,
+    trailFlags,
+    trailSampling,
+} from './system/serialization';
 import {settingsForClone} from './system/settingsSchema';
 import {SIMULATION_STEP, SimulationClock} from './system/SimulationClock';
 import {
@@ -1286,6 +1293,21 @@ export class ParticleSystem implements IParticleSystem {
     }
 
     /**
+     * Drops every trail's recorded samples and keeps the particles (Unity's `TrailRenderer.Clear`):
+     * each ribbon starts over from where its particle is now. For a teleport: {@link pause}, move
+     * the emitter, {@link play} (so the move is not spread over the next frame's steps as motion)
+     * and call this, and no ribbon is drawn across the jump. Does nothing on the other render modes.
+     */
+    clearTrails(): void {
+        if (this.rendererSettings.renderMode !== RenderMode.Trail) {
+            return;
+        }
+        for (let i = 0; i < this.particleNum; i++) {
+            (this.particles[i] as TrailParticle).resetHistory();
+        }
+    }
+
+    /**
      * Scales how many particles the system emits, from 0.1 to 1 (values outside are clamped), for
      * lower quality settings or a crowded frame; the renderer's adaptive performance sets it. It
      * multiplies with {@link emissionMultiplier}. Default 1.
@@ -1884,14 +1906,14 @@ export class ParticleSystem implements IParticleSystem {
         let rendererEmitterSettings: RendererEmitterSettings;
 
         if (this.renderMode === RenderMode.Trail) {
+            const settings = this.rendererEmitterSettings as TrailSettings;
             rendererEmitterSettings = {
-                startLength: (this.rendererEmitterSettings as TrailSettings).startLength.clone(),
-                followLocalOrigin: (this.rendererEmitterSettings as TrailSettings).followLocalOrigin,
-                ...trailFlags(this.rendererEmitterSettings as TrailSettings),
-                ...trailCurve(this.rendererEmitterSettings as TrailSettings),
-                ...((this.rendererEmitterSettings as TrailSettings).sideAxis
-                    ? {sideAxis: (this.rendererEmitterSettings as TrailSettings).sideAxis!.clone()}
-                    : {}),
+                startLength: settings.startLength.clone(),
+                followLocalOrigin: Boolean(settings.followLocalOrigin),
+                ...trailFlags(settings),
+                ...trailCurve(settings),
+                ...trailSampling(settings),
+                ...(settings.sideAxis ? {sideAxis: settings.sideAxis.clone()} : {}),
             };
         } else if (this.renderMode === RenderMode.StretchedBillBoard) {
             rendererEmitterSettings = {

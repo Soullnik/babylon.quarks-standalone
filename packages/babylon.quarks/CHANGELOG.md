@@ -8,6 +8,30 @@ and the project follows the `quarks.core` 0.x version line.
 
 ### Added
 
+- **Trail texture modes** (`TrailSettings.textureMode`, Unity's Texture Mode): `'stretch'` (the
+  default) runs the texture once along the ribbon by distance; `'distributePerSegment'` once with
+  each recorded segment an equal share (Niagara's Scaled Uniformly, what trails did before);
+  `'tile'` repeats it per world unit, anchored where the particle was born so a sample keeps its U
+  while it lives (Niagara's Tiling Distance); `'repeatPerSegment'` once per segment.
+  `TrailSettings.textureScale` (Unity's Texture Scale) sets the repeats: per unit, per segment or
+  over the ribbon. `uvFromHead` runs any mode from the particle back. The texture's UV channel 1
+  follows the same U. Each sample now records its distance along the trail
+  (`TrailParticle.historyDistances`, `measureHeadDistance()`).
+- **`TrailSettings.minVertexDistance`** (Unity's Min Vertex Distance): a point is fixed only once
+  the particle has moved that far from the last fixed one, the newest sample following the
+  particle meanwhile (`TrailParticle.update(replaceHead)`), so a slow or standing particle no
+  longer fills its history with points on one spot, and the trail's length is a distance rather
+  than a number of steps.
+- **`TrailSettings.lifetime`** (Unity's Time): samples older than that many seconds are dropped
+  from the tail (`TrailParticle.historyAges`, `dropOldest()`), within the `startLength` cap.
+- **`ParticleSystem.clearTrails()`** (Unity's `TrailRenderer.Clear`): drops every ribbon and keeps
+  the particles, which start new ones where they are. With `pause()`, the move and `play()`, it is
+  how an emitter teleports without a ribbon across the jump; the advice to `pause()` alone, given
+  below, never cleared the samples already recorded.
+- Normalisers `trailTextureMode`, `trailTextureScale`, `trailMinVertexDistance`, `trailLifetime`,
+  beside `trailTessellation` and `trailCurveTension`; the trail settings' JSON writes each only
+  when set, and `fromJSON`, `clone()`, `serializeEffect` and `QuarksLoader` carry them all.
+- Demo: Trail Texture Modes and Sampling.
 - **`shaderProgram()` and `shaderVariants()`**: the defines, attributes, uniforms, samplers and
   sources (GLSL and WGSL) of the material a batch builds from its settings, and every distinct
   program the library can compile (Unity's ShaderVariantCollection), for warming the shader cache
@@ -125,6 +149,26 @@ or duplicated something else, and nothing in the package used them.
 
 ### Changed
 
+- **A trail's texture is stretched by distance** (breaking: an existing effect file has no
+  `textureMode`, so its trails now stretch by distance, which shows wherever a trail's speed
+  varies along its length): the default texture mode is Unity's Stretch, so a fast stretch of
+  the ribbon shows more of the texture than a slow one. Trails used to give each recorded segment
+  an equal share whatever its length; set `textureMode: 'distributePerSegment'` to keep that. A
+  ribbon that has not moved is laid out per segment, since it has no distance to stretch over.
+- **`WidthOverLength` spans the samples the trail holds** (breaking for a young trail): the curve's
+  end is the oldest sample, as Unity's width curve runs over the trail as it is, so a trail cut
+  short by `lifetime` or `minVertexDistance` reaches the curve's end and a trail still growing
+  shows the whole curve compressed. It used to span the `startLength` capacity, so a growing or
+  shortened trail never tapered to the curve's end.
+- **`followLocalOrigin: false` is no longer written to JSON**, as the other trail settings at
+  their defaults are not (three.quarks's loader reads a missing flag as off); `startLength` is
+  still always written, for loaders that read it without a default. A JSON `sideAxis` that is
+  not three finite numbers (numeric strings still count), or has no length, is dropped with a
+  `[quarks]` warning instead of making a ribbon of no width (or of NaN).
+- **A particle at the end of its life is dead for its trail too.** The trail path recorded one
+  more sample at `age === life`, the step the removal pass already counted the particle dead, and
+  the renderer drew a tip for it; the samples, the world-space rewrite, the side axis and the tip
+  now all stop at `age < life`.
 - **Flipbook frames wrap into the sheet, and the last cell blends into the first** (breaking for a
   frame outside the sheet). A frame past the last cell used to read outside the texture, a
   negative one differed between GLSL (floored) and WGSL (truncated), and with `blendTiles` the last
@@ -382,6 +426,16 @@ or duplicated something else, and nothing in the package used them.
 
 ### Fixed
 
+- **A trail re-emitted with a random `startLength` reallocated its history every time.** The ring
+  buffers were replaced whenever the capacity changed; they now only grow
+  (`TrailParticle.ensureHistoryCapacity`), and `TrailParticle.length` defaults to 30, the
+  documented value, instead of 100.
+- **Trail batches allocated twice the vertices they could draw.** The buffers were sized in
+  vertex pairs but compared against vertex counts, so every trail batch held two unused copies
+  of itself on the CPU and the GPU; `maxParticles` now counts vertices.
+- **A tessellated trail bunched its points at the samples at `curveTension: 1`** and on the live
+  tip's segment: the Hermite basis eased a segment with no tangents while its widths, colours and
+  U ran linearly. A straight segment is now walked evenly.
 - **Local-space sub emitter particles jumped to the next parent.** A sub emitter target in local
   space (`worldSpace: false`) draws each particle through the matrix of the emission that spawned
   it; that matrix object was reused for the next emission once the first ended, so particles that
@@ -517,6 +571,11 @@ or duplicated something else, and nothing in the package used them.
 
 ### Tests
 
+- Trails: the texture modes and scale, the live tip's distance, minimum vertex distance, lifetime
+  (alive and dead), the end-of-life boundary, `clearTrails()` and the teleport, the history
+  buffers' reuse, the batch's vertex sizing, tessellation at tension 1, the trail `tint`, the
+  trail settings through `serializeEffect` and `QuarksLoader`, the `sideAxis` JSON validation,
+  and `WidthOverLength` on fractional and zero lengths.
 - **Coverage is enforced.** The package thresholds were never checked, because `npm test` ran
   without coverage, and the root run ignored each package's file list. `npm run test:coverage` (in
   CI and `npm run check`) now counts every source file and fails under a floor per package, set in

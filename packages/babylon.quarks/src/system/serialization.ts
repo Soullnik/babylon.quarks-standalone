@@ -12,7 +12,14 @@ import {
     Vector3,
 } from 'quarks.core';
 import type {ParticleSystem} from '../ParticleSystem';
-import {trailCurveTension, trailTessellation} from '../trailCurve';
+import {
+    trailCurveTension,
+    trailLifetime,
+    trailMinVertexDistance,
+    trailTessellation,
+    trailTextureMode,
+    trailTextureScale,
+} from '../trailSettings';
 import {
     EROSION_DEFAULT_SOFTNESS,
     RenderMode,
@@ -61,21 +68,59 @@ export function trailCurve(settings: TrailSettings | undefined): Partial<TrailSe
     return curve;
 }
 
+/**
+ * A trail's texture mode and scale, minimum vertex distance and lifetime, normalised, each only
+ * when it differs from the default.
+ */
+export function trailSampling(settings: TrailSettings | undefined): Partial<TrailSettings> {
+    const out: Partial<TrailSettings> = {};
+    const textureMode = trailTextureMode(settings);
+    const textureScale = trailTextureScale(settings);
+    const minVertexDistance = trailMinVertexDistance(settings);
+    const lifetime = trailLifetime(settings);
+    if (textureMode !== 'stretch') out.textureMode = textureMode;
+    if (textureScale !== 1) out.textureScale = textureScale;
+    if (minVertexDistance > 0) out.minVertexDistance = minVertexDistance;
+    if (lifetime !== Infinity) out.lifetime = lifetime;
+    return out;
+}
+
+/** A trail's `followLocalOrigin`, only when on: off is the default. */
+export function trailFollowLocalOrigin(settings: TrailSettings | undefined): Partial<TrailSettings> {
+    return settings?.followLocalOrigin ? {followLocalOrigin: true} : {};
+}
+
 /** A trail's side axis as JSON `[x, y, z]`, or nothing when unset. */
 function trailSideAxisJSON(settings: TrailSettings | undefined): {sideAxis?: number[]} {
     const axis = settings?.sideAxis;
     return axis ? {sideAxis: [axis.x, axis.y, axis.z]} : {};
 }
 
-/** A trail's side axis from JSON `[x, y, z]` (or an object with x, y, z), or nothing. */
+/**
+ * A trail's side axis from JSON `[x, y, z]` (or an object with x, y, z), or nothing: an axis
+ * that is not three finite numbers, or has no length, cannot sweep a ribbon and is dropped with
+ * a warning, so the trail faces the camera instead of vanishing.
+ */
 function trailSideAxisFromJSON(value: unknown): {sideAxis?: Vector3} {
+    if (value === undefined || value === null) {
+        return {};
+    }
+    let x: unknown;
+    let y: unknown;
+    let z: unknown;
     if (Array.isArray(value)) {
-        return {sideAxis: new Vector3(Number(value[0]) || 0, Number(value[1]) || 0, Number(value[2]) || 0)};
+        [x, y, z] = value;
+    } else if (typeof value === 'object') {
+        ({x, y, z} = value as {x?: unknown; y?: unknown; z?: unknown});
     }
-    if (value && typeof value === 'object') {
-        const v = value as {x?: number; y?: number; z?: number};
-        return {sideAxis: new Vector3(v.x ?? 0, v.y ?? 0, v.z ?? 0)};
+    // A number, or a numeric string, as an older file could hold.
+    const component = (v: unknown): number =>
+        typeof v === 'number' ? v : typeof v === 'string' && v.trim() !== '' ? Number(v) : NaN;
+    const [nx, ny, nz] = [component(x), component(y), component(z)];
+    if (Number.isFinite(nx) && Number.isFinite(ny) && Number.isFinite(nz) && nx * nx + ny * ny + nz * nz > 0) {
+        return {sideAxis: new Vector3(nx, ny, nz)};
     }
+    console.warn(`[quarks] sideAxis ${JSON.stringify(value)} is not a direction and is ignored`);
     return {};
 }
 
@@ -136,9 +181,10 @@ export function particleSystemParametersFromJSON(
                 trailSettings?.startLength !== undefined
                     ? ValueGeneratorFromJSON(trailSettings.startLength)
                     : new ConstantValue(30),
-            followLocalOrigin: trailSettings?.followLocalOrigin ?? false,
+            followLocalOrigin: Boolean(trailSettings?.followLocalOrigin),
             ...trailFlags(trailSettings),
             ...trailCurve(trailSettings),
+            ...trailSampling(trailSettings),
             ...trailSideAxisFromJSON((trailSettings as {sideAxis?: unknown} | undefined)?.sideAxis),
         };
     } else if (json.renderMode === RenderMode.StretchedBillBoard) {
@@ -209,13 +255,16 @@ export function particleSystemParametersFromJSON(
 /** The render mode's own settings as JSON: a trail's or a stretched billboard's, else none. */
 function rendererEmitterSettingsJSON(system: ParticleSystem): RendererEmitterSettings {
     if (system.renderMode === RenderMode.Trail) {
+        const settings = system.rendererEmitterSettings as TrailSettings;
+        // `startLength` always, for loaders that read it without a default; the rest only when on.
         return {
-            startLength: (system.rendererEmitterSettings as TrailSettings).startLength.toJSON(),
-            followLocalOrigin: (system.rendererEmitterSettings as TrailSettings).followLocalOrigin,
-            ...trailFlags(system.rendererEmitterSettings as TrailSettings),
-            ...trailCurve(system.rendererEmitterSettings as TrailSettings),
-            ...(trailSideAxisJSON(system.rendererEmitterSettings as TrailSettings) as {sideAxis?: any}),
-        };
+            startLength: settings.startLength.toJSON(),
+            ...trailFollowLocalOrigin(settings),
+            ...trailFlags(settings),
+            ...trailCurve(settings),
+            ...trailSampling(settings),
+            ...(trailSideAxisJSON(settings) as {sideAxis?: any}),
+        } as TrailSettings;
     }
     if (system.renderMode === RenderMode.StretchedBillBoard) {
         return {
