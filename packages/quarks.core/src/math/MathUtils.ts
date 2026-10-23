@@ -263,10 +263,16 @@ const _lut = [
 
 let _seed = 1234567;
 
+/** Multiply degrees by this to get radians. */
 const DEG2RAD = Math.PI / 180;
+/** Multiply radians by this to get degrees. */
 const RAD2DEG = 180 / Math.PI;
 
 // http://stackoverflow.com/questions/105034/how-to-create-a-guid-uuid-in-javascript/21963136#21963136
+/**
+ * A random RFC 4122 version 4 UUID in lower case. Uses `Math.random`, not the library's seedable
+ * random source, so ids stay unique under a fixed seed.
+ */
 function generateUUID() {
     const d0 = (Math.random() * 0xffffffff) | 0;
     const d1 = (Math.random() * 0xffffffff) | 0;
@@ -298,22 +304,29 @@ function generateUUID() {
     return uuid.toLowerCase();
 }
 
+/** `value` limited to [`min`, `max`]. */
 function clamp(value: number, min: number, max: number) {
     return Math.max(min, Math.min(max, value));
 }
 
 // compute euclidean modulo of m % n
 // https://en.wikipedia.org/wiki/Modulo_operation
+/**
+ * The remainder of `n / m` with the sign of `m`, so a negative `n` wraps into [0, `m`) for a
+ * positive `m`.
+ */
 function euclideanModulo(n: number, m: number) {
     return ((n % m) + m) % m;
 }
 
 // Linear mapping from range <a1, a2> to range <b1, b2>
+/** Maps `x` linearly from the range [`a1`, `a2`] to [`b1`, `b2`], without clamping. */
 function mapLinear(x: number, a1: number, a2: number, b1: number, b2: number) {
     return b1 + ((x - a1) * (b2 - b1)) / (a2 - a1);
 }
 
 // https://www.gamedev.net/tutorials/programming/general-and-gameplay-programming/inverse-lerp-a-super-useful-yet-often-overlooked-function-r5230/
+/** Where `value` lies between `x` and `y`: 0 at `x`, 1 at `y`, unclamped; 0 when `x` equals `y`. */
 function inverseLerp(x: number, y: number, value: number) {
     if (x !== y) {
         return (value - x) / (y - x);
@@ -323,21 +336,31 @@ function inverseLerp(x: number, y: number, value: number) {
 }
 
 // https://en.wikipedia.org/wiki/Linear_interpolation
+/** The linear interpolation from `x` to `y` by `t`. */
 function lerp(x: number, y: number, t: number) {
     return (1 - t) * x + t * y;
 }
 
 // http://www.rorydriscoll.com/2016/03/07/frame-rate-independent-damping-using-lerp/
+/**
+ * Moves `x` toward `y` by a frame-rate independent exponential step: `lambda` is the rate per
+ * second, `dt` the step in seconds.
+ */
 function damp(x: number, y: number, lambda: number, dt: number) {
     return lerp(x, y, 1 - Math.exp(-lambda * dt));
 }
 
 // https://www.desmos.com/calculator/vcsjnyz7x4
+/** Bounces `x` between 0 and `length`: rises from 0 to `length`, then falls back, and repeats. */
 function pingpong(x: number, length = 1) {
     return length - Math.abs(euclideanModulo(x, length * 2) - length);
 }
 
 // http://en.wikipedia.org/wiki/Smoothstep
+/**
+ * The cubic Hermite step of `x` from `min` to `max`: 0 at or below `min`, 1 at or above `max`,
+ * smooth between.
+ */
 function smoothstep(x: number, min: number, max: number) {
     if (x <= min) return 0;
     if (x >= max) return 1;
@@ -347,6 +370,10 @@ function smoothstep(x: number, min: number, max: number) {
     return x * x * (3 - 2 * x);
 }
 
+/**
+ * Ken Perlin's quintic step of `x` from `min` to `max`: like {@link smoothstep} with zero first and
+ * second derivatives at both ends.
+ */
 function smootherstep(x: number, min: number, max: number) {
     if (x <= min) return 0;
     if (x >= max) return 1;
@@ -357,21 +384,28 @@ function smootherstep(x: number, min: number, max: number) {
 }
 
 // Random integer from <low, high> interval
+/** A random integer in [`low`, `high`], both included, from the library's random source. */
 function randInt(low: number, high: number) {
     return low + Math.floor(random() * (high - low + 1));
 }
 
 // Random float from <low, high> interval
+/** A random number in [`low`, `high`), from the library's random source. */
 function randFloat(low: number, high: number) {
     return low + random() * (high - low);
 }
 
 // Random float from <-range/2, range/2> interval
+/** A random number in (-`range`/2, `range`/2], from the library's random source. */
 function randFloatSpread(range: number) {
     return range * (0.5 - random());
 }
 
 // Deterministic pseudo-random float in the interval [ 0, 1 ]
+/**
+ * A deterministic pseudo-random number in [0, 1) (Mulberry32). Passing `s` reseeds the generator
+ * first; each call advances it.
+ */
 function seededRandom(s: number) {
     if (s !== undefined) _seed = s;
 
@@ -386,26 +420,36 @@ function seededRandom(s: number) {
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
 }
 
+/** `degrees` in radians. */
 function degToRad(degrees: number) {
     return degrees * DEG2RAD;
 }
 
+/** `radians` in degrees. */
 function radToDeg(radians: number) {
     return radians * RAD2DEG;
 }
 
+/** Whether the integer `value` is a positive power of two. */
 function isPowerOfTwo(value: number) {
     return (value & (value - 1)) === 0 && value !== 0;
 }
 
+/** The smallest power of two at or above `value`. */
 function ceilPowerOfTwo(value: number) {
     return Math.pow(2, Math.ceil(Math.log(value) / Math.LN2));
 }
 
+/** The largest power of two at or below `value`. */
 function floorPowerOfTwo(value: number) {
     return Math.pow(2, Math.floor(Math.log(value) / Math.LN2));
 }
 
+/**
+ * Sets `q` from the intrinsic proper Euler angles `a`, `b`, `c` in radians, applied in `order`
+ * (`XYX`, `YZY`, `ZXZ`, `XZX`, `YXY` or `ZYZ`); another order logs a warning and leaves `q` as it
+ * was.
+ */
 function setQuaternionFromProperEuler(q: Quaternion, a: number, b: number, c: number, order: EulerOrder) {
     // Intrinsic Proper Euler Angles - see https://en.wikipedia.org/wiki/Euler_angles
 
@@ -458,6 +502,10 @@ function setQuaternionFromProperEuler(q: Quaternion, a: number, b: number, c: nu
     }
 }
 
+/**
+ * Turns `value`, stored normalized in an array of `array`'s integer type, back into a float in [0,
+ * 1] or [-1, 1]; a `Float32Array` keeps it as it is, and other arrays throw.
+ */
 function denormalize(value: number, array: number[]) {
     switch (array.constructor) {
         case Float32Array:
@@ -486,6 +534,10 @@ function denormalize(value: number, array: number[]) {
     }
 }
 
+/**
+ * Turns the float `value` into the normalized integer an array of `array`'s type stores; a
+ * `Float32Array` keeps it as it is, and other arrays throw.
+ */
 function normalize(value: number, array: number[]) {
     switch (array.constructor) {
         case Float32Array:
@@ -514,30 +566,55 @@ function normalize(value: number, array: number[]) {
     }
 }
 
+/** The math helpers gathered in one object, as three.js `MathUtils`; each is also exported on its own. */
 const MathUtils = {
+    /** See {@link DEG2RAD}. */
     DEG2RAD: DEG2RAD,
+    /** See {@link RAD2DEG}. */
     RAD2DEG: RAD2DEG,
+    /** See {@link generateUUID}. */
     generateUUID: generateUUID,
+    /** See {@link clamp}. */
     clamp: clamp,
+    /** See {@link euclideanModulo}. */
     euclideanModulo: euclideanModulo,
+    /** See {@link mapLinear}. */
     mapLinear: mapLinear,
+    /** See {@link inverseLerp}. */
     inverseLerp: inverseLerp,
+    /** See {@link lerp}. */
     lerp: lerp,
+    /** See {@link damp}. */
     damp: damp,
+    /** See {@link pingpong}. */
     pingpong: pingpong,
+    /** See {@link smoothstep}. */
     smoothstep: smoothstep,
+    /** See {@link smootherstep}. */
     smootherstep: smootherstep,
+    /** See {@link randInt}. */
     randInt: randInt,
+    /** See {@link randFloat}. */
     randFloat: randFloat,
+    /** See {@link randFloatSpread}. */
     randFloatSpread: randFloatSpread,
+    /** See {@link seededRandom}. */
     seededRandom: seededRandom,
+    /** See {@link degToRad}. */
     degToRad: degToRad,
+    /** See {@link radToDeg}. */
     radToDeg: radToDeg,
+    /** See {@link isPowerOfTwo}. */
     isPowerOfTwo: isPowerOfTwo,
+    /** See {@link ceilPowerOfTwo}. */
     ceilPowerOfTwo: ceilPowerOfTwo,
+    /** See {@link floorPowerOfTwo}. */
     floorPowerOfTwo: floorPowerOfTwo,
+    /** See {@link setQuaternionFromProperEuler}. */
     setQuaternionFromProperEuler: setQuaternionFromProperEuler,
+    /** See {@link normalize}. */
     normalize: normalize,
+    /** See {@link denormalize}. */
     denormalize: denormalize,
 };
 

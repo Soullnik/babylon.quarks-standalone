@@ -6,11 +6,21 @@ import {FunctionJSON} from './FunctionJSON';
 import {GeneratorMemory} from './GeneratorMemory';
 import {RandomQuatGenerator} from './RandomQuatGenerator';
 
+/** A rotation for a particle: a start rotation, or a rotation per second over its life. */
 export interface RotationGenerator {
+    /** Always `'rotation'`. */
     type: 'rotation';
+    /** Rolls whatever the generator picks at random into `memory`. */
     startGen(memory: GeneratorMemory): void;
+    /**
+     * Writes into `q` the rotation over `delta` seconds at time `t` (for a start rotation, `delta`
+     * is 1).
+     * @returns `q`.
+     */
     genValue(memory: GeneratorMemory, q: Quaternion, delta: number, t: number): Quaternion;
+    /** The generator's JSON. */
     toJSON(): FunctionJSON;
+    /** A copy with the same settings. */
     clone(): RotationGenerator;
 }
 

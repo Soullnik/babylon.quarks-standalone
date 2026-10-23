@@ -1,6 +1,8 @@
 import {Quaternion, Vector3} from '../math';
 import {Particle} from '../Particle';
+import type {ShapeJSON} from './EmitterUtil';
 
+/** The JSON form of a {@link ShapeTransform}; every field is left out at its identity value. */
 export interface ShapeTransformJSON {
     /** Offset of the shape, `[x, y, z]`. Omitted when zero. */
     position?: number[];
@@ -20,8 +22,11 @@ export interface ShapeTransformJSON {
  * start speed — which is what Unity does.
  */
 export class ShapeTransform {
+    /** Offset of the shape in the system. */
     position: Vector3;
+    /** Rotation of the shape in the system. */
     rotation: Quaternion;
+    /** Scale of the shape, applied before the rotation. */
     scale: Vector3;
 
     constructor(position?: Vector3, rotation?: Quaternion, scale?: Vector3) {
@@ -45,6 +50,7 @@ export class ShapeTransform {
         }
     }
 
+    /** Whether the transform moves nothing: zero offset, identity rotation, unit scale. */
     isIdentity(): boolean {
         const {position: t, rotation: r, scale: s} = this;
         return (
@@ -61,6 +67,7 @@ export class ShapeTransform {
         );
     }
 
+    /** The JSON form, with only the parts that are not identity. */
     toJSON(): ShapeTransformJSON {
         const json: ShapeTransformJSON = {};
         const {position: t, rotation: r, scale: s} = this;
@@ -87,10 +94,11 @@ export class ShapeTransform {
      * The `transform` entry of a shape's JSON: empty when the shape has no
      * transform or an identity one, so shapes without one serialize as before.
      */
-    static toShapeJSON(transform: ShapeTransform | undefined): {transform?: ShapeTransformJSON} {
+    static toShapeJSON(transform: ShapeTransform | undefined): Pick<ShapeJSON, 'transform'> {
         return transform && !transform.isIdentity() ? {transform: transform.toJSON()} : {};
     }
 
+    /** A copy with its own vectors and quaternion. */
     clone(): ShapeTransform {
         return new ShapeTransform(this.position.clone(), this.rotation.clone(), this.scale.clone());
     }

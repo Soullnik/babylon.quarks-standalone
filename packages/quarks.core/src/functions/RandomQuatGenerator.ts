@@ -4,17 +4,24 @@ import {FunctionJSON} from './FunctionJSON';
 import {GeneratorMemory} from './GeneratorMemory';
 import {RotationGenerator} from './RotationGenerator';
 
+/** A uniformly random rotation, rolled once per particle and kept for its life. */
 export class RandomQuatGenerator implements RotationGenerator {
+    /** Always `'rotation'`. */
     type: 'rotation';
 
     constructor() {
         this.type = 'rotation';
     }
 
+    /**
+     * The first of the four {@link GeneratorMemory} slots the roll lives in.
+     * @internal
+     */
     indexCount = 0;
 
     // Four numeric slots rather than one Quaternion object: nothing is allocated
     // per spawn, and the numbers can be mirrored into the store's memory column.
+    /** Rolls the particle's rotation into four new slots of `memory`. */
     startGen(memory: GeneratorMemory): void {
         this.indexCount = memory.length;
         let x, y, z, u, v, w;
@@ -32,6 +39,10 @@ export class RandomQuatGenerator implements RotationGenerator {
         memory.push(x, y, s * u, s * v);
     }
 
+    /**
+     * Writes the particle's rotation into `quat`.
+     * @returns `quat`.
+     */
     genValue(memory: GeneratorMemory, quat: Quaternion, delta: number, t: number): Quaternion {
         if (this.indexCount === -1) {
             this.startGen(memory);
@@ -41,16 +52,19 @@ export class RandomQuatGenerator implements RotationGenerator {
         return quat;
     }
 
+    /** The JSON form, `{type: 'RandomQuat'}`. */
     toJSON(): FunctionJSON {
         return {
             type: 'RandomQuat',
         };
     }
 
+    /** Reads {@link RandomQuatGenerator.toJSON} output. */
     static fromJSON(json: FunctionJSON): RotationGenerator {
         return new RandomQuatGenerator();
     }
 
+    /** A new generator. */
     clone(): RotationGenerator {
         return new RandomQuatGenerator();
     }

@@ -32,6 +32,17 @@ and the project follows the `quarks.core` 0.x version line.
   `ALPHA_PREMULTIPLIED`, opaque) still mix toward the fog colour. Before, every mode other than
   `ALPHA_ADD` and `ALPHA_ONEONE` mixed toward the fog colour, which fogged a multiply or subtract
   effect into a coloured haze.
+- **`Vector2.isVector2` is an instance flag**, set on the prototype as `isVector3` and `isVector4`
+  are, instead of a static field. Read it on a vector (`v.isVector2`); `Vector2.isVector2` on the
+  class is gone.
+- **`Vector4.setAxisAngleFromRotationMatrix` takes a `Matrix4`**, the matrix it has always read
+  (see Fixed). Code that passed a `Matrix3` no longer compiles; it got a wrong axis and angle.
+
+### Deprecated
+
+- `RecordState`, the sample of the old linked-list trail history. Trails record into the flat ring
+  buffer of `TrailParticle` (`historyPositions` and its siblings); nothing fills or draws the list.
+- `TrailParticle.previous`, that list, is `@internal` and out of the documented API.
 
 ### Added
 
@@ -42,6 +53,12 @@ and the project follows the `quarks.core` 0.x version line.
 - The shader variants cover every blend resolve with and without fog and soft particles, so
   `validate:shaders` compiles the new `BLEND_PREMULTIPLY`, `BLEND_MULTIPLY` and `FOG_MULTIPLY`
   defines in GLSL and WGSL.
+- **The whole simulation core is documented.** Every vector, quaternion, matrix and math helper,
+  every shape, value, colour and rotation generator, behavior field and plugin type re-exported from
+  `quarks.core` now carries TSDoc, and `npm run docs:check` fails on one that does not, as it does
+  for the rest of the package.
+- `ContinuousLinearFunction` (the keys of a `Gradient`) and its `ObjectValueType` are exported, and
+  `Bezier` has `BezierJSON` and `BezierSplit` types for what `toJSON` and `split` return.
 
 ### Fixed
 
@@ -49,6 +66,19 @@ and the project follows the `quarks.core` 0.x version line.
   premultiplied blending a discarded fragment used to be one that would still have drawn.
 - Erosion and a mesh's rim fade no longer show a hard cut under one-one and premultiplied
   blending; they fade like under alpha blending.
+- **`Bezier.split(t)` split the curve at `1 - t`.** Its de Casteljau steps weighted the two points
+  the wrong way round, so the halves met at the mirrored point; a curve split in the editor away
+  from a segment's middle changed shape. It now splits at `t`, and both halves trace the curve.
+- `Matrix3.makeTranslation(vector)` read a `Vector2` as a number and built a broken matrix; it
+  checked a flag that `Vector2` only had as a static.
+- `Vector4.setAxisAngleFromRotationMatrix` is typed to take the `Matrix4` it reads (as three.js
+  does); it was typed `Matrix3` and read a 3×3 matrix's entries from the wrong places.
+
+### Internal
+
+- Tests cover the vectors, quaternions, Euler angles, matrices and math helpers, and the coverage
+  floors rise: the simulation core's from 54 % to 88 % of lines, the library's and the editor's to
+  one point under what the suites reach.
 
 ## [0.27.1] — 2026-10-23
 

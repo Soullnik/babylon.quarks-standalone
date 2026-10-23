@@ -14,6 +14,10 @@ export class RotationBySpeed implements Behavior {
     type = 'RotationBySpeed';
     private tempQuat = new Quaternion();
 
+    /**
+     * @param angularVelocity - Turn rate in radians per second over the speed range.
+     * @param speedRange - The speeds that map to 0 and 1 on the curve (`a` and `b`).
+     */
     constructor(
         public angularVelocity: ValueGenerator | FunctionValueGenerator,
         public speedRange: IntervalValue
@@ -43,6 +47,9 @@ export class RotationBySpeed implements Behavior {
         };
     }
 
+    /**
+     * Reads {@link RotationBySpeed.toJSON} output; a field the JSON leaves out takes its default.
+     */
     static fromJSON(json: any): Behavior {
         return new RotationBySpeed(
             ValueGeneratorFromJSON(json.angularVelocity) as FunctionValueGenerator,

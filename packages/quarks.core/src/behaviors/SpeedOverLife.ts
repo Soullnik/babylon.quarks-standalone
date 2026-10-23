@@ -12,6 +12,7 @@ export class SpeedOverLife implements Behavior {
         this.speed.startGen(particle.memory);
     }
 
+    /** @param speed - The speed multiplier over the particle's life. */
     constructor(public speed: FunctionValueGenerator) {}
 
     update(particle: Particle): void {
@@ -35,6 +36,7 @@ export class SpeedOverLife implements Behavior {
         };
     }
 
+    /** Reads {@link SpeedOverLife.toJSON} output; a field the JSON leaves out takes its default. */
     static fromJSON(json: any): Behavior {
         return new SpeedOverLife(ValueGeneratorFromJSON(json.speed) as FunctionValueGenerator);
     }

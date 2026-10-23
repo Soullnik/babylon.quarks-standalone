@@ -29,8 +29,9 @@ export interface BoxEmitterParameters {
     /** Which part of the box particles start from. {@link BoxEmitFrom} */
     emitFrom?: BoxEmitFrom;
     /**
-     * How far Shell and Edge particles may sink into the box on each axis, as a fraction of the
-     * box size: 0 keeps them on the surface, 0.5 reaches the center.
+     * How far Shell and Edge particles may sink into the box on each axis, as Unity's Box
+     * Thickness: 0 keeps them on the surface; otherwise half stay on the face and the rest sink
+     * evenly up to 2 × thickness of the half size, so 0.5 reaches the center.
      */
     boxThickness?: [number, number, number];
     /**
@@ -45,11 +46,20 @@ export interface BoxEmitterParameters {
  * like Unity's Box shape. A box with no depth is a flat rectangle (Unity's Rectangle shape).
  */
 export class BoxEmitter implements EmitterShape {
+    /** Always `'box'`. */
     type = 'box';
+    /** Size of the box along x. */
     width: number;
+    /** Size of the box along y. */
     height: number;
+    /** Size of the box along z. */
     depth: number;
+    /** Which part of the box particles start from, see {@link BoxEmitFrom}. */
     emitFrom: BoxEmitFrom;
+    /**
+     * How far `Shell` and `Edge` particles may sink into the box on each axis: half stay on the
+     * face and the rest sink evenly up to 2 × thickness of the half size.
+     */
     boxThickness: [number, number, number];
     transform?: ShapeTransform;
 
@@ -64,8 +74,10 @@ export class BoxEmitter implements EmitterShape {
         this.transform = parameters.transform;
     }
 
+    /** Does nothing: the box has no state. */
     update(_system: IParticleSystem, _delta: number): void {}
 
+    /** Starts `p` in, on or along the edges of the box, heading along +z at its start speed. */
     initialize(p: Particle, _emissionState: EmissionState) {
         const point = this._point;
         for (let axis = 0; axis < 3; axis++) {
@@ -99,6 +111,7 @@ export class BoxEmitter implements EmitterShape {
         return side * (1 - 2 * thickness * random());
     }
 
+    /** The shape's JSON. */
     toJSON(): ShapeJSON {
         return {
             type: 'box',
@@ -111,6 +124,7 @@ export class BoxEmitter implements EmitterShape {
         };
     }
 
+    /** Reads {@link BoxEmitter.toJSON} output; a field the JSON leaves out takes its default. */
     static fromJSON(json: any): BoxEmitter {
         return new BoxEmitter({
             width: json.width,
@@ -122,6 +136,7 @@ export class BoxEmitter implements EmitterShape {
         });
     }
 
+    /** A copy with the same settings. */
     clone(): EmitterShape {
         return new BoxEmitter({
             width: this.width,

@@ -22,6 +22,20 @@ export class VelocityOverLife implements Behavior {
     /** Learned in {@link initialize}, so undefined until this behavior sees a particle. */
     ps?: IParticleSystem;
 
+    /**
+     * @param linearX - Velocity along x over the particle's life, in units per second.
+     * @param linearY - Velocity along y.
+     * @param linearZ - Velocity along z.
+     * @param orbitalX - Angular speed around the x axis through the orbit centre, in radians per
+     *   second.
+     * @param orbitalY - Angular speed around the y axis.
+     * @param orbitalZ - Angular speed around the z axis.
+     * @param space - The space the velocities and axes are authored in: `'local'` (the emitter's,
+     *   the default) or `'world'`.
+     * @param radial - Speed away from the orbit centre (Unity's Radial).
+     * @param orbitalOffset - Where the orbital speeds turn around, relative to the emitter (Unity's
+     *   Orbital Offset).
+     */
     constructor(
         public linearX: FunctionValueGenerator | ValueGenerator = new ConstantValue(0),
         public linearY: FunctionValueGenerator | ValueGenerator = new ConstantValue(0),
@@ -36,12 +50,40 @@ export class VelocityOverLife implements Behavior {
         public orbitalOffset: Vector3 = new Vector3()
     ) {}
 
+    /**
+     * Scratch value.
+     * @internal
+     */
     _temp = new Vector3();
+    /**
+     * Scratch value.
+     * @internal
+     */
     _tempEmitterPos = new Vector3();
+    /**
+     * Scratch value.
+     * @internal
+     */
     _tempQ = new Quaternion();
+    /**
+     * Scratch value.
+     * @internal
+     */
     _tempQInv = new Quaternion();
+    /**
+     * Scratch value.
+     * @internal
+     */
     _tempScale = new Vector3(1, 1, 1);
+    /**
+     * Scratch value.
+     * @internal
+     */
     _tempScaleInv = new Vector3(1, 1, 1);
+    /**
+     * Scratch value.
+     * @internal
+     */
     _tempRot = new Quaternion();
     /**
      * Axes the orbital speeds turn around, refreshed once per frame by
@@ -50,7 +92,15 @@ export class VelocityOverLife implements Behavior {
      * per-particle work rather than rebuilt for every particle.
      */
     _axisX = new Vector3(1, 0, 0);
+    /**
+     * Scratch value.
+     * @internal
+     */
     _axisY = new Vector3(0, 1, 0);
+    /**
+     * Scratch value.
+     * @internal
+     */
     _axisZ = new Vector3(0, 0, 1);
     /** The orbit centre in the simulation space, refreshed with the axes. */
     _center = new Vector3();
@@ -148,6 +198,9 @@ export class VelocityOverLife implements Behavior {
         };
     }
 
+    /**
+     * Reads {@link VelocityOverLife.toJSON} output; a field the JSON leaves out takes its default.
+     */
     static fromJSON(json: any): Behavior {
         const readValue = (field: any) =>
             field ? (ValueGeneratorFromJSON(field) as FunctionValueGenerator) : new ConstantValue(0);

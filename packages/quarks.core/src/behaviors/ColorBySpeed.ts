@@ -10,6 +10,10 @@ import {speedFraction} from './speedFraction';
  */
 export class ColorBySpeed implements Behavior {
     type = 'ColorBySpeed';
+    /**
+     * @param color - The gradient over the speed range, multiplying the start colour.
+     * @param speedRange - The speeds that map to 0 and 1 on the gradient (`a` and `b`).
+     */
     constructor(
         public color: FunctionColorGenerator,
         public speedRange: IntervalValue
@@ -38,6 +42,7 @@ export class ColorBySpeed implements Behavior {
         };
     }
 
+    /** Reads {@link ColorBySpeed.toJSON} output; a field the JSON leaves out takes its default. */
     static fromJSON(json: any): Behavior {
         return new ColorBySpeed(
             ColorGeneratorFromJSON(json.color) as FunctionColorGenerator,

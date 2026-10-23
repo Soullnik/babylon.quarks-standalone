@@ -10,7 +10,9 @@ const tempColor = new Vector4();
 
 export class Gradient implements FunctionColorGenerator {
     type: 'function';
+    /** The colour keys: linear RGB at positions in [0, 1], interpolated linearly. */
     color: ContinuousLinearFunction<Vector3>;
+    /** The alpha keys: alpha at positions in [0, 1], interpolated linearly. */
     alpha: ContinuousLinearFunction<number>;
     // default linear bezier
     constructor(
@@ -206,6 +208,7 @@ export class Gradient implements FunctionColorGenerator {
         };
     }
 
+    /** Reads {@link Gradient.toJSON} output. */
     static fromJSON(json: FunctionJSON): Gradient {
         // compatibility
         if (json.functions) {

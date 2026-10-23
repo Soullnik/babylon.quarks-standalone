@@ -51,17 +51,42 @@ export interface SphereEmitterParameters {
     transform?: ShapeTransform;
 }
 
+/**
+ * Emits from a sphere around the origin (Unity's Sphere shape): particles start inside it, or on
+ * its surface, and head straight out.
+ */
 export class SphereEmitter implements EmitterShape {
+    /** Always `'sphere'`. */
     type = 'sphere';
+    /** Radius of the sphere. */
     radius: number;
+    /** Arc around z, in radians, that particles start in; 2π for the whole sphere. */
     arc: number;
+    /**
+     * How far in from the surface particles may start, as a fraction of the radius: 0 on the
+     * surface, 1 anywhere down to the centre.
+     */
     thickness: number; //[0, 1]
+    /** How the start point moves along the arc, see {@link EmitterMode}. */
     mode: EmitterMode;
+    /**
+     * Snaps the start point along the arc to multiples of this fraction (Unity's Spread); 0 for
+     * none.
+     */
     spread: number;
+    /**
+     * Speed of the arc sweep in arcs per second, for the `Loop` and `PingPong` modes; sampled over
+     * the system's cycle.
+     */
     speed: ValueGenerator | FunctionValueGenerator;
+    /** State the {@link SphereEmitter.speed} generator keeps. */
     memory: GeneratorMemory;
     transform?: ShapeTransform;
 
+    /**
+     * Scratch matrix.
+     * @internal
+     */
     _m1: Matrix4;
 
     constructor(parameters: SphereEmitterParameters = {}) {
@@ -84,12 +109,17 @@ export class SphereEmitter implements EmitterShape {
         this.memory.length = 0;
     }
 
+    /** Advances the arc sweep by `delta` seconds in the `Loop` and `PingPong` modes. */
     update(system: IParticleSystem, delta: number): void {
         if (EmitterMode.Random != this.mode) {
             this.currentValue += this.speed.genValue(this.memory, system.emissionState.time / system.duration) * delta;
         }
     }
 
+    /**
+     * Starts `p` at a point of the sphere, heading straight out at its start speed and, when it has
+     * no start rotation, facing out.
+     */
     initialize(p: Particle, emissionState: EmissionState) {
         const u = getValueFromEmitterMode(this.mode, this.currentValue, this.spread, emissionState);
         const v = random();
@@ -118,6 +148,7 @@ export class SphereEmitter implements EmitterShape {
         this.transform?.apply(p);
     }
 
+    /** The shape's JSON. */
     toJSON(): ShapeJSON {
         return {
             type: 'sphere',
@@ -131,6 +162,7 @@ export class SphereEmitter implements EmitterShape {
         };
     }
 
+    /** Reads {@link SphereEmitter.toJSON} output; a field the JSON leaves out takes its default. */
     static fromJSON(json: any): SphereEmitter {
         return new SphereEmitter({
             radius: json.radius,
@@ -143,6 +175,7 @@ export class SphereEmitter implements EmitterShape {
         });
     }
 
+    /** A copy with the same settings. */
     clone(): EmitterShape {
         return new SphereEmitter({
             radius: this.radius,

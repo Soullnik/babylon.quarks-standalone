@@ -4,6 +4,10 @@ import {GeneratorMemory} from './GeneratorMemory';
 import {PiecewiseFunction} from './PiecewiseFunction';
 import {FunctionValueGenerator} from './ValueGenerator';
 
+/**
+ * A curve made of cubic {@link Bezier} segments, each starting at its own time in [0, 1]: Unity's
+ * animation curve. Sampled through a table of {@link PiecewiseBezier.TABLE_SIZE} values.
+ */
 export class PiecewiseBezier extends PiecewiseFunction<Bezier> implements FunctionValueGenerator {
     /** Sample count of the table built by {@link refreshTable}. */
     static readonly TABLE_SIZE = 257;
@@ -105,6 +109,10 @@ export class PiecewiseBezier extends PiecewiseFunction<Bezier> implements Functi
         this.tableSignature = null;
     }
 
+    /**
+     * The curve's value at `t`, clamped to the ends outside [0, 1]: from the sampled table when
+     * {@link PiecewiseBezier.refreshTable} has built one, from the curve otherwise.
+     */
     genValue(memory: GeneratorMemory, t = 0): number {
         const table = this.table;
         if (table !== null) {
@@ -147,6 +155,10 @@ export class PiecewiseBezier extends PiecewiseFunction<Bezier> implements Functi
         return functions[index][0].genValue(span > 0 ? (t - startX) / span : 0);
     }
 
+    /**
+     * An SVG path `d` attribute drawing the curve over x in [0, `length`] with `segments` straight
+     * segments; empty below one segment.
+     */
     toSVG(length: number, segments: number) {
         if (segments < 1) return '';
         let result = ['M', 0, this.functions[0][0].p[0]].join(' ');
@@ -156,8 +168,10 @@ export class PiecewiseBezier extends PiecewiseFunction<Bezier> implements Functi
         return result;
     }
 
+    /** Always `'function'`. */
     type: 'function';
 
+    /** The JSON form, `{type: 'PiecewiseBezier', functions: [{function, start}]}`. */
     toJSON(): FunctionJSON {
         return {
             type: 'PiecewiseBezier',
@@ -165,6 +179,7 @@ export class PiecewiseBezier extends PiecewiseFunction<Bezier> implements Functi
         };
     }
 
+    /** Reads {@link PiecewiseBezier.toJSON} output. */
     static fromJSON(json: FunctionJSON): PiecewiseBezier {
         return new PiecewiseBezier(
             json.functions.map((piecewiseFunction: any) => [
@@ -174,9 +189,11 @@ export class PiecewiseBezier extends PiecewiseFunction<Bezier> implements Functi
         );
     }
 
+    /** A copy with its own pieces. */
     clone(): FunctionValueGenerator {
         return new PiecewiseBezier(this.functions.map(([bezier, start]) => [bezier.clone(), start]));
     }
 
+    /** Does nothing: a curve rolls nothing. */
     startGen(memory: GeneratorMemory): void {}
 }

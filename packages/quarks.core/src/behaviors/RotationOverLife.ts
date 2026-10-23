@@ -18,6 +18,7 @@ export class RotationOverLife implements Behavior {
     /** Scratch for a mesh particle's rotation step; also read by the fused pass. */
     tempQuat = new Quaternion();
 
+    /** @param angularVelocity - Turn rate in radians per second over the particle's life. */
     constructor(public angularVelocity: ValueGenerator | FunctionValueGenerator) {}
 
     initialize(particle: Particle): void {
@@ -89,6 +90,9 @@ export class RotationOverLife implements Behavior {
         };
     }
 
+    /**
+     * Reads {@link RotationOverLife.toJSON} output; a field the JSON leaves out takes its default.
+     */
     static fromJSON(json: any): Behavior {
         return new RotationOverLife(ValueGeneratorFromJSON(json.angularVelocity) as FunctionValueGenerator);
     }

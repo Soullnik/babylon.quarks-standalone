@@ -16,10 +16,18 @@ export class SizeOverLife implements Behavior {
         this.size = size;
     }
 
+    /**
+     * The size over the particle's life, multiplying its start size: one curve for all axes, or a
+     * {@link Vector3Function} for each.
+     */
     get size(): FunctionValueGenerator | Vector3Generator {
         return this._size;
     }
 
+    /**
+     * The size over the particle's life, multiplying its start size: one curve for all axes, or a
+     * {@link Vector3Function} for each.
+     */
     set size(size: FunctionValueGenerator | Vector3Generator) {
         this._size = size;
         this._sizeIsVector3 = size instanceof Vector3Function;
@@ -80,6 +88,7 @@ export class SizeOverLife implements Behavior {
         };
     }
 
+    /** Reads {@link SizeOverLife.toJSON} output; a field the JSON leaves out takes its default. */
     static fromJSON(json: any): Behavior {
         return new SizeOverLife(GeneratorFromJSON(json.size) as FunctionValueGenerator);
     }

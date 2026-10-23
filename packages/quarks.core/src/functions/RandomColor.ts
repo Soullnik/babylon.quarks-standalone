@@ -6,6 +6,10 @@ import {FunctionJSON} from './FunctionJSON';
 import {GeneratorMemory} from './GeneratorMemory';
 
 export class RandomColor implements ColorGenerator {
+    /**
+     * @param a - One end of the range, linear RGBA.
+     * @param b - The other end.
+     */
     constructor(
         public a: Vector4,
         public b: Vector4
@@ -30,6 +34,7 @@ export class RandomColor implements ColorGenerator {
         };
     }
 
+    /** Reads {@link RandomColor.toJSON} output. */
     static fromJSON(json: FunctionJSON): RandomColor {
         return new RandomColor(JSONToColor(json.a), JSONToColor(json.b));
     }

@@ -11,11 +11,23 @@ import {Behavior} from './Behavior';
  */
 export class ChangeEmitDirection implements Behavior {
     type = 'ChangeEmitDirection';
+    /**
+     * Scratch value.
+     * @internal
+     */
     _temp: Vector3 = new Vector3();
+    /**
+     * Scratch value.
+     * @internal
+     */
     _q: Quaternion = new Quaternion();
     /** Scratch for the angle generator's per-spawn sample; cleared before every spawn. */
     memory: GeneratorMemory = [];
 
+    /**
+     * @param angle - How far each new particle's direction turns, in radians; rolled once per
+     *   particle.
+     */
     constructor(public angle: ValueGenerator) {}
 
     initialize(particle: Particle): void {
@@ -48,6 +60,10 @@ export class ChangeEmitDirection implements Behavior {
         };
     }
 
+    /**
+     * Reads {@link ChangeEmitDirection.toJSON} output; a field the JSON leaves out takes its
+     * default.
+     */
     static fromJSON(json: any): Behavior {
         return new ChangeEmitDirection(ValueGeneratorFromJSON(json.angle) as ValueGenerator);
     }

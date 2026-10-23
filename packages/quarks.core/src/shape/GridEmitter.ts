@@ -31,11 +31,20 @@ export interface GridEmitterParameters {
     transform?: ShapeTransform;
 }
 
+/**
+ * Emits from the points of a grid in the xy plane, heading along +z: each particle starts at a
+ * random point of the grid.
+ */
 export class GridEmitter implements EmitterShape {
+    /** Always `'grid'`. */
     type = 'grid';
+    /** Width of the grid, along x. */
     width: number;
+    /** Height of the grid, along y. */
     height: number; // [0, Math.PI * 2]
+    /** Points along x. */
     column: number; // [0, 1]
+    /** Points along y. */
     row: number; // [0, Math.PI / 2]
     transform?: ShapeTransform;
 
@@ -47,6 +56,7 @@ export class GridEmitter implements EmitterShape {
         this.transform = parameters.transform;
     }
 
+    /** Starts `p` at a random point of the grid, heading along +z at its start speed. */
     initialize(p: Particle) {
         const r = Math.floor(random() * this.row);
         const c = Math.floor(random() * this.column);
@@ -58,6 +68,7 @@ export class GridEmitter implements EmitterShape {
         this.transform?.apply(p);
     }
 
+    /** The shape's JSON. */
     toJSON(): ShapeJSON {
         return {
             type: 'grid',
@@ -69,10 +80,12 @@ export class GridEmitter implements EmitterShape {
         };
     }
 
+    /** Reads {@link GridEmitter.toJSON} output; a field the JSON leaves out takes its default. */
     static fromJSON(json: any): GridEmitter {
         return new GridEmitter({...json, transform: ShapeTransform.fromJSON(json.transform)});
     }
 
+    /** A copy with the same settings. */
     clone(): EmitterShape {
         return new GridEmitter({
             width: this.width,
@@ -83,5 +96,6 @@ export class GridEmitter implements EmitterShape {
         });
     }
 
+    /** Does nothing: the grid has no state. */
     update(system: IParticleSystem, delta: number): void {}
 }

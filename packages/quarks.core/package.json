@@ -25,6 +25,7 @@
         "build:js": "cross-env NODE_ENV=production rollup -c",
         "build": "npm run clean && npm run build:types && npm run build:js",
         "test": "jest",
+        "docs:check": "typedoc --out node_modules/.cache/typedoc-check",
         "prettier": "prettier --write \"src/**/*.ts\""
     },
     "repository": {

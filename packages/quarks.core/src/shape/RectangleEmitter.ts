@@ -56,13 +56,33 @@ export interface RectangleEmitterParameters {
  * a particle emitter that emits particles from a rectangle.
  */
 export class RectangleEmitter implements EmitterShape {
+    /** Always `'rectangle'`. */
     type = 'rectangle';
+    /** Width of the rectangle, along x. */
     width: number;
+    /** Height of the rectangle, along y. */
     height: number;
+    /**
+     * How far in from the edge particles may start, as a fraction of the way to the centre: 0 on
+     * the edge, 1 anywhere down to the centre.
+     */
     thickness: number; // [0, 1]
+    /**
+     * How the start point moves around the edge, see {@link EmitterMode}; the edge is the "arc"
+     * here, run from the bottom left corner.
+     */
     mode: EmitterMode;
+    /**
+     * Snaps the start point along the arc to multiples of this fraction (Unity's Spread); 0 for
+     * none.
+     */
     spread: number;
+    /**
+     * Speed of the arc sweep in arcs per second, for the `Loop` and `PingPong` modes; sampled over
+     * the system's cycle.
+     */
     speed: ValueGenerator | FunctionValueGenerator;
+    /** State the {@link RectangleEmitter.speed} generator keeps. */
     memory: GeneratorMemory;
     transform?: ShapeTransform;
 
@@ -73,6 +93,10 @@ export class RectangleEmitter implements EmitterShape {
         this.memory.length = 0;
     }
 
+    /**
+     * Scratch matrix.
+     * @internal
+     */
     private _m1: Matrix4;
 
     constructor(parameters: RectangleEmitterParameters = {}) {
@@ -88,10 +112,15 @@ export class RectangleEmitter implements EmitterShape {
         this._m1 = new Matrix4();
     }
 
+    /** Advances the arc sweep by `delta` seconds in the `Loop` and `PingPong` modes. */
     update(system: IParticleSystem, delta: number): void {
         this.currentValue += this.speed.genValue(this.memory, system.emissionState.time / system.duration) * delta;
     }
 
+    /**
+     * Starts `p` on the rectangle's edge, heading away from the centre at its start speed and, when
+     * it has no start rotation, facing that way.
+     */
     initialize(p: Particle, emissionState: EmissionState) {
         const u = getValueFromEmitterMode(this.mode, this.currentValue, this.spread, emissionState);
         // Drawn and unused: seeded effects keep the random sequence they had.
@@ -145,6 +174,7 @@ export class RectangleEmitter implements EmitterShape {
         this.transform?.apply(p);
     }
 
+    /** The shape's JSON. */
     toJSON(): ShapeJSON {
         return {
             type: 'rectangle',
@@ -158,6 +188,9 @@ export class RectangleEmitter implements EmitterShape {
         };
     }
 
+    /**
+     * Reads {@link RectangleEmitter.toJSON} output; a field the JSON leaves out takes its default.
+     */
     static fromJSON(json: any): RectangleEmitter {
         return new RectangleEmitter({
             width: json.width,
@@ -170,6 +203,7 @@ export class RectangleEmitter implements EmitterShape {
         });
     }
 
+    /** A copy with the same settings. */
     clone(): EmitterShape {
         return new RectangleEmitter({
             width: this.width,

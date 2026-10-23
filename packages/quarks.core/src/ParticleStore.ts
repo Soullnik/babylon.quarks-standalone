@@ -18,6 +18,7 @@ export class ParticleStore {
     /** Number of particle rows the arrays can hold. */
     capacity: number;
 
+    /** Position, 3 per row. */
     position: Float32Array;
     /**
      * Where each particle was when the current simulation step began.
@@ -37,6 +38,9 @@ export class ParticleStore {
      * frame and none on the next.
      */
     previousSize: Float32Array;
+    /**
+     * Colour at the start of the current step, 4 per row; see {@link ParticleStore.previousSize}.
+     */
     previousColor: Float32Array;
     /**
      * Velocity at the start of the current step. A stretched billboard's shape
@@ -49,10 +53,15 @@ export class ParticleStore {
      * between the columns that are hot and costs them their locality.
      */
     previousVelocity: Float32Array = ParticleStore.EMPTY;
+    /** Velocity, 3 per row. */
     velocity: Float32Array;
+    /** Size, 3 per row. */
     size: Float32Array;
+    /** Size the particle was born with, 3 per row. */
     startSize: Float32Array;
+    /** Colour, linear RGBA, 4 per row. */
     color: Float32Array;
+    /** Colour the particle was born with, 4 per row. */
     startColor: Float32Array;
     /**
      * age, life and speedModifier interleaved, {@link SCALAR_STRIDE} per row.
@@ -71,8 +80,11 @@ export class ParticleStore {
      * rotation on the particle; its `rotation` row here is then unused.
      */
     rotation: Float32Array;
+    /** Sprite rotation rate in radians per second, one per row. */
     angularVelocity: Float32Array;
+    /** Texture tile (sprite sheet frame), one per row. */
     uvTile: Float32Array;
+    /** Speed the particle was born with, one per row. */
     startSpeed: Float32Array;
     /** Bit 1 mirrors along U, bit 2 along V. */
     flip: Uint8Array;
@@ -83,6 +95,7 @@ export class ParticleStore {
      * billboards do not pay for columns they never read.
      */
     rotationQuaternion: Float32Array = ParticleStore.EMPTY;
+    /** One step's quaternion turn, 4 per row; see {@link ParticleStore.rotationQuaternion}. */
     angularVelocityQuaternion: Float32Array = ParticleStore.EMPTY;
 
     /**
@@ -95,13 +108,16 @@ export class ParticleStore {
      * to the array. Empty until {@link recordMemory} sees the first spawn.
      */
     memory: Float64Array = new Float64Array(0);
+    /** Values per row in {@link ParticleStore.memory}. */
     memoryStride = 0;
 
     /** Values per row in {@link scalars}. */
     static readonly SCALAR_STRIDE = 3;
     /** Offsets within a {@link scalars} row. */
     static readonly AGE = 0;
+    /** Offset of the lifetime in a {@link ParticleStore.scalars} row. */
     static readonly LIFE = 1;
+    /** Offset of the speed modifier in a {@link ParticleStore.scalars} row. */
     static readonly SPEED_MODIFIER = 2;
 
     constructor(capacity = 64) {
@@ -189,13 +205,6 @@ export class ParticleStore {
         return true;
     }
 
-    /**
-     * Exchanges the contents of two rows.
-     *
-     * Used to keep row order aligned with the owning system's particle order, so
-     * the live particles stay a contiguous range that a renderer can copy in one
-     * go rather than gathering particle by particle.
-     */
     /**
      * Starts keeping {@link previousVelocity}. Harmless to call every step;
      * returns true on the call that allocated, which replaces the array and so
@@ -285,6 +294,7 @@ export class ParticleStore {
         return true;
     }
 
+    /** Swaps every column's rows `a` and `b`. */
     swapRows(a: number, b: number): void {
         if (a === b) {
             return;

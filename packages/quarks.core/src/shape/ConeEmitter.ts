@@ -54,15 +54,40 @@ export interface ConeEmitterParameters {
     transform?: ShapeTransform;
 }
 
+/**
+ * Emits from a disc in the xy plane into a cone along +z (Unity's Cone shape): a particle at the
+ * disc's rim heads out at the cone's angle, one at the centre straight along z.
+ */
 export class ConeEmitter implements EmitterShape {
+    /** Always `'cone'`. */
     type = 'cone';
+    /** Radius of the disc particles start on. */
     radius: number;
+    /** Arc of the disc, in radians, that particles start in; 2π for the whole disc. */
     arc: number; // [0, Math.PI * 2]
+    /**
+     * How far in from the rim particles may start, as a fraction of the radius (Unity's Radius
+     * Thickness): 0 on the rim, 1 anywhere on the disc, spread evenly over the area.
+     */
     thickness: number; // [0, 1]
+    /**
+     * Angle in radians between z and the direction of a particle that starts at the rim, from 0 to
+     * π/2.
+     */
     angle: number; // [0, Math.PI / 2]
+    /** How the start point moves along the arc, see {@link EmitterMode}. */
     mode: EmitterMode;
+    /**
+     * Snaps the start point along the arc to multiples of this fraction (Unity's Spread); 0 for
+     * none.
+     */
     spread: number;
+    /**
+     * Speed of the arc sweep in arcs per second, for the `Loop` and `PingPong` modes; sampled over
+     * the system's cycle.
+     */
     speed: ValueGenerator | FunctionValueGenerator;
+    /** State the {@link ConeEmitter.speed} generator keeps. */
     memory: GeneratorMemory;
     transform?: ShapeTransform;
 
@@ -85,12 +110,14 @@ export class ConeEmitter implements EmitterShape {
         this.transform = parameters.transform;
     }
 
+    /** Advances the arc sweep by `delta` seconds in the `Loop` and `PingPong` modes. */
     update(system: IParticleSystem, delta: number): void {
         if (EmitterMode.Random != this.mode) {
             this.currentValue += this.speed.genValue(this.memory, system.emissionState.time / system.duration) * delta;
         }
     }
 
+    /** Starts `p` on the disc, heading into the cone at its start speed. */
     initialize(p: Particle, emissionState: EmissionState) {
         const u = getValueFromEmitterMode(this.mode, this.currentValue, this.spread, emissionState);
         // Uniform over the area of the ring between radius 1 - thickness and 1 (Unity's Radius
@@ -111,6 +138,7 @@ export class ConeEmitter implements EmitterShape {
         this.transform?.apply(p);
     }
 
+    /** The shape's JSON. */
     toJSON(): ShapeJSON {
         return {
             type: 'cone',
@@ -125,6 +153,7 @@ export class ConeEmitter implements EmitterShape {
         };
     }
 
+    /** Reads {@link ConeEmitter.toJSON} output; a field the JSON leaves out takes its default. */
     static fromJSON(json: ShapeJSON): ConeEmitter {
         return new ConeEmitter({
             radius: json.radius,
@@ -138,6 +167,7 @@ export class ConeEmitter implements EmitterShape {
         });
     }
 
+    /** A copy with the same settings. */
     clone(): EmitterShape {
         return new ConeEmitter({
             radius: this.radius,

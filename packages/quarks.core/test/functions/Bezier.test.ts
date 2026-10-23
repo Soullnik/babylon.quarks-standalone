@@ -18,3 +18,28 @@ describe('Bezier', () => {
         expect(bezier.p[3]).toBe(1);
     });
 });
+
+describe('Bezier.split', () => {
+    test('splits at t into two curves that trace the original', () => {
+        const bezier = new Bezier(0, 0.1, 0.9, 1);
+        for (const t of [0.25, 0.5, 0.8]) {
+            const {left, right, span} = bezier.split(t);
+            expect(left.p[3]).toBeCloseTo(bezier.genValue(t));
+            expect(right.p[0]).toBeCloseTo(bezier.genValue(t));
+            expect(span).toHaveLength(10);
+            for (const u of [0, 0.3, 0.7, 1]) {
+                expect(left.genValue(u)).toBeCloseTo(bezier.genValue(u * t));
+                expect(right.genValue(u)).toBeCloseTo(bezier.genValue(t + u * (1 - t)));
+            }
+        }
+    });
+
+    test('reads slopes and sets them', () => {
+        const bezier = new Bezier(0, 0, 0, 1);
+        bezier.controlCurve(3, 6);
+        expect(bezier.getSlope(0)).toBeCloseTo(3);
+        expect(bezier.getSlope(1)).toBeCloseTo(6);
+        expect(bezier.derivativeCoefficients(bezier.p)).toHaveLength(3);
+        expect(bezier.clone().p).toEqual(bezier.p);
+    });
+});

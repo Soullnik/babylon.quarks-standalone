@@ -75,6 +75,9 @@ export class WidthOverLength implements Behavior {
         };
     }
 
+    /**
+     * Reads {@link WidthOverLength.toJSON} output; a field the JSON leaves out takes its default.
+     */
     static fromJSON(json: any): Behavior {
         // JSON from before `absolute` existed was authored against absolute widths.
         return new WidthOverLength(ValueGeneratorFromJSON(json.width) as FunctionValueGenerator, json.absolute ?? true);

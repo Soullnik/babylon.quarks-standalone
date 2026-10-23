@@ -3,24 +3,49 @@ import {Particle} from '../Particle';
 import {random} from '../util/random';
 import type {ShapeTransform, ShapeTransformJSON} from './ShapeTransform';
 
+/**
+ * The JSON form of an emitter shape. `type` names the shape; the other fields are the ones that
+ * shape has, under the names of its own fields.
+ */
 export interface ShapeJSON {
+    /** The shape's type (`'sphere'`, `'cone'`, …). */
     type: string;
+    /** Radius of a sphere, hemisphere, circle, cone or donut. */
     radius?: number;
+    /** Arc in radians that a round shape emits from. */
     arc?: number;
+    /**
+     * Fraction of a round shape's radius it emits from, measured in from the surface: 0 the
+     * surface, 1 the whole volume.
+     */
     thickness?: number;
+    /** Radius of a donut's tube. */
     donutRadius?: number;
+    /** Opening angle of a cone, in radians. */
     angle?: number;
+    /** Width of a rectangle, box or grid. */
     width?: number;
+    /** Height of a rectangle, box or grid. */
     height?: number;
+    /** Depth of a box. */
     depth?: number;
+    /** Where a box emits from (its volume, shell or edges), as the box's enum value. */
     emitFrom?: number;
+    /** Thickness of a box's shell along x, y and z. */
     boxThickness?: number[];
+    /** Columns of a grid. */
     column?: number;
+    /** Rows of a grid. */
     row?: number;
+    /** Uuid of the mesh a mesh-surface shape emits from. */
     mesh?: string;
+    /** The {@link EmitterMode} of the shape's arc. */
     mode?: number;
+    /** Kept for three.quarks files, which can name a system here; no built-in shape reads it. */
     particleSystem?: string;
+    /** Spread of the arc: emission points snap to multiples of it; 0 for none. */
     spread?: number;
+    /** Speed of the arc sweep in arcs per second, a value generator's JSON. */
     speed?: any;
     /** Local offset / rotation / scale of the shape; omitted when there is none. */
     transform?: ShapeTransformJSON;
@@ -80,11 +105,26 @@ export function getValueFromEmitterMode(
     return u;
 }
 
+/**
+ * Where a system's particles start and which way they head: a sphere, cone, box, mesh surface and
+ * so on. Register more with an `EmitterShapePlugin`.
+ */
 export interface EmitterShape {
+    /** The shape's type, as its JSON writes it. */
     type: string;
+    /**
+     * Places a new particle: sets its position and direction and its velocity, the direction at
+     * the particle's start speed, in the system's space.
+     */
     initialize(particle: Particle, emissionState: EmissionState): void;
+    /** The shape's JSON. */
     toJSON(): ShapeJSON;
+    /**
+     * Advances the shape's own state (its arc sweep) by `delta` seconds; called once per step
+     * before emission.
+     */
     update(system: IParticleSystem, delta: number): void;
+    /** A copy of the shape with the same settings. */
     clone(): EmitterShape;
     /**
      * Optional local transform of the shape inside its particle system, applied

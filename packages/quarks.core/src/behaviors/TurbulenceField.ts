@@ -29,12 +29,24 @@ function inverseOf(scale: number): number {
  */
 export class TurbulenceField implements Behavior {
     type = 'TurbulenceField';
+    /**
+     * The noise the field samples.
+     * @internal
+     */
     generator: SimplexNoise;
     /** Where in time the field is sampled now; starts at {@link initialOffset} and drifts by `timeScale`. */
     timeOffset = new Vector3();
     /** The time offset the field starts from, derived from {@link seed}; restored by {@link reset}. */
     readonly initialOffset = new Vector3();
+    /**
+     * Scratch value.
+     * @internal
+     */
     temp = new Vector3();
+    /**
+     * Scratch value.
+     * @internal
+     */
     temp2 = new Vector3();
 
     constructor(
@@ -152,6 +164,9 @@ export class TurbulenceField implements Behavior {
         this.timeOffset.z += delta * this.timeScale.z;
     }
 
+    /**
+     * Reads {@link TurbulenceField.toJSON} output; a field the JSON leaves out takes its default.
+     */
     static fromJSON(json: any): Behavior {
         return new TurbulenceField(
             readVector3(json.scale, new Vector3(1, 1, 1)),
