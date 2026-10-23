@@ -8,6 +8,25 @@ and the project follows the `quarks.core` 0.x version line.
 
 ### Added
 
+- **`space` on `ApplyForce`, `ForceOverLife` and `OrbitOverLife`** (quarks.core), the space the
+  force or the orbit is authored in (Unity's Space on Force over Lifetime): `'world'` keeps gravity
+  down and wind steady however the emitter is turned, and orbits the world origin about a world
+  axis; `'local'` turns and scales the force with the emitter, and orbits the emitter about one of
+  its own axes. The forces default to `'world'`, the orbit to `'local'`. The behavior converts into
+  the space the system simulates in, so a setting means the same in a local and a world-space
+  system, and the compiled behavior pass does the same. Written to JSON only when not the default.
+  The type is `BehaviorSpace` (`VelocityOverLifeSpace` is now an alias of it); the decomposed
+  emitter transform the conversions use is `EmitterFrame`, for behaviors of your own. The editor
+  shows Space on Force over Lifetime and Gravity, and Seed on Turbulence. The Force Space demo
+  shows a world gravity and a local thrust on turning emitters.
+- **`seed` on `TurbulenceField`** (quarks.core): the field is built from it, 0 by default, so the
+  same settings swirl the same way on every run and in every copy; give each system its own seed
+  for different fields. Written to JSON only when set. `ParticleSystem.seed` now covers the whole
+  effect, since no behavior rolls outside the step any more.
+- **`PhysicsResolver`** (quarks.core) is exported, and `setPhysicsResolver(undefined)` unregisters
+  the host's resolver. `ApplyCollision` asks the registered resolver when a particle is tested,
+  so one registered after the effect loaded takes effect; a resolver given to the constructor is
+  still preferred. `getPhysicsResolver()` is typed as possibly undefined.
 - **`prewarmTime` on `ParticleSystem`**: how much of the cycle `prewarm` simulates before the first
   frame, in seconds (Niagara's Warmup Time), on a looping system like `prewarm` itself. 0, the
   default, warms up a whole cycle as Unity's Prewarm does; a shorter time warms up the cycle's last part only, with the bursts before it
@@ -89,6 +108,45 @@ or duplicated something else, and nothing in the package used them.
 
 ### Changed
 
+- **`ApplyForce` is a world force (breaking for turned or scaled emitters in local-space systems,
+  and for `motionScale`).** It used to push along its direction in whatever space the system
+  simulated in, so a local-space system with a turned emitter had its "gravity" turned with it,
+  and a world-space system in `'hierarchy'` scaling mode did not scale it with the emitter, unlike
+  `ForceOverLife`. Both forces now follow the same rule: a `'world'` force is converted into the
+  emitter's axes for a local-space system and multiplied by `motionScale` in a world-space one. A
+  file that relied on the old reading sets `space: 'local'`. Converting a world vector into a
+  non-uniformly scaled emitter's axes now undoes the rotation before the scale, as the matrix's
+  inverse does; `ForceOverLife` used to do it the other way round. `GravityForce` is documented as
+  pulling toward a point in the simulation space.
+- **`OrbitOverLife` orbits the emitter, about the emitter's axis (breaking for a non-unit axis,
+  and for world-space systems).** The axis is normalised: an axis of length 2 used to turn
+  particles twice as far and push them off their circle. In a world-space system the pivot is now
+  the emitter's world position and the axis turns with the emitter, where it used to orbit the
+  world origin about the world axis; an effect that wants the old orbit sets `space: 'world'`.
+  A zero axis orbits nothing. The compiled behavior pass does the same.
+- **`Noise` turns mesh particles by `rotationAmount` (breaking for mesh particles with a
+  `rotationAmount`).** A quaternion particle used to be turned by
+  a normalised four-noise quaternion, which ignored the amount and the power altogether: a
+  `rotationAmount` of 0.001 wobbled as hard as 1. It now turns about an axis the X, Y and Z noise
+  choose by W noise × π × amount, the angle a billboard would turn by.
+- **`TurbulenceField` is deterministic and restarts cleanly (breaking: two fields with the same
+  settings and no `seed` now swirl identically).** Its noise permutation and time offsets were
+  rolled from the global random source when the behavior was constructed, so a clone, a reloaded
+  file and a seeded system all swirled differently, and `reset()` did nothing;
+  a zero `scale` component divided by zero and filled the velocities with NaN. The field now comes
+  from `seed` (see Added), `reset()` rewinds the drift, and a zero scale samples the field at 0
+  along that axis (no variation there) instead.
+- **`ForceOverLife` before its first particle.** `update`, `updateAll` and the compiled pass
+  disagreed on a behavior that had not seen a particle yet (one applied the force, one skipped
+  it); all three now apply it as a world force.
+- **The `Behavior` interface documents its contract**: the order the host calls `initialize`,
+  `frameUpdate`, `update`/`updateAll` and `reset` in, what the particle looks like at each, that
+  randomness goes through `quarks.core`'s `random()` so a host that wraps its steps in
+  `setRandomSource` replays an effect, and that everything else a behavior keeps derives from its
+  settings. `BehaviorTypes[...].params` lists every field a behavior writes (`Noise`'s
+  `scrollSpeed` and `remap`, `VelocityOverLife`'s `radial` and `orbitalOffset`, `FrameOverLife`'s
+  options, `WidthOverLength.absolute`, the new `space` and `seed`), and the serialisation contract
+  test fails when a field is written that the table does not list, so an editor cannot miss one.
 - **A moving emitter's motion is spread over the steps of a frame.** The simulation runs in fixed
   1/60 s steps, several per frame on a slow display, and every step of a frame used the emitter
   where the frame ended: the frame's spawns clumped there, and a trail recorded in world space

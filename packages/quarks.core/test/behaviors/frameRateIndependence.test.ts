@@ -142,7 +142,7 @@ const CASES: Record<string, Case> = {
         tolerance: 0.25,
     },
     TurbulenceField: {
-        behavior: () => new TurbulenceField(new Vector3(1, 1, 1), 2, new Vector3(2, 2, 2), new Vector3(0.5, 0.5, 0.5)),
+        behavior: () => new TurbulenceField(new Vector3(4, 4, 4), 2, new Vector3(2, 2, 2), new Vector3(0.5, 0.5, 0.5)),
         read: velocity,
         tolerance: 0.15,
     },
@@ -208,7 +208,7 @@ const CASES: Record<string, Case> = {
 };
 
 function simulate(test: Case, rate: number, path: Path = 'update'): SpriteParticle {
-    // Noise and TurbulenceField roll their fields at random; every run rolls the same ones.
+    // Noise picks its generators at random; every run picks the same ones.
     return withRandomSource(createSeededRandom(7), () => {
         const behaviors = test.companion ? [test.companion(), test.behavior()] : [test.behavior()];
         const particle = new SpriteParticle();

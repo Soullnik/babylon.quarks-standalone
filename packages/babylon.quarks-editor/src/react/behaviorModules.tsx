@@ -12,7 +12,6 @@ import {
     EulerGenerator,
     ForceOverLife,
     FrameOverLife,
-    getPhysicsResolver,
     Gradient,
     GravityForce,
     InheritVelocity,
@@ -157,6 +156,16 @@ export function ForceOverLifeModule({binding}: ModuleProps) {
         >
             {(behavior) => (
                 <>
+                    <Row label="Space">
+                        <SelectField
+                            value={behavior.space}
+                            options={[
+                                {value: 'world', label: 'World'},
+                                {value: 'local', label: 'Local'},
+                            ]}
+                            onChange={(v) => binding.apply(() => (behavior.space = v))}
+                        />
+                    </Row>
                     <ValueField
                         hintKey="force.x"
                         label="X"
@@ -334,13 +343,25 @@ export function GravityModule({binding}: ModuleProps) {
             create={() => new ApplyForce(new Vector3(0, -1, 0), new ConstantValue(9.81))}
         >
             {(behavior) => (
-                <Row label="Strength" hintKey="gravity.strength">
-                    <NumberField
-                        value={readScalar(behavior.magnitude).value}
-                        step={0.5}
-                        onChange={(v) => binding.apply(() => (behavior.magnitude = new ConstantValue(v)))}
-                    />
-                </Row>
+                <>
+                    <Row label="Strength" hintKey="gravity.strength">
+                        <NumberField
+                            value={readScalar(behavior.magnitude).value}
+                            step={0.5}
+                            onChange={(v) => binding.apply(() => (behavior.magnitude = new ConstantValue(v)))}
+                        />
+                    </Row>
+                    <Row label="Space">
+                        <SelectField
+                            value={behavior.space}
+                            options={[
+                                {value: 'world', label: 'World'},
+                                {value: 'local', label: 'Local'},
+                            ]}
+                            onChange={(v) => binding.apply(() => (behavior.space = v))}
+                        />
+                    </Row>
+                </>
             )}
         </BehaviorModule>
     );
@@ -772,6 +793,29 @@ export function TurbulenceModule({binding}: ModuleProps) {
                         step={0.1}
                         onChange={(v) => binding.apply(() => (behavior.timeScale = v))}
                     />
+                    {/* The field is built from the seed, so a different seed is a different swirl. */}
+                    <Row label="Seed">
+                        <NumberField
+                            value={behavior.seed}
+                            step={1}
+                            onChange={(v) =>
+                                binding.apply(() => {
+                                    const seed = Math.round(v);
+                                    const next = new TurbulenceField(
+                                        behavior.scale,
+                                        behavior.octaves,
+                                        behavior.velocityMultiplier,
+                                        behavior.timeScale,
+                                        seed
+                                    );
+                                    behavior.seed = seed;
+                                    behavior.generator = next.generator;
+                                    behavior.initialOffset.copy(next.initialOffset);
+                                    behavior.timeOffset.copy(next.initialOffset);
+                                })
+                            }
+                        />
+                    </Row>
                 </>
             )}
         </BehaviorModule>
@@ -801,13 +845,13 @@ export function EmitDirectionModule({binding}: ModuleProps) {
 
 export function CollisionModule({binding}: ModuleProps) {
     // Like Unity: Collision stores bounce only. Colliders are host-provided via
-    // setPhysicsResolver — the editor never invents a ground plane.
+    // setPhysicsResolver, asked when a particle is tested — the editor never invents a ground plane.
     return (
         <BehaviorModule<ApplyCollision>
             binding={binding}
             title="Collision"
             type="ApplyCollision"
-            create={() => new ApplyCollision(getPhysicsResolver(), 0.5)}
+            create={() => new ApplyCollision(undefined, 0.5)}
         >
             {(behavior) => (
                 <>

@@ -3,8 +3,10 @@ import {Particle} from '../Particle';
 import {ConstantValue, FunctionValueGenerator, ValueGenerator, ValueGeneratorFromJSON} from '../functions';
 import {Quaternion, Vector3} from '../math';
 import {Behavior} from './Behavior';
+import {BehaviorSpace} from './EmitterFrame';
 
-export type VelocityOverLifeSpace = 'local' | 'world';
+/** The space a `VelocityOverLife` is authored in; the same choice as {@link BehaviorSpace}. */
+export type VelocityOverLifeSpace = BehaviorSpace;
 
 const UNIT_X = new Vector3(1, 0, 0);
 const UNIT_Y = new Vector3(0, 1, 0);

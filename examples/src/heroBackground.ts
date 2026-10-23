@@ -137,7 +137,8 @@ export function mountIndexHeroBackground() {
 
     // The disk lies almost flat (XZ) but tips slightly toward the camera so more of the swirl is
     // visible. The donut emitter generates its ring in XY, so the emitters are rotated by
-    // -PI/2 + tilt, and the orbit axis is the resulting world-space disk normal.
+    // -PI/2 + tilt, and the orbit axis is the resulting world-space disk normal: the orbits are
+    // authored in world space so they pivot on the vortex core wherever their emitter is.
     const DISK_TILT = 0.22;
     const diskAxis = new QVector3(0, Math.cos(DISK_TILT), Math.sin(DISK_TILT));
     const layFlat = (system: ParticleSystem) => {
@@ -248,7 +249,7 @@ export function mountIndexHeroBackground() {
         renderOrder: 4,
     });
     comets.addBehavior(new ColorOverLife(fadeEnvelope(0.2, 0.7)));
-    comets.addBehavior(new OrbitOverLife(new IntervalValue(0.5, 0.95), diskAxis));
+    comets.addBehavior(new OrbitOverLife(new IntervalValue(0.5, 0.95), diskAxis, 'world'));
     comets.addBehavior(new GravityForce(new QVector3(0, 0, 0), 22));
     comets.addBehavior(new WidthOverLength(new PiecewiseBezier([[new Bezier(1, 0.7, 0.35, 0.05), 0]])));
     layFlat(comets);
@@ -320,7 +321,7 @@ export function mountIndexHeroBackground() {
     // Fling ribbons along the cursor's motion, then let the vortex capture them.
     cursorComets.addBehavior(new InheritVelocity(new ConstantValue(0.55), 'initial'));
     cursorComets.addBehavior(new GravityForce(new QVector3(0, 0, 0), 45));
-    cursorComets.addBehavior(new OrbitOverLife(new IntervalValue(0.3, 0.6), diskAxis));
+    cursorComets.addBehavior(new OrbitOverLife(new IntervalValue(0.3, 0.6), diskAxis, 'world'));
     cursorComets.addBehavior(new LimitSpeedOverLife(constantCurve(7), 0.25));
     cursorComets.addBehavior(new WidthOverLength(new PiecewiseBezier([[new Bezier(1, 0.7, 0.35, 0.05), 0]])));
     batchRenderer.addSystem(cursorComets);

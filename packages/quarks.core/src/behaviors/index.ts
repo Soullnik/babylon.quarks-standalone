@@ -7,6 +7,7 @@ export * from './ChangeEmitDirection';
 export * from './ColorBySpeed';
 export * from './ColorOverLife';
 export * from './EmitSubParticleSystem';
+export * from './EmitterFrame';
 export * from './ForceOverLife';
 export * from './FrameOverLife';
 export * from './GravityForce';

@@ -79,14 +79,13 @@ const SCRATCH_FIELDS = new Set(['temp', 'temp2', 'temp3', 'tempQ', 'memory']);
 /**
  * Runtime state particular to one class, left out of the comparison for that class only, so a
  * setting with the same name elsewhere (a shape transform's `rotation`) is still compared.
- * `resolver` is the host's collision resolver, shared on purpose; `generator` and `timeOffset` are
- * TurbulenceField's noise permutation and phase, rolled per instance (see `ParticleSystem.seed`).
+ * `resolver` is the host's collision resolver, which a file does not carry. TurbulenceField's
+ * generator and offsets are derived from its `seed`, so they are compared like any setting.
  */
 const RUNTIME_FIELDS: Record<string, string[]> = {
     OrbitOverLife: ['rotation'],
     FrameOverLife: ['indexCount'],
     ApplyCollision: ['resolver'],
-    TurbulenceField: ['generator', 'timeOffset'],
 };
 
 const isRuntime = (owner: object, key: string) =>
@@ -158,7 +157,7 @@ const gradient = () =>
     );
 
 const behaviors: Record<string, () => Behavior> = {
-    ApplyForce: () => new ApplyForce(new Vector3(1, 2, 3), new IntervalValue(2, 4)),
+    ApplyForce: () => new ApplyForce(new Vector3(1, 2, 3), new IntervalValue(2, 4), 'local'),
     Noise: () =>
         new Noise(
             new ConstantValue(2),
@@ -169,7 +168,7 @@ const behaviors: Record<string, () => Behavior> = {
             curve()
         ),
     TurbulenceField: () =>
-        new TurbulenceField(new Vector3(2, 3, 4), 3, new Vector3(1, 2, 3), new Vector3(0.1, 0.2, 0.3)),
+        new TurbulenceField(new Vector3(2, 3, 4), 3, new Vector3(1, 2, 3), new Vector3(0.1, 0.2, 0.3), 7),
     GravityForce: () => new GravityForce(new Vector3(1, 2, 3), 4),
     ColorOverLife: () => new ColorOverLife(gradient()),
     RotationOverLife: () => new RotationOverLife(curve()),
@@ -181,7 +180,7 @@ const behaviors: Record<string, () => Behavior> = {
     SpeedOverLife: () => new SpeedOverLife(curve()),
     FrameOverLife: () =>
         new FrameOverLife(new IntervalValue(1, 4), {fps: 12, frameCount: 8, startFrame: new ConstantValue(2)} as never),
-    ForceOverLife: () => new ForceOverLife(curve(), new ConstantValue(2), new IntervalValue(-1, 1)),
+    ForceOverLife: () => new ForceOverLife(curve(), new ConstantValue(2), new IntervalValue(-1, 1), 'local'),
     VelocityOverLife: () =>
         new VelocityOverLife(
             curve(),
@@ -195,7 +194,7 @@ const behaviors: Record<string, () => Behavior> = {
             new Vector3(1, 2, 3)
         ),
     InheritVelocity: () => new InheritVelocity(curve(), 'current'),
-    OrbitOverLife: () => new OrbitOverLife(curve(), new Vector3(1, 0, 0)),
+    OrbitOverLife: () => new OrbitOverLife(curve(), new Vector3(1, 0, 0), 'world'),
     WidthOverLength: () => new WidthOverLength(curve(), true),
     ChangeEmitDirection: () => new ChangeEmitDirection(new IntervalValue(0.1, 0.5)),
     ApplySequences: () => {
@@ -207,6 +206,11 @@ const behaviors: Record<string, () => Behavior> = {
     },
     LimitSpeedOverLife: () => new LimitSpeedOverLife(curve(), 0.5),
     ApplyCollision: () => new ApplyCollision({resolve: () => false} as never, 0.6),
+};
+
+/** Fields a behavior writes that an editor edits through code, not as a plain parameter. */
+const EDITED_IN_CODE: Record<string, string[]> = {
+    ApplySequences: ['sequencers'],
 };
 
 /** Behaviors that need a particle system to load; covered by the babylon.quarks contract test. */
@@ -321,6 +325,15 @@ describe('serialisation contract', () => {
             const copy = original.clone();
             expect(state(copy)).toEqual(state(original));
             expect(sharedObjects(original, copy)).toEqual([]);
+        });
+
+        it('lists every field it writes in BehaviorTypes params, so an editor shows it', () => {
+            const json = make().toJSON();
+            const params = BehaviorTypes[json.type].params.map(([name]) => name);
+            const written = Object.keys(json).filter(
+                (key) => key !== 'type' && !(EDITED_IN_CODE[json.type] ?? []).includes(key)
+            );
+            expect(params).toEqual(expect.arrayContaining(written));
         });
     });
 

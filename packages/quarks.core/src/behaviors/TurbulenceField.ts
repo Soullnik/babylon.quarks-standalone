@@ -3,36 +3,68 @@ import {ParticleStore} from '../ParticleStore';
 import {Vector3} from '../math';
 import {readVector3} from '../util/JSONUtil';
 import SimplexNoise from '../util/SimplexNoise';
-import {random} from '../util/random';
+import {createSeededRandom} from '../util/random';
 import {Behavior} from './Behavior';
 
+/** Reciprocal of a scale component; a zero scale samples the field at 0 along that axis instead of dividing by it. */
+function inverseOf(scale: number): number {
+    return scale === 0 ? 0 : 1 / scale;
+}
+
 /**
- * Apply turbulence to particles.
+ * Push particles around with a turbulent vector field sampled at their
+ * position (Unity's Noise module in its Position mode, Niagara's Curl Noise
+ * Force): nearby particles are pushed alike, so the system swirls instead of
+ * jittering.
+ *
+ * The field is three channels of four-dimensional simplex noise, `octaves`
+ * layers deep, each layer twice as fine and half as strong as the one before.
+ * `scale` is the size of one noise cell per axis in the simulation space (a
+ * zero component gives no variation along that axis), `velocityMultiplier` the
+ * push per axis in units per second squared, and `timeScale` how fast the
+ * field drifts per axis. The field is built from `seed`, so the same settings
+ * give the same field on every run and a clone or a saved copy swirls
+ * identically; give each system its own seed for different fields. Applies in
+ * every render mode.
  */
 export class TurbulenceField implements Behavior {
     type = 'TurbulenceField';
-    generator = new SimplexNoise(random);
+    generator: SimplexNoise;
+    /** Where in time the field is sampled now; starts at {@link initialOffset} and drifts by `timeScale`. */
     timeOffset = new Vector3();
+    /** The time offset the field starts from, derived from {@link seed}; restored by {@link reset}. */
+    readonly initialOffset = new Vector3();
     temp = new Vector3();
     temp2 = new Vector3();
 
     constructor(
+        /** Size of one noise cell per axis, in the simulation space. */
         public scale: Vector3,
+        /** How many layers of noise are summed; more is finer and dearer. */
         public octaves: number,
+        /** Push per axis, in units per second squared. */
         public velocityMultiplier: Vector3,
-        public timeScale: Vector3
+        /** How fast the field drifts per axis, in noise time per second. */
+        public timeScale: Vector3,
+        /** The seed the field is built from; 0 by default. */
+        public seed = 0
     ) {
-        this.timeOffset.x = (random() / this.scale.x) * this.timeScale.x;
-        this.timeOffset.y = (random() / this.scale.y) * this.timeScale.y;
-        this.timeOffset.z = (random() / this.scale.z) * this.timeScale.z;
+        const random = createSeededRandom(seed);
+        this.generator = new SimplexNoise(random);
+        this.initialOffset.set(
+            random() * inverseOf(scale.x) * timeScale.x,
+            random() * inverseOf(scale.y) * timeScale.y,
+            random() * inverseOf(scale.z) * timeScale.z
+        );
+        this.timeOffset.copy(this.initialOffset);
     }
 
     initialize(particle: Particle): void {}
 
     update(particle: Particle, delta: number): void {
-        const x = particle.position.x / this.scale.x;
-        const y = particle.position.y / this.scale.y;
-        const z = particle.position.z / this.scale.z;
+        const x = particle.position.x * inverseOf(this.scale.x);
+        const y = particle.position.y * inverseOf(this.scale.y);
+        const z = particle.position.z * inverseOf(this.scale.z);
 
         this.temp.set(0, 0, 0);
         let lvl = 1;
@@ -68,9 +100,9 @@ export class TurbulenceField implements Behavior {
         const stride = ParticleStore.SCALAR_STRIDE;
         const generator = this.generator;
         const octaves = this.octaves;
-        const inverseScaleX = 1 / this.scale.x;
-        const inverseScaleY = 1 / this.scale.y;
-        const inverseScaleZ = 1 / this.scale.z;
+        const inverseScaleX = inverseOf(this.scale.x);
+        const inverseScaleY = inverseOf(this.scale.y);
+        const inverseScaleZ = inverseOf(this.scale.z);
         const multiplierX = this.velocityMultiplier.x * delta;
         const multiplierY = this.velocityMultiplier.y * delta;
         const multiplierZ = this.velocityMultiplier.z * delta;
@@ -110,6 +142,7 @@ export class TurbulenceField implements Behavior {
             octaves: this.octaves,
             velocityMultiplier: [this.velocityMultiplier.x, this.velocityMultiplier.y, this.velocityMultiplier.z],
             timeScale: [this.timeScale.x, this.timeScale.y, this.timeScale.z],
+            ...(this.seed !== 0 ? {seed: this.seed} : {}),
         };
     }
 
@@ -124,7 +157,8 @@ export class TurbulenceField implements Behavior {
             readVector3(json.scale, new Vector3(1, 1, 1)),
             typeof json.octaves === 'number' ? json.octaves : 1,
             readVector3(json.velocityMultiplier, new Vector3(1, 1, 1)),
-            readVector3(json.timeScale, new Vector3(1, 1, 1))
+            readVector3(json.timeScale, new Vector3(1, 1, 1)),
+            typeof json.seed === 'number' ? json.seed : 0
         );
     }
 
@@ -133,8 +167,13 @@ export class TurbulenceField implements Behavior {
             this.scale.clone(),
             this.octaves,
             this.velocityMultiplier.clone(),
-            this.timeScale.clone()
+            this.timeScale.clone(),
+            this.seed
         );
     }
-    reset(): void {}
+
+    /** Rewinds the field's drift to where it started, so a restarted system swirls the same way. */
+    reset(): void {
+        this.timeOffset.copy(this.initialOffset);
+    }
 }

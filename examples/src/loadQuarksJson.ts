@@ -17,8 +17,8 @@ export function isQuarksExportJson(json: unknown): json is Record<string, unknow
 
 /**
  * Registers a ground-plane collider (y=0) unless the host already set one, so effects with
- * ApplyCollision behaviors actually bounce in the demo — matching the editor. Must run before
- * QuarksLoader.parse, since ApplyCollision captures the resolver at deserialization time.
+ * ApplyCollision behaviors actually bounce in the demo — matching the editor. ApplyCollision asks
+ * the registered resolver when it tests a particle, so this can run before or after loading.
  */
 function ensureGroundResolver(): void {
     if (getPhysicsResolver()) return;
