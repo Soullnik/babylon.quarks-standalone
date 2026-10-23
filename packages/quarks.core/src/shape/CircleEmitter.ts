@@ -66,6 +66,11 @@ export class CircleEmitter implements EmitterShape {
 
     private currentValue = 0;
 
+    reset(): void {
+        this.currentValue = 0;
+        this.memory.length = 0;
+    }
+
     constructor(parameters: CircleEmitterParameters = {}) {
         this.radius = parameters.radius ?? 10;
         this.arc = parameters.arc ?? 2.0 * Math.PI;

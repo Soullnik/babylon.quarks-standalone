@@ -18,17 +18,23 @@ export class ContinuousLinearFunction<T extends ObjectValueType<T> | number> {
         this.keys = keys;
     }
 
+    /**
+     * The key whose span holds `t`: -1 before the first key, the last key from its position on
+     * (so a `t` past 1 holds the final value, as the sampled table does).
+     */
     findKey(t: number): number {
         const keys = this.keys;
         const last = keys.length - 1;
+        if (last < 0 || t < keys[0][1]) {
+            return -1;
+        }
+        if (t >= keys[last][1]) {
+            return last;
+        }
         // One- and two-key gradients are by far the most common case; resolve
         // them without running the search.
-        if (last <= 0) {
-            return last === 0 && t >= keys[0][1] && t <= 1 ? 0 : -1;
-        }
         if (last === 1) {
-            if (t < keys[0][1] || t > 1) return -1;
-            return t <= keys[1][1] ? 0 : 1;
+            return 0;
         }
         let left = 0,
             right = last;

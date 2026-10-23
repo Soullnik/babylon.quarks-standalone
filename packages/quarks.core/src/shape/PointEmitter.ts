@@ -27,18 +27,16 @@ export class PointEmitter implements EmitterShape {
     update(system: IParticleSystem, delta: number): void {}
 
     initialize(p: Particle) {
+        // A direction uniform over the unit sphere; the speed is the particle's start speed as
+        // it is, like every other shape (and Unity's point-like shapes).
         const u = random();
         const v = random();
         const theta = u * Math.PI * 2;
-        const phi = Math.acos(2.0 * v - 1.0);
-        const r = Math.cbrt(random());
-        const sinTheta = Math.sin(theta);
-        const cosTheta = Math.cos(theta);
-        const sinPhi = Math.sin(phi);
-        const cosPhi = Math.cos(phi);
-        p.velocity.x = r * sinPhi * cosTheta;
-        p.velocity.y = r * sinPhi * sinTheta;
-        p.velocity.z = r * cosPhi;
+        const cosPhi = 2.0 * v - 1.0;
+        const sinPhi = Math.sqrt(Math.max(0, 1 - cosPhi * cosPhi));
+        p.velocity.x = sinPhi * Math.cos(theta);
+        p.velocity.y = sinPhi * Math.sin(theta);
+        p.velocity.z = cosPhi;
         p.velocity.multiplyScalar(p.startSpeed);
 
         p.position.setScalar(0);

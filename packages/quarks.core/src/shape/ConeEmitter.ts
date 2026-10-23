@@ -68,6 +68,11 @@ export class ConeEmitter implements EmitterShape {
 
     private currentValue = 0;
 
+    reset(): void {
+        this.currentValue = 0;
+        this.memory.length = 0;
+    }
+
     constructor(parameters: ConeEmitterParameters = {}) {
         this.radius = parameters.radius ?? 10;
         this.arc = parameters.arc ?? 2.0 * Math.PI;
@@ -88,9 +93,11 @@ export class ConeEmitter implements EmitterShape {
 
     initialize(p: Particle, emissionState: EmissionState) {
         const u = getValueFromEmitterMode(this.mode, this.currentValue, this.spread, emissionState);
-        const rand = MathUtils.lerp(1 - this.thickness, 1, random());
+        // Uniform over the area of the ring between radius 1 - thickness and 1 (Unity's Radius
+        // Thickness): the squared radius is what is uniform.
+        const inner = 1 - MathUtils.clamp(this.thickness, 0, 1);
+        const r = Math.sqrt(MathUtils.lerp(inner * inner, 1, random()));
         const theta = u * this.arc;
-        const r = Math.sqrt(rand);
         const sinTheta = Math.sin(theta);
         const cosTheta = Math.cos(theta);
         p.position.x = r * cosTheta;

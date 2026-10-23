@@ -1,16 +1,20 @@
 import {Particle} from '../Particle';
+import {GeneratorMemory} from '../functions/GeneratorMemory';
 import {ValueGenerator, ValueGeneratorFromJSON} from '../functions/ValueGenerator';
 import {Quaternion, Vector3} from '../math';
 import {random} from '../util/random';
 import {Behavior} from './Behavior';
 /**
- * Change the emit direction of particles.
+ * Turns each new particle's velocity away from its emit direction by `angle` (radians), about
+ * a random axis perpendicular to it, keeping its speed. `angle` may be a constant or a
+ * random range; it is rolled once per particle.
  */
 export class ChangeEmitDirection implements Behavior {
     type = 'ChangeEmitDirection';
     _temp: Vector3 = new Vector3();
     _q: Quaternion = new Quaternion();
-    memory = {data: [], dataCount: 0};
+    /** Scratch for the angle generator's per-spawn sample; cleared before every spawn. */
+    memory: GeneratorMemory = [];
 
     constructor(public angle: ValueGenerator) {}
 
@@ -23,6 +27,7 @@ export class ChangeEmitDirection implements Behavior {
         } else {
             this._temp.set(-particle.velocity.y, particle.velocity.x, 0);
         }
+        this.memory.length = 0;
         this.angle.startGen(this.memory);
         this._q.setFromAxisAngle(this._temp.normalize(), this.angle.genValue(this.memory));
         this._temp.copy(particle.velocity);
@@ -50,5 +55,7 @@ export class ChangeEmitDirection implements Behavior {
     clone(): Behavior {
         return new ChangeEmitDirection(this.angle.clone());
     }
-    reset(): void {}
+    reset(): void {
+        this.memory.length = 0;
+    }
 }

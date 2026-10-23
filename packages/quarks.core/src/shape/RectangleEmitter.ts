@@ -68,6 +68,11 @@ export class RectangleEmitter implements EmitterShape {
 
     private currentValue = 0;
 
+    reset(): void {
+        this.currentValue = 0;
+        this.memory.length = 0;
+    }
+
     private _m1: Matrix4;
 
     constructor(parameters: RectangleEmitterParameters = {}) {

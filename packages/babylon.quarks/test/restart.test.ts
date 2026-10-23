@@ -228,3 +228,33 @@ describe('disposing the emitter node', () => {
         expect(ps.emitter.isDisposed()).toBe(true);
     });
 });
+
+describe('restart() and a sweeping shape', () => {
+    it('starts the arc over, so a seeded Loop shape replays the same positions', () => {
+        const {CircleEmitter, EmitterMode} = jest.requireActual<typeof import('quarks.core')>('quarks.core');
+        const ps = system({
+            emissionOverTime: new ConstantValue(60),
+            startSpeed: new ConstantValue(0),
+            shape: new CircleEmitter({radius: 1, thickness: 0, mode: EmitterMode.Loop, speed: new ConstantValue(1)}),
+        });
+        const angles = () => {
+            const out: number[] = [];
+            for (let i = 0; i < ps.particleNum; i++) {
+                const p = ps.particles[i];
+                out.push(Math.round(Math.atan2(p.position.y, p.position.x) * 1000) / 1000);
+            }
+            return out;
+        };
+        run(ps, 0.5);
+        const first = angles();
+        expect(first.length).toBeGreaterThan(10);
+        ps.restart();
+        run(ps, 0.5);
+        expect(angles()).toEqual(first);
+        // The first particle after a restart is at the arc's start, not where the sweep stopped.
+        ps.restart();
+        ps.update(STEP);
+        expect(Math.abs(Math.atan2(ps.particles[0].position.y, ps.particles[0].position.x))).toBeLessThan(0.2);
+        ps.dispose();
+    });
+});

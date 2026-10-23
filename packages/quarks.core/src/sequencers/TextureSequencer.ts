@@ -10,8 +10,14 @@ export class TextureSequencer implements Sequencer {
         public position: Vector3 = new Vector3()
     ) {}
     transform(position: Vector3, index: number) {
-        position.x = this.locations[index % this.locations.length].x * this.scaleX + this.position.x;
-        position.y = this.locations[index % this.locations.length].y * this.scaleY + this.position.y;
+        const count = this.locations.length;
+        if (count === 0) {
+            // Nothing sampled yet (`fromImage` not called, or an empty file): the particle stays put.
+            return;
+        }
+        const location = this.locations[index % count];
+        position.x = location.x * this.scaleX + this.position.x;
+        position.y = location.y * this.scaleY + this.position.y;
         position.z = this.position.z;
     }
 
