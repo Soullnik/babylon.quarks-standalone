@@ -1,7 +1,7 @@
 import {Constants} from '@babylonjs/core/Engines/constants';
 import type {Vector3} from 'quarks.core';
 import type {VFXBatchSettings} from './BatchedRenderer';
-import {DEFAULT_SOFT_FAR_FADE, validSoftFade, validTileCount} from './system/normalize';
+import {DEFAULT_SOFT_FAR_FADE, validRenderFace, validSoftFade, validTileCount} from './system/normalize';
 import {
     normalizeErosion,
     normalizeGradientMap,
@@ -106,6 +106,7 @@ export function storedBatchSettings(settings: VFXBatchSettings): StoredBatchSett
         applyFog: settings.applyFog ?? true,
         pivot: quad && pivot && (pivot.x !== 0 || pivot.y !== 0 || pivot.z !== 0) ? pivot.clone() : undefined,
         sortMode: settings.sortMode ?? 'none',
+        renderFace: isMesh ? validRenderFace(settings.renderFace) : 'both',
         minParticleSize: quad ? Math.max(0, settings.minParticleSize ?? 0) : 0,
         maxParticleSize: quad ? positiveOrUnlimited(settings.maxParticleSize) : Infinity,
         lighting: isMesh ? (settings.lighting ?? 'fixed') : 'fixed',
@@ -155,6 +156,7 @@ export function shaderKeyEqual(a: StoredBatchSettings, b: StoredBatchSettings): 
         a.renderOrder === b.renderOrder &&
         a.applyFog === b.applyFog &&
         a.sortMode === b.sortMode &&
+        a.renderFace === b.renderFace &&
         !a.pivot === !b.pivot &&
         hasSizeLimits(a) === hasSizeLimits(b) &&
         a.mapUV?.channel === b.mapUV?.channel &&

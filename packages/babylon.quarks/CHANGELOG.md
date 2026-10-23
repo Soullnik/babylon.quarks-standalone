@@ -94,6 +94,14 @@ and the project follows the `quarks.core` 0.x version line.
   visible.
 - `retainEffectResources` takes the effect's materials as any iterable, and counts holders of a
   material as it does of a texture.
+- **The renderer's transform no longer moves particles.** The batch meshes stay under the
+  `BatchedRenderer` node (disabling or disposing it still hides or frees them), but their world
+  matrix is frozen at identity: particles are drawn where their emitters put them, wherever the
+  renderer is, and the batch bounds Babylon culls by are the particles' own. Before, a moved,
+  turned or scaled renderer moved every particle again and only warned once; the warning is gone.
+- `BatchedRenderer.batches` and `systemToBatchIndex` are read-only (`ReadonlyArray`,
+  `ReadonlyMap`); the renderer has always owned them, and code that wrote to them no longer
+  compiles.
 
 ### Deprecated
 
@@ -148,6 +156,11 @@ and the project follows the `quarks.core` 0.x version line.
 - `removeAllEventListeners()` with no event type removes every listener.
 - A **Timeline** demo: a charge, a release burst on a window shorter than a frame and lingering
   smoke on a `QuarksPrefab`, every other blast in slow motion.
+- **`renderFace`** on a system (`'both'`, `'front'`, `'back'`; the new `RenderFace` type), Unity's
+  Render Face and Unreal's Two Sided: a mesh particle can cull its back faces, or show only its
+  inside. `'both'` by default, as before; written to JSON only when set; mesh systems that differ
+  are batched apart; the flat render modes (billboards, stretched, beam, trail) always draw both
+  faces. The editor has a Render face field for mesh systems.
 
 ### Fixed
 
@@ -206,6 +219,16 @@ and the project follows the `quarks.core` 0.x version line.
   while the listeners run (documented, as is when a trail's death fires).
 - `EmitSubParticleSystem.reset()` drops the running sub emissions, as `ParticleSystem.restart`
   did through a special case it no longer needs; any host gets the same reset.
+- **Culling only counts the cameras that render a system's layer**: a camera whose `layerMask`
+  shares no bit with the system's `layers.mask` no longer keeps it simulating, so a system on a
+  layer only an inactive camera renders pauses as its `cullingMode` says. The `CullingMode` docs
+  say which cameras are tested, and that one rendering into a render target texture is not.
+- Culling reuses its frustum planes; it allocated a new array per extra camera every frame.
+- **Instance buffers shrink.** A batch whose buffers a burst grew halves them after it has used
+  under a quarter of them for 300 fills (about five seconds), down to where it started, so one
+  big explosion no longer holds that memory for the rest of the session. Trails too.
+- A batch no longer creates a placeholder mesh that it disposes straight away.
+- `SortMode` documents that `'distance'` sorts once a frame, for the first active camera.
 
 ### Internal
 

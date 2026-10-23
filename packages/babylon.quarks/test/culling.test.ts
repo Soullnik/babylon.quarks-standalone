@@ -140,6 +140,42 @@ describe('visibility culling', () => {
         renderer.dispose();
     });
 
+    it("counts only cameras that render the system's layer", () => {
+        const renderer = new BatchedRenderer('r', scene);
+        const system = oneParticle({cullingMode: 'pause', layerMask: 0x10000000});
+        renderer.addSystem(system);
+        frames(renderer, 2);
+        // The camera looks at it, but its default mask does not take the system's layer.
+        expect(camera.layerMask & 0x10000000).toBe(0);
+        expect(system.culled).toBe(true);
+        camera.layerMask = 0x10000000;
+        frames(renderer, 1);
+        expect(system.culled).toBe(false);
+        renderer.dispose();
+    });
+
+    it('is seen when any of several active cameras sees it, and reuses its planes', () => {
+        const renderer = new BatchedRenderer('r', scene);
+        const system = oneParticle({cullingMode: 'pause'});
+        renderer.addSystem(system);
+        const away = new FreeCamera('away', new BVector3(0, 0, -10), scene);
+        away.setTarget(new BVector3(0, 0, -20));
+        scene.activeCameras = [away];
+        frames(renderer, 2);
+        expect(system.culled).toBe(true);
+        scene.activeCameras = [away, camera];
+        frames(renderer, 1);
+        const planes = (renderer as unknown as {cameraPlanes: unknown[][]}).cameraPlanes;
+        const second = planes[1];
+        expect(system.culled).toBe(false);
+        frames(renderer, 1);
+        expect(planes[1]).toBe(second);
+        scene.activeCameras = [away];
+        frames(renderer, 1);
+        expect(system.culled).toBe(true);
+        renderer.dispose();
+    });
+
     it("'pauseAndCatchUp' replays the missed time, within the catch-up budget", () => {
         const renderer = new BatchedRenderer('r', scene);
         renderer.catchUpBudgetMs = Infinity;

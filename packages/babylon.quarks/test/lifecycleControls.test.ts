@@ -283,18 +283,27 @@ describe('a system belongs to one renderer', () => {
         ps.dispose();
     });
 
-    it('warns once when the renderer itself is transformed', () => {
+    it('draws in world space whatever the renderer transform, under the renderer for enabled state', () => {
         const renderer = new BatchedRenderer('moved', scene);
-        const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
-        renderer.update(STEP);
-        expect(warn).not.toHaveBeenCalled();
         renderer.position.x = 10;
+        renderer.rotation.y = 1;
+        renderer.scaling.set(3, 3, 3);
+        const ps = system();
+        renderer.addSystem(ps);
+        renderer.update(STEP);
+        const mesh = renderer.batches[0].mesh;
+        expect(mesh.parent).toBe(renderer);
+        expect(mesh.computeWorldMatrix(true).isIdentity()).toBe(true);
+        expect(mesh.isWorldMatrixFrozen).toBe(true);
+        renderer.position.set(-4, 2, 7);
         renderer.computeWorldMatrix(true);
         renderer.update(STEP);
-        renderer.update(STEP);
-        expect(warn).toHaveBeenCalledTimes(1);
-        warn.mockRestore();
+        expect(mesh.computeWorldMatrix(true).isIdentity()).toBe(true);
+        renderer.setEnabled(false);
+        expect(mesh.isEnabled()).toBe(false);
         renderer.dispose();
+        expect(mesh.isDisposed()).toBe(true);
+        ps.dispose();
     });
 });
 

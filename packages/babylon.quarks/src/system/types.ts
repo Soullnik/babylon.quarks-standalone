@@ -20,6 +20,7 @@ import type {
     ParticleErosionOptions,
     ParticleGradientMap,
     ParticleUVDistortionOptions,
+    RenderFace,
     RenderMode,
     SortMode,
     TextureUV,
@@ -64,6 +65,12 @@ export interface BurstParameters {
  * An empty system is never culled, so it can start emitting and grow the
  * bounds that decide its visibility. A system another one emits into is never
  * culled either; its parent decides.
+ *
+ * The cameras tested are the scene's active cameras (`scene.activeCameras`, or
+ * `scene.activeCamera`), each only for the systems on a layer it renders
+ * (`camera.layerMask & system.layers.mask`). A camera that renders into a
+ * render target texture (a mirror, a minimap, a portal) is not one of them: a
+ * system seen only through one should keep `'always'`.
  */
 export type CullingMode = 'always' | 'pause' | 'pauseAndCatchUp';
 
@@ -236,6 +243,8 @@ export interface ParticleSystemParameters {
     seed?: number;
     /** Draw order within the batch, see {@link ParticleSystem.sortMode}. Default `'none'`. */
     sortMode?: SortMode;
+    /** Which faces a mesh particle draws, see {@link ParticleSystem.renderFace}. Default `'both'`. */
+    renderFace?: RenderFace;
     /** Whether particles start turned along their direction of travel, see {@link ParticleSystem.alignToDirection}. Default false. */
     alignToDirection?: boolean;
     /** Smallest on-screen size, as a fraction of the viewport height, see {@link ParticleSystem.minParticleSize}. Default 0. */
@@ -336,6 +345,8 @@ export interface ParticleSystemJSONParameters {
     seed?: number;
     /** Written only when not `'none'`. */
     sortMode?: SortMode;
+    /** Written only when not `'both'`. */
+    renderFace?: RenderFace;
     /** Written only when true. */
     alignToDirection?: boolean;
     /** Written only when not 0. */

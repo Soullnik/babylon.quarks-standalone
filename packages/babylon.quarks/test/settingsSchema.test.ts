@@ -86,6 +86,7 @@ const HANDLED_BY: Record<keyof ParticleSystemParameters, 'table' | 'elsewhere'> 
     maxParticleSize: 'table',
     renderingGroupId: 'table',
     applyFog: 'table',
+    renderFace: 'table',
     scene: 'elsewhere',
 };
 

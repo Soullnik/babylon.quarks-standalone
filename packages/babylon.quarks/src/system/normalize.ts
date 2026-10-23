@@ -1,5 +1,5 @@
 import {ConstantValue, FunctionValueGenerator, ValueGenerator, Vector2, Vector3} from 'quarks.core';
-import type {MeshLighting, SortMode} from '../VFXBatch';
+import type {MeshLighting, RenderFace, SortMode} from '../VFXBatch';
 import type {BurstParameters, CullingMode} from './types';
 
 // Normalisers shared by the ParticleSystem constructor, its setters and its JSON reader, so a
@@ -13,6 +13,11 @@ export function validLighting(lighting: unknown): MeshLighting {
 /** `mode` if it is one of the sort modes, else `'none'`. */
 export function validSortMode(mode: unknown): SortMode {
     return mode === 'distance' || mode === 'oldestInFront' || mode === 'youngestInFront' ? mode : 'none';
+}
+
+/** `face` if it is one of the render faces, else `'both'`. */
+export function validRenderFace(face: unknown): RenderFace {
+    return face === 'front' || face === 'back' ? face : 'both';
 }
 
 /** `mode` if it is one of the culling modes, else `'always'`. */

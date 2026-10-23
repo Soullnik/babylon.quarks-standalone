@@ -69,6 +69,7 @@ Three tiers: ✅ shipped · 🟡 runtime supports it, editor UI missing · 🔴 
 - ✅ soft particles (+near/far fade), alpha test, depth write/test
 - ✅ layer mask (`layerMask`)
 - ✅ texture layout (UV channel, Tiling / Offset, scroll as Unreal's Panner), flip, gradient map, alpha erosion, UV distortion, rim on mesh particles
+- ✅ render face (`renderFace`: both / front / back, mesh particles)
 - ✅ sort mode (`sortMode`: distance / oldest in front / youngest in front), min/max particle size (`minParticleSize` / `maxParticleSize`, billboards and stretched), pivot (`pivot`)
 - 🔴 shadows
 

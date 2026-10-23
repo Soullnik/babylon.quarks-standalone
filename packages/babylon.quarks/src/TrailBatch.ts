@@ -128,7 +128,7 @@ export class TrailBatch extends VFXBatch {
 
     /** @internal */
     setupBuffers(): void {
-        this.mesh.dispose();
+        this.mesh?.dispose();
         this.mesh = new Mesh('trailBatch', this.scene);
         this.configureMesh();
         this.buildGeometryBuffers();
@@ -210,11 +210,19 @@ export class TrailBatch extends VFXBatch {
         }
     }
 
+    /** @internal */
+    protected readonly initialCapacity = 1024;
+
     /** Grows the buffers to hold more than `target` vertices. @internal */
     expandBuffers(target: number): void {
         while (target >= this.maxParticles) {
             this.maxParticles *= 2;
         }
+        this.resizeBuffers();
+    }
+
+    /** @internal */
+    protected resizeBuffers(): void {
         // `Geometry.setVerticesBuffer` disposes the buffer it replaces; these custom attributes
         // are not in the geometry's map, so they are released here.
         this.previousVB?.dispose();
@@ -518,9 +526,7 @@ export class TrailBatch extends VFXBatch {
                 particleCount += (historyCount * (tessellation + 1) + 1) * 2;
             }
         }
-        if (particleCount > this.maxParticles) {
-            this.expandBuffers(particleCount);
-        }
+        this.fitBuffers(particleCount);
 
         for (let s = 0; s < visibleSystems.length; s++) {
             const system = visibleSystems[s];

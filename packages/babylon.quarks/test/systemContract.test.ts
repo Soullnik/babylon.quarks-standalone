@@ -134,6 +134,7 @@ const PARAMETERS: {[K in keyof Required<ParticleSystemParameters>]: Parameter<K>
     maxParticleSize: () => 0.5,
     renderingGroupId: () => 2,
     applyFog: () => false,
+    renderFace: () => 'front',
     scene: 'not-a-setting',
 };
 

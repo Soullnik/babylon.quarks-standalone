@@ -74,7 +74,7 @@ export class SpriteBatch extends VFXBatch {
 
     /** @internal */
     setupBuffers(): void {
-        this.mesh.dispose();
+        this.mesh?.dispose();
         this.mesh = new Mesh('spriteBatch', this.scene);
         this.configureMesh();
 
@@ -179,10 +179,18 @@ export class SpriteBatch extends VFXBatch {
     }
 
     /** @internal */
+    protected readonly initialCapacity = 1000;
+
+    /** @internal */
     expandBuffers(target: number): void {
         while (target >= this.maxParticles) {
             this.maxParticles *= 2;
         }
+        this.resizeBuffers();
+    }
+
+    /** @internal */
+    protected resizeBuffers(): void {
         this.disposeExpandableBuffers();
         this.buildExpandableBuffers();
         this.sortScratch = undefined;
@@ -393,7 +401,9 @@ export class SpriteBatch extends VFXBatch {
 
         this.bindFog(mat);
         this.bindSurface(mat);
-        mat.backFaceCulling = false;
+        // Billboards, beams and the like are flat sheets: both faces, whatever the setting says.
+        mat.backFaceCulling = this.settings.renderFace !== 'both';
+        mat.cullBackFaces = this.settings.renderFace !== 'back';
 
         if (this.settings.materialTransparent) {
             mat.alphaMode = this.settings.materialBlendMode;
@@ -532,9 +542,7 @@ export class SpriteBatch extends VFXBatch {
         for (let i = 0; i < visibleSystems.length; i++) {
             particleCount += visibleSystems[i].particleNum;
         }
-        if (particleCount > this.maxParticles) {
-            this.expandBuffers(particleCount);
-        }
+        this.fitBuffers(particleCount);
 
         for (let s = 0; s < visibleSystems.length; s++) {
             const system = visibleSystems[s];

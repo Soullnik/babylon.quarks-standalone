@@ -20,6 +20,7 @@ import {
     ParticleErosion,
     ParticleGradientMap,
     ParticleUVDistortion,
+    RenderFace,
     RenderMode,
     SortMode,
     TextureUV,
@@ -128,6 +129,11 @@ export interface VFXBatchSettings {
     /** Draw order within the batch, see {@link SortMode}. Unset is `'none'`. Systems that differ are batched apart. */
     sortMode?: SortMode;
     /**
+     * Which faces a mesh particle draws, see {@link RenderFace}. Unset is `'both'`. Mesh systems
+     * that differ are batched apart; other render modes ignore it.
+     */
+    renderFace?: RenderFace;
+    /**
      * Smallest size a billboard or stretched particle may have on screen, as a
      * fraction of the viewport height (Unity's Min Particle Size); 0 by default.
      * Meshes and trails ignore it. Systems that differ are batched apart.
@@ -198,20 +204,27 @@ export interface AdaptivePerformanceState extends AdaptivePerformanceOptions {
  *
  * Systems step on a fixed 60 Hz clock, so an effect plays out the same at any frame rate.
  *
- * The renderer is a node so the batches have a parent to live under; leave it at the origin,
- * unturned and unscaled. Particles are placed in the world by their emitters, and a transform on
- * the renderer would move every one of them again (it warns once when it finds one). A system
- * belongs to one renderer at a time: adding it to another takes it out of the first.
+ * The renderer is a node so the batches have a parent to live under: disabling it hides them,
+ * disposing it disposes them. Its transform moves nothing: particles are placed in the world by
+ * their emitters, and the batch meshes draw them there whatever the renderer's position, rotation
+ * or scale. A system belongs to one renderer at a time: adding it to another takes it out of the
+ * first.
  */
 export class BatchedRenderer extends TransformNode {
-    /** Whether the renderer has warned about its own transform; see the class description. */
-    private warnedAboutTransform = false;
-    /** The batches, one draw each. Read to inspect what is drawn; the renderer owns them. */
-    batches: Array<VFXBatch> = [];
+    private readonly batchList: Array<VFXBatch> = [];
+    private readonly batchIndexOf = new Map<IParticleSystem, number>();
+
+    /** The batches, one draw each, to inspect what is drawn; the renderer makes and frees them. */
+    get batches(): ReadonlyArray<VFXBatch> {
+        return this.batchList;
+    }
+
+    /** Index into {@link batches} of each system's batch, to inspect; the renderer keeps it. */
+    get systemToBatchIndex(): ReadonlyMap<IParticleSystem, number> {
+        return this.batchIndexOf;
+    }
     /** Seconds this renderer has been updated for; the clock UV and erosion scrolling run on. */
     private elapsed = 0;
-    /** Index into {@link batches} of each system's batch. The renderer owns it. */
-    systemToBatchIndex: Map<IParticleSystem, number> = new Map<IParticleSystem, number>();
     private depth: DepthBinding | null = null;
     /** Systems in insertion order — iterated every frame, unlike the map. */
     private systems: Array<IParticleSystem> = [];
@@ -274,8 +287,12 @@ export class BatchedRenderer extends TransformNode {
      */
     simulationBudgetMs = Infinity;
 
-    /** Frustum planes of the active cameras, six per camera, rebuilt each update. */
-    private frustumPlanes: Plane[] = [];
+    /** Frustum planes of each active camera, six per camera, reused across updates. */
+    private readonly cameraPlanes: Plane[][] = [];
+    /** Each active camera's `layerMask`, parallel to {@link cameraPlanes}. */
+    private readonly cameraMasks: number[] = [];
+    /** How many cameras {@link cameraPlanes} holds this update. */
+    private cameraCount = 0;
     private readonly boundsMin = new Vector3();
     private readonly boundsMax = new Vector3();
 
@@ -284,21 +301,16 @@ export class BatchedRenderer extends TransformNode {
     }
 
     /**
-     * Gathers the frustum planes of the cameras the scene renders with, six per
-     * camera. Empty when there is no camera yet; systems are then never culled.
+     * Gathers the frustum planes and layer masks of the cameras the scene renders with, and returns
+     * how many. 0 when there is no camera yet; systems are then never culled. Allocates only when a
+     * camera is added.
      */
-    private collectFrustumPlanes(): Plane[] {
+    private collectCameras(): number {
         const scene = this.getScene();
-        const planes = this.frustumPlanes;
         const activeCameras = scene.activeCameras;
         const activeCamera = scene.activeCamera;
-        const cameras: Camera[] =
+        const cameras: readonly Camera[] =
             activeCameras && activeCameras.length > 0 ? activeCameras : activeCamera ? [activeCamera] : [];
-        const needed = cameras.length * 6;
-        while (planes.length < needed) {
-            planes.push(new Plane(0, 0, 0, 0));
-        }
-        planes.length = needed;
         for (let c = 0; c < cameras.length; c++) {
             const camera = cameras[c];
             // Both matrices are recomputed only on demand: a camera moved since
@@ -306,31 +318,33 @@ export class BatchedRenderer extends TransformNode {
             // that has not rendered yet has no projection at all.
             camera.getViewMatrix();
             camera.getProjectionMatrix();
-            const transform = camera.getTransformationMatrix();
-            const slice = c === 0 ? planes : planes.slice(c * 6, c * 6 + 6);
-            Frustum.GetPlanesToRef(transform, slice);
-            if (c !== 0) {
-                for (let p = 0; p < 6; p++) {
-                    planes[c * 6 + p] = slice[p];
-                }
-            }
+            const planes = (this.cameraPlanes[c] ??= [0, 1, 2, 3, 4, 5].map(() => new Plane(0, 0, 0, 0)));
+            Frustum.GetPlanesToRef(camera.getTransformationMatrix(), planes);
+            this.cameraMasks[c] = camera.layerMask;
         }
-        return planes;
+        this.cameraCount = cameras.length;
+        return cameras.length;
     }
 
     /**
-     * True when `system`'s world bounds reach into at least one camera's
-     * frustum, or when it has no bounds to test (empty, or not yet measured).
+     * True when `system`'s world bounds reach into the frustum of at least one camera whose
+     * `layerMask` shares a bit with the system's (a camera that does not render the system's layer
+     * does not see it), or when it has no bounds to test (empty, or not yet measured).
      */
-    private isSystemInView(system: ParticleSystem, planes: Plane[]): boolean {
+    private isSystemInView(system: ParticleSystem): boolean {
         const min = this.boundsMin;
         const max = this.boundsMax;
         if (!system.getWorldBounds(min, max)) {
             return true;
         }
-        for (let c = 0; c < planes.length; c += 6) {
+        const layerMask = system.layers.mask;
+        for (let c = 0; c < this.cameraCount; c++) {
+            if ((this.cameraMasks[c] & layerMask) === 0) {
+                continue;
+            }
+            const planes = this.cameraPlanes[c];
             let inside = true;
-            for (let p = c; p < c + 6; p++) {
+            for (let p = 0; p < 6; p++) {
                 const plane = planes[p];
                 const n = plane.normal;
                 // The box corner farthest along the plane's normal: if even it
@@ -387,10 +401,10 @@ export class BatchedRenderer extends TransformNode {
         const system = particleSystem as IParticleSystem;
         const settings = particleSystem.getRendererSettings();
         const stored = storedBatchSettings(settings);
-        for (let i = 0; i < this.batches.length; i++) {
-            if (batchSettingsEqual(this.batches[i].settings, stored)) {
-                this.batches[i].addSystem(system);
-                this.systemToBatchIndex.set(system, i);
+        for (let i = 0; i < this.batchList.length; i++) {
+            if (batchSettingsEqual(this.batchList[i].settings, stored)) {
+                this.batchList[i].addSystem(system);
+                this.batchIndexOf.set(system, i);
                 return;
             }
         }
@@ -411,12 +425,12 @@ export class BatchedRenderer extends TransformNode {
             default:
                 throw new Error(`Unsupported render mode: ${settings.renderMode}`);
         }
-        batch.mesh.parent = this;
+        batch.attachTo(this);
         batch.applyMeshLighting(this.meshLighting);
         batch.addSystem(system);
-        this.batches.push(batch);
+        this.batchList.push(batch);
         this.batchEmptyFrames.push(0);
-        this.systemToBatchIndex.set(system, this.batches.length - 1);
+        this.batchIndexOf.set(system, this.batchList.length - 1);
     }
 
     /**
@@ -442,12 +456,12 @@ export class BatchedRenderer extends TransformNode {
 
     /** Detaches a system from its batch, leaving the renderer's system list alone. */
     private removeFromBatch(system: IParticleSystem): boolean {
-        const batchIndex = this.systemToBatchIndex.get(system);
+        const batchIndex = this.batchIndexOf.get(system);
         if (batchIndex === undefined) {
             return false;
         }
-        this.batches[batchIndex].removeSystem(system);
-        this.systemToBatchIndex.delete(system);
+        this.batchList[batchIndex].removeSystem(system);
+        this.batchIndexOf.delete(system);
         return true;
     }
 
@@ -458,16 +472,16 @@ export class BatchedRenderer extends TransformNode {
      * system keeps its place in the update order, so this is safe to call mid-frame.
      */
     updateSystem(system: IParticleSystem) {
-        const batchIndex = this.systemToBatchIndex.get(system);
+        const batchIndex = this.batchIndexOf.get(system);
         if (batchIndex !== undefined) {
-            const batch = this.batches[batchIndex];
+            const batch = this.batchList[batchIndex];
             const settings = storedBatchSettings((system as ParticleSystem).getRendererSettings());
             if (
                 batch.systems.size === 1 &&
                 shaderKeyEqual(batch.settings, settings) &&
                 // A batch that already draws with these values takes the system instead, so two
                 // batches never hold the same settings.
-                !this.batches.some((other) => other !== batch && batchSettingsEqual(other.settings, settings))
+                !this.batchList.some((other) => other !== batch && batchSettingsEqual(other.settings, settings))
             ) {
                 batch.applyLiveSettings(settings);
                 return;
@@ -493,7 +507,7 @@ export class BatchedRenderer extends TransformNode {
      */
     setDepthTexture(depth: BaseTexture | DepthRenderer | null, options: DepthTextureOptions = {}) {
         this.depth = depth ? depthBinding(depth, options) : null;
-        for (const batch of this.batches) {
+        for (const batch of this.batchList) {
             batch.applyDepthTexture(this.depth);
         }
     }
@@ -534,7 +548,7 @@ export class BatchedRenderer extends TransformNode {
         if (lighting.ambient) {
             current.ambient = lighting.ambient.clone();
         }
-        for (const batch of this.batches) {
+        for (const batch of this.batchList) {
             batch.applyMeshLighting(current);
         }
     }
@@ -658,19 +672,13 @@ export class BatchedRenderer extends TransformNode {
      */
     update(delta: number): void {
         this.elapsed += delta;
-        if (!this.warnedAboutTransform && !this.getWorldMatrix().isIdentity()) {
-            this.warnedAboutTransform = true;
-            console.warn(
-                `[babylon.quarks] BatchedRenderer "${this.name}" is transformed; particles are placed in the world by their emitters, so the renderer's own transform moves them again. Keep the renderer at the origin.`
-            );
-        }
         const adaptiveState = this.adaptivePerformanceState;
         const frameStart = adaptiveState.enabled ? performance.now() : 0;
         if (adaptiveState.enabled) {
             this.applyAdaptiveQuality();
         }
         const systems = this.orderSystems();
-        const planes = this.cullingEnabled ? this.collectFrustumPlanes() : null;
+        const cameraCount = this.cullingEnabled ? this.collectCameras() : 0;
         const budgetStart =
             this.simulationBudgetMs !== Infinity || this.catchUpBudgetMs !== Infinity ? performance.now() : 0;
         const stepDeadline = this.simulationBudgetMs === Infinity ? Infinity : budgetStart + this.simulationBudgetMs;
@@ -684,11 +692,10 @@ export class BatchedRenderer extends TransformNode {
                 // A system no camera sees pauses, by its own choice. One that
                 // only serves as a sub emitter target follows its parent.
                 system.culled =
-                    planes !== null &&
-                    planes.length > 0 &&
+                    cameraCount > 0 &&
                     system.cullingMode !== 'always' &&
                     system.onlyUsedByOther !== true &&
-                    !this.isSystemInView(system, planes);
+                    !this.isSystemInView(system);
                 system.update(delta, stepDeadline, catchUpDeadline);
             }
             // An autoDestroy system disposes itself from inside update and drops
@@ -721,8 +728,8 @@ export class BatchedRenderer extends TransformNode {
     /** Rebuild instance buffers from current particle state without advancing simulation. */
     refreshBatches(): void {
         const emptyFrames = this.batchEmptyFrames;
-        for (let i = 0; i < this.batches.length; i++) {
-            const batch = this.batches[i];
+        for (let i = 0; i < this.batchList.length; i++) {
+            const batch = this.batchList[i];
             batch.time = this.elapsed;
             if (batch.systems.size > 0) {
                 emptyFrames[i] = 0;
@@ -746,12 +753,12 @@ export class BatchedRenderer extends TransformNode {
 
     /** Disposes the batch at `index` and repairs the system→batch mapping. */
     private removeBatch(index: number): void {
-        this.batches[index].dispose();
-        this.batches.splice(index, 1);
+        this.batchList[index].dispose();
+        this.batchList.splice(index, 1);
         this.batchEmptyFrames.splice(index, 1);
-        for (const [system, batchIndex] of this.systemToBatchIndex) {
+        for (const [system, batchIndex] of this.batchIndexOf) {
             if (batchIndex > index) {
-                this.systemToBatchIndex.set(system, batchIndex - 1);
+                this.batchIndexOf.set(system, batchIndex - 1);
             }
         }
     }
@@ -769,7 +776,7 @@ export class BatchedRenderer extends TransformNode {
         /** The emitter names of the batch's systems. */
         systemNames: string[];
     }> {
-        return this.batches.map((batch, batchIndex) => {
+        return this.batchList.map((batch, batchIndex) => {
             let particleCount = 0;
             const systemNames: string[] = [];
             for (const system of batch.systems) {
@@ -792,10 +799,10 @@ export class BatchedRenderer extends TransformNode {
      * their particles and can be added to another renderer. The renderer cannot be used again.
      */
     dispose(): void {
-        for (const batch of this.batches) {
+        for (const batch of this.batchList) {
             batch.dispose();
         }
-        this.batches = [];
+        this.batchList.length = 0;
         this.batchEmptyFrames.length = 0;
         for (const system of this.systems) {
             if ((system as ParticleSystem)._renderer === this) {
@@ -805,7 +812,7 @@ export class BatchedRenderer extends TransformNode {
         this.systems.length = 0;
         this.orderedSystems = [];
         this.orderedSystemsStale = true;
-        this.systemToBatchIndex.clear();
+        this.batchIndexOf.clear();
         super.dispose();
     }
 }

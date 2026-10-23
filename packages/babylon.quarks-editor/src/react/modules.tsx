@@ -10,6 +10,7 @@ import type {
     ParticleErosionOptions,
     ParticleSystem,
     ParticleUVDistortionOptions,
+    RenderFace,
     ScalingMode,
     SortMode,
     TrailSettings,
@@ -1657,6 +1658,19 @@ export function RendererModule({
                         />
                     </Row>
                 </>
+            )}
+            {isMesh && (
+                <Row label="Render face">
+                    <SelectField
+                        value={system.renderFace}
+                        options={[
+                            {value: 'both', label: 'Both'},
+                            {value: 'front', label: 'Front'},
+                            {value: 'back', label: 'Back'},
+                        ]}
+                        onChange={(face) => binding.apply((s) => (s.renderFace = face as RenderFace))}
+                    />
+                </Row>
             )}
             <Row label="Sort mode">
                 <SelectField
