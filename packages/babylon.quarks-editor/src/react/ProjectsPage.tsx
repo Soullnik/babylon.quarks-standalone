@@ -88,6 +88,18 @@ function StorageBar(props: {estimate: StorageEstimate | null; onPersist: () => v
     );
 }
 
+/** What the projects page shows: the store's projects and usage, or why it could not read them. */
+type ProjectListing = {list: ProjectMeta[]; storage: StorageEstimate} | {error: string};
+
+async function listProjects(store: ProjectsPageProps['store']): Promise<ProjectListing> {
+    try {
+        const [list, storage] = await Promise.all([store.listProjects(), store.estimate()]);
+        return {list, storage};
+    } catch (err) {
+        return {error: err instanceof Error ? err.message : String(err)};
+    }
+}
+
 /** Start page: the projects saved in the store, plus storage usage. */
 export function ProjectsPage(props: ProjectsPageProps): React.ReactElement {
     const {store, onOpen, title = 'Effect editor', backLink} = props;
@@ -97,20 +109,26 @@ export function ProjectsPage(props: ProjectsPageProps): React.ReactElement {
     const [menu, setMenu] = useState<{x: number; y: number; items: ContextMenuItem[]} | null>(null);
     const [error, setError] = useState<string | null>(null);
 
-    const reload = useCallback(async () => {
-        try {
-            const [list, storage] = await Promise.all([store.listProjects(), store.estimate()]);
-            setProjects(list);
-            setEstimate(storage);
-        } catch (err) {
-            setError(err instanceof Error ? err.message : String(err));
+    const show = useCallback((listing: ProjectListing) => {
+        if ('error' in listing) {
+            setError(listing.error);
             setProjects([]);
+        } else {
+            setProjects(listing.list);
+            setEstimate(listing.storage);
         }
-    }, [store]);
+    }, []);
+    const reload = useCallback(async () => show(await listProjects(store)), [store, show]);
 
     useEffect(() => {
-        void reload();
-    }, [reload]);
+        let cancelled = false;
+        void listProjects(store).then((listing) => {
+            if (!cancelled) show(listing);
+        });
+        return () => {
+            cancelled = true;
+        };
+    }, [store, show]);
 
     const run = (action: () => Promise<unknown>) => {
         setDialog(null);

@@ -106,10 +106,13 @@ export function TimelinePanel(props: TimelinePanelProps): React.ReactElement {
 
     const focusRootId = binding.root.uniqueId;
 
-    React.useEffect(() => {
+    // Another effect starts with every system shown and nothing selected.
+    const [shownBinding, setShownBinding] = useState(binding);
+    if (binding !== shownBinding) {
+        setShownBinding(binding);
         setHiddenSystems(new Set());
         setGroupSelection(new Set());
-    }, [binding]);
+    }
 
     const toggleGroupSelect = (node: TransformNode) => {
         setGroupSelection((prev) => {
@@ -215,17 +218,18 @@ export function TimelinePanel(props: TimelinePanelProps): React.ReactElement {
     ]);
 
     const visibleRows = useMemo(() => {
+        const visible: typeof rows = [];
         let hideUntilDepth: number | null = null;
-        const visible = rows.filter((row) => {
+        for (const row of rows) {
             if (hideUntilDepth !== null) {
-                if (row.depth > hideUntilDepth) return false;
+                if (row.depth > hideUntilDepth) continue;
                 hideUntilDepth = null;
             }
             if (row.kind === 'group' && collapsedGroups.has(row.node)) {
                 hideUntilDepth = row.depth;
             }
-            return true;
-        });
+            visible.push(row);
+        }
         return visible;
     }, [rows, collapsedGroups]);
 
