@@ -38,7 +38,7 @@ export class OrbitOverLife implements Behavior {
     constructor(
         /** Angular speed around the axis over the particle's life, in radians per second. */
         public orbitSpeed: FunctionValueGenerator | ValueGenerator,
-        /** The axis orbited, in {@link space}; its length is ignored. */
+        /** The axis orbited, in {@link OrbitOverLife.space | space}; its length is ignored. */
         public axis: Vector3 = new Vector3(0, 1, 0),
         /** The space the axis and the pivot are authored in; `'local'` (the emitter's) by default. */
         public space: BehaviorSpace = 'local'

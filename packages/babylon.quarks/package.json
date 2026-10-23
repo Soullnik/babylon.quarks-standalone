@@ -35,7 +35,7 @@
         "build": "npm run clean && npm run build:types && npm run build:js",
         "test": "jest",
         "docs": "typedoc",
-        "docs:check": "typedoc --emit none",
+        "docs:check": "typedoc --out node_modules/.cache/typedoc-check",
         "prettier": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\""
     },
     "repository": {
