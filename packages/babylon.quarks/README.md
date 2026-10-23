@@ -19,6 +19,7 @@ High-performance particle system for [Babylon.js](https://www.babylonjs.com/). B
 - **Render modes** — billboard, vertical/horizontal billboard, stretched billboard, mesh particles, **trails** and **beams** (not available in Babylon's built-in particle systems).
 - **Sub-emitters** and a rich set of composable behaviors (color/size/speed over life, noise turbulence, forces, attractors, collision, and more from `quarks.core`).
 - **Texture effects** — per-texture UV layout (UV channel, tiling, offset, scroll), gradient maps, alpha erosion, UV distortion, flip, texture tile animation with blending, soft particles, custom blend functions, rim lighting on mesh particles, smoothed trails with curve tension.
+- **Trails** — texture modes (stretch, tile, per segment) with a texture scale, a minimum vertex distance and a lifetime (Unity's TrailRenderer settings), swept weapon trails along an emitter axis, world-space recording behind a moving emitter, and `clearTrails()` for teleports.
 - **Scene integration** — render order and rendering groups, layer masks, fog, bounds and frustum culling with Unity's culling modes, sort modes, screen-size limits, and an `EffectPool` that plays one-shot effects without allocating.
 - **Visual authoring** — design effects in our own [effect editor](https://soullnik.github.io/babylon.quarks-standalone/editor.html) or export them from Unity, then load with `QuarksLoader` (quarks.art-exported JSON also works — same format).
 - **Cross-engine format** — the same effect JSON runs in three.js (three.quarks) and Babylon.js.

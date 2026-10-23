@@ -4,7 +4,7 @@ import {ConstantColor, ConstantValue, PointEmitter, TrailParticle, TrailSettings
 import {BatchedRenderer} from '../src/BatchedRenderer';
 import {ParticleSystem} from '../src/ParticleSystem';
 import {TrailBatch} from '../src/TrailBatch';
-import {MAX_TRAIL_TESSELLATION, trailCurveTension, trailTessellation} from '../src/trailCurve';
+import {MAX_TRAIL_TESSELLATION, trailCurveTension, trailTessellation} from '../src/trailSettings';
 import {RenderMode} from '../src/VFXBatch';
 
 let engine: NullEngine;

@@ -5,7 +5,7 @@ import {Behavior} from './Behavior';
 /**
  * Shapes a trail's width along its length — Unity's Width over Trail.
  *
- * The curve runs from the head (0) to the tail (1) and, by default, is a
+ * The curve runs from the head (0) to the tail (1), the trail's oldest sample, and, by default, is a
  * multiplier on the width each sample was recorded with (the particle's
  * `size.x` at that moment): a curve from 1 to 0 tapers the trail from the
  * particle's size at the head down to nothing at the tail, whatever that size
@@ -47,9 +47,10 @@ export class WidthOverLength implements Behavior {
         const capacity = particle.historyCapacity;
         const sizes = particle.historySizes;
         const baseSizes = particle.historyBaseSizes;
-        // The oldest sample sits at 1. A fractional or zero length falls short of the capacity the
-        // history keeps, so measure by whichever is longer and never sample the curve past its end.
-        const invLength = 1 / Math.max(particle.length, capacity);
+        // The curve spans the samples the trail holds now, the oldest at 1 (Unity's width curve runs
+        // over the trail as it is), so a trail cut short by its lifetime or minimum vertex distance
+        // still reaches the curve's end, and a young one shows the whole curve.
+        const invLength = 1 / count;
         const absolute = this.absolute;
         // Walk the ring buffer oldest-first, wrapping by hand so the loop stays
         // free of divisions.

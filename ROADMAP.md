@@ -61,6 +61,11 @@ In rough priority order; each is a few days of work.
   in #18 stands. Worth doing as the headline of a 1.0.
 - **Per-particle ribbon trails** on billboard systems (Unity's Trails module): a different
   render architecture from the trail render mode.
+- **Beams as ribbons** (Niagara's beam emitter): a beam is one quad from each particle to one
+  end point per system. Tangents at both ends, subdivisions along the beam, noise and a per-particle
+  end would make it a ribbon; the trail batch is the natural host.
+- **Trail tessellation by curvature or screen size** instead of a fixed count, and a trail
+  vertex format with RGBA8 colour and neighbours by vertex id (see Perf, round two).
 - **Node-based authoring**: not planned. Babylon's own Node Particle Editor covers it, and a
   graph only pays off once it compiles to GPU code.
 

@@ -56,7 +56,15 @@ export {shaderVariants} from './shaderVariants';
 export type {ShaderVariant} from './shaderVariants';
 export {decodeSoftDepth, softDepthParams} from './softDepth';
 export type {DepthTextureOptions, SoftDepthEncoding} from './softDepth';
-export {MAX_TRAIL_TESSELLATION, trailCurveTension, trailTessellation} from './trailCurve';
+export {
+    MAX_TRAIL_TESSELLATION,
+    trailCurveTension,
+    trailLifetime,
+    trailMinVertexDistance,
+    trailTessellation,
+    trailTextureMode,
+    trailTextureScale,
+} from './trailSettings';
 export {
     defaultMeshLighting,
     EROSION_DEFAULT_SOFTNESS,

@@ -332,11 +332,11 @@ describe('TrailBatch', () => {
             });
             copy.dispose();
         }
-        // Flags left off stay out of the JSON.
+        // Flags left off stay out of the JSON, `followLocalOrigin: false` included.
         const plain = createTrailSystem();
         expect(
             Object.keys(plain.toJSON({textures: {}, materials: {}, geometries: {}} as any).rendererEmitterSettings!)
-        ).toEqual(['startLength', 'followLocalOrigin']);
+        ).toEqual(['startLength']);
         plain.dispose();
         system.dispose();
     });

@@ -542,7 +542,7 @@ describe('texture effects', () => {
             const before = batch.maxParticles;
             batch.expandBuffers(before * 3);
             expect(batch.uv1Buffer).toBeInstanceOf(Float32Array);
-            expect(batch.uv1Buffer.length).toBe(batch.maxParticles * 4);
+            expect(batch.uv1Buffer.length).toBe(batch.maxParticles * 2);
             expect(batch.mesh.getVerticesData('uv2')).toBeTruthy();
 
             const along = (uvFromHead: boolean) => {

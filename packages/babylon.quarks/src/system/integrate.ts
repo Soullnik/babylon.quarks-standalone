@@ -10,6 +10,7 @@ import {
     Vector3,
 } from 'quarks.core';
 import type {VFXBatchSettings} from '../BatchedRenderer';
+import {trailLifetime, trailMinVertexDistance} from '../trailSettings';
 import type {BoundsTracker} from './BoundsTracker';
 import {SIMULATION_STEP} from './SimulationClock';
 
@@ -321,8 +322,10 @@ export function moveTrails(
 /**
  * Records this step's sample into each trail's history: its position (in world space when the
  * trail asks for it and the system is not already there) and, for a swept trail, the side axis
- * as the emitter holds it, in the space the positions are recorded in. A trail that dies with
- * its particle has its history emptied instead, so the removal pass takes it this same step.
+ * as the emitter holds it, in the space the positions are recorded in. With a minimum vertex
+ * distance the newest sample follows the particle until it is that far from the sample before;
+ * samples older than the trail's lifetime are dropped from the tail. A trail that dies with its
+ * particle has its history emptied instead, so the removal pass takes it this same step.
  */
 export function recordTrailHistory(
     particles: Particle[],
@@ -336,15 +339,28 @@ export function recordTrailHistory(
     const recordWorldSpace = trailSettings.recordWorldSpace && !worldSpace;
     const sideAxis = trailSettings.sideAxis;
     const sidesInWorld = worldSpace || Boolean(trailSettings.recordWorldSpace);
+    const minDistance = trailMinVertexDistance(trailSettings);
+    const lifetime = trailLifetime(trailSettings);
     for (let i = 0; i < particleCount; i++) {
         const trail = particles[i] as TrailParticle;
-        if (dieWithParticle && trail.age >= trail.life) {
+        // A particle at the end of its life is dead: it records nothing more and its trail fades.
+        const alive = trail.age < trail.life;
+        if (dieWithParticle && !alive) {
             trail.resetHistory();
             continue;
         }
-        trail.update();
+        // The newest sample follows the particle until it is the minimum distance from the sample
+        // before it; then it is fixed where it is and this step's sample starts a new one.
+        let replaceHead = false;
+        if (minDistance > 0 && alive && trail.historyCount > 1) {
+            const distances = trail.historyDistances;
+            const count = trail.historyCount;
+            replaceHead =
+                distances[trail.getHistoryIndex(count - 1)] - distances[trail.getHistoryIndex(count - 2)] < minDistance;
+        }
+        trail.update(replaceHead, !recordWorldSpace);
         // update() wrote a sample only while the particle is alive.
-        if (recordWorldSpace && trail.age <= trail.life) {
+        if (recordWorldSpace && alive) {
             const offset = ((trail.historyHead + trail.historyCapacity - 1) % trail.historyCapacity) * 3;
             const positions = trail.historyPositions;
             tempV.set(positions[offset], positions[offset + 1], positions[offset + 2]);
@@ -352,8 +368,16 @@ export function recordTrailHistory(
             positions[offset] = tempV.x;
             positions[offset + 1] = tempV.y;
             positions[offset + 2] = tempV.z;
+            trail.measureHeadDistance();
         }
-        if (sideAxis && trail.age <= trail.life) {
+        if (lifetime !== Infinity) {
+            const ages = trail.historyAges;
+            const age = trail.age;
+            while (trail.historyCount > 0 && age - ages[trail.getHistoryIndex(0)] > lifetime) {
+                trail.dropOldest();
+            }
+        }
+        if (sideAxis && alive) {
             trail.ensureSideHistory();
             const offset = ((trail.historyHead + trail.historyCapacity - 1) % trail.historyCapacity) * 3;
             const sides = trail.historySides;
