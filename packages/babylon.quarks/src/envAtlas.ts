@@ -10,6 +10,8 @@ const atlasesByCube = new WeakMap<BaseTexture, Map<Scene, Texture>>();
 const pendingByCube = new WeakMap<BaseTexture, Map<Scene, Promise<Texture | null>>>();
 /** Atlases this module built, which it disposes; an atlas given to {@link cacheEnvAtlas} stays the caller's. */
 const builtAtlases = new WeakSet<Texture>();
+/** Cubes whose atlas failed to build: not tried, or warned about, again. */
+const failedCubes = new WeakSet<BaseTexture>();
 /** Atlases whose dispose this module already listens to. */
 const watchedAtlases = new WeakSet<Texture>();
 /** Cubes whose dispose this module already listens to. */
@@ -146,7 +148,8 @@ export const envAtlasBuilder = {
 /**
  * Ensures a 3×2 env atlas exists for a CubeTexture in `scene`. Returns a cached atlas
  * synchronously when available; otherwise starts (or joins) an async build and invokes onReady
- * when the atlas is usable. A cube disposed before its build finishes gets no atlas.
+ * when the atlas is usable. A cube disposed before its build finishes gets no atlas, and one
+ * whose build failed is not tried again: it warns once.
  */
 export function ensureEnvAtlasFromCube(
     cube: BaseTexture,
@@ -178,7 +181,7 @@ export function ensureEnvAtlasFromCube(
         }
 
         const urls = cubeFaceUrls(cube);
-        if (!urls) {
+        if (!urls || failedCubes.has(cube)) {
             return;
         }
 
@@ -206,6 +209,7 @@ export function ensureEnvAtlasFromCube(
             })
             .catch((err) => {
                 settle();
+                failedCubes.add(cube);
                 console.warn('[babylon.quarks] Failed to build env atlas from cubemap faces', err);
                 return null;
             });

@@ -33,3 +33,9 @@ describe('PiecewiseBezier', () => {
         expect(piecewiseBezier.genValue([], 1)).toBeCloseTo(0.85625, 5);
     });
 });
+
+describe('PiecewiseBezier.toSVG', () => {
+    it('draws nothing for a curve with no pieces', () => {
+        expect(new PiecewiseBezier([]).toSVG(100, 10)).toBe('');
+    });
+});

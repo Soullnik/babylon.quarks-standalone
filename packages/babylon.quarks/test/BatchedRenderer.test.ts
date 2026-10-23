@@ -36,6 +36,24 @@ describe('BatchedRenderer', () => {
             renderMode: RenderMode.BillBoard,
         });
 
+    it('refuses a system of another scene', () => {
+        const other = new Scene(engine);
+        const renderer = new BatchedRenderer('batcher-scene', scene);
+        const system = new ParticleSystem({scene: other, shape: new PointEmitter()});
+        expect(() => renderer.addSystem(system)).toThrow('the system belongs to another scene');
+        expect(renderer['systems']).toHaveLength(0);
+        system.dispose();
+        renderer.dispose();
+        other.dispose();
+    });
+
+    it('keeps the lowest quality at the floor setQualityFactor clamps to', () => {
+        const renderer = new BatchedRenderer('batcher-floor', scene);
+        renderer.configureAdaptivePerformance({minQuality: 0.01});
+        expect(renderer['adaptivePerformanceState'].minQuality).toBe(0.1);
+        renderer.dispose();
+    });
+
     it('reuses the same batch for equivalent systems', () => {
         const renderer = new BatchedRenderer('batcher-equal', scene);
         const a = createSystem();

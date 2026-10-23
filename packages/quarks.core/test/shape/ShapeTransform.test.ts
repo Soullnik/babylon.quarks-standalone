@@ -154,3 +154,13 @@ describe('ShapeTransform', () => {
         }
     });
 });
+
+describe('ShapeTransform.fromJSON', () => {
+    it('reads a rotation as a unit quaternion, and a zero one as the identity', () => {
+        const scaled = ShapeTransform.fromJSON({rotation: [0, 0, 2, 2]})!.rotation;
+        expect(scaled.length()).toBeCloseTo(1, 9);
+        expect(scaled.z).toBeCloseTo(Math.SQRT1_2, 9);
+        const zero = ShapeTransform.fromJSON({rotation: [0, 0, 0, 0]})!.rotation;
+        expect([zero.x, zero.y, zero.z, zero.w]).toEqual([0, 0, 0, 1]);
+    });
+});

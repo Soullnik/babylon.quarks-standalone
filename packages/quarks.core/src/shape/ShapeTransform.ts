@@ -6,7 +6,10 @@ import type {ShapeJSON} from './EmitterUtil';
 export interface ShapeTransformJSON {
     /** Offset of the shape, `[x, y, z]`. Omitted when zero. */
     position?: number[];
-    /** Rotation of the shape as a quaternion, `[x, y, z, w]`. Omitted when identity. */
+    /**
+     * Rotation of the shape as a quaternion, `[x, y, z, w]`. Omitted when identity. Read scaled to
+     * length 1, and a zero one as the identity.
+     */
     rotation?: number[];
     /** Scale of the shape, `[x, y, z]`. Omitted when `[1, 1, 1]`. */
     scale?: number[];
@@ -85,7 +88,7 @@ export class ShapeTransform {
         const {position: t, rotation: r, scale: s} = json;
         return new ShapeTransform(
             t ? new Vector3(t[0], t[1], t[2]) : undefined,
-            r ? new Quaternion(r[0], r[1], r[2], r[3]) : undefined,
+            r ? new Quaternion(r[0], r[1], r[2], r[3]).normalize() : undefined,
             s ? new Vector3(s[0], s[1], s[2]) : undefined
         );
     }

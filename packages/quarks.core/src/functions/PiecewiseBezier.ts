@@ -160,7 +160,7 @@ export class PiecewiseBezier extends PiecewiseFunction<Bezier> implements Functi
      * segments; empty below one segment.
      */
     toSVG(length: number, segments: number) {
-        if (segments < 1) return '';
+        if (segments < 1 || this.functions.length === 0) return '';
         let result = ['M', 0, this.functions[0][0].p[0]].join(' ');
         for (let i = 1.0 / segments; i <= 1; i += 1.0 / segments) {
             result = [result, 'L', i * length, this.genValueExact(i)].join(' ');

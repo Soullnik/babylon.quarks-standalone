@@ -1,4 +1,5 @@
 import {
+    AxisAngleGenerator,
     Behavior,
     ColorOverLife,
     ConstantValue,
@@ -7,6 +8,7 @@ import {
     ParticleStore,
     planBehaviorFusion,
     Quaternion,
+    Rotation3DOverLife,
     RotationOverLife,
     SpriteParticle,
     Vector3,
@@ -91,5 +93,23 @@ describe('RotationOverLife on mesh particles', () => {
         behavior.update(particle, DELTA);
         expect(particle.rotation).toBeCloseTo(0.25 + RATE * DELTA, 6);
         expect(particle.angularVelocity).toBe(RATE);
+    });
+});
+
+describe('Rotation3DOverLife', () => {
+    it('starts each mesh particle’s step at no turn, in its own row', () => {
+        const store = new ParticleStore(2);
+        const a = meshParticle(store, 0, START);
+        const b = meshParticle(store, 1, START);
+        const behavior = new Rotation3DOverLife(new AxisAngleGenerator(new Vector3(0, 0, 1), new ConstantValue(RATE)));
+        behavior.initialize(a);
+        behavior.update(a, DELTA);
+        behavior.initialize(b);
+        expectQuaternion(b.angularVelocity as Quaternion, new Quaternion());
+        expect(a.angularVelocity).not.toBe(b.angularVelocity);
+        expectQuaternion(
+            a.angularVelocity as Quaternion,
+            new Quaternion().setFromAxisAngle(new Vector3(0, 0, 1), RATE * DELTA)
+        );
     });
 });

@@ -167,6 +167,8 @@ and the project follows the `quarks.core` 0.x version line.
 - `MeshSettings.startRotationX`, `startRotationY` and `startRotationZ`, which nothing reads, are
   optional and deprecated; a mesh particle's start rotation about each axis is the system's
   `startRotation`, an `EulerGenerator`.
+- `EulerGenerator.eular`, a misspelling: the Euler is `EulerGenerator.euler`, and `eular` is a
+  read-only alias of it.
 
 ### Added
 
@@ -221,6 +223,20 @@ and the project follows the `quarks.core` 0.x version line.
 
 ### Fixed
 
+- `new Gradient()` with no keys runs from black to white. Both colour keys were at 0, so it was
+  white everywhere after the start.
+- `PiecewiseBezier.toSVG` returns an empty path for a curve with no pieces instead of throwing.
+- A shape transform's rotation is read as a unit quaternion, and a zero one as the identity, so a
+  hand-written or rounded rotation no longer scales the shape.
+- `Rotation3DOverLife` no longer allocates a quaternion for each mesh particle it starts.
+- `BatchedRenderer.addSystem` throws for a system of another scene instead of building a batch
+  that holds two scenes' meshes and materials.
+- `configureAdaptivePerformance` keeps `minQuality` at 0.1 or more, the floor
+  `ParticleSystem.setQualityFactor` clamps to and the documented range; it allowed 0.05.
+- The 1×1 white map mesh batches share is made again after something outside disposes it, instead
+  of binding a disposed texture.
+- An env atlas that fails to build from a cube's faces is not tried again for that cube, so it
+  warns once instead of once per system.
 - `ApplySequences` keeps each particle's place in a `WeakMap` instead of fields added to the
   particle, reuses that state when a pooled particle is emitted again instead of allocating two
   vectors, and moves a particle straight to its point when a sequence's range has no length (it

@@ -162,3 +162,14 @@ describe('Gradient', () => {
         warn.mockRestore();
     });
 });
+
+describe('the default Gradient', () => {
+    it('runs from black at 0 to white at 1, opaque', () => {
+        const gradient = new Gradient();
+        const out = new Vector4();
+        gradient.startGen([]);
+        expect(gradient.genColor([], out, 0).toArray()).toEqual([0, 0, 0, 1]);
+        expect(gradient.genColor([], out, 1).toArray()).toEqual([1, 1, 1, 1]);
+        expect(gradient.genColor([], out, 0.5).x).toBeCloseTo(0.5, 2);
+    });
+});

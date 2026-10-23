@@ -4,6 +4,9 @@ import {Quaternion} from '../math';
 import {Particle, SpriteParticle} from '../Particle';
 import {Behavior, BehaviorJSON} from './Behavior';
 
+/** No turn: what each particle's step starts at. Never written to. */
+const IDENTITY = new Quaternion();
+
 /** The JSON of a 3D rotation over life: a {@link Rotation3DOverLife}. */
 export interface Rotation3DOverLifeJSON extends BehaviorJSON {
     /** The angular velocity. */
@@ -26,7 +29,9 @@ export class Rotation3DOverLife implements Behavior {
 
     initialize(particle: Particle): void {
         if (particle.rotation instanceof Quaternion) {
-            (particle as SpriteParticle).angularVelocity = new Quaternion();
+            // A sprite particle copies it into its own store row, so one shared identity does for
+            // every spawn; any other particle keeps what it is given.
+            particle.angularVelocity = particle instanceof SpriteParticle ? IDENTITY : new Quaternion();
             (this.angularVelocity as RotationGenerator).startGen(particle.memory);
         }
     }

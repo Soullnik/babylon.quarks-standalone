@@ -37,6 +37,13 @@ export class SpriteBatch extends VFXBatch {
             texture = RawTexture.CreateRGBATexture(new Uint8Array([255, 255, 255, 255]), 1, 1, scene);
             texture.name = 'quarksMeshWhite';
             SpriteBatch.whiteTextureByScene.set(scene, texture);
+            // Disposed from outside (a scene-wide texture sweep): the next batch makes a new one.
+            const made = texture;
+            texture.onDisposeObservable.addOnce(() => {
+                if (SpriteBatch.whiteTextureByScene.get(scene) === made) {
+                    SpriteBatch.whiteTextureByScene.delete(scene);
+                }
+            });
         }
         return texture;
     }
