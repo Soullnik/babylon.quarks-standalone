@@ -17,9 +17,9 @@ export interface ValueGenerator {
      * Rolls whatever the generator picks at random into `memory`, before the first {@link
      * ValueGenerator.genValue}.
      */
-    startGen(memory: any): void;
+    startGen(memory: GeneratorMemory): void;
     /** The number, from what `memory` holds. */
-    genValue(memory: any): number;
+    genValue(memory: GeneratorMemory): number;
     /** See FunctionValueGenerator.refreshTable. */
     refreshTable?(): void;
     /** The generator's JSON. */

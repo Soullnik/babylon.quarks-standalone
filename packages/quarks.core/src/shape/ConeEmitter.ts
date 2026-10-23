@@ -6,9 +6,8 @@ import {
     ValueGeneratorFromJSON,
 } from '../functions';
 import {EmissionState, IParticleSystem} from '../IParticleSystem';
-import {MathUtils} from '../math';
 import {Particle} from '../Particle';
-import {random} from '../util/random';
+import {shellRadius} from '../util/MathUtil';
 import {EmitterMode, EmitterShape, getValueFromEmitterMode, ShapeJSON} from './EmitterUtil';
 import {ShapeTransform} from './ShapeTransform';
 
@@ -17,21 +16,26 @@ import {ShapeTransform} from './ShapeTransform';
  */
 export interface ConeEmitterParameters {
     /**
-     * The radius of the cone base.
+     * Radius of the cone's base disc, in the xy plane; a negative value is read as 0. Defaults
+     * to 10.
      */
     radius?: number;
     /**
-     * The arc of the cone.
+     * Arc of the cone that particles start in, in radians around +z from +x (Unity's Arc, which
+     * its inspector shows in degrees); 2π, the default, for the whole cone.
      */
     arc?: number;
     /**
-     * The thickness of the cone. 1 is a full cone, 0 is a cone with 0 thickness.
+     * Radius Thickness, as in Unity: how far in from the base's rim particles may start, as a fraction of
+     * the radius, clamped to [0, 1]. 0 is the base's rim only; 1, the default, fills the whole base, evenly
+     * over its area.
      */
     thickness?: number;
     /**
-     * The angle of the cone, ranging from 0 to Math.PI / 2.
+     * Opening angle of the cone in radians, clamped to [0, π/2] (Unity's Angle, 0 to 90 degrees).
+     * Defaults to π/6.
      */
-    angle?: number; // [0, Math.PI / 2]
+    angle?: number;
     /**
      * The mode of the emitter.
      * {@link EmitterMode}
@@ -64,17 +68,17 @@ export class ConeEmitter implements EmitterShape {
     /** Radius of the disc particles start on. */
     radius: number;
     /** Arc of the disc, in radians, that particles start in; 2π for the whole disc. */
-    arc: number; // [0, Math.PI * 2]
+    arc: number;
     /**
      * How far in from the rim particles may start, as a fraction of the radius (Unity's Radius
-     * Thickness): 0 on the rim, 1 anywhere on the disc, spread evenly over the area.
+     * Thickness): 0 on the rim, 1 anywhere on the disc, spread evenly over the area; clamped to [0, 1].
      */
-    thickness: number; // [0, 1]
+    thickness: number;
     /**
      * Angle in radians between z and the direction of a particle that starts at the rim, from 0 to
      * π/2.
      */
-    angle: number; // [0, Math.PI / 2]
+    angle: number;
     /** How the start point moves along the arc, see {@link EmitterMode}. */
     mode: EmitterMode;
     /**
@@ -121,9 +125,8 @@ export class ConeEmitter implements EmitterShape {
     initialize(p: Particle, emissionState: EmissionState) {
         const u = getValueFromEmitterMode(this.mode, this.currentValue, this.spread, emissionState);
         // Uniform over the area of the ring between radius 1 - thickness and 1 (Unity's Radius
-        // Thickness): the squared radius is what is uniform.
-        const inner = 1 - MathUtils.clamp(this.thickness, 0, 1);
-        const r = Math.sqrt(MathUtils.lerp(inner * inner, 1, random()));
+        // Thickness).
+        const r = shellRadius(this.thickness, 2);
         const theta = u * this.arc;
         const sinTheta = Math.sin(theta);
         const cosTheta = Math.cos(theta);
@@ -131,10 +134,15 @@ export class ConeEmitter implements EmitterShape {
         p.position.y = r * sinTheta;
         p.position.z = 0;
 
-        const angle = this.angle * r;
-        p.velocity.set(0, 0, Math.cos(angle)).addScaledVector(p.position, Math.sin(angle)).multiplyScalar(p.startSpeed);
-        //const v = random();
-        p.position.multiplyScalar(this.radius);
+        // Unity's cone opens between 0 and 90 degrees.
+        const angle = Math.min(Math.max(this.angle, 0), Math.PI / 2) * r;
+        // The direction tilts from +z toward the point by the angle; normalised, since the point is
+        // inside the unit disc and the tilt alone would slow particles away from the rim.
+        p.velocity
+            .set(0, 0, Math.cos(angle))
+            .addScaledVector(p.position, r > 0 ? Math.sin(angle) / r : 0)
+            .multiplyScalar(p.startSpeed);
+        p.position.multiplyScalar(Math.max(0, this.radius));
         this.transform?.apply(p);
     }
 

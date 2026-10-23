@@ -4,6 +4,8 @@ import {GeneratorMemory} from './GeneratorMemory';
 import {RotationGenerator} from './RotationGenerator';
 import {FunctionValueGenerator, ValueGenerator, ValueGeneratorFromJSON} from './ValueGenerator';
 
+const unitAxis = new Vector3();
+
 /**
  * A rotation about a fixed axis by an angle from a number generator (radians, or radians per second
  * over a particle's life).
@@ -12,7 +14,7 @@ export class AxisAngleGenerator implements RotationGenerator {
     /** Always `'rotation'`. */
     type: 'rotation';
     /**
-     * @param axis - The axis; must be a unit vector.
+     * @param axis - The axis. Any length: it is normalised when used, and a zero axis is read as +z.
      * @param angle - The angle in radians, scaled by `delta` in {@link
      *   AxisAngleGenerator.genValue}.
      */
@@ -33,7 +35,11 @@ export class AxisAngleGenerator implements RotationGenerator {
      * @returns `quat`.
      */
     genValue(memory: GeneratorMemory, quat: Quaternion, delta: number, t?: number): Quaternion {
-        return quat.setFromAxisAngle(this.axis, this.angle.genValue(memory, t!) * delta);
+        const axis = this.axis;
+        const lengthSq = axis.lengthSq();
+        if (lengthSq === 0) unitAxis.set(0, 0, 1);
+        else unitAxis.copy(axis).multiplyScalar(1 / Math.sqrt(lengthSq));
+        return quat.setFromAxisAngle(unitAxis, this.angle.genValue(memory, t!) * delta);
     }
 
     /** The JSON form, `{type: 'AxisAngle', axis, angle}`. */

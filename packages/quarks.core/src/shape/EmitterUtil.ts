@@ -1,3 +1,4 @@
+import type {FunctionJSON} from '../functions/FunctionJSON';
 import {EmissionState, IParticleSystem} from '../IParticleSystem';
 import {Particle} from '../Particle';
 import {random} from '../util/random';
@@ -29,7 +30,7 @@ export interface ShapeJSON {
     height?: number;
     /** Depth of a box. */
     depth?: number;
-    /** Where a box emits from (its volume, shell or edges), as the box's enum value. */
+    /** Where a box emits from (its volume, shell or edges), a `BoxEmitFrom` value. */
     emitFrom?: number;
     /** Thickness of a box's shell along x, y and z. */
     boxThickness?: number[];
@@ -46,7 +47,7 @@ export interface ShapeJSON {
     /** Spread of the arc: emission points snap to multiples of it; 0 for none. */
     spread?: number;
     /** Speed of the arc sweep in arcs per second, a value generator's JSON. */
-    speed?: any;
+    speed?: FunctionJSON;
     /** Local offset / rotation / scale of the shape; omitted when there is none. */
     transform?: ShapeTransformJSON;
 }

@@ -6,9 +6,9 @@ import {
     ValueGeneratorFromJSON,
 } from '../functions';
 import {EmissionState, IParticleSystem} from '../IParticleSystem';
-import {MathUtils, Matrix4, Quaternion} from '../math';
+import {Matrix4, Quaternion} from '../math';
 import {Particle} from '../Particle';
-import {UP_VEC3, ZERO_VEC3} from '../util/MathUtil';
+import {shellRadius, UP_VEC3, ZERO_VEC3} from '../util/MathUtil';
 import {random} from '../util/random';
 import {EmitterMode, EmitterShape, getValueFromEmitterMode, ShapeJSON} from './EmitterUtil';
 import {ShapeTransform} from './ShapeTransform';
@@ -18,15 +18,18 @@ import {ShapeTransform} from './ShapeTransform';
  */
 export interface SphereEmitterParameters {
     /**
-     * The radius of the sphere.
+     * Radius of the sphere; a negative value is read as 0. Defaults to 10.
      */
     radius?: number;
     /**
-     * The arc of the sphere.
+     * Arc of the sphere that particles start in, in radians around +z from +x (Unity's Arc, which
+     * its inspector shows in degrees); 2π, the default, for the whole sphere.
      */
     arc?: number;
     /**
-     * The thickness of the sphere. 1 is a full sphere, 0 is a thin shell.
+     * Radius Thickness, as in Unity: how far in from the surface particles may start, as a fraction
+     * of the radius, clamped to [0, 1]. 0 is the surface only; 1, the default, fills the whole
+     * sphere, evenly over its volume.
      */
     thickness?: number;
     /**
@@ -64,9 +67,9 @@ export class SphereEmitter implements EmitterShape {
     arc: number;
     /**
      * How far in from the surface particles may start, as a fraction of the radius: 0 on the
-     * surface, 1 anywhere down to the centre.
+     * surface, 1 anywhere down to the centre, evenly over the volume; clamped to [0, 1].
      */
-    thickness: number; //[0, 1]
+    thickness: number;
     /** How the start point moves along the arc, see {@link EmitterMode}. */
     mode: EmitterMode;
     /**
@@ -123,7 +126,7 @@ export class SphereEmitter implements EmitterShape {
     initialize(p: Particle, emissionState: EmissionState) {
         const u = getValueFromEmitterMode(this.mode, this.currentValue, this.spread, emissionState);
         const v = random();
-        const rand = MathUtils.lerp(1 - this.thickness, 1, random());
+        const rand = shellRadius(this.thickness, 3);
         const theta = u * this.arc;
         const phi = Math.acos(2.0 * v - 1.0);
         const sinTheta = Math.sin(theta);
@@ -135,7 +138,7 @@ export class SphereEmitter implements EmitterShape {
         p.position.z = cosPhi;
 
         p.velocity.copy(p.position).multiplyScalar(p.startSpeed);
-        p.position.multiplyScalar(this.radius * rand);
+        p.position.multiplyScalar(Math.max(0, this.radius) * rand);
 
         // Default facing-outward orientation, but defer to startRotation if set.
         if (p.rotation instanceof Quaternion) {
@@ -163,7 +166,7 @@ export class SphereEmitter implements EmitterShape {
     }
 
     /** Reads {@link SphereEmitter.toJSON} output; a field the JSON leaves out takes its default. */
-    static fromJSON(json: any): SphereEmitter {
+    static fromJSON(json: ShapeJSON): SphereEmitter {
         return new SphereEmitter({
             radius: json.radius,
             arc: json.arc,

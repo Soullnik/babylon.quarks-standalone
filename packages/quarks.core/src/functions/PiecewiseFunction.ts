@@ -58,10 +58,15 @@ export abstract class PiecewiseFunction<T> {
         if (index + 1 < this.functions.length) this.functions[index + 1][1] = x;
     }
 
-    /** Inserts `func` as a piece starting at `t`, after the piece `t` falls in. */
+    /**
+     * Inserts `func` as a piece starting at `t`, after the pieces that start at or before it, so the
+     * pieces stay sorted. `t` is clamped to [0, 1].
+     */
     insertFunction(t: number, func: T): void {
-        const index = this.findFunction(t);
-        this.functions.splice(index + 1, 0, [func, t]);
+        const x = Math.min(Math.max(t, 0), 1);
+        let index = this.functions.findIndex(([, start]) => start > x);
+        if (index === -1) index = this.functions.length;
+        this.functions.splice(index, 0, [func, x]);
     }
 
     /**

@@ -6,9 +6,9 @@ import {
     ValueGeneratorFromJSON,
 } from '../functions';
 import {EmissionState, IParticleSystem} from '../IParticleSystem';
-import {MathUtils, Matrix4, Quaternion} from '../math';
+import {Matrix4, Quaternion} from '../math';
 import {Particle} from '../Particle';
-import {UP_VEC3, ZERO_VEC3} from '../util/MathUtil';
+import {shellRadius, UP_VEC3, ZERO_VEC3} from '../util/MathUtil';
 import {random} from '../util/random';
 import {EmitterMode, EmitterShape, getValueFromEmitterMode, ShapeJSON} from './EmitterUtil';
 import {ShapeTransform} from './ShapeTransform';
@@ -18,19 +18,24 @@ import {ShapeTransform} from './ShapeTransform';
  */
 export interface DonutEmitterParameters {
     /**
-     * The radius of the donut.
+     * Radius of the donut's centre line, a circle in the xy plane; a negative value is read as 0.
+     * Defaults to 10.
      */
     radius?: number;
     /**
-     * The arc of the donut.
+     * Arc of the donut that particles start in, in radians around +z from +x (Unity's Arc, which
+     * its inspector shows in degrees); 2π, the default, for the whole donut.
      */
     arc?: number;
     /**
-     * The thickness of the ring. 1 is a full donut, 0 is a ring with 0 radius.
+     * Radius Thickness, as in Unity: how far in from the tube's surface particles may start, as a
+     * fraction of the tube's radius, clamped to [0, 1]. 0 is the tube's surface only; 1, the
+     * default, fills the tube, evenly over its cross-section.
      */
     thickness?: number;
     /**
-     * The radius of the hole in the center of the donut.
+     * Radius of the tube around the centre line (Unity's Donut Radius); a negative value is read
+     * as 0. Defaults to a fifth of `radius`.
      */
     donutRadius?: number;
     /**
@@ -67,10 +72,10 @@ export class DonutEmitter implements EmitterShape {
     /** Radius of the tube. */
     donutRadius: number;
     /** Arc around z, in radians, that particles start in; 2π for the whole torus. */
-    arc: number; // [0, Math.PI * 2]
+    arc: number;
     /**
      * How far in from the tube's surface particles may start, as a fraction of its radius: 0 on the
-     * surface, 1 anywhere down to the centre line.
+     * surface, 1 anywhere down to the centre line, evenly over the cross-section; clamped to [0, 1].
      */
     thickness: number;
     /** How the start point moves along the arc, see {@link EmitterMode}. */
@@ -129,29 +134,20 @@ export class DonutEmitter implements EmitterShape {
     initialize(p: Particle, emissionState: EmissionState) {
         const u = getValueFromEmitterMode(this.mode, this.currentValue, this.spread, emissionState);
         const v = random();
-        const rand = MathUtils.lerp(1 - this.thickness, 1, random());
+        // Uniform over the area of the tube's cross-section ring.
+        const rand = shellRadius(this.thickness, 2);
         const theta = u * this.arc;
         const phi = v * Math.PI * 2;
-        //const r = Math.sqrt(rand);
         const sinTheta = Math.sin(theta);
         const cosTheta = Math.cos(theta);
-        p.position.x = this.radius * cosTheta;
-        p.position.y = this.radius * sinTheta;
-        p.position.z = 0;
+        const radius = Math.max(0, this.radius);
+        const tube = Math.max(0, this.donutRadius) * rand;
+        // The direction out from the tube's centre line, a unit vector even where the tube or the
+        // roll is 0, so a particle there still heads out at its start speed.
+        p.velocity.set(Math.cos(phi) * cosTheta, Math.cos(phi) * sinTheta, Math.sin(phi));
+        p.position.set(radius * cosTheta, radius * sinTheta, 0).addScaledVector(p.velocity, tube);
+        p.velocity.multiplyScalar(p.startSpeed);
 
-        p.velocity.z = this.donutRadius * rand * Math.sin(phi);
-        p.velocity.x = this.donutRadius * rand * Math.cos(phi) * cosTheta;
-        p.velocity.y = this.donutRadius * rand * Math.cos(phi) * sinTheta;
-
-        p.position.add(p.velocity);
-
-        p.velocity.normalize().multiplyScalar(p.startSpeed);
-
-        //const angle = this.angle * r;
-        //p.velocity.set(0, 0, Math.cos(angle)).addScaledVector(p.position, Math.sin(angle)).multiplyScalar(p.startSpeed);
-        //const v = random();
-
-        //.multiplyScalar(this.radius);
         // Default facing-velocity orientation, but defer to startRotation if set.
         if (p.rotation instanceof Quaternion) {
             const r = p.rotation;
@@ -179,7 +175,7 @@ export class DonutEmitter implements EmitterShape {
     }
 
     /** Reads {@link DonutEmitter.toJSON} output; a field the JSON leaves out takes its default. */
-    static fromJSON(json: any): DonutEmitter {
+    static fromJSON(json: ShapeJSON): DonutEmitter {
         return new DonutEmitter({
             radius: json.radius,
             arc: json.arc,

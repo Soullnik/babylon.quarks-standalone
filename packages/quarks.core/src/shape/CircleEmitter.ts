@@ -6,9 +6,8 @@ import {
     ValueGeneratorFromJSON,
 } from '../functions';
 import {EmissionState, IParticleSystem} from '../IParticleSystem';
-import {MathUtils} from '../math';
 import {Particle} from '../Particle';
-import {random} from '../util/random';
+import {shellRadius} from '../util/MathUtil';
 import {EmitterMode, EmitterShape, getValueFromEmitterMode, ShapeJSON} from './EmitterUtil';
 import {ShapeTransform} from './ShapeTransform';
 /**
@@ -16,16 +15,18 @@ import {ShapeTransform} from './ShapeTransform';
  */
 export interface CircleEmitterParameters {
     /**
-     * The radius of the circle.
+     * Radius of the circle, in the xy plane; a negative value is read as 0. Defaults to 10.
      */
     radius?: number;
     /**
-     * The arc of the circle.
+     * Arc of the circle that particles start in, in radians around +z from +x (Unity's Arc, which
+     * its inspector shows in degrees); 2π, the default, for the whole circle.
      */
     arc?: number;
     /**
-     * The thickness of the ring.
-     * 1 is a full circle, 0 is a ring with 0 radius.
+     * Radius Thickness, as in Unity: how far in from the rim particles may start, as a fraction of
+     * the radius, clamped to [0, 1]. 0 is the rim only; 1, the default, fills the whole circle, evenly
+     * over its area.
      */
     thickness?: number;
     /**
@@ -59,12 +60,12 @@ export class CircleEmitter implements EmitterShape {
     /** Radius of the circle. */
     radius: number;
     /** Arc, in radians, that particles start in; 2π for the whole circle. */
-    arc: number; // [0, Math.PI * 2]
+    arc: number;
     /**
      * How far in from the rim particles may start, as a fraction of the radius: 0 on the rim, 1
-     * anywhere down to the centre.
+     * anywhere down to the centre, evenly over the area; clamped to [0, 1].
      */
-    thickness: number; // [0, 1]
+    thickness: number;
     /** How the start point moves along the arc, see {@link EmitterMode}. */
     mode: EmitterMode;
     /**
@@ -101,20 +102,20 @@ export class CircleEmitter implements EmitterShape {
 
     /** Advances the arc sweep by `delta` seconds in the `Loop` and `PingPong` modes. */
     update(system: IParticleSystem, delta: number): void {
+        if (EmitterMode.Random === this.mode) return;
         this.currentValue += this.speed.genValue(this.memory, system.emissionState.time / system.duration) * delta;
     }
 
     /** Starts `p` on the circle, heading straight out at its start speed. */
     initialize(p: Particle, emissionState: EmissionState) {
         const u = getValueFromEmitterMode(this.mode, this.currentValue, this.spread, emissionState);
-        const r = MathUtils.lerp(1 - this.thickness, 1, random());
+        const r = shellRadius(this.thickness, 2);
         const theta = u * this.arc;
         p.position.x = Math.cos(theta);
         p.position.y = Math.sin(theta);
         p.position.z = 0;
         p.velocity.copy(p.position).multiplyScalar(p.startSpeed);
-        //const v = random();
-        p.position.multiplyScalar(this.radius * r);
+        p.position.multiplyScalar(Math.max(0, this.radius) * r);
         this.transform?.apply(p);
     }
 
@@ -133,7 +134,7 @@ export class CircleEmitter implements EmitterShape {
     }
 
     /** Reads {@link CircleEmitter.toJSON} output; a field the JSON leaves out takes its default. */
-    static fromJSON(json: any): CircleEmitter {
+    static fromJSON(json: ShapeJSON): CircleEmitter {
         return new CircleEmitter({
             radius: json.radius,
             arc: json.arc,

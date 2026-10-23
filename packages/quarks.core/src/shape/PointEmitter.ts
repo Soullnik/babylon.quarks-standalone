@@ -71,7 +71,7 @@ export class PointEmitter implements EmitterShape {
     }
 
     /** Reads {@link PointEmitter.toJSON} output. */
-    static fromJSON(json: any): PointEmitter {
+    static fromJSON(json: ShapeJSON): PointEmitter {
         return new PointEmitter(ShapeTransform.fromJSON(json?.transform));
     }
 

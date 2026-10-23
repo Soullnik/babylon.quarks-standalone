@@ -37,6 +37,22 @@ and the project follows the `quarks.core` 0.x version line.
   class is gone.
 - **`Vector4.setAxisAngleFromRotationMatrix` takes a `Matrix4`**, the matrix it has always read
   (see Fixed). Code that passed a `Matrix3` no longer compiles; it got a wrong axis and angle.
+- **Shape thickness fills evenly, as in Unity.** A sphere's or hemisphere's Radius Thickness now
+  spreads particles evenly over the volume of the shell, and a circle's and donut tube's over its
+  area (the cone already did); a rectangle spreads each edge's particles evenly over its band. Before, the radius was rolled linearly, so a
+  full sphere put half its particles within half its radius instead of an eighth. Effects with a
+  thickness above 0 look less crowded at the centre.
+- **Cone particles all start at their start speed.** The direction tilted toward the rim was not
+  normalised, so particles inside the base disc moved slower than the rim's, by up to 3 % at the
+  default 30° and up to 24 % at 90°.
+- **A grid emits from its cells' centres**, symmetric about the origin: a grid of width 2 with two
+  columns emits from x = ±0.5 instead of −1 and 0.
+- `EmitterShapePlugin.loadJSON` and every shape's `fromJSON` take a `ShapeJSON` instead of `any`,
+  `ShapeJSON.speed` is a `FunctionJSON`, and `ValueGenerator.startGen` and `genValue` take a
+  `GeneratorMemory`. A plugin whose reader declared a narrower parameter type may need a cast.
+- `EmitterShapes` lists the fields its shapes have: the grid's `row` (it said `rows`), no `angle`
+  on the sphere and hemisphere, the box's `emitFrom` as the new `'boxEmitFrom'` field type, and a
+  `transform` (the new `'shapeTransform'` type) on every shape.
 
 ### Deprecated
 
@@ -73,12 +89,34 @@ and the project follows the `quarks.core` 0.x version line.
   checked a flag that `Vector2` only had as a static.
 - `Vector4.setAxisAngleFromRotationMatrix` is typed to take the `Matrix4` it reads (as three.js
   does); it was typed `Matrix3` and read a 3×3 matrix's entries from the wrong places.
+- Shapes read out-of-range settings safely: a thickness is clamped to [0, 1] (NaN reads as 1), a negative radius,
+  width or height is read as 0, a cone's angle is clamped to [0, π/2] and a box's thickness to 1, a
+  grid's rows and columns are read as whole numbers of at least 1 (0 or Infinity gave NaN
+  positions), and a
+  short `boxThickness` array reads its missing axes as 0.
+- A donut with no tube, and a rectangle with no size, started particles with no speed; they head
+  out from the centre line, or along the edge's normal, at their start speed.
+- `AxisAngleGenerator` normalises its axis when it rotates (a zero axis is read as +z): an axis of
+  any other length gave a quaternion that was not a unit and skewed mesh particles.
+- `RandomQuatGenerator` and `RandomColorBetweenGradient` used before `startGen` read slots that
+  belong to other generators, and the gradient mix rolled a new value every frame, flickering; both
+  now roll their own slots once, as `IntervalValue` does.
+- `PiecewiseFunction.insertFunction` at a `t` outside every piece inserted at the front and
+  unsorted the pieces; it inserts in order and clamps `t` to [0, 1].
+- A circle or rectangle in `Random` mode no longer samples its sweep speed every frame, as the
+  other shapes do not; a random sweep speed no longer draws its roll, which shifts a seeded
+  effect's random sequence by one draw.
+- Shape docs give the units and axes of `arc` (radians around +z from +x), the ranges of every
+  size and thickness, and say that `RectangleEmitter` emits from the outline (Unity's Rectangle is a
+  `BoxEmitter` with no depth); the donut's `donutRadius` is the tube's radius, not the hole's.
 
 ### Internal
 
 - Tests cover the vectors, quaternions, Euler angles, matrices and math helpers, and the coverage
   floors rise: the simulation core's from 54 % to 88 % of lines, the library's and the editor's to
   one point under what the suites reach.
+- Behaviour tests for every shape: even filling, bounds, start speed, the rectangle's outline,
+  grid cells, out-of-range settings, JSON round trips of every field and the registry's fields.
 
 ## [0.27.1] — 2026-10-23
 
