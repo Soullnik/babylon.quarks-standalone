@@ -1,3 +1,4 @@
+import {blendFragmentGLSL} from './chunks/blend';
 import {fogFragmentDeclarationGLSL, fogFragmentGLSL} from './chunks/fog';
 import {softFragmentDeclarationGLSL, softFragmentGLSL} from './chunks/soft';
 import {surfaceColorGLSL, surfaceFragmentDeclarationGLSL} from './chunks/surface';
@@ -130,7 +131,9 @@ ${surfaceColorGLSL(true)}
 #endif
 
 ${fogFragmentGLSL('color')}
-    gl_FragColor = vec4(color, baseColor.a);
-${softFragmentGLSL('gl_FragColor')}
+    vec4 finalColor = vec4(color, baseColor.a);
+${softFragmentGLSL('finalColor')}
+${blendFragmentGLSL('finalColor')}
+    gl_FragColor = finalColor;
 }
 `;

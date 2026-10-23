@@ -180,9 +180,9 @@ describe('GLSL and WGSL apply the fragment features in the same order', () => {
         ['trail_frag', trailFragGLSL, trailFragWGSL],
     ])('%s', (_name, glsl, wgsl) => {
         expect(featureBlocks(glsl)).toEqual(featureBlocks(wgsl));
-        // The soft fade runs last, after fog.
+        // The soft fade runs after fog, and only the blend resolve after it.
         const blocks = featureBlocks(glsl);
-        expect(blocks[blocks.length - 1]).toBe('SOFT_PARTICLES');
+        expect(blocks.slice(-2)).toEqual(['SOFT_PARTICLES', 'defined(BLEND_PREMULTIPLY)']);
         expect(blocks.lastIndexOf('FOG')).toBeLessThan(blocks.lastIndexOf('SOFT_PARTICLES'));
     });
 });
@@ -255,7 +255,7 @@ describe('soft particles and the depth texture', () => {
         renderer.dispose();
     });
 
-    test('a trail draws soft once there is a depth texture, and fades last in both languages', () => {
+    test('a trail draws soft once there is a depth texture, and fades before the blend resolve in both languages', () => {
         const renderer = new BatchedRenderer('trail', scene);
         renderer.addSystem(
             softSystem({
@@ -274,7 +274,7 @@ describe('soft particles and the depth texture', () => {
         expect(depthTextureOf(renderer)).toBe(depth);
         expect(featureBlocks(trailFragGLSL)).toEqual(featureBlocks(trailFragWGSL));
         const blocks = featureBlocks(trailFragGLSL);
-        expect(blocks[blocks.length - 1]).toBe('SOFT_PARTICLES');
+        expect(blocks.slice(-2)).toEqual(['SOFT_PARTICLES', 'defined(BLEND_PREMULTIPLY)']);
         for (const source of [trailVertGLSL, trailVertWGSL]) {
             expect(source).toContain('#ifdef SOFT_PARTICLES');
             expect(source).toContain('abs(point.z)');

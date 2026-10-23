@@ -311,8 +311,7 @@ export interface ParticleErosion {
     /** Colour added in the edge band, linear RGB, may exceed 1. Default `[1, 1, 1]`. */
     edgeColor: [number, number, number];
 }
-// Limits worth knowing: erosion only changes alpha (one-one and premultiplied
-// blending show a hard cut), and with neither a mask nor a map there is
+// Limits worth knowing: with neither a mask nor a map there is
 // nothing to order the cut by, so the shape goes all at once near alpha 0.
 // Scrolling runs on the renderer's clock, not a system's playback speed.
 

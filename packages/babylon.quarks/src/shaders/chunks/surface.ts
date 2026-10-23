@@ -35,8 +35,8 @@
  *   on the way down the shape eats away from its lowest mask values first — a
  *   noise mask dissolves it, a gradient mask wipes it. `erosionParams` is
  *   (softness, edge width); the edge band just above the cut glows in
- *   `erosionEdgeColor`. Erosion only changes alpha, so blend modes that
- *   ignore alpha (one-one, premultiplied) show a hard cut.
+ *   `erosionEdgeColor`. Erosion only changes alpha, which the blend resolve
+ *   (`blend.ts`) turns into coverage in every blend mode.
  */
 
 /** Fragment-side declarations, GLSL. */

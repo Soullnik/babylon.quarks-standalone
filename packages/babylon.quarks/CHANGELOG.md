@@ -4,6 +4,52 @@ All notable changes to the `babylon.quarks` package are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project follows the `quarks.core` 0.x version line.
 
+## [0.28.0] — unreleased
+
+### Breaking
+
+- **Alpha means coverage in every blend mode.** A particle's alpha (its colour over life, a soft
+  fade, erosion, a rim fade, a `tint`) now fades it out whatever `blendMode` it draws with, as
+  Unity's particle shaders do for their Alpha, Premultiply, Additive and Multiply modes. Before,
+  modes whose blend takes the colour at full weight ignored alpha. What changes on screen:
+  - `ALPHA_ONEONE`, `ALPHA_PREMULTIPLIED`, `ALPHA_SCREENMODE`, `ALPHA_SUBTRACT`, `ALPHA_MAXIMIZED`,
+    `ALPHA_MAX` and the other modes that take the colour at full weight multiply it by its alpha
+    in the shader. An effect whose alpha is below 1 under these modes draws dimmer than before, as
+    it would in Unity; one with alpha 1 draws as before. Textures stay straight alpha, as in
+    Unity's Premultiply mode: a texture authored premultiplied should be re-exported straight.
+  - `ALPHA_MULTIPLY` and `ALPHA_MIN` move the colour toward white as alpha falls, so a fading
+    multiply particle lightens away instead of staying dark (Babylon's own particles do the same).
+  - The soft-particle fade lowers alpha only. Under `ALPHA_ADD` and `ALPHA_COMBINE` it used to fade
+    colour and alpha together, so the blend weighed it twice and the fade looked quadratic; it is
+    now linear over the soft distance, as in Unity and Unreal's Depth Fade. An opaque system
+    (`transparent: false`) or one under `ALPHA_INTERPOLATE` or `ALPHA_REPLACE_COLOR` has no
+    coverage to fade, so soft particles no longer darken it; they never faded it out either.
+  - `ALPHA_MAXIMIZED` takes the colour by alpha twice (its blend weighs it once more), so its fade
+    is quadratic; every other coverage mode fades linearly.
+- **Fog follows the blend mode.** Particles that subtract from or screen over the frame fade
+  toward black with distance, like additive ones; multiply particles fade toward white, which
+  leaves the frame alone; particles that lay over the frame (`ALPHA_COMBINE`,
+  `ALPHA_PREMULTIPLIED`, opaque) still mix toward the fog colour. Before, every mode other than
+  `ALPHA_ADD` and `ALPHA_ONEONE` mixed toward the fog colour, which fogged a multiply or subtract
+  effect into a coloured haze.
+
+### Added
+
+- **`blendCategory(settings)`** says how a blend mode's colour leaves the shader (`'straight'`,
+  `'premultiply'` or `'multiply'`) and where fog takes it (`'color'`, `'black'` or `'white'`), with
+  the `BlendCategory`, `BlendOutput` and `FogTarget` types. Opaque materials, `ALPHA_INTERPOLATE`,
+  `ALPHA_REPLACE_COLOR` and `ALPHA_DUAL_SRC0_ADD_SRC1xDST` have no coverage and stay `'straight'`.
+- The shader variants cover every blend resolve with and without fog and soft particles, so
+  `validate:shaders` compiles the new `BLEND_PREMULTIPLY`, `BLEND_MULTIPLY` and `FOG_MULTIPLY`
+  defines in GLSL and WGSL.
+
+### Fixed
+
+- The fragment's `alpha < 0.01` discard is right in every blend mode: under one-one or
+  premultiplied blending a discarded fragment used to be one that would still have drawn.
+- Erosion and a mesh's rim fade no longer show a hard cut under one-one and premultiplied
+  blending; they fade like under alpha blending.
+
 ## [0.27.1] — 2026-10-23
 
 Packaging and release checks; the runtime is the same as 0.27.0.

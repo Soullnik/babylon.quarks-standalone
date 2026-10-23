@@ -95,7 +95,7 @@ describe('scene integration', () => {
         renderer.dispose();
     });
 
-    it('compiles fog into every render mode by default, additive fog for additive blending', () => {
+    it('compiles fog into every render mode by default, toward black for additive blending', () => {
         const renderer = new BatchedRenderer('r', scene);
         const defines = (mode: RenderMode, blendMode: number): string[] => {
             const system = makeSystem({renderMode: mode, blendMode});
