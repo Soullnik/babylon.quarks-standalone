@@ -1,5 +1,5 @@
 import {Vector3, Vector4} from '../math';
-import {JSONToNumber, JSONToVector3} from '../util/JSONUtil';
+import {warnFormat} from '../util/JSONUtil';
 import {FunctionColorGenerator} from './ColorGenerator';
 import {ColorRange} from './ColorRange';
 import {ContinuousLinearFunction} from './ContinuousLinearFunction';
@@ -227,16 +227,14 @@ export class Gradient implements FunctionColorGenerator {
         } else {
             const gradient = new Gradient();
             if (json.alpha) {
-                gradient.alpha = new ContinuousLinearFunction<number>(
-                    json.alpha.keys.map((key) => [JSONToNumber(key.value), key.pos]),
-                    'Number'
-                );
+                gradient.alpha = ContinuousLinearFunction.fromJSON(json.alpha);
+            } else {
+                warnFormat('Gradient has no alpha keys; it is opaque.');
             }
             if (json.color) {
-                gradient.color = new ContinuousLinearFunction<Vector3>(
-                    json.color.keys.map((key) => [JSONToVector3(key.value), key.pos]),
-                    'Color'
-                );
+                gradient.color = ContinuousLinearFunction.fromJSON(json.color);
+            } else {
+                warnFormat('Gradient has no color keys; it is white.');
             }
             return gradient;
         }

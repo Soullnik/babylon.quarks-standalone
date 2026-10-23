@@ -165,9 +165,9 @@ export interface GradientJSON {
     /** The generator's type. */
     type: 'Gradient';
     /** The colour keys. */
-    color?: ContinuousLinearFunctionJSON;
+    color?: ContinuousLinearFunctionJSON<'Vector3' | 'Color'>;
     /** The alpha keys. */
-    alpha?: ContinuousLinearFunctionJSON;
+    alpha?: ContinuousLinearFunctionJSON<'Number'>;
     /** The older form: colour ranges, each with the time it starts at. */
     functions?: GradientRangeJSON[];
 }

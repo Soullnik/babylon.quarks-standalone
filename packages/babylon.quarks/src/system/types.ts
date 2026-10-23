@@ -2,13 +2,11 @@ import type {Texture} from '@babylonjs/core/Materials/Textures/texture';
 import type {Scene} from '@babylonjs/core/scene';
 import type {
     Behavior,
-    BillBoardSettings,
     ColorGenerator,
     EmitterShape,
     FunctionColorGenerator,
     FunctionJSON,
     FunctionValueGenerator,
-    MeshSettings,
     RendererEmitterSettings,
     RotationGenerator,
     StretchedBillBoardSettings,
@@ -18,6 +16,7 @@ import type {
     Vector3,
     Vector3ArrayJSON,
     Vector3Generator,
+    Vector3JSON,
 } from 'quarks.core';
 import type {
     MeshLighting,
@@ -32,17 +31,19 @@ import type {
 } from '../VFXBatch';
 import type {TrailOptions} from '../trailSettings';
 
-/** A trail's settings in JSON: the start length as a generator's JSON, the side axis as `[x, y, z]`. */
-export type TrailSettingsJSON = TrailOptions & {
+/** A trail's settings in JSON, each only when not its default: the start length as a generator's JSON, the side axis as `[x, y, z]`. */
+export type TrailSettingsJSON = Partial<TrailOptions> & {
     /** See `TrailSettings.startLength`. */
     startLength?: ValueGeneratorJSON;
-    /** See `TrailSettings.sideAxis`. */
-    sideAxis?: Vector3ArrayJSON;
+    /** See `TrailSettings.sideAxis`; files may hold it as `{x, y, z}`. */
+    sideAxis?: Vector3ArrayJSON | Vector3JSON;
 };
 
-/** A render mode's own settings in JSON, see {@link RendererEmitterSettings}. */
-export type RendererEmitterSettingsJSON =
-    TrailSettingsJSON | StretchedBillBoardSettings | MeshSettings | BillBoardSettings;
+/**
+ * A render mode's own settings in JSON, see {@link RendererEmitterSettings}: a trail's or a
+ * stretched billboard's. The other render modes have none, and their systems leave the field out.
+ */
+export type RendererEmitterSettingsJSON = TrailSettingsJSON | StretchedBillBoardSettings;
 
 /**
  * One burst of a system's emission (Unity's Emission Bursts): `count` particles at `time` seconds

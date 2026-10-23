@@ -142,11 +142,12 @@ export class EmitSubParticleSystem implements Behavior {
      * so a bad value is skipped rather than thrown on.
      */
     private get target(): IParticleSystem | undefined {
-        const sub = this.subParticleSystem as unknown;
+        const sub = this.subParticleSystem;
+        // A file can hold anything here; only an object is an emitter.
         if (sub === null || typeof sub !== 'object') {
             return undefined;
         }
-        const system = (sub as IEmitter).system as IParticleSystem | undefined;
+        const system: IParticleSystem | undefined = sub.system;
         return system?.isDisposed ? undefined : system;
     }
 
@@ -261,7 +262,7 @@ export class EmitSubParticleSystem implements Behavior {
     static fromJSON(json: EmitSubParticleSystemJSON, particleSystem: IParticleSystem): Behavior {
         return new EmitSubParticleSystem(
             particleSystem,
-            json.useVelocityAsBasis === true,
+            Boolean(json.useVelocityAsBasis),
             json.subParticleSystem,
             json.mode,
             json.emitProbability,

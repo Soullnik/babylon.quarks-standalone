@@ -1,6 +1,6 @@
 import {Vector3, Vector4} from '../math';
 import {JSONToNumber, JSONToVector3, JSONToVector4, ValueToJSON} from '../util/JSONUtil';
-import type {ContinuousLinearFunctionJSON, ContinuousLinearSubType} from './FunctionJSON';
+import type {ContinuousLinearFunctionJSON} from './FunctionJSON';
 
 /** A value object a {@link ContinuousLinearFunction} can interpolate: a vector or a colour. */
 export interface ObjectValueType<T> {
@@ -18,6 +18,13 @@ export interface ObjectValueType<T> {
     clone(): ObjectValueType<T>;
 }
 
+/** The {@link ContinuousLinearSubType} values of type `T` are written as. */
+export type ContinuousLinearSubTypeOf<T> = T extends number
+    ? 'Number'
+    : T extends Vector4
+      ? 'Vector4'
+      : 'Vector3' | 'Color';
+
 /**
  * A piecewise linear function over [0, 1] through keys: the alpha or colour keys of a {@link
  * Gradient}. Before the first key it holds the first value, after the last the last.
@@ -28,13 +35,13 @@ export class ContinuousLinearFunction<T extends number | Vector3 | Vector4> {
     /** Always `'function'`. */
     type: 'function';
     /** What the values are, for the JSON. */
-    subType: ContinuousLinearSubType;
+    subType: ContinuousLinearSubTypeOf<T>;
     // default linear bezier
     /**
      * @param keys - The keys as `[value, position]`, sorted by position.
      * @param subType - What the values are.
      */
-    constructor(keys: Array<[T, number]>, subType: ContinuousLinearSubType) {
+    constructor(keys: Array<[T, number]>, subType: ContinuousLinearSubTypeOf<T>) {
         this.subType = subType;
         this.type = 'function';
         this.keys = keys;
@@ -116,7 +123,7 @@ export class ContinuousLinearFunction<T extends number | Vector3 | Vector4> {
     }
 
     /** The JSON form, `{type: 'CLinearFunction', subType, keys: [{value, pos}]}`. */
-    toJSON(): ContinuousLinearFunctionJSON {
+    toJSON(): ContinuousLinearFunctionJSON<ContinuousLinearSubTypeOf<T>> {
         return {
             type: 'CLinearFunction',
             subType: this.subType,

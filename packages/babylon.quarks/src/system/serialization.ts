@@ -61,7 +61,7 @@ function nextSerializationId(meta: BabylonMetaData, prefix: string): string {
 }
 
 /** The optional trail flags that are switched on, so JSON and clones only carry the ones in use. */
-export function trailFlags(settings: TrailOptions | undefined): Partial<TrailOptions> {
+export function trailFlags(settings: Partial<TrailOptions> | undefined): Partial<TrailOptions> {
     const flags: Partial<TrailOptions> = {};
     if (settings?.uvFromHead) flags.uvFromHead = true;
     if (settings?.colorFromParticle) flags.colorFromParticle = true;
@@ -71,7 +71,7 @@ export function trailFlags(settings: TrailOptions | undefined): Partial<TrailOpt
 }
 
 /** A trail's tessellation and curve tension, normalised, each only when it differs from the default. */
-export function trailCurve(settings: TrailOptions | undefined): Partial<TrailOptions> {
+export function trailCurve(settings: Partial<TrailOptions> | undefined): Partial<TrailOptions> {
     const curve: Partial<TrailOptions> = {};
     const tessellation = trailTessellation(settings);
     const curveTension = trailCurveTension(settings);
@@ -84,7 +84,7 @@ export function trailCurve(settings: TrailOptions | undefined): Partial<TrailOpt
  * A trail's texture mode and scale, minimum vertex distance and lifetime, normalised, each only
  * when it differs from the default.
  */
-export function trailSampling(settings: TrailOptions | undefined): Partial<TrailOptions> {
+export function trailSampling(settings: Partial<TrailOptions> | undefined): Partial<TrailOptions> {
     const out: Partial<TrailOptions> = {};
     const textureMode = trailTextureMode(settings);
     const textureScale = trailTextureScale(settings);
@@ -98,7 +98,7 @@ export function trailSampling(settings: TrailOptions | undefined): Partial<Trail
 }
 
 /** A trail's `followLocalOrigin`, only when on: off is the default. */
-export function trailFollowLocalOrigin(settings: TrailOptions | undefined): Partial<TrailOptions> {
+export function trailFollowLocalOrigin(settings: Partial<TrailOptions> | undefined): Partial<TrailOptions> {
     return settings?.followLocalOrigin ? {followLocalOrigin: true} : {};
 }
 
@@ -169,7 +169,7 @@ export function particleSystemToJSON(
         shape: EmitterToJSON(system.emitterShape),
         ...settingsToJSON(system),
         instancingGeometry: geometryUUID,
-        ...(Object.keys(rendererSettingsJSON).length > 0 ? {rendererEmitterSettings: rendererSettingsJSON} : {}),
+        ...(rendererSettingsJSON ? {rendererEmitterSettings: rendererSettingsJSON} : {}),
         material: materialUUID,
         behaviors: system.behaviors.map((b) => BehaviorToJSON(b, system)),
     };
@@ -202,10 +202,14 @@ export function particleSystemParametersFromJSON(
             ...trailSideAxisFromJSON(trailSettings?.sideAxis),
         };
     } else if (json.renderMode === RenderMode.StretchedBillBoard) {
-        rendererEmitterSettings = {...(json.rendererEmitterSettings ?? {})};
+        // The render mode says which settings the file holds.
+        const stretched: Partial<StretchedBillBoardSettings> = {
+            ...(json.rendererEmitterSettings as StretchedBillBoardSettings | undefined),
+        };
         if (json.speedFactor !== undefined) {
-            (rendererEmitterSettings as StretchedBillBoardSettings).speedFactor = json.speedFactor;
+            stretched.speedFactor = json.speedFactor;
         }
+        rendererEmitterSettings = stretched;
     } else {
         rendererEmitterSettings = {};
     }
@@ -267,7 +271,7 @@ export function particleSystemParametersFromJSON(
 }
 
 /** The render mode's own settings as JSON: a trail's or a stretched billboard's, else none. */
-function rendererEmitterSettingsJSON(system: ParticleSystem): RendererEmitterSettingsJSON {
+function rendererEmitterSettingsJSON(system: ParticleSystem): RendererEmitterSettingsJSON | undefined {
     if (system.renderMode === RenderMode.Trail) {
         const settings = system.rendererEmitterSettings as TrailSettings;
         // `startLength` always, for loaders that read it without a default; the rest only when on.
@@ -286,7 +290,7 @@ function rendererEmitterSettingsJSON(system: ParticleSystem): RendererEmitterSet
             lengthFactor: (system.rendererEmitterSettings as StretchedBillBoardSettings).lengthFactor,
         };
     }
-    return {};
+    return undefined;
 }
 
 /** Writes the system's geometry into `meta` once per document, and returns its uuid. */
