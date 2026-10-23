@@ -218,8 +218,7 @@ export class QuarksUtil {
                     continue;
                 }
                 const target = (behavior.subParticleSystem as unknown as ParticleEmitter | undefined)?.system as
-                    | ParticleSystem
-                    | undefined;
+                    ParticleSystem | undefined;
                 if (target !== undefined && typeof target === 'object') {
                     if (!systems.includes(target)) {
                         systems.push(target);

@@ -247,6 +247,12 @@ and the project follows the `quarks.core` 0.x version line.
   written from.
 - Loaded node ids and mesh surface links live in module `WeakMap`s instead of `as any` fields on
   nodes and systems.
+- The batch settings, their defaults and the helpers that normalise and compare them move from
+  `VFXBatch.ts` to `batchSettings.ts`, which `VFXBatch.ts` re-exports; the batch key reads them
+  there, so the build no longer reports a circular import. Exports are unchanged.
+- A clean build and install print no warnings: the core build stops passing `declarationDir`
+  without declarations, CI runs on Node 24 with current GitHub Actions, dev dependencies have no
+  known vulnerabilities, and the demo smoke test fails on a console warning as well as an error.
 
 ## [0.27.1] — 2026-10-23
 

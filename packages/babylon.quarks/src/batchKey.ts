@@ -1,7 +1,6 @@
 import {Constants} from '@babylonjs/core/Engines/constants';
 import type {Vector3} from 'quarks.core';
 import type {VFXBatchSettings} from './BatchedRenderer';
-import {DEFAULT_SOFT_FAR_FADE, validRenderFace, validSoftFade, validTileCount} from './system/normalize';
 import {
     normalizeErosion,
     normalizeGradientMap,
@@ -12,7 +11,8 @@ import {
     RenderMode,
     StoredBatchSettings,
     TextureUV,
-} from './VFXBatch';
+} from './batchSettings';
+import {DEFAULT_SOFT_FAR_FADE, validRenderFace, validSoftFade, validTileCount} from './system/normalize';
 
 // What decides whether two systems draw from one batch.
 //
