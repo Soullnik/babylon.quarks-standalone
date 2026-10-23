@@ -18,7 +18,7 @@ requests are all welcome.
 
 ## Getting started
 
-Requirements: Node.js >= 22.13, npm >= 10. CI runs the version in `.nvmrc`.
+Requirements: Node.js 22.20 or later, or 24.12 or later; npm >= 10. CI runs the version in `.nvmrc`.
 
 `package.json` overrides two dependencies of the test toolchain whose own ranges still pull in
 deprecated packages: `test-exclude` (through Jest's coverage) gets a current `glob`, and
