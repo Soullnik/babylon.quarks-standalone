@@ -64,7 +64,7 @@ import {
     runBehaviorSteps,
     snapshotPreviousState,
 } from './system/integrate';
-import {liveAtlas, MaterialOverrides, resolveMaterialSettings} from './system/materialResolve';
+import {liveAtlas, MaterialOverrides, ParticleMaterialSource, resolveMaterialSettings} from './system/materialResolve';
 import {
     DEFAULT_SOFT_FAR_FADE,
     nonZeroFlip,
@@ -298,7 +298,7 @@ export class ParticleSystem implements IParticleSystem {
     private readonly emission = new EmissionController(this, this.spawner);
     private readonly events = new EventDispatcher();
     private readonly layerMaskProxy: {mask: number};
-    private materialRef: any = null;
+    private materialRef: ParticleMaterialSource | null = null;
     private sceneRef: Scene | undefined;
     private qualityFactor = 1;
     private destroyed = false;
@@ -398,11 +398,11 @@ export class ParticleSystem implements IParticleSystem {
      * is not drawn with; particles always use quarks' own shaders. Null leaves the settings as they
      * are.
      */
-    get material(): any {
+    get material(): ParticleMaterialSource | null {
         return this.materialRef;
     }
 
-    set material(material: any) {
+    set material(material: ParticleMaterialSource | null) {
         this.materialRef = material;
         this.applyMaterialSettings(material);
     }
@@ -1221,7 +1221,7 @@ export class ParticleSystem implements IParticleSystem {
      * ran) while the system still uses it, drops it and builds a new one if the cube is still alive,
      * so the batch never samples a disposed texture.
      */
-    private watchEnvAtlas(atlas: BaseTexture | null, material: any): void {
+    private watchEnvAtlas(atlas: BaseTexture | null, material: ParticleMaterialSource | null): void {
         atlas?.onDisposeObservable.addOnce(() => {
             if (this.destroyed || this.rendererSettings.reflectionAtlas !== atlas) {
                 return;
@@ -1248,7 +1248,7 @@ export class ParticleSystem implements IParticleSystem {
         });
     }
 
-    private applyMaterialSettings(material: any, overrides: MaterialOverrides = {}) {
+    private applyMaterialSettings(material: ParticleMaterialSource | null, overrides: MaterialOverrides = {}) {
         /* istanbul ignore if -- rendererSettings is always assigned in the constructor before any code path can call this private method */
         if (!this.rendererSettings) {
             return;

@@ -8,10 +8,12 @@ import {Geometry} from '@babylonjs/core/Meshes/geometry';
 import {InstancedMesh} from '@babylonjs/core/Meshes/instancedMesh';
 import {Mesh} from '@babylonjs/core/Meshes/mesh';
 import {TransformNode} from '@babylonjs/core/Meshes/transformNode';
+import type {GeometryEntry, QuarksMaterialJSON} from './effectDocumentJSON';
 import {ensureTriangleIndices} from './geometryUtil';
 import {quarksNodeId} from './nodeId';
 import {ParticleEmitter} from './ParticleEmitter';
 import type {BabylonMetaData, ParticleSystem, ParticleSystemJSONParameters} from './ParticleSystem';
+import type {AnimationJSON} from './QuarksPrefab';
 import {QuarksPrefab} from './QuarksPrefab';
 import {textureSourceUrl} from './textureSource';
 
@@ -83,10 +85,13 @@ export interface QuarksNodeJSON {
     type: 'Group' | 'ParticleEmitter' | 'Mesh' | 'QuarksPrefab' | string;
     /** The node's name. */
     name?: string;
-    /** Local transform, column-major, as Babylon's `Matrix.asArray()`. */
-    matrix: number[];
-    /** Written only when the node is disabled; loads it disabled, with everything under it. */
-    visible?: false;
+    /**
+     * Local transform, column-major, as Babylon's `Matrix.asArray()`. Always written; a three.js
+     * file without it places the node by `position`, `quaternion` or `rotation`, and `scale`.
+     */
+    matrix?: number[];
+    /** Written only when the node is disabled (false); loads it disabled, with everything under it. */
+    visible?: boolean;
     /** `Mesh`: written only when the mesh is not drawn (`isVisible`), which leaves its children drawn. */
     isVisible?: false;
     /** Child nodes, in order. */
@@ -95,9 +100,20 @@ export interface QuarksNodeJSON {
     ps?: ParticleSystemJSONParameters;
     /** `Mesh`: the {@link QuarksGeometryJSON} uuid. */
     geometry?: string;
-    /** `Mesh`: the material uuid. */
-    material?: string;
-    [key: string]: unknown;
+    /** `Mesh`: the material uuid; a three.js mesh may list several, of which the first is used. */
+    material?: string | string[];
+    /** `QuarksPrefab`: the timeline's speed, written only when not 1. */
+    timeScale?: number;
+    /** `QuarksPrefab`: the timeline's tracks. */
+    animationData?: AnimationJSON[];
+    /** three.js files without `matrix`: the position as `[x, y, z]`. */
+    position?: number[];
+    /** three.js files without `matrix`: the scale as `[x, y, z]`. */
+    scale?: number[];
+    /** three.js files without `matrix`: the rotation as a quaternion `[x, y, z, w]`. */
+    quaternion?: number[];
+    /** three.js files without `matrix` or `quaternion`: Euler angles `[x, y, z]` in radians. */
+    rotation?: number[];
 }
 
 /** A whole effect, as {@link serializeEffect} writes it and `QuarksLoader` reads it. */
@@ -116,7 +132,7 @@ export interface QuarksEffectJSON {
     /** Meshes the nodes and particle systems use. */
     geometries: QuarksGeometryJSON[];
     /** Materials the particle systems and `Mesh` nodes use, referred to by uuid. */
-    materials: Array<Record<string, unknown>>;
+    materials: QuarksMaterialJSON[];
     /** Textures the particle systems use. */
     textures: QuarksTextureJSON[];
     /** Image files the textures load. */
@@ -182,7 +198,7 @@ class EffectWriter {
     readonly meta: BabylonMetaData = {geometries: {}, materials: {}, textures: {}};
     private readonly meshGeometries = new Map<string, QuarksGeometryJSON>();
     private readonly geometryIds = new Map<Geometry, string>();
-    private readonly meshMaterials: Array<{json: Record<string, unknown>; map: BaseTexture | null}> = [];
+    private readonly meshMaterials: Array<{json: QuarksMaterialJSON; map: BaseTexture | null}> = [];
     private readonly meshMaterialIds = new Map<StandardMaterial, string>();
     private readonly extraTextures = new Map<BaseTexture, string>();
     private nextId = 0;
@@ -329,7 +345,7 @@ class EffectWriter {
             this.warn(`Mesh "${mesh.name}": its material's alpha and colours are not written; it loads opaque white.`);
         }
         // Each field only when it differs from what the loader gives a material without it.
-        const json: Record<string, unknown> = {uuid, type: 'MeshBasicMaterial'};
+        const json: QuarksMaterialJSON = {uuid, type: 'MeshBasicMaterial'};
         if (material.alphaMode !== Constants.ALPHA_COMBINE) json.alphaMode = material.alphaMode;
         if (material.backFaceCulling) json.side = 0;
         if (material.alphaCutOff !== 0) json.alphaTest = material.alphaCutOff;
@@ -398,7 +414,7 @@ class EffectWriter {
 
         const materials = Object.values(this.meta.materials).map((material) => {
             // The live Babylon material is for in-memory reuse only.
-            const {sourceMaterial: _sourceMaterial, ...serializable} = material as Record<string, unknown>;
+            const {sourceMaterial: _sourceMaterial, ...serializable} = material;
             return serializable;
         });
 
@@ -409,7 +425,10 @@ class EffectWriter {
                 generator: this.options.generator ?? 'babylon.quarks',
                 quarksFormat: QUARKS_FORMAT_VERSION,
             },
-            geometries: [...Object.values(this.meta.geometries), ...this.meshGeometries.values()],
+            geometries: [
+                ...Object.values(this.meta.geometries).filter(isQuarksGeometryJSON),
+                ...this.meshGeometries.values(),
+            ],
             materials: [...materials, ...meshMaterials],
             textures,
             images,
@@ -418,18 +437,27 @@ class EffectWriter {
     }
 }
 
+/** Whether a system's geometry entry is inline quarks data, the form its `toJSON` writes. */
+function isQuarksGeometryJSON(entry: GeometryEntry): entry is QuarksGeometryJSON {
+    return 'type' in entry && entry.type === 'QuarksGeometry' && Array.isArray(entry.positions);
+}
+
 /** Ids a written document links to by uuid, by the kind of link. */
 function* links(node: QuarksNodeJSON): Generator<[string, string]> {
-    const ps = node.ps as {behaviors?: Array<{type?: string; subParticleSystem?: unknown}>; shape?: any} | undefined;
+    const ps = node.ps;
     for (const behavior of ps?.behaviors ?? []) {
-        if (behavior.type === 'EmitSubParticleSystem' && typeof behavior.subParticleSystem === 'string') {
+        if (
+            behavior.type === 'EmitSubParticleSystem' &&
+            'subParticleSystem' in behavior &&
+            typeof behavior.subParticleSystem === 'string'
+        ) {
             yield ['a sub emitter', behavior.subParticleSystem];
         }
     }
     if (ps?.shape?.type === 'mesh_surface' && typeof ps.shape.mesh === 'string') {
         yield ['a mesh surface shape', ps.shape.mesh];
     }
-    for (const animation of (node.animationData as Array<{targetUUID?: unknown}> | undefined) ?? []) {
+    for (const animation of node.animationData ?? []) {
         if (typeof animation.targetUUID === 'string') {
             yield ['a prefab animation', animation.targetUUID];
         }

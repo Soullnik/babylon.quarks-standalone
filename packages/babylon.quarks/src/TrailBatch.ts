@@ -975,7 +975,7 @@ export class TrailBatch extends VFXBatch {
     private adoptMeshBounds(): void {
         const meshBoundingInfo = this.mesh.getBoundingInfo();
         for (const subMesh of this.mesh.subMeshes) {
-            (subMesh as any)._boundingInfo = meshBoundingInfo;
+            subMesh.setBoundingInfo(meshBoundingInfo);
         }
     }
 

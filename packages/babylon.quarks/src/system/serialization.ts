@@ -16,6 +16,7 @@ import {
     Vector3ArrayJSON,
     warnFormat,
 } from 'quarks.core';
+import type {MaterialTextureRef} from '../effectDocumentJSON';
 import type {ParticleSystem} from '../ParticleSystem';
 import {
     trailCurveTension,
@@ -34,6 +35,7 @@ import {
     UV_DISTORTION_DEFAULT_UV,
 } from '../VFXBatch';
 import {resolveGeometryData} from './geometry';
+import type {ParticleMaterialSource} from './materialResolve';
 import {settingsFromJSON, settingsToJSON} from './settingsSchema';
 import type {
     BabylonMetaData,
@@ -186,7 +188,7 @@ export function particleSystemParametersFromJSON(
     scene?: Scene
 ): ParticleSystemParameters {
     // A part the file leaves out takes the constructor's default, as a system made in code does.
-    const shape = json.shape ? readFormatPart('shape', () => EmitterFromJSON(json.shape!, meta as any)) : undefined;
+    const shape = json.shape ? readFormatPart('shape', () => EmitterFromJSON(json.shape!, meta)) : undefined;
     let rendererEmitterSettings: RendererEmitterSettings;
     if (json.renderMode === RenderMode.Trail) {
         const trailSettings = json.rendererEmitterSettings as TrailSettingsJSON | undefined;
@@ -215,14 +217,15 @@ export function particleSystemParametersFromJSON(
     }
 
     const materialMeta = json.material ? meta.materials?.[json.material] : undefined;
-    const materialTextureRef = materialMeta?.texture ?? json.texture;
-    const texture =
-        typeof materialTextureRef === 'string'
-            ? (meta.textures?.[materialTextureRef] ?? null)
-            : (materialTextureRef ?? null);
-    // Texture effects reference textures by uuid in a serialised meta, or hold them once a loader resolved them.
-    const resolveTexture = (ref: unknown): BaseTexture | null =>
-        typeof ref === 'string' ? (meta.textures?.[ref] ?? null) : ((ref as BaseTexture | null) ?? null);
+    // Texture slots reference textures by uuid in a serialised meta, or hold them once a loader resolved them.
+    const resolveTexture = (ref: MaterialTextureRef | undefined): BaseTexture | null =>
+        typeof ref === 'string' ? (meta.textures?.[ref] ?? null) : (ref ?? null);
+    const mainTexture = resolveTexture(materialMeta?.texture ?? json.texture);
+    // Particles sample a 2D texture.
+    const texture = mainTexture instanceof Texture ? mainTexture : null;
+    const material: ParticleMaterialSource | undefined =
+        materialMeta?.sourceMaterial ??
+        (materialMeta ? {...materialMeta, reflectionAtlas: resolveTexture(materialMeta.reflectionAtlas)} : undefined);
     const erosionMeta = materialMeta?.erosion;
     const gradientMeta = materialMeta?.gradientMap;
     const distortionMeta = materialMeta?.uvDistortion;
@@ -244,7 +247,7 @@ export function particleSystemParametersFromJSON(
         instancingNormals: resolvedGeometry.normals,
         rendererEmitterSettings,
         texture,
-        material: materialMeta?.sourceMaterial ?? materialMeta,
+        material,
         // The material entry wins over the system's own fields, which older files wrote too.
         blendMode: materialMeta?.alphaMode ?? settings.blendMode ?? Constants.ALPHA_ADD,
         transparent: materialMeta?.transparent ?? settings.transparent ?? true,
@@ -355,7 +358,7 @@ function materialMeta(system: ParticleSystem, meta: BabylonMetaData): string {
         if (uuid === undefined) {
             uuid = nextSerializationId(meta, 'quarks_texture');
             textures.set(value, uuid);
-            meta.textures[uuid] = value as Texture;
+            meta.textures[uuid] = value;
         }
         return uuid;
     };

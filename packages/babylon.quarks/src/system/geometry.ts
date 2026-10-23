@@ -1,3 +1,4 @@
+import type {BufferGeometryDataJSON, GeometryArrays, GeometryEntry} from '../effectDocumentJSON';
 import {ensureTriangleIndices} from '../geometryUtil';
 
 /** Positions of the unit quad billboards are drawn with, and the default mesh. */
@@ -47,19 +48,19 @@ export function isFallbackNormals(normals: Float32Array | undefined, positions: 
     return normals !== undefined && normals === fallbackNormals.get(positions);
 }
 
+/** `values` as a Float32Array: itself when it is one, else a copy. */
+function floats(values: number[] | Float32Array | undefined): Float32Array | undefined {
+    return values ? (values instanceof Float32Array ? values : new Float32Array(values)) : undefined;
+}
+
 /**
  * Typed arrays from a geometry entry of an effect document: quarks' own `{positions, indices, uvs,
- * uvs2, normals}`, or a three.js `BufferGeometry` JSON. Anything else gives the default quad.
+ * uvs2, normals}`, or a three.js `BufferGeometry` JSON or its `data`. Anything else gives the
+ * default quad.
  */
-export function resolveGeometryData(entry: any): {
-    positions: Float32Array;
-    indices: Uint32Array | Uint16Array;
-    uvs?: Float32Array;
-    uvs2?: Float32Array;
-    normals?: Float32Array;
-} {
-    if (entry?.positions) {
-        const positions = entry.positions instanceof Float32Array ? entry.positions : new Float32Array(entry.positions);
+export function resolveGeometryData(entry: GeometryEntry | BufferGeometryDataJSON | undefined): GeometryArrays {
+    if (entry && 'positions' in entry && entry.positions) {
+        const positions = floats(entry.positions)!;
         const rawIndices =
             entry.indices instanceof Uint16Array || entry.indices instanceof Uint32Array
                 ? entry.indices
@@ -69,23 +70,17 @@ export function resolveGeometryData(entry: any): {
         return {
             positions,
             indices: ensureTriangleIndices(positions, rawIndices),
-            uvs: entry.uvs ? (entry.uvs instanceof Float32Array ? entry.uvs : new Float32Array(entry.uvs)) : undefined,
-            uvs2: entry.uvs2
-                ? entry.uvs2 instanceof Float32Array
-                    ? entry.uvs2
-                    : new Float32Array(entry.uvs2)
-                : undefined,
-            normals: entry.normals
-                ? entry.normals instanceof Float32Array
-                    ? entry.normals
-                    : new Float32Array(entry.normals)
-                : undefined,
+            uvs: floats(entry.uvs),
+            uvs2: floats(entry.uvs2),
+            normals: floats(entry.normals),
         };
     }
 
-    const data = entry?.data ?? entry;
-    if (data?.attributes?.position?.array) {
-        const positions = new Float32Array(data.attributes.position.array);
+    const data = entry && 'data' in entry ? entry.data : entry;
+    const attributes = data && 'attributes' in data ? data.attributes : undefined;
+    const position = attributes?.position?.array;
+    if (data && 'attributes' in data && attributes && position) {
+        const positions = new Float32Array(position);
         let indices: Uint32Array | Uint16Array | undefined;
         if (data.index?.array) {
             const indexType = data.index.type === 'Uint16Array' ? Uint16Array : Uint32Array;
@@ -94,12 +89,10 @@ export function resolveGeometryData(entry: any): {
         return {
             positions,
             indices: ensureTriangleIndices(positions, indices),
-            uvs: data.attributes.uv?.array ? new Float32Array(data.attributes.uv.array) : undefined,
+            uvs: floats(attributes.uv?.array),
             // three.js names the second set `uv1` (r151 on), `uv2` before.
-            uvs2: (data.attributes.uv1 ?? data.attributes.uv2)?.array
-                ? new Float32Array((data.attributes.uv1 ?? data.attributes.uv2).array)
-                : undefined,
-            normals: data.attributes.normal?.array ? new Float32Array(data.attributes.normal.array) : undefined,
+            uvs2: floats((attributes.uv1 ?? attributes.uv2)?.array),
+            normals: floats(attributes.normal?.array),
         };
     }
 
