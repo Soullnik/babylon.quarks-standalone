@@ -4,6 +4,7 @@ import {Scene} from '@babylonjs/core/scene';
 import {ConstantValue} from 'quarks.core';
 import {ParticleEmitter} from '../src/ParticleEmitter';
 import {ParticleSystem} from '../src/ParticleSystem';
+import {setQuarksNodeId} from '../src/nodeId';
 
 describe('ParticleEmitter parity helpers', () => {
     let engine: NullEngine;
@@ -40,7 +41,7 @@ describe('ParticleEmitter parity helpers', () => {
         expect(clone.isEnabled()).toBe(false);
         expect(clone.rotationQuaternion).not.toBeNull();
 
-        (emitter as any)._quarksUUID = 'custom-uuid';
+        setQuarksNodeId(emitter, 'custom-uuid');
         const json = emitter.toJSON();
         expect(json.uuid).toBe('custom-uuid');
         expect(json.type).toBe('ParticleEmitter');

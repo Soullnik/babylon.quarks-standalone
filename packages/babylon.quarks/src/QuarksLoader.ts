@@ -8,13 +8,22 @@ import {Mesh} from '@babylonjs/core/Meshes/mesh';
 import {VertexData} from '@babylonjs/core/Meshes/mesh.vertexData';
 import {TransformNode} from '@babylonjs/core/Meshes/transformNode';
 import {Scene} from '@babylonjs/core/scene';
-import {Behavior, EmitSubParticleSystem} from 'quarks.core';
+import {
+    Behavior,
+    currentFormatPath,
+    EmitSubParticleSystem,
+    QuarksFormatError,
+    readFormat,
+    readFormatPart,
+    warnFormat,
+} from 'quarks.core';
 import {ParticleEmitter} from './ParticleEmitter';
 import {ParticleSystem} from './ParticleSystem';
 import {QuarksPrefab} from './QuarksPrefab';
 import {QUARKS_FORMAT_VERSION} from './QuarksSerializer';
 import {disposeEffect, retainEffectResources} from './effectResources';
 import {ensureTriangleIndices} from './geometryUtil';
+import {fileNodeId, setQuarksNodeId} from './nodeId';
 import {setTextureSourceUrl} from './textureSource';
 
 /** Kind of linked asset the loader asks a {@link QuarksResourceResolver} to handle. */
@@ -65,6 +74,22 @@ export interface QuarksLoaderOptions {
      * keeps its link unresolved, and a texture draws nothing. Default: a console warning.
      */
     onResourceError?: (kind: QuarksResourceKind, url: string, error: unknown) => void;
+    /**
+     * Called for each part of an effect file that cannot be read as written (an unknown behavior,
+     * shape or curve type, a sub emitter or mesh surface shape whose target is not in the effect, a
+     * newer format), with what was used instead and the part's JSON path, such as
+     * `object.children[2].ps.behaviors[3]`. The effect still loads, with that part at its default.
+     * Default: a console warning that names the path.
+     */
+    onFormatWarning?: (message: string, path: string) => void;
+    /**
+     * Makes a load of a file with a part that cannot be read as written throw a
+     * {@link QuarksFormatError} instead of loading on with a warning: for checks that a set of
+     * assets loads cleanly, such as in CI. The whole effect is read first, so the error's message
+     * names the first such part and its `problems` list them all; what the load built is freed
+     * before it throws. `onFormatWarning` still hears each part. Default false.
+     */
+    strict?: boolean;
 }
 
 /** Options for one {@link QuarksLoader.load} or {@link QuarksLoader.loadFromJSON}. */
@@ -117,6 +142,11 @@ interface ParsedGeometry {
     normals?: Float32Array;
 }
 
+/** The uuid of the mesh each loaded system's mesh surface shape names, until the effect links it. */
+const meshSurfaceLinks = new WeakMap<ParticleSystem, string>();
+/** The JSON path each loaded system was read from, for the warnings of linking it. */
+const systemPaths = new WeakMap<ParticleSystem, string>();
+
 /** Textures and geometries reused across loads, per scene. See QuarksLoaderOptions.shareResources. */
 const sharedTextures = new WeakMap<Scene, Map<string, Texture>>();
 const sharedGeometries = new WeakMap<Scene, Map<string, ParsedGeometry>>();
@@ -165,17 +195,8 @@ function geometryKey(geometry: ParsedGeometry): string {
     return `${lengths}${(h1 >>> 0).toString(16)}${(h2 >>> 0).toString(16)}`;
 }
 
-/**
- * Thrown for a document the loader cannot read at all, such as one with no `object`. A part it
- * cannot read (an unknown behavior, shape or curve type, a missing setting) only warns, and that
- * part takes its default.
- */
-export class QuarksFormatError extends Error {
-    constructor(message: string) {
-        super(message);
-        this.name = 'QuarksFormatError';
-    }
-}
+// Defined in quarks.core, whose readers throw it in a strict read; exported here as before.
+export {QuarksFormatError};
 
 /**
  * A copy of an effect document that loading can rewrite (resolved image urls, inlined geometry
@@ -502,13 +523,34 @@ export class QuarksLoader {
 
     /** {@link parse}, and the textures the effect uses. */
     private parseDocument(json: any, baseUrl: string): {root: TransformNode; textures: Texture[]} {
+        const {strict, onFormatWarning} = this.options;
+        const problems: string[] = [];
+        const onWarning = (message: string, path: string): void => {
+            const located = path ? `${message} (at ${path})` : message;
+            if (strict) problems.push(located);
+            if (onFormatWarning) onFormatWarning(message, path);
+            else if (!strict) console.warn(`[quarks] ${located}`);
+        };
+        const loaded = readFormat({onWarning}, () => this.readDocument(json, baseUrl));
+        if (problems.length > 0) {
+            // The whole effect is read first, so a strict load frees what it built the same way any
+            // other effect is freed, and reports how many parts failed.
+            QuarksLoader.disposeEffect(loaded.root);
+            const more = problems.length > 1 ? ` (and ${problems.length - 1} more)` : '';
+            throw new QuarksFormatError(`${problems[0]}${more}`, problems);
+        }
+        return loaded;
+    }
+
+    /** {@link parseDocument} inside its format read. */
+    private readDocument(json: any, baseUrl: string): {root: TransformNode; textures: Texture[]} {
         if (json === null || typeof json !== 'object' || json.object === null || typeof json.object !== 'object') {
             throw new QuarksFormatError('[QuarksLoader] Not an effect document: it has no "object" to load.');
         }
         const format = json.metadata?.quarksFormat;
         if (typeof format === 'number' && format > QUARKS_FORMAT_VERSION) {
-            console.warn(
-                `[QuarksLoader] This effect was written in format ${format}, newer than the ${QUARKS_FORMAT_VERSION} ` +
+            warnFormat(
+                `This effect was written in format ${format}, newer than the ${QUARKS_FORMAT_VERSION} ` +
                     'this version of babylon.quarks reads; settings it does not know are left out.'
             );
         }
@@ -522,10 +564,10 @@ export class QuarksLoader {
         };
 
         if (json.geometries) {
-            this.parseGeometries(json.geometries, meta);
+            readFormatPart('geometries', () => this.parseGeometries(json.geometries, meta));
         }
         if (json.images) {
-            this.parseImages(json.images, baseUrl, meta);
+            readFormatPart('images', () => this.parseImages(json.images, baseUrl, meta));
         }
         if (json.textures) {
             this.parseTextures(json.textures, meta);
@@ -534,7 +576,7 @@ export class QuarksLoader {
             this.parseMaterials(json.materials, meta);
         }
 
-        const root = this.parseObject(json.object, meta);
+        const root = readFormatPart('object', () => this.parseObject(json.object, meta));
         this.linkReferences(root);
         const textures = [...new Set(Object.values(meta.textures).filter((t): t is Texture => t !== null))];
         retainEffectResources(root, textures, meta.ownedMaterials);
@@ -561,8 +603,8 @@ export class QuarksLoader {
                 meta.geometries[geom.uuid] = parsed;
             } else if (geom.type === 'QuarksGeometry') {
                 if (typeof geom.url === 'string' && !geom.positions) {
-                    console.warn(
-                        `[QuarksLoader] Geometry "${geom.url}" is an external file; use load(), ` +
+                    warnFormat(
+                        `Geometry "${geom.url}" is an external file; use load(), ` +
                             'loadFromJSON(), or resolveResources() before parse().'
                     );
                 }
@@ -1013,9 +1055,9 @@ export class QuarksLoader {
     }
 
     private parseImages(images: any[], baseUrl: string, meta: LoadedMeta): void {
-        for (const img of images) {
+        for (const [index, img] of images.entries()) {
             if (img.url) {
-                QuarksLoader.warnIfNotAnImageUrl(img.url);
+                readFormatPart(`[${index}]`, () => QuarksLoader.warnIfNotAnImageUrl(img.url));
             }
             // Urls are usually already absolute after resolveResources; joinUrl is a no-op for
             // data/blob/http(s) and still supports callers that use parse() with a baseUrl only.
@@ -1042,8 +1084,8 @@ export class QuarksLoader {
         if (/^(data|blob):/i.test(url) || /\.(png|jpe?g|webp|gif|bmp|ktx2?|dds|env|basis)(\?|#|$)/i.test(url)) {
             return;
         }
-        console.warn(
-            `[QuarksLoader] Image "${url}" does not look like an image; its texture will fail to load. ` +
+        warnFormat(
+            `Image "${url}" does not look like an image; its texture will fail to load. ` +
                 'This usually means the effect was exported without embedding that texture.'
         );
     }
@@ -1298,7 +1340,7 @@ export class QuarksLoader {
                 break;
             case 'ParticleEmitter':
                 if (data.ps) {
-                    const ps = this.parseParticleSystem(data.ps, meta);
+                    const ps = readFormatPart('ps', () => this.parseParticleSystem(data.ps, meta));
                     node = ps.emitter;
                     break;
                 }
@@ -1336,7 +1378,7 @@ export class QuarksLoader {
                 node = new TransformNode(data.name || data.type || 'node', this.scene);
         }
 
-        if (data.uuid) (node as any)._quarksUUID = data.uuid;
+        if (data.uuid) setQuarksNodeId(node, data.uuid);
         if (data.name) node.name = data.name;
 
         if (data.matrix) {
@@ -1367,8 +1409,8 @@ export class QuarksLoader {
         if (data.isVisible === false && node instanceof Mesh) node.isVisible = false;
 
         if (data.children) {
-            for (const childData of data.children) {
-                const child = this.parseObject(childData, meta);
+            for (const [index, childData] of (data.children as any[]).entries()) {
+                const child = readFormatPart(`children[${index}]`, () => this.parseObject(childData, meta));
                 child.parent = node;
             }
         }
@@ -1379,7 +1421,10 @@ export class QuarksLoader {
     private parseParticleSystem(json: any, meta: LoadedMeta): ParticleSystem {
         const dependencies: {[uuid: string]: Behavior} = {};
         const ps = ParticleSystem.fromJSON(json, meta as any, dependencies, this.scene);
-        (ps as any)._meshSurfaceReferenceUUID = json?.shape?.type === 'mesh_surface' ? json?.shape?.mesh : undefined;
+        if (json?.shape?.type === 'mesh_surface' && typeof json.shape.mesh === 'string') {
+            meshSurfaceLinks.set(ps, json.shape.mesh);
+        }
+        systemPaths.set(ps, currentFormatPath());
         return ps;
     }
 
@@ -1387,8 +1432,9 @@ export class QuarksLoader {
         const nodesMap: {[uuid: string]: TransformNode} = {};
 
         const traverse = (node: TransformNode) => {
-            if ((node as any)._quarksUUID) {
-                nodesMap[(node as any)._quarksUUID] = node;
+            const fileId = fileNodeId(node);
+            if (fileId) {
+                nodesMap[fileId] = node;
             }
             for (const child of node.getChildren()) {
                 if (child instanceof TransformNode) {
@@ -1404,14 +1450,18 @@ export class QuarksLoader {
             }
             if (node instanceof ParticleEmitter) {
                 const system = node.system as ParticleSystem;
-                const meshSurfaceUUID = (system as any)._meshSurfaceReferenceUUID;
+                // Links are made once the whole effect is read; a warning names the system's path.
+                const path = systemPaths.get(system);
+                const warnAtSystem = (message: string) =>
+                    path ? readFormatPart(path, () => warnFormat(message)) : warnFormat(message);
+                const meshSurfaceUUID = meshSurfaceLinks.get(system);
                 if (meshSurfaceUUID && (system.emitterShape as any).type === 'mesh_surface') {
                     const targetNode = nodesMap[meshSurfaceUUID];
                     if (targetNode instanceof Mesh) {
                         (system.emitterShape as any).mesh = targetNode;
                     } else {
-                        console.warn(
-                            `[QuarksLoader] Emitter "${node.name}" has a mesh surface shape on "${meshSurfaceUUID}", ` +
+                        warnAtSystem(
+                            `Emitter "${node.name}" has a mesh surface shape on "${meshSurfaceUUID}", ` +
                                 (targetNode ? 'which is not a mesh' : 'which is not in the effect') +
                                 '; it emits nothing until a mesh is set.'
                         );
@@ -1434,8 +1484,8 @@ export class QuarksLoader {
                             // a string the behavior would treat as an emitter.
                             subEmitter.subParticleSystem = undefined;
                             if (targetUUID !== '') {
-                                console.warn(
-                                    `[QuarksLoader] Emitter "${node.name}" has a sub emitter targeting "${targetUUID}", ` +
+                                warnAtSystem(
+                                    `Emitter "${node.name}" has a sub emitter targeting "${targetUUID}", ` +
                                         (resolved ? 'which is not a particle emitter' : 'which is not in the effect') +
                                         '; that sub emitter is skipped.'
                                 );

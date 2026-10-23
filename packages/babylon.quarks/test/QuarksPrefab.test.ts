@@ -7,6 +7,7 @@ import {BatchedRenderer} from '../src/BatchedRenderer';
 import {ParticleEmitter} from '../src/ParticleEmitter';
 import {ParticleSystem} from '../src/ParticleSystem';
 import {QuarksPrefab} from '../src/QuarksPrefab';
+import {setQuarksNodeId} from '../src/nodeId';
 
 describe('QuarksPrefab', () => {
     let engine: NullEngine;
@@ -30,7 +31,7 @@ describe('QuarksPrefab', () => {
             emissionOverTime: new ConstantValue(1),
         });
         const emitter = system.emitter as ParticleEmitter;
-        (emitter as any)._quarksUUID = 'emitter-1';
+        setQuarksNodeId(emitter, 'emitter-1');
         emitter.parent = root;
 
         const prefab = QuarksPrefab.fromJSON(
@@ -74,7 +75,7 @@ describe('QuarksPrefab', () => {
     it('supports three-style timeline entries with clip references', () => {
         const root = new TransformNode('root-three', scene);
         const animatedTarget = new TransformNode('animated-target', scene);
-        (animatedTarget as any)._quarksUUID = 'animated-uuid';
+        setQuarksNodeId(animatedTarget, 'animated-uuid');
         animatedTarget.parent = root;
 
         const clip = {

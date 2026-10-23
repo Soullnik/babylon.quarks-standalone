@@ -683,15 +683,6 @@ exports[`seeded simulation snapshot beam keeps its particles, bounds and JSON 1`
     "renderMode": 6,
     "seed": 1234,
     "shape": {
-      "arc": 6.28319,
-      "mode": 0,
-      "radius": 10,
-      "speed": {
-        "type": "ConstantValue",
-        "value": 1,
-      },
-      "spread": 0,
-      "thickness": 1,
       "type": "sphere",
     },
     "startColor": {
@@ -1476,15 +1467,6 @@ exports[`seeded simulation snapshot billboard, local space keeps its particles, 
     "material": "quarks_material_2",
     "seed": 1234,
     "shape": {
-      "arc": 6.28319,
-      "mode": 0,
-      "radius": 10,
-      "speed": {
-        "type": "ConstantValue",
-        "value": 1,
-      },
-      "spread": 0,
-      "thickness": 1,
       "type": "sphere",
     },
     "startColor": {
@@ -2269,15 +2251,6 @@ exports[`seeded simulation snapshot billboard, world space keeps its particles, 
     "material": "quarks_material_2",
     "seed": 1234,
     "shape": {
-      "arc": 6.28319,
-      "mode": 0,
-      "radius": 10,
-      "speed": {
-        "type": "ConstantValue",
-        "value": 1,
-      },
-      "spread": 0,
-      "thickness": 1,
       "type": "sphere",
     },
     "startColor": {
@@ -3146,15 +3119,6 @@ exports[`seeded simulation snapshot mesh keeps its particles, bounds and JSON 1`
     "renderMode": 2,
     "seed": 1234,
     "shape": {
-      "arc": 6.28319,
-      "mode": 0,
-      "radius": 10,
-      "speed": {
-        "type": "ConstantValue",
-        "value": 1,
-      },
-      "spread": 0,
-      "thickness": 1,
       "type": "sphere",
     },
     "startColor": {
@@ -3957,15 +3921,6 @@ exports[`seeded simulation snapshot stretched billboard keeps its particles, bou
     },
     "seed": 1234,
     "shape": {
-      "arc": 6.28319,
-      "mode": 0,
-      "radius": 10,
-      "speed": {
-        "type": "ConstantValue",
-        "value": 1,
-      },
-      "spread": 0,
-      "thickness": 1,
       "type": "sphere",
     },
     "startColor": {
@@ -4802,15 +4757,7 @@ exports[`seeded simulation snapshot trail keeps its particles, bounds and JSON 1
     "seed": 1234,
     "shape": {
       "angle": 0.4,
-      "arc": 6.28319,
-      "mode": 0,
       "radius": 0.5,
-      "speed": {
-        "type": "ConstantValue",
-        "value": 1,
-      },
-      "spread": 0,
-      "thickness": 1,
       "type": "cone",
     },
     "startColor": {

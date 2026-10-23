@@ -47,18 +47,31 @@ and the project follows the `quarks.core` 0.x version line.
   default 30° and up to 24 % at 90°.
 - **A grid emits from its cells' centres**, symmetric about the origin: a grid of width 2 with two
   columns emits from x = ±0.5 instead of −1 and 0.
-- `EmitterShapePlugin.loadJSON` and every shape's `fromJSON` take a `ShapeJSON` instead of `any`,
-  `ShapeJSON.speed` is a `FunctionJSON`, and `ValueGenerator.startGen` and `genValue` take a
-  `GeneratorMemory`. A plugin whose reader declared a narrower parameter type may need a cast.
+- Every shape's `fromJSON` takes a `ShapeJSON` instead of `any`, `ShapeJSON.speed` is a
+  `FunctionJSON`, and `ValueGenerator.startGen` and `genValue` take a `GeneratorMemory`.
 - `EmitterShapes` lists the fields its shapes have: the grid's `row` (it said `rows`), no `angle`
   on the sphere and hemisphere, the box's `emitFrom` as the new `'boxEmitFrom'` field type, and a
   `transform` (the new `'shapeTransform'` type) on every shape.
+- **Files hold only the shape and behavior fields that differ from their defaults.** A system's
+  shape and each behavior are written through the new `EmitterToJSON` and `BehaviorToJSON`, which
+  leave out every field equal to the default their type reads a missing field as, as the system's
+  own settings already were; a field the type needs, such as a behavior's curve, stays. babylon.quarks
+  0.27 and later read these files; **three.quarks and babylon.quarks before 0.27 no longer do**.
+  `toJSON()` on a shape or behavior still writes every field.
+- `Behavior.toJSON()` returns the new `BehaviorJSON` (a `type` and the settings) instead of `any`. A
+  behavior whose `toJSON` was declared to return something without a `type` no longer compiles.
+  `EmitterShapePlugin.loadJSON` and `BehaviorPlugin.loadJSON` are declared to take `ShapeJSON` and
+  `BehaviorJSON`, as methods, so a plugin that types its own JSON still compiles; they must only
+  read, since saving calls them to find the defaults.
 
 ### Deprecated
 
 - `RecordState`, the sample of the old linked-list trail history. Trails record into the flat ring
   buffer of `TrailParticle` (`historyPositions` and its siblings); nothing fills or draws the list.
 - `TrailParticle.previous`, that list, is `@internal` and out of the documented API.
+- `MeshSettings.startRotationX`, `startRotationY` and `startRotationZ`, which nothing reads, are
+  optional and deprecated; a mesh particle's start rotation about each axis is the system's
+  `startRotation`, an `EulerGenerator`.
 
 ### Added
 
@@ -75,6 +88,17 @@ and the project follows the `quarks.core` 0.x version line.
   for the rest of the package.
 - `ContinuousLinearFunction` (the keys of a `Gradient`) and its `ObjectValueType` are exported, and
   `Bezier` has `BezierJSON` and `BezierSplit` types for what `toJSON` and `split` return.
+- **Format warnings name the part of the file they are about**, by its JSON path
+  (`object.children[2].ps.behaviors[3]`). `QuarksLoaderOptions.onFormatWarning` receives them
+  instead of the console, and `QuarksLoaderOptions.strict` makes a load throw `QuarksFormatError`
+  for them, after reading the whole effect and freeing what it built, with every part in its
+  `problems`, to check in CI that a set of assets loads cleanly. The
+  loader's own format warnings (a newer format, an unresolved sub emitter or mesh surface link, an
+  image url that is not an image) go the same way. `readFormat`, `readFormatPart`,
+  `currentFormatPath`, `warnFormat` and `QuarksFormatError` (now defined in `quarks.core`) give plugin
+  readers and other hosts the same.
+- `BehaviorTypes.EmitSubParticleSystem` lists `inherit`, with the new `'subEmitterInherit'` field
+  type.
 
 ### Fixed
 
@@ -109,6 +133,9 @@ and the project follows the `quarks.core` 0.x version line.
 - Shape docs give the units and axes of `arc` (radians around +z from +x), the ranges of every
   size and thickness, and say that `RectangleEmitter` emits from the outline (Unity's Rectangle is a
   `BoxEmitter` with no depth); the donut's `donutRadius` is the tube's radius, not the hole's.
+- `docs/FORMAT.md` gave 0.28 as the release of format version 1; 0.27.0 is. It now says how a
+  system's blend mode is read when its material entry, or the system, has none, and that
+  `ps.version` is written for three.quarks only.
 
 ### Internal
 
@@ -117,6 +144,12 @@ and the project follows the `quarks.core` 0.x version line.
   one point under what the suites reach.
 - Behaviour tests for every shape: even filling, bounds, start speed, the rectangle's outline,
   grid cells, out-of-range settings, JSON round trips of every field and the registry's fields.
+- Golden fixtures in `packages/babylon.quarks/test/fixtures`: effects written by three.quarks, by
+  the Unity exporter and by babylon.quarks 0.27.0. Each loads with the warnings its snapshot holds and
+  saves to the format it holds, saving is stable, and each 0.27.0 file loads as the one it was
+  written from.
+- Loaded node ids and mesh surface links live in module `WeakMap`s instead of `as any` fields on
+  nodes and systems.
 
 ## [0.27.1] — 2026-10-23
 

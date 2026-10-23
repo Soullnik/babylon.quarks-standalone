@@ -3,7 +3,7 @@ import {Mesh} from '@babylonjs/core/Meshes/mesh';
 import {Scene} from '@babylonjs/core/scene';
 import {ConstantValue, EmitSubParticleSystem, PointEmitter, SubParticleEmitMode} from 'quarks.core';
 import {MeshSurfaceEmitter} from '../src/MeshSurfaceEmitter';
-import {quarksNodeId} from '../src/nodeId';
+import {quarksNodeId, setQuarksNodeId} from '../src/nodeId';
 import {ParticleEmitter} from '../src/ParticleEmitter';
 import {ParticleSystem} from '../src/ParticleSystem';
 import {QuarksLoader} from '../src/QuarksLoader';
@@ -80,7 +80,7 @@ describe('links survive loading and saving again', () => {
 
     test('an emitter and the links to it use the id it was loaded under', () => {
         const emitter = new ParticleSystem({scene}).emitter as ParticleEmitter;
-        (emitter as any)._quarksUUID = 'from-file';
+        setQuarksNodeId(emitter, 'from-file');
         expect(emitter.uuid).toBe('from-file');
         expect(emitter.toJSON({geometries: {}, materials: {}, textures: {}}).uuid).toBe('from-file');
         emitter.dispose();
@@ -101,7 +101,7 @@ describe('links survive loading and saving again', () => {
         // may well get that same uniqueId.
         const loaded = new ParticleSystem({scene}).emitter as ParticleEmitter;
         const fresh = new ParticleSystem({scene}).emitter as ParticleEmitter;
-        (loaded as any)._quarksUUID = fresh.uniqueId.toString();
+        setQuarksNodeId(loaded, fresh.uniqueId.toString());
         expect(quarksNodeId(fresh)).not.toBe(quarksNodeId(loaded));
         loaded.dispose();
         fresh.dispose();
@@ -109,7 +109,7 @@ describe('links survive loading and saving again', () => {
 
     test('a mesh surface shape names its mesh by the id it was loaded under', () => {
         const mesh = new Mesh('surface', scene);
-        (mesh as any)._quarksUUID = 'mesh-from-file';
+        setQuarksNodeId(mesh, 'mesh-from-file');
         expect(new MeshSurfaceEmitter(mesh).toJSON().mesh).toBe('mesh-from-file');
         const made = new Mesh('made', scene);
         expect(new MeshSurfaceEmitter(made).toJSON().mesh).toBe(quarksNodeId(made));
@@ -119,7 +119,7 @@ describe('links survive loading and saving again', () => {
 
     test('a clone gets an id of its own', () => {
         const emitter = new ParticleSystem({scene}).emitter as ParticleEmitter;
-        (emitter as any)._quarksUUID = 'from-file';
+        setQuarksNodeId(emitter, 'from-file');
         const copy = emitter.clone();
         expect(copy.uuid).not.toBe('from-file');
         emitter.dispose();
