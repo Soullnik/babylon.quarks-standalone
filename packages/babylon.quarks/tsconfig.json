@@ -12,7 +12,6 @@
         "skipLibCheck": true,
         "forceConsistentCasingInFileNames": true,
         "resolveJsonModule": true,
-        "composite": true,
         "rootDir": "./src"
     },
     "include": ["src/**/*"],

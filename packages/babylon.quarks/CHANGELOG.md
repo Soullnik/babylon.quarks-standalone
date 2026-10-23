@@ -4,6 +4,35 @@ All notable changes to the `babylon.quarks` package are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project follows the `quarks.core` 0.x version line.
 
+## [0.27.1] — 2026-10-23
+
+Packaging and release checks; the runtime is the same as 0.27.0.
+
+### Changed
+
+- **`@babylonjs/core` peer range is `^9.0.0`** instead of `>=9.0.0`. The package is built and
+  tested against Babylon 9; a future major is a separate release, so npm no longer accepts it
+  silently.
+- **`"sideEffects": false`.** Importing the package registers nothing (shaders are registered
+  when a batch is built), so bundlers may drop the modules an app does not use.
+- The README says what `require('babylon.quarks')` needs: `@babylonjs/core` is ES modules only, so
+  CommonJS consumers need a Node that can `require` ES modules (20.19 or 22.12 and later).
+
+### Internal
+
+- **`npm run check:pack` checks that the editor moves with the library.** The editor's peer
+  dependency on `babylon.quarks` must be the library's own minor line (`~X.Y.0`), and CONTRIBUTING's
+  release steps say so: an editor published with an older range would install a babylon.quarks
+  without the API it imports.
+- The examples compile with `strict` and are part of `npm run typecheck`, in CI too.
+- The vendored `quarks.core` workspace is marked `private` (it is bundled into babylon.quarks and
+  never published on its own), points at this repository, and lists `types` first in its
+  `exports`. Its unused Babel and ESLint configs are gone, and so is `composite` in the library's
+  `tsconfig.json`, which nothing referenced.
+- The examples dev server accepts only localhost and Cloudflare quick tunnel hosts instead of
+  any `Host` header. The repository's Node requirement is 20.19, the version `check:pack`'s
+  CommonJS import needs.
+
 ## [0.27.0] — 2026-10-23
 
 The release that follows the October 2026 audit: every domain (emitters, behaviors, system and

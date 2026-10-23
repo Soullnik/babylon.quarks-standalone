@@ -22,7 +22,7 @@ import type {DemoContext} from '../types';
 
 const REFRESH_INTERVAL = 1.8;
 
-function restartTracked(tracked) {
+function restartTracked(tracked: ParticleSystem[]) {
     for (const s of tracked) {
         s.restart();
         s.play();

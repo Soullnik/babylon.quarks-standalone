@@ -45,6 +45,27 @@ function assertNoRuntimeDependencies(packageDir) {
 }
 
 /**
+ * The editor imports the library's newest API, so its peer range must be the library's own minor
+ * line (`~X.Y.0`): a range that still admits an older minor lets npm install a babylon.quarks the
+ * editor cannot link against, and one that leaves out the current version cannot be installed at
+ * all. The two packages are released in lockstep; see CONTRIBUTING, "Releases".
+ */
+function assertEditorPeerInLockstep() {
+    const read = (dir) => JSON.parse(readFileSync(new URL(`../packages/${dir}/package.json`, import.meta.url), 'utf8'));
+    const library = read('babylon.quarks');
+    const editor = read('babylon.quarks-editor');
+    const [major, minor] = library.version.split('.');
+    const expected = `~${major}.${minor}.0`;
+    const actual = editor.peerDependencies?.['babylon.quarks'];
+    if (actual !== expected) {
+        throw new Error(
+            `babylon.quarks-editor's peer dependency on babylon.quarks is ${actual ?? 'missing'}; ` +
+                `with babylon.quarks at ${library.version} it must be ${expected}.`
+        );
+    }
+}
+
+/**
  * Peer dependencies the consumer project links from the repo's own node_modules, so the smoke
  * test runs offline against the same versions the packages are built with.
  */
@@ -180,6 +201,7 @@ function main() {
         'README.md',
     ]);
     assertNoRuntimeDependencies('babylon.quarks-editor');
+    assertEditorPeerInLockstep();
 
     assertConsumersCanImport();
 

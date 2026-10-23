@@ -38,14 +38,14 @@ changes to the library show up in demos without rebuilding.
 Run the full suite before opening a PR:
 
 ```bash
-npm run check        # build + test typecheck + tests with coverage gate + examples build + tarball content check
+npm run check        # format, lint, build, API docs, typecheck, tests with coverage gate, smoothness sweep, examples build, tarball check
 ```
 
 Individual pieces:
 
 ```bash
 npm run test                                   # jest suites: quarks.core, babylon.quarks, babylon.quarks-editor
-npm run typecheck                              # tsc over sources and tests (jest only transpiles them)
+npm run typecheck                              # tsc over sources, tests and the examples (jest only transpiles them; needs `npm run build`)
 npm run test:coverage                          # the same suites with the coverage gate (what CI runs)
 npm run docs                                   # TypeDoc API docs
 npm run docs:check                             # renders the API docs; fails on a missing TSDoc or broken {@link} (CI runs it)
@@ -81,8 +81,8 @@ quotes; Markdown lists indent 2 spaces, and code blocks in Markdown are left as 
 hook rules for the editor) and is part of `npm run check` and CI. Errors fail it. The warnings are
 explicit `any`s, kept while the JSON readers are typed; `--max-warnings` in the script is a ratchet
 like the coverage floors: a change may not add one, and a PR that removes some lowers the number.
-An `eslint-disable` comment names its rule and says why. The three packages compile with
-`strict: true`; the examples do not yet.
+An `eslint-disable` comment names its rule and says why. The three packages and the examples
+compile with `strict: true`.
 
 Everything `babylon.quarks` exports carries TSDoc: `npm run docs:check`, part of `npm run check`
 and CI, fails on an exported class, function, type, member or accessor without a comment, and on a
@@ -117,6 +117,10 @@ users should not rely on it.
    `packages/babylon.quarks/package.json` (keep the `quarks.core` 0.x line alignment). If the
    editor changed too, do the same for `packages/babylon.quarks-editor/CHANGELOG.md` and
    `package.json`.
+   - **A new minor moves the editor with it.** The editor imports the library's newest API, so
+     its peer dependency on `babylon.quarks` is the library's own minor line, `~X.Y.0`; bump it
+     with the library's minor and publish the editor in the same release. `npm run check:pack`
+     fails when the two are out of step.
 3. Verify the tarballs: `npm run check:pack` (validates both `babylon.quarks` and
    `babylon.quarks-editor`).
 4. Publish a GitHub release — the `publish.yml` workflow publishes both `babylon.quarks` and

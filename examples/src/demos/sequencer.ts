@@ -16,7 +16,7 @@ import {
 import {SHARED_ASSETS} from '../shared/common';
 import type {DemoContext} from '../types';
 
-function loadImage(src) {
+function loadImage(src: string): Promise<HTMLImageElement> {
     return new Promise((resolve, reject) => {
         const image = new Image();
         image.onload = () => resolve(image);
@@ -25,7 +25,7 @@ function loadImage(src) {
     });
 }
 
-function createSequencerImage(image, maxDimension) {
+function createSequencerImage(image: HTMLImageElement, maxDimension: number): HTMLImageElement | HTMLCanvasElement {
     const ratio = Math.min(1, maxDimension / Math.max(image.width, image.height));
     const width = Math.max(1, Math.round(image.width * ratio));
     const height = Math.max(1, Math.round(image.height * ratio));
@@ -41,7 +41,14 @@ function createSequencerImage(image, maxDimension) {
     return canvas;
 }
 
-function centerSequencer(sequencer, image, scaleX, scaleY, anchorX, anchorY) {
+function centerSequencer(
+    sequencer: TextureSequencer,
+    image: {width: number; height: number},
+    scaleX: number,
+    scaleY: number,
+    anchorX: number,
+    anchorY: number
+) {
     sequencer.position.x = anchorX - image.width * scaleX * 0.5;
     sequencer.position.y = anchorY - image.height * scaleY * 0.5;
 }
