@@ -13,7 +13,7 @@
         "build:examples": "npm run build --workspace=examples",
         "test": "jest",
         "test:coverage": "jest --coverage",
-        "typecheck": "tsc -p packages/quarks.core/tsconfig.test.json && tsc -p packages/babylon.quarks/tsconfig.test.json && tsc -p packages/babylon.quarks-editor/tsconfig.test.json",
+        "typecheck": "tsc -p packages/quarks.core/tsconfig.test.json && tsc -p packages/babylon.quarks/tsconfig.test.json && tsc -p packages/babylon.quarks-editor/tsconfig.test.json && tsc -p examples/tsconfig.json",
         "docs": "npm run docs --workspace=babylon.quarks",
         "docs:check": "npm run docs:check --workspace=babylon.quarks",
         "capture:previews": "tsx ./scripts/capture-demo-previews.mts",
@@ -31,7 +31,7 @@
         "lint": "eslint . --max-warnings 457"
     },
     "engines": {
-        "node": ">=20.11.0",
+        "node": ">=20.19.0",
         "npm": ">=10.0.0"
     },
     "devDependencies": {
@@ -63,5 +63,5 @@
         "typescript-eslint": "^8.72.0",
         "vite": "^7.3.1"
     },
-    "version": "0.27.0"
+    "version": "0.27.1"
 }

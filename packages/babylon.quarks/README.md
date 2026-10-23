@@ -32,7 +32,9 @@ High-performance particle system for [Babylon.js](https://www.babylonjs.com/). B
 npm install babylon.quarks @babylonjs/core
 ```
 
-Peer dependency: `@babylonjs/core` >= 9.
+Peer dependency: `@babylonjs/core` 9.x. The package ships ES module and CommonJS builds;
+`@babylonjs/core` is ES modules only, so `require('babylon.quarks')` needs a Node that can
+`require` ES modules (20.19 or 22.12 and later). Bundlers and `import` work everywhere.
 
 ## Quick start
 

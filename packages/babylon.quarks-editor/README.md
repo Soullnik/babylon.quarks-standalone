@@ -10,6 +10,9 @@ Shuriken-style effect editor for [babylon.quarks](https://www.npmjs.com/package/
 npm install babylon.quarks-editor babylon.quarks @babylonjs/core @babylonjs/materials react react-dom @heroicons/react @tanstack/react-virtual
 ```
 
+The editor is an ES module package (`import`, not `require`). Its version follows babylon.quarks:
+editor 0.27.x needs babylon.quarks 0.27.x.
+
 ## Usage
 
 The supported embed is the host: it owns the scene, the timeline, undo/redo, playback and the

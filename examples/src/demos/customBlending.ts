@@ -1,4 +1,5 @@
 import {Constants} from '@babylonjs/core/Engines/constants';
+import type {Texture} from '@babylonjs/core/Materials/Textures/texture';
 import {Vector3 as BVector3} from '@babylonjs/core/Maths/math.vector';
 import {
     Bezier,
@@ -15,7 +16,14 @@ import {
 import {createSharedTexture, SHARED_ASSETS} from '../shared/common';
 import type {DemoContext} from '../types';
 
-function addBlendSystem({scene, batchRenderer, systems, texture, blendMode, position, color}) {
+interface BlendSystemOptions extends Pick<DemoContext, 'scene' | 'batchRenderer' | 'systems'> {
+    texture: Texture;
+    blendMode: number;
+    position: BVector3;
+    color: Vector4;
+}
+
+function addBlendSystem({scene, batchRenderer, systems, texture, blendMode, position, color}: BlendSystemOptions) {
     const system = new ParticleSystem({
         scene,
         duration: 5,

@@ -17,7 +17,6 @@ const typescriptPlugin = () =>
         tsconfig: './tsconfig.json',
         declaration: false,
         declarationDir: undefined,
-        composite: false,
     });
 
 export default [

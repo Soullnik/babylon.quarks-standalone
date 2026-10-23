@@ -1,16 +1,17 @@
 {
     "name": "quarks.core",
-    "version": "0.27.0",
-    "description": "Core library for Quarks VFX / Particle System Library",
+    "version": "0.27.1",
+    "private": true,
+    "description": "The simulation core of babylon.quarks: a fork of the three.quarks core, bundled into babylon.quarks and not published on its own",
     "type": "module",
     "types": "./dist/types/index.d.ts",
     "main": "./dist/quarks.core.cjs",
     "module": "./dist/quarks.core.esm.js",
     "exports": {
         ".": {
+            "types": "./dist/types/index.d.ts",
             "import": "./dist/quarks.core.esm.js",
-            "require": "./dist/quarks.core.cjs",
-            "types": "./dist/types/index.d.ts"
+            "require": "./dist/quarks.core.cjs"
         }
     },
     "files": [
@@ -28,7 +29,8 @@
     },
     "repository": {
         "type": "git",
-        "url": "git+https://github.com/Alchemist0823/three.quarks.git"
+        "url": "git+https://github.com/Soullnik/babylon.quarks-standalone.git",
+        "directory": "packages/quarks.core"
     },
     "keywords": [
         "particle",
@@ -41,7 +43,7 @@
     "author": "Alchemist0823 <the.forrest.sun@gmail.com>",
     "license": "MIT",
     "bugs": {
-        "url": "https://github.com/Alchemist0823/three.quarks/issues"
+        "url": "https://github.com/Soullnik/babylon.quarks-standalone/issues"
     },
-    "homepage": "https://quarks.art"
+    "homepage": "https://github.com/Soullnik/babylon.quarks-standalone#readme"
 }

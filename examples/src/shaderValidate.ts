@@ -13,6 +13,7 @@
  *
  * Reports into window.__shaderSources for the runner to read.
  */
+import type {AbstractEngine} from '@babylonjs/core/Engines/abstractEngine';
 import {Engine} from '@babylonjs/core/Engines/engine';
 import {ShaderStore} from '@babylonjs/core/Engines/shaderStore';
 import '@babylonjs/core/Engines/WebGPU/Extensions/index';
@@ -34,7 +35,7 @@ type Report = {
 
 const language = new URLSearchParams(location.search).get('lang') === 'glsl' ? 'glsl' : 'wgsl';
 const canvas = document.getElementById('c') as HTMLCanvasElement;
-let engine: Engine | WebGPUEngine;
+let engine: AbstractEngine;
 if (language === 'wgsl') {
     const webgpu = new WebGPUEngine(canvas);
     await webgpu.initAsync();
@@ -79,6 +80,8 @@ for (const [i, c] of cases.entries()) {
                 samplers: c.program.samplers,
                 defines: c.program.defines.map((d) => `#define ${d}`).join('\n'),
                 shaderLanguage: language === 'wgsl' ? ShaderLanguage.WGSL : ShaderLanguage.GLSL,
+                fallbacks: null,
+                onCompiled: null,
                 onError: (_effect, errors) => {
                     failed = errors || 'compile error';
                 },

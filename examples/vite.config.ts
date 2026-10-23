@@ -10,8 +10,9 @@ export default defineConfig({
     base,
     server: {
         port: 3010,
-        // Cloudflare quick tunnels hit Vite with a *.trycloudflare.com Host header.
-        allowedHosts: true,
+        // Cloudflare quick tunnels hit Vite with a *.trycloudflare.com Host header; any other host
+        // is refused, as Vite does by default to block DNS rebinding.
+        allowedHosts: ['.trycloudflare.com'],
     },
     preview: {
         port: 3010,
