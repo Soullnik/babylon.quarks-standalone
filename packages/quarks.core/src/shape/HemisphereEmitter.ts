@@ -6,9 +6,9 @@ import {
     ValueGeneratorFromJSON,
 } from '../functions';
 import {EmissionState, IParticleSystem} from '../IParticleSystem';
-import {MathUtils, Matrix4, Quaternion} from '../math';
+import {Matrix4, Quaternion} from '../math';
 import {Particle} from '../Particle';
-import {UP_VEC3, ZERO_VEC3} from '../util/MathUtil';
+import {shellRadius, UP_VEC3, ZERO_VEC3} from '../util/MathUtil';
 import {random} from '../util/random';
 import {EmitterMode, EmitterShape, getValueFromEmitterMode, ShapeJSON} from './EmitterUtil';
 import {ShapeTransform} from './ShapeTransform';
@@ -17,15 +17,19 @@ import {ShapeTransform} from './ShapeTransform';
  */
 export interface HemisphereEmitterParameters {
     /**
-     * The radius of the hemisphere.
+     * Radius of the hemisphere, which opens toward +z; a negative value is read as 0. Defaults
+     * to 10.
      */
     radius?: number;
     /**
-     * The arc of the hemisphere.
+     * Arc of the hemisphere that particles start in, in radians around +z from +x (Unity's Arc, which
+     * its inspector shows in degrees); 2π, the default, for the whole hemisphere.
      */
     arc?: number;
     /**
-     * The thickness of the hemisphere. 1 is a full hemisphere, 0 is a thin shell.
+     * Radius Thickness, as in Unity: how far in from the surface particles may start, as a fraction
+     * of the radius, clamped to [0, 1]. 0 is the surface only; 1, the default, fills the whole
+     * hemisphere, evenly over its volume.
      */
     thickness?: number;
     /**
@@ -63,9 +67,9 @@ export class HemisphereEmitter implements EmitterShape {
     arc: number;
     /**
      * How far in from the surface particles may start, as a fraction of the radius: 0 on the
-     * surface, 1 anywhere down to the centre.
+     * surface, 1 anywhere down to the centre, evenly over the volume; clamped to [0, 1].
      */
-    thickness: number; //[0, 1]
+    thickness: number;
     /** How the start point moves along the arc, see {@link EmitterMode}. */
     mode: EmitterMode;
     /**
@@ -121,10 +125,9 @@ export class HemisphereEmitter implements EmitterShape {
     initialize(p: Particle, emissionState: EmissionState) {
         const u = getValueFromEmitterMode(this.mode, this.currentValue, this.spread, emissionState);
         const v = random();
-        const rand = MathUtils.lerp(1 - this.thickness, 1, random());
+        const rand = shellRadius(this.thickness, 3);
         const theta = u * this.arc;
         const phi = Math.acos(v);
-        //const r = Math.cbrt(rand);
         const sinTheta = Math.sin(theta);
         const cosTheta = Math.cos(theta);
         const sinPhi = Math.sin(phi);
@@ -134,7 +137,7 @@ export class HemisphereEmitter implements EmitterShape {
         p.position.z = cosPhi;
 
         p.velocity.copy(p.position).multiplyScalar(p.startSpeed);
-        p.position.multiplyScalar(this.radius * rand);
+        p.position.multiplyScalar(Math.max(0, this.radius) * rand);
 
         // Default facing-outward orientation, but defer to startRotation if set.
         if (p.rotation instanceof Quaternion) {
@@ -164,7 +167,7 @@ export class HemisphereEmitter implements EmitterShape {
     /**
      * Reads {@link HemisphereEmitter.toJSON} output; a field the JSON leaves out takes its default.
      */
-    static fromJSON(json: any): HemisphereEmitter {
+    static fromJSON(json: ShapeJSON): HemisphereEmitter {
         return new HemisphereEmitter({
             radius: json.radius,
             arc: json.arc,

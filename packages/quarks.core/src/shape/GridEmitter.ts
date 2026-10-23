@@ -32,8 +32,8 @@ export interface GridEmitterParameters {
 }
 
 /**
- * Emits from the points of a grid in the xy plane, heading along +z: each particle starts at a
- * random point of the grid.
+ * Emits from the cells of a grid in the xy plane, centred on the origin and heading along +z: each particle starts at the centre of a random cell, so a 2 × 2 grid of
+ * width 2 emits from x = ±0.5.
  */
 export class GridEmitter implements EmitterShape {
     /** Always `'grid'`. */
@@ -41,11 +41,11 @@ export class GridEmitter implements EmitterShape {
     /** Width of the grid, along x. */
     width: number;
     /** Height of the grid, along y. */
-    height: number; // [0, Math.PI * 2]
-    /** Points along x. */
-    column: number; // [0, 1]
-    /** Points along y. */
-    row: number; // [0, Math.PI / 2]
+    height: number;
+    /** Cells along x; read as a whole number of at least 1, and as 1 when not finite. */
+    column: number;
+    /** Cells along y; read as a whole number of at least 1, and as 1 when not finite. */
+    row: number;
     transform?: ShapeTransform;
 
     constructor(parameters: GridEmitterParameters = {}) {
@@ -56,13 +56,17 @@ export class GridEmitter implements EmitterShape {
         this.transform = parameters.transform;
     }
 
-    /** Starts `p` at a random point of the grid, heading along +z at its start speed. */
+    /**
+     * Starts `p` at the centre of a random cell of the grid, heading along +z at its start speed.
+     */
     initialize(p: Particle) {
-        const r = Math.floor(random() * this.row);
-        const c = Math.floor(random() * this.column);
+        const rows = Number.isFinite(this.row) ? Math.max(1, Math.floor(this.row)) : 1;
+        const columns = Number.isFinite(this.column) ? Math.max(1, Math.floor(this.column)) : 1;
+        const r = Math.floor(random() * rows);
+        const c = Math.floor(random() * columns);
 
-        p.position.x = (c * this.width) / this.column - this.width / 2;
-        p.position.y = (r * this.height) / this.row - this.height / 2;
+        p.position.x = ((c + 0.5) / columns - 0.5) * this.width;
+        p.position.y = ((r + 0.5) / rows - 0.5) * this.height;
         p.position.z = 0;
         p.velocity.set(0, 0, p.startSpeed);
         this.transform?.apply(p);
@@ -81,8 +85,14 @@ export class GridEmitter implements EmitterShape {
     }
 
     /** Reads {@link GridEmitter.toJSON} output; a field the JSON leaves out takes its default. */
-    static fromJSON(json: any): GridEmitter {
-        return new GridEmitter({...json, transform: ShapeTransform.fromJSON(json.transform)});
+    static fromJSON(json: ShapeJSON): GridEmitter {
+        return new GridEmitter({
+            width: json.width,
+            height: json.height,
+            column: json.column,
+            row: json.row,
+            transform: ShapeTransform.fromJSON(json.transform),
+        });
     }
 
     /** A copy with the same settings. */

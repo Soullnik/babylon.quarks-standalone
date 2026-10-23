@@ -4,7 +4,10 @@ import {FunctionJSON} from './FunctionJSON';
 import {GeneratorMemory} from './GeneratorMemory';
 import {RotationGenerator} from './RotationGenerator';
 
-/** A uniformly random rotation, rolled once per particle and kept for its life. */
+/**
+ * A uniformly random rotation, rolled once per particle and kept for its life. Call
+ * {@link RandomQuatGenerator.startGen} with each particle's memory when it spawns.
+ */
 export class RandomQuatGenerator implements RotationGenerator {
     /** Always `'rotation'`. */
     type: 'rotation';
@@ -14,10 +17,11 @@ export class RandomQuatGenerator implements RotationGenerator {
     }
 
     /**
-     * The first of the four {@link GeneratorMemory} slots the roll lives in.
+     * The first of the four {@link GeneratorMemory} slots the roll lives in; -1 until the first
+     * {@link RandomQuatGenerator.startGen}.
      * @internal
      */
-    indexCount = 0;
+    indexCount = -1;
 
     // Four numeric slots rather than one Quaternion object: nothing is allocated
     // per spawn, and the numbers can be mirrored into the store's memory column.

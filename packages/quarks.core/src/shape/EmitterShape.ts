@@ -23,10 +23,13 @@ export interface EmitterShapePlugin {
     type: string;
     /** The shape's class. */
     constructor: Constructable<EmitterShape>;
-    /** The fields an editor shows, with the kinds of value each takes. */
+    /**
+     * The fields an editor shows, with the kinds of value each takes: each name is a field of the
+     * shape and a key of its JSON.
+     */
     params: ParameterPair[];
     /** Reads the shape from its JSON, resolving references (a mesh) through `meta`. */
-    loadJSON: (json: any, meta: JsonMetaData) => EmitterShape;
+    loadJSON: (json: ShapeJSON, meta: JsonMetaData) => EmitterShape;
 }
 
 /** The emitter shapes effect files can name, by type; plugins add more. */
@@ -37,8 +40,9 @@ export const EmitterShapes: {[key: string]: EmitterShapePlugin} = {
             ['width', ['number']],
             ['height', ['number']],
             ['depth', ['number']],
-            ['emitFrom', ['number']],
+            ['emitFrom', ['boxEmitFrom']],
             ['boxThickness', ['vec3']],
+            ['transform', ['shapeTransform']],
         ],
         constructor: BoxEmitter,
         loadJSON: BoxEmitter.fromJSON,
@@ -52,6 +56,7 @@ export const EmitterShapes: {[key: string]: EmitterShapePlugin} = {
             ['mode', ['emitterMode']],
             ['spread', ['number']],
             ['speed', ['valueFunc', 'value']],
+            ['transform', ['shapeTransform']],
         ],
         constructor: CircleEmitter,
         loadJSON: CircleEmitter.fromJSON,
@@ -66,6 +71,7 @@ export const EmitterShapes: {[key: string]: EmitterShapePlugin} = {
             ['mode', ['emitterMode']],
             ['spread', ['number']],
             ['speed', ['valueFunc', 'value']],
+            ['transform', ['shapeTransform']],
         ],
         constructor: ConeEmitter,
         loadJSON: ConeEmitter.fromJSON,
@@ -80,6 +86,7 @@ export const EmitterShapes: {[key: string]: EmitterShapePlugin} = {
             ['mode', ['emitterMode']],
             ['spread', ['number']],
             ['speed', ['valueFunc', 'value']],
+            ['transform', ['shapeTransform']],
         ],
         constructor: DonutEmitter,
         loadJSON: DonutEmitter.fromJSON,
@@ -91,21 +98,27 @@ export const EmitterShapes: {[key: string]: EmitterShapePlugin} = {
             ['mode', ['emitterMode']],
             ['spread', ['number']],
             ['speed', ['valueFunc', 'value']],
+            ['transform', ['shapeTransform']],
         ],
         constructor: EdgeEmitter,
         loadJSON: EdgeEmitter.fromJSON,
     },
-    point: {type: 'point', params: [], constructor: PointEmitter, loadJSON: PointEmitter.fromJSON},
+    point: {
+        type: 'point',
+        params: [['transform', ['shapeTransform']]],
+        constructor: PointEmitter,
+        loadJSON: PointEmitter.fromJSON,
+    },
     sphere: {
         type: 'sphere',
         params: [
             ['radius', ['number']],
             ['arc', ['radian']],
             ['thickness', ['number']],
-            ['angle', ['radian']],
             ['mode', ['emitterMode']],
             ['spread', ['number']],
             ['speed', ['valueFunc', 'value']],
+            ['transform', ['shapeTransform']],
         ],
         constructor: SphereEmitter,
         loadJSON: SphereEmitter.fromJSON,
@@ -116,10 +129,10 @@ export const EmitterShapes: {[key: string]: EmitterShapePlugin} = {
             ['radius', ['number']],
             ['arc', ['radian']],
             ['thickness', ['number']],
-            ['angle', ['radian']],
             ['mode', ['emitterMode']],
             ['spread', ['number']],
             ['speed', ['valueFunc', 'value']],
+            ['transform', ['shapeTransform']],
         ],
         constructor: HemisphereEmitter,
         loadJSON: HemisphereEmitter.fromJSON,
@@ -129,8 +142,9 @@ export const EmitterShapes: {[key: string]: EmitterShapePlugin} = {
         params: [
             ['width', ['number']],
             ['height', ['number']],
-            ['rows', ['number']],
             ['column', ['number']],
+            ['row', ['number']],
+            ['transform', ['shapeTransform']],
         ],
         constructor: GridEmitter,
         loadJSON: GridEmitter.fromJSON,
@@ -144,6 +158,7 @@ export const EmitterShapes: {[key: string]: EmitterShapePlugin} = {
             ['mode', ['emitterMode']],
             ['spread', ['number']],
             ['speed', ['valueFunc', 'value']],
+            ['transform', ['shapeTransform']],
         ],
         constructor: RectangleEmitter,
         loadJSON: RectangleEmitter.fromJSON,

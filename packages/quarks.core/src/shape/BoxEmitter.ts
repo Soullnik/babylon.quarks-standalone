@@ -104,7 +104,7 @@ export class BoxEmitter implements EmitterShape {
      */
     private onSurface(axis: number): number {
         const side = random() < 0.5 ? -1 : 1;
-        const thickness = this.boxThickness[axis];
+        const thickness = Math.min(this.boxThickness[axis], 1);
         if (thickness <= 0 || random() < 0.5) {
             return side;
         }
@@ -125,13 +125,19 @@ export class BoxEmitter implements EmitterShape {
     }
 
     /** Reads {@link BoxEmitter.toJSON} output; a field the JSON leaves out takes its default. */
-    static fromJSON(json: any): BoxEmitter {
+    static fromJSON(json: ShapeJSON): BoxEmitter {
         return new BoxEmitter({
             width: json.width,
             height: json.height,
             depth: json.depth,
             emitFrom: json.emitFrom,
-            boxThickness: Array.isArray(json.boxThickness) ? json.boxThickness : undefined,
+            boxThickness: Array.isArray(json.boxThickness)
+                ? [
+                      Number(json.boxThickness[0]) || 0,
+                      Number(json.boxThickness[1]) || 0,
+                      Number(json.boxThickness[2]) || 0,
+                  ]
+                : undefined,
             transform: ShapeTransform.fromJSON(json.transform),
         });
     }

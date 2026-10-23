@@ -8,7 +8,7 @@ import {
 import {EmissionState, IParticleSystem} from '../IParticleSystem';
 import {Matrix4, Quaternion} from '../math';
 import {Particle} from '../Particle';
-import {UP_VEC3, ZERO_VEC3} from '../util/MathUtil';
+import {shellRadius, UP_VEC3, ZERO_VEC3} from '../util/MathUtil';
 import {random} from '../util/random';
 import {EmitterMode, EmitterShape, getValueFromEmitterMode, ShapeJSON} from './EmitterUtil';
 import {ShapeTransform} from './ShapeTransform';
@@ -18,16 +18,18 @@ import {ShapeTransform} from './ShapeTransform';
  */
 export interface RectangleEmitterParameters {
     /**
-     * The width of the rectangle.
+     * Width of the outline, along x; a negative value is read as 0. Defaults to 10.
      */
     width?: number;
     /**
-     * The height of the rectangle.
+     * Height of the outline, along y; a negative value is read as 0. Defaults to 10.
      */
     height?: number;
     /**
-     * The thickness of the ring.
-     * 1 is a full rectangle, 0 is a ring with 0 radius.
+     * How far in from the outline particles may start, as a fraction of the way to the centre,
+     * clamped to [0, 1]. 0 is the outline only; 1, the default, fills the whole rectangle. The
+     * point along the outline is even per unit of length, so each edge gets particles in
+     * proportion to its length, spread evenly over the area of its band.
      */
     thickness?: number;
     /**
@@ -53,7 +55,10 @@ export interface RectangleEmitterParameters {
 }
 
 /**
- * a particle emitter that emits particles from a rectangle.
+ * Emits from the outline of a rectangle in the xy plane, heading out from its centre: a perimeter
+ * emitter, like a Niagara box or plane location with Surface Only, which `thickness` widens into a
+ * band toward the centre. Unity's Rectangle shape, a filled rectangle emitting along +z, is a
+ * {@link BoxEmitter} with no depth instead.
  */
 export class RectangleEmitter implements EmitterShape {
     /** Always `'rectangle'`. */
@@ -63,10 +68,11 @@ export class RectangleEmitter implements EmitterShape {
     /** Height of the rectangle, along y. */
     height: number;
     /**
-     * How far in from the edge particles may start, as a fraction of the way to the centre: 0 on
-     * the edge, 1 anywhere down to the centre.
+     * How far in from the outline particles may start, as a fraction of the way to the centre,
+     * clamped to [0, 1]: 0 on the outline, 1 anywhere down to the centre. Each edge gets particles
+     * in proportion to its length, spread evenly over the area of its band.
      */
-    thickness: number; // [0, 1]
+    thickness: number;
     /**
      * How the start point moves around the edge, see {@link EmitterMode}; the edge is the "arc"
      * here, run from the bottom left corner.
@@ -114,6 +120,7 @@ export class RectangleEmitter implements EmitterShape {
 
     /** Advances the arc sweep by `delta` seconds in the `Loop` and `PingPong` modes. */
     update(system: IParticleSystem, delta: number): void {
+        if (EmitterMode.Random === this.mode) return;
         this.currentValue += this.speed.genValue(this.memory, system.emissionState.time / system.duration) * delta;
     }
 
@@ -126,42 +133,43 @@ export class RectangleEmitter implements EmitterShape {
         // Drawn and unused: seeded effects keep the random sequence they had.
         random();
 
-        // Calculate perimeter points
-        const totalPerimeter = 2 * (this.width + this.height);
-        const point = u * totalPerimeter;
-
-        // Map perimeter position to x,y coordinates
-        let x, y;
-        if (point < this.width) {
-            // Bottom edge
-            x = point - this.width / 2;
-            y = -this.height / 2;
-        } else if (point < this.width + this.height) {
-            // Right edge
-            x = this.width / 2;
-            y = point - this.width - this.height / 2;
-        } else if (point < 2 * this.width + this.height) {
-            // Top edge
-            x = this.width / 2 - (point - this.width - this.height);
-            y = this.height / 2;
+        const width = Math.max(0, this.width);
+        const height = Math.max(0, this.height);
+        // The point at `u` of the outline, run counter-clockwise from the bottom left corner, and
+        // the outward normal of its edge.
+        const point = u * 2 * (width + height);
+        let x, y, nx, ny;
+        if (point < width) {
+            x = point - width / 2;
+            y = -height / 2;
+            nx = 0;
+            ny = -1;
+        } else if (point < width + height) {
+            x = width / 2;
+            y = point - width - height / 2;
+            nx = 1;
+            ny = 0;
+        } else if (point < 2 * width + height) {
+            x = width / 2 - (point - width - height);
+            y = height / 2;
+            nx = 0;
+            ny = 1;
         } else {
-            // Left edge
-            x = -this.width / 2;
-            y = this.height / 2 - (point - 2 * this.width - this.height);
+            x = -width / 2;
+            y = height / 2 - (point - 2 * width - height);
+            nx = -1;
+            ny = 0;
         }
 
-        // Apply thickness - lerp from edge point toward center
-        const rand = random();
-        const thicknessScale = 1 - this.thickness * rand;
-        p.position.x = x * thicknessScale;
-        p.position.y = y * thicknessScale;
-        p.position.z = 0;
+        // Thickness scales the outline toward the centre, uniformly over the area of the band
+        // between the outline and its copy scaled by 1 - thickness.
+        const scale = shellRadius(this.thickness, 2);
+        p.position.set(x * scale, y * scale, 0);
 
-        // Set velocity outward from center
-        p.velocity.x = x;
-        p.velocity.y = y;
-        p.velocity.z = 0;
-        p.velocity.normalize().multiplyScalar(p.startSpeed);
+        // Out from the centre; along the edge's normal where the point is the centre itself.
+        if (x === 0 && y === 0) p.velocity.set(nx, ny, 0);
+        else p.velocity.set(x, y, 0).normalize();
+        p.velocity.multiplyScalar(p.startSpeed);
 
         // Default facing-velocity orientation, but defer to startRotation if set.
         if (p.rotation instanceof Quaternion) {
@@ -191,7 +199,7 @@ export class RectangleEmitter implements EmitterShape {
     /**
      * Reads {@link RectangleEmitter.toJSON} output; a field the JSON leaves out takes its default.
      */
-    static fromJSON(json: any): RectangleEmitter {
+    static fromJSON(json: ShapeJSON): RectangleEmitter {
         return new RectangleEmitter({
             width: json.width,
             height: json.height,

@@ -110,7 +110,7 @@ export class EdgeEmitter implements EmitterShape {
     }
 
     /** Reads {@link EdgeEmitter.toJSON} output; a field the JSON leaves out takes its default. */
-    static fromJSON(json: any): EdgeEmitter {
+    static fromJSON(json: ShapeJSON): EdgeEmitter {
         return new EdgeEmitter({
             radius: json.radius,
             mode: json.mode,
