@@ -15,6 +15,10 @@ export class EulerGenerator implements RotationGenerator {
     get eular(): Euler {
         return this.euler;
     }
+    /** @deprecated Misspelt; use {@link euler}. */
+    set eular(value: Euler) {
+        this.euler = value;
+    }
 
     /**
      * @param angleX - The angle about x, in radians.

@@ -164,12 +164,11 @@ describe('Gradient', () => {
 });
 
 describe('the default Gradient', () => {
-    it('runs from black at 0 to white at 1, opaque', () => {
+    it('is opaque white from 0 to 1, with its keys at both ends', () => {
         const gradient = new Gradient();
         const out = new Vector4();
         gradient.startGen([]);
-        expect(gradient.genColor([], out, 0).toArray()).toEqual([0, 0, 0, 1]);
-        expect(gradient.genColor([], out, 1).toArray()).toEqual([1, 1, 1, 1]);
-        expect(gradient.genColor([], out, 0.5).x).toBeCloseTo(0.5, 2);
+        for (const t of [0, 0.5, 1]) expect(gradient.genColor([], out, t).toArray()).toEqual([1, 1, 1, 1]);
+        expect(gradient.color.keys.map(([, position]) => position)).toEqual([0, 1]);
     });
 });

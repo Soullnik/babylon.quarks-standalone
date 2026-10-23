@@ -167,8 +167,8 @@ and the project follows the `quarks.core` 0.x version line.
 - `MeshSettings.startRotationX`, `startRotationY` and `startRotationZ`, which nothing reads, are
   optional and deprecated; a mesh particle's start rotation about each axis is the system's
   `startRotation`, an `EulerGenerator`.
-- `EulerGenerator.eular`, a misspelling: the Euler is `EulerGenerator.euler`, and `eular` is a
-  read-only alias of it.
+- `EulerGenerator.eular`, a misspelling: the Euler is `EulerGenerator.euler`, and `eular` is an
+  alias of it.
 
 ### Added
 
@@ -223,8 +223,9 @@ and the project follows the `quarks.core` 0.x version line.
 
 ### Fixed
 
-- `new Gradient()` with no keys runs from black to white. Both colour keys were at 0, so it was
-  white everywhere after the start.
+- `new Gradient()` with no keys is opaque white from 0 to 1, as Unity's default gradient is. Its two
+  colour keys were both at 0 (black, then white), so it already looked white after the start; now
+  its keys span the range.
 - `PiecewiseBezier.toSVG` returns an empty path for a curve with no pieces instead of throwing.
 - A shape transform's rotation is read as a unit quaternion, and a zero one as the identity, so a
   hand-written or rounded rotation no longer scales the shape.
@@ -235,8 +236,8 @@ and the project follows the `quarks.core` 0.x version line.
   `ParticleSystem.setQualityFactor` clamps to and the documented range; it allowed 0.05.
 - The 1×1 white map mesh batches share is made again after something outside disposes it, instead
   of binding a disposed texture.
-- An env atlas that fails to build from a cube's faces is not tried again for that cube, so it
-  warns once instead of once per system.
+- An env atlas that fails to build from a cube's faces warns once instead of once per system: it
+  is not tried again until the cube's faces change or `disposeEnvAtlas` is called for the cube.
 - `ApplySequences` keeps each particle's place in a `WeakMap` instead of fields added to the
   particle, reuses that state when a pooled particle is emitted again instead of allocating two
   vectors, and moves a particle straight to its point when a sequence's range has no length (it

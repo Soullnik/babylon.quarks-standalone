@@ -203,6 +203,11 @@ describe('mesh particle environment map', () => {
             expect(build).toHaveBeenCalledTimes(1);
             expect(warn).toHaveBeenCalledTimes(1);
             expect(onReady).not.toHaveBeenCalled();
+            // New faces are tried again.
+            forceSet(cube, 'files', ['a', 'b', 'c', 'd', 'e', 'f']);
+            envAtlas.ensureEnvAtlasFromCube(cube, scene, onReady);
+            await new Promise((resolve) => setTimeout(resolve, 0));
+            expect(build).toHaveBeenCalledTimes(2);
         } finally {
             envAtlas.envAtlasBuilder.createFromFaceUrls = originalBuilder;
             warn.mockRestore();
