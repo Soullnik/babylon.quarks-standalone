@@ -1,5 +1,5 @@
-import {TransformNode} from '@babylonjs/core/Meshes/transformNode';
 import {NullEngine} from '@babylonjs/core/Engines/nullEngine';
+import {TransformNode} from '@babylonjs/core/Meshes/transformNode';
 import {Scene} from '@babylonjs/core/scene';
 import {ConstantColor, ConstantValue, IntervalValue, PointEmitter, Vector4} from 'quarks.core';
 import {BatchedRenderer} from '../src/BatchedRenderer';
