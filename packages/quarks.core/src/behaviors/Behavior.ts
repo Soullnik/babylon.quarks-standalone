@@ -45,9 +45,9 @@ export interface BehaviorJSON {
  *    emitter shape, and converted to the simulation space; `particleSystem` is
  *    the system it belongs to. A behavior that reads a per-particle random
  *    sample starts its generators on `particle.memory` here.
- * 2. {@link frameUpdate} once per step, before any particle is updated that
- *    step, with the step's length. Per-step work (decomposing the emitter's
- *    transform, advancing a time offset) belongs here.
+ * 2. {@link frameUpdate} once per step, with the step's length, just before this behavior
+ *    updates its particles (after the behaviors before it have updated theirs). Per-step work
+ *    (decomposing the emitter's transform, advancing a time offset) belongs here.
  * 3. {@link update} once per live particle, or {@link updateAll} once for the
  *    whole pool when it is implemented. The particle's `age` is the age at the
  *    start of the step; the host adds `delta` and integrates the velocity
@@ -89,7 +89,7 @@ export interface Behavior {
      * `update` but not `updateAll` has its `update` called, not the inherited `updateAll`.
      */
     updateAll?(particles: Array<Particle>, count: number, delta: number): void;
-    /** Called once per step before the particles are updated, with the step's length in seconds. */
+    /** Called once per step before this behavior updates the particles, with the step's length in seconds. */
     frameUpdate(delta: number): void;
     /** The behavior's settings as plain data, with its `type`; see the interface's description. */
     toJSON(): BehaviorJSON;

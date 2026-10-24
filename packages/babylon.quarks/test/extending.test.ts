@@ -4,13 +4,17 @@ import {Scene} from '@babylonjs/core/scene';
 import type {Behavior, BehaviorJSON, EmitterShape, IParticleSystem, Particle, ShapeJSON} from '../src';
 import {
     BatchedRenderer,
+    BehaviorTypes,
     ColorOverLife,
     ConstantColor,
     ConstantValue,
+    EmitterShapes,
     Gradient,
     loadPlugin,
     ParticleSystem,
+    PointEmitter,
     random,
+    readFormat,
     unloadPlugin,
 } from '../src';
 import {emptyMeta} from './internals';
@@ -142,7 +146,9 @@ describe('extending quarks (docs/EXTENDING.md)', () => {
         const json = ps.toJSON(meta);
         expect(json.shape).toEqual({type: 'line', length: 4});
         expect(json.behaviors).toEqual([{type: 'Drag', drag: 2}]);
-        const defaults = create(1, 1).toJSON(emptyMeta());
+        const plain = create(1, 1);
+        const defaults = plain.toJSON(emptyMeta());
+        plain.dispose();
         expect(defaults.shape).toEqual({type: 'line'});
         expect(defaults.behaviors).toEqual([{type: 'Drag'}]);
 
@@ -178,5 +184,43 @@ describe('extending quarks (docs/EXTENDING.md)', () => {
         }
         renderer.dispose();
         ps.dispose();
+    });
+
+    it('ignores a type already registered, and a plugin id already loaded', () => {
+        const other = {
+            id: 'other-effects',
+            initialize: jest.fn(),
+            behaviors: [{...plugin.behaviors[0], loadJSON: () => new Drag(99)}],
+            emitterShapes: [],
+        };
+        loadPlugin(other);
+        expect(other.initialize).toHaveBeenCalledTimes(1);
+        // The first registration of 'Drag' wins.
+        expect(BehaviorTypes.Drag).toBe(plugin.behaviors[0]);
+        loadPlugin({...other, initialize: jest.fn()});
+        unloadPlugin('other-effects');
+        expect(BehaviorTypes.Drag).toBe(plugin.behaviors[0]);
+    });
+
+    it('loads a file without the plugin: the behavior is skipped and the shape is a point, with warnings', () => {
+        const meta = emptyMeta();
+        const source = create(2, 4);
+        const json = source.toJSON(meta);
+        source.dispose();
+        unloadPlugin('my-effects');
+        try {
+            expect(BehaviorTypes.Drag).toBeUndefined();
+            expect(EmitterShapes.line).toBeUndefined();
+            const warnings: string[] = [];
+            const loaded = readFormat({onWarning: (message) => warnings.push(message)}, () =>
+                ParticleSystem.fromJSON(JSON.parse(JSON.stringify(json)), meta, scene)
+            );
+            expect(loaded.behaviors).toHaveLength(0);
+            expect(loaded.emitterShape).toBeInstanceOf(PointEmitter);
+            expect(warnings.length).toBeGreaterThanOrEqual(2);
+            loaded.dispose();
+        } finally {
+            loadPlugin(plugin);
+        }
     });
 });

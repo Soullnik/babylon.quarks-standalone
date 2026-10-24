@@ -5,7 +5,6 @@ import {
     Particle,
     ParticleStore,
     RendererEmitterSettings,
-    runsUpdateAll,
     TrailParticle,
     TrailSettings,
     Vector3,
@@ -98,7 +97,7 @@ export function runBehaviorSteps(
             continue;
         }
         const behavior = stepBehaviors[0];
-        if (runsUpdateAll(behavior)) {
+        if (step.updateAll === true) {
             behavior.updateAll!(particles, particleCount, delta);
             continue;
         }

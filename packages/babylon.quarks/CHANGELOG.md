@@ -72,17 +72,6 @@ as before.
     interface they implement.
   - **editor:** `rgbaToVector4` is removed; pass `{r, g, b, a}`.
 
-### Fixed
-
-- **Custom behaviors run their own code, whatever their `type`.** The renderer compiled a behavior
-  into its fused pass by its `type` string, so a custom behavior named like a built-in, or a
-  subclass of a built-in with its own `update`, ran the built-in's code instead of its own, and
-  was assumed not to change size or colour. Behaviors are now recognised by implementation: only
-  an instance of the built-in class that still runs that class's `update` and `updateAll` is
-  compiled. A subclass that only adds fields is still compiled.
-- A subclass that overrides `update` but inherits its parent's `updateAll` has its `update`
-  called; the inherited `updateAll` skipped the override.
-
 ### Added
 
 - **API reports:** the public API of `babylon.quarks`, `quarks.core` and each entry point of
@@ -96,6 +85,22 @@ as before.
 - `Gradient.evaluate(t, target?)`, as Unity's `Gradient.Evaluate`: the colour at `t` as
   `{r, g, b, a}`, written into `target` (such as a Babylon `Color4`) when one is given, for tools
   and UI that draw a gradient.
+
+### Fixed
+
+- **Custom behaviors run their own code, whatever their `type`.** The renderer compiled a behavior
+  into its fused pass by its `type` string, so a custom behavior named like a built-in, or a
+  subclass of a built-in with its own `update`, ran the built-in's code instead of its own, and
+  was assumed not to change size or colour. Behaviors are now recognised by implementation: only
+  an instance of exactly the built-in class, with no method set on the instance, is compiled.
+  Every subclass runs its own methods, which can be slower than before for a subclass that only
+  added fields.
+- A subclass that overrides `update` but inherits its parent's `updateAll` has its `update`
+  called; the inherited `updateAll` skipped the override. Such a subclass no longer takes the
+  faster `updateAll` path.
+- The renderer and the editor find sub-emitter links by `instanceof EmitSubParticleSystem`, not
+  by the `type` string, so an object that only looks like one no longer orders or unlinks
+  systems.
 
 ## [0.29.0] — 2026-10-24
 

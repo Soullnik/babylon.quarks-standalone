@@ -41,18 +41,21 @@ export class Drag implements Behavior {
 }
 ```
 
-The hooks run in this order:
+The hooks:
 
 - **`initialize(particle, system)`** runs once, when a particle is born. It runs after the start
   values and the shape have placed the particle.
-- **`update(particle, delta)`** runs every simulation step for each live particle. `delta` is in
-  seconds of the system's own time.
-- **`updateAll(particles, count, delta)`** is optional. If you define it, the system calls it once
-  per step instead of calling `update` for each particle. It covers `particles[0..count)`, and
-  dead particles in that range must be skipped (`age >= life`). Use it to hoist per-step work out
-  of the loop.
-- **`frameUpdate(delta)`** runs once per step, just before this behavior updates its particles.
-  Use it to refresh values every particle reads.
+- Then, every simulation step, the behaviors run in their order. For each behavior:
+  - **`frameUpdate(delta)`** runs first, once. Use it to refresh values every particle reads. It
+    runs after the behaviors before it have updated their particles.
+  - **`update(particle, delta)`** then runs for each live particle. `delta` is in seconds of the
+    system's own time.
+  - **`updateAll(particles, count, delta)`** is optional. If you define it, the system calls it
+    once instead of calling `update` for each particle. It covers `particles[0..count)`, it must
+    skip dead particles in that range (`age >= life`), and it must give the same result as
+    `update`. If a subclass overrides `update` but not `updateAll`, its `update` is called.
+- After every behavior has run, the system ages the particles and moves them by their velocity.
+  So a behavior that changes `velocity` moves the particle in the same step.
 - **`reset()`** runs when the system restarts.
 - **`clone()`** must return an independent copy, so that one effect can be pooled and instanced.
 
@@ -70,20 +73,24 @@ behavior takes from users, such as an axis or a colour, should be typed `Vector3
 
 `position` and `velocity` are in the system's simulation space. That is the emitter's local space
 for a local-space system, and the world for a `worldSpace` system. To work in another space, take
-the emitter's frame in `initialize` from `system.emitter.matrixWorld`.
+the emitter's frame from `system.emitter.matrixWorld`. Keep `system` from `initialize`, and
+read the matrix in `frameUpdate`, because the emitter can move.
 
 ### Performance and the compiled pass
 
 The renderer compiles runs of built-in behaviors into one loop over the particle columns. A custom
 behavior is never compiled. It runs its own `update` or `updateAll`, in its place in the order,
 and the built-ins before and after it are compiled separately. A behavior counts as a built-in by
-its implementation, not by its `type` string:
+its implementation, not by its `type` string. Only an instance of exactly a built-in class, with
+no method set on the instance, is compiled:
 
 - A behavior whose `type` copies a built-in's name (for example `'ColorOverLife'`) is still
   custom. It runs its own code.
-- A subclass of a built-in that overrides `update` or `updateAll` is custom.
-- A subclass that keeps the built-in's `update` (to add a field, or change `frameUpdate` or
-  `toJSON`) is still compiled as that built-in.
+- Any subclass of a built-in is custom and runs its own methods, including those it inherits.
+  The compiled code inlines the built-in's helpers as well as its `update`, so it could skip an
+  override.
+- The choice is made when the system first runs a behavior. Set any method on the instance
+  before that. To change one later, replace the behavior with a new instance.
 
 The renderer treats a custom behavior as able to change any particle value, including size and
 colour. So it copies those values for the renderer every step while the behavior is on the system.
@@ -124,6 +131,8 @@ export class LineEmitter implements EmitterShape {
   scale your direction by `particle.startSpeed`.
 - Use quarks' `random()` instead of `Math.random()`. That way `withRandomSource` and seeded
   playback reproduce your shape.
+- The optional `reset()` runs when the system restarts, for a shape that keeps state across
+  particles (one that walks a path, for example).
 - An optional `transform` (a `ShapeTransform`) moves, rotates and scales the shape, like the
   Shape module's Position, Rotation and Scale. Call `this.transform?.apply(particle)` at the end of
   `initialize` if you support it, and write it with `ShapeTransform.toShapeJSON`.
@@ -159,6 +168,8 @@ loadPlugin({
 
 - `type` must be unique. A name that is already registered, whether built-in or from an earlier
   plugin, is kept, and yours is ignored. Prefix your names (`'my.Drag'`) if they might clash.
+- Loading a plugin whose `id` is already loaded does nothing. `unloadPlugin(id)` removes the types
+  the plugin registered.
 - `toJSON` writes every field. When an effect is saved, fields equal to their defaults are
   dropped. To find the defaults, `loadJSON` is called with `{type}` alone, then again with the
   smaller JSON to check that it reads back the same. So `loadJSON` must give every missing field

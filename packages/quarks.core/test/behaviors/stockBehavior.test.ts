@@ -41,7 +41,7 @@ class Tinted extends ColorOverLife {
     }
 }
 
-/** A subclass of a built-in that keeps its update: it only adds a field. */
+/** A subclass of a built-in that keeps its update: it only adds a field. Still custom. */
 class Named extends ColorOverLife {
     label = 'named';
 }
@@ -87,7 +87,10 @@ describe('stockBehaviorType', () => {
     it('names a built-in that runs its own update', () => {
         expect(stockBehaviorType(new ColorOverLife(gradient()))).toBe('ColorOverLife');
         expect(stockBehaviorType(new ApplyForce({x: 0, y: 1, z: 0}, new ConstantValue(1)))).toBe('ApplyForce');
-        expect(stockBehaviorType(new Named(gradient()))).toBe('ColorOverLife');
+    });
+
+    it('treats every subclass as custom: compiled code inlines helpers a subclass may override', () => {
+        expect(stockBehaviorType(new Named(gradient()))).toBeUndefined();
     });
 
     it('treats a borrowed type string, an overriding subclass and a replaced update as custom', () => {
@@ -96,6 +99,9 @@ describe('stockBehaviorType', () => {
         const patched = new ColorOverLife(gradient());
         patched.update = () => {};
         expect(stockBehaviorType(patched)).toBeUndefined();
+        const helper = new ColorOverLife(gradient()) as ColorOverLife & {reset: () => void};
+        helper.reset = () => {};
+        expect(stockBehaviorType(helper)).toBeUndefined();
         const unknown = new Impostor();
         unknown.type = 'toString';
         expect(stockBehaviorType(unknown)).toBeUndefined();
@@ -122,10 +128,10 @@ describe('fusion by implementation', () => {
         expect(particles.map((p) => p.color.x)).toEqual([0, 0, 0]);
     });
 
-    it('still compiles a subclass that keeps the update', () => {
+    it('runs a subclass that keeps the update through its own pass, with the same result', () => {
         const particles = pool(3);
         const behaviors = [new Named(gradient())];
-        expect(planBehaviorFusion(behaviors)[0].run).toBeDefined();
+        expect(planBehaviorFusion(behaviors)[0].run).toBeUndefined();
         step(behaviors, particles);
         expect(particles.map((p) => [p.color.x, p.color.y])).toEqual([
             [1, 0],
@@ -170,5 +176,23 @@ describe('runsUpdateAll', () => {
         const patched = new ColorOverLife(gradient());
         patched.update = () => {};
         expect(runsUpdateAll(patched)).toBe(false);
+    });
+
+    it('calls update when it is bound on the instance, and updateAll of an Object.create copy', () => {
+        class Bound extends ColorOverLife {
+            constructor() {
+                super(gradient());
+                this.update = this.update.bind(this);
+            }
+        }
+        // Calling update is always correct; updateAll is only a faster equivalent.
+        expect(runsUpdateAll(new Bound())).toBe(false);
+        const created = Object.create(ColorOverLife.prototype) as ColorOverLife;
+        expect(runsUpdateAll(created)).toBe(true);
+    });
+
+    it('is decided when the plan is built', () => {
+        const steps = planBehaviorFusion([new Impostor(), new Tinted(gradient())]);
+        expect(steps.map((step) => step.updateAll)).toEqual([false, false]);
     });
 });

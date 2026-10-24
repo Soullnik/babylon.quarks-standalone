@@ -1212,6 +1212,8 @@ export type FusedPass = (behaviors: Array<Behavior>, particles: Array<Particle>,
 export interface FusionStep {
     behaviors: Array<Behavior>;
     run?: FusedPass;
+    // @internal
+    updateAll?: boolean;
 }
 
 // @public

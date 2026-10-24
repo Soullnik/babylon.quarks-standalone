@@ -57,13 +57,14 @@ const STOCK_BEHAVIORS: {readonly [type: string]: Constructable<Behavior>} = {
 /**
  * The built-in type a behavior runs exactly as, or undefined when it does not.
  *
- * A behavior counts as a built-in only when it is an instance of that built-in class and still
- * runs the class's own `update` and `updateAll`. Only then may a renderer replace its per-particle
- * work with compiled code ({@link planBehaviorFusion}) or rely on what the built-in writes. A
- * behavior that only shares the `type` string, a subclass that overrides `update`, or an instance
- * whose `update` was replaced is a custom behavior: it runs its own code, and is assumed to write
- * anything. A subclass that keeps `update` (to add a field, or change `frameUpdate` or `toJSON`)
- * is still compiled.
+ * A behavior counts as a built-in only when it is an instance of exactly that built-in class (not
+ * a subclass) and carries no method of its own. Only then may a renderer replace its per-particle
+ * work with compiled code ({@link planBehaviorFusion}) or rely on what the built-in writes: the
+ * compiled code inlines helpers as well as `update`, so any override could be skipped. A behavior
+ * that only shares the `type` string, any subclass, or an instance given its own `update` (or any
+ * other function-valued property) is a custom behavior: it runs its own code, and is assumed to
+ * write anything. Renderers decide once, when a behavior list is planned; replacing a method
+ * later needs a new behaviors array to take effect.
  *
  * @internal
  */
@@ -72,12 +73,15 @@ export function stockBehaviorType(behavior: Behavior): string | undefined {
     if (!Object.prototype.hasOwnProperty.call(STOCK_BEHAVIORS, type)) {
         return undefined;
     }
-    const stock = STOCK_BEHAVIORS[type];
-    if (!(behavior instanceof stock)) {
+    if (Object.getPrototypeOf(behavior) !== STOCK_BEHAVIORS[type].prototype) {
         return undefined;
     }
-    const prototype = stock.prototype as Behavior;
-    return behavior.update === prototype.update && behavior.updateAll === prototype.updateAll ? type : undefined;
+    for (const key of Object.keys(behavior)) {
+        if (typeof (behavior as unknown as Record<string, unknown>)[key] === 'function') {
+            return undefined;
+        }
+    }
+    return type;
 }
 
 /** The object in `behavior`'s prototype chain, itself included, that holds `key`. */
@@ -93,7 +97,9 @@ function owner(behavior: object, key: string): object | null {
  * Whether a system should call `behavior.updateAll` rather than `update` per particle: when it has
  * one, defined no further up its class chain than its `update`. A subclass that overrides only
  * `update` inherits its parent's `updateAll`, which would skip the override; its `update` runs
- * instead.
+ * instead. An `update` set on the instance itself (such as one bound in the constructor) counts
+ * as an override unless `updateAll` is set on the instance too: calling `update` is always
+ * correct, since `updateAll` must give the same result.
  *
  * @internal
  */

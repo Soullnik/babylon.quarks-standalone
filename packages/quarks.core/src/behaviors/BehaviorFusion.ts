@@ -11,7 +11,7 @@ import {Quaternion, Vector4View} from '../math';
 import {Particle} from '../Particle';
 import {ParticleStore} from '../ParticleStore';
 import {Behavior} from './Behavior';
-import {stockBehaviorType} from './StockBehavior';
+import {runsUpdateAll, stockBehaviorType} from './StockBehavior';
 
 /**
  * Compiles a run of behaviors into a single loop over the particles.
@@ -58,6 +58,12 @@ export interface FusionStep {
     behaviors: Array<Behavior>;
     /** Compiled pass, or undefined when the behavior runs its own update. */
     run?: FusedPass;
+    /**
+     * Without {@link run}: whether the behavior's `updateAll` is called rather than its `update`
+     * per particle, decided when the plan is built (see `runsUpdateAll`).
+     * @internal
+     */
+    updateAll?: boolean;
 }
 
 /** Constructors and helpers the generated code needs. */
@@ -688,7 +694,7 @@ export function planBehaviorFusion(behaviors: Array<Behavior>): Array<FusionStep
             steps.push({behaviors: runBehaviors, run});
         } else {
             for (const behavior of runBehaviors) {
-                steps.push({behaviors: [behavior]});
+                steps.push({behaviors: [behavior], updateAll: runsUpdateAll(behavior)});
             }
         }
         runBehaviors = [];
@@ -701,7 +707,7 @@ export function planBehaviorFusion(behaviors: Array<Behavior>): Array<FusionStep
         const fragment = fragmentFor(behavior, i);
         if (fragment === null) {
             flush();
-            steps.push({behaviors: [behavior]});
+            steps.push({behaviors: [behavior], updateAll: runsUpdateAll(behavior)});
             continue;
         }
         if (runFragments.length === 0) {
