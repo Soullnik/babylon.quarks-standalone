@@ -12,9 +12,12 @@ import {
     LimitSpeedOverLife,
     PiecewiseBezier,
     SubParticleEmitMode,
+    Vector3,
     Vector4,
 } from 'quarks.core';
+import type {ParticleEmitter} from '../src/ParticleEmitter';
 import {ParticleSystem, ScalingMode} from '../src/ParticleSystem';
+import {QuarksLoader} from '../src/QuarksLoader';
 import {emptyMeta} from './internals';
 
 let engine: NullEngine;
@@ -153,6 +156,87 @@ describe('scaling mode', () => {
         }
     });
 
+    /** Where the matrix sends `p`, as [x, y, z]. */
+    const send = (ps: ParticleSystem, p: [number, number, number]) => {
+        const v = new Vector3(...p).applyMatrix4(ps.emitter.matrixWorld);
+        return [v.x, v.y, v.z];
+    };
+    /** Where Babylon's own world matrix sends `p`. */
+    const sendBabylon = (ps: ParticleSystem, p: [number, number, number]) => {
+        const v = BVector3.TransformCoordinates(new BVector3(...p), ps.emitter.getWorldMatrix());
+        return [v.x, v.y, v.z];
+    };
+
+    it('mirrors on the axis the emitter is mirrored on, in every mode', () => {
+        for (const own of [
+            [1, -1, 1],
+            [1, 1, -1],
+            [-1, -1, 1],
+            [-2, 1, 1],
+        ]) {
+            for (const mode of ['local', 'hierarchy', 'shape'] as const) {
+                const ps = system(mode, 1);
+                const parent = new TransformNode('parent', scene);
+                parent.rotation = new BVector3(0.3, 0.5, 0.1);
+                ps.emitter.parent = parent;
+                ps.emitter.scaling = new BVector3(own[0], own[1], own[2]);
+                ps.emitter.computeWorldMatrix(true);
+                const expected = sendBabylon(ps, [1, 2, 3]);
+                const got = send(ps, [1, 2, 3]);
+                if (mode === 'shape') {
+                    // Unit axes: only the direction of each axis, mirroring included, is kept.
+                    const unit = sendBabylon(ps, [1 / Math.abs(own[0]), 2, 3]);
+                    for (let i = 0; i < 3; i++) expect(got[i]).toBeCloseTo(unit[i], 5);
+                } else {
+                    for (let i = 0; i < 3; i++) expect(got[i]).toBeCloseTo(expected[i], 5);
+                }
+            }
+        }
+    });
+
+    it("keeps a mirrored parent's mirroring but not its scale in 'local'", () => {
+        const ps = system('local', 1);
+        const parent = new TransformNode('parent', scene);
+        parent.scaling = new BVector3(3, -3, 3);
+        ps.emitter.parent = parent;
+        ps.emitter.computeWorldMatrix(true);
+        expect(send(ps, [1, 2, 3])).toEqual([expect.closeTo(1, 5), expect.closeTo(-2, 5), expect.closeTo(3, 5)]);
+    });
+
+    it('keeps the turn of an emitter flattened on one axis', () => {
+        for (const mode of ['local', 'shape'] as const) {
+            const ps = system(mode, 1);
+            const parent = new TransformNode('parent', scene);
+            parent.scaling = new BVector3(2, 2, 2);
+            ps.emitter.parent = parent;
+            ps.emitter.rotation = new BVector3(0, Math.PI / 4, 0);
+            ps.emitter.scaling = new BVector3(1, 0, 1);
+            ps.emitter.computeWorldMatrix(true);
+            // Local x turns 45° about y, to (√½, 0, −√½), whatever the y axis is scaled to.
+            const x = send(ps, [1, 0, 0]);
+            expect(x[0]).toBeCloseTo(Math.SQRT1_2, 5);
+            expect(x[2]).toBeCloseTo(-Math.SQRT1_2, 5);
+        }
+        // A parent flattened to 0 leaves 'shape' a whole basis, square to what is left.
+        const ps = system('shape', 1);
+        const parent = new TransformNode('parent', scene);
+        parent.scaling = new BVector3(1, 0, 1);
+        ps.emitter.parent = parent;
+        ps.emitter.computeWorldMatrix(true);
+        expect(send(ps, [0, 1, 0]).map((v) => Math.round(v * 1e6) / 1e6)).toEqual([0, 1, 0]);
+    });
+
+    it('starts particles moving the way the mirrored shape sends them', () => {
+        const ps = system('local', 1);
+        ps.emitterShape = new ConeEmitter({radius: 0, angle: 0});
+        ps.emitter.scaling = new BVector3(1, 1, -1);
+        ps.emitter.computeWorldMatrix(true);
+        ps.update(1 / 60);
+        // The cone sends particles along +z; the mirror along -z, and so the position.
+        expect(ps.particles[0].velocity.z).toBeCloseTo(-4);
+        expect(ps.particles[0].position.z).toBeLessThan(0);
+    });
+
     it('scales ForceOverLife and LimitSpeedOverLife with the motion', () => {
         const make = (mode: ScalingMode) => {
             const ps = system(mode, 0.5);
@@ -190,6 +274,37 @@ describe('scaling mode', () => {
     });
 });
 
+describe('scaling mode in files', () => {
+    const file = (quarksFormat: number | undefined, scalingMode?: ScalingMode) => {
+        const ps = system(scalingMode, 1);
+        const meta = emptyMeta();
+        const json = ps.toJSON(meta);
+        return {
+            metadata: quarksFormat === undefined ? {} : {quarksFormat},
+            object: {
+                uuid: 'e',
+                type: 'ParticleEmitter',
+                name: 'e',
+                matrix: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1],
+                ps: json,
+            },
+        };
+    };
+    const loaded = (document: object) =>
+        ((new QuarksLoader(scene).parse(document) as ParticleEmitter).system as unknown as ParticleSystem).scalingMode;
+
+    it("reads a system in a file from before format 2 as 'hierarchy', which keeps its look", () => {
+        expect(loaded(file(undefined))).toBe('hierarchy');
+        expect(loaded(file(1))).toBe('hierarchy');
+        expect(loaded(file(1, 'shape'))).toBe('hierarchy');
+    });
+
+    it('reads a format 2 file as written', () => {
+        expect(loaded(file(2))).toBe('local');
+        expect(loaded(file(2, 'shape'))).toBe('shape');
+    });
+});
+
 describe('scaling mode with sub emitters', () => {
     it("'hierarchy' takes the scale from the emitter, not a parent particle's velocity", () => {
         const parent = system('local', 1);
@@ -208,5 +323,23 @@ describe('scaling mode with sub emitters', () => {
         expect(child.particleNum).toBeGreaterThan(0);
         // Before, the parent particle's speed scaled it, to tens.
         expect(speedOf(child)).toBeCloseTo(2, 1);
+    });
+
+    it("sizes and speeds a sub emission by the parent particle's frame, not the sub emitter's scale", () => {
+        const parent = system('local', 1);
+        parent.looping = true;
+        parent.startSpeed = new ConstantValue(20);
+        const child = system('local', 2);
+        child.onlyUsedByOther = true;
+        child.startSpeed = new ConstantValue(2);
+        parent.addBehavior(new ForceOverLife(new ConstantValue(600), new ConstantValue(0), new ConstantValue(0)));
+        parent.addBehavior(new EmitSubParticleSystem(parent, true, child.emitter, SubParticleEmitMode.Frame));
+        for (let i = 0; i < 10; i++) {
+            parent.update(1 / 60);
+            child.update(1 / 60);
+        }
+        expect(child.particleNum).toBeGreaterThan(0);
+        expect(speedOf(child)).toBeCloseTo(2, 1);
+        expect(child.particles[0].size.x).toBeCloseTo(1, 1);
     });
 });

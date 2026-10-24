@@ -102,7 +102,7 @@ exports[`golden fixtures babylon.quarks-0.27.0.AcidBoiling.json loads, with the 
     ],
     "metadata": {
       "generator": "babylon.quarks",
-      "quarksFormat": 1,
+      "quarksFormat": 2,
       "type": "Object3D",
       "version": 4.5,
     },
@@ -197,6 +197,7 @@ exports[`golden fixtures babylon.quarks-0.27.0.AcidBoiling.json loads, with the 
                   "lengthFactor": 2,
                   "speedFactor": 0,
                 },
+                "scalingMode": "hierarchy",
                 "shape": {
                   "radius": 0.2,
                   "type": "sphere",
@@ -413,6 +414,7 @@ exports[`golden fixtures babylon.quarks-0.27.0.AcidBoiling.json loads, with the 
                 "instancingGeometry": "quarks_geometry_1",
                 "layers": 1,
                 "material": "quarks_material_4",
+                "scalingMode": "hierarchy",
                 "shape": {
                   "angle": 0.08726646259971647,
                   "radius": 1,
@@ -551,6 +553,7 @@ exports[`golden fixtures babylon.quarks-0.27.0.AcidBoiling.json loads, with the 
             "layers": 1,
             "material": "quarks_material_6",
             "renderMode": 5,
+            "scalingMode": "hierarchy",
             "shape": {
               "radius": 1.5,
               "type": "circle",
@@ -783,7 +786,7 @@ exports[`golden fixtures babylon.quarks-0.27.0.SimplePortalRed.json loads, with 
     ],
     "metadata": {
       "generator": "babylon.quarks",
-      "quarksFormat": 1,
+      "quarksFormat": 2,
       "type": "Object3D",
       "version": 4.5,
     },
@@ -897,6 +900,7 @@ exports[`golden fixtures babylon.quarks-0.27.0.SimplePortalRed.json loads, with 
             "layers": 1,
             "material": "quarks_material_3",
             "renderMode": 2,
+            "scalingMode": "hierarchy",
             "shape": {
               "type": "point",
             },
@@ -1076,6 +1080,7 @@ exports[`golden fixtures babylon.quarks-0.27.0.SimplePortalRed.json loads, with 
             "instancingGeometry": "quarks_geometry_4",
             "layers": 1,
             "material": "quarks_material_5",
+            "scalingMode": "hierarchy",
             "shape": {
               "arc": 6.2831854820251465,
               "radius": 0.9399999976158142,
@@ -1211,6 +1216,7 @@ exports[`golden fixtures babylon.quarks-0.27.0.SimplePortalRed.json loads, with 
             "instancingGeometry": "quarks_geometry_4",
             "layers": 1,
             "material": "quarks_material_6",
+            "scalingMode": "hierarchy",
             "shape": {
               "arc": 6.2831854820251465,
               "radius": 0.949999988079071,
@@ -1373,6 +1379,7 @@ exports[`golden fixtures babylon.quarks-0.27.0.SimplePortalRed.json loads, with 
         "layers": 1,
         "material": "quarks_material_7",
         "renderMode": 2,
+        "scalingMode": "hierarchy",
         "shape": {
           "type": "point",
         },
@@ -3523,7 +3530,7 @@ exports[`golden fixtures babylon.quarks-0.27.0.subEmitter2.json loads, with the 
     ],
     "metadata": {
       "generator": "babylon.quarks",
-      "quarksFormat": 1,
+      "quarksFormat": 2,
       "type": "Object3D",
       "version": 4.5,
     },
@@ -3699,6 +3706,7 @@ exports[`golden fixtures babylon.quarks-0.27.0.subEmitter2.json loads, with the 
                 "layers": 1,
                 "looping": false,
                 "material": "quarks_material_3",
+                "scalingMode": "hierarchy",
                 "shape": {
                   "angle": 0.19198621771937624,
                   "radius": 0.2,
@@ -4010,6 +4018,7 @@ exports[`golden fixtures babylon.quarks-0.27.0.subEmitter2.json loads, with the 
                 "layers": 1,
                 "looping": false,
                 "material": "quarks_material_4",
+                "scalingMode": "hierarchy",
                 "shape": {
                   "radius": 0.4,
                   "thickness": 0,
@@ -4297,6 +4306,7 @@ exports[`golden fixtures babylon.quarks-0.27.0.subEmitter2.json loads, with the 
                   "lengthFactor": 1,
                   "speedFactor": 0.01,
                 },
+                "scalingMode": "hierarchy",
                 "shape": {
                   "angle": 0.7312929565856241,
                   "radius": 0.8,
@@ -4521,6 +4531,7 @@ exports[`golden fixtures babylon.quarks-0.27.0.subEmitter2.json loads, with the 
                 "layers": 1,
                 "looping": false,
                 "material": "quarks_material_7",
+                "scalingMode": "hierarchy",
                 "shape": {
                   "radius": 0.01,
                   "thickness": 0,
@@ -4714,6 +4725,7 @@ exports[`golden fixtures babylon.quarks-0.27.0.subEmitter2.json loads, with the 
                 "looping": false,
                 "material": "quarks_material_9",
                 "renderMode": 2,
+                "scalingMode": "hierarchy",
                 "shape": {
                   "radius": 0.01,
                   "type": "sphere",
@@ -4936,6 +4948,7 @@ exports[`golden fixtures babylon.quarks-0.27.0.subEmitter2.json loads, with the 
                 "material": "quarks_material_11",
                 "renderMode": 2,
                 "renderOrder": 5,
+                "scalingMode": "hierarchy",
                 "shape": {
                   "type": "point",
                 },
@@ -5176,6 +5189,7 @@ exports[`golden fixtures babylon.quarks-0.27.0.subEmitter2.json loads, with the 
                     "looping": false,
                     "material": "quarks_material_12",
                     "onlyUsedByOther": true,
+                    "scalingMode": "hierarchy",
                     "shape": {
                       "type": "point",
                     },
@@ -5408,6 +5422,7 @@ exports[`golden fixtures babylon.quarks-0.27.0.subEmitter2.json loads, with the 
                 "looping": false,
                 "material": "quarks_material_13",
                 "renderOrder": -5,
+                "scalingMode": "hierarchy",
                 "shape": {
                   "angle": 0.5612978874413763,
                   "radius": 0.4,
@@ -5623,6 +5638,7 @@ exports[`golden fixtures babylon.quarks-0.27.0.subEmitter2.json loads, with the 
             "looping": false,
             "material": "quarks_material_15",
             "renderOrder": -5,
+            "scalingMode": "hierarchy",
             "shape": {
               "type": "point",
             },
@@ -5826,7 +5842,7 @@ exports[`golden fixtures three.quarks.AcidBoiling.json loads, with the warnings 
     ],
     "metadata": {
       "generator": "babylon.quarks",
-      "quarksFormat": 1,
+      "quarksFormat": 2,
       "type": "Object3D",
       "version": 4.5,
     },
@@ -5921,6 +5937,7 @@ exports[`golden fixtures three.quarks.AcidBoiling.json loads, with the warnings 
                   "lengthFactor": 2,
                   "speedFactor": 0,
                 },
+                "scalingMode": "hierarchy",
                 "shape": {
                   "radius": 0.2,
                   "type": "sphere",
@@ -6137,6 +6154,7 @@ exports[`golden fixtures three.quarks.AcidBoiling.json loads, with the warnings 
                 "instancingGeometry": "quarks_geometry_1",
                 "layers": 1,
                 "material": "quarks_material_4",
+                "scalingMode": "hierarchy",
                 "shape": {
                   "angle": 0.08726646259971647,
                   "radius": 1,
@@ -6275,6 +6293,7 @@ exports[`golden fixtures three.quarks.AcidBoiling.json loads, with the warnings 
             "layers": 1,
             "material": "quarks_material_6",
             "renderMode": 5,
+            "scalingMode": "hierarchy",
             "shape": {
               "radius": 1.5,
               "type": "circle",
@@ -8445,7 +8464,7 @@ exports[`golden fixtures three.quarks.subEmitter2.json loads, with the warnings 
     ],
     "metadata": {
       "generator": "babylon.quarks",
-      "quarksFormat": 1,
+      "quarksFormat": 2,
       "type": "Object3D",
       "version": 4.5,
     },
@@ -8621,6 +8640,7 @@ exports[`golden fixtures three.quarks.subEmitter2.json loads, with the warnings 
                 "layers": 1,
                 "looping": false,
                 "material": "quarks_material_3",
+                "scalingMode": "hierarchy",
                 "shape": {
                   "angle": 0.19198621771937624,
                   "radius": 0.2,
@@ -8932,6 +8952,7 @@ exports[`golden fixtures three.quarks.subEmitter2.json loads, with the warnings 
                 "layers": 1,
                 "looping": false,
                 "material": "quarks_material_4",
+                "scalingMode": "hierarchy",
                 "shape": {
                   "radius": 0.4,
                   "thickness": 0,
@@ -9219,6 +9240,7 @@ exports[`golden fixtures three.quarks.subEmitter2.json loads, with the warnings 
                   "lengthFactor": 1,
                   "speedFactor": 0.01,
                 },
+                "scalingMode": "hierarchy",
                 "shape": {
                   "angle": 0.7312929565856241,
                   "radius": 0.8,
@@ -9443,6 +9465,7 @@ exports[`golden fixtures three.quarks.subEmitter2.json loads, with the warnings 
                 "layers": 1,
                 "looping": false,
                 "material": "quarks_material_7",
+                "scalingMode": "hierarchy",
                 "shape": {
                   "radius": 0.01,
                   "thickness": 0,
@@ -9636,6 +9659,7 @@ exports[`golden fixtures three.quarks.subEmitter2.json loads, with the warnings 
                 "looping": false,
                 "material": "quarks_material_9",
                 "renderMode": 2,
+                "scalingMode": "hierarchy",
                 "shape": {
                   "radius": 0.01,
                   "type": "sphere",
@@ -9858,6 +9882,7 @@ exports[`golden fixtures three.quarks.subEmitter2.json loads, with the warnings 
                 "material": "quarks_material_11",
                 "renderMode": 2,
                 "renderOrder": 5,
+                "scalingMode": "hierarchy",
                 "shape": {
                   "type": "point",
                 },
@@ -10098,6 +10123,7 @@ exports[`golden fixtures three.quarks.subEmitter2.json loads, with the warnings 
                     "looping": false,
                     "material": "quarks_material_12",
                     "onlyUsedByOther": true,
+                    "scalingMode": "hierarchy",
                     "shape": {
                       "type": "point",
                     },
@@ -10330,6 +10356,7 @@ exports[`golden fixtures three.quarks.subEmitter2.json loads, with the warnings 
                 "looping": false,
                 "material": "quarks_material_13",
                 "renderOrder": -5,
+                "scalingMode": "hierarchy",
                 "shape": {
                   "angle": 0.5612978874413763,
                   "radius": 0.4,
@@ -10545,6 +10572,7 @@ exports[`golden fixtures three.quarks.subEmitter2.json loads, with the warnings 
             "looping": false,
             "material": "quarks_material_15",
             "renderOrder": -5,
+            "scalingMode": "hierarchy",
             "shape": {
               "type": "point",
             },
@@ -10791,7 +10819,7 @@ exports[`golden fixtures unity-exporter.SimplePortalRed.json loads, with the war
     ],
     "metadata": {
       "generator": "babylon.quarks",
-      "quarksFormat": 1,
+      "quarksFormat": 2,
       "type": "Object3D",
       "version": 4.5,
     },
@@ -10905,6 +10933,7 @@ exports[`golden fixtures unity-exporter.SimplePortalRed.json loads, with the war
             "layers": 1,
             "material": "quarks_material_3",
             "renderMode": 2,
+            "scalingMode": "hierarchy",
             "shape": {
               "type": "point",
             },
@@ -11084,6 +11113,7 @@ exports[`golden fixtures unity-exporter.SimplePortalRed.json loads, with the war
             "instancingGeometry": "quarks_geometry_4",
             "layers": 1,
             "material": "quarks_material_5",
+            "scalingMode": "hierarchy",
             "shape": {
               "arc": 6.2831854820251465,
               "radius": 0.9399999976158142,
@@ -11219,6 +11249,7 @@ exports[`golden fixtures unity-exporter.SimplePortalRed.json loads, with the war
             "instancingGeometry": "quarks_geometry_4",
             "layers": 1,
             "material": "quarks_material_6",
+            "scalingMode": "hierarchy",
             "shape": {
               "arc": 6.2831854820251465,
               "radius": 0.949999988079071,
@@ -11381,6 +11412,7 @@ exports[`golden fixtures unity-exporter.SimplePortalRed.json loads, with the war
         "layers": 1,
         "material": "quarks_material_7",
         "renderMode": 2,
+        "scalingMode": "hierarchy",
         "shape": {
           "type": "point",
         },
@@ -11525,7 +11557,7 @@ exports[`golden fixtures unity-exporter.SparkleSoloBlue.json loads, with the war
     ],
     "metadata": {
       "generator": "babylon.quarks",
-      "quarksFormat": 1,
+      "quarksFormat": 2,
       "type": "Object3D",
       "version": 4.5,
     },
@@ -11649,6 +11681,7 @@ exports[`golden fixtures unity-exporter.SparkleSoloBlue.json loads, with the war
             "instancingGeometry": "quarks_geometry_1",
             "layers": 1,
             "material": "quarks_material_3",
+            "scalingMode": "hierarchy",
             "shape": {
               "arc": 6.2831854820251465,
               "radius": 0.009999999776482582,
@@ -11849,6 +11882,7 @@ exports[`golden fixtures unity-exporter.SparkleSoloBlue.json loads, with the war
         "instancingGeometry": "quarks_geometry_1",
         "layers": 1,
         "material": "quarks_material_5",
+        "scalingMode": "hierarchy",
         "shape": {
           "type": "point",
         },

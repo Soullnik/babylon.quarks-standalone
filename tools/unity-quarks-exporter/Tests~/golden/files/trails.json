@@ -3,7 +3,7 @@
     "version": 4.5,
     "type": "Object3D",
     "generator": "babylon.quarks Unity exporter {version}",
-    "quarksFormat": 1
+    "quarksFormat": 2
   },
   "geometries": [
     {

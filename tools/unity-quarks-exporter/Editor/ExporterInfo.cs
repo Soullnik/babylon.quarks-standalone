@@ -16,6 +16,6 @@ namespace BabylonQuarks.UnityExporter
         /// The babylon.quarks JSON format the export is written in, as <c>metadata.quarksFormat</c>.
         /// A loader that reads an older format warns that settings it does not know are left out.
         /// </summary>
-        public const int QuarksFormat = 1;
+        public const int QuarksFormat = 2;
     }
 }

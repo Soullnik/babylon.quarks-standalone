@@ -112,7 +112,15 @@ export type CullingMode = 'always' | 'pause' | 'pauseAndCatchUp';
  * - `'shape'`: the world scale sizes the emission shape alone; the particles keep their size and
  *   speed, so a bigger emitter spreads the same particles over a larger area.
  *
- * Under every mode the emitter's position and rotation come from the whole hierarchy.
+ * Under every mode the emitter's position, rotation and any mirroring come from the whole
+ * hierarchy; only the length of each axis changes. A sub emission starts in its parent particle's
+ * frame and takes its size and speed from that, not from the sub emitter's scale; `'shape'` still
+ * scales its shape by the sub emitter's world scale. With a non-uniform scale `'shape'` stretches
+ * where particles start, not the directions the shape sends them.
+ *
+ * Known differences from Unity: a world force (`ForceOverLife`, `ApplyForce`, and so the gravity
+ * the Unity exporter writes) is scaled with the motion in `'local'` and `'hierarchy'`, where
+ * Unity's gravity is not.
  */
 export type ScalingMode = 'local' | 'hierarchy' | 'shape';
 

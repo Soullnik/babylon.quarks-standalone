@@ -1,6 +1,7 @@
 import {
     EmissionState,
     FunctionValueGenerator,
+    Matrix3,
     Matrix4,
     Particle,
     Quaternion,
@@ -24,6 +25,7 @@ const IDENTITY_QUATERNION = new Quaternion();
 const tempQ = new Quaternion();
 const tempV = new Vector3();
 const tempV2 = new Vector3();
+const tempM3 = new Matrix3();
 
 /**
  * Gives a system its newborn particles: grows the pool and the store they live in, rolls each
@@ -68,6 +70,7 @@ export class ParticleSpawner {
         const scale = tempV2;
         // decompose writes tempQ, so no separate setFromRotationMatrix is needed.
         matrix.decompose(translation, tempQ, scale);
+        const linear = tempM3.setFromMatrix4(matrix);
         const behaviors = system.behaviors;
         const behaviorCount = behaviors.length;
         const renderMode = system.rendererSettings.renderMode;
@@ -199,9 +202,10 @@ export class ParticleSpawner {
                 particle.position.applyMatrix4(matrix);
                 particle.startSize.multiply(scale).abs();
                 particle.size.copy(particle.startSize);
-                // Scaled per axis by the scale the emitter's matrix carries, then turned: the speed
-                // scales with it.
-                particle.velocity.multiply(system.hierarchyScale).applyQuaternion(tempQ);
+                // Through the matrix's own axes, as the position is: scaled, turned and mirrored
+                // with it. For a sub emission that is the parent particle's frame, the same one
+                // its start size takes.
+                particle.velocity.applyMatrix3(linear);
                 if (particle.rotation && particle.rotation instanceof Quaternion) {
                     particle.rotation.multiplyQuaternions(tempQ, particle.rotation);
                 }

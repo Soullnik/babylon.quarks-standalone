@@ -238,7 +238,10 @@ export interface IEmitter {
     uuid: string;
     /** Whether the node, and so the system, is visible. */
     visible: boolean;
-    /** The node's world matrix. */
+    /**
+     * The matrix the system simulates and draws in: the node's world matrix, with the scale its
+     * scaling mode applies on each axis (babylon.quarks' `ScalingMode`).
+     */
     matrixWorld: Matrix4;
 }
 
@@ -288,9 +291,9 @@ export interface IParticleSystem {
      */
     simulationStep?: number;
     /**
-     * What world-space forces and speed limits are multiplied by: the
-     * emitter's world scale when the system scales its motion with it (a
-     * world-space system in `'hierarchy'` scaling mode), 1 or undefined
+     * What world-space forces and speed limits are multiplied by: the mean
+     * scale of {@link IEmitter.matrixWorld}'s axes for a world-space system,
+     * which carries what its scaling mode scales motion by; 1 or undefined
      * otherwise.
      * @type {number}
      */

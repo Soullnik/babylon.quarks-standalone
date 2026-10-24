@@ -33,7 +33,7 @@ const INSPECTOR_HINTS: Record<string, string> = {
     Looping: 'When enabled, the effect restarts from the beginning after duration ends.',
     'World space': 'Simulates in world coordinates so moving the emitter does not drag existing particles.',
     'Scaling mode':
-        'What the emitter’s scale does to a world-space system: only the shape and sizes, or speeds and forces too (Unity’s Scaling Mode).',
+        'Which scale reaches the effect (Unity’s Scaling Mode): Local, the emitter’s own; Hierarchy, its parents’ too; Shape, the whole scale on the emission shape alone.',
     Prewarm: 'Simulates the effect once at start so it already looks mid-playback when play begins.',
     'Warm-up time':
         'Seconds of the cycle simulated before the first frame of a looping system (Niagara’s Warmup Time); 0 warms up a whole cycle, as Unity does.',

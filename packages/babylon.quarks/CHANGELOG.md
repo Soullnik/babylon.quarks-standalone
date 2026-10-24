@@ -26,8 +26,20 @@ the API and the look of effects are frozen.
   mode. An effect whose emitter or its parents are scaled looks different unless it was
   `'hierarchy'`: set `scalingMode: 'hierarchy'` to keep a parent's scale on it, or leave it at
   `'local'` to keep the effect its own size under a scaled parent. Effects at scale 1 are
-  unchanged. `ParticleEmitter.matrixWorld` is now the matrix the system simulates and draws in,
-  with the mode's scale, and `ParticleEmitter.shapeScale` the scale `'shape'` gives the shape.
+  unchanged.
+  - **Files from before this release keep their look:** the format goes to 2, and a system in a
+    file of format 1 or without `quarksFormat` (older babylon.quarks, three.quarks, the Unity
+    exporter before 0.29) reads as `'hierarchy'`, which gives it the emitter's whole world scale
+    as before (except a world-space system's speed, which now scales too). Save it again to keep
+    that, or set the mode you want. A 0.28 loader warns about a format 2 file and reads its
+    systems as its own default.
+  - **`ParticleEmitter.matrixWorld` (`IEmitter.matrixWorld`) is the matrix the system simulates
+    and draws in:** the world matrix with each axis's length set by the mode. A custom behavior
+    that reads it gets that scale. `ParticleEmitter.shapeScale` is what `'shape'` gives the shape.
+  - **Negative scales mirror the start velocity as they mirror the position,** in every mode; a
+    world-space `'hierarchy'` system used to mirror the position only.
+  - **A sub emission's speed** takes its parent particle's frame, as its size did: it no longer
+    scales with the sub emitter's own scale in `'hierarchy'`.
 
 ### Added
 

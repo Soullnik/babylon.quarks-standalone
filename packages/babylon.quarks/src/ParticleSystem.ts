@@ -639,26 +639,15 @@ export class ParticleSystem implements IParticleSystem {
         this.neededToUpdateRender = true;
     }
 
-    /**
-     * The scale per axis the {@link scalingMode} applies to a world-space system, measured with
-     * {@link motionScale} before every step; what start speeds are multiplied by. Taken from the
-     * system's own emitter rather than the emission matrix, whose columns carry a parent
-     * particle's velocity for a sub emitter.
-     * @internal
-     */
-    readonly hierarchyScale = new Vector3(1, 1, 1);
-
     /** The mean scale of the emitter's matrix for a world-space system, else 1. */
     private measureMotionScale(emitterMatrix: Matrix4): number {
         if (!this.worldSpace) {
-            this.hierarchyScale.set(1, 1, 1);
             return 1;
         }
         const e = emitterMatrix.elements;
         const sx = Math.sqrt(e[0] * e[0] + e[1] * e[1] + e[2] * e[2]);
         const sy = Math.sqrt(e[4] * e[4] + e[5] * e[5] + e[6] * e[6]);
         const sz = Math.sqrt(e[8] * e[8] + e[9] * e[9] + e[10] * e[10]);
-        this.hierarchyScale.set(sx, sy, sz);
         return (sx + sy + sz) / 3;
     }
 
