@@ -203,7 +203,8 @@ export type TrailTextureMode = 'stretch' | 'tile' | 'distributePerSegment' | 're
  * system's `startRotation`, a rotation generator such as an `EulerGenerator` (Unity's 3D Start
  * Rotation).
  */
-export type MeshSettings = Record<string, never>;
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type -- an extension point, as BillBoardSettings
+export interface MeshSettings {}
 
 /** The scene node a system emits from, as the simulation sees it. */
 export interface IEmitter {
@@ -331,8 +332,6 @@ export interface IParticleSystem {
      * @type {IEmitter}
      */
     emitter: IEmitter;
-    //_renderer?: BatchedRenderer;
-    //instancingGeometry: BufferGeometry;
     /** Settings of the renderer that draws the particles, such as the trail or beam setup. */
     rendererEmitterSettings: RendererEmitterSettings;
     /**
@@ -343,8 +342,6 @@ export interface IParticleSystem {
     flip?: Vector2;
     /** Emission progress: time in the cycle, burst and distance counters. */
     readonly emissionState: EmissionState;
-
-    //getRendererSettings(): VFXBatchSettings;
 
     /** True while paused: the system is not simulated. */
     paused: boolean;

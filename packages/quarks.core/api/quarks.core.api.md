@@ -1435,7 +1435,8 @@ export class Matrix4 {
 }
 
 // @public
-export type MeshSettings = Record<string, never>;
+export interface MeshSettings {
+}
 
 // @public
 export class NodeParticle implements IParticle {

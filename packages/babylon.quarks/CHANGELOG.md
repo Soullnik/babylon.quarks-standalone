@@ -32,11 +32,13 @@ effect; files written by earlier releases still load as before.
   `dependencies` map, and `toJSON` no longer takes `SerializationOptions`, which nothing read
   (also removed from `IParticleSystem.toJSON` and `ParticleEmitter.toJSON`).
 - **Read-only state:** `ParticleSystem.particleNum` is a getter, and `particles` and
-  `emissionState` are `readonly` (as on `IParticleSystem`); the renderer keeps them.
+  `emissionState` are `readonly`, on the class and on quarks.core's `IParticleSystem`; the renderer
+  keeps them. Code that wrote them, through either type, no longer compiles, and in JavaScript
+  `ps.particleNum = 0` throws a `TypeError`.
 - **The prefab's clip track is `'clip'`,** not `'three'`: `AnimationData.type` is `'clip' | 'ps'`
   and `QuarksPrefab.addThreeAnimation` is `addClipAnimation`. Files are written with `'clip'`;
   a `'three'` track from three.quarks or an older babylon.quarks is read as a clip track. A 0.29
-  runtime skips a `'clip'` track.
+  runtime and three.quarks skip a `'clip'` track.
 - **editor:** the session handle's `importGallery` alias is removed; use `importAssets`.
 
 ### Added

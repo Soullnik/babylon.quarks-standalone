@@ -1794,7 +1794,8 @@ export interface MeshRim {
 export function meshRimEqual(a: MeshRim | undefined, b: MeshRim | undefined): boolean;
 
 // @public
-export type MeshSettings = Record<string, never>;
+export interface MeshSettings {
+}
 
 // @public
 export class MeshSurfaceEmitter implements EmitterShape {
