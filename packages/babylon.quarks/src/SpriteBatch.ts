@@ -333,10 +333,12 @@ export class SpriteBatch extends VFXBatch {
             }
         }
         const useEnvAtlas = this.usesEnvAtlas();
+        const imageProcessing = this.imageProcessing();
         const program = shaderProgram(this.settings, {
             depth: this.depth,
             envAtlasReady: useEnvAtlas,
             meshUV2: this.meshUV2(),
+            imageProcessing,
         });
         const {defines, attributes, uniforms, samplers} = program;
         const shaderName = program.name;
@@ -407,6 +409,7 @@ export class SpriteBatch extends VFXBatch {
         }
 
         this.bindFog(mat);
+        this.bindImageProcessing(mat, imageProcessing);
         this.bindSurface(mat);
         // Billboards, beams and the like are flat sheets: both faces, whatever the setting says.
         mat.backFaceCulling = this.settings.renderFace !== 'both';

@@ -1,7 +1,7 @@
 import {Constants} from '@babylonjs/core/Engines/constants';
 import type {BaseTexture} from '@babylonjs/core/Materials/Textures/baseTexture';
 import {Vector3} from 'quarks.core';
-import {ShaderContext, shaderProgram, ShaderProgram, ShaderSettings} from './shaderProgram';
+import {ShaderContext, ShaderImageProcessing, shaderProgram, ShaderProgram, ShaderSettings} from './shaderProgram';
 import {
     normalizeErosion,
     normalizeGradientMap,
@@ -25,7 +25,10 @@ export interface ShaderVariant {
 /** A texture reference for settings that only ask whether one is set; it is never sampled. */
 const TEXTURE = {} as BaseTexture;
 
-/** The settings of a bare batch in `renderMode`: no texture, no effects, fog off, 1×1 sheet. */
+/**
+ * The settings of a bare batch in `renderMode`: no texture, no effects, fog off, 1×1 sheet. Image
+ * processing is applied, and compiles in only with an image processing axis in the context.
+ */
 function bare(renderMode: RenderMode): ShaderSettings {
     return {
         renderMode,
@@ -39,6 +42,7 @@ function bare(renderMode: RenderMode): ShaderSettings {
         materialTransparent: true,
         materialBlendMode: Constants.ALPHA_COMBINE,
         applyFog: false,
+        applyImageProcessing: true,
         pivot: undefined,
         minParticleSize: 0,
         maxParticleSize: Infinity,
@@ -184,6 +188,90 @@ const SURFACE_TARGETS = [
     'trail',
 ];
 
+/** A scene configuration's defines with `on` set and the rest off, see {@link ShaderImageProcessing}. */
+function imageProcessing(on: Partial<ShaderImageProcessing>): ShaderImageProcessing {
+    return {
+        IMAGEPROCESSING: false,
+        WHITEBALANCE: false,
+        VIGNETTE: false,
+        VIGNETTEBLENDMODEMULTIPLY: false,
+        VIGNETTEBLENDMODEOPAQUE: false,
+        TONEMAPPING: 0,
+        CONTRAST: false,
+        EXPOSURE: false,
+        COLORCURVES: false,
+        COLORGRADING: false,
+        COLORGRADING3D: false,
+        SAMPLER3DGREENDEPTH: false,
+        SAMPLER3DBGRMAP: false,
+        DITHER: false,
+        IMAGEPROCESSINGPOSTPROCESS: false,
+        SKIPFINALCOLORCLAMP: false,
+        ...on,
+    };
+}
+
+/**
+ * The scene's image processing: applied by a post process, and in the material with each of its
+ * effects and tone mappers at least once.
+ */
+const IMAGE_PROCESSING: Axis[] = [
+    {name: 'post-processed', context: {imageProcessing: imageProcessing({IMAGEPROCESSINGPOSTPROCESS: true})}},
+    {name: 'tone mapped', context: {imageProcessing: imageProcessing({IMAGEPROCESSING: true, TONEMAPPING: 1})}},
+    {
+        name: 'aces exposure contrast',
+        context: {
+            imageProcessing: imageProcessing({IMAGEPROCESSING: true, TONEMAPPING: 2, EXPOSURE: true, CONTRAST: true}),
+        },
+    },
+    {
+        name: 'neutral vignette dither',
+        context: {
+            imageProcessing: imageProcessing({
+                IMAGEPROCESSING: true,
+                TONEMAPPING: 3,
+                VIGNETTE: true,
+                VIGNETTEBLENDMODEMULTIPLY: true,
+                DITHER: true,
+            }),
+        },
+    },
+    {
+        name: 'opaque vignette curves white balance grading',
+        context: {
+            imageProcessing: imageProcessing({
+                IMAGEPROCESSING: true,
+                VIGNETTE: true,
+                VIGNETTEBLENDMODEOPAQUE: true,
+                COLORCURVES: true,
+                WHITEBALANCE: true,
+                COLORGRADING: true,
+                SKIPFINALCOLORCLAMP: true,
+            }),
+        },
+    },
+    {
+        name: 'grading 3d green depth bgr',
+        context: {
+            imageProcessing: imageProcessing({
+                IMAGEPROCESSING: true,
+                COLORGRADING: true,
+                COLORGRADING3D: true,
+                SAMPLER3DGREENDEPTH: true,
+                SAMPLER3DBGRMAP: true,
+            }),
+        },
+    },
+];
+
+/** The blends image processing is tried with: over, premultiplied, additive and multiply. */
+const IMAGE_PROCESSING_BLEND: Axis[] = [
+    NONE,
+    {name: 'premultiplied', settings: {materialBlendMode: Constants.ALPHA_PREMULTIPLIED}},
+    {name: 'additive fog', settings: {materialBlendMode: Constants.ALPHA_ADD, applyFog: true}},
+    {name: 'multiply', settings: {materialBlendMode: Constants.ALPHA_MULTIPLY}},
+];
+
 /** A mesh batch whose geometry has a second UV set. */
 const MESH_UV2: Axis = {name: 'uv2', context: {meshUV2: true}};
 
@@ -197,8 +285,8 @@ const EVERYTHING_ELSE: Axis = {
 /**
  * Every shader program the library can compile, one per distinct set of defines: every render
  * mode with every combination of sheet, map, soft particles, alpha test and fog, every blend
- * resolve with and without fog and soft particles, and the texture effects alone and together on
- * each shader family. What a shader validator compiles, and what
+ * resolve with and without fog and soft particles, the texture effects alone and together on
+ * each shader family, and the scene's image processing on every render mode. What a shader validator compiles, and what
  * an application can warm the shader cache with before its first frame (Unity's
  * ShaderVariantCollection). Built by {@link shaderProgram}, so a variant here is a material a
  * batch would build.
@@ -208,7 +296,7 @@ export function shaderVariants(): ShaderVariant[] {
     const out: ShaderVariant[] = [];
     const add = (axes: Axis[]) => {
         const settings = bare(RenderMode.BillBoard);
-        const context: ShaderContext = {depth: null, envAtlasReady: false, meshUV2: false};
+        const context: ShaderContext = {depth: null, envAtlasReady: false, meshUV2: false, imageProcessing: null};
         for (const axis of axes) {
             Object.assign(settings, axis.settings);
             Object.assign(context, axis.context);
@@ -241,5 +329,14 @@ export function shaderVariants(): ShaderVariant[] {
                 for (const map of MAP)
                     for (const tile of [NONE, TILE[2]])
                         for (const rest of [NONE, EVERYTHING_ELSE]) add([target, uv2, surface, map, tile, rest]);
+
+    for (const target of TARGETS)
+        for (const ip of IMAGE_PROCESSING)
+            for (const blend of IMAGE_PROCESSING_BLEND) for (const map of MAP) add([target, ip, blend, map]);
+
+    // With the rest of the fragment: soft, alpha-tested, fogged and with every texture effect.
+    const everySurface = SURFACE[SURFACE.length - 3];
+    for (const target of TARGETS.filter((t) => SURFACE_TARGETS.includes(t.name)))
+        for (const ip of IMAGE_PROCESSING) add([target, ip, everySurface, MAP[MAP.length - 1], EVERYTHING_ELSE]);
     return out;
 }

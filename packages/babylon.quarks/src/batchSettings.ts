@@ -521,6 +521,8 @@ export interface StoredBatchSettings {
     renderingGroupId: number;
     /** Whether the scene's fog is applied, see {@link VFXBatchSettings.applyFog}. */
     applyFog: boolean;
+    /** Whether the scene's image processing is applied, see {@link VFXBatchSettings.applyImageProcessing}. */
+    applyImageProcessing: boolean;
     /** Billboard pivot in particle-size units, see {@link VFXBatchSettings.pivot}. */
     pivot?: Vector3;
     /** Draw order within the batch, see {@link SortMode}. */

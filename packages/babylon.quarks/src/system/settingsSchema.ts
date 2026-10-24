@@ -251,6 +251,12 @@ export const SETTINGS: ReadonlyArray<SettingDescriptor> = [
         true,
         (json) => json !== false
     ),
+    plain(
+        'applyImageProcessing',
+        (s) => s.applyImageProcessing,
+        true,
+        (json) => json !== false
+    ),
     plain('playbackSpeed', (s) => s.playbackSpeed, 1, number),
     plain('cullingMode', (s) => s.cullingMode, 'always', validCullingMode),
     plain('scalingMode', (s) => s.scalingMode, 'local', validScalingMode),

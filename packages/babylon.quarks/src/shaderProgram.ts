@@ -1,4 +1,9 @@
 import {Constants} from '@babylonjs/core/Engines/constants';
+import type {IImageProcessingConfigurationDefines} from '@babylonjs/core/Materials/imageProcessingConfiguration.defines';
+import {
+    PrepareSamplersForImageProcessing,
+    PrepareUniformsForImageProcessing,
+} from '@babylonjs/core/Materials/imageProcessingConfiguration.functions';
 import {hasSizeLimits, takesPivotAndSizeLimits, tilesSheet} from './batchKey';
 import {readsUV1, RenderMode, StoredBatchSettings} from './batchSettings';
 import local_particle_physics_vert from './shaders/local_particle_physics_vert.glsl';
@@ -35,6 +40,7 @@ export type ShaderSettings = Pick<
     | 'materialTransparent'
     | 'materialBlendMode'
     | 'applyFog'
+    | 'applyImageProcessing'
     | 'pivot'
     | 'minParticleSize'
     | 'maxParticleSize'
@@ -66,7 +72,40 @@ export interface ShaderContext {
     envAtlasReady: boolean;
     /** Whether the mesh batch has a second UV set to read for {@link UVChannel} 1. */
     meshUV2: boolean;
+    /**
+     * The scene's image processing as `ImageProcessingConfiguration.prepareDefines` writes it;
+     * null or left out for none. Compiled in only when the settings apply it, see
+     * {@link ParticleSystem.applyImageProcessing}.
+     */
+    imageProcessing?: ShaderImageProcessing | null;
 }
+
+/**
+ * The defines an `ImageProcessingConfiguration` prepares for a material
+ * (`ImageProcessingConfigurationDefines`): which of its effects are on, and whether a post
+ * process applies it instead.
+ */
+export type ShaderImageProcessing = Readonly<IImageProcessingConfigurationDefines>;
+
+/** The keys of {@link ShaderImageProcessing}, in the order Babylon writes them. @internal */
+export const IMAGE_PROCESSING_DEFINES: readonly (keyof IImageProcessingConfigurationDefines)[] = [
+    'IMAGEPROCESSING',
+    'WHITEBALANCE',
+    'VIGNETTE',
+    'VIGNETTEBLENDMODEMULTIPLY',
+    'VIGNETTEBLENDMODEOPAQUE',
+    'TONEMAPPING',
+    'CONTRAST',
+    'COLORCURVES',
+    'COLORGRADING',
+    'COLORGRADING3D',
+    'SAMPLER3DGREENDEPTH',
+    'SAMPLER3DBGRMAP',
+    'DITHER',
+    'IMAGEPROCESSINGPOSTPROCESS',
+    'EXPOSURE',
+    'SKIPFINALCOLORCLAMP',
+];
 
 /**
  * One compiled shader of the library: the sources in both languages and the defines, attributes,
@@ -292,6 +331,7 @@ function spriteShaderProgram(settings: ShaderSettings, context: ShaderContext): 
         uniforms.push('eyePosition');
     }
     surfaceDefines(settings, defines, uniforms, samplers);
+    imageProcessingDefines(settings, context, defines, uniforms, samplers);
     if (isMesh) {
         attributes.push('normal');
         if (readsUV1(settings) && context.meshUV2) {
@@ -317,6 +357,7 @@ function trailShaderProgram(settings: ShaderSettings, context: ShaderContext): S
     }
     surfaceDefines(settings, defines, uniforms, samplers);
     softDefines(settings, context, defines, uniforms, samplers);
+    imageProcessingDefines(settings, context, defines, uniforms, samplers);
     if (readsUV1(settings)) {
         // A trail's channel 1 arrives as its own vertex buffer.
         attributes.push('uv2');
@@ -354,6 +395,68 @@ function blendDefines(settings: ShaderSettings): string[] {
         }
     }
     return defines;
+}
+
+/**
+ * Whether a batch with `settings` compiles the scene's image processing `ip` in: when the settings
+ * apply it and it does something, either in the material (`IMAGEPROCESSING`) or through a post
+ * process the colour is left in linear space for (`IMAGEPROCESSINGPOSTPROCESS`). A material that
+ * multiplies the frame takes no in-material processing: its colour is a factor, and tone mapping
+ * white would darken the frame where the particle is fully faded. See `chunks/imageProcessing.ts`.
+ */
+export function compilesImageProcessing(
+    settings: Pick<ShaderSettings, 'applyImageProcessing' | 'materialTransparent' | 'materialBlendMode'>,
+    ip: ShaderImageProcessing | null | undefined
+): boolean {
+    if (settings.applyImageProcessing === false || !ip) {
+        return false;
+    }
+    if (ip.IMAGEPROCESSINGPOSTPROCESS) {
+        return true;
+    }
+    return ip.IMAGEPROCESSING && blendCategory(settings).output !== 'multiply';
+}
+
+/**
+ * The defines, uniforms and samplers the scene's image processing `ip` adds to a material with
+ * `settings`: nothing unless {@link compilesImageProcessing}, otherwise its defines as Babylon
+ * writes them (a number always, a flag when set) and the uniforms and samplers its effects read.
+ * A batch swaps these in place on its material when the configuration changes what compiles.
+ * @internal
+ */
+export function imageProcessingParts(
+    settings: Pick<ShaderSettings, 'applyImageProcessing' | 'materialTransparent' | 'materialBlendMode'>,
+    ip: ShaderImageProcessing | null | undefined
+): {defines: string[]; uniforms: string[]; samplers: string[]} {
+    const parts = {defines: [] as string[], uniforms: [] as string[], samplers: [] as string[]};
+    if (!ip || !compilesImageProcessing(settings, ip)) {
+        return parts;
+    }
+    for (const key of IMAGE_PROCESSING_DEFINES) {
+        const value = ip[key];
+        if (typeof value === 'number') {
+            parts.defines.push(`${key} ${value}`);
+        } else if (value) {
+            parts.defines.push(key);
+        }
+    }
+    PrepareUniformsForImageProcessing(parts.uniforms, ip);
+    PrepareSamplersForImageProcessing(parts.samplers, ip);
+    return parts;
+}
+
+/** Appends {@link imageProcessingParts} to a program's lists. */
+function imageProcessingDefines(
+    settings: ShaderSettings,
+    context: ShaderContext,
+    defines: string[],
+    uniforms: string[],
+    samplers: string[]
+): void {
+    const parts = imageProcessingParts(settings, context.imageProcessing);
+    defines.push(...parts.defines);
+    uniforms.push(...parts.uniforms);
+    samplers.push(...parts.samplers);
 }
 
 /** Soft particles, when on and a depth texture is there to read, and the alpha test. */

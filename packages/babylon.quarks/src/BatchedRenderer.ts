@@ -119,6 +119,18 @@ export interface VFXBatchSettings {
      */
     applyFog: boolean;
     /**
+     * Whether the material applies the scene's image processing (`scene.imageProcessingConfiguration`:
+     * exposure, contrast, tone mapping, vignette, colour curves, colour grading, dithering), as
+     * Babylon's own `ParticleSystem` and its standard and PBR materials do; unset reads as true.
+     * When the configuration is applied by a post process (a `DefaultRenderingPipeline` with image
+     * processing on), the material leaves its colour in linear space for it, as those materials do.
+     * Off, the material does neither: its colour is written as authored. That does not keep the
+     * particles out of a post process, which processes the whole frame; particles that must reach
+     * the screen untouched are drawn by a camera the pipeline is not attached to. Systems that
+     * differ are batched apart. See {@link ParticleSystem.applyImageProcessing}.
+     */
+    applyImageProcessing?: boolean;
+    /**
      * Offset of billboard quads from their particle, in particle-size units
      * (Unity's renderer Pivot). On billboards x/y move the quad in its own plane
      * before it is rotated and z moves it toward the camera (up for horizontal

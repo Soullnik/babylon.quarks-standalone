@@ -125,6 +125,7 @@ describe('blend defines', () => {
         materialTransparent,
         materialBlendMode,
         applyFog,
+        applyImageProcessing: true,
         pivot: undefined,
         minParticleSize: 0,
         maxParticleSize: Infinity,
@@ -135,7 +136,7 @@ describe('blend defines', () => {
         gradientMap: undefined,
         erosion: undefined,
     });
-    const context = {depth: null, envAtlasReady: false, meshUV2: false};
+    const context = {depth: null, envAtlasReady: false, meshUV2: false, imageProcessing: null};
     const defines = (mode: number, fog: boolean, transparent = true) =>
         shaderProgram(settings(mode, fog, transparent), context).defines;
 

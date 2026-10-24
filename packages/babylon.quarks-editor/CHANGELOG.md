@@ -8,6 +8,9 @@ and the project follows the `quarks.core` 0.x version line.
 
 ### Changed
 
+- **Renderer module** has an "Image processing" switch beside "Apply fog", for
+  `ParticleSystem.applyImageProcessing`.
+
 - **Value fields** offer Random Between Two Curves, with a curve editor for each bound. Switching
   between Curve and Random Between Two Curves keeps every segment.
 - **Curve modules** (Size, Speed and Limit Speed over Lifetime, Size by Speed, Width over Trail,

@@ -95,6 +95,16 @@ export const demoManifest: DemoManifestEntry[] = [
         preview: {icon: 'RB', gradient: 'linear-gradient(135deg, #ffb366 0%, #8c3a1a 100%)'},
     },
     {
+        key: 'ImageProcessingDemo',
+        name: 'Image Processing',
+        module: 'imageProcessing',
+        sourcePath: 'examples/src/demos/imageProcessing.ts',
+        description:
+            "The scene's tone mapping, exposure, contrast and vignette on the particles, as on its meshes; the right flame opts out with applyImageProcessing: false.",
+        tags: ['rendering', 'image processing', 'tone mapping'],
+        preview: {icon: 'IP', gradient: 'linear-gradient(135deg, #ffcf66 0%, #6a2a12 100%)'},
+    },
+    {
         key: 'TurbulenceDemo',
         name: 'Noise Turbulence',
         module: 'turbulence',
