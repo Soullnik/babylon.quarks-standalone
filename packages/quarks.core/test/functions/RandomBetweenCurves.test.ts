@@ -3,7 +3,9 @@ import {
     createSeededRandom,
     GeneratorFromJSON,
     PiecewiseBezier,
+    QuarksFormatError,
     RandomBetweenCurves,
+    readFormat,
     ValueGeneratorFromJSON,
     withRandomSource,
 } from '../../src';
@@ -80,5 +82,42 @@ describe('RandomBetweenCurves', () => {
         expect(copy.curve1).not.toBe(generator.curve1);
         expect(copy.curve2).not.toBe(generator.curve2);
         expect(copy.type).toBe('function');
+    });
+});
+
+describe('RandomBetweenCurves hardening', () => {
+    it('gives a particle that was never rolled for it the midway curve, not NaN', () => {
+        const generator = new RandomBetweenCurves(line(0, 0), line(10, 10));
+        generator.startGen([]);
+        // A particle alive before the setting was replaced has no slot for it.
+        expect(generator.genValue([], 0.5)).toBeCloseTo(5);
+    });
+
+    it('re-rolls a recycled particle', () => {
+        const generator = new RandomBetweenCurves(line(0, 0), line(10, 10));
+        withRandomSource(createSeededRandom(11), () => {
+            const memory: number[] = [];
+            generator.startGen(memory);
+            const first = generator.genValue(memory, 0);
+            memory.length = 0;
+            generator.startGen(memory);
+            expect(generator.genValue(memory, 0)).not.toBe(first);
+        });
+    });
+
+    it.each([
+        ['without curves', {type: 'RandomBetweenCurves'}],
+        ['with a constant for a bound', {type: 'RandomBetweenCurves', curve1: {type: 'ConstantValue', value: 1}}],
+    ])('warns and reads a flat 0 curve for a bound %s', (_name, json) => {
+        const warnings: string[] = [];
+        const generator = readFormat({onWarning: (message) => warnings.push(message)}, () =>
+            ValueGeneratorFromJSON(json as never)
+        ) as RandomBetweenCurves;
+        expect(generator).toBeInstanceOf(RandomBetweenCurves);
+        expect(generator.genValue([0.5], 0.3)).toBe(0);
+        expect(warnings).toHaveLength(2);
+        expect(() => readFormat({strict: true}, () => ValueGeneratorFromJSON(json as never))).toThrow(
+            QuarksFormatError
+        );
     });
 });

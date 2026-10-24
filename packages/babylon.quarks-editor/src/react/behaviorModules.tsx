@@ -35,11 +35,11 @@ import {
 import React from 'react';
 import {EffectBinding} from '../core/binding.js';
 import {buildGradient, DEFAULT_GRADIENT_STOPS, findBehavior, readGradientStops} from '../core/colors.js';
-import {buildCurve, buildScalar, readPieces, readScalar} from '../core/values.js';
-import {CurveEditor} from './CurveEditor.js';
+import {buildScalar, readScalar} from '../core/values.js';
 import {CheckboxField, NumberField, Row, SelectField} from './fields.js';
 import {GradientEditor} from './GradientEditor.js';
 import {iconStyle} from './icons.js';
+import {LifeCurveField} from './LifeCurveField.js';
 import type {TextureOption} from './modules.js';
 import {ModuleSection, type ModuleProps} from './ModuleSection.js';
 import {theme} from './theme.js';
@@ -94,10 +94,10 @@ export function SpeedOverLifeModule({binding}: ModuleProps) {
         >
             {(behavior) => (
                 <div style={{marginTop: 6}}>
-                    <CurveEditor
-                        pieces={readPieces(behavior.speed)}
+                    <LifeCurveField
+                        generator={behavior.speed}
                         maxValue={2}
-                        onChange={(pieces) => binding.apply(() => (behavior.speed = buildCurve(pieces)))}
+                        onChange={(curve) => binding.apply(() => (behavior.speed = curve))}
                     />
                 </div>
             )}
@@ -119,10 +119,10 @@ export function LimitSpeedOverLifeModule({binding}: ModuleProps) {
             {(behavior) => (
                 <>
                     <div style={{marginTop: 6}}>
-                        <CurveEditor
-                            pieces={readPieces(behavior.speed)}
+                        <LifeCurveField
+                            generator={behavior.speed}
                             maxValue={8}
-                            onChange={(pieces) => binding.apply(() => (behavior.speed = buildCurve(pieces)))}
+                            onChange={(curve) => binding.apply(() => (behavior.speed = curve))}
                         />
                     </div>
                     <Row label="Dampen">
@@ -942,10 +942,10 @@ export function SizeBySpeedModule({binding}: ModuleProps) {
             {(behavior) => (
                 <>
                     <div style={{marginTop: 6}}>
-                        <CurveEditor
-                            pieces={readPieces(behavior.size)}
+                        <LifeCurveField
+                            generator={behavior.size}
                             maxValue={2}
-                            onChange={(pieces) => binding.apply(() => (behavior.size = buildCurve(pieces)))}
+                            onChange={(curve) => binding.apply(() => (behavior.size = curve))}
                         />
                     </div>
                     <SpeedRangeRows binding={binding} behavior={behavior} />
@@ -1015,10 +1015,10 @@ export function WidthOverTrailModule({binding}: ModuleProps) {
             {(behavior) => (
                 <>
                     <div style={{marginTop: 6}}>
-                        <CurveEditor
-                            pieces={readPieces(behavior.width)}
+                        <LifeCurveField
+                            generator={behavior.width}
                             maxValue={2}
-                            onChange={(pieces) => binding.apply(() => (behavior.width = buildCurve(pieces)))}
+                            onChange={(curve) => binding.apply(() => (behavior.width = curve))}
                         />
                     </div>
                     {/* Off: the curve multiplies the particle size. On: it is the width in world units (files from 0.21 and earlier). */}
@@ -1265,10 +1265,10 @@ export function TextureSheetModule({binding}: ModuleProps) {
                         )}
                     </Row>
                     <div style={{marginTop: 6}}>
-                        <CurveEditor
-                            pieces={readPieces(frameBehavior.frame)}
+                        <LifeCurveField
+                            generator={frameBehavior.frame}
                             maxValue={Math.max(1, tiles - 1)}
-                            onChange={(pieces) => binding.apply(() => (frameBehavior.frame = buildCurve(pieces)))}
+                            onChange={(curve) => binding.apply(() => (frameBehavior.frame = curve))}
                         />
                     </div>
                 </>

@@ -58,10 +58,10 @@ import {
     getShapeType,
     readShapeParams,
 } from '../core/shapes.js';
-import {buildCurve, buildScalar, readPieces, readScalar} from '../core/values.js';
-import {CurveEditor} from './CurveEditor.js';
+import {buildCurve, buildScalar, readScalar} from '../core/values.js';
 import {GradientEditor} from './GradientEditor.js';
 import {InspectorInfoIcon} from './InspectorInfoIcon.js';
+import {LifeCurveField} from './LifeCurveField.js';
 import {ModuleSection, type ModuleProps} from './ModuleSection.js';
 import {TextureSelect} from './TextureSelect.js';
 import {TextureUVField} from './TextureUVField.js';
@@ -857,13 +857,13 @@ export function SizeOverLifeModule({binding}: ModuleProps) {
             }
         >
             <div style={{marginTop: 6}}>
-                <CurveEditor
-                    pieces={behavior ? readPieces(behavior.size) : [{start: 0, p: curve}]}
+                <LifeCurveField
+                    generator={behavior ? behavior.size : buildCurve([{start: 0, p: curve}])}
                     maxValue={2}
-                    onChange={(pieces) =>
+                    onChange={(size) =>
                         binding.apply((s) => {
                             removeBehavior(s, 'SizeOverLife');
-                            s.addBehavior(new SizeOverLife(buildCurve(pieces)));
+                            s.addBehavior(new SizeOverLife(size));
                         })
                     }
                 />

@@ -1,5 +1,7 @@
+import {describePart, warnFormat} from '../util/JSONUtil';
 import {random} from '../util/random';
-import type {RandomBetweenCurvesJSON} from './FunctionJSON';
+import {Bezier} from './Bezier';
+import type {PiecewiseBezierJSON, RandomBetweenCurvesJSON} from './FunctionJSON';
 import {GeneratorMemory} from './GeneratorMemory';
 import {PiecewiseBezier} from './PiecewiseBezier';
 import type {FunctionValueGenerator} from './ValueGenerator';
@@ -9,6 +11,13 @@ import type {FunctionValueGenerator} from './ValueGenerator';
  * (Unity's Random Between Two Curves): each particle follows its own curve, the same fraction of the
  * way from {@link RandomBetweenCurves.curve1} to {@link RandomBetweenCurves.curve2} at every `t`.
  * Where it drives a start value, `t` is the system's cycle, as for any curve there.
+ *
+ * Where a system-level setting takes it (emission over time or distance, a burst's count, a shape's
+ * speed, Noise's scroll speed), the mix is rolled once per play rather than at every emission step,
+ * as a random range is there.
+ *
+ * Like every random generator, an instance holds the memory slot of its mix: give each setting its
+ * own instance, and {@link RandomBetweenCurves.clone} one to reuse it.
  */
 export class RandomBetweenCurves implements FunctionValueGenerator {
     /** Always `'function'`: the number depends on `t`. */
@@ -41,13 +50,19 @@ export class RandomBetweenCurves implements FunctionValueGenerator {
         this.curve2.refreshTable();
     }
 
-    /** The particle's number at `t`; rolls its mix first if {@link RandomBetweenCurves.startGen} has not. */
+    /**
+     * The particle's number at `t`; rolls its mix first if {@link RandomBetweenCurves.startGen}
+     * never has. A particle that was not rolled for this instance (one alive when the setting was
+     * replaced) takes the midway curve rather than a missing mix.
+     */
     genValue(memory: GeneratorMemory, t = 0): number {
         if (this.indexCount === -1) {
             this.startGen(memory);
         }
+        const rolled = memory[this.indexCount];
+        const mix = rolled === undefined ? 0.5 : rolled;
         const a = this.curve1.genValue(memory, t);
-        return a + (this.curve2.genValue(memory, t) - a) * memory[this.indexCount];
+        return a + (this.curve2.genValue(memory, t) - a) * mix;
     }
 
     /** The JSON form, `{type: 'RandomBetweenCurves', curve1, curve2}`. */
@@ -59,13 +74,25 @@ export class RandomBetweenCurves implements FunctionValueGenerator {
         };
     }
 
-    /** Reads {@link RandomBetweenCurves.toJSON} output. */
+    /**
+     * Reads {@link RandomBetweenCurves.toJSON} output. A bound that is missing or not a curve warns
+     * (throws when strict) and reads as a flat 0 curve, so one bad value does not cost the effect.
+     */
     static fromJSON(json: RandomBetweenCurvesJSON): RandomBetweenCurves {
-        return new RandomBetweenCurves(PiecewiseBezier.fromJSON(json.curve1), PiecewiseBezier.fromJSON(json.curve2));
+        return new RandomBetweenCurves(readBound(json.curve1, 'curve1'), readBound(json.curve2, 'curve2'));
     }
 
     /** A copy with copies of both curves. */
     clone(): RandomBetweenCurves {
         return new RandomBetweenCurves(this.curve1.clone() as PiecewiseBezier, this.curve2.clone() as PiecewiseBezier);
     }
+}
+
+/** One bound of a {@link RandomBetweenCurves} from JSON; see its `fromJSON`. */
+function readBound(json: PiecewiseBezierJSON | undefined, name: string): PiecewiseBezier {
+    if (json?.type === 'PiecewiseBezier' && Array.isArray(json.functions)) {
+        return PiecewiseBezier.fromJSON(json);
+    }
+    warnFormat(`RandomBetweenCurves ${name}: ${describePart('curve', json)}; using a flat 0 curve.`);
+    return new PiecewiseBezier([[new Bezier(0, 0, 0, 0), 0]]);
 }

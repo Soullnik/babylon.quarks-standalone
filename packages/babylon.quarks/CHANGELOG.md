@@ -52,13 +52,22 @@ the API and the look of effects are frozen.
   holds two `PiecewiseBezier` curves and rolls each particle a mix between them, kept for its
   life, so every particle follows its own curve within the band. It goes wherever a curve does
   (start values over the system's cycle, emission rates, every over-lifetime and by-speed
-  behavior) and reads and writes as `{type: 'RandomBetweenCurves', curve1, curve2}`. The Unity
-  exporter writes it instead of the upper curve, and the editor's value fields offer it with a
-  curve editor per bound.
+  behavior, Noise) and reads and writes as `{type: 'RandomBetweenCurves', curve1, curve2}`. Where
+  a system-level setting takes it (emission over time or distance, a burst's count, a shape's
+  speed, Noise's scroll speed) the mix is rolled once per play, as a random range is there, rather
+  than at each emission step as in Unity. A bound that is missing or not a curve warns and reads as
+  a flat 0 curve. The Unity exporter writes it instead of the upper curve, and the editor offers it
+  in its value fields and in every module that edits a curve over life.
 - **Grid sampling** (Niagara's Grid Location by particle index): `GridEmitter.sampling`
   (`GridSampling.Random`, the default, or `GridSampling.Sequential`). Sequential fills the cells in
   turn, row by row from −x, −y, so a burst of `row × column` particles puts one in every cell; a
   restart starts over at the first cell. The editor's Shape module offers it.
+
+### Fixed
+
+- **Noise** rolls a random Frequency, Strength, Position or Rotation amount, or Remap (a range or
+  two curves) into every particle. Only the first particle got its own value; the others read a
+  missing one and their position became NaN.
 
 ## [0.28.0] — 2026-10-23
 

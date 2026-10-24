@@ -121,6 +121,27 @@ export function buildCurve(pieces: CurvePiece[]): PiecewiseBezier {
     return new PiecewiseBezier(sorted.map((piece) => [new Bezier(...piece.p), piece.start] as [Bezier, number]));
 }
 
+/**
+ * `generator` as one curve (`'curve'`) or two (`'curves'`, Unity's Random Between Two Curves),
+ * keeping every segment: one curve becomes both bounds of two, and two keep their first as one.
+ */
+export function withCurves(generator: AnyGenerator | undefined, mode: 'curve'): PiecewiseBezier;
+export function withCurves(generator: AnyGenerator | undefined, mode: 'curves'): RandomBetweenCurves;
+export function withCurves(
+    generator: AnyGenerator | undefined,
+    mode: 'curve' | 'curves'
+): PiecewiseBezier | RandomBetweenCurves;
+export function withCurves(
+    generator: AnyGenerator | undefined,
+    mode: 'curve' | 'curves'
+): PiecewiseBezier | RandomBetweenCurves {
+    const first = buildCurve(readPieces(generator));
+    if (mode === 'curve') {
+        return first;
+    }
+    return new RandomBetweenCurves(first, buildCurve(readPieces(generator, generator instanceof RandomBetweenCurves)));
+}
+
 /** Splits the piece containing x into two exact halves using Bezier.split. */
 export function splitPieces(pieces: CurvePiece[], x: number): CurvePiece[] {
     const sorted = [...pieces].sort((a, b) => a.start - b.start);

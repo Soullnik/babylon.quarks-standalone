@@ -8,7 +8,11 @@ and the project follows the `quarks.core` 0.x version line.
 
 ### Changed
 
-- **Value fields** offer Random Between Two Curves, with a curve editor for each bound.
+- **Value fields** offer Random Between Two Curves, with a curve editor for each bound. Switching
+  between Curve and Random Between Two Curves keeps every segment.
+- **Curve modules** (Size, Speed and Limit Speed over Lifetime, Size by Speed, Width over Trail,
+  Texture Sheet frames) have a "Two curves" switch and show both bounds of an imported Random
+  Between Two Curves; an edit used to drop the upper one.
 - **Scaling mode** offers Local (the default), Hierarchy and Shape, as Unity's, for world- and
   local-space systems alike.
 - **Shape module:** a cone's Emit from (Base, Volume) and Length, shown for Volume only, and a

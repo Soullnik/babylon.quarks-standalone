@@ -9,6 +9,7 @@ import {
     buildScalar,
     readPieces,
     readScalar,
+    withCurves,
 } from '../core/values.js';
 import {CurveEditor} from './CurveEditor.js';
 import {NumberField, Row, SelectField} from './fields.js';
@@ -53,7 +54,8 @@ function isValueGenerator(generator: ScalarGenerator): generator is ValueGenerat
 
 /**
  * Unity-like value field: Constant | Random Between Two Constants | Curve | Random Between Two
- * Curves, bound to a quarks value generator. With `curve={false}` it offers only the first two, for settings sampled once.
+ * Curves, bound to a quarks value generator. With `curve={false}` it offers only the first two,
+ * for settings sampled once.
  */
 export function ValueField(props: CurveValueFieldProps | ConstantValueFieldProps): React.ReactElement {
     const read = readScalar(props.generator);
@@ -85,7 +87,12 @@ export function ValueField(props: CurveValueFieldProps | ConstantValueFieldProps
                               ]
                             : []),
                     ]}
-                    onChange={(mode) => commit({mode})}
+                    onChange={(mode) =>
+                        // Between one curve and two, every segment is kept; other switches start afresh.
+                        (mode === 'curve' || mode === 'curves') && curved
+                            ? emit(withCurves(props.generator, mode))
+                            : commit({mode})
+                    }
                 />
             </Row>
             {state.mode === 'constant' && (
