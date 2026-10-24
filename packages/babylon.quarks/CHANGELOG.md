@@ -81,6 +81,12 @@ as before.
 - **[Extending babylon.quarks](https://github.com/Soullnik/babylon.quarks-standalone/blob/main/docs/EXTENDING.md):** the contract for custom behaviors and
   emitter shapes (the hooks and when they run, what a behavior sees, the compiled pass, plugins
   and saving), with every example run by the tests.
+- `ApplySequences` documents what it does and its limits: sequences play once, in seconds since
+  the behavior was reset, each move eases in and out, and each particle starts `delay` after the
+  one before. `Noise`,
+  `TurbulenceField`, `OrbitOverLife` and `VelocityOverLife` say which to pick for what.
+- Tests hold the editor-facing `params` of every registered behavior and shape to the class's
+  fields and JSON, and every live parameter's in-place update to what a new material holds.
 - `ShaderImageProcessing`, the type of `ShaderContext.imageProcessing`, is exported.
 - `Gradient.evaluate(t, target?)`, as Unity's `Gradient.Evaluate`: the colour at `t` as
   `{r, g, b, a}`, written into `target` (such as a Babylon `Color4`) when one is given, for tools
@@ -98,6 +104,10 @@ as before.
 - A subclass that overrides `update` but inherits its parent's `updateAll` has its `update`
   called; the inherited `updateAll` skipped the override. Such a subclass no longer takes the
   faster `updateAll` path.
+- `ApplySequences` lands each particle on its point when its move ends; the last frame of a move
+  left it short of the point, by up to a frame's step. A particle whose delayed move to one
+  sequence is cut short by the next sequence now moves to the next sequence's point; it went on
+  towards the old one.
 - The renderer and the editor find sub-emitter links by `instanceof EmitSubParticleSystem`, not
   by the `type` string, so an object that only looks like one no longer orders or unlinks
   systems.

@@ -43,6 +43,9 @@ export interface TurbulenceFieldJSON extends BehaviorJSON {
  * give the same field on every run and a clone or a saved copy swirls
  * identically; give each system its own seed for different fields. Applies in
  * every render mode.
+ *
+ * For each particle wobbling on its own curve instead, or for noise in the
+ * rotation, use `Noise`.
  */
 export class TurbulenceField implements Behavior {
     type = 'TurbulenceField';

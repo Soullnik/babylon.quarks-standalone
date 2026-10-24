@@ -71,6 +71,9 @@ export interface NoiseJSON extends BehaviorJSON {
  * The generators are picked per particle from the random source, so a seeded
  * system (see the `Behavior` contract) replays the same noise. Applies in
  * every render mode.
+ *
+ * Each particle jitters on its own here; for a field that pushes nearby
+ * particles alike, so the system swirls, use `TurbulenceField`.
  */
 export class Noise implements Behavior {
     type = 'Noise';
