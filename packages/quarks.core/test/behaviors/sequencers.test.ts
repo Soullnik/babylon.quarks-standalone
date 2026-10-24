@@ -57,3 +57,55 @@ describe('ApplySequences.fromJSON', () => {
         expect(warn).toHaveBeenCalledWith(expect.stringContaining('Missing sequencer'));
     });
 });
+
+describe('ApplySequences moves', () => {
+    /** A sequencer that sends every particle to one point. */
+    const to = (x: number): TextureSequencer =>
+        ({
+            transform: (position: Vector3) => position.set(x, 0, 0),
+            toJSON: () => ({}),
+            clone: () => to(x),
+        }) as unknown as TextureSequencer;
+
+    function run(behavior: ApplySequences, particles: SpriteParticle[], until: number): void {
+        const step = 0.05;
+        for (let t = 0; t < until; t += step) {
+            behavior.frameUpdate(step);
+            particles.forEach((p) => behavior.update(p, step));
+        }
+    }
+
+    test('ease in and out along the way, and end on the point', () => {
+        const behavior = new ApplySequences(0);
+        behavior.appendSequencer(new IntervalValue(0, 1), to(10));
+        const p = new SpriteParticle();
+        behavior.initialize(p);
+        run(behavior, [p], 0.25);
+        // Smoothstep at a quarter of the way is 0.15625, behind a straight ramp's 0.25.
+        expect(p.position.x).toBeLessThan(2.5);
+        run(behavior, [p], 1);
+        expect(p.position.x).toBeCloseTo(10);
+    });
+
+    test('a particle delayed past the next sequence moves to that sequence’s point', () => {
+        const behavior = new ApplySequences(0.8);
+        behavior.appendSequencer(new IntervalValue(0, 1), to(10));
+        behavior.appendSequencer(new IntervalValue(1, 2), to(-10));
+        const first = new SpriteParticle();
+        const late = new SpriteParticle();
+        behavior.initialize(first);
+        behavior.initialize(late);
+        run(behavior, [first, late], 3.2);
+        expect(first.position.x).toBeCloseTo(-10);
+        expect(late.position.x).toBeCloseTo(-10);
+    });
+
+    test('reset starts the sequences and the emission order over', () => {
+        const behavior = new ApplySequences(0);
+        behavior.appendSequencer(new IntervalValue(0, 1), to(10));
+        behavior.initialize(new SpriteParticle());
+        behavior.frameUpdate(0.5);
+        behavior.reset();
+        expect([behavior.time, behavior.index, behavior.pCount]).toEqual([0, 0, 0]);
+    });
+});

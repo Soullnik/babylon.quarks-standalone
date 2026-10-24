@@ -31,6 +31,8 @@ interface SequenceState {
     dst: Vector3;
     /** Whether a move is under way. */
     inMotion: boolean;
+    /** The sequence the move is to, so that a move cut short by the next sequence starts afresh. */
+    sequence: number;
 }
 
 /**
@@ -38,21 +40,28 @@ interface SequenceState {
  * picture, such as a word or a logo, then re-form into the next: a scripted formation, as a
  * three.quarks sequence.
  *
- * Each sequence plays over its time range, in seconds since the behavior started (the system
- * began playing, or was restarted). While it plays, every particle moves in a straight line from
- * where it was to its own point of the sequence, which a {@link Sequencer} picks from the
- * particle's order of emission (the n-th particle emitted takes point n, wrapping around). Each
- * particle starts `delay` seconds after the one before it, so a cloud forms in order rather than
- * all at once. Between ranges, particles stay where they are and the system's forces and
- * velocity move them as usual.
+ * Each sequence plays over its time range, in seconds since the behavior started. While it
+ * plays, every particle moves along a straight line from where it was to its own point of the
+ * sequence, easing in and out ({@link ApplySequences.BEZIER}); a {@link Sequencer} picks the
+ * point from the particle's order of emission (the n-th particle emitted takes point n, wrapping
+ * around). Each particle's move starts `delay` seconds after the one before it, so a cloud forms
+ * in order rather than all at once. Outside its move, a particle is left to the system's forces
+ * and velocity.
  *
- * The sequences play once: the time and the emission count only go back to zero when the system
- * restarts, not on each loop of a looping system, so particles emitted late in a long-running
- * system take ever later starts. Use it with a system that emits its particles at the start
- * (a burst) and plays the sequences once. Applies in every render mode.
+ * A sequence ends where the next one starts: a particle delayed past that point leaves its move
+ * unfinished and takes its move to the next sequence, from where it got to.
+ *
+ * The time and the emission count go back to zero when the behavior is reset, which the system
+ * does when it restarts (`restart()`, `play()` after it finished, or a setter that restarts it),
+ * not on each loop of a looping system, so particles emitted late in a long-running system take
+ * ever later starts. Use it with a system that emits its particles at the start (a burst) and
+ * plays the sequences once. Applies in every render mode.
  */
 export class ApplySequences implements Behavior {
-    /** The ease every move between two sequence points follows: linear (a straight ramp from 0 to 1). */
+    /**
+     * The ease every move to a sequence point follows: `Bezier(0, 0, 1, 1)`, the smoothstep
+     * `3t² − 2t³`, which starts and ends at rest. It is shared by every instance.
+     */
     static BEZIER: Bezier = new Bezier(0, 0, 1, 1);
     type = 'ApplySequences';
     /** The sequences in time order, each with the time range it plays in. */
@@ -70,7 +79,7 @@ export class ApplySequences implements Behavior {
     index = 0;
     /**
      * Particles emitted since the behavior started; each takes the next point of a sequence. Goes
-     * back to 0 on {@link reset}.
+     * back to 0 on {@link ApplySequences.reset | reset}.
      * @internal
      */
     pCount = 0;
@@ -96,11 +105,18 @@ export class ApplySequences implements Behavior {
             state.id = this.pCount;
             state.inMotion = false;
         } else {
-            this.states.set(particle, {id: this.pCount, begin: new Vector3(), dst: new Vector3(), inMotion: false});
+            this.states.set(particle, {
+                id: this.pCount,
+                begin: new Vector3(),
+                dst: new Vector3(),
+                inMotion: false,
+                sequence: 0,
+            });
         }
         this.pCount++;
     }
 
+    /** Starts the sequences over: time 0, the first sequence, and the next particle emitted takes point 0. */
     reset() {
         this.time = 0;
         this.index = 0;
@@ -121,8 +137,9 @@ export class ApplySequences implements Behavior {
         const [range, points] = sequencer;
         const delay = state.id * this.delay;
         if (this.time >= range.a + delay && this.time <= range.b + delay) {
-            if (!state.inMotion) {
+            if (!state.inMotion || state.sequence !== this.index) {
                 state.inMotion = true;
+                state.sequence = this.index;
                 state.begin.copy(particle.position);
                 points.transform(state.dst, state.id);
             }
@@ -134,6 +151,10 @@ export class ApplySequences implements Behavior {
                 ApplySequences.BEZIER.genValue(span > 0 ? (this.time - range.a - delay) / span : 1)
             );
         } else if (this.time > range.b + delay) {
+            if (state.inMotion && state.sequence === this.index) {
+                // The frame that steps past the end of the move lands the particle on its point.
+                particle.position.copy(state.dst);
+            }
             state.inMotion = false;
         }
     }

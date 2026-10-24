@@ -20,13 +20,29 @@ import {notifyBind} from './internals';
 const UNIFORM_TABLES = [
     '_floats',
     '_ints',
+    '_uints',
     '_vectors2',
     '_vectors3',
     '_vectors4',
+    '_quaternions',
     '_colors3',
     '_colors4',
+    '_matrices',
+    '_matrices3x3',
+    '_matrices2x2',
     '_floatsArrays',
+    '_vectors2Arrays',
+    '_vectors3Arrays',
+    '_vectors4Arrays',
+    '_quaternionsArrays',
+    '_colors3Arrays',
+    '_colors4Arrays',
+    '_matrixArrays',
 ];
+
+/** A uniform's value, without the bookkeeping Babylon keeps on its math objects. */
+const plain = (value: unknown): unknown =>
+    JSON.parse(JSON.stringify(value, (key, field: unknown) => (key === '_isDirty' ? undefined : field)));
 
 /** The uniforms after the material is bound for a draw, which is when the per-frame ones are written. */
 function uniforms(material: ShaderMaterial): Record<string, unknown> {
@@ -35,7 +51,7 @@ function uniforms(material: ShaderMaterial): Record<string, unknown> {
     const record = material as unknown as Record<string, Record<string, unknown>>;
     for (const table of UNIFORM_TABLES) {
         for (const [name, value] of Object.entries(record[table] ?? {})) {
-            out[`${table}.${name}`] = JSON.parse(JSON.stringify(value));
+            out[`${table}.${name}`] = plain(value);
         }
     }
     return out;
@@ -80,11 +96,11 @@ describe('live parameters written in place', () => {
             softFarFade: 1,
         });
         ps.alphaTest = 0.5;
-        if (renderMode !== RenderMode.Mesh) {
+        if (renderMode !== RenderMode.Mesh && renderMode !== RenderMode.Trail) {
             ps.pivot = {x: 0.5, y: 0, z: 0};
             ps.minParticleSize = 0.01;
             ps.maxParticleSize = 0.5;
-        } else {
+        } else if (renderMode === RenderMode.Mesh) {
             ps.rim = {color: [1, 1, 1], power: 2, strength: 1, mode: 'add'};
         }
         ps.mapUV = {tiling: [2, 2]};
@@ -94,34 +110,42 @@ describe('live parameters written in place', () => {
         return ps;
     }
 
+    /** Which render modes a parameter is read in: a camera-facing quad, any non-mesh, or a mesh. */
+    type Reads = 'quad' | 'sprite' | 'mesh';
+    const MODES: Record<Reads, RenderMode[]> = {
+        quad: [RenderMode.BillBoard, RenderMode.StretchedBillBoard],
+        sprite: [RenderMode.BillBoard, RenderMode.StretchedBillBoard, RenderMode.Trail],
+        mesh: [RenderMode.Mesh],
+    };
+
     // The reflection level needs a loaded env atlas; batchKey.test.ts checks it is written in place.
-    const changes: Array<[string, RenderMode, (s: VFXBatchSettings) => void]> = [
-        ['softNearFade', RenderMode.BillBoard, (s) => (s.softNearFade = 0.2)],
-        ['softFarFade', RenderMode.BillBoard, (s) => (s.softFarFade = 2)],
-        ['materialAlphaTest', RenderMode.BillBoard, (s) => (s.materialAlphaTest = 0.25)],
-        ['pivot', RenderMode.BillBoard, (s) => (s.pivot = {x: 0, y: 0.5, z: 0})],
-        ['minParticleSize', RenderMode.BillBoard, (s) => (s.minParticleSize = 0.02)],
-        ['maxParticleSize', RenderMode.BillBoard, (s) => (s.maxParticleSize = 0.25)],
-        ['rim', RenderMode.Mesh, (s) => (s.rim = {color: [0, 1, 0], power: 3, strength: 0.5, mode: 'add'})],
-        ['mapUV', RenderMode.BillBoard, (s) => (s.mapUV = {...uv(), tiling: [3, 1], scroll: [0.5, 0]})],
-        ['uvDistortion.strength', RenderMode.BillBoard, (s) => (s.uvDistortion = {...s.uvDistortion!, strength: 0.3})],
+    // The UV layouts are written when the material is bound, so these cases test that path.
+    const params: Array<[string, Reads, (s: VFXBatchSettings) => void]> = [
+        ['softNearFade', 'sprite', (s) => (s.softNearFade = 0.2)],
+        ['softFarFade', 'sprite', (s) => (s.softFarFade = 2)],
+        ['materialAlphaTest', 'sprite', (s) => (s.materialAlphaTest = 0.25)],
+        ['pivot', 'quad', (s) => (s.pivot = {x: 0, y: 0.5, z: 0})],
+        ['minParticleSize', 'quad', (s) => (s.minParticleSize = 0.02)],
+        ['maxParticleSize', 'quad', (s) => (s.maxParticleSize = 0.25)],
+        ['rim', 'mesh', (s) => (s.rim = {color: [0, 1, 0], power: 3, strength: 0.5, mode: 'add'})],
+        ['mapUV', 'sprite', (s) => (s.mapUV = {...uv(), tiling: [3, 1], scroll: [0.5, 0]})],
+        ['uvDistortion.strength', 'sprite', (s) => (s.uvDistortion = {...s.uvDistortion!, strength: 0.3})],
         [
             'uvDistortion.mapUV',
-            RenderMode.BillBoard,
+            'sprite',
             (s) => (s.uvDistortion = {...s.uvDistortion!, mapUV: {...uv(), offset: [0.5, 0]}}),
         ],
-        ['gradientMap.channel', RenderMode.BillBoard, (s) => (s.gradientMap = {...s.gradientMap!, channel: 'a'})],
-        ['erosion.softness', RenderMode.BillBoard, (s) => (s.erosion = {...s.erosion!, softness: 0.3})],
-        ['erosion.edgeWidth', RenderMode.BillBoard, (s) => (s.erosion = {...s.erosion!, edgeWidth: 0.2})],
-        ['erosion.edgeColor', RenderMode.BillBoard, (s) => (s.erosion = {...s.erosion!, edgeColor: [0, 0, 1]})],
-        [
-            'erosion.maskUV',
-            RenderMode.BillBoard,
-            (s) => (s.erosion = {...s.erosion!, maskUV: {...uv(), tiling: [2, 1]}}),
-        ],
+        ['gradientMap.channel', 'sprite', (s) => (s.gradientMap = {...s.gradientMap!, channel: 'a'})],
+        ['erosion.softness', 'sprite', (s) => (s.erosion = {...s.erosion!, softness: 0.3})],
+        ['erosion.edgeWidth', 'sprite', (s) => (s.erosion = {...s.erosion!, edgeWidth: 0.2})],
+        ['erosion.edgeColor', 'sprite', (s) => (s.erosion = {...s.erosion!, edgeColor: [0, 0, 1]})],
+        ['erosion.maskUV', 'sprite', (s) => (s.erosion = {...s.erosion!, maskUV: {...uv(), tiling: [2, 1]}})],
     ];
+    const changes = params.flatMap(([name, reads, change]) =>
+        MODES[reads].map((mode) => [name, RenderMode[mode], mode, change] as const)
+    );
 
-    it.each(changes)('%s: in place, as a fresh material would hold it', (_name, renderMode, change) => {
+    it.each(changes)('%s (%s): in place, as a fresh material would hold it', (_name, _mode, renderMode, change) => {
         const live = new BatchedRenderer('live', scene);
         live.setDepthTexture(textures.depth);
         const a = system(renderMode);
