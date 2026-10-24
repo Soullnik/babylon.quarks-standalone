@@ -203,7 +203,7 @@ describe('trail tessellation', () => {
         const {system} = circling({tessellation: 5, curveTension: 0.25});
         const json = system.toJSON();
         expect(json.rendererEmitterSettings).toMatchObject({tessellation: 5, curveTension: 0.25});
-        const copy = ParticleSystem.fromJSON(json, emptyMeta(), {}, scene);
+        const copy = ParticleSystem.fromJSON(json, emptyMeta(), scene);
         expect(copy.rendererEmitterSettings).toMatchObject({tessellation: 5, curveTension: 0.25});
         expect(system.clone().rendererEmitterSettings).toMatchObject({tessellation: 5, curveTension: 0.25});
 

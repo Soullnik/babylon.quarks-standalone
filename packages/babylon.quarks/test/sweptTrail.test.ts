@@ -156,7 +156,7 @@ describe('swept trail', () => {
         const json = system.toJSON();
         expect((json.rendererEmitterSettings as TrailSettingsJSON).sideAxis).toEqual([0, 0, 2]);
         const meta = emptyMeta();
-        for (const copy of [ParticleSystem.fromJSON(system.toJSON(meta), meta, {}, scene), system.clone()]) {
+        for (const copy of [ParticleSystem.fromJSON(system.toJSON(meta), meta, scene), system.clone()]) {
             const axis = (copy.rendererEmitterSettings as TrailSettings).sideAxis!;
             expect([axis.x, axis.y, axis.z]).toEqual([0, 0, 2]);
         }

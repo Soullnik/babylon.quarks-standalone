@@ -211,8 +211,8 @@ describe('the clock in a particle system', () => {
         ps.dispose();
     });
 
-    it('stops simulating in the frame autoDestroy disposes the system', () => {
-        const ps = system({autoDestroy: true, duration: 0.2, startLife: new ConstantValue(0.1)});
+    it('stops simulating in the frame the destroy stop action disposes the system', () => {
+        const ps = system({stopAction: 'destroy', duration: 0.2, startLife: new ConstantValue(0.1)});
         const stepped = jest.spyOn(ps as never, 'simulateStep' as never);
         let stepsAtDestroy = -1;
         ps.addEventListener('destroy', () => (stepsAtDestroy = stepped.mock.calls.length));

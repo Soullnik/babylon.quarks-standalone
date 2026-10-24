@@ -6,6 +6,11 @@ and the project follows the `quarks.core` 0.x version line.
 
 ## [0.30.0] — Unreleased
 
+### Breaking
+
+- `EffectEditorHostHandle.importGallery`, deprecated since it was renamed, is removed: call
+  `importAssets`.
+
 ### Added
 
 - The `./session` and `./react` entry points export the types their signatures use (`EffectAsset`,

@@ -108,7 +108,7 @@ describe('beam render mode', () => {
     it('survives toJSON / fromJSON as a render mode', () => {
         const meta = emptyMeta();
         const json = beam().toJSON(meta);
-        expect(ParticleSystem.fromJSON(json, meta, {}, scene).renderMode).toBe(RenderMode.Beam);
+        expect(ParticleSystem.fromJSON(json, meta, scene).renderMode).toBe(RenderMode.Beam);
     });
 });
 

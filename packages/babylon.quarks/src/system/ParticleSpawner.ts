@@ -89,7 +89,7 @@ export class ParticleSpawner {
         }
         // Oldest first from the cursor: the survivors start `count - max` rows after it.
         this.rotateRows((this.ringCursor + count - max) % count, count);
-        system.particleNum = max;
+        system.liveCount = max;
         this.ringCursor = 0;
     }
 
@@ -173,7 +173,7 @@ export class ParticleSpawner {
                     this.rotateRows(this.ringCursor, system.particleNum);
                     this.ringCursor = 0;
                 }
-                system.particleNum++;
+                system.liveCount++;
                 if (particles.length < system.particleNum) {
                     this.grow(isTrailMode);
                 }

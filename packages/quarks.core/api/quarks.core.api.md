@@ -802,9 +802,6 @@ export class EulerGenerator implements RotationGenerator {
     // (undocumented)
     angleZ: FunctionValueGenerator | ValueGenerator;
     clone(): RotationGenerator;
-    // @deprecated (undocumented)
-    get eular(): Euler;
-    set eular(value: Euler);
     euler: Euler;
     static fromJSON(json: EulerJSON): EulerGenerator;
     genValue(memory: GeneratorMemory, quat: Quaternion, delta: number, t?: number): Quaternion;
@@ -1225,11 +1222,9 @@ export interface IParticle {
 // @public
 export interface IParticleSystem {
     addEventListener(event: ParticleSystemEventType, callback: (event: ParticleSystemEvent) => void): void;
-    // @deprecated
-    autoDestroy: boolean;
     clone(): IParticleSystem;
     duration: number;
-    emissionState: EmissionState;
+    readonly emissionState: EmissionState;
     emit(delta: number, subEmissionState: EmissionState, matrix: Matrix4): void;
     emitter: IEmitter;
     emitterVelocity?: Vector3;
@@ -1242,8 +1237,8 @@ export interface IParticleSystem {
     looping: boolean;
     motionScale?: number;
     onlyUsedByOther?: boolean;
-    particleNum: number;
-    particles: Array<IParticle>;
+    readonly particleNum: number;
+    readonly particles: Array<IParticle>;
     pause(): void;
     paused: boolean;
     play(): void;
@@ -1257,7 +1252,7 @@ export interface IParticleSystem {
     stop(): void;
     stopAction?: 'none' | 'disable' | 'destroy';
     store?: ParticleStore;
-    toJSON(metaData: unknown, options: SerializationOptions): unknown;
+    toJSON(metaData: unknown): unknown;
     worldSpace: boolean;
 }
 
@@ -1408,8 +1403,6 @@ export class Matrix4 {
     elements: number[];
     equals(matrix: Matrix4): boolean;
     extractBasis(xAxis: Vector3, yAxis: Vector3, zAxis: Vector3): this;
-    // @deprecated (undocumented)
-    extractPosition(m: Matrix4): Matrix4;
     extractRotation(m: Matrix4): this;
     fromArray(array: number[], offset?: number): this;
     getMaxScaleOnAxis(): number;
@@ -1432,28 +1425,17 @@ export class Matrix4 {
     multiply(m: Matrix4): this;
     multiplyMatrices(a: Matrix4, b: Matrix4): this;
     multiplyScalar(s: number): this;
-    // @deprecated
-    multiplyToArray(a: Matrix4, b: Matrix4, r: number[]): Matrix4;
     premultiply(m: Matrix4): this;
     scale(v: Vector3): this;
     set(n11: number, n12: number, n13: number, n14: number, n21: number, n22: number, n23: number, n24: number, n31: number, n32: number, n33: number, n34: number, n41: number, n42: number, n43: number, n44: number): this;
     setFromMatrix3(m: Matrix3): this;
     setPosition(x: number | Vector3, y?: number, z?: number): this;
-    // @deprecated (undocumented)
-    setRotationFromQuaternion(q: Quaternion): Matrix4;
     toArray(array?: number[], offset?: number): number[];
     transpose(): this;
 }
 
 // @public
-export interface MeshSettings {
-    // @deprecated
-    startRotationX?: ValueGenerator | FunctionValueGenerator;
-    // @deprecated
-    startRotationY?: ValueGenerator | FunctionValueGenerator;
-    // @deprecated
-    startRotationZ?: ValueGenerator | FunctionValueGenerator;
-}
+export type MeshSettings = Record<string, never>;
 
 // @public
 export class NodeParticle implements IParticle {
@@ -1918,17 +1900,6 @@ export function readFormat<T>(options: FormatReadOptions, read: () => T): T;
 // @public
 export function readFormatPart<T>(segment: string, read: () => T): T;
 
-// @public @deprecated
-export class RecordState {
-    constructor(position: Vector3, size: number, color: Vector4);
-    // (undocumented)
-    color: Vector4;
-    // (undocumented)
-    position: Vector3;
-    // (undocumented)
-    size: number;
-}
-
 // @public
 export class RectangleEmitter implements EmitterShape {
     constructor(parameters?: RectangleEmitterParameters);
@@ -2101,11 +2072,6 @@ export function SequencerFromJSON(json: SequencerJSON | undefined | null): Seque
 
 // @public
 export type SequencerJSON = TextureSequencerJSON;
-
-// @public
-export interface SerializationOptions {
-    useUrlForImage?: boolean;
-}
 
 // @public
 export function setPhysicsResolver(resolver: PhysicsResolver | undefined): void;
@@ -2419,11 +2385,6 @@ export class TrailParticle implements Particle {
     memory: never[];
     parentMatrix?: Matrix4;
     position: Vector3;
-    // Warning: (ae-forgotten-export) The symbol "LinkedList" needs to be exported by the entry point index.d.ts
-    //
-    // @internal @deprecated
-    get previous(): LinkedList<RecordState>;
-    set previous(value: LinkedList<RecordState>);
     previousPosition: Vector3;
     previousVelocity: Vector3;
     rebind(): void;

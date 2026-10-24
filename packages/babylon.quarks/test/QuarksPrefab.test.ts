@@ -109,8 +109,10 @@ describe('QuarksPrefab', () => {
         prefab.resolveReferences(root);
 
         expect(prefab.animationData.length).toBe(1);
-        expect(prefab.animationData[0].type).toBe('three');
+        // An older file's 'three' track is a clip track, and is written as one.
+        expect(prefab.animationData[0].type).toBe('clip');
         expect(prefab.animationData[0]['clipUUID']).toBe('clip-uuid');
+        expect(prefab.toJSON().animationData[0]).toMatchObject({type: 'clip', clipUUID: 'clip-uuid'});
 
         prefab.play();
         prefab.update(0.3);
@@ -132,7 +134,7 @@ describe('QuarksPrefab', () => {
         const prefab = new QuarksPrefab('prefab-resume', scene);
         const clip = {duration: 2, play: jest.fn(), pause: jest.fn(), stop: jest.fn()};
         prefab.addParticleSystemAnimation(system.emitter as ParticleEmitter, 0, 2);
-        prefab.addThreeAnimation(new TransformNode('resume-target', scene), clip, 0, 2);
+        prefab.addClipAnimation(new TransformNode('resume-target', scene), clip, 0, 2);
         prefab.play();
         prefab.update(0.5);
         expect(clip.play).toHaveBeenCalledTimes(1);
@@ -160,7 +162,7 @@ describe('QuarksPrefab', () => {
         const prefab = new QuarksPrefab('prefab-clip-only', scene);
         const target = new TransformNode('clip-target', scene);
         const clip = {uuid: 'clip-main', duration: 2, play: jest.fn(), stop: jest.fn(), pause: jest.fn()};
-        prefab.addThreeAnimation(target, clip, 0.5, 0, false);
+        prefab.addClipAnimation(target, clip, 0.5, 0, false);
         expect(prefab.getDuration()).toBe(2.5);
 
         prefab.removeAnimation(0);
@@ -181,8 +183,8 @@ describe('QuarksPrefab', () => {
         const prefab = new QuarksPrefab('prefab-loop', scene);
 
         prefab.addParticleSystemAnimation(emitter, 0, 0.2, true);
-        prefab.addThreeAnimation(target, clip, 0, 0.2, true);
-        prefab.addThreeAnimation(target, keepAliveClip, 0, 1, false);
+        prefab.addClipAnimation(target, clip, 0, 0.2, true);
+        prefab.addClipAnimation(target, keepAliveClip, 0, 1, false);
         const restartSpy = jest.spyOn(system, 'restart');
 
         prefab.play();
@@ -197,7 +199,7 @@ describe('QuarksPrefab', () => {
         const target = new TransformNode('pause-stop-target', scene);
         const clip = {duration: 1, play: jest.fn(), stop: jest.fn(), pause: jest.fn(), setTime: jest.fn()};
         const prefab = new QuarksPrefab('prefab-stop-three', scene);
-        prefab.addThreeAnimation(target, clip, 0, 1, false);
+        prefab.addClipAnimation(target, clip, 0, 1, false);
 
         prefab.play();
         prefab.pause();
@@ -256,7 +258,7 @@ describe('QuarksPrefab', () => {
         const prefab = new QuarksPrefab('settime-three', scene);
         const target = new Mesh('st-mesh', scene);
         const clip = {play: jest.fn(), stop: jest.fn(), pause: jest.fn(), setTime: jest.fn()};
-        prefab.addThreeAnimation(target, clip, 0, 1, false);
+        prefab.addClipAnimation(target, clip, 0, 1, false);
         prefab.setTime(-0.1);
         prefab.setTime(0.05);
         expect(clip.play).toHaveBeenCalled();

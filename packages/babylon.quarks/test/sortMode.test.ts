@@ -179,7 +179,7 @@ describe('sort mode and screen-size limits', () => {
         expect(json.sortMode).toBe('oldestInFront');
         expect(json.minParticleSize).toBe(0.02);
         expect(json.maxParticleSize).toBe(0.5);
-        const loaded = ParticleSystem.fromJSON(json, {textures: {}, materials: {}, geometries: {}}, {}, scene);
+        const loaded = ParticleSystem.fromJSON(json, {textures: {}, materials: {}, geometries: {}}, scene);
         expect(loaded.sortMode).toBe('oldestInFront');
         expect(loaded.minParticleSize).toBe(0.02);
         expect(loaded.maxParticleSize).toBe(0.5);
@@ -187,7 +187,7 @@ describe('sort mode and screen-size limits', () => {
         expect(cloned.sortMode).toBe('oldestInFront');
         expect(cloned.maxParticleSize).toBe(0.5);
         json.sortMode = 'sideways' as never;
-        expect(ParticleSystem.fromJSON(json, {textures: {}, materials: {}, geometries: {}}, {}, scene).sortMode).toBe(
+        expect(ParticleSystem.fromJSON(json, {textures: {}, materials: {}, geometries: {}}, scene).sortMode).toBe(
             'none'
         );
     });

@@ -202,7 +202,7 @@ describe('bursts', () => {
         expect(ps.emissionBursts[0].probability).toBe(1);
         expect(ps.emissionBursts[0].count.genValue([], 0)).toBe(2);
         const meta = {geometries: {}, materials: {}, textures: {}};
-        const loaded = ParticleSystem.fromJSON(ps.toJSON(meta), meta, {}, scene);
+        const loaded = ParticleSystem.fromJSON(ps.toJSON(meta), meta, scene);
         expect(loaded.emissionBursts).toEqual(ps.emissionBursts);
         const peakOf = (s: ParticleSystem) => {
             let peak = 0;

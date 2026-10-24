@@ -60,7 +60,7 @@ describe('material state', () => {
 
     it('restores depthTest: false from JSON onto the material', () => {
         const json = makeSystem({renderMode: RenderMode.BillBoard, depthTest: false}).toJSON();
-        const loaded = ParticleSystem.fromJSON(json, {textures: {}, materials: {}} as never, {}, scene);
+        const loaded = ParticleSystem.fromJSON(json, {textures: {}, materials: {}} as never, scene);
         const renderer = new BatchedRenderer('depth-test-json', scene);
         renderer.addSystem(loaded);
         renderer.update(1 / 60);

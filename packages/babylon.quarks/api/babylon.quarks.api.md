@@ -42,7 +42,7 @@ export interface AnimationData extends IAnimationData {
     clipUUID?: string;
     loop: boolean;
     target: TransformNode;
-    type: 'three' | 'ps';
+    type: 'clip' | 'ps';
 }
 
 // @public
@@ -52,7 +52,7 @@ export interface AnimationJSON {
     loop: boolean;
     startTime: number;
     targetUUID: string;
-    type: 'three' | 'ps';
+    type: 'clip' | 'ps' | 'three';
 }
 
 // @public
@@ -1093,9 +1093,6 @@ export class EulerGenerator implements RotationGenerator {
     // (undocumented)
     angleZ: FunctionValueGenerator | ValueGenerator;
     clone(): RotationGenerator;
-    // @deprecated (undocumented)
-    get eular(): Euler;
-    set eular(value: Euler);
     euler: Euler;
     static fromJSON(json: EulerJSON): EulerGenerator;
     genValue(memory: GeneratorMemory, quat: Quaternion, delta: number, t?: number): Quaternion;
@@ -1554,11 +1551,9 @@ export interface IParticle {
 // @public
 export interface IParticleSystem {
     addEventListener(event: ParticleSystemEventType, callback: (event: ParticleSystemEvent) => void): void;
-    // @deprecated
-    autoDestroy: boolean;
     clone(): IParticleSystem;
     duration: number;
-    emissionState: EmissionState;
+    readonly emissionState: EmissionState;
     emit(delta: number, subEmissionState: EmissionState, matrix: Matrix4): void;
     emitter: IEmitter;
     emitterVelocity?: Vector3;
@@ -1571,8 +1566,8 @@ export interface IParticleSystem {
     looping: boolean;
     motionScale?: number;
     onlyUsedByOther?: boolean;
-    particleNum: number;
-    particles: Array<IParticle>;
+    readonly particleNum: number;
+    readonly particles: Array<IParticle>;
     pause(): void;
     paused: boolean;
     play(): void;
@@ -1586,7 +1581,7 @@ export interface IParticleSystem {
     stop(): void;
     stopAction?: 'none' | 'disable' | 'destroy';
     store?: ParticleStore;
-    toJSON(metaData: unknown, options: SerializationOptions): unknown;
+    toJSON(metaData: unknown): unknown;
     worldSpace: boolean;
 }
 
@@ -1743,8 +1738,6 @@ export class Matrix4 {
     elements: number[];
     equals(matrix: Matrix4): boolean;
     extractBasis(xAxis: Vector3, yAxis: Vector3, zAxis: Vector3): this;
-    // @deprecated (undocumented)
-    extractPosition(m: Matrix4): Matrix4;
     extractRotation(m: Matrix4): this;
     fromArray(array: number[], offset?: number): this;
     getMaxScaleOnAxis(): number;
@@ -1767,15 +1760,11 @@ export class Matrix4 {
     multiply(m: Matrix4): this;
     multiplyMatrices(a: Matrix4, b: Matrix4): this;
     multiplyScalar(s: number): this;
-    // @deprecated
-    multiplyToArray(a: Matrix4, b: Matrix4, r: number[]): Matrix4;
     premultiply(m: Matrix4): this;
     scale(v: Vector3): this;
     set(n11: number, n12: number, n13: number, n14: number, n21: number, n22: number, n23: number, n24: number, n31: number, n32: number, n33: number, n34: number, n41: number, n42: number, n43: number, n44: number): this;
     setFromMatrix3(m: Matrix3): this;
     setPosition(x: number | Vector3, y?: number, z?: number): this;
-    // @deprecated (undocumented)
-    setRotationFromQuaternion(q: Quaternion): Matrix4;
     toArray(array?: number[], offset?: number): number[];
     transpose(): this;
 }
@@ -1805,14 +1794,7 @@ export interface MeshRim {
 export function meshRimEqual(a: MeshRim | undefined, b: MeshRim | undefined): boolean;
 
 // @public
-export interface MeshSettings {
-    // @deprecated
-    startRotationX?: ValueGenerator | FunctionValueGenerator;
-    // @deprecated
-    startRotationY?: ValueGenerator | FunctionValueGenerator;
-    // @deprecated
-    startRotationZ?: ValueGenerator | FunctionValueGenerator;
-}
+export type MeshSettings = Record<string, never>;
 
 // @public
 export class MeshSurfaceEmitter implements EmitterShape {
@@ -1995,7 +1977,7 @@ export class ParticleEmitter extends TransformNode {
     get matrixWorld(): Matrix4;
     get shapeScale(): Vector3;
     system: IParticleSystem;
-    toJSON(meta?: BabylonMetaData, options?: SerializationOptions): ParticleEmitterJSON;
+    toJSON(meta?: BabylonMetaData): ParticleEmitterJSON;
     get uuid(): string;
     get visible(): boolean;
     set visible(value: boolean);
@@ -2105,9 +2087,6 @@ export class ParticleSystem implements IParticleSystem {
     set applyFog(apply: boolean);
     get applyImageProcessing(): boolean;
     set applyImageProcessing(apply: boolean);
-    // @deprecated
-    get autoDestroy(): boolean;
-    set autoDestroy(value: boolean);
     beamEnd?: BeamEnd;
     behaviors: Array<Behavior>;
     get blending(): number;
@@ -2135,7 +2114,7 @@ export class ParticleSystem implements IParticleSystem {
     set emissionMultiplier(multiplier: number);
     emissionOverDistance: ValueGenerator | FunctionValueGenerator;
     emissionOverTime: ValueGenerator | FunctionValueGenerator;
-    emissionState: EmissionState;
+    readonly emissionState: EmissionState;
     emit(delta: number, emissionState: EmissionState, emitterMatrix: Matrix4): void;
     emitter: ParticleEmitter;
     emitterShape: EmitterShape;
@@ -2146,9 +2125,7 @@ export class ParticleSystem implements IParticleSystem {
     // @internal
     finishedEventFired: boolean;
     flip?: Vector2;
-    static fromJSON(json: ParticleSystemJSONParameters, meta: BabylonMetaData, dependencies?: {
-        [uuid: string]: Behavior;
-    }, scene?: Scene): ParticleSystem;
+    static fromJSON(json: ParticleSystemJSONParameters, meta: BabylonMetaData, scene?: Scene): ParticleSystem;
     getBeamEnd(out: Vector3): boolean;
     getRendererSettings(): VFXBatchSettings;
     getWorldBounds(min: Vector3, max: Vector3): boolean;
@@ -2173,6 +2150,8 @@ export class ParticleSystem implements IParticleSystem {
     };
     get lighting(): MeshLighting;
     set lighting(lighting: MeshLighting);
+    // @internal
+    liveCount: number;
     looping: boolean;
     get mapUV(): TextureUV | undefined;
     set mapUV(uv: Partial<TextureUV> | undefined);
@@ -2187,8 +2166,8 @@ export class ParticleSystem implements IParticleSystem {
     motionScale: number;
     neededToUpdateRender: boolean;
     onlyUsedByOther: boolean;
-    particleNum: number;
-    particles: Array<Particle>;
+    get particleNum(): number;
+    readonly particles: Array<Particle>;
     pause(): void;
     paused: boolean;
     get pivot(): Vector3 | undefined;
@@ -2255,7 +2234,7 @@ export class ParticleSystem implements IParticleSystem {
     get timeDilation(): number;
     set timeDilation(dilation: number);
     tint?: Vector4;
-    toJSON(metaData?: BabylonMetaData | string, _options?: SerializationOptions): ParticleSystemJSONParameters;
+    toJSON(metaData?: BabylonMetaData | string): ParticleSystemJSONParameters;
     get transparent(): boolean;
     set transparent(transparent: boolean);
     // @internal
@@ -2346,8 +2325,6 @@ export interface ParticleSystemParameters {
     alphaTest?: number;
     applyFog?: boolean;
     applyImageProcessing?: boolean;
-    // @deprecated
-    autoDestroy?: boolean;
     behaviors?: Array<Behavior>;
     blendMode?: number;
     blendTiles?: boolean;
@@ -2395,8 +2372,6 @@ export interface ParticleSystemParameters {
     softNearFade?: number;
     softParticles?: boolean;
     sortMode?: SortMode;
-    // @deprecated (undocumented)
-    speedFactor?: number;
     startColor?: ColorGenerator | FunctionColorGenerator;
     startDelay?: ValueGenerator | FunctionValueGenerator;
     startLife?: ValueGenerator | FunctionValueGenerator;
@@ -2675,8 +2650,8 @@ export interface QuarksNodeJSON {
 // @public
 export class QuarksPrefab extends TransformNode implements IPrefab {
     constructor(name?: string, scene?: Scene);
+    addClipAnimation(target: TransformNode, clip?: QuarksTimelineClip, startTime?: number, duration?: number, loop?: boolean, clipUUID?: string): AnimationData;
     addParticleSystemAnimation(emitter: ParticleEmitter, startTime?: number, duration?: number, loop?: boolean): AnimationData;
-    addThreeAnimation(target: TransformNode, clip?: QuarksTimelineClip, startTime?: number, duration?: number, loop?: boolean, clipUUID?: string): AnimationData;
     animationData: Array<AnimationData>;
     get autoUpdate(): boolean;
     set autoUpdate(enabled: boolean);
@@ -2762,8 +2737,6 @@ export class QuarksUtil {
     static restart(root: Node_2): void;
     static resume(root: Node_2): void;
     static runOnAllParticleEmitters(root: Node_2, callback: (emitter: ParticleEmitter) => void): void;
-    // @deprecated
-    static setAutoDestroy(root: Node_2, autoDestroy: boolean): void;
     static setStopAction(root: Node_2, stopAction: StopAction): void;
     static stop(root: Node_2): void;
 }
@@ -2966,17 +2939,6 @@ export function readsUV1(settings: {
     erosion?: ParticleErosion;
 }): boolean;
 
-// @public @deprecated
-export class RecordState {
-    constructor(position: Vector3, size: number, color: Vector4);
-    // (undocumented)
-    color: Vector4;
-    // (undocumented)
-    position: Vector3;
-    // (undocumented)
-    size: number;
-}
-
 // @public
 export class RectangleEmitter implements EmitterShape {
     constructor(parameters?: RectangleEmitterParameters);
@@ -3172,11 +3134,6 @@ export function SequencerFromJSON(json: SequencerJSON | undefined | null): Seque
 
 // @public
 export type SequencerJSON = TextureSequencerJSON;
-
-// @public
-export interface SerializationOptions {
-    useUrlForImage?: boolean;
-}
 
 // @public
 export function serializeEffect(root: TransformNode | TransformNode[], options?: SerializeEffectOptions): QuarksEffectJSON;
@@ -3645,11 +3602,6 @@ export class TrailParticle implements Particle {
     memory: never[];
     parentMatrix?: Matrix4;
     position: Vector3;
-    // Warning: (ae-forgotten-export) The symbol "LinkedList" needs to be exported by the entry point index.d.ts
-    //
-    // @internal @deprecated
-    get previous(): LinkedList<RecordState>;
-    set previous(value: LinkedList<RecordState>);
     previousPosition: Vector3;
     previousVelocity: Vector3;
     rebind(): void;

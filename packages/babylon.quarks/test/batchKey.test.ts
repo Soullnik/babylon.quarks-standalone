@@ -441,7 +441,7 @@ describe('material flags after construction', () => {
         s.alphaTest = 0.25;
         const json = s.toJSON(meta);
         expect(json).toMatchObject({transparent: false, depthTest: false, depthWrite: true, alphaTest: 0.25});
-        const loaded = ParticleSystem.fromJSON(json, meta, {}, scene);
+        const loaded = ParticleSystem.fromJSON(json, meta, scene);
         expect([loaded.transparent, loaded.depthTest, loaded.depthWrite, loaded.alphaTest]).toEqual([
             false,
             false,

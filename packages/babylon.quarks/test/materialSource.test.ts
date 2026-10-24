@@ -35,7 +35,7 @@ describe('what a system reads from its material', () => {
         const material = meta.materials[json.material!];
         material.reflectionAtlas = 'atlas';
         meta.textures.atlas = atlas;
-        const loaded = ParticleSystem.fromJSON(json, meta, {}, scene);
+        const loaded = ParticleSystem.fromJSON(json, meta, scene);
         expect(loaded.material?.reflectionAtlas).toBe(atlas);
         loaded.dispose();
     });

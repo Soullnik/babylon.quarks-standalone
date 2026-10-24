@@ -235,7 +235,7 @@ describe('texture effects', () => {
         // Only the fields that differ from the default layout are written.
         expect(material.erosion?.maskUV).toEqual(maskUV);
 
-        for (const copy of [ParticleSystem.fromJSON(json, meta, {}, scene), s.clone()]) {
+        for (const copy of [ParticleSystem.fromJSON(json, meta, scene), s.clone()]) {
             expect(copy.mapUV).toEqual({channel: 0, tiling: [1, 1], offset: [0, 0], scroll: [0.5, 1]});
             expect(copy.gradientMap).toEqual({ramp, channel: 'a'});
             expect(copy.erosion).toEqual({
@@ -383,7 +383,7 @@ describe('texture effects', () => {
             expect((meta.geometries[json.instancingGeometry as string] as QuarksGeometryJSON).uvs2).toEqual(
                 Array.from(quadUVs2)
             );
-            const copy = ParticleSystem.fromJSON(json, meta, {}, scene);
+            const copy = ParticleSystem.fromJSON(json, meta, scene);
             expect(Array.from(copy['rendererSettings'].instancingUVs2!)).toEqual(Array.from(quadUVs2));
             expect(s.clone()['rendererSettings'].instancingUVs2).toBe(quadUVs2);
             const plain = emptyMeta();
@@ -664,7 +664,7 @@ describe('texture effects', () => {
             const json = a.toJSON(meta);
             const material = meta.materials[json.material!];
             expect(textureOf(meta, material.uvDistortion?.map)).toBe(noise);
-            for (const copy of [ParticleSystem.fromJSON(json, meta, {}, scene), a.clone()]) {
+            for (const copy of [ParticleSystem.fromJSON(json, meta, scene), a.clone()]) {
                 expect(copy.uvDistortion).toEqual({
                     map: noise,
                     mapUV: {channel: 0, tiling: [1, 1], offset: [0, 0], scroll: [0, 0.5]},

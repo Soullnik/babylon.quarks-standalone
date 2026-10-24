@@ -203,7 +203,7 @@ describe('ParticleSystem', () => {
             emissionOverTime: new ConstantValue(10),
             shape: new ConeEmitter(),
             renderMode: RenderMode.StretchedBillBoard,
-            speedFactor: 0.5,
+            rendererEmitterSettings: {speedFactor: 0.5, lengthFactor: 0},
         });
         expect(ps.renderMode).toBe(RenderMode.StretchedBillBoard);
     });
@@ -249,7 +249,7 @@ describe('ParticleSystem', () => {
         expect(meta.materials[json.material!]).toBeDefined();
         expect(meta.geometries[json.instancingGeometry as string]).toBeDefined();
 
-        const restored = ParticleSystem.fromJSON(json, meta, {}, scene);
+        const restored = ParticleSystem.fromJSON(json, meta, scene);
         expect(restored.renderMode).toBe(RenderMode.Trail);
         expect(restored.uTileCount).toBe(2);
         expect(restored.vTileCount).toBe(3);
@@ -304,7 +304,7 @@ describe('ParticleSystem', () => {
     it('should auto destroy when non-looping emission fully ends', () => {
         const ps = new ParticleSystem({
             scene,
-            autoDestroy: true,
+            stopAction: 'destroy',
             looping: false,
             duration: 0.05,
             startLife: new ConstantValue(1),
@@ -420,7 +420,7 @@ describe('ParticleSystem', () => {
             },
         };
 
-        const restored = ParticleSystem.fromJSON(json, meta, {}, scene);
+        const restored = ParticleSystem.fromJSON(json, meta, scene);
         expect((restored.rendererEmitterSettings as StretchedBillBoardSettings).speedFactor).toBe(0.75);
         expect(restored.getRendererSettings().instancingIndices).toBeInstanceOf(Uint16Array);
     });
@@ -700,12 +700,12 @@ describe('ParticleSystem', () => {
             const meta = emptyMeta();
             const json = ps.toJSON(meta);
             expect(json.maxParticles).toBe(7);
-            expect(ParticleSystem.fromJSON(json, meta, {}, scene).maxParticles).toBe(7);
+            expect(ParticleSystem.fromJSON(json, meta, scene).maxParticles).toBe(7);
             expect(ps.clone().maxParticles).toBe(7);
 
             const unlimited = capped().toJSON(meta);
             expect('maxParticles' in unlimited).toBe(false);
-            expect(ParticleSystem.fromJSON(unlimited, meta, {}, scene).maxParticles).toBeUndefined();
+            expect(ParticleSystem.fromJSON(unlimited, meta, scene).maxParticles).toBeUndefined();
         });
     });
 
@@ -824,7 +824,6 @@ describe('ParticleSystem', () => {
                     },
                 },
             },
-            {},
             scene
         );
         ps.emissionState.waitEmiting = 1;
@@ -981,7 +980,6 @@ describe('ParticleSystem', () => {
                     },
                 },
             },
-            {},
             scene
         );
         expect(ps.getRendererSettings().instancingGeometry.length).toBeGreaterThan(0);
@@ -1040,7 +1038,6 @@ describe('ParticleSystem', () => {
                 worldSpace: true,
             },
             meta,
-            {},
             scene
         );
         const indices = ps.getRendererSettings().instancingIndices as Uint32Array;
@@ -1221,8 +1218,6 @@ describe('ParticleSystem', () => {
         const trail = ps.particles[0] as TrailParticle;
         expect(trail.historyCapacity).toBe(8);
         expect(trail.historyCount).toBeGreaterThan(0);
-        // The legacy linked list is no longer populated.
-        expect(trail.previous.length).toBe(0);
     });
 
     it('trail followLocalOrigin respects particle parentMatrix when updating positions', () => {
@@ -1382,7 +1377,7 @@ describe('ParticleSystem start delay', () => {
         const json = ps.toJSON(meta);
         expect(json.startDelay).toEqual({type: 'ConstantValue', value: 0.5});
 
-        const restored = ParticleSystem.fromJSON(json, meta, {}, scene);
+        const restored = ParticleSystem.fromJSON(json, meta, scene);
         expect((restored.startDelay as ConstantValue).value).toBe(0.5);
 
         const cloned = ps.clone();
@@ -1395,7 +1390,7 @@ describe('ParticleSystem start delay', () => {
         const json = ps.toJSON(meta);
         delete json.startDelay;
 
-        const restored = ParticleSystem.fromJSON(json, meta, {}, scene);
+        const restored = ParticleSystem.fromJSON(json, meta, scene);
         expect((restored.startDelay as ConstantValue).value).toBe(0);
         restored.update(0.1);
         restored.update(0.1);
@@ -1459,7 +1454,7 @@ describe('ParticleSystem emitter velocity', () => {
         ]);
         const meta = emptyMeta();
         const json = ps.toJSON(meta);
-        const restored = ParticleSystem.fromJSON(json, meta, {}, scene);
+        const restored = ParticleSystem.fromJSON(json, meta, scene);
 
         const velocity = restored.behaviors.find((b) => b.type === 'VelocityOverLife') as VelocityOverLife;
         expect(velocity).toBeDefined();

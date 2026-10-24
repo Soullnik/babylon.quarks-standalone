@@ -193,7 +193,7 @@ describe('seeded simulation snapshot', () => {
         const json = ps.toJSON(meta);
 
         // Loaded back, the system writes the same JSON and, seeded the same, plays the same.
-        const loaded = ParticleSystem.fromJSON(json, meta, {}, scene);
+        const loaded = ParticleSystem.fromJSON(json, meta, scene);
         const reloadMeta: BabylonMetaData = {geometries: {}, materials: {}, textures: {}};
         expect(round(loaded.toJSON(reloadMeta))).toEqual(round(json));
         expect(round(reloadMeta.geometries)).toEqual(round(meta.geometries));
