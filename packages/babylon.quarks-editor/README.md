@@ -11,7 +11,7 @@ npm install babylon.quarks-editor babylon.quarks @babylonjs/core @babylonjs/mate
 ```
 
 The editor is an ES module package (`import`, not `require`). Its version follows babylon.quarks:
-editor 0.27.x needs babylon.quarks 0.27.x.
+editor 0.28.x needs babylon.quarks 0.28.x.
 
 ## Usage
 

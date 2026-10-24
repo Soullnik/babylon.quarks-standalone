@@ -4,7 +4,7 @@ All notable changes to the `babylon.quarks-editor` package are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project follows the `quarks.core` 0.x version line.
 
-## [0.28.0] — unreleased
+## [0.28.0] — 2026-10-23
 
 ### Breaking
 
@@ -65,7 +65,7 @@ and the project follows the `quarks.core` 0.x version line.
   every `as never` cast is gone. The session and the host have their own tests, and the React
   code has a coverage floor.
 
-## [0.27.1] — 2026-10-23
+## [0.27.1] — 2026-10-23 (not published)
 
 ### Changed
 
