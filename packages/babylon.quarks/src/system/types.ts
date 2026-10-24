@@ -101,18 +101,20 @@ export interface BurstParameters {
 export type CullingMode = 'always' | 'pause' | 'pauseAndCatchUp';
 
 /**
- * What the emitter's world scale does to a world-space system (Unity's
- * Scaling Mode, as far as it differs here). A local-space system lives in its
- * emitter's space, so its scale reaches everything either way.
+ * What the emitter's scale does to the system, as Unity's Scaling Mode, in world and local space
+ * alike. The scale reaches the emission shape, the particles' size, their start speed and, in world
+ * space, `ForceOverLife`, `ApplyForce` and `LimitSpeedOverLife` (by the mean of the axes), so a
+ * scaled effect looks and moves like a scaled model, except where a mode leaves it out:
  *
- * - `'shape'` (default): the scale sizes the emission shape and the
- *   particles; speeds, forces and speed limits stay in world units, so a
- *   scaled-down effect moves as far as the full-size one.
- * - `'hierarchy'`: the scale also multiplies start speeds (per axis),
- *   `ForceOverLife` and `LimitSpeedOverLife` (by the mean of the axes), so the
- *   whole effect, motion included, scales like a model would.
+ * - `'local'` (default, as in Unity): only the emitter's own `scaling`; its parents' scale is left
+ *   out, so an effect keeps its size under a scaled character or prop.
+ * - `'hierarchy'`: the emitter's whole world scale, its parents' included.
+ * - `'shape'`: the world scale sizes the emission shape alone; the particles keep their size and
+ *   speed, so a bigger emitter spreads the same particles over a larger area.
+ *
+ * Under every mode the emitter's position and rotation come from the whole hierarchy.
  */
-export type ScalingMode = 'shape' | 'hierarchy';
+export type ScalingMode = 'local' | 'hierarchy' | 'shape';
 
 /**
  * Where a {@link RenderMode.Beam} system's quads end: a point in world space,
@@ -263,7 +265,7 @@ export interface ParticleSystemParameters {
     playbackSpeed?: number;
     /** What the system does while off screen, see {@link CullingMode}. Default `'always'`. */
     cullingMode?: CullingMode;
-    /** What the emitter's scale does to a world-space system, see {@link ScalingMode}. Default `'shape'`. */
+    /** What the emitter's scale does to the system, see {@link ScalingMode}. Default `'local'`. */
     scalingMode?: ScalingMode;
     /** Seed for this system's own random generator, see {@link ParticleSystem.seed}. Default none. */
     seed?: number;
@@ -367,7 +369,7 @@ export interface ParticleSystemJSONParameters {
     playbackSpeed?: number;
     /** Written only when not `'always'`. */
     cullingMode?: CullingMode;
-    /** Written only when not `'shape'`. */
+    /** Written only when not `'local'`. */
     scalingMode?: ScalingMode;
     /** Written only when set. */
     seed?: number;

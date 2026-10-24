@@ -76,6 +76,7 @@ import {
     validLighting,
     validMaxParticles,
     validRenderFace,
+    validScalingMode,
     validSoftFade,
     validSortMode,
     validTileCount,
@@ -639,17 +640,17 @@ export class ParticleSystem implements IParticleSystem {
     }
 
     /**
-     * The emitter's world scale per axis, measured with {@link motionScale}
-     * before every step; what `'hierarchy'` multiplies start speeds by. Taken
-     * from the system's own emitter rather than the emission matrix, whose
-     * columns carry a parent particle's velocity for a sub emitter.
+     * The scale per axis the {@link scalingMode} applies to a world-space system, measured with
+     * {@link motionScale} before every step; what start speeds are multiplied by. Taken from the
+     * system's own emitter rather than the emission matrix, whose columns carry a parent
+     * particle's velocity for a sub emitter.
      * @internal
      */
     readonly hierarchyScale = new Vector3(1, 1, 1);
 
-    /** The mean world scale of the emitter for a world-space `'hierarchy'` system, else 1. */
+    /** The mean scale of the emitter's matrix for a world-space system, else 1. */
     private measureMotionScale(emitterMatrix: Matrix4): number {
-        if (this.scalingMode !== 'hierarchy' || !this.worldSpace) {
+        if (!this.worldSpace) {
             this.hierarchyScale.set(1, 1, 1);
             return 1;
         }
@@ -1003,13 +1004,14 @@ export class ParticleSystem implements IParticleSystem {
     /** What this system does while off screen, see {@link CullingMode}. `'always'` by default. */
     cullingMode: CullingMode = 'always';
 
-    /** What the emitter's world scale does to a world-space system, see {@link ScalingMode}. `'shape'` by default. */
-    scalingMode: ScalingMode = 'shape';
+    /** What the emitter's scale does to the system, see {@link ScalingMode}. `'local'` by default. */
+    scalingMode: ScalingMode = 'local';
 
     /**
-     * What world-space forces and speed limits are multiplied by this step:
-     * the mean of the emitter's world scale axes in `'hierarchy'` mode, 1
-     * otherwise. Updated before every simulation step.
+     * What world-space forces and speed limits are multiplied by this step: the mean of the axes
+     * of the scale the {@link scalingMode} applies (the emitter's own in `'local'`, its world scale
+     * in `'hierarchy'`, 1 in `'shape'`) in a world-space system, 1 in a local-space one, whose
+     * emitter matrix scales them already. Updated before every simulation step.
      */
     motionScale = 1;
 
@@ -1176,7 +1178,7 @@ export class ParticleSystem implements IParticleSystem {
         this.flip = nonZeroFlip(parameters.flip);
         this.playbackSpeed = parameters.playbackSpeed ?? 1;
         this.cullingMode = validCullingMode(parameters.cullingMode);
-        this.scalingMode = parameters.scalingMode === 'hierarchy' ? 'hierarchy' : 'shape';
+        this.scalingMode = validScalingMode(parameters.scalingMode);
         this.alignToDirection = parameters.alignToDirection === true;
         this.seed = parameters.seed;
         this.ensureMeshNormals();

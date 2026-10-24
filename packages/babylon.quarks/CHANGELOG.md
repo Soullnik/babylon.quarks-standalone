@@ -17,6 +17,17 @@ the API and the look of effects are frozen.
   as its base. The rim and the centre are unchanged; particles in between lean out more than
   before. Re-tune a cone effect that relied on the old, narrower middle. Cones in three.quarks
   files tilt the new way too, so they lean out further in the middle than in three.quarks.
+- **Scaling Mode works as Unity's, in world and local space, and defaults to `'local'`.** The
+  emitter's scale now reaches the shape, the particles' size and their motion in every mode except
+  where the mode leaves it out: `'local'` (new, the default) uses only the emitter's own `scaling`
+  and leaves its parents' out; `'hierarchy'` uses the whole world scale, as before; `'shape'` now
+  scales only the emission shape, leaving the particles' size and speed alone (it used to scale
+  their size too). Before, a local-space system took its emitter's whole world scale whatever the
+  mode. An effect whose emitter or its parents are scaled looks different unless it was
+  `'hierarchy'`: set `scalingMode: 'hierarchy'` to keep a parent's scale on it, or leave it at
+  `'local'` to keep the effect its own size under a scaled parent. Effects at scale 1 are
+  unchanged. `ParticleEmitter.matrixWorld` is now the matrix the system simulates and draws in,
+  with the mode's scale, and `ParticleEmitter.shapeScale` the scale `'shape'` gives the shape.
 
 ### Added
 

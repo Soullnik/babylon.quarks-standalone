@@ -1,6 +1,6 @@
 import {ConstantValue, FunctionValueGenerator, ValueGenerator, Vector2, Vector3} from 'quarks.core';
 import type {MeshLighting, RenderFace, SortMode} from '../batchSettings';
-import type {BurstParameters, CullingMode} from './types';
+import type {BurstParameters, CullingMode, ScalingMode} from './types';
 
 // Normalisers shared by the ParticleSystem constructor, its setters and its JSON reader, so a
 // value read from a file and one set in code end up the same.
@@ -23,6 +23,11 @@ export function validRenderFace(face: unknown): RenderFace {
 /** `mode` if it is one of the culling modes, else `'always'`. */
 export function validCullingMode(mode: unknown): CullingMode {
     return mode === 'pause' || mode === 'pauseAndCatchUp' ? mode : 'always';
+}
+
+/** `mode` if it is one of the scaling modes, else `'local'`. */
+export function validScalingMode(mode: unknown): ScalingMode {
+    return mode === 'hierarchy' || mode === 'shape' ? mode : 'local';
 }
 
 /** `count` as a whole number of particles, or undefined (no limit) when it is unset, NaN or negative. */

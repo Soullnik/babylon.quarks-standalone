@@ -7,6 +7,8 @@ All notable changes to the Unity Quarks Exporter are documented here.
 ### Added
 
 - **Cone Volume** → a cone with `emitFrom: 1` (Volume) and its `length`; it no longer warns.
+- **Scaling Mode** Local, Hierarchy and Shape map to the runtime's modes of the same names, which
+  now behave as Unity's; Local and Shape no longer warn.
 
 ## [0.28.0] — 2026-10-23
 

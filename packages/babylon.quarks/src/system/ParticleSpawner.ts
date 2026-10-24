@@ -1,7 +1,6 @@
 import {
     EmissionState,
     FunctionValueGenerator,
-    Matrix3,
     Matrix4,
     Particle,
     Quaternion,
@@ -33,12 +32,6 @@ const tempV2 = new Vector3();
  * spawn and when, this decides what each one starts as.
  */
 export class ParticleSpawner {
-    /**
-     * The emitter matrix's normal matrix, for turning a world-space newborn's velocity. The
-     * emission controller refreshes it before it spawns from a world-space system.
-     */
-    readonly normalMatrix = new Matrix3();
-
     constructor(private readonly system: ParticleSystem) {}
 
     /** Points every particle at the store's columns again, after any were replaced. */
@@ -89,7 +82,9 @@ export class ParticleSpawner {
         const trailSettings = isTrailMode ? (system.rendererEmitterSettings as TrailSettings) : undefined;
         const followLocalOrigin = Boolean(trailSettings?.followLocalOrigin);
         const worldSpace = system.worldSpace;
-        const hierarchy = system.scalingMode === 'hierarchy';
+        // The emitter's matrix carries the scale the scaling mode applies (see
+        // `ParticleEmitter.matrixWorld`); 'shape' scales the shape alone, here.
+        const shapeScale = system.scalingMode === 'shape' ? system.emitter.shapeScale : undefined;
         const particles = system.particles;
         if (system.maxParticles !== undefined) {
             // Like Unity, a full system skips the particles it has no room for rather than queueing them.
@@ -178,6 +173,9 @@ export class ParticleSpawner {
             }
 
             system.emitterShape.initialize(particle, emissionState);
+            if (shapeScale !== undefined) {
+                particle.position.multiply(shapeScale);
+            }
 
             if (system.alignToDirection && isSpriteMode) {
                 alignParticleToDirection(particle as SpriteParticle, isMeshMode);
@@ -201,12 +199,9 @@ export class ParticleSpawner {
                 particle.position.applyMatrix4(matrix);
                 particle.startSize.multiply(scale).abs();
                 particle.size.copy(particle.startSize);
-                if (hierarchy) {
-                    // Scaled per axis by the emitter's world scale, then turned: the speed scales with it.
-                    particle.velocity.multiply(system.hierarchyScale).applyQuaternion(tempQ);
-                } else {
-                    particle.velocity.multiply(scale).applyMatrix3(this.normalMatrix);
-                }
+                // Scaled per axis by the scale the emitter's matrix carries, then turned: the speed
+                // scales with it.
+                particle.velocity.multiply(system.hierarchyScale).applyQuaternion(tempQ);
                 if (particle.rotation && particle.rotation instanceof Quaternion) {
                     particle.rotation.multiplyQuaternions(tempQ, particle.rotation);
                 }

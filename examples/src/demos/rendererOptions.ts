@@ -34,7 +34,9 @@ import type {DemoContext} from '../types';
  * 3. `minParticleSize` / `maxParticleSize`: sizes from tiny to huge, then
  *    clamped on screen to between 2% and 6% of the viewport height.
  * 4. `scalingMode`: an emitter under a parent scaled 3×. In `'shape'` mode
- *    only the shape grows; in `'hierarchy'` mode the particles grow with it.
+ *    only the shape grows; in `'hierarchy'` mode the particles and their
+ *    speed grow with it. (`'local'`, the default, would leave out the
+ *    parent's scale altogether, as Unity's Local does.)
  * 5. `renderFace`: open bowls tumbling as mesh particles. With `'both'` their
  *    inside shows through the opening; with `'front'` the back faces are
  *    culled and the inside disappears, as with Unity's Render Face: Front.

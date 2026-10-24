@@ -395,7 +395,6 @@
           "transparent": true,
           "depthWrite": false,
           "worldSpace": false,
-          "scalingMode": "hierarchy",
           "behaviors": [
             {
               "type": "LimitSpeedOverLife",

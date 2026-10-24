@@ -207,7 +207,6 @@
       "transparent": true,
       "depthWrite": false,
       "worldSpace": false,
-      "scalingMode": "hierarchy",
       "behaviors": [
         {
           "type": "VelocityOverLife",
@@ -462,7 +461,7 @@
           "transparent": true,
           "depthWrite": false,
           "worldSpace": false,
-          "scalingMode": "hierarchy",
+          "scalingMode": "shape",
           "behaviors": [
             {
               "type": "ColorOverLife",
@@ -771,7 +770,6 @@
           "transparent": true,
           "depthWrite": false,
           "worldSpace": false,
-          "scalingMode": "hierarchy",
           "behaviors": [
             {
               "type": "SizeBySpeed",

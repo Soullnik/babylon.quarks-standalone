@@ -191,7 +191,6 @@
       "softParticles": true,
       "softNearFade": 0.1,
       "softFarFade": 2,
-      "scalingMode": "hierarchy",
       "behaviors": [
         {
           "type": "FrameOverLife",

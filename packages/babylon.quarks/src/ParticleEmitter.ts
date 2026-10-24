@@ -1,8 +1,12 @@
 import {TransformNode} from '@babylonjs/core/Meshes/transformNode';
 import {Scene} from '@babylonjs/core/scene';
-import {IParticleSystem, Matrix4, SerializationOptions} from 'quarks.core';
+import {IParticleSystem, Matrix4, Quaternion, SerializationOptions, Vector3} from 'quarks.core';
 import {quarksNodeId} from './nodeId';
-import type {BabylonMetaData} from './system/types';
+import type {BabylonMetaData, ScalingMode} from './system/types';
+
+const tempPosition = new Vector3();
+const tempRotation = new Quaternion();
+const tempScale = new Vector3();
 
 /** A {@link ParticleEmitter} as its `toJSON` writes it: the node, its transform and its system. */
 export interface ParticleEmitterJSON {
@@ -54,38 +58,58 @@ export class ParticleEmitter extends TransformNode {
     system: IParticleSystem;
     private _matrixWorld: Matrix4 = new Matrix4();
     private _matrixWorldFlag = -1;
+    private _matrixWorldMode: ScalingMode | undefined;
+    private readonly _shapeScale = new Vector3(1, 1, 1);
 
     /**
-     * The node's world matrix in quarks.core form. Mirrored from Babylon's
-     * matrix only when that matrix actually changed (tracked by its
-     * `updateFlag`), so repeated reads inside a frame are free.
+     * The matrix the system simulates and draws in, in quarks.core form: the node's world matrix,
+     * with its scale as the system's {@link ScalingMode} takes it. `'hierarchy'` keeps the whole
+     * world scale; `'local'` puts the node's own `scaling` in place of it, so
+     * the parents' scale is left out; `'shape'` takes the scale out, and {@link shapeScale} applies
+     * it to the emission shape alone. Recomputed only when Babylon's matrix changed (tracked by its
+     * `updateFlag`) or the mode did, so repeated reads inside a frame are free.
      */
     get matrixWorld(): Matrix4 {
         const m = this.getWorldMatrix();
         const flag = m.updateFlag;
-        if (flag === this._matrixWorldFlag) {
+        const mode = (this.system as {scalingMode?: ScalingMode} | undefined)?.scalingMode ?? 'hierarchy';
+        if (flag === this._matrixWorldFlag && mode === this._matrixWorldMode) {
             return this._matrixWorld;
         }
         this._matrixWorldFlag = flag;
+        this._matrixWorldMode = mode;
         const e = this._matrixWorld.elements;
         const s = m.m;
-        e[0] = s[0];
-        e[1] = s[1];
-        e[2] = s[2];
-        e[3] = s[3];
-        e[4] = s[4];
-        e[5] = s[5];
-        e[6] = s[6];
-        e[7] = s[7];
-        e[8] = s[8];
-        e[9] = s[9];
-        e[10] = s[10];
-        e[11] = s[11];
-        e[12] = s[12];
-        e[13] = s[13];
-        e[14] = s[14];
-        e[15] = s[15];
+        for (let i = 0; i < 16; i++) {
+            e[i] = s[i];
+        }
+        if (mode === 'hierarchy') {
+            this._shapeScale.set(1, 1, 1);
+        } else {
+            this._matrixWorld.decompose(tempPosition, tempRotation, tempScale);
+            if (Number.isNaN(tempRotation.w)) {
+                // A zero scale axis leaves no rotation to read; the shape collapses either way.
+                tempRotation.identity();
+            }
+            if (mode === 'local') {
+                const own = this.scaling;
+                this._matrixWorld.compose(tempPosition, tempRotation, tempScale.set(own.x, own.y, own.z));
+                this._shapeScale.set(1, 1, 1);
+            } else {
+                this._shapeScale.copy(tempScale);
+                this._matrixWorld.compose(tempPosition, tempRotation, tempScale.set(1, 1, 1));
+            }
+        }
         return this._matrixWorld;
+    }
+
+    /**
+     * What the system's emission shape is scaled by before {@link matrixWorld} places it: the
+     * node's world scale in `'shape'` mode, which leaves the particles and their motion unscaled,
+     * and 1 otherwise. Read it after `matrixWorld`, which refreshes it.
+     */
+    get shapeScale(): Vector3 {
+        return this._shapeScale;
     }
 
     /** Whether the node and its parents are enabled; setting it is `setEnabled`. */

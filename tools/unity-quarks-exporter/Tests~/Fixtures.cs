@@ -153,7 +153,7 @@ namespace BabylonQuarks.UnityExporter.Tests
         /// Mesh particles in a scaled group: a box shape, 3D start rotation and separate-axes spin,
         /// Hierarchy scaling, a mesh with a second UV set and no normals, and an opaque URP material
         /// with Alpha Clipping and back-face culling. A second system covers what the runtime lacks
-        /// and warns about Random Between Two Curves, separate-axes limits and Local
+        /// and warns about Random Between Two Curves and separate-axes limits, with Local
         /// scaling under a scaled parent.
         /// </summary>
         private static GameObject MeshParticles()
@@ -275,6 +275,7 @@ namespace BabylonQuarks.UnityExporter.Tests
             var smokeMain = smoke.main;
             smokeMain.startLifetime = 1f;
             smokeMain.startSize = 0.3f;
+            smokeMain.scalingMode = ParticleSystemScalingMode.Shape;
             smoke.emission.rateOverTime = 0f;
             smoke.emission.SetBursts(new[] { new ParticleSystem.Burst(0f, 8f) });
             var trails = smoke.trails;

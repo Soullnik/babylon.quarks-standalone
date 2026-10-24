@@ -138,8 +138,8 @@ describe('Unity exporter output', () => {
         const dust = system('Dust');
         expect(dust.transparent).toBe(true);
         expect(dust.blending).toBe(Constants.ALPHA_COMBINE);
-        // Local is Hierarchy without the parents' scale; the scaled parent warns.
-        expect(dust.scalingMode).toBe('hierarchy');
+        // Local, Unity's default and the runtime's, is left out of the file.
+        expect(dust.scalingMode).toBe('local');
         // Cone Volume, with its Length.
         const cone = dust.emitterShape as ConeEmitter;
         expect(cone.type).toBe('cone');
@@ -158,6 +158,7 @@ describe('Unity exporter output', () => {
         expect(smoke.renderMode).toBe(RenderMode.Trail);
         expect(smoke.blending).toBe(Constants.ALPHA_SUBTRACT);
         expect(smoke.onlyUsedByOther).toBe(true);
+        expect(smoke.scalingMode).toBe('shape');
         const source = root.getChildMeshes(false).find((mesh) => mesh.name.endsWith('(emitter source)')) as Mesh;
         expect(source.isVisible).toBe(false);
     });
