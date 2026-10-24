@@ -49,6 +49,9 @@ const INTERNAL_MATH = new Set([
     'quaternionFrom',
     'vector3FromColor',
     'vector4FromColor',
+    // Internal to the renderer: whether a behavior runs a built-in's own code.
+    'stockBehaviorType',
+    'runsUpdateAll',
 ]);
 
 describe('quarks.core re-exports', () => {

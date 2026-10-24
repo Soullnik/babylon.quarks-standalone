@@ -78,10 +78,29 @@ as before.
   `babylon.quarks-editor` is recorded in the repository (`packages/*/api/*.api.md`, written by API
   Extractor), and `npm run check` and CI fail when a change alters it without updating the report.
   Every change to the public surface is now visible in review.
+- **[Extending babylon.quarks](https://github.com/Soullnik/babylon.quarks-standalone/blob/main/docs/EXTENDING.md):** the contract for custom behaviors and
+  emitter shapes (the hooks and when they run, what a behavior sees, the compiled pass, plugins
+  and saving), with every example run by the tests.
 - `ShaderImageProcessing`, the type of `ShaderContext.imageProcessing`, is exported.
 - `Gradient.evaluate(t, target?)`, as Unity's `Gradient.Evaluate`: the colour at `t` as
   `{r, g, b, a}`, written into `target` (such as a Babylon `Color4`) when one is given, for tools
   and UI that draw a gradient.
+
+### Fixed
+
+- **Custom behaviors run their own code, whatever their `type`.** The renderer compiled a behavior
+  into its fused pass by its `type` string, so a custom behavior named like a built-in, or a
+  subclass of a built-in with its own `update`, ran the built-in's code instead of its own, and
+  was assumed not to change size or colour. Behaviors are now recognised by implementation: only
+  an instance of exactly the built-in class, with no method set on the instance, is compiled.
+  Every subclass runs its own methods, which can be slower than before for a subclass that only
+  added fields.
+- A subclass that overrides `update` but inherits its parent's `updateAll` has its `update`
+  called; the inherited `updateAll` skipped the override. Such a subclass no longer takes the
+  faster `updateAll` path.
+- The renderer and the editor find sub-emitter links by `instanceof EmitSubParticleSystem`, not
+  by the `type` string, so an object that only looks like one no longer orders or unlinks
+  systems.
 
 ## [0.29.0] — 2026-10-24
 
