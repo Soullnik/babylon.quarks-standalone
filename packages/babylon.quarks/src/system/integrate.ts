@@ -130,6 +130,34 @@ function retire(particles: Particle[], store: ParticleStore, i: number, last: nu
 }
 
 /**
+ * What a ring buffer does to a particle at the end of its life (see `RingBufferMode`): `pause`
+ * holds it frozen at its end, else it goes back to `loopStart` (a fraction of its life) once it
+ * reaches `loopEnd`.
+ */
+export interface RingBufferStep {
+    /** Freeze at the end of life rather than loop. */
+    pause: boolean;
+    /** Where a looping particle goes back to, a fraction of its life, 0 to 1. */
+    loopStart: number;
+    /**
+     * Where a looping particle goes back from, a fraction of its life, `loopStart` to 1. Equal to
+     * `loopStart`, the particle is held there.
+     */
+    loopEnd: number;
+}
+
+/** The least age a held particle keeps, as a fraction of its life: past 0, a newborn's age. */
+const HELD_AGE = 1e-6;
+
+/**
+ * The age a looping ring particle is held at, or Infinity when it loops: a loop range of no
+ * length holds it at that point of its life, as a pause does at the end.
+ */
+function holdAge(ring: RingBufferStep, life: number): number {
+    return ring.loopEnd > ring.loopStart ? Infinity : Math.max(ring.loopEnd, HELD_AGE) * life;
+}
+
+/**
  * The sprite path's step after the behaviors, as one pass over the columns that does three
  * things, none of which touches a particle object until a death. Returns the live count.
  *
@@ -142,7 +170,8 @@ function retire(particles: Particle[], store: ParticleStore, i: number, last: nu
  * Position is integrated along the velocity.
  *
  * A particle whose age reached its life is swapped with the last live one, rows included. The
- * survivor moved into the slot has not been visited yet, so the slot is processed again.
+ * survivor moved into the slot has not been visited yet, so the slot is processed again. With a
+ * `ring` buffer no particle dies: it is frozen at the end of its life, or sent back into it.
  *
  * The bounds fall out of the same pass. Measuring every particle on every step costs about as
  * much as the integration itself, so the full measurement runs every few steps; in between,
@@ -158,9 +187,11 @@ export function integrateSprites(
     collapseColor: boolean,
     bounds: BoundsTracker,
     settings: BoundsSettings,
-    onDied: DeathListener | undefined
+    onDied: DeathListener | undefined,
+    ring?: RingBufferStep
 ): number {
     const scalars = store.scalars;
+    const pause = ring !== undefined && ring.pause;
     const stride = ParticleStore.SCALAR_STRIDE;
     const positions = store.position;
     const velocities = store.velocity;
@@ -198,7 +229,12 @@ export function integrateSprites(
                 prevColor[o4 + 3] = curColor[o4 + 3];
             }
         }
-        const step = delta * scalars[scalar + ParticleStore.SPEED_MODIFIER];
+        const life = scalars[scalar + ParticleStore.LIFE];
+        // Frozen until a newborn replaces it, no motion and no ageing: at the end of its life when
+        // paused, or at a loop range of no length, held a hair past 0 so Birth fires only once.
+        const hold = ring === undefined ? Infinity : pause ? life : holdAge(ring, life);
+        const frozen = age >= hold;
+        const step = frozen ? 0 : delta * scalars[scalar + ParticleStore.SPEED_MODIFIER];
         const vx = velocities[offset];
         const vy = velocities[offset + 1];
         const vz = velocities[offset + 2];
@@ -219,10 +255,31 @@ export function integrateSprites(
         }
         // Speed is tracked every step: it bounds how far the particles
         // can have moved since the last measurement.
+        if (frozen) {
+            continue;
+        }
         maxSpeedSq = Math.max(maxSpeedSq, vx * vx + vy * vy + vz * vz);
         age += delta;
         scalars[scalar + ParticleStore.AGE] = age;
-        if (age >= scalars[scalar + ParticleStore.LIFE]) {
+        if (ring !== undefined) {
+            if (age > hold) {
+                scalars[scalar + ParticleStore.AGE] = hold;
+            } else if (!pause && hold === Infinity && age >= ring.loopEnd * life) {
+                const loopStart = ring.loopStart * life;
+                const wrapped = loopStart + ((age - ring.loopEnd * life) % ((ring.loopEnd - ring.loopStart) * life));
+                // Never exactly 0, which is a newborn's age: Birth sub emitters would fire again.
+                scalars[scalar + ParticleStore.AGE] = wrapped > 0 ? wrapped : HELD_AGE * life;
+                // The jump back is not motion: the renderer must not extrapolate size or colour across it.
+                prevSize[offset] = curSize[offset];
+                prevSize[offset + 1] = curSize[offset + 1];
+                prevSize[offset + 2] = curSize[offset + 2];
+                const o4 = i * 4;
+                prevColor[o4] = curColor[o4];
+                prevColor[o4 + 1] = curColor[o4 + 1];
+                prevColor[o4 + 2] = curColor[o4 + 2];
+                prevColor[o4 + 3] = curColor[o4 + 3];
+            }
+        } else if (age >= life) {
             const particle = retire(particles, store, i, liveParticleCount - 1);
             liveParticleCount--;
             i--;

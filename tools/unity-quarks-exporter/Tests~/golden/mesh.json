@@ -154,7 +154,6 @@
         "type": "ParticleEmitter",
         "ps": {
           "version": "3.0",
-          "autoDestroy": false,
           "looping": false,
           "prewarm": false,
           "duration": 5,
@@ -309,7 +308,6 @@
         "type": "ParticleEmitter",
         "ps": {
           "version": "3.0",
-          "autoDestroy": false,
           "looping": true,
           "prewarm": false,
           "duration": 5,

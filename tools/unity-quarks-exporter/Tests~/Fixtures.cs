@@ -93,6 +93,9 @@ namespace BabylonQuarks.UnityExporter.Tests
             main.maxParticles = 200;
             main.simulationSpace = ParticleSystemSimulationSpace.World;
             main.cullingMode = ParticleSystemCullingMode.Pause;
+            main.stopAction = ParticleSystemStopAction.Destroy;
+            main.ringBufferMode = ParticleSystemRingBufferMode.LoopUntilReplaced;
+            main.ringBufferLoopRange = new Vector2(0.25f, 0.75f);
             ps.useAutoRandomSeed = false;
             ps.randomSeed = 4000000001u;
 
@@ -231,6 +234,7 @@ namespace BabylonQuarks.UnityExporter.Tests
         {
             var (go, rocket, renderer) = MakeSystem("Rocket");
             var main = rocket.main;
+            main.stopAction = ParticleSystemStopAction.Disable;
             main.startLifetime = 2f;
             main.startSpeed = 6f;
             main.startColor = Color.white;

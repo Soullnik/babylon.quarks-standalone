@@ -72,7 +72,6 @@
     "type": "ParticleEmitter",
     "ps": {
       "version": "3.0",
-      "autoDestroy": false,
       "looping": true,
       "prewarm": false,
       "duration": 2,
@@ -191,6 +190,12 @@
       "softParticles": true,
       "softNearFade": 0.1,
       "softFarFade": 2,
+      "stopAction": "destroy",
+      "ringBufferMode": "loopUntilReplaced",
+      "ringBufferLoopRange": [
+        0.25,
+        0.75
+      ],
       "behaviors": [
         {
           "type": "FrameOverLife",

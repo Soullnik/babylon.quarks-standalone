@@ -17,6 +17,10 @@ All notable changes to the Unity Quarks Exporter are documented here.
   its Space; it was the X limit for the speed, with a warning.
 - **Size by Speed with Separate Axes** → a per-axis `Vector3Function`; it was the X curve, with a
   warning.
+- **Stop Action** Disable and Destroy → `stopAction`; the exporter no longer writes
+  `autoDestroy: false`. Callback is the runtime's `finished` event. An effect authored with
+  Destroy now disposes itself when it finishes, as in Unity; `EffectPool` keeps its copies.
+- **Ring Buffer Mode** and its **Loop Range** → `ringBufferMode` and `ringBufferLoopRange`.
 
 ## [0.28.0] — 2026-10-23
 

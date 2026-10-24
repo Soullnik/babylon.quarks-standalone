@@ -66,19 +66,24 @@ export class EmissionController {
         return delay;
     }
 
-    /** Whether continuous or queued emission can still spawn particles before the system is done. */
-    hasPendingEmission(): boolean {
+    /**
+     * Whether continuous or queued emission can still spawn particles before the system is done:
+     * its own, or with `state` the emission a sub emitter runs into it for one parent particle.
+     */
+    hasPendingEmission(state?: EmissionState): boolean {
         const system = this.system;
-        if (system.isEmitEnded) {
-            return false;
+        if (state === undefined || state === system.emissionState) {
+            if (system.isEmitEnded) {
+                return false;
+            }
+            if (system.looping) {
+                return true;
+            }
+            if (system.onlyUsedByOther) {
+                return false;
+            }
+            state = system.emissionState;
         }
-        if (system.looping) {
-            return true;
-        }
-        if (system.onlyUsedByOther) {
-            return false;
-        }
-        const state = system.emissionState;
         if (state.waitEmiting > 0) {
             return true;
         }

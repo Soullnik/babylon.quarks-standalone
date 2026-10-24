@@ -13,6 +13,8 @@ and the project follows the `quarks.core` 0.x version line.
 - **Curve modules** (Size, Speed and Limit Speed over Lifetime, Size by Speed, Width over Trail,
   Texture Sheet frames) have a "Two curves" switch and show both bounds of an imported Random
   Between Two Curves; an edit used to drop the upper one.
+- **Stop action** in Main and **Ring buffer** (with its loop range) beside Max particles, as
+  Unity's. The editor saves the stop action but does not apply it, so previews replay.
 - **Separate axes** in Limit Speed over Lifetime (with its Space), Size over Lifetime and Size by
   Speed: a curve for each of X, Y and Z, as Unity's Separate Axes.
 - **Scaling mode** offers Local (the default), Hierarchy and Shape, as Unity's, for world- and

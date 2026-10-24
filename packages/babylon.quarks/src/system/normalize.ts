@@ -1,6 +1,6 @@
 import {ConstantValue, FunctionValueGenerator, ValueGenerator, Vector2, Vector3} from 'quarks.core';
 import type {MeshLighting, RenderFace, SortMode} from '../batchSettings';
-import type {BurstParameters, CullingMode, ScalingMode} from './types';
+import type {BurstParameters, CullingMode, RingBufferMode, ScalingMode, StopAction} from './types';
 
 // Normalisers shared by the ParticleSystem constructor, its setters and its JSON reader, so a
 // value read from a file and one set in code end up the same.
@@ -23,6 +23,28 @@ export function validRenderFace(face: unknown): RenderFace {
 /** `mode` if it is one of the culling modes, else `'always'`. */
 export function validCullingMode(mode: unknown): CullingMode {
     return mode === 'pause' || mode === 'pauseAndCatchUp' ? mode : 'always';
+}
+
+/** `action` if it is one of the stop actions, else `'none'`. */
+export function validStopAction(action: unknown): StopAction {
+    return action === 'disable' || action === 'destroy' ? action : 'none';
+}
+
+/** `mode` if it is one of the ring buffer modes, else `'disabled'`. */
+export function validRingBufferMode(mode: unknown): RingBufferMode {
+    return mode === 'pauseUntilReplaced' || mode === 'loopUntilReplaced' ? mode : 'disabled';
+}
+
+/**
+ * A ring buffer loop range within 0..1, start no later than end; a missing or non-finite bound
+ * takes its default (0 or 1).
+ */
+export function validLoopRange(range: {x: number; y: number} | undefined): Vector2 {
+    const clamp = (value: number | undefined, fallback: number) =>
+        typeof value === 'number' && Number.isFinite(value) ? Math.min(1, Math.max(0, value)) : fallback;
+    const start = clamp(range?.x, 0);
+    const end = clamp(range?.y, 1);
+    return new Vector2(Math.min(start, end), Math.max(start, end));
 }
 
 /** `mode` if it is one of the scaling modes, else `'local'`. */

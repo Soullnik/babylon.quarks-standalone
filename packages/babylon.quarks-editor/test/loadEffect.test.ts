@@ -51,6 +51,8 @@ describe('loading an effect', () => {
         expect(loaded.systems.map((s) => s.emitter.name).sort()).toEqual(['a', 'child', 'parent']);
         expect(scene.get().getTransformNodeByName('wrap')).not.toBeNull();
         expect(loaded.systems.every((s) => s.paused)).toBe(true);
+        // Previews replay: the stop action is kept for saving but not applied.
+        expect(loaded.systems.every((s) => s.ignoreStopAction)).toBe(true);
         expect(a.emitter.name).toBe('a');
     });
 
