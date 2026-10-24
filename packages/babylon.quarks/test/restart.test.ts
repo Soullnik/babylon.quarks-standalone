@@ -209,7 +209,7 @@ describe('disposing the emitter node', () => {
         child.emitter.parent = parent.emitter;
         renderer.addSystem(parent);
         renderer.addSystem(child);
-        QuarksUtil.setAutoDestroy(parent.emitter, true);
+        QuarksUtil.setStopAction(parent.emitter, 'destroy');
         let childFramesAfterParent = 0;
         for (let i = 0; i < 120; i++) {
             renderer.update(STEP);

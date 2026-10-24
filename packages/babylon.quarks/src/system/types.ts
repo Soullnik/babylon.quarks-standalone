@@ -197,11 +197,6 @@ export type BeamEnd =
 export interface ParticleSystemParameters {
     /** What the system does once it has finished, see {@link StopAction}. Default `'none'`. */
     stopAction?: StopAction;
-    /**
-     * `true` is `stopAction: 'destroy'`; read only when `stopAction` is left out.
-     * @deprecated Use `stopAction: 'destroy'`.
-     */
-    autoDestroy?: boolean;
     /** See {@link ParticleSystem.looping}. Default true. */
     looping?: boolean;
     /** See {@link ParticleSystem.prewarm}. Default false. */
@@ -258,8 +253,6 @@ export interface ParticleSystemParameters {
     renderMode?: RenderMode;
     /** See {@link ParticleSystem.rendererEmitterSettings}. Default the render mode's own. */
     rendererEmitterSettings?: RendererEmitterSettings;
-    /** @deprecated Set `speedFactor` in {@link rendererEmitterSettings} instead; this one wins when both are set. */
-    speedFactor?: number;
     /** See {@link ParticleSystem.material}. Default none. */
     material?: ParticleMaterialSource | null;
     /** See {@link ParticleSystem.texture}. Unset takes the material's texture; null draws without one. */

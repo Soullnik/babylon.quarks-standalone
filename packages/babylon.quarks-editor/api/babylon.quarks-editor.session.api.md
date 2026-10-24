@@ -170,8 +170,6 @@ export interface EffectEditorHostHandle {
     exportJson: () => string;
     history: EffectHistory;
     importAssets: (files: FileList | File[]) => Promise<void>;
-    // @deprecated (undocumented)
-    importGallery: (files: FileList | File[]) => Promise<void>;
     importJson: (json: unknown) => void;
     renderer: BatchedRenderer;
     scene: Scene;

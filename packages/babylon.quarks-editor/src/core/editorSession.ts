@@ -71,8 +71,6 @@ export interface EffectEditorHostHandle {
     importJson: (json: unknown) => void;
     /** Imports effect files (and the texture/geometry files they reference) into Assets. */
     importAssets: (files: FileList | File[]) => Promise<void>;
-    /** @deprecated Renamed to `importAssets`. */
-    importGallery: (files: FileList | File[]) => Promise<void>;
     /** The focused effect as quarks JSON; throws when no effect is focused. */
     exportJson: () => string;
 }
@@ -1079,7 +1077,6 @@ export function createEditorSession(options: EditorSessionOptions): EditorSessio
         renderer,
         importJson,
         importAssets,
-        importGallery: importAssets,
         exportJson: () => makeHandle().binding.exportJSON('EditorEffect'),
     });
 

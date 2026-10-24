@@ -66,8 +66,6 @@ type Parameter<K extends keyof ParticleSystemParameters> = (() => ParticleSystem
  */
 const PARAMETERS: {[K in keyof Required<ParticleSystemParameters>]: Parameter<K>} = {
     stopAction: () => 'disable',
-    // A deprecated alias of stopAction, covered there.
-    autoDestroy: 'not-a-setting',
     looping: () => false,
     prewarm: () => true,
     prewarmTime: () => 0.5,
@@ -104,7 +102,6 @@ const PARAMETERS: {[K in keyof Required<ParticleSystemParameters>]: Parameter<K>
     instancingNormals: () => new Float32Array([0, 0, 1, 0, 0, 1, 0, 0, 1]),
     renderMode: () => RenderMode.Mesh,
     rendererEmitterSettings: 'not-a-setting',
-    speedFactor: 'not-a-setting',
     material: 'not-a-setting',
     texture: () => texture,
     startTileIndex: () => new IntervalValue(1, 3),
@@ -284,7 +281,7 @@ describe('ParticleSystem serialisation contract', () => {
             const original = make();
             const meta = newMeta();
             const json = JSON.parse(JSON.stringify(original.toJSON(meta)));
-            const loaded = ParticleSystem.fromJSON(json, meta, {}, scene);
+            const loaded = ParticleSystem.fromJSON(json, meta, scene);
             expect(settings(loaded)).toEqual(settings(original));
             original.dispose();
             loaded.dispose();

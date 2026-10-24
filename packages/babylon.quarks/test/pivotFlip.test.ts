@@ -50,7 +50,7 @@ describe('billboard pivot and flip', () => {
     const roundTrip = (ps: ParticleSystem) => {
         const meta = emptyMeta();
         const json = ps.toJSON(meta);
-        return {json, restored: ParticleSystem.fromJSON(json, meta, {}, scene)};
+        return {json, restored: ParticleSystem.fromJSON(json, meta, scene)};
     };
 
     it('is off by default and stays out of the JSON', () => {

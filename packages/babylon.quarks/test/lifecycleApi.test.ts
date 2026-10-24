@@ -429,9 +429,9 @@ describe('lifecycle API', () => {
             const burst = makeSystem({looping: true, duration: 1});
             const prefab = new QuarksPrefab('skip', scene);
             prefab.addParticleSystemAnimation(burst.emitter as ParticleEmitter, 0.1, 0.05);
-            prefab.addThreeAnimation(new TransformNode('t', scene), {play: jest.fn(), stop: jest.fn()}, 0, 1);
+            prefab.addClipAnimation(new TransformNode('t', scene), {play: jest.fn(), stop: jest.fn()}, 0, 1);
             const clip = {play: jest.fn(), stop: jest.fn()};
-            prefab.addThreeAnimation(new TransformNode('c', scene), clip, 0.2, 0.01);
+            prefab.addClipAnimation(new TransformNode('c', scene), clip, 0.2, 0.01);
             prefab.play();
             prefab.update(0.5);
             expect(clip.play).toHaveBeenCalledTimes(1);
@@ -448,7 +448,7 @@ describe('lifecycle API', () => {
             const prefab = new QuarksPrefab('end', scene);
             const clip = {play: jest.fn(), stop: jest.fn(), pause: jest.fn()};
             prefab.addParticleSystemAnimation(system.emitter as ParticleEmitter, 0, 1);
-            prefab.addThreeAnimation(new TransformNode('t', scene), clip, 0, 1, true);
+            prefab.addClipAnimation(new TransformNode('t', scene), clip, 0, 1, true);
             prefab.play();
             prefab.update(0.01);
             run(system, 0.3);
@@ -475,7 +475,7 @@ describe('lifecycle API', () => {
             const system = emitterSystem();
             const prefab = new QuarksPrefab('edges', scene);
             prefab.addParticleSystemAnimation(system.emitter as ParticleEmitter, 0, 0.5);
-            prefab.addThreeAnimation(new TransformNode('t', scene), {}, 0, 2);
+            prefab.addClipAnimation(new TransformNode('t', scene), {}, 0, 2);
             prefab.setTime(0.25);
             expect(system.isEmitEnded).toBe(false);
             prefab.setTime(0.5);
@@ -530,7 +530,7 @@ describe('lifecycle API', () => {
 
         it('advances with the scene when autoUpdate is on, by the engine frame time', () => {
             const prefab = new QuarksPrefab('auto', scene);
-            prefab.addThreeAnimation(new TransformNode('t', scene), {}, 0, 10);
+            prefab.addClipAnimation(new TransformNode('t', scene), {}, 0, 10);
             jest.spyOn(engine, 'getDeltaTime').mockReturnValue(100);
             prefab.play();
             prefab.autoUpdate = true;
@@ -552,7 +552,7 @@ describe('lifecycle API', () => {
             const burst = makeSystem({looping: true, duration: 1});
             const prefab = new QuarksPrefab('pending', scene);
             prefab.addParticleSystemAnimation(burst.emitter as ParticleEmitter, 0.1, 0.05);
-            prefab.addThreeAnimation(new TransformNode('t', scene), {}, 0, 1);
+            prefab.addClipAnimation(new TransformNode('t', scene), {}, 0, 1);
             prefab.play();
             prefab.update(0.5);
             prefab.stop();
@@ -643,7 +643,7 @@ describe('lifecycle API', () => {
             const a = looping({startLife: new ConstantValue(2)});
             const prefab = new QuarksPrefab('dying', scene);
             prefab.addParticleSystemAnimation(a.emitter as ParticleEmitter, 0, 0.3);
-            prefab.addThreeAnimation(new TransformNode('t', scene), {}, 0, 3);
+            prefab.addClipAnimation(new TransformNode('t', scene), {}, 0, 3);
             prefab.play();
             for (let i = 0; i < 30; i++) {
                 prefab.update(STEP);
@@ -701,7 +701,7 @@ describe('lifecycle API', () => {
             const burst = looping();
             const prefab = new QuarksPrefab('dispose', scene);
             prefab.addParticleSystemAnimation(burst.emitter as ParticleEmitter, 0.1, 0.01);
-            prefab.addThreeAnimation(new TransformNode('t', scene), {}, 0, 1);
+            prefab.addClipAnimation(new TransformNode('t', scene), {}, 0, 1);
             prefab.play();
             prefab.update(0.5);
             prefab.dispose();
