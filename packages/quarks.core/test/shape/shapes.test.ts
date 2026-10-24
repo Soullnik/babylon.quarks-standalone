@@ -288,18 +288,37 @@ describe('ConeEmitter', () => {
         expect(fraction(points, ({p}) => p.z < length / 2)).toBeCloseTo(0.5, 1);
     });
 
-    it('lays a flat volume out past the rim in the base plane', () => {
-        const shape = new ConeEmitter({radius: 1, thickness: 0, angle: Math.PI / 2, length: 2, emitFrom: 1});
-        for (const {p} of sample(shape, 200)) {
-            expect(p.z).toBeCloseTo(0, 6);
-            expect(radial(p)).toBeGreaterThanOrEqual(1 - 1e-9);
-            expect(radial(p)).toBeLessThanOrEqual(3 + 1e-9);
+    it('keeps a near-flat volume continuous, following side lines past 89° as if at 89°', () => {
+        const reach = (angle: number) => {
+            const shape = new ConeEmitter({radius: 1, thickness: 0, angle, length: 1, emitFrom: 1});
+            return Math.max(...sample(shape, 400).map(({p}) => radial(p)));
+        };
+        const cap = 1 + 1 / Math.cos((89 * Math.PI) / 180);
+        for (const angle of [Math.PI / 2 - 1e-5, Math.PI / 2 - 1e-9, Math.PI / 2]) {
+            expect(reach(angle)).toBeLessThanOrEqual(cap + 1e-6);
+            expect(reach(angle)).toBeGreaterThan(cap * 0.95);
+        }
+        // Below 89° the cone keeps Unity's own geometry.
+        expect(reach(Math.PI / 4)).toBeCloseTo(2, 1);
+    });
+
+    it('reads a negative or non-finite length as 0', () => {
+        for (const length of [-3, NaN, Infinity]) {
+            const shape = new ConeEmitter({length, emitFrom: ConeEmitFrom.Volume});
+            for (const {p} of sample(shape, 50)) {
+                expect(p.z).toBe(0);
+                expect(Number.isFinite(p.x) && Number.isFinite(p.y)).toBe(true);
+            }
         }
     });
 
-    it('reads a negative length as 0', () => {
-        const shape = new ConeEmitter({length: -3, emitFrom: ConeEmitFrom.Volume});
-        for (const {p} of sample(shape, 50)) expect(p.z).toBe(0);
+    it('fills the volume in the shape transform, which scales the length too', () => {
+        const transform = new ShapeTransform();
+        transform.scale.set(1, 1, 3);
+        const shape = new ConeEmitter({radius: 1, angle: 0, length: 2, emitFrom: ConeEmitFrom.Volume, transform});
+        const points = sample(shape, 400);
+        for (const {p} of points) expect(p.z).toBeLessThanOrEqual(6 + 1e-9);
+        expect(Math.max(...points.map(({p}) => p.z))).toBeGreaterThan(5.5);
     });
 });
 

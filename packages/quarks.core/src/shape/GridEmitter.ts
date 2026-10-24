@@ -13,7 +13,8 @@ export enum GridSampling {
     /**
      * The cells in turn, row by row from the one at -x, -y, starting over after the last, as
      * Niagara's Grid Location fills its cells by particle index: a burst of `row × column`
-     * particles puts one in every cell.
+     * particles puts one in every cell. The turn carries on across bursts, loop cycles and prewarm;
+     * only a restart (the shape's `reset()`) starts it over. Meant for grids of up to 2^53 cells.
      */
     Sequential,
 }

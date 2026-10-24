@@ -728,17 +728,20 @@ export function ShapeModule({binding}: ModuleProps) {
                     onChange={(next) => binding.apply((s) => (s.emitterShape = createShape(next, params)))}
                 />
             </Row>
-            {keys.map((key) => (
-                <Row key={key} label={PARAM_LABELS[key]}>
-                    <NumberField
-                        value={params[key] as number}
-                        min={0}
-                        onChange={(v) =>
-                            binding.apply((s) => (s.emitterShape = createShape(type, {...params, [key]: v})))
-                        }
-                    />
-                </Row>
-            ))}
+            {keys
+                // A cone's Length only shapes Emit from Volume; Unity shows it for Cone Volume alone.
+                .filter((key) => key !== 'length' || params.coneEmitFrom === ConeEmitFrom.Volume)
+                .map((key) => (
+                    <Row key={key} label={PARAM_LABELS[key]}>
+                        <NumberField
+                            value={params[key] as number}
+                            min={0}
+                            onChange={(v) =>
+                                binding.apply((s) => (s.emitterShape = createShape(type, {...params, [key]: v})))
+                            }
+                        />
+                    </Row>
+                ))}
             {type === 'mesh_surface' && (
                 <Row label="Source mesh">
                     <SelectField

@@ -12,6 +12,9 @@ import {random} from '../util/random';
 import {EmitterMode, EmitterShape, getValueFromEmitterMode, ShapeJSON} from './EmitterUtil';
 import {ShapeTransform} from './ShapeTransform';
 
+/** The cosine of 89°: how far from the axis {@link ConeEmitFrom.Volume} follows a side line at most. */
+const MIN_VOLUME_COS = Math.cos((89 * Math.PI) / 180);
+
 /**
  * Which part of a cone particles start from (Unity's Cone Emit from).
  */
@@ -54,7 +57,7 @@ export interface ConeEmitterParameters {
     emitFrom?: ConeEmitFrom;
     /**
      * Height of the cone along +z that {@link ConeEmitFrom.Volume} fills (Unity's Length); a
-     * negative value is read as 0. Defaults to 5, as in Unity. The base ignores it.
+     * negative or non-finite value is read as 0. Defaults to 5, as in Unity. The base ignores it.
      */
     length?: number;
     /**
@@ -106,8 +109,9 @@ export class ConeEmitter implements EmitterShape {
     /** Which part of the cone particles start from, see {@link ConeEmitFrom}. */
     emitFrom: ConeEmitFrom;
     /**
-     * Height along +z of the volume {@link ConeEmitFrom.Volume} fills; read as at least 0. At an
-     * angle of π/2 the cone lies flat, and it is the distance past the base's rim instead.
+     * Height along +z of the volume {@link ConeEmitFrom.Volume} fills; read as 0 when negative or
+     * not finite. Side lines steeper than 89° from the axis are followed as if at 89°, so a cone
+     * opened to 90° fills out to about 57 times the length past the rim, not infinitely far.
      */
     length: number;
     /** How the start point moves along the arc, see {@link EmitterMode}. */
@@ -177,9 +181,12 @@ export class ConeEmitter implements EmitterShape {
         p.velocity.set(sinTilt * cosTheta, sinTilt * sinTheta, cosTilt).multiplyScalar(p.startSpeed);
         p.position.multiplyScalar(Math.max(0, this.radius));
         if (this.emitFrom === ConeEmitFrom.Volume) {
-            // Up the side line to a random height; flat cones (cos 0) go out along the base instead.
-            const height = random() * Math.max(0, this.length);
-            const distance = cosTilt > 1e-6 ? height / cosTilt : height;
+            // Up the side line to a random height. A side line steeper than 89° from the axis is
+            // followed as if at 89°, so a cone opened to 90° reaches a finite way out instead of
+            // jumping to infinity.
+            const length = Number.isFinite(this.length) ? Math.max(0, this.length) : 0;
+            const height = random() * length;
+            const distance = height / Math.max(cosTilt, MIN_VOLUME_COS);
             p.position.x += sinTilt * cosTheta * distance;
             p.position.y += sinTilt * sinTheta * distance;
             p.position.z = cosTilt * distance;

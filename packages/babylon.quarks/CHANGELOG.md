@@ -15,7 +15,8 @@ the API and the look of effects are frozen.
   Cone, instead of `angle · r`. Each particle follows the cone's side line through its start
   point, so the cone's far end is a disc of radius `radius + length · tan(angle)` filled as evenly
   as its base. The rim and the centre are unchanged; particles in between lean out more than
-  before. Re-tune a cone effect that relied on the old, narrower middle.
+  before. Re-tune a cone effect that relied on the old, narrower middle. Cones in three.quarks
+  files tilt the new way too, so they lean out further in the middle than in three.quarks.
 
 ### Added
 
