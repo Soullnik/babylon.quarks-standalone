@@ -168,9 +168,9 @@ export class EffectPool {
         const systems: ParticleSystem[] = [];
         QuarksUtil.runOnAllParticleEmitters(copy, (emitter) => {
             const system = emitter.system as unknown as ParticleSystem;
-            // The pool owns the copy's life; a system disposing itself would
-            // pull one emitter out of an effect that is meant to play again.
-            system.autoDestroy = false;
+            // The pool owns the copy's life; a system disposing or disabling itself
+            // would pull one emitter out of an effect that is meant to play again.
+            system.ignoreStopAction = true;
             system.addEventListener('finished', this.onSystemFinished);
             systems.push(system);
         });

@@ -103,6 +103,10 @@ describe('Unity exporter output', () => {
         expect(sparks.worldSpace).toBe(true);
         expect(sparks.seed).toBe(4000000001);
         expect(sparks.cullingMode).toBe('pause');
+        // Stop Action and Ring Buffer Mode, with its loop range.
+        expect(sparks.stopAction).toBe('destroy');
+        expect(sparks.ringBufferMode).toBe('loopUntilReplaced');
+        expect([sparks.ringBufferLoopRange.x, sparks.ringBufferLoopRange.y]).toEqual([0.25, 0.75]);
         expect(sparks.sortMode).toBe('distance');
         expect(sparks.mapUV).toEqual({channel: 0, tiling: [2, 1], offset: [0.5, 0], scroll: [0, 0]});
         const texture = sparks.texture as Texture;
@@ -167,6 +171,7 @@ describe('Unity exporter output', () => {
         expect(rocket.renderMode).toBe(RenderMode.StretchedBillBoard);
         expect(rocket.blending).toBe(Constants.ALPHA_PREMULTIPLIED);
         expect(rocket.emitterShape.type).toBe('mesh_surface');
+        expect(rocket.stopAction).toBe('disable');
         expect(rocket.behaviors.filter((b) => b.type === 'EmitSubParticleSystem')).toHaveLength(2);
         const smoke = system('Smoke');
         expect(smoke.renderMode).toBe(RenderMode.Trail);

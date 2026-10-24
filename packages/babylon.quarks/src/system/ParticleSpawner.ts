@@ -36,6 +36,13 @@ const tempM3 = new Matrix3();
 export class ParticleSpawner {
     constructor(private readonly system: ParticleSystem) {}
 
+    /**
+     * The row a full ring buffer replaces next, the oldest. Particles of a ring buffer never die,
+     * so they stay in the order they were born: the oldest is row 0 when the system fills up, and
+     * the cursor walks on from there.
+     */
+    private ringCursor = 0;
+
     /** Points every particle at the store's columns again, after any were replaced. */
     rebind(): void {
         const particles = this.system.particles;
@@ -89,18 +96,35 @@ export class ParticleSpawner {
         // `ParticleEmitter.matrixWorld`); 'shape' scales the shape alone, here.
         const shapeScale = system.scalingMode === 'shape' ? system.emitter.shapeScale : undefined;
         const particles = system.particles;
-        if (system.maxParticles !== undefined) {
-            // Like Unity, a full system skips the particles it has no room for rather than queueing them.
-            count = Math.min(count, Math.max(0, system.maxParticles - system.particleNum));
+        const maxParticles = system.maxParticles;
+        // A ring buffer replaces the oldest particles of a full system (see `ringBufferMode`).
+        const ring = maxParticles !== undefined && system.ringBufferMode !== 'disabled' && !isTrailMode;
+        if (maxParticles !== undefined) {
+            // Like Unity, a full system skips the particles it has no room for rather than
+            // queueing them; a ring buffer replaces at most every particle once.
+            count = ring
+                ? Math.min(count, maxParticles)
+                : Math.min(count, Math.max(0, maxParticles - system.particleNum));
         }
 
         for (let i = 0; i < count; i++) {
             emissionState.burstParticleIndex = i;
-            system.particleNum++;
-            if (particles.length < system.particleNum) {
-                this.grow(isTrailMode);
+            let particle: Particle;
+            if (ring && system.particleNum >= maxParticles) {
+                if (this.ringCursor >= system.particleNum) {
+                    this.ringCursor = 0;
+                }
+                particle = particles[this.ringCursor];
+                this.ringCursor = (this.ringCursor + 1) % system.particleNum;
+            } else {
+                system.particleNum++;
+                if (particles.length < system.particleNum) {
+                    this.grow(isTrailMode);
+                }
+                particle = particles[system.particleNum - 1];
+                // Appended in birth order, so the oldest is row 0 when the system fills up.
+                this.ringCursor = 0;
             }
-            const particle = particles[system.particleNum - 1];
             particle.reset();
             particle.serial = (particle.serial ?? 0) + 1;
             particle.speedModifier = 1;

@@ -11,7 +11,7 @@ Three tiers: ✅ shipped · 🟡 runtime supports it, editor UI missing · 🔴 
 - ✅ 3D start size (uniform / per-axis `Vector3Function`), gradient start color (single `Gradient` and random-between-two-gradients `RandomColorBetweenGradient`)
 - ✅ max particles (`maxParticles`), simulation speed (`playbackSpeed`), culling mode (`cullingMode`: always / pause / pause and catch up), random seed (`seed`)
 - ✅ scaling mode (`scalingMode`: local / hierarchy / shape with Unity's meaning, world and local space)
-- 🔴 stop action, ring buffer
+- ✅ stop action (`stopAction`: none / disable / destroy; Callback is the `finished` event), ring buffer (`ringBufferMode`: pause / loop until replaced, `ringBufferLoopRange`)
 
 ## Emission
 - ✅ rate over time (constant/random/curve), bursts (time/count)

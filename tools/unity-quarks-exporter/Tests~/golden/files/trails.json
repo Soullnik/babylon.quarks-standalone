@@ -99,7 +99,6 @@
     "type": "ParticleEmitter",
     "ps": {
       "version": "3.0",
-      "autoDestroy": false,
       "looping": true,
       "prewarm": false,
       "duration": 5,
@@ -176,6 +175,7 @@
       "transparent": true,
       "depthWrite": false,
       "worldSpace": false,
+      "stopAction": "disable",
       "behaviors": [
         {
           "type": "VelocityOverLife",
@@ -336,7 +336,6 @@
         "type": "ParticleEmitter",
         "ps": {
           "version": "3.0",
-          "autoDestroy": false,
           "looping": true,
           "prewarm": false,
           "duration": 5,
@@ -665,7 +664,6 @@
         "type": "ParticleEmitter",
         "ps": {
           "version": "3.0",
-          "autoDestroy": false,
           "looping": true,
           "prewarm": false,
           "duration": 5,

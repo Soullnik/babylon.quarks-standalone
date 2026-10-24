@@ -46,7 +46,6 @@ namespace BabylonQuarks.UnityExporter
 
             var obj = new JObject()
                 .Set("version", "3.0")
-                .Set("autoDestroy", false)
                 .Set("looping", main.loop)
                 .Set("prewarm", main.prewarm)
                 .Set("duration", main.duration)
@@ -142,6 +141,8 @@ namespace BabylonQuarks.UnityExporter
                 if (!Mathf.Approximately(material.SoftFarFade, 1f)) obj.Set("softFarFade", material.SoftFarFade);
             }
             AddScalingMode(ps, main, obj);
+            AddStopAction(main, obj);
+            AddRingBuffer(main, obj);
 
             // ---- behaviors from the over-lifetime / by-speed modules ----
             AddGravity(main, behaviors);
@@ -738,6 +739,40 @@ namespace BabylonQuarks.UnityExporter
             behaviors.Add(new JObject()
                 .Set("type", "RotationOverLife")
                 .Set("angularVelocity", ScaleCurve(m.z, SpinSign(renderMode))));
+        }
+
+        /// <summary>
+        /// Unity's Stop Action: Disable and Destroy under the same names. None is the runtime's
+        /// default, and Callback is its <c>finished</c> event, which fires whatever the action.
+        /// </summary>
+        private static void AddStopAction(ParticleSystem.MainModule main, JObject obj)
+        {
+            switch (main.stopAction)
+            {
+                case ParticleSystemStopAction.Disable:
+                    obj.Set("stopAction", "disable");
+                    break;
+                case ParticleSystemStopAction.Destroy:
+                    obj.Set("stopAction", "destroy");
+                    break;
+            }
+        }
+
+        /// <summary>
+        /// Unity's Ring Buffer Mode and Loop Range, under the same names; Disabled, the default
+        /// in both, is left out, and so is the whole-life range.
+        /// </summary>
+        private static void AddRingBuffer(ParticleSystem.MainModule main, JObject obj)
+        {
+            if (main.ringBufferMode == ParticleSystemRingBufferMode.Disabled) return;
+            obj.Set("ringBufferMode", main.ringBufferMode == ParticleSystemRingBufferMode.PauseUntilReplaced
+                ? "pauseUntilReplaced"
+                : "loopUntilReplaced");
+            var range = main.ringBufferLoopRange;
+            if (main.ringBufferMode == ParticleSystemRingBufferMode.LoopUntilReplaced && (range.x != 0f || range.y != 1f))
+            {
+                obj.Set("ringBufferLoopRange", new JArray().Add(range.x).Add(range.y));
+            }
         }
 
         /// <summary>

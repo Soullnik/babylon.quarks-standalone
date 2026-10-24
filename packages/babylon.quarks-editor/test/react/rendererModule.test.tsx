@@ -36,6 +36,20 @@ describe('Renderer module', () => {
         return {system, binding, container: mounted.container};
     }
 
+    it('offers the ring buffer with max particles, and its loop range when it loops', () => {
+        const {system, container} = setup();
+        expect(hasRow(container, 'Ring buffer')).toBe(false);
+        click(controlsOf(rowOf(container, 'Max particles'))[0]);
+        pick(controlsOf(rowOf(container, 'Ring buffer'))[0], 'loopUntilReplaced');
+        expect(system.ringBufferMode).toBe('loopUntilReplaced');
+        const [start, end] = controlsOf(rowOf(container, 'Loop range'));
+        type(start, '0.6');
+        type(end, '0.3');
+        expect([system.ringBufferLoopRange.x, system.ringBufferLoopRange.y]).toEqual([0.3, 0.6]);
+        pick(controlsOf(rowOf(container, 'Ring buffer'))[0], 'disabled');
+        expect(hasRow(container, 'Loop range')).toBe(false);
+    });
+
     it('lays the map out through tiling, offset, scroll and channel, and drops the identity', () => {
         const {system, container} = setup();
         expect(system.mapUV).toBeUndefined();
@@ -202,6 +216,18 @@ describe('Main module', () => {
         pick(controlsOf(rowOf(container, 'Scaling mode'))[0], 'hierarchy');
         expect(system.worldSpace).toBe(true);
         expect(system.scalingMode).toBe('hierarchy');
+    });
+
+    it('sets the stop action in Main', () => {
+        const system = makeSystem(scene.get());
+        const binding = new EffectBinding(system);
+        const element = () => <MainModule binding={binding} />;
+        mounted = mount(element());
+        binding.subscribe(() => mounted!.render(element()));
+        openModule(mounted.container, 'Main');
+        expect(system.stopAction).toBe('none');
+        pick(controlsOf(rowOf(mounted.container, 'Stop action'))[0], 'destroy');
+        expect(system.stopAction).toBe('destroy');
     });
     it('takes every buffer of a host mesh, and gives one without them the library fallbacks', () => {
         const system = makeSystem(scene.get(), {renderMode: RenderMode.Mesh});

@@ -11,6 +11,11 @@ the API and the look of effects are frozen.
 
 ### Breaking
 
+- `autoDestroy` gives way to `stopAction` (`'none'`, `'disable'` or `'destroy'`, Unity's Stop
+  Action). Files are written with `stopAction` and no longer with `autoDestroy`; reading
+  `autoDestroy: true` from an older file, or passing it to the constructor, still gives
+  `'destroy'`, and the `autoDestroy` property and `QuarksUtil.setAutoDestroy` remain as deprecated
+  aliases. An older runtime does not read `stopAction`.
 - `LimitSpeedOverLife.speed` is typed `FunctionValueGenerator | ValueGenerator | Vector3Function`
   (it was `FunctionValueGenerator`), for Separate Axes and constant limits. Code that reads it
   with `genValue(memory, t)` narrows it first: `!(speed instanceof Vector3Function)`.
@@ -73,6 +78,18 @@ the API and the look of effects are frozen.
   when not `'local'`. One limit for the speed works as before. The editor's Limit Speed, Size over
   Lifetime and Size by Speed modules get a Separate Axes switch, and the new Limit Velocity Axes
   demo compares the two.
+- **Stop Action** (Unity's option of the same name): `ParticleSystem.stopAction` says what a
+  finished system does: nothing (`'none'`, the default), disable its emitter node (`'disable'`,
+  once per finish), or dispose itself (`'destroy'`). Unity's Callback is the `finished` event,
+  which fires whatever the action. `ignoreStopAction`, runtime only, skips it for tools that replay
+  an effect; `EffectPool` and the editor set it, so pooled and previewed effects keep their
+  authored stop action. `QuarksUtil.setStopAction` sets it on a whole effect.
+- **Ring Buffer Mode** (Unity's option of the same name): with `maxParticles`, a full system's
+  new particles replace the oldest instead of being dropped. `ringBufferMode: 'pauseUntilReplaced'`
+  freezes a particle at the end of its life until then (footprints, decals);
+  `'loopUntilReplaced'` replays the part of its life `ringBufferLoopRange` names (0 to 1 by
+  default). Particles of a ring buffer never die by age, so the system keeps them. Billboard,
+  stretched and mesh render modes; trail particles always die. The Ring Buffer demo shows both.
 - `EmitterFrame.fromSimulation`, the inverse of `toSimulation`, for behaviors that measure a
   vector in their own space.
 

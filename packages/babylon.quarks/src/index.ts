@@ -48,7 +48,9 @@ export type {
     CullingMode,
     ParticleSystemJSONParameters,
     ParticleSystemParameters,
+    RingBufferMode,
     ScalingMode,
+    StopAction,
 } from './ParticleSystem';
 export {QuarksFormatError, QuarksLoader} from './QuarksLoader';
 export type {

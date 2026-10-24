@@ -61,6 +61,7 @@ import {
     moveTrails,
     recordTrailHistory,
     removeDeadTrails,
+    RingBufferStep,
     runBehaviorSteps,
     snapshotPreviousState,
 } from './system/integrate';
@@ -74,11 +75,14 @@ import {
     validAlphaTest,
     validCullingMode,
     validLighting,
+    validLoopRange,
     validMaxParticles,
     validRenderFace,
+    validRingBufferMode,
     validScalingMode,
     validSoftFade,
     validSortMode,
+    validStopAction,
     validTileCount,
 } from './system/normalize';
 import {ParticleSpawner} from './system/ParticleSpawner';
@@ -117,7 +121,9 @@ import type {
     CullingMode,
     ParticleSystemJSONParameters,
     ParticleSystemParameters,
+    RingBufferMode,
     ScalingMode,
+    StopAction,
 } from './system/types';
 
 export type {
@@ -128,7 +134,9 @@ export type {
     CullingMode,
     ParticleSystemJSONParameters,
     ParticleSystemParameters,
+    RingBufferMode,
     ScalingMode,
+    StopAction,
 } from './system/types';
 
 // Scratch for the per-step emitter matrix of a frame that interpolates, see `update`.
@@ -156,8 +164,36 @@ const stepScale = new Vector3();
  * start values and emission, and the particle's age over its life inside behaviors.
  */
 export class ParticleSystem implements IParticleSystem {
-    /** Dispose the system, its emitter and its batch slot when it finishes. Default false. */
-    autoDestroy: boolean;
+    /**
+     * What the system does once it has finished (Unity's Stop Action): nothing, disable its
+     * emitter, or dispose it; see {@link StopAction}. `'none'` by default.
+     */
+    stopAction: StopAction;
+
+    /**
+     * Skips the {@link stopAction} while true, so a tool can play an effect over and over (an
+     * editor's preview, a gallery, a pool of reused copies) and still save the stop action it
+     * was authored with, as Unity applies stop actions only in Play mode. The `finished` event
+     * fires either way. False by default; never saved, cloned or loaded.
+     */
+    ignoreStopAction = false;
+
+    /**
+     * Whether the system disposes itself when it finishes: `stopAction === 'destroy'`. Setting it
+     * true sets that stop action, and false turns a `'destroy'` one into `'none'`.
+     * @deprecated Use {@link stopAction}.
+     */
+    get autoDestroy(): boolean {
+        return this.stopAction === 'destroy';
+    }
+
+    set autoDestroy(value: boolean) {
+        if (value) {
+            this.stopAction = 'destroy';
+        } else if (this.stopAction === 'destroy') {
+            this.stopAction = 'none';
+        }
+    }
     /**
      * Start a looping system as if it had already run one full cycle (Unity's Prewarm), so a fire
      * or a mist is full from its first frame. Default false.
@@ -237,9 +273,22 @@ export class ParticleSystem implements IParticleSystem {
     /**
      * Most particles alive at once (Unity's Max Particles); emission past it is dropped. Undefined
      * means no limit, as does a negative or NaN count given to the constructor; a fraction is
-     * rounded down.
+     * rounded down. With a {@link ringBufferMode}, new particles replace the oldest instead.
      */
     maxParticles?: number;
+    /**
+     * What a full system does with new particles (Unity's Ring Buffer Mode): drop them, or
+     * replace the oldest, which wait frozen or looping until then; see {@link RingBufferMode}.
+     * `'disabled'` by default. Takes effect only with {@link maxParticles}.
+     */
+    ringBufferMode: RingBufferMode;
+    /**
+     * The part of its life a particle plays again in `'loopUntilReplaced'` (Unity's Loop Range):
+     * at the end of its life it goes back to `x` and plays to `y`, as fractions of its life, 0 to
+     * 1. (0, 1), the default, replays its whole life. Set it through the constructor or assign a
+     * new vector; the constructor clamps both ends into 0..1 and orders them.
+     */
+    ringBufferLoopRange: Vector2;
     /**
      * The system emits nothing of its own and only spawns what an `EmitSubParticleSystem` on
      * another system sends it (a Unity sub emitter). Default false.
@@ -1085,7 +1134,9 @@ export class ParticleSystem implements IParticleSystem {
             },
         });
 
-        this.autoDestroy = parameters.autoDestroy ?? false;
+        this.stopAction = validStopAction(
+            parameters.stopAction ?? (parameters.autoDestroy === true ? 'destroy' : undefined)
+        );
         this.duration = parameters.duration ?? 1;
         this.startDelay = parameters.startDelay ?? new ConstantValue(0);
         this.looping = parameters.looping ?? true;
@@ -1100,6 +1151,8 @@ export class ParticleSystem implements IParticleSystem {
         this.emissionOverDistance = parameters.emissionOverDistance ?? new ConstantValue(0);
         this.emissionBursts = normalizeBursts(parameters.emissionBursts);
         this.maxParticles = validMaxParticles(parameters.maxParticles);
+        this.ringBufferMode = validRingBufferMode(parameters.ringBufferMode);
+        this.ringBufferLoopRange = validLoopRange(parameters.ringBufferLoopRange);
         this.onlyUsedByOther = parameters.onlyUsedByOther ?? false;
         this.emitterShape = parameters.shape ?? new SphereEmitter();
         this.behaviors = parameters.behaviors ?? [];
@@ -1375,7 +1428,7 @@ export class ParticleSystem implements IParticleSystem {
     /**
      * Stops emission and lets the particles alive die out (Unity's `Stop` with
      * `StopEmitting`). The system fires `emitEnd`, then `finished` when the last particle has
-     * died, and is disposed then if {@link autoDestroy} is set. {@link restart} starts it again.
+     * died, and then does what its {@link stopAction} says. {@link restart} starts it again.
      */
     endEmit(): void {
         this.emitEnded = true;
@@ -1823,7 +1876,8 @@ export class ParticleSystem implements IParticleSystem {
                 snapshotColor,
                 this.bounds,
                 this,
-                onDied
+                onDied,
+                this.ringBufferStep()
             );
         } else {
             // Trails: the newborn collapse, then motion, then the trail history,
@@ -1853,6 +1907,20 @@ export class ParticleSystem implements IParticleSystem {
         event.particle = undefined;
     };
 
+    /** The ring buffer step for {@link integrateSprites}, or undefined when particles die by age. */
+    private ringBufferStep(): RingBufferStep | undefined {
+        if (this.ringBufferMode === 'disabled' || this.maxParticles === undefined) {
+            return undefined;
+        }
+        const step = this.ringStep;
+        step.pause = this.ringBufferMode === 'pauseUntilReplaced';
+        step.loopStart = this.ringBufferLoopRange.x;
+        step.loopEnd = this.ringBufferLoopRange.y;
+        return step;
+    }
+
+    private readonly ringStep: RingBufferStep = {pause: true, loopStart: 0, loopEnd: 1};
+
     private notifyFinished(): void {
         if (!this.isFinished()) {
             return;
@@ -1860,8 +1928,12 @@ export class ParticleSystem implements IParticleSystem {
         if (!this.finishedEventFired) {
             this.finishedEventFired = true;
             this.events.fire({type: 'finished', particleSystem: this});
+            // Once per finish, so an emitter enabled again from a listener or later stays enabled.
+            if (this.stopAction === 'disable' && !this.ignoreStopAction && !this.destroyed) {
+                this.emitter.setEnabled(false);
+            }
         }
-        if (this.autoDestroy) {
+        if (this.stopAction === 'destroy' && !this.ignoreStopAction) {
             this.dispose();
         }
     }

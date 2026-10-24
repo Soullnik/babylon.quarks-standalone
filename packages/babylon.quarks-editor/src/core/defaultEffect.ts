@@ -40,6 +40,8 @@ export function createDefaultEffect(
         transparent: true,
         blendMode: 1,
     });
+    // The editor previews over and over; the stop action is saved, not applied.
+    system.ignoreStopAction = true;
     system.addBehavior(new ColorOverLife(buildGradient(DEFAULT_GRADIENT_STOPS)));
     system.emitter.rotation.x = -Math.PI / 2;
     return system;

@@ -85,6 +85,16 @@ export const demoManifest: DemoManifestEntry[] = [
         preview: {icon: 'LV', gradient: 'linear-gradient(135deg, #66c2ff 0%, #1a3f8c 100%)'},
     },
     {
+        key: 'RingBufferDemo',
+        name: 'Ring Buffer',
+        module: 'ringBuffer',
+        sourcePath: 'examples/src/demos/ringBuffer.ts',
+        description:
+            'Ring Buffer Mode: a full system replaces its oldest particles, which wait paused (footprints) or looping (pulsing dots) until then.',
+        tags: ['emission', 'ring buffer', 'max particles'],
+        preview: {icon: 'RB', gradient: 'linear-gradient(135deg, #ffb366 0%, #8c3a1a 100%)'},
+    },
+    {
         key: 'TurbulenceDemo',
         name: 'Noise Turbulence',
         module: 'turbulence',

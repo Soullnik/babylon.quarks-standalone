@@ -101,6 +101,38 @@ export interface BurstParameters {
 export type CullingMode = 'always' | 'pause' | 'pauseAndCatchUp';
 
 /**
+ * What a system does once it has finished, its emission over and its last particle dead (Unity's
+ * Stop Action):
+ *
+ * - `'none'` (the default): nothing; {@link ParticleSystem.restart} plays it again.
+ * - `'disable'`: disables its emitter node (`setEnabled(false)`), and with it the nodes under it.
+ *   A disabled system is not advanced or drawn; enable the emitter again before playing it.
+ * - `'destroy'`: disposes the system and its emitter, as `ParticleSystem.dispose()` does.
+ *
+ * Unity's Callback is the system's `finished` event, which fires whatever the stop action.
+ */
+export type StopAction = 'none' | 'disable' | 'destroy';
+
+/**
+ * What a full system does with the particles it emits next (Unity's Ring Buffer Mode). It needs
+ * {@link ParticleSystemParameters.maxParticles}; without a limit it is ignored.
+ *
+ * - `'disabled'` (the default): particles die at the end of their life, and a full system drops
+ *   what it would emit.
+ * - `'pauseUntilReplaced'`: a particle at the end of its life stays where and as it is, frozen,
+ *   until a new particle replaces it, the oldest first. For footprints, decals and bullet holes.
+ * - `'loopUntilReplaced'`: a particle at the end of its life goes back to an earlier point of it
+ *   and plays that part again, over and over, until a new particle replaces it; see
+ *   {@link ParticleSystem.ringBufferLoopRange}.
+ *
+ * Particles are never killed by age, so a system in either mode keeps its particles and does not
+ * finish while it has any. A replaced particle does not fire `particleDied`. Applies in the
+ * billboard, stretched and mesh render modes; trail particles always die at the end of their
+ * life.
+ */
+export type RingBufferMode = 'disabled' | 'pauseUntilReplaced' | 'loopUntilReplaced';
+
+/**
  * What the emitter's scale does to the system, as Unity's Scaling Mode, in world and local space
  * alike. The scale reaches the emission shape, the particles' size, their start speed and, in world
  * space, `ForceOverLife`, `ApplyForce` and `LimitSpeedOverLife` (by the mean of the axes), so a
@@ -155,7 +187,12 @@ export type BeamEnd =
  * default named on it, the same default `fromJSON` gives a file that leaves it out.
  */
 export interface ParticleSystemParameters {
-    /** See {@link ParticleSystem.autoDestroy}. Default false. */
+    /** What the system does once it has finished, see {@link StopAction}. Default `'none'`. */
+    stopAction?: StopAction;
+    /**
+     * `true` is `stopAction: 'destroy'`; read only when `stopAction` is left out.
+     * @deprecated Use `stopAction: 'destroy'`.
+     */
     autoDestroy?: boolean;
     /** See {@link ParticleSystem.looping}. Default true. */
     looping?: boolean;
@@ -187,6 +224,10 @@ export interface ParticleSystemParameters {
     emissionBursts?: Array<BurstParameters>;
     /** Most particles alive at once; emission past it is dropped. Leave unset for no limit. */
     maxParticles?: number;
+    /** What a full system does with new particles, see {@link RingBufferMode}. Default `'disabled'`. */
+    ringBufferMode?: RingBufferMode;
+    /** See {@link ParticleSystem.ringBufferLoopRange}. Default the whole life, (0, 1). */
+    ringBufferLoopRange?: Vector2;
     /** See {@link ParticleSystem.onlyUsedByOther}. Default false. */
     onlyUsedByOther?: boolean;
     /** See {@link ParticleSystem.behaviors}. Default none. */
@@ -324,7 +365,9 @@ export interface BurstParametersJSON {
 export interface ParticleSystemJSONParameters {
     /** The quarks.core version line the system was written with. */
     version: string;
-    /** See {@link ParticleSystem.autoDestroy}. */
+    /** Written only when not `'none'`. */
+    stopAction?: StopAction;
+    /** Read from older files: `true` is `stopAction: 'destroy'`. No longer written. */
     autoDestroy?: boolean;
     /** See {@link ParticleSystem.looping}. */
     looping?: boolean;
@@ -356,6 +399,10 @@ export interface ParticleSystemJSONParameters {
     emissionBursts?: Array<BurstParametersJSON>;
     /** See {@link ParticleSystem.maxParticles}. */
     maxParticles?: number;
+    /** Written only when not `'disabled'`. */
+    ringBufferMode?: RingBufferMode;
+    /** `[start, end]`; written only when not `[0, 1]`. */
+    ringBufferLoopRange?: [number, number];
     /** See {@link ParticleSystem.onlyUsedByOther}. */
     onlyUsedByOther?: boolean;
     /**

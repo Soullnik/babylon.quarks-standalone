@@ -130,6 +130,20 @@ function retire(particles: Particle[], store: ParticleStore, i: number, last: nu
 }
 
 /**
+ * What a ring buffer does to a particle at the end of its life (see `RingBufferMode`): `pause`
+ * holds it frozen at its end, else it goes back to `loopStart` (a fraction of its life) once it
+ * reaches `loopEnd`.
+ */
+export interface RingBufferStep {
+    /** Freeze at the end of life rather than loop. */
+    pause: boolean;
+    /** Where a looping particle goes back to, a fraction of its life. */
+    loopStart: number;
+    /** Where a looping particle goes back from, a fraction of its life. */
+    loopEnd: number;
+}
+
+/**
  * The sprite path's step after the behaviors, as one pass over the columns that does three
  * things, none of which touches a particle object until a death. Returns the live count.
  *
@@ -142,7 +156,8 @@ function retire(particles: Particle[], store: ParticleStore, i: number, last: nu
  * Position is integrated along the velocity.
  *
  * A particle whose age reached its life is swapped with the last live one, rows included. The
- * survivor moved into the slot has not been visited yet, so the slot is processed again.
+ * survivor moved into the slot has not been visited yet, so the slot is processed again. With a
+ * `ring` buffer no particle dies: it is frozen at the end of its life, or sent back into it.
  *
  * The bounds fall out of the same pass. Measuring every particle on every step costs about as
  * much as the integration itself, so the full measurement runs every few steps; in between,
@@ -158,9 +173,11 @@ export function integrateSprites(
     collapseColor: boolean,
     bounds: BoundsTracker,
     settings: BoundsSettings,
-    onDied: DeathListener | undefined
+    onDied: DeathListener | undefined,
+    ring?: RingBufferStep
 ): number {
     const scalars = store.scalars;
+    const pause = ring !== undefined && ring.pause;
     const stride = ParticleStore.SCALAR_STRIDE;
     const positions = store.position;
     const velocities = store.velocity;
@@ -198,7 +215,10 @@ export function integrateSprites(
                 prevColor[o4 + 3] = curColor[o4 + 3];
             }
         }
-        const step = delta * scalars[scalar + ParticleStore.SPEED_MODIFIER];
+        const life = scalars[scalar + ParticleStore.LIFE];
+        // Frozen at the end of its life until a newborn replaces it: no motion, no ageing.
+        const frozen = pause && age >= life;
+        const step = frozen ? 0 : delta * scalars[scalar + ParticleStore.SPEED_MODIFIER];
         const vx = velocities[offset];
         const vy = velocities[offset + 1];
         const vz = velocities[offset + 2];
@@ -219,10 +239,26 @@ export function integrateSprites(
         }
         // Speed is tracked every step: it bounds how far the particles
         // can have moved since the last measurement.
+        if (frozen) {
+            continue;
+        }
         maxSpeedSq = Math.max(maxSpeedSq, vx * vx + vy * vy + vz * vz);
         age += delta;
         scalars[scalar + ParticleStore.AGE] = age;
-        if (age >= scalars[scalar + ParticleStore.LIFE]) {
+        if (ring !== undefined) {
+            if (pause) {
+                if (age > life) {
+                    scalars[scalar + ParticleStore.AGE] = life;
+                }
+            } else {
+                const loopEnd = ring.loopEnd * life;
+                if (age >= loopEnd) {
+                    const loopStart = ring.loopStart * life;
+                    const span = loopEnd - loopStart;
+                    scalars[scalar + ParticleStore.AGE] = span > 0 ? loopStart + ((age - loopEnd) % span) : loopStart;
+                }
+            }
+        } else if (age >= life) {
             const particle = retire(particles, store, i, liveParticleCount - 1);
             liveParticleCount--;
             i--;
