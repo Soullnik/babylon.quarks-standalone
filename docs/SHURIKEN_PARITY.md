@@ -29,14 +29,14 @@ Three tiers: ✅ shipped · 🟡 runtime supports it, editor UI missing · 🔴 
 - 🔴 texture-based emission
 
 ## Velocity / forces
-- ✅ Speed over Lifetime (curve), Limit Speed over Lifetime (curve + dampen), Force over Lifetime (XYZ), Gravity
+- ✅ Speed over Lifetime (curve), Limit Speed over Lifetime (curve + dampen; separate axes per axis in local or world space), Force over Lifetime (XYZ), Gravity
 - ✅ Orbit over Lifetime
 - ✅ Velocity over Lifetime (linear XYZ local/world + orbital XYZ, orbital offset, radial), Inherit Velocity (initial/current)
 - 🔴 Lifetime by Emitter Speed
 
 ## Color / size / rotation
 - ✅ Color over Lifetime (gradient), Size over Lifetime (curve), Rotation over Lifetime (billboards in their plane, meshes about their local Z; separate axes → `Rotation3DOverLife`)
-- ✅ Color by Speed, Size by Speed, Rotation by Speed
+- ✅ Color by Speed, Size by Speed (separate axes → `Vector3Function`), Rotation by Speed
 
 ## Noise
 - ✅ frequency + strength, position/rotation amounts as separate fields

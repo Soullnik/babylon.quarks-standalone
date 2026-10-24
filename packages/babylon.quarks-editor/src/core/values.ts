@@ -99,11 +99,17 @@ export interface CurvePiece {
 
 /**
  * Reads pieces from a PiecewiseBezier, or from the first curve of a RandomBetweenCurves (the
- * second with `second`), and synthesizes one segment for other generators.
+ * second with `second`). A constant reads as a flat curve, a random range as a flat curve at its
+ * lower end (its upper with `second`), and other generators as one default segment.
  */
 export function readPieces(generator: AnyGenerator | undefined, second = false): CurvePiece[] {
     if (generator instanceof RandomBetweenCurves) {
         return readPieces(second ? generator.curve2 : generator.curve1);
+    }
+    // A constant is a flat curve, and a random range two flat curves at its ends.
+    if (generator instanceof ConstantValue || generator instanceof IntervalValue) {
+        const value = generator instanceof ConstantValue ? generator.value : second ? generator.b : generator.a;
+        return [{start: 0, p: [value, value, value, value]}];
     }
     if (generator instanceof PiecewiseBezier && generator.functions.length > 0) {
         return generator.functions.map(([bezier, start]) => ({
@@ -124,6 +130,7 @@ export function buildCurve(pieces: CurvePiece[]): PiecewiseBezier {
 /**
  * `generator` as one curve (`'curve'`) or two (`'curves'`, Unity's Random Between Two Curves),
  * keeping every segment: one curve becomes both bounds of two, and two keep their first as one.
+ * A constant is a flat curve, and a random range flat curves at its ends.
  */
 export function withCurves(generator: AnyGenerator | undefined, mode: 'curve'): PiecewiseBezier;
 export function withCurves(generator: AnyGenerator | undefined, mode: 'curves'): RandomBetweenCurves;
@@ -139,7 +146,8 @@ export function withCurves(
     if (mode === 'curve') {
         return first;
     }
-    return new RandomBetweenCurves(first, buildCurve(readPieces(generator, generator instanceof RandomBetweenCurves)));
+    const second = generator instanceof RandomBetweenCurves || generator instanceof IntervalValue;
+    return new RandomBetweenCurves(first, buildCurve(readPieces(generator, second)));
 }
 
 /** Splits the piece containing x into two exact halves using Bezier.split. */

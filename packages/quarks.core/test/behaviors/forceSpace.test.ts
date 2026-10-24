@@ -281,3 +281,28 @@ describe('force space JSON', () => {
         ).toBe('world');
     });
 });
+
+describe('EmitterFrame of a flattened emitter', () => {
+    it.each([
+        ['one axis', new Vector3(2, 0, 1)],
+        ['two axes', new Vector3(0, 0, 3)],
+        ['every axis', new Vector3(0, 0, 0)],
+    ])('keeps a finite rotation with %s scaled to 0', (_name, scale) => {
+        const turn = new Quaternion().setFromAxisAngle(new Vector3(0, 0, 1), HALF_PI);
+        const flattened = new Matrix4().compose(new Vector3(1, 2, 3), turn, scale);
+        const frame = new EmitterFrame();
+        frame.refresh({worldSpace: true, emitter: {matrixWorld: flattened}} as unknown as IParticleSystem);
+        for (const value of [frame.quaternion.x, frame.quaternion.y, frame.quaternion.z, frame.quaternion.w]) {
+            expect(Number.isFinite(value)).toBe(true);
+        }
+        const local = frame.toSimulation(new Vector3(0, 0, 1), 'local', true);
+        expect(Number.isFinite(local.z)).toBe(true);
+        if (scale.z !== 0) {
+            // The axis that remains keeps its direction.
+            close(local, 0, 0, scale.z);
+        }
+        if (scale.x !== 0) {
+            close(frame.toSimulation(new Vector3(1, 0, 0), 'local', true), 0, scale.x, 0);
+        }
+    });
+});

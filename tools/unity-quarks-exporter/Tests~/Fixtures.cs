@@ -214,6 +214,9 @@ namespace BabylonQuarks.UnityExporter.Tests
             dustLimit.enabled = true;
             dustLimit.separateAxes = true;
             dustLimit.limitX = 2f;
+            dustLimit.limitY = 0.5f;
+            dustLimit.limitZ = 3f;
+            dustLimit.space = ParticleSystemSimulationSpace.World;
             dustRenderer.sharedMaterial = Urp("DustAlpha", 1, 5, 10, Spark());
             return root.transform.gameObject;
         }
@@ -299,7 +302,10 @@ namespace BabylonQuarks.UnityExporter.Tests
             sparks.emission.rateOverTime = 30f;
             var sizeBySpeed = sparks.sizeBySpeed;
             sizeBySpeed.enabled = true;
-            sizeBySpeed.size = new ParticleSystem.MinMaxCurve(1f, AnimationCurve.Linear(0, 0.5f, 1, 1));
+            sizeBySpeed.separateAxes = true;
+            sizeBySpeed.x = new ParticleSystem.MinMaxCurve(1f, AnimationCurve.Linear(0, 0.5f, 1, 1));
+            sizeBySpeed.y = 1.5f;
+            sizeBySpeed.z = 1f;
             sizeBySpeed.range = new Vector2(0f, 5f);
             var rotationBySpeed = sparks.rotationBySpeed;
             rotationBySpeed.enabled = true;

@@ -59,9 +59,9 @@ import {
     readShapeParams,
 } from '../core/shapes.js';
 import {buildCurve, buildScalar, readScalar} from '../core/values.js';
+import {AxesCurveField} from './AxesCurveField.js';
 import {GradientEditor} from './GradientEditor.js';
 import {InspectorInfoIcon} from './InspectorInfoIcon.js';
-import {LifeCurveField} from './LifeCurveField.js';
 import {ModuleSection, type ModuleProps} from './ModuleSection.js';
 import {TextureSelect} from './TextureSelect.js';
 import {TextureUVField} from './TextureUVField.js';
@@ -857,7 +857,7 @@ export function SizeOverLifeModule({binding}: ModuleProps) {
             }
         >
             <div style={{marginTop: 6}}>
-                <LifeCurveField
+                <AxesCurveField
                     generator={behavior ? behavior.size : buildCurve([{start: 0, p: curve}])}
                     maxValue={2}
                     onChange={(size) =>

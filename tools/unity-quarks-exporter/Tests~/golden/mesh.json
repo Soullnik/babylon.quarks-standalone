@@ -416,10 +416,22 @@
             {
               "type": "LimitSpeedOverLife",
               "speed": {
-                "type": "ConstantValue",
-                "value": 2
+                "type": "Vector3Function",
+                "x": {
+                  "type": "ConstantValue",
+                  "value": 2
+                },
+                "y": {
+                  "type": "ConstantValue",
+                  "value": 0.5
+                },
+                "z": {
+                  "type": "ConstantValue",
+                  "value": 3
+                }
               },
-              "dampen": 1
+              "dampen": 1,
+              "space": "world"
             }
           ]
         }

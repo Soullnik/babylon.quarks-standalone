@@ -13,7 +13,15 @@ import type {Node} from '@babylonjs/core/node';
 import {Scene} from '@babylonjs/core/scene';
 import * as fs from 'fs';
 import * as path from 'path';
-import {ConeEmitFrom, ConeEmitter, loadPlugin, RandomBetweenCurves} from 'quarks.core';
+import {
+    ConeEmitFrom,
+    ConeEmitter,
+    LimitSpeedOverLife,
+    loadPlugin,
+    RandomBetweenCurves,
+    SizeBySpeed,
+    Vector3Function,
+} from 'quarks.core';
 import {BatchedRenderer} from '../src/BatchedRenderer';
 import {MeshSurfaceEmitterPlugin} from '../src/MeshSurfaceEmitter';
 import type {ParticleEmitter} from '../src/ParticleEmitter';
@@ -147,6 +155,10 @@ describe('Unity exporter output', () => {
         expect(cone.length).toBe(2);
         // Random Between Two Curves, with both of its curves.
         expect(dust.startSpeed).toBeInstanceOf(RandomBetweenCurves);
+        // Limit Velocity with Separate Axes, in world space.
+        const limit = dust.behaviors.find((b) => b.type === 'LimitSpeedOverLife') as LimitSpeedOverLife;
+        expect(limit.speed).toBeInstanceOf(Vector3Function);
+        expect(limit.space).toBe('world');
     });
 
     it('keeps trails, sub-emitters and a hidden mesh emitter source', () => {
@@ -161,6 +173,9 @@ describe('Unity exporter output', () => {
         expect(smoke.blending).toBe(Constants.ALPHA_SUBTRACT);
         expect(smoke.onlyUsedByOther).toBe(true);
         expect(smoke.scalingMode).toBe('shape');
+        // Size by Speed with Separate Axes, one curve per axis.
+        const sizeBySpeed = system('TrailSparks').behaviors.find((b) => b.type === 'SizeBySpeed') as SizeBySpeed;
+        expect(sizeBySpeed.size).toBeInstanceOf(Vector3Function);
         const source = root.getChildMeshes(false).find((mesh) => mesh.name.endsWith('(emitter source)')) as Mesh;
         expect(source.isVisible).toBe(false);
     });

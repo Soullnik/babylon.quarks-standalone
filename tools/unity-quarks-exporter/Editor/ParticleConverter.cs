@@ -707,13 +707,7 @@ namespace BabylonQuarks.UnityExporter
             var m = ps.sizeOverLifetime;
             if (!m.enabled) return;
             // Separate axes become a per-axis Vector3Function; Unity throws on `.size` in that mode.
-            JToken size = m.separateAxes
-                ? new JObject()
-                    .Set("type", "Vector3Function")
-                    .Set("x", ValueConverter.Curve(m.x))
-                    .Set("y", ValueConverter.Curve(m.y))
-                    .Set("z", ValueConverter.Curve(m.z))
-                : ValueConverter.Curve(m.size);
+            JToken size = m.separateAxes ? PerAxis(m.x, m.y, m.z) : ValueConverter.Curve(m.size);
             behaviors.Add(new JObject().Set("type", "SizeOverLife").Set("size", size));
         }
 
@@ -784,17 +778,24 @@ namespace BabylonQuarks.UnityExporter
         {
             var m = ps.limitVelocityOverLifetime;
             if (!m.enabled) return;
-            // With separate axes Unity throws on `.limit`; the runtime limits the speed, not each
-            // axis, so the X limit stands for all three.
-            if (m.separateAxes)
-            {
-                Debug.LogWarning($"[Quarks Exporter] '{ps.name}': Limit Velocity over Lifetime limits the speed in babylon.quarks; its X limit is exported for all three axes.");
-            }
-            var curve = m.separateAxes ? m.limitX : m.limit;
-            behaviors.Add(new JObject()
+            // With separate axes each axis has its own limit, measured along the axes of the
+            // module's space; Unity throws on `.limit` in that mode.
+            var limit = new JObject()
                 .Set("type", "LimitSpeedOverLife")
-                .Set("speed", ValueConverter.Curve(curve))
-                .Set("dampen", m.dampen));
+                .Set("speed", m.separateAxes ? PerAxis(m.limitX, m.limitY, m.limitZ) : ValueConverter.Curve(m.limit))
+                .Set("dampen", m.dampen);
+            if (m.separateAxes && m.space == ParticleSystemSimulationSpace.World) limit.Set("space", "world");
+            behaviors.Add(limit);
+        }
+
+        /// <summary>A per-axis <c>Vector3Function</c> of three Unity curves.</summary>
+        private static JObject PerAxis(ParticleSystem.MinMaxCurve x, ParticleSystem.MinMaxCurve y, ParticleSystem.MinMaxCurve z)
+        {
+            return new JObject()
+                .Set("type", "Vector3Function")
+                .Set("x", ValueConverter.Curve(x))
+                .Set("y", ValueConverter.Curve(y))
+                .Set("z", ValueConverter.Curve(z));
         }
 
         private static void AddForceOverLife(ParticleSystem ps, JArray behaviors)
@@ -862,14 +863,11 @@ namespace BabylonQuarks.UnityExporter
         {
             var m = ps.sizeBySpeed;
             if (!m.enabled) return;
-            if (m.separateAxes)
-            {
-                Debug.LogWarning($"[Quarks Exporter] '{ps.name}': Size by Speed with separate axes is exported with its X curve for all three axes.");
-            }
-            var curve = m.separateAxes ? m.x : m.size;
+            // Separate axes become a per-axis Vector3Function, as in Size over Lifetime.
+            JToken size = m.separateAxes ? PerAxis(m.x, m.y, m.z) : ValueConverter.Curve(m.size);
             behaviors.Add(new JObject()
                 .Set("type", "SizeBySpeed")
-                .Set("size", ValueConverter.Curve(curve))
+                .Set("size", size)
                 .Set("speedRange", SpeedRange(m.range)));
         }
 

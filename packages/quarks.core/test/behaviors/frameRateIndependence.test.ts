@@ -30,6 +30,7 @@ import {
     SpriteParticle,
     TurbulenceField,
     Vector3,
+    Vector3Function,
     VelocityOverLife,
     withRandomSource,
 } from '../../src';
@@ -170,6 +171,17 @@ const CASES: Record<string, Case> = {
     },
     LimitSpeedOverLife: {
         behavior: () => new LimitSpeedOverLife(ramp(2, 2), 0.5),
+        read: velocity,
+        tolerance: 0.05,
+        seconds: 0.2,
+        converged: 0.005,
+    },
+    'LimitSpeedOverLife separate axes': {
+        behavior: () =>
+            new LimitSpeedOverLife(
+                new Vector3Function(new ConstantValue(2), new ConstantValue(1), new ConstantValue(3)),
+                0.5
+            ),
         read: velocity,
         tolerance: 0.05,
         seconds: 0.2,
