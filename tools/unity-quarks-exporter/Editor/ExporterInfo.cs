@@ -7,7 +7,7 @@ namespace BabylonQuarks.UnityExporter
         /// The exporter's version: the babylon.quarks release it writes for. Kept equal to the
         /// package's <c>package.json</c> version; the exporter tests check it.
         /// </summary>
-        public const string Version = "0.28.0";
+        public const string Version = "0.29.0";
 
         /// <summary>The <c>metadata.generator</c> of every exported file.</summary>
         public const string Generator = "babylon.quarks Unity exporter " + Version;
