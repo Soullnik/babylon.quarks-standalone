@@ -54,7 +54,7 @@ changes to the library show up in demos without rebuilding.
 Run the full suite before opening a PR:
 
 ```bash
-npm run check        # format, lint, build, API docs, typecheck, tests with coverage gate, smoothness sweep, examples build, tarball check
+npm run check        # format, lint, build, API reports, API docs, typecheck, tests with coverage gate, smoothness sweep, examples build, tarball check
 ```
 
 Individual pieces:
@@ -108,6 +108,15 @@ packages and fails on an exported class, function, type, member or accessor with
 a `{@link}` that does not resolve. A member that is public in TypeScript only so other files of the
 package can reach it is tagged `@internal`, which keeps it out of the docs and out of the contract;
 users should not rely on it.
+
+The public API of every published entry point is recorded in `packages/<package>/api/*.api.md`,
+written by API Extractor from the built declarations. `npm run api:check`, part of `npm run check`
+and CI, fails when the build's API differs from the committed report, so every change to the
+public surface shows in review as a diff of the report. After an intended change, run
+`npm run build && npm run build:editor && npm run api` and commit the reports with it. A type the
+API reaches but no entry point exports is listed in the report as `ae-forgotten-export`; export
+it, or keep it out of the public signature. The reports list `@internal` members too, marked as
+such, so a change to one also needs `npm run api`; they are still no promise to users.
 
 ## Commit and PR conventions
 

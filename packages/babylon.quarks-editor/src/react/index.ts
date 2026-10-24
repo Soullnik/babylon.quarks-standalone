@@ -63,4 +63,22 @@ export type {TimelineTrackRowProps} from './TimelineTrackRow.js';
 export {TransportBar} from './TransportBar.js';
 export type {TransportBarProps} from './TransportBar.js';
 export {ValueField} from './ValueField.js';
-export type {ConstantValueFieldProps, CurveValueFieldProps} from './ValueField.js';
+export type {ConstantValueFieldProps, CurveValueFieldProps, ValueFieldBaseProps} from './ValueField.js';
+// The core types the components' props use, so a host can name them from this entry point too.
+export type {AssetLoadProgress, EffectAsset} from '../core/assets.js';
+export type {AssetDragPayload} from '../core/assetTree.js';
+export type {EditorListener, EffectBinding} from '../core/binding.js';
+export type {GradientStop} from '../core/colors.js';
+export type {EffectTreeNode} from '../core/effectTree.js';
+export type {EffectHistory, HistoryStacks} from '../core/history.js';
+export type {
+    ProjectMeta,
+    ProjectStore,
+    StorageEstimate,
+    StoredAsset,
+    StoredScene,
+    StoredSceneEntry,
+} from '../core/projectStore.js';
+export type {SceneEntry} from '../core/sceneEntries.js';
+export type {TimelineGroupRow, TimelineRow, TimelineSystemRow} from '../core/timeline.js';
+export type {AnyGenerator, CurvePiece, ScalarGenerator} from '../core/values.js';

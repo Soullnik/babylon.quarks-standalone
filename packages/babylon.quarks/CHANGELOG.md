@@ -4,6 +4,19 @@ All notable changes to the `babylon.quarks` package are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project follows the `quarks.core` 0.x version line.
 
+## [0.30.0] — Unreleased
+
+Phase 8 of the road to 1.0: the public API is frozen, so 0.30 is the last release that changes it
+on purpose.
+
+### Added
+
+- **API reports:** the public API of `babylon.quarks`, `quarks.core` and each entry point of
+  `babylon.quarks-editor` is recorded in the repository (`packages/*/api/*.api.md`, written by API
+  Extractor), and `npm run check` and CI fail when a change alters it without updating the report.
+  Every change to the public surface is now visible in review.
+- `ShaderImageProcessing`, the type of `ShaderContext.imageProcessing`, is exported.
+
 ## [0.29.0] — 2026-10-24
 
 Phase 7 of the road to 1.0: what still behaves differently from Unity is brought in line before
