@@ -2,6 +2,13 @@
 
 All notable changes to the Unity Quarks Exporter are documented here.
 
+## [0.30.0] — 2026-10-24
+
+### Changed
+
+- The exporter's version follows babylon.quarks 0.30. Its output is unchanged: files it writes
+  load in babylon.quarks 0.29 and 0.30.
+
 ## [0.29.0] — 2026-10-24
 
 ### Added

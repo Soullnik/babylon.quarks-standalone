@@ -4,10 +4,37 @@ All notable changes to the `babylon.quarks` package are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project follows the `quarks.core` 0.x version line.
 
-## [0.30.0] — Unreleased
+## [0.30.0] — 2026-10-24
 
 Phase 8 of the road to 1.0: the public API is frozen, so 0.30 is the last release that changes it
-on purpose.
+on purpose. quarks' own math leaves the public API, which takes Babylon's vectors and colours,
+deprecated aliases and dead parameters are removed, custom behaviors are recognised by
+implementation and have a guide, and the public surface is recorded in API reports.
+
+### Upgrading from 0.29
+
+Effects look as before and files from 0.29 load as they are; the upgrade is in code. Check
+these, in this order:
+
+1. **Math imports:** import `Vector3`, `Quaternion`, `Color3`, `Color4` and the rest from
+   `@babylonjs/core`, not from `babylon.quarks`. Colours are `{r, g, b, a}`: replace
+   `new Vector4(r, g, b, a)` in a `ConstantColor`, `ColorRange`, `RandomColor` or `tint` with a
+   `Color4`, and `Gradient` colour keys with `Color3`. Code that read a colour's `x`/`w` reads
+   `r`/`a`.
+2. **Removed aliases:** `autoDestroy` → `stopAction: 'destroy'`, `speedFactor` →
+   `rendererEmitterSettings`, `eular` → `euler`, `addThreeAnimation` → `addClipAnimation`, and
+   the editor's `importGallery` → `importAssets`. Each is listed below with its replacement.
+3. **Read-only state:** code that assigned `particleNum`, `particles` or `emissionState` no longer
+   compiles; let the renderer keep them, and call `restart()` to clear a system.
+4. **Vector methods on read-back values:** `pivot`, `flip`, `ringBufferLoopRange` and
+   `TrailSettings.sideAxis` are plain `{x, y, z}` objects; use Babylon's math to work on them.
+5. **Custom behaviors:** a subclass of a built-in now always runs its own methods, and one that
+   overrides `update` has it called. See
+   [Extending babylon.quarks](https://github.com/Soullnik/babylon.quarks-standalone/blob/main/docs/EXTENDING.md).
+6. **Prefabs with a clip track** are saved with `'clip'`, which a 0.29 runtime skips; load them
+   with 0.30.
+7. **Versions:** install `babylon.quarks-editor` 0.30 with `babylon.quarks` 0.30. Files from the
+   Unity exporter 0.29 load as they are.
 
 ### Breaking
 
