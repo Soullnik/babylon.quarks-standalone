@@ -137,10 +137,24 @@ function retire(particles: Particle[], store: ParticleStore, i: number, last: nu
 export interface RingBufferStep {
     /** Freeze at the end of life rather than loop. */
     pause: boolean;
-    /** Where a looping particle goes back to, a fraction of its life. */
+    /** Where a looping particle goes back to, a fraction of its life, 0 to 1. */
     loopStart: number;
-    /** Where a looping particle goes back from, a fraction of its life. */
+    /**
+     * Where a looping particle goes back from, a fraction of its life, `loopStart` to 1. Equal to
+     * `loopStart`, the particle is held there.
+     */
     loopEnd: number;
+}
+
+/** The least age a held particle keeps, as a fraction of its life: past 0, a newborn's age. */
+const HELD_AGE = 1e-6;
+
+/**
+ * The age a looping ring particle is held at, or Infinity when it loops: a loop range of no
+ * length holds it at that point of its life, as a pause does at the end.
+ */
+function holdAge(ring: RingBufferStep, life: number): number {
+    return ring.loopEnd > ring.loopStart ? Infinity : Math.max(ring.loopEnd, HELD_AGE) * life;
 }
 
 /**
@@ -216,8 +230,10 @@ export function integrateSprites(
             }
         }
         const life = scalars[scalar + ParticleStore.LIFE];
-        // Frozen at the end of its life until a newborn replaces it: no motion, no ageing.
-        const frozen = pause && age >= life;
+        // Frozen until a newborn replaces it, no motion and no ageing: at the end of its life when
+        // paused, or at a loop range of no length, held a hair past 0 so Birth fires only once.
+        const hold = ring === undefined ? Infinity : pause ? life : holdAge(ring, life);
+        const frozen = age >= hold;
         const step = frozen ? 0 : delta * scalars[scalar + ParticleStore.SPEED_MODIFIER];
         const vx = velocities[offset];
         const vy = velocities[offset + 1];
@@ -246,17 +262,22 @@ export function integrateSprites(
         age += delta;
         scalars[scalar + ParticleStore.AGE] = age;
         if (ring !== undefined) {
-            if (pause) {
-                if (age > life) {
-                    scalars[scalar + ParticleStore.AGE] = life;
-                }
-            } else {
-                const loopEnd = ring.loopEnd * life;
-                if (age >= loopEnd) {
-                    const loopStart = ring.loopStart * life;
-                    const span = loopEnd - loopStart;
-                    scalars[scalar + ParticleStore.AGE] = span > 0 ? loopStart + ((age - loopEnd) % span) : loopStart;
-                }
+            if (age > hold) {
+                scalars[scalar + ParticleStore.AGE] = hold;
+            } else if (!pause && hold === Infinity && age >= ring.loopEnd * life) {
+                const loopStart = ring.loopStart * life;
+                const wrapped = loopStart + ((age - ring.loopEnd * life) % ((ring.loopEnd - ring.loopStart) * life));
+                // Never exactly 0, which is a newborn's age: Birth sub emitters would fire again.
+                scalars[scalar + ParticleStore.AGE] = wrapped > 0 ? wrapped : HELD_AGE * life;
+                // The jump back is not motion: the renderer must not extrapolate size or colour across it.
+                prevSize[offset] = curSize[offset];
+                prevSize[offset + 1] = curSize[offset + 1];
+                prevSize[offset + 2] = curSize[offset + 2];
+                const o4 = i * 4;
+                prevColor[o4] = curColor[o4];
+                prevColor[o4 + 1] = curColor[o4 + 1];
+                prevColor[o4 + 2] = curColor[o4 + 2];
+                prevColor[o4 + 3] = curColor[o4 + 3];
             }
         } else if (age >= life) {
             const particle = retire(particles, store, i, liveParticleCount - 1);

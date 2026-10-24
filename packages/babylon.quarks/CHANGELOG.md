@@ -83,18 +83,28 @@ the API and the look of effects are frozen.
   once per finish), or dispose itself (`'destroy'`). Unity's Callback is the `finished` event,
   which fires whatever the action. `ignoreStopAction`, runtime only, skips it for tools that replay
   an effect; `EffectPool` and the editor set it, so pooled and previewed effects keep their
-  authored stop action. `QuarksUtil.setStopAction` sets it on a whole effect.
+  authored stop action. `QuarksUtil.setStopAction` sets it on a whole effect. As in Unity, the
+  action waits until the systems the system emits into have no particles left, and a sub emitter
+  target takes none of its own. `ParticleSystem.isAlive(withSubEmitters = true)` is Unity's
+  `IsAlive`. quarks.core's `IParticleSystem` gains `stopAction` (`autoDestroy` is deprecated),
+  `ringBufferActive`, and `hasPendingEmission(state?)` for a sub emission's state.
 - **Ring Buffer Mode** (Unity's option of the same name): with `maxParticles`, a full system's
   new particles replace the oldest instead of being dropped. `ringBufferMode: 'pauseUntilReplaced'`
   freezes a particle at the end of its life until then (footprints, decals);
   `'loopUntilReplaced'` replays the part of its life `ringBufferLoopRange` names (0 to 1 by
-  default). Particles of a ring buffer never die by age, so the system keeps them. Billboard,
-  stretched and mesh render modes; trail particles always die. The Ring Buffer demo shows both.
+  default); a range of no length holds the particle at that point. Particles of a ring buffer
+  never die by age, so the system keeps them, fires no Death sub emitter for them and never
+  finishes. Lowering `maxParticles` drops the oldest over the new limit. Every render mode but
+  Trail, whose particles always die. The Ring Buffer demo shows both.
 - `EmitterFrame.fromSimulation`, the inverse of `toSimulation`, for behaviors that measure a
   vector in their own space.
 
 ### Fixed
 
+- A **Death sub emitter** fired for the particles that died on a non-looping system's last step
+  queued its burst and never emitted it: the system counted itself finished first. A system now
+  finishes once the emissions its sub emitters run have nothing left to emit, so `finished` fires
+  after those bursts.
 - A local-space force, orbit or per-axis speed limit under an emitter scaled to 0 on an axis read
   a NaN rotation from it, and turned the velocity into NaN (forces) or stopped limiting
   (limits). `EmitterFrame` rebuilds the rotation from the axes that remain.

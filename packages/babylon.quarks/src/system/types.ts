@@ -109,7 +109,9 @@ export type CullingMode = 'always' | 'pause' | 'pauseAndCatchUp';
  *   A disabled system is not advanced or drawn; enable the emitter again before playing it.
  * - `'destroy'`: disposes the system and its emitter, as `ParticleSystem.dispose()` does.
  *
- * Unity's Callback is the system's `finished` event, which fires whatever the stop action.
+ * Unity's Callback is the system's `finished` event, which fires whatever the stop action. The
+ * action waits for the system's sub emitters, see {@link ParticleSystem.stopAction}. A disabled
+ * emitter is state like any other: saved as not visible, and copied disabled by `clone`.
  */
 export type StopAction = 'none' | 'disable' | 'destroy';
 
@@ -126,9 +128,15 @@ export type StopAction = 'none' | 'disable' | 'destroy';
  *   {@link ParticleSystem.ringBufferLoopRange}.
  *
  * Particles are never killed by age, so a system in either mode keeps its particles and does not
- * finish while it has any. A replaced particle does not fire `particleDied`. Applies in the
- * billboard, stretched and mesh render modes; trail particles always die at the end of their
- * life.
+ * finish while it has any: a non-looping ring effect never fires `finished`, and an
+ * `EffectPool` copy of it returns to the pool only when it is released. A replaced particle
+ * does not fire `particleDied`, nor Death sub emitters, which never fire in either mode since
+ * no particle dies. Lowering `maxParticles` drops the oldest particles over the new limit, also
+ * without `particleDied`. Particles are replaced oldest first in the order they were emitted;
+ * switching a mode on in a system whose particles have already died in a different order
+ * replaces them in row order the first time round. `'oldestInFront'` and `'youngestInFront'`
+ * sorting reads age, so a looping particle sorts by its age in the loop. Applies in every
+ * render mode but Trail, whose particles always die at the end of their life.
  */
 export type RingBufferMode = 'disabled' | 'pauseUntilReplaced' | 'loopUntilReplaced';
 

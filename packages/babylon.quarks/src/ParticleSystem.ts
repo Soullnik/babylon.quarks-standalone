@@ -167,6 +167,12 @@ export class ParticleSystem implements IParticleSystem {
     /**
      * What the system does once it has finished (Unity's Stop Action): nothing, disable its
      * emitter, or dispose it; see {@link StopAction}. `'none'` by default.
+     *
+     * As in Unity, the action waits for the system's sub emitters: it runs once the system has
+     * finished and none of the systems it emits into, nor theirs, has a particle left (see
+     * {@link isAlive}), so disabling or disposing a parent does not cut its sub emitters'
+     * particles short. A sub emitter target ({@link onlyUsedByOther}) takes no stop action of its
+     * own: it is empty between its parent's bursts, and its parent decides when the effect is done.
      */
     stopAction: StopAction;
 
@@ -285,8 +291,10 @@ export class ParticleSystem implements IParticleSystem {
     /**
      * The part of its life a particle plays again in `'loopUntilReplaced'` (Unity's Loop Range):
      * at the end of its life it goes back to `x` and plays to `y`, as fractions of its life, 0 to
-     * 1. (0, 1), the default, replays its whole life. Set it through the constructor or assign a
-     * new vector; the constructor clamps both ends into 0..1 and orders them.
+     * 1. (0, 1), the default, replays its whole life. Both ends are read clamped into 0..1 and in
+     * order, however the vector was set. A range of no length, such as (0.5, 0.5), holds the
+     * particle still at that point of its life; behaviors that act by age stop with it, those
+     * that act per second (rotation speed, forces) still run.
      */
     ringBufferLoopRange: Vector2;
     /**
@@ -389,9 +397,12 @@ export class ParticleSystem implements IParticleSystem {
         return this.emitEnded;
     }
 
-    /** Whether continuous or queued emission can still spawn particles before the system is done. */
-    hasPendingEmission(): boolean {
-        return this.emission.hasPendingEmission();
+    /**
+     * Whether continuous or queued emission can still spawn particles before the system is done:
+     * its own, or with `state` one a sub emitter runs into this system for a parent particle.
+     */
+    hasPendingEmission(state?: EmissionState): boolean {
+        return this.emission.hasPendingEmission(state);
     }
 
     /**
@@ -400,7 +411,7 @@ export class ParticleSystem implements IParticleSystem {
      * {@link endEmit} and whose last particle has died.
      */
     isFinished(): boolean {
-        if (this.particleNum > 0) {
+        if (this.particleNum > 0 || this.hasPendingSubEmission()) {
             return false;
         }
         // A sub emitter target emits nothing of its own: empty is finished,
@@ -1512,6 +1523,7 @@ export class ParticleSystem implements IParticleSystem {
         this.emitterShape.reset?.();
         this.emitEnded = false;
         this.finishedEventFired = false;
+        this.stopActionPending = false;
         this.prewarmed = false;
         this.initSystemGenerators();
         this.previousEmitterPos = undefined;
@@ -1562,6 +1574,9 @@ export class ParticleSystem implements IParticleSystem {
         }
 
         if (!this.looping && this.finishedEventFired && this.particleNum === 0) {
+            // Finished; the stop action may still be waiting for the sub emitters' particles.
+            this.applyStopAction();
+            if (this.destroyed) return;
             // Still tick the fixed-step clock. A sub-emitter target
             // (onlyUsedByOther) goes empty between parent bursts; skipping the
             // accumulator here desyncs it from the parent, so the next particles
@@ -1833,6 +1848,7 @@ export class ParticleSystem implements IParticleSystem {
 
     private stepOnce(delta: number, emitterMatrix: Matrix4): void {
         if (this.destroyed) return;
+        this.spawner.fitRing();
         this.motionScale = this.measureMotionScale(emitterMatrix);
         if (!this.onlyUsedByOther) {
             this.emission.emit(delta, this.emissionState, emitterMatrix);
@@ -1893,6 +1909,58 @@ export class ParticleSystem implements IParticleSystem {
         this.notifyFinished();
     }
 
+    /** Whether a sub emitter of this system still has an emission running into its target. */
+    private hasPendingSubEmission(): boolean {
+        for (const behavior of this.behaviors) {
+            if (behavior instanceof EmitSubParticleSystem && behavior.hasPendingEmission()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Whether the system still has particles or emission to come (Unity's `IsAlive`): not
+     * {@link isFinished}, or, with `withSubEmitters` (the default), any system it emits into
+     * through an `EmitSubParticleSystem`, and theirs, still has particles.
+     */
+    isAlive(withSubEmitters = true): boolean {
+        if (!this.isFinished()) {
+            return true;
+        }
+        return withSubEmitters && this.subEmittersAlive(new Set<ParticleSystem>([this]));
+    }
+
+    /** Whether a system this one emits into has particles, or one of theirs; `seen` stops a cycle. */
+    private subEmittersAlive(seen: Set<ParticleSystem>): boolean {
+        for (const behavior of this.behaviors) {
+            if (!(behavior instanceof EmitSubParticleSystem)) {
+                continue;
+            }
+            const target = behavior.targetSystem;
+            if (!(target instanceof ParticleSystem) || seen.has(target)) {
+                continue;
+            }
+            seen.add(target);
+            if (target.particleNum > 0 || target.hasPendingSubEmission() || target.subEmittersAlive(seen)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Whether particles outlive their lifetime, held or looped until replaced: a {@link ringBufferMode}
+     * on a system with {@link maxParticles}, outside the Trail render mode.
+     */
+    get ringBufferActive(): boolean {
+        return (
+            this.ringBufferMode !== 'disabled' &&
+            this.maxParticles !== undefined &&
+            this.rendererSettings.renderMode !== RenderMode.Trail
+        );
+    }
+
     /** Re-points every particle at the store, for {@link snapshotPreviousState}. */
     private readonly rebindParticles = (): void => this.spawner.rebind();
 
@@ -1909,17 +1977,24 @@ export class ParticleSystem implements IParticleSystem {
 
     /** The ring buffer step for {@link integrateSprites}, or undefined when particles die by age. */
     private ringBufferStep(): RingBufferStep | undefined {
-        if (this.ringBufferMode === 'disabled' || this.maxParticles === undefined) {
+        if (!this.ringBufferActive) {
             return undefined;
         }
         const step = this.ringStep;
         step.pause = this.ringBufferMode === 'pauseUntilReplaced';
-        step.loopStart = this.ringBufferLoopRange.x;
-        step.loopEnd = this.ringBufferLoopRange.y;
+        // Read through the same clamp as the constructor: the field can be assigned anything.
+        const {x, y} = this.ringBufferLoopRange;
+        const start = Number.isFinite(x) ? Math.min(1, Math.max(0, x)) : 0;
+        const end = Number.isFinite(y) ? Math.min(1, Math.max(0, y)) : 1;
+        step.loopStart = Math.min(start, end);
+        step.loopEnd = Math.max(start, end);
         return step;
     }
 
     private readonly ringStep: RingBufferStep = {pause: true, loopStart: 0, loopEnd: 1};
+
+    /** Set on each finish until the {@link stopAction} has run, which waits for the sub emitters. */
+    private stopActionPending = false;
 
     private notifyFinished(): void {
         if (!this.isFinished()) {
@@ -1927,13 +2002,29 @@ export class ParticleSystem implements IParticleSystem {
         }
         if (!this.finishedEventFired) {
             this.finishedEventFired = true;
-            this.events.fire({type: 'finished', particleSystem: this});
             // Once per finish, so an emitter enabled again from a listener or later stays enabled.
-            if (this.stopAction === 'disable' && !this.ignoreStopAction && !this.destroyed) {
-                this.emitter.setEnabled(false);
-            }
+            this.stopActionPending = true;
+            this.events.fire({type: 'finished', particleSystem: this});
         }
-        if (this.stopAction === 'destroy' && !this.ignoreStopAction) {
+        this.applyStopAction();
+    }
+
+    /** Runs a pending {@link stopAction} once no system this one emits into has particles left. */
+    private applyStopAction(): void {
+        if (!this.stopActionPending) {
+            return;
+        }
+        if (this.stopAction === 'none' || this.ignoreStopAction || this.onlyUsedByOther || this.destroyed) {
+            this.stopActionPending = false;
+            return;
+        }
+        if (this.subEmittersAlive(new Set<ParticleSystem>([this]))) {
+            return;
+        }
+        this.stopActionPending = false;
+        if (this.stopAction === 'disable') {
+            this.emitter.setEnabled(false);
+        } else {
             this.dispose();
         }
     }

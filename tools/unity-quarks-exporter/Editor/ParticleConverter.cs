@@ -142,7 +142,7 @@ namespace BabylonQuarks.UnityExporter
             }
             AddScalingMode(ps, main, obj);
             AddStopAction(main, obj);
-            AddRingBuffer(main, obj);
+            AddRingBuffer(ps, main, obj, trailOnly);
 
             // ---- behaviors from the over-lifetime / by-speed modules ----
             AddGravity(main, behaviors);
@@ -762,9 +762,15 @@ namespace BabylonQuarks.UnityExporter
         /// Unity's Ring Buffer Mode and Loop Range, under the same names; Disabled, the default
         /// in both, is left out, and so is the whole-life range.
         /// </summary>
-        private static void AddRingBuffer(ParticleSystem.MainModule main, JObject obj)
+        private static void AddRingBuffer(ParticleSystem ps, ParticleSystem.MainModule main, JObject obj, bool trailOnly)
         {
             if (main.ringBufferMode == ParticleSystemRingBufferMode.Disabled) return;
+            if (trailOnly)
+            {
+                // Trail particles always die at the end of their life in babylon.quarks.
+                Debug.LogWarning($"[Quarks Exporter] '{ps.name}': Ring Buffer Mode has no effect on a trail system and is skipped.");
+                return;
+            }
             obj.Set("ringBufferMode", main.ringBufferMode == ParticleSystemRingBufferMode.PauseUntilReplaced
                 ? "pauseUntilReplaced"
                 : "loopUntilReplaced");

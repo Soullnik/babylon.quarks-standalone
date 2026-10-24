@@ -18,7 +18,7 @@ import type {ParticleSystem} from '../ParticleSystem';
 import {RenderMode} from '../VFXBatch';
 
 /** Particle backed by a `ParticleStore` row, as a system always creates. */
-type StoreBackedParticle = Particle & {storeIndex: number};
+type StoreBackedParticle = Particle & {storeIndex: number; setStoreIndex(index: number): void};
 
 const UP = new Vector3(0, 0, 1);
 const IDENTITY_QUATERNION = new Quaternion();
@@ -42,6 +42,56 @@ export class ParticleSpawner {
      * the cursor walks on from there.
      */
     private ringCursor = 0;
+
+    /** Swaps rows `a` and `b`: the particle objects and their store rows. */
+    private swapRows(a: number, b: number): void {
+        const particles = this.system.particles;
+        const first = particles[a] as StoreBackedParticle;
+        const second = particles[b] as StoreBackedParticle;
+        particles[a] = second;
+        particles[b] = first;
+        this.system.store.swapRows(a, b);
+        second.setStoreIndex(a);
+        first.setStoreIndex(b);
+    }
+
+    /** Reverses rows `from` to `to`, inclusive. */
+    private reverseRows(from: number, to: number): void {
+        for (; from < to; from++, to--) {
+            this.swapRows(from, to);
+        }
+    }
+
+    /** Moves the first `by` of the `count` live rows to the end, keeping the order of both parts. */
+    private rotateRows(by: number, count: number): void {
+        if (by <= 0 || by >= count) {
+            return;
+        }
+        this.reverseRows(0, by - 1);
+        this.reverseRows(by, count - 1);
+        this.reverseRows(0, count - 1);
+    }
+
+    /**
+     * Keeps a ring buffer within `maxParticles` once it was lowered: its particles never die, so
+     * the oldest over the limit are dropped, and the rest stay in birth order from row 0. Called
+     * at the start of every step; costs nothing while the system is within its limit.
+     */
+    fitRing(): void {
+        const system = this.system;
+        const max = system.maxParticles;
+        const count = system.particleNum;
+        if (max === undefined || count <= max || system.ringBufferMode === 'disabled') {
+            return;
+        }
+        if (system.rendererSettings.renderMode === RenderMode.Trail) {
+            return;
+        }
+        // Oldest first from the cursor: the survivors start `count - max` rows after it.
+        this.rotateRows((this.ringCursor + count - max) % count, count);
+        system.particleNum = max;
+        this.ringCursor = 0;
+    }
 
     /** Points every particle at the store's columns again, after any were replaced. */
     rebind(): void {
@@ -117,13 +167,17 @@ export class ParticleSpawner {
                 particle = particles[this.ringCursor];
                 this.ringCursor = (this.ringCursor + 1) % system.particleNum;
             } else {
+                if (ring && this.ringCursor !== 0) {
+                    // A ring that wrapped and was given room (a higher limit): put its oldest at
+                    // row 0 again, so the newborn appended after the newest stays in birth order.
+                    this.rotateRows(this.ringCursor, system.particleNum);
+                    this.ringCursor = 0;
+                }
                 system.particleNum++;
                 if (particles.length < system.particleNum) {
                     this.grow(isTrailMode);
                 }
                 particle = particles[system.particleNum - 1];
-                // Appended in birth order, so the oldest is row 0 when the system fills up.
-                this.ringCursor = 0;
             }
             particle.reset();
             particle.serial = (particle.serial ?? 0) + 1;
