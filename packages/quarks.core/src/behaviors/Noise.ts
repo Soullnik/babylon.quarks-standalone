@@ -121,6 +121,14 @@ export class Noise implements Behavior {
     }
 
     initialize(particle: Particle): void {
+        // Every per-particle generator gets its slot in the particle's memory: a random one (an
+        // interval, two curves) is rolled here, new or recycled, before update reads it.
+        const memory = particle.memory;
+        this.frequency.startGen(memory);
+        this.power.startGen(memory);
+        this.positionAmount.startGen(memory);
+        this.rotationAmount.startGen(memory);
+        this.remap?.startGen(memory);
         const isScalarRotation = typeof particle.rotation === 'number';
         let state = (particle as NoisyParticle)._noiseState;
         if (state === undefined) {

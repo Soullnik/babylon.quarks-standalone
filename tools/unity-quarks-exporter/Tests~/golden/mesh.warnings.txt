@@ -1,3 +1,2 @@
 [Quarks Exporter] 'Chunks': Rotation over Lifetime turns about the particle's own X and Y axes in babylon.quarks, not Unity's Euler angles.
-[Quarks Exporter] 'Dust': Random Between Two Curves is exported as its upper curve.
 [Quarks Exporter] 'Dust': Limit Velocity over Lifetime limits the speed in babylon.quarks; its X limit is exported for all three axes.

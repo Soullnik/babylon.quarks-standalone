@@ -72,8 +72,18 @@ export interface PiecewiseBezierJSON {
     functions: PiecewiseBezierSegmentJSON[];
 }
 
+/** A {@link RandomBetweenCurves}. */
+export interface RandomBetweenCurvesJSON {
+    /** The generator's type. */
+    type: 'RandomBetweenCurves';
+    /** One bound. */
+    curve1: PiecewiseBezierJSON;
+    /** The other bound. */
+    curve2: PiecewiseBezierJSON;
+}
+
 /** The JSON of a value generator. */
-export type ValueGeneratorJSON = ConstantValueJSON | IntervalValueJSON | PiecewiseBezierJSON;
+export type ValueGeneratorJSON = ConstantValueJSON | IntervalValueJSON | PiecewiseBezierJSON | RandomBetweenCurvesJSON;
 
 /** A {@link ConstantColor}. */
 export interface ConstantColorJSON {

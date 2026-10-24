@@ -1,8 +1,23 @@
 /** @jest-environment jsdom */
-import {ChangeEmitDirection, ConstantValue, FrameOverLife, GravityForce, IntervalValue} from 'babylon.quarks';
+import {
+    Bezier,
+    ChangeEmitDirection,
+    ConstantValue,
+    FrameOverLife,
+    GravityForce,
+    IntervalValue,
+    PiecewiseBezier,
+    RandomBetweenCurves,
+    SpeedOverLife,
+} from 'babylon.quarks';
 import {EffectBinding} from '../../src/core/binding';
 import {findBehavior} from '../../src/core/colors';
-import {AttractorModule, EmitDirectionModule, TextureSheetModule} from '../../src/react/behaviorModules';
+import {
+    AttractorModule,
+    EmitDirectionModule,
+    SpeedOverLifeModule,
+    TextureSheetModule,
+} from '../../src/react/behaviorModules';
 import {makeSystem, useScene} from '../helpers';
 import {click, controlsOf, hasRow, moduleToggle, mount, Mounted, openModule, pick, rowOf, type} from './dom';
 
@@ -117,5 +132,31 @@ describe('Randomize Direction module', () => {
         expect(Array.from(mode.options).map((o) => o.value)).toEqual(['constant', 'random']);
         pick(mode, 'constant');
         expect(direction().angle).toBeInstanceOf(ConstantValue);
+    });
+});
+
+describe('Speed over Lifetime module', () => {
+    const scene = useScene();
+    let mounted: Mounted | null = null;
+    afterEach(() => {
+        mounted?.unmount();
+        mounted = null;
+    });
+
+    it('shows both curves of an imported Random Between Two Curves and keeps them through a switch', () => {
+        const system = makeSystem(scene.get());
+        const flat = (v: number) => new PiecewiseBezier([[new Bezier(v, v, v, v), 0]]);
+        system.addBehavior(new SpeedOverLife(new RandomBetweenCurves(flat(0.5), flat(2))));
+        const binding = new EffectBinding(system);
+        const element = () => <SpeedOverLifeModule binding={binding} />;
+        mounted = mount(element());
+        binding.subscribe(() => mounted!.render(element()));
+        const section = openModule(mounted.container, 'Speed over Lifetime');
+        expect(section.querySelectorAll('svg[width]')).toHaveLength(2);
+        const speed = () => findBehavior<SpeedOverLife>(system.behaviors, 'SpeedOverLife')!.speed;
+        click(controlsOf(rowOf(section, 'Two curves'))[0]);
+        expect(speed()).toBeInstanceOf(PiecewiseBezier);
+        click(controlsOf(rowOf(section, 'Two curves'))[0]);
+        expect(speed()).toBeInstanceOf(RandomBetweenCurves);
     });
 });

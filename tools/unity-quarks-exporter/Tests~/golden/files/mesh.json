@@ -296,18 +296,35 @@
             "value": 5.016667
           },
           "startSpeed": {
-            "type": "PiecewiseBezier",
-            "functions": [
-              {
-                "function": {
-                  "p0": 1,
-                  "p1": 1.3333334,
-                  "p2": 1.6666666,
-                  "p3": 2
-                },
-                "start": 0
-              }
-            ]
+            "type": "RandomBetweenCurves",
+            "curve1": {
+              "type": "PiecewiseBezier",
+              "functions": [
+                {
+                  "function": {
+                    "p0": 0,
+                    "p1": 0.33333334,
+                    "p2": 0.6666666,
+                    "p3": 1
+                  },
+                  "start": 0
+                }
+              ]
+            },
+            "curve2": {
+              "type": "PiecewiseBezier",
+              "functions": [
+                {
+                  "function": {
+                    "p0": 1,
+                    "p1": 1.3333334,
+                    "p2": 1.6666666,
+                    "p3": 2
+                  },
+                  "start": 0
+                }
+              ]
+            }
           },
           "startRotation": {
             "type": "ConstantValue",

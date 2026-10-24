@@ -111,8 +111,6 @@ counterpart, and custom shaders with neither, export as alpha blending.
 
 Each of these logs a warning naming the system.
 
-- **Random Between Two Curves** is exported as its upper curve: babylon.quarks has no generator
-  that picks a curve between two.
 - **Rotation over Lifetime** with Separate Axes on mesh particles turns about the particle's own
   axes in babylon.quarks; Unity adds the rates to its Euler angles. Z matches; X and Y warn.
 - **Subtractive** blending (`_BlendOp` Reverse Subtract) becomes `ALPHA_SUBTRACT`, which darkens
