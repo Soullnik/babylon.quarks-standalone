@@ -32,17 +32,22 @@ namespace BabylonQuarks.UnityExporter
                 case ParticleSystemCurveMode.Curve:
                     return Bezier(c.curve, c.curveMultiplier);
                 case ParticleSystemCurveMode.TwoCurves:
-                    // quarks value generators have no two-curve range; use the upper curve.
-                    WarnTwoCurves();
-                    return Bezier(c.curveMax, c.curveMultiplier);
+                    return TwoCurves(c.curveMin, c.curveMax, c.curveMultiplier);
                 default:
                     return Constant(c.constant);
             }
         }
 
-        /// <summary>Random Between Two Curves has no babylon.quarks counterpart; the upper curve is exported.</summary>
-        internal static void WarnTwoCurves() =>
-            Debug.LogWarning($"[Quarks Exporter] '{Owner}': Random Between Two Curves is exported as its upper curve.");
+        /// <summary>
+        /// Random Between Two Curves → RandomBetweenCurves: each particle keeps one mix between the
+        /// lower and the upper curve, as Unity rolls it.
+        /// </summary>
+        /// <param name="cycles">Replays both curves this many times across 0..1, as <see cref="Bezier"/>.</param>
+        public static JToken TwoCurves(AnimationCurve min, AnimationCurve max, float multiplier, int cycles = 1) =>
+            new JObject()
+                .Set("type", "RandomBetweenCurves")
+                .Set("curve1", Bezier(min, multiplier, cycles))
+                .Set("curve2", Bezier(max, multiplier, cycles));
 
         /// <summary>AnimationCurve (0..1 time domain) → PiecewiseBezier via Hermite→Bézier per segment.</summary>
         /// <param name="cycles">Replays the curve this many times across 0..1 (a sawtooth for frames).</param>

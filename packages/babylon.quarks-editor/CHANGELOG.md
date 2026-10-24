@@ -8,6 +8,7 @@ and the project follows the `quarks.core` 0.x version line.
 
 ### Changed
 
+- **Value fields** offer Random Between Two Curves, with a curve editor for each bound.
 - **Scaling mode** offers Local (the default), Hierarchy and Shape, as Unity's, for world- and
   local-space systems alike.
 - **Shape module:** a cone's Emit from (Base, Volume) and Length, shown for Volume only, and a

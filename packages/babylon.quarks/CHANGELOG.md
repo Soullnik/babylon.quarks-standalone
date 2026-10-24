@@ -48,6 +48,13 @@ the API and the look of effects are frozen.
   default, as in Unity). In Volume, particles start anywhere on their side line from the base up
   to `length` along z. The Unity exporter writes Cone Volume with its Length instead of warning,
   and the editor's Shape module and wireframe show both.
+- **Random Between Two Curves** (Unity's MinMaxCurve mode of the same name): `RandomBetweenCurves`
+  holds two `PiecewiseBezier` curves and rolls each particle a mix between them, kept for its
+  life, so every particle follows its own curve within the band. It goes wherever a curve does
+  (start values over the system's cycle, emission rates, every over-lifetime and by-speed
+  behavior) and reads and writes as `{type: 'RandomBetweenCurves', curve1, curve2}`. The Unity
+  exporter writes it instead of the upper curve, and the editor's value fields offer it with a
+  curve editor per bound.
 - **Grid sampling** (Niagara's Grid Location by particle index): `GridEmitter.sampling`
   (`GridSampling.Random`, the default, or `GridSampling.Sequential`). Sequential fills the cells in
   turn, row by row from −x, −y, so a burst of `row × column` particles puts one in every cell; a

@@ -2,7 +2,14 @@ import {InstancedMesh} from '@babylonjs/core/Meshes/instancedMesh';
 import {Mesh} from '@babylonjs/core/Meshes/mesh';
 import {TransformNode} from '@babylonjs/core/Meshes/transformNode';
 import {Node} from '@babylonjs/core/node';
-import {ConstantValue, EmitSubParticleSystem, FunctionValueGenerator, IntervalValue, ValueGenerator} from 'quarks.core';
+import {
+    ConstantValue,
+    EmitSubParticleSystem,
+    FunctionValueGenerator,
+    IntervalValue,
+    RandomBetweenCurves,
+    ValueGenerator,
+} from 'quarks.core';
 import {BatchedRenderer} from './BatchedRenderer';
 import {shareEffectResources} from './effectResources';
 import {MeshSurfaceEmitter} from './MeshSurfaceEmitter';
@@ -271,6 +278,10 @@ export class QuarksUtil {
         }
         if (generator instanceof IntervalValue) {
             return Math.max(generator.a, generator.b);
+        }
+        if (generator instanceof RandomBetweenCurves) {
+            // Every mix lies between the two curves.
+            return Math.max(QuarksUtil.maxOf(generator.curve1, at), QuarksUtil.maxOf(generator.curve2, at));
         }
         let max = -Infinity;
         const samples = 32;

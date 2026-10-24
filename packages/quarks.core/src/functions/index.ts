@@ -12,6 +12,7 @@ export * from './Gradient';
 export * from './IntervalValue';
 export * from './PiecewiseBezier';
 export * from './PiecewiseFunction';
+export * from './RandomBetweenCurves';
 export * from './RandomColor';
 export * from './RandomColorBetweenGradient';
 export * from './RandomQuatGenerator';

@@ -1,4 +1,5 @@
 import type {ValueGenerator} from 'babylon.quarks';
+import {RandomBetweenCurves} from 'babylon.quarks';
 import React from 'react';
 import {
     AnyGenerator,
@@ -51,13 +52,14 @@ function isValueGenerator(generator: ScalarGenerator): generator is ValueGenerat
 }
 
 /**
- * Unity-like value field: Constant | Random Between Two Constants | Curve, bound to a quarks value
- * generator. With `curve={false}` it offers only the first two, for settings sampled once.
+ * Unity-like value field: Constant | Random Between Two Constants | Curve | Random Between Two
+ * Curves, bound to a quarks value generator. With `curve={false}` it offers only the first two, for settings sampled once.
  */
 export function ValueField(props: CurveValueFieldProps | ConstantValueFieldProps): React.ReactElement {
     const read = readScalar(props.generator);
     // A setting without curves shows a curve it was loaded with as a constant, so an edit replaces it.
-    const state: ScalarValueState = props.curve === false && read.mode === 'curve' ? {...read, mode: 'constant'} : read;
+    const curved = read.mode === 'curve' || read.mode === 'curves';
+    const state: ScalarValueState = props.curve === false && curved ? {...read, mode: 'constant'} : read;
 
     const emit = (generator: ScalarGenerator) => {
         if (props.curve !== false) {
@@ -76,7 +78,12 @@ export function ValueField(props: CurveValueFieldProps | ConstantValueFieldProps
                     options={[
                         {value: 'constant', label: 'Constant'},
                         {value: 'random', label: 'Random between two'},
-                        ...(props.curve !== false ? [{value: 'curve' as const, label: 'Curve'}] : []),
+                        ...(props.curve !== false
+                            ? [
+                                  {value: 'curve' as const, label: 'Curve'},
+                                  {value: 'curves' as const, label: 'Random between two curves'},
+                              ]
+                            : []),
                     ]}
                     onChange={(mode) => commit({mode})}
                 />
@@ -104,6 +111,32 @@ export function ValueField(props: CurveValueFieldProps | ConstantValueFieldProps
                         onChange={(pieces) => emit(buildCurve(pieces))}
                     />
                 </div>
+            )}
+            {state.mode === 'curves' && (
+                <>
+                    {(['lower', 'upper'] as const).map((bound, index) => (
+                        <div key={bound} style={{marginTop: 6}}>
+                            <span style={captionStyle}>{bound}</span>
+                            <CurveEditor
+                                pieces={readPieces(props.generator, index === 1)}
+                                maxValue={props.curveMax}
+                                onChange={(pieces) =>
+                                    emit(
+                                        index === 0
+                                            ? new RandomBetweenCurves(
+                                                  buildCurve(pieces),
+                                                  buildCurve(readPieces(props.generator, true))
+                                              )
+                                            : new RandomBetweenCurves(
+                                                  buildCurve(readPieces(props.generator)),
+                                                  buildCurve(pieces)
+                                              )
+                                    )
+                                }
+                            />
+                        </div>
+                    ))}
+                </>
             )}
         </>
     );
