@@ -999,6 +999,24 @@ export class ParticleSystem implements IParticleSystem {
     }
 
     /**
+     * Whether the scene's image processing (exposure, contrast, tone mapping, vignette, colour
+     * curves, colour grading, dithering of `scene.imageProcessingConfiguration`) applies to the
+     * particles, as it does to Babylon's own particle systems and materials; true by default.
+     * A scene whose configuration does nothing leaves the colour as it is, and one applied by a
+     * post process gets the colour in linear space. Particles that multiply the frame
+     * (`ALPHA_MULTIPLY`) are a factor rather than light and are not tone mapped. Saved in the
+     * effect JSON only when switched off.
+     */
+    get applyImageProcessing(): boolean {
+        return this.rendererSettings.applyImageProcessing;
+    }
+
+    set applyImageProcessing(apply: boolean) {
+        this.rendererSettings.applyImageProcessing = apply;
+        this.neededToUpdateRender = true;
+    }
+
+    /**
      * Multiplier on the time this system is advanced by (Unity's Simulation
      * Speed): 2 runs the effect twice as fast, 0 freezes it without pausing the
      * renderer. 1 by default; saved in the effect JSON only when it differs. A
@@ -1221,6 +1239,7 @@ export class ParticleSystem implements IParticleSystem {
             maxParticleSize: parameters.maxParticleSize ?? Infinity,
             renderingGroupId: parameters.renderingGroupId ?? 0,
             applyFog: parameters.applyFog ?? true,
+            applyImageProcessing: parameters.applyImageProcessing ?? true,
             lighting: validLighting(parameters.lighting),
             rim: normalizeMeshRim(parameters.rim),
             mapUV: normalizeMapUV(parameters.mapUV),

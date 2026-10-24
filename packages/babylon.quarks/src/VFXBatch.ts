@@ -1,9 +1,11 @@
 import {BoundingInfo} from '@babylonjs/core/Culling/boundingInfo';
 import {BaseTexture} from '@babylonjs/core/Materials/Textures/baseTexture';
 import type {Effect} from '@babylonjs/core/Materials/effect';
+import type {ImageProcessingConfiguration} from '@babylonjs/core/Materials/imageProcessingConfiguration';
 import {ShaderMaterial} from '@babylonjs/core/Materials/shaderMaterial';
 import {Vector2 as BVector2, Vector3 as BVector3, Vector4 as BVector4, Matrix} from '@babylonjs/core/Maths/math.vector';
 import {Mesh} from '@babylonjs/core/Meshes/mesh';
+import type {Observer} from '@babylonjs/core/Misc/observable';
 import type {Node} from '@babylonjs/core/node';
 import {Scene} from '@babylonjs/core/scene';
 import {IParticleSystem, Vector3} from 'quarks.core';
@@ -11,6 +13,7 @@ import {VFXBatchSettings} from './BatchedRenderer';
 import type {ParticleSystem} from './ParticleSystem';
 import {storedBatchSettings} from './batchKey';
 import {GRADIENT_MAP_WEIGHTS, MeshLightingSettings, readsUV1, StoredBatchSettings, TextureUV} from './batchSettings';
+import {compilesImageProcessing, ShaderImageProcessing} from './shaderProgram';
 import {DepthBinding, softDepthParams} from './softDepth';
 
 export * from './batchSettings';
@@ -197,6 +200,88 @@ export abstract class VFXBatch {
             effect.setFloat4('vFogInfos', mode, scene.fogStart, scene.fogEnd, scene.fogDensity);
             effect.setColor3('vFogColor', scene.fogColor);
         });
+    }
+
+    /** The observer of the scene's image processing that rebuilds the material when its defines change. */
+    private imageProcessingObserver: Observer<ImageProcessingConfiguration> | null = null;
+
+    /**
+     * The scene's image processing as the material compiles it, see {@link ShaderContext.imageProcessing}:
+     * null when the batch does not apply it.
+     * @internal
+     */
+    protected imageProcessing(): ShaderImageProcessing | null {
+        if (!this.settings.applyImageProcessing) {
+            return null;
+        }
+        const defines: ShaderImageProcessing = {
+            IMAGEPROCESSING: false,
+            WHITEBALANCE: false,
+            VIGNETTE: false,
+            VIGNETTEBLENDMODEMULTIPLY: false,
+            VIGNETTEBLENDMODEOPAQUE: false,
+            TONEMAPPING: 0,
+            CONTRAST: false,
+            EXPOSURE: false,
+            COLORCURVES: false,
+            COLORGRADING: false,
+            COLORGRADING3D: false,
+            SAMPLER3DGREENDEPTH: false,
+            SAMPLER3DBGRMAP: false,
+            DITHER: false,
+            IMAGEPROCESSINGPOSTPROCESS: false,
+            SKIPFINALCOLORCLAMP: false,
+        };
+        this.scene.imageProcessingConfiguration.prepareDefines(defines);
+        return defines;
+    }
+
+    /**
+     * Binds the scene's image processing to a material compiled with `compiled`: its values on every
+     * bind, unless a post process applies them, and a rebuild whenever the configuration changes
+     * what the material has to compile (tone mapping switched on, a vignette, a colour grading
+     * texture). A colour grading texture is set on the material too, so that the batch, like
+     * Babylon's own materials, is not drawn before it has loaded.
+     * @internal
+     */
+    protected bindImageProcessing(material: ShaderMaterial, compiled: ShaderImageProcessing | null): void {
+        this.imageProcessingObserver?.remove();
+        this.imageProcessingObserver = null;
+        if (!this.settings.applyImageProcessing) {
+            return;
+        }
+        const config = this.scene.imageProcessingConfiguration;
+        const applies = compilesImageProcessing(this.settings, compiled);
+        const key = applies ? imageProcessingKey(compiled) : '';
+        const grading = () => {
+            if (applies && compiled?.COLORGRADING && config.colorGradingTexture) {
+                material.setTexture('txColorTransform', config.colorGradingTexture);
+            }
+        };
+        grading();
+        this.imageProcessingObserver = config.onUpdateParameters.add(() => {
+            const next = this.imageProcessing();
+            const nextKey = compilesImageProcessing(this.settings, next) ? imageProcessingKey(next) : '';
+            if (nextKey !== key) {
+                this.rebuildMaterial();
+            } else {
+                grading();
+            }
+        });
+        if (applies && compiled?.IMAGEPROCESSING && !compiled.IMAGEPROCESSINGPOSTPROCESS) {
+            material.onBindObservable.add(() => {
+                const effect = material.getEffect();
+                if (effect) {
+                    config.bind(effect);
+                }
+            });
+        }
+    }
+
+    /** Stops following the scene's image processing. @internal */
+    protected releaseImageProcessing(): void {
+        this.imageProcessingObserver?.remove();
+        this.imageProcessingObserver = null;
     }
 
     /**
@@ -477,6 +562,20 @@ export abstract class VFXBatch {
 
     /** @internal */
     dispose(): void {
+        this.releaseImageProcessing();
         this.mesh.dispose();
     }
+}
+
+/** What of `ip` decides the shader: its defines, one string per distinct material. */
+function imageProcessingKey(ip: ShaderImageProcessing | null): string {
+    if (ip === null) {
+        return '';
+    }
+    let key = '';
+    for (const name in ip) {
+        const value = ip[name as keyof ShaderImageProcessing];
+        key += typeof value === 'number' ? `${name}=${value};` : value ? `${name};` : '';
+    }
+    return key;
 }

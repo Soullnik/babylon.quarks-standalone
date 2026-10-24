@@ -1819,6 +1819,12 @@ export function RendererModule({
             <Row label="Apply fog">
                 <CheckboxField value={system.applyFog} onChange={(v) => binding.apply((s) => (s.applyFog = v))} />
             </Row>
+            <Row label="Image processing">
+                <CheckboxField
+                    value={system.applyImageProcessing}
+                    onChange={(v) => binding.apply((s) => (s.applyImageProcessing = v))}
+                />
+            </Row>
             <Row label="Soft particles">
                 <CheckboxField
                     value={system.softParticles}

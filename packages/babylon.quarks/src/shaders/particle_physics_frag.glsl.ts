@@ -1,5 +1,6 @@
 import {blendFragmentGLSL} from './chunks/blend';
 import {fogFragmentDeclarationGLSL, fogFragmentGLSL} from './chunks/fog';
+import {imageProcessingDeclarationGLSL} from './chunks/imageProcessing';
 import {softFragmentDeclarationGLSL, softFragmentGLSL} from './chunks/soft';
 import {surfaceColorGLSL, surfaceFragmentDeclarationGLSL} from './chunks/surface';
 
@@ -87,6 +88,7 @@ uniform float alphaTest;
 #endif
 
 ${fogFragmentDeclarationGLSL}
+${imageProcessingDeclarationGLSL}
 ${softFragmentDeclarationGLSL}
 ${surfaceFragmentDeclarationGLSL}
 void main() {

@@ -104,6 +104,7 @@ export function storedBatchSettings(settings: VFXBatchSettings): StoredBatchSett
         layerMask: settings.layerMask,
         renderingGroupId: settings.renderingGroupId ?? 0,
         applyFog: settings.applyFog ?? true,
+        applyImageProcessing: settings.applyImageProcessing ?? true,
         pivot: quad && pivot && (pivot.x !== 0 || pivot.y !== 0 || pivot.z !== 0) ? pivot.clone() : undefined,
         sortMode: settings.sortMode ?? 'none',
         renderFace: isMesh ? validRenderFace(settings.renderFace) : 'both',
@@ -155,6 +156,7 @@ export function shaderKeyEqual(a: StoredBatchSettings, b: StoredBatchSettings): 
         a.renderingGroupId === b.renderingGroupId &&
         a.renderOrder === b.renderOrder &&
         a.applyFog === b.applyFog &&
+        a.applyImageProcessing === b.applyImageProcessing &&
         a.sortMode === b.sortMode &&
         a.renderFace === b.renderFace &&
         !a.pivot === !b.pivot &&

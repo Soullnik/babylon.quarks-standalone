@@ -48,8 +48,28 @@ the API and the look of effects are frozen.
     world-space `'hierarchy'` system used to mirror the position only.
   - **A sub emission's speed** takes its parent particle's frame, as its size did: it no longer
     scales with the sub emitter's own scale in `'hierarchy'`.
+- **The scene's image processing applies to the particles by default**, as it does to Babylon's
+  own `ParticleSystem` and its standard and PBR materials. A scene whose
+  `imageProcessingConfiguration` does nothing (Babylon's default) looks the same as before. One
+  that tone maps, sets exposure or contrast, grades, vignettes or dithers now does it to the
+  particles too, so they sit in the frame like the meshes around them. Under a
+  `DefaultRenderingPipeline` with image processing on (`applyByPostProcess`), the particles now
+  leave their colour in linear space for the post process, as Babylon's materials do; before they
+  were gamma-corrected twice and looked washed out. Set `applyImageProcessing: false` on a system
+  to keep the old look.
 
 ### Added
+
+- **Scene image processing** (`ParticleSystem.applyImageProcessing`, default true; JSON writes it
+  only when false): the scene's `imageProcessingConfiguration` (exposure, contrast, tone mapping,
+  vignette, colour curves, colour grading, dithering) is compiled into every render mode, in GLSL
+  and WGSL, through Babylon's own includes, bound on every draw, and recompiled when the
+  configuration changes what the shader needs. A post process that applies it gets the colour in
+  linear space. It runs on the straight colour after fog and before the blend resolve, so alpha
+  stays coverage; particles that multiply the frame (`ALPHA_MULTIPLY`) are a factor rather than
+  light and are not tone mapped. Systems that differ are batched apart. On WebGPU, a 2D colour
+  grading texture works through a WGSL port of Babylon's slice sampler, which Babylon's own WGSL
+  include lacks. The Image Processing demo compares a flame with and without it.
 
 - **Cone Emit from Volume and Length** (Unity's Cone Volume): `ConeEmitter.emitFrom`
   (`ConeEmitFrom.Base`, the default, or `ConeEmitFrom.Volume`) and `ConeEmitter.length` (5 by

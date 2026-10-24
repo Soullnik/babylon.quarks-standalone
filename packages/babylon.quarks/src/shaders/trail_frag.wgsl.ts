@@ -1,5 +1,6 @@
 import {blendFragmentWGSL} from './chunks/blend';
 import {fogFragmentDeclarationWGSL, fogFragmentWGSL} from './chunks/fog';
+import {imageProcessingDeclarationWGSL} from './chunks/imageProcessing';
 import {softFragmentDeclarationWGSL, softFragmentWGSL} from './chunks/soft';
 import {surfaceColorWGSL, surfaceFragmentDeclarationWGSL} from './chunks/surface';
 
@@ -20,6 +21,7 @@ uniform alphaTest: f32;
 #endif
 
 ${fogFragmentDeclarationWGSL}
+${imageProcessingDeclarationWGSL}
 ${softFragmentDeclarationWGSL}
 ${surfaceFragmentDeclarationWGSL}
 @fragment
