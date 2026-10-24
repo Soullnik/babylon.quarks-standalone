@@ -1,4 +1,5 @@
 import {Constants} from '@babylonjs/core/Engines/constants';
+import {Color4} from '@babylonjs/core/Maths/math.color';
 import {Vector3 as BVector3} from '@babylonjs/core/Maths/math.vector';
 import {
     ConeEmitter,
@@ -8,7 +9,6 @@ import {
     ParticleSystem,
     RandomColor,
     RenderMode,
-    Vector4,
 } from 'babylon.quarks';
 import {createSharedTexture} from '../shared/common';
 import type {DemoContext} from '../types';
@@ -24,7 +24,7 @@ export function init({scene, camera, batchRenderer, systems}: DemoContext) {
         startLife: new ConstantValue(4),
         startSpeed: new IntervalValue(5, 6),
         startSize: new ConstantValue(0.1),
-        startColor: new RandomColor(new Vector4(1, 1, 1, 1), new Vector4(1, 1, 1, 1)),
+        startColor: new RandomColor(new Color4(1, 1, 1, 1), new Color4(1, 1, 1, 1)),
         worldSpace: true,
         emissionOverTime: new ConstantValue(500),
         shape: new ConeEmitter({radius: 0.5, angle: 0.5}),

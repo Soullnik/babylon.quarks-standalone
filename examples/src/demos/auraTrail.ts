@@ -2,6 +2,7 @@ import {VertexBuffer} from '@babylonjs/core/Buffers/buffer';
 import {Constants} from '@babylonjs/core/Engines/constants';
 import {DynamicTexture} from '@babylonjs/core/Materials/Textures/dynamicTexture';
 import {Texture} from '@babylonjs/core/Materials/Textures/texture';
+import {Color4} from '@babylonjs/core/Maths/math.color';
 import {Vector3 as BVector3} from '@babylonjs/core/Maths/math.vector';
 import {CreateCylinder} from '@babylonjs/core/Meshes/Builders/cylinderBuilder';
 import {TransformNode} from '@babylonjs/core/Meshes/transformNode';
@@ -18,9 +19,7 @@ import {
     PointEmitter,
     RenderMode,
     SizeOverLife,
-    Vector3,
     Vector3Function,
-    Vector4,
     VelocityOverLife,
 } from 'babylon.quarks';
 import {createColorOverLifeGradient} from '../shared/common';
@@ -194,7 +193,7 @@ export function init({scene, camera, batchRenderer, systems}: DemoContext) {
         startLife: new ConstantValue(1000),
         startSpeed: new ConstantValue(0),
         startSize: new ConstantValue(1),
-        startColor: new ConstantColor(new Vector4(1, 0.8, 0.35, 1)),
+        startColor: new ConstantColor(new Color4(1, 0.8, 0.35, 1)),
         emissionOverTime: new ConstantValue(0),
         emissionBursts: [{time: 0, count: new ConstantValue(1), cycle: 1, interval: 0, probability: 1}],
         shape: new PointEmitter(),
@@ -218,9 +217,9 @@ export function init({scene, camera, batchRenderer, systems}: DemoContext) {
         // Still at birth, each turned its own way about the tube's axis: a
         // point emitter would fling them, and face them, any which way.
         startSpeed: new ConstantValue(0),
-        startRotation: new AxisAngleGenerator(new Vector3(0, 1, 0), new IntervalValue(0, Math.PI * 2)),
+        startRotation: new AxisAngleGenerator(new BVector3(0, 1, 0), new IntervalValue(0, Math.PI * 2)),
         startSize: new Vector3Function(new ConstantValue(1), new ConstantValue(0.12), new ConstantValue(1)),
-        startColor: new ConstantColor(new Vector4(1, 0.9, 0.5, 1)),
+        startColor: new ConstantColor(new Color4(1, 0.9, 0.5, 1)),
         emissionOverTime: new ConstantValue(1.5),
         shape: new PointEmitter(),
         renderMode: RenderMode.Mesh,
@@ -231,7 +230,7 @@ export function init({scene, camera, batchRenderer, systems}: DemoContext) {
         rim: {mode: 'fade', strength: 0.5, power: 1},
     });
     rings.addBehavior(new SizeOverLife(new PiecewiseBezier([[new Bezier(1, 0.9, 0.75, 0.65), 0]])));
-    rings.addBehavior(createColorOverLifeGradient(new Vector4(1, 1, 1, 1), new Vector4(1, 1, 1, 0)));
+    rings.addBehavior(createColorOverLifeGradient(new Color4(1, 1, 1, 1), new Color4(1, 1, 1, 0)));
     rings.addBehavior(new VelocityOverLife(new ConstantValue(0), new ConstantValue(1.6)));
     rings.emitter.position = new BVector3(-3.5, 0, 0);
 
@@ -245,7 +244,7 @@ export function init({scene, camera, batchRenderer, systems}: DemoContext) {
         startLife: new ConstantValue(1000),
         startSpeed: new ConstantValue(0),
         startSize: new ConstantValue(1),
-        startColor: new ConstantColor(new Vector4(0.6, 0.8, 1, 1)),
+        startColor: new ConstantColor(new Color4(0.6, 0.8, 1, 1)),
         emissionOverTime: new ConstantValue(0),
         emissionBursts: [{time: 0, count: new ConstantValue(1), cycle: 1, interval: 0, probability: 1}],
         shape: new PointEmitter(),
@@ -273,7 +272,7 @@ export function init({scene, camera, batchRenderer, systems}: DemoContext) {
         startLife: new ConstantValue(1000),
         startSpeed: new ConstantValue(0),
         startSize: new ConstantValue(1.2),
-        startColor: new ConstantColor(new Vector4(1, 0.55, 0.2, 1)),
+        startColor: new ConstantColor(new Color4(1, 0.55, 0.2, 1)),
         emissionOverTime: new ConstantValue(0),
         emissionBursts: [{time: 0, count: new ConstantValue(1), cycle: 1, interval: 0, probability: 1}],
         shape: new PointEmitter(),
@@ -284,7 +283,7 @@ export function init({scene, camera, batchRenderer, systems}: DemoContext) {
         rendererEmitterSettings: {
             startLength: new ConstantValue(18),
             followLocalOrigin: true,
-            sideAxis: new Vector3(1, 0, 0),
+            sideAxis: new BVector3(1, 0, 0),
             // A fast swing moves far between frames: curve the trail through
             // its samples so it stays round instead of showing their corners.
             tessellation: 6,

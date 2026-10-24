@@ -1,3 +1,4 @@
+import type {Vector3Like} from '../Like';
 import {Particle} from '../Particle';
 import {Vector3} from '../math';
 import {Behavior, BehaviorJSON} from './Behavior';
@@ -10,9 +11,10 @@ export interface PhysicsResolver {
     /**
      * Tests `position`, in the simulation space of the system asking. Returns
      * true when it is inside or on a collider, with the surface's unit normal
-     * written to `normal`; false otherwise, leaving `normal` alone.
+     * written to `normal`; false otherwise, leaving `normal` alone. Both are `{x, y, z}`: read
+     * the position's components and write the normal's.
      */
-    resolve(position: Vector3, normal: Vector3): boolean;
+    resolve(position: Vector3Like, normal: Vector3Like): boolean;
 }
 
 let physicsResolver: PhysicsResolver | undefined;

@@ -1,4 +1,5 @@
 export * from './Euler';
+export * from './fromLike';
 export * from './MathUtils';
 export * from './Matrix3';
 export * from './Matrix4';

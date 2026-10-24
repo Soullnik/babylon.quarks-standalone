@@ -563,7 +563,7 @@ describe('the trail batch', () => {
     it("tints a system's ribbons and leaves another's alone", () => {
         const tinted = trailSystem();
         const plain = trailSystem();
-        tinted.tint = new Vector4(1, 0.5, 0.25, 0.5);
+        tinted.tint = {r: 1, g: 0.5, b: 0.25, a: 0.5};
         const renderer = new BatchedRenderer('tint', scene);
         renderer.addSystem(tinted);
         renderer.addSystem(plain);

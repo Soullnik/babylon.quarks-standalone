@@ -1,4 +1,5 @@
 import {Constants} from '@babylonjs/core/Engines/constants';
+import {Color4} from '@babylonjs/core/Maths/math.color';
 import {Vector3 as BVector3} from '@babylonjs/core/Maths/math.vector';
 import {
     Bezier,
@@ -10,7 +11,6 @@ import {
     PointEmitter,
     RenderMode,
     SpeedOverLife,
-    Vector4,
 } from 'babylon.quarks';
 import {createSharedTexture} from '../shared/common';
 import type {DemoContext} from '../types';
@@ -39,7 +39,7 @@ function createSystem({
         startLife: new IntervalValue(4, 5),
         startSpeed: new ConstantValue(1),
         startSize: new IntervalValue(1, 2),
-        startColor: new ConstantColor(new Vector4(1, 1, 1, 1)),
+        startColor: new ConstantColor(new Color4(1, 1, 1, 1)),
         emissionOverTime: new ConstantValue(0),
         emissionBursts: [{time: 0, count: new ConstantValue(10), cycle: 1, interval: 0.01, probability: 1}],
         shape: new PointEmitter(),

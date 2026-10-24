@@ -1,5 +1,6 @@
 import {Constants} from '@babylonjs/core/Engines/constants';
-import {Vector3 as BVector3} from '@babylonjs/core/Maths/math.vector';
+import {Color4} from '@babylonjs/core/Maths/math.color';
+import {Vector3 as BVector3, Vector2} from '@babylonjs/core/Maths/math.vector';
 import {
     Bezier,
     ConstantColor,
@@ -9,8 +10,6 @@ import {
     PointEmitter,
     RenderMode,
     SizeOverLife,
-    Vector2,
-    Vector4,
 } from 'babylon.quarks';
 import {createSharedTexture} from '../shared/common';
 import type {DemoContext} from '../types';
@@ -26,7 +25,7 @@ export function init({scene, camera, batchRenderer, systems}: DemoContext) {
     camera.setPosition(new BVector3(0, 10, 18));
     const texture = createSharedTexture(scene);
 
-    const make = (x: number, tint: Vector4, mode: 'pauseUntilReplaced' | 'loopUntilReplaced') => {
+    const make = (x: number, tint: Color4, mode: 'pauseUntilReplaced' | 'loopUntilReplaced') => {
         const system = new ParticleSystem({
             scene,
             duration: 1,
@@ -57,8 +56,8 @@ export function init({scene, camera, batchRenderer, systems}: DemoContext) {
         return system;
     };
 
-    make(-5, new Vector4(1, 0.7, 0.3, 1), 'pauseUntilReplaced');
-    make(5, new Vector4(0.4, 0.8, 1, 1), 'loopUntilReplaced');
+    make(-5, new Color4(1, 0.7, 0.3, 1), 'pauseUntilReplaced');
+    make(5, new Color4(0.4, 0.8, 1, 1), 'loopUntilReplaced');
 }
 
 /** Moves both emitters around their circles. */

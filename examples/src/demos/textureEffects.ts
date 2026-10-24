@@ -1,6 +1,7 @@
 import {Constants} from '@babylonjs/core/Engines/constants';
 import {DynamicTexture} from '@babylonjs/core/Materials/Textures/dynamicTexture';
 import {Texture} from '@babylonjs/core/Materials/Textures/texture';
+import {Color4} from '@babylonjs/core/Maths/math.color';
 import {Vector3 as BVector3} from '@babylonjs/core/Maths/math.vector';
 import {TransformNode} from '@babylonjs/core/Meshes/transformNode';
 import type {Scene} from '@babylonjs/core/scene';
@@ -14,7 +15,6 @@ import {
     PointEmitter,
     RenderMode,
     SphereEmitter,
-    Vector4,
 } from 'babylon.quarks';
 import {createColorOverLifeGradient, createSharedTexture, SHARED_ASSETS} from '../shared/common';
 import type {DemoContext} from '../types';
@@ -161,7 +161,7 @@ export function init({scene, camera, batchRenderer, systems}: DemoContext) {
         startLife: new ConstantValue(1000),
         startSpeed: new ConstantValue(0),
         startSize: new ConstantValue(3),
-        startColor: new ConstantColor(new Vector4(0.4, 0.8, 1, 1)),
+        startColor: new ConstantColor(new Color4(0.4, 0.8, 1, 1)),
         emissionOverTime: new ConstantValue(0),
         emissionBursts: [{time: 0, count: new ConstantValue(1), cycle: 1, interval: 0, probability: 1}],
         shape: new PointEmitter(),
@@ -180,14 +180,14 @@ export function init({scene, camera, batchRenderer, systems}: DemoContext) {
         startLife: new IntervalValue(1, 1.6),
         startSpeed: new IntervalValue(1, 2),
         startSize: new IntervalValue(0.8, 1.4),
-        startColor: new ConstantColor(new Vector4(1, 1, 1, 1)),
+        startColor: new ConstantColor(new Color4(1, 1, 1, 1)),
         emissionOverTime: new ConstantValue(18),
         shape: new ConeEmitter({radius: 0.3, angle: 0.2}),
         texture: canvasTexture(scene, 'blob', 64, false, blob),
         blendMode: Constants.ALPHA_ADD,
         gradientMap: {ramp: canvasTexture(scene, 'fireRamp', 64, false, fireRamp)},
     });
-    embers.addBehavior(createColorOverLifeGradient(new Vector4(1, 1, 1, 1), new Vector4(0.5, 0.5, 0.5, 1)));
+    embers.addBehavior(createColorOverLifeGradient(new Color4(1, 1, 1, 1), new Color4(0.5, 0.5, 0.5, 1)));
     embers.emitter.position = new BVector3(0, 0, 0);
     embers.emitter.rotation.x = -Math.PI / 2;
 
@@ -199,7 +199,7 @@ export function init({scene, camera, batchRenderer, systems}: DemoContext) {
         startLife: new IntervalValue(1.5, 2.2),
         startSpeed: new IntervalValue(0.3, 0.8),
         startSize: new IntervalValue(1.5, 2.2),
-        startColor: new ConstantColor(new Vector4(0.35, 0.3, 0.45, 1)),
+        startColor: new ConstantColor(new Color4(0.35, 0.3, 0.45, 1)),
         emissionOverTime: new ConstantValue(6),
         shape: new SphereEmitter({radius: 0.5}),
         texture: createSharedTexture(scene, SHARED_ASSETS.smoke),
@@ -214,7 +214,7 @@ export function init({scene, camera, batchRenderer, systems}: DemoContext) {
             edgeColor: [1.5, 0.6, 0.1],
         },
     });
-    smoke.addBehavior(createColorOverLifeGradient(new Vector4(1, 1, 1, 1), new Vector4(1, 1, 1, 0)));
+    smoke.addBehavior(createColorOverLifeGradient(new Color4(1, 1, 1, 1), new Color4(1, 1, 1, 0)));
     smoke.emitter.position = new BVector3(5, 1.5, 0);
 
     // Beam: a bolt laid from the emitter to a moving node, flickering between the sheet's rows,
@@ -228,7 +228,7 @@ export function init({scene, camera, batchRenderer, systems}: DemoContext) {
         startLife: new ConstantValue(1000),
         startSpeed: new ConstantValue(0),
         startSize: new ConstantValue(0.8),
-        startColor: new ConstantColor(new Vector4(0.6, 0.8, 1, 1)),
+        startColor: new ConstantColor(new Color4(0.6, 0.8, 1, 1)),
         emissionOverTime: new ConstantValue(0),
         emissionBursts: [{time: 0, count: new ConstantValue(1), cycle: 1, interval: 0, probability: 1}],
         shape: new PointEmitter(),
@@ -239,7 +239,7 @@ export function init({scene, camera, batchRenderer, systems}: DemoContext) {
         blendMode: Constants.ALPHA_ADD,
         erosion: {mask: canvasTexture(scene, 'reach', 64, false, reach), maskUV: {channel: 1}, softness: 0.08},
     });
-    bolt.tint = new Vector4(1, 1, 1, 1);
+    bolt.tint = new Color4(1, 1, 1, 1);
     bolt.addBehavior(new FrameOverLife(new ConstantValue(0), {fps: 14, frameCount: 4}));
     bolt.emitter.position = new BVector3(-3, -1.5, 0);
     bolt.beamEnd = target;
@@ -247,7 +247,7 @@ export function init({scene, camera, batchRenderer, systems}: DemoContext) {
     scene.onBeforeRenderObservable.add(() => {
         t += scene.getEngine().getDeltaTime() / 1000;
         target.position.set(3 + Math.cos(t) * 0.8, -1.5 + Math.sin(t * 1.3) * 0.8, Math.sin(t) * 0.5);
-        bolt.tint!.w = Math.min(1, 0.6 + 0.6 * Math.sin(t * 1.7));
+        bolt.tint!.a = Math.min(1, 0.6 + 0.6 * Math.sin(t * 1.7));
     });
 
     for (const system of [flow, embers, smoke, bolt]) {

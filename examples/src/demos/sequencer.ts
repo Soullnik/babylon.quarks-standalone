@@ -1,5 +1,6 @@
 import {Constants} from '@babylonjs/core/Engines/constants';
 import {Texture} from '@babylonjs/core/Materials/Textures/texture';
+import {Color4} from '@babylonjs/core/Maths/math.color';
 import {Vector3 as BVector3} from '@babylonjs/core/Maths/math.vector';
 import {
     ApplySequences,
@@ -10,8 +11,6 @@ import {
     RandomColor,
     RenderMode,
     TextureSequencer,
-    Vector3,
-    Vector4,
 } from 'babylon.quarks';
 import {SHARED_ASSETS} from '../shared/common';
 import type {DemoContext} from '../types';
@@ -71,7 +70,7 @@ export async function init({scene, camera, batchRenderer, systems}: DemoContext)
         startLife: new ConstantValue(15.8),
         startSpeed: new ConstantValue(0),
         startSize: new IntervalValue(0.035, 0.16),
-        startColor: new RandomColor(new Vector4(0.97, 0.48, 0.11, 1), new Vector4(1.0, 0.71, 0.2, 1)),
+        startColor: new RandomColor(new Color4(0.97, 0.48, 0.11, 1), new Color4(1.0, 0.71, 0.2, 1)),
         worldSpace: false,
         emissionOverTime: new ConstantValue(0),
         emissionBursts: [{time: 0, count: new ConstantValue(particleCount), cycle: 1, interval: 1, probability: 1}],
@@ -84,10 +83,10 @@ export async function init({scene, camera, batchRenderer, systems}: DemoContext)
         uTileCount: 10,
         vTileCount: 10,
     });
-    const seq = new TextureSequencer(0.08, 0.08, new Vector3());
+    const seq = new TextureSequencer(0.08, 0.08, new BVector3());
     seq.fromImage(textSequencerImage, 0.5);
     centerSequencer(seq, textSequencerImage, 0.08, 0.08, -0.6, 0.75);
-    const seq2 = new TextureSequencer(0.08, 0.08, new Vector3());
+    const seq2 = new TextureSequencer(0.08, 0.08, new BVector3());
     seq2.fromImage(logoSequencerImage, 0.45);
     centerSequencer(seq2, logoSequencerImage, 0.08, 0.08, 0.2, -0.1);
     const applySeq = new ApplySequences(0.0001);

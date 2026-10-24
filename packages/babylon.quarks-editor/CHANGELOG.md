@@ -10,6 +10,8 @@ and the project follows the `quarks.core` 0.x version line.
 
 - `EffectEditorHostHandle.importGallery`, deprecated since it was renamed, is removed: call
   `importAssets`.
+- `rgbaToVector4` is removed, with quarks' own `Vector4` (see babylon.quarks 0.30): colours are
+  plain `{r, g, b, a}`.
 
 ### Added
 

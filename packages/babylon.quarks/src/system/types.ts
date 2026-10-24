@@ -16,12 +16,12 @@ import type {
     StretchedBillBoardSettings,
     ValueGenerator,
     ValueGeneratorJSON,
-    Vector2,
-    Vector3,
+    Vector2Like,
     Vector3ArrayJSON,
     Vector3Generator,
     Vector3GeneratorJSON,
     Vector3JSON,
+    Vector3Like,
 } from 'quarks.core';
 import type {
     MeshLighting,
@@ -230,7 +230,7 @@ export interface ParticleSystemParameters {
     /** What a full system does with new particles, see {@link RingBufferMode}. Default `'disabled'`. */
     ringBufferMode?: RingBufferMode;
     /** See {@link ParticleSystem.ringBufferLoopRange}. Default the whole life, (0, 1). */
-    ringBufferLoopRange?: Vector2;
+    ringBufferLoopRange?: Vector2Like;
     /** See {@link ParticleSystem.onlyUsedByOther}. Default false. */
     onlyUsedByOther?: boolean;
     /** See {@link ParticleSystem.behaviors}. Default none. */
@@ -296,9 +296,9 @@ export interface ParticleSystemParameters {
     /** Camera layer mask the batch draws for, see {@link ParticleSystem.layers}. Default `0x0fffffff`. */
     layerMask?: number;
     /** Billboard pivot in particle-size units, see {@link VFXBatchSettings.pivot}. */
-    pivot?: Vector3;
+    pivot?: Vector3Like;
     /** Fraction of billboard particles mirrored along U (x) and V (y), see {@link ParticleSystem.flip}. */
-    flip?: Vector2;
+    flip?: Vector2Like;
     /** How mesh particles are lit, see {@link ParticleSystem.lighting}. Default `'fixed'`. */
     lighting?: MeshLighting;
     /** Rim (Fresnel) term on mesh particles, see {@link ParticleSystem.rim}. Default none. */

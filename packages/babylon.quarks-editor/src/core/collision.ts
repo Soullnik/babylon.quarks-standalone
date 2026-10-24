@@ -1,4 +1,4 @@
-import {Vector3, getPhysicsResolver, setPhysicsResolver} from 'babylon.quarks';
+import {getPhysicsResolver, setPhysicsResolver, type Vector3Like} from 'babylon.quarks';
 
 /**
  * A horizontal ground plane collider for hosts/demos that opt in via ensureGroundResolver /
@@ -14,9 +14,11 @@ export class GroundPlaneResolver {
     /**
      * True when `position` is at or below the plane, with the plane's normal written to `normal`.
      */
-    resolve(position: Vector3, normal: Vector3): boolean {
+    resolve(position: Vector3Like, normal: Vector3Like): boolean {
         if (position.y <= this.y) {
-            normal.set(0, 1, 0);
+            normal.x = 0;
+            normal.y = 1;
+            normal.z = 0;
             return true;
         }
         return false;

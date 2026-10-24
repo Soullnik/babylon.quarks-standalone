@@ -2,6 +2,7 @@ import {Constants} from '@babylonjs/core/Engines/constants';
 import {BaseTexture} from '@babylonjs/core/Materials/Textures/baseTexture';
 import {Texture} from '@babylonjs/core/Materials/Textures/texture';
 import {Scene} from '@babylonjs/core/scene';
+import type {Color4Like, Vector2Like, Vector3Like} from 'quarks.core';
 import {
     AxisAngleGenerator,
     Behavior,
@@ -32,7 +33,6 @@ import {
     TrailParticle,
     TrailSettings,
     ValueGenerator,
-    Vector2,
     Vector3,
     Vector3Generator,
     Vector4,
@@ -250,9 +250,9 @@ export class ParticleSystem implements IParticleSystem {
     /**
      * Fraction of billboard particles mirrored along U (x) and V (y), each
      * picked at random when the particle is born — Unity's renderer Flip.
-     * Undefined: nothing is mirrored. Meshes ignore it.
+     * Undefined: nothing is mirrored. Meshes ignore it. Any `{x, y}`, such as a Babylon `Vector2`.
      */
-    flip?: Vector2;
+    flip?: Vector2Like;
     /** Particles emitted per second, read over the system's time. Default 10. */
     emissionOverTime: ValueGenerator | FunctionValueGenerator;
     /** Particles emitted per world unit the emitter moves (Unity's Rate over Distance). Default 0. */
@@ -279,7 +279,7 @@ export class ParticleSystem implements IParticleSystem {
      * particle still at that point of its life; behaviors that act by age stop with it, those
      * that act per second (rotation speed, forces) still run.
      */
-    ringBufferLoopRange: Vector2;
+    ringBufferLoopRange: Vector2Like;
     /**
      * The system emits nothing of its own and only spawns what an `EmitSubParticleSystem` on
      * another system sends it (a Unity sub emitter). Default false.
@@ -573,11 +573,11 @@ export class ParticleSystem implements IParticleSystem {
      * {@link VFXBatchSettings.pivot}. Assign a new vector to change it: editing
      * the returned one in place does not reach the renderer.
      */
-    get pivot(): Vector3 | undefined {
+    get pivot(): Vector3Like | undefined {
         return this.rendererSettings.pivot;
     }
 
-    set pivot(v: Vector3 | undefined) {
+    set pivot(v: Vector3Like | undefined) {
         this.rendererSettings.pivot = nonZeroPivot(v);
         this.neededToUpdateRender = true;
     }
@@ -1737,7 +1737,7 @@ export class ParticleSystem implements IParticleSystem {
      * padded for the motion since, in between: conservative, and at most a
      * frame behind the display.
      */
-    getWorldBounds(min: Vector3, max: Vector3): boolean {
+    getWorldBounds(min: Vector3Like, max: Vector3Like): boolean {
         if (!this.bounds.toWorld(min, max, this.emitter)) {
             return false;
         }
@@ -1749,8 +1749,12 @@ export class ParticleSystem implements IParticleSystem {
                 return true;
             }
             const pad = this.bounds.worldPadding(this.emitter);
-            min.set(Math.min(min.x, end.x - pad), Math.min(min.y, end.y - pad), Math.min(min.z, end.z - pad));
-            max.set(Math.max(max.x, end.x + pad), Math.max(max.y, end.y + pad), Math.max(max.z, end.z + pad));
+            min.x = Math.min(min.x, end.x - pad);
+            min.y = Math.min(min.y, end.y - pad);
+            min.z = Math.min(min.z, end.z - pad);
+            max.x = Math.max(max.x, end.x + pad);
+            max.y = Math.max(max.y, end.y + pad);
+            max.z = Math.max(max.z, end.z + pad);
         }
         return true;
     }
@@ -1773,13 +1777,23 @@ export class ParticleSystem implements IParticleSystem {
      * particles in every blend mode that blends by coverage (see
      * {@link blendCategory}). Unset (the default): none.
      * Not saved in the effect JSON; copied by {@link clone}.
+     * Set it from any `Color4Like`, such as a Babylon `Color4`; the value is copied, so later
+     * edits to the object passed in do not reach the system until it is set again.
      */
-    tint?: Vector4;
+    get tint(): Color4Like | undefined {
+        return this._tint;
+    }
+
+    set tint(value: Color4Like | undefined) {
+        this._tint = value === undefined ? undefined : {r: value.r, g: value.g, b: value.b, a: value.a};
+    }
+
+    private _tint?: Color4Like;
 
     private readonly beamEndScratch = new Vector3();
 
     /** The world position of {@link beamEnd} into `out`; false when it is unset. */
-    getBeamEnd(out: Vector3): boolean {
+    getBeamEnd(out: Vector3Like): boolean {
         const end = this.beamEnd;
         if (end === undefined) {
             return false;
@@ -1787,11 +1801,15 @@ export class ParticleSystem implements IParticleSystem {
         const node = end as {getAbsolutePosition?: () => {x: number; y: number; z: number}};
         if (typeof node.getAbsolutePosition === 'function') {
             const position = node.getAbsolutePosition();
-            out.set(position.x, position.y, position.z);
+            out.x = position.x;
+            out.y = position.y;
+            out.z = position.z;
         } else {
             // Any point: quarks' Vector3, or a Babylon one passed from plain JavaScript.
             const point = end as {x: number; y: number; z: number};
-            out.set(point.x, point.y, point.z);
+            out.x = point.x;
+            out.y = point.y;
+            out.z = point.z;
         }
         return true;
     }
@@ -2135,7 +2153,9 @@ export class ParticleSystem implements IParticleSystem {
                 ...trailFlags(settings),
                 ...trailCurve(settings),
                 ...trailSampling(settings),
-                ...(settings.sideAxis ? {sideAxis: settings.sideAxis.clone()} : {}),
+                ...(settings.sideAxis
+                    ? {sideAxis: {x: settings.sideAxis.x, y: settings.sideAxis.y, z: settings.sideAxis.z}}
+                    : {}),
             };
         } else if (this.renderMode === RenderMode.StretchedBillBoard) {
             rendererEmitterSettings = {
@@ -2174,7 +2194,7 @@ export class ParticleSystem implements IParticleSystem {
             }
         }
         if (this.tint) {
-            copy.tint = this.tint.clone();
+            copy.tint = this.tint;
         }
         copy.emissionMultiplier = this.emissionMultiplier;
         const beamEnd = this.beamEnd;

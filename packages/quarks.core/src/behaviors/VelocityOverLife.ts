@@ -1,7 +1,9 @@
 import {ConstantValue, FunctionValueGenerator, ValueGenerator, ValueGeneratorFromJSON} from '../functions';
 import type {ValueGeneratorJSON, Vector3ArrayJSON} from '../functions/FunctionJSON';
 import {IParticleSystem} from '../IParticleSystem';
+import type {Vector3Like} from '../Like';
 import {Quaternion, Vector3} from '../math';
+import {vector3From} from '../math/fromLike';
 import {Particle} from '../Particle';
 import {Behavior, BehaviorJSON} from './Behavior';
 import {BehaviorSpace} from './EmitterFrame';
@@ -45,6 +47,20 @@ export class VelocityOverLife implements Behavior {
     /** Learned in {@link initialize}, so undefined until this behavior sees a particle. */
     ps?: IParticleSystem;
 
+    private _orbitalOffsetValue: Vector3;
+
+    /**
+     * Where the orbital speeds turn around, relative to the emitter (Unity's Orbital Offset).
+     * Set it from any `Vector3Like`, such as a Babylon `Vector3`; the value is copied.
+     */
+    get orbitalOffset(): Vector3 {
+        return this._orbitalOffsetValue;
+    }
+
+    set orbitalOffset(value: Vector3Like) {
+        this._orbitalOffsetValue = vector3From(value);
+    }
+
     /**
      * @param linearX - Velocity along x over the particle's life, in units per second.
      * @param linearY - Velocity along y.
@@ -70,8 +86,10 @@ export class VelocityOverLife implements Behavior {
         /** Speed away from the orbit centre (Unity's Radial), in the authored space's units. */
         public radial: FunctionValueGenerator | ValueGenerator = new ConstantValue(0),
         /** Where the orbital speeds turn around, relative to the emitter (Unity's Orbital Offset). */
-        public orbitalOffset: Vector3 = new Vector3()
-    ) {}
+        orbitalOffset: Vector3Like = new Vector3()
+    ) {
+        this._orbitalOffsetValue = vector3From(orbitalOffset);
+    }
 
     /**
      * Scratch value.

@@ -12,8 +12,8 @@ import {
     StretchedBillBoardSettings,
     TrailSettings,
     ValueGeneratorFromJSON,
-    Vector3,
     Vector3ArrayJSON,
+    Vector3Like,
     warnFormat,
 } from 'quarks.core';
 import type {MaterialTextureRef} from '../effectDocumentJSON';
@@ -115,7 +115,7 @@ function trailSideAxisJSON(settings: TrailSettings | undefined): {sideAxis?: Vec
  * that is not three finite numbers, or has no length, cannot sweep a ribbon and is dropped with
  * a warning, so the trail faces the camera instead of vanishing.
  */
-function trailSideAxisFromJSON(value: unknown): {sideAxis?: Vector3} {
+function trailSideAxisFromJSON(value: unknown): {sideAxis?: Vector3Like} {
     if (value === undefined || value === null) {
         return {};
     }
@@ -132,7 +132,7 @@ function trailSideAxisFromJSON(value: unknown): {sideAxis?: Vector3} {
         typeof v === 'number' ? v : typeof v === 'string' && v.trim() !== '' ? Number(v) : NaN;
     const [nx, ny, nz] = [component(x), component(y), component(z)];
     if (Number.isFinite(nx) && Number.isFinite(ny) && Number.isFinite(nz) && nx * nx + ny * ny + nz * nz > 0) {
-        return {sideAxis: new Vector3(nx, ny, nz)};
+        return {sideAxis: {x: nx, y: ny, z: nz}};
     }
     warnFormat(`sideAxis ${JSON.stringify(value)} is not a direction and is ignored`);
     return {};

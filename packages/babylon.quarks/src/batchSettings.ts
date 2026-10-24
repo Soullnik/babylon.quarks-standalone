@@ -1,7 +1,7 @@
 import type {BaseTexture} from '@babylonjs/core/Materials/Textures/baseTexture';
 import {Color3} from '@babylonjs/core/Maths/math.color';
 import {Vector3 as BVector3} from '@babylonjs/core/Maths/math.vector';
-import type {Vector3} from 'quarks.core';
+import type {Vector3Like} from 'quarks.core';
 
 // The settings a batch's systems share and the helpers that normalise and compare them. They live
 // apart from VFXBatch so the batch key (batchKey.ts) can read them without importing the batch.
@@ -524,7 +524,7 @@ export interface StoredBatchSettings {
     /** Whether the scene's image processing is applied, see {@link VFXBatchSettings.applyImageProcessing}. */
     applyImageProcessing: boolean;
     /** Billboard pivot in particle-size units, see {@link VFXBatchSettings.pivot}. */
-    pivot?: Vector3;
+    pivot?: Vector3Like;
     /** Draw order within the batch, see {@link SortMode}. */
     sortMode: SortMode;
     /** Which faces a mesh particle draws, see {@link RenderFace}; `'both'` outside the Mesh render mode. */

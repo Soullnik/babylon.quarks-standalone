@@ -1,4 +1,5 @@
-import {ConstantValue, FunctionValueGenerator, ValueGenerator, Vector2, Vector3} from 'quarks.core';
+import type {Vector2Like, Vector3Like} from 'quarks.core';
+import {ConstantValue, FunctionValueGenerator, ValueGenerator} from 'quarks.core';
 import type {MeshLighting, RenderFace, SortMode} from '../batchSettings';
 import type {BurstParameters, CullingMode, RingBufferMode, ScalingMode, StopAction} from './types';
 
@@ -39,12 +40,12 @@ export function validRingBufferMode(mode: unknown): RingBufferMode {
  * A ring buffer loop range within 0..1, start no later than end; a missing or non-finite bound
  * takes its default (0 or 1).
  */
-export function validLoopRange(range: {x: number; y: number} | undefined): Vector2 {
+export function validLoopRange(range: Vector2Like | undefined): Vector2Like {
     const clamp = (value: number | undefined, fallback: number) =>
         typeof value === 'number' && Number.isFinite(value) ? Math.min(1, Math.max(0, value)) : fallback;
     const start = clamp(range?.x, 0);
     const end = clamp(range?.y, 1);
-    return new Vector2(Math.min(start, end), Math.max(start, end));
+    return {x: Math.min(start, end), y: Math.max(start, end)};
 }
 
 /** `mode` if it is one of the scaling modes, else `'local'`. */
@@ -58,13 +59,13 @@ export function validMaxParticles(count: unknown): number | undefined {
 }
 
 /** A copy of `v`, or undefined when it is unset or zero, which is the same as no pivot. */
-export function nonZeroPivot(v: Vector3 | undefined): Vector3 | undefined {
-    return v && (v.x !== 0 || v.y !== 0 || v.z !== 0) ? v.clone() : undefined;
+export function nonZeroPivot(v: Vector3Like | undefined): Vector3Like | undefined {
+    return v && (v.x !== 0 || v.y !== 0 || v.z !== 0) ? {x: v.x, y: v.y, z: v.z} : undefined;
 }
 
 /** A copy of `v`, or undefined when neither axis flips. */
-export function nonZeroFlip(v: Vector2 | undefined): Vector2 | undefined {
-    return v && (v.x > 0 || v.y > 0) ? v.clone() : undefined;
+export function nonZeroFlip(v: Vector2Like | undefined): Vector2Like | undefined {
+    return v && (v.x > 0 || v.y > 0) ? {x: v.x, y: v.y} : undefined;
 }
 
 /** `cutoff` kept to 0…1, or 0 (no alpha test) when it is unset, NaN or negative. */

@@ -1,5 +1,7 @@
 import type {Vector2JSON, Vector3ArrayJSON, Vector3JSON} from '../functions/FunctionJSON';
+import type {Vector3Like} from '../Like';
 import {Vector2, Vector3} from '../math';
+import {vector3From} from '../math/fromLike';
 import type {Sequencer} from './Sequencer';
 
 /**
@@ -27,6 +29,20 @@ export class TextureSequencer implements Sequencer {
     /** The pixel coordinates read from the image, y up. */
     locations: Vector2[] = [];
 
+    private _positionValue: Vector3;
+
+    /**
+     * Where the image's origin lands.
+     * Set it from any `Vector3Like`, such as a Babylon `Vector3`; the value is copied.
+     */
+    get position(): Vector3 {
+        return this._positionValue;
+    }
+
+    set position(value: Vector3Like) {
+        this._positionValue = vector3From(value);
+    }
+
     /**
      * @param scaleX - World units per pixel along x.
      * @param scaleY - World units per pixel along y.
@@ -35,8 +51,10 @@ export class TextureSequencer implements Sequencer {
     constructor(
         public scaleX: number = 0,
         public scaleY: number = 0,
-        public position: Vector3 = new Vector3()
-    ) {}
+        position: Vector3Like = new Vector3()
+    ) {
+        this._positionValue = vector3From(position);
+    }
     /**
      * Writes into `position` the point for particle `index`, wrapping around the points; leaves it
      * as it is when there are none.

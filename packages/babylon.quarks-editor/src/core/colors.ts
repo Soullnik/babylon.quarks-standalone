@@ -1,5 +1,5 @@
 import type {Behavior} from 'babylon.quarks';
-import {ColorOverLife, Gradient, Vector3, Vector4} from 'babylon.quarks';
+import {ColorOverLife, Gradient} from 'babylon.quarks';
 
 /** One RGBA stop of the editable gradient (all channels 0..1, pos 0..1). */
 export interface GradientStop {
@@ -25,7 +25,7 @@ export const DEFAULT_GRADIENT_STOPS: GradientStop[] = [
 export function buildGradient(stops: GradientStop[]): Gradient {
     const sorted = [...stops].sort((a, b) => a.pos - b.pos);
     return new Gradient(
-        sorted.map((s) => [new Vector3(s.r, s.g, s.b), s.pos] as [Vector3, number]),
+        sorted.map((s) => [{r: s.r, g: s.g, b: s.b}, s.pos] as [{r: number; g: number; b: number}, number]),
         sorted.map((s) => [s.a, s.pos] as [number, number])
     );
 }
@@ -33,11 +33,6 @@ export function buildGradient(stops: GradientStop[]): Gradient {
 /** A Color over Lifetime behavior through `stops`. */
 export function buildColorOverLife(stops: GradientStop[]): ColorOverLife {
     return new ColorOverLife(buildGradient(stops));
-}
-
-/** An RGBA colour as a quarks `Vector4`. */
-export function rgbaToVector4(stop: {r: number; g: number; b: number; a: number}): Vector4 {
-    return new Vector4(stop.r, stop.g, stop.b, stop.a);
 }
 
 /** A stop's colour as CSS `rgba()`. */
@@ -88,13 +83,11 @@ export function readGradientStops(gradient: Gradient): GradientStop[] {
     for (const [, pos] of gradient.alpha.keys) {
         positions.add(Math.round(pos * 1000) / 1000);
     }
-    const color = new Vector3();
     return [...positions]
         .sort((a, b) => a - b)
         .map((pos) => {
-            gradient.color.genValue(color, pos);
-            const alpha = gradient.alpha.genValue(0, pos);
-            return {pos, r: color.x, g: color.y, b: color.z, a: alpha};
+            const {r, g, b, a} = gradient.evaluate(pos);
+            return {pos, r, g, b, a};
         });
 }
 

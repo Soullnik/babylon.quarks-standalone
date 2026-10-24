@@ -48,8 +48,8 @@ import {
     ConstantValue,
     IntervalValue,
     ConstantColor,
-    Vector4,
 } from 'babylon.quarks';
+import {Color4} from '@babylonjs/core/Maths/math.color';
 
 // One renderer per scene; it batches all systems added to it.
 const batchRenderer = new BatchedRenderer('particles', scene);
@@ -61,7 +61,7 @@ const system = new ParticleSystem({
     startLife: new IntervalValue(4, 5),
     startSpeed: new ConstantValue(1),
     startSize: new IntervalValue(1, 2),
-    startColor: new ConstantColor(new Vector4(1, 1, 1, 1)),
+    startColor: new ConstantColor(new Color4(1, 1, 1, 1)),
     emissionOverTime: new ConstantValue(20),
     shape: new PointEmitter(),
     renderMode: RenderMode.BillBoard,
@@ -98,7 +98,7 @@ var createScene = async function () {
         startLife: new Q.IntervalValue(2, 3),
         startSpeed: new Q.ConstantValue(2),
         startSize: new Q.IntervalValue(0.5, 1),
-        startColor: new Q.ConstantColor(new Q.Vector4(1, 0.6, 0.2, 1)),
+        startColor: new Q.ConstantColor(new BABYLON.Color4(1, 0.6, 0.2, 1)),
         emissionOverTime: new Q.ConstantValue(60),
         shape: new Q.ConeEmitter({radius: 0.3, angle: 0.4}),
         renderMode: Q.RenderMode.BillBoard,
@@ -144,13 +144,14 @@ A few optional settings mirror Shuriken so Unity exports look the same; all are 
 only written to the effect JSON when set.
 
 ```ts
-import {ConeEmitter, Quaternion, ShapeTransform, Vector2, Vector3} from 'babylon.quarks';
+import {Quaternion, Vector2, Vector3} from '@babylonjs/core/Maths/math.vector';
+import {ConeEmitter, ShapeTransform} from 'babylon.quarks';
 
 const system = new ParticleSystem({
     // Shape module Position / Rotation / Scale: spawn points and start directions go through it.
     shape: new ConeEmitter({
         radius: 0.5,
-        transform: new ShapeTransform(new Vector3(0, 1, 0), new Quaternion(), new Vector3(2, 1, 1)),
+        transform: new ShapeTransform(new Vector3(0, 1, 0), Quaternion.Identity(), new Vector3(2, 1, 1)),
     }),
     // Renderer Pivot, in particle-size units (billboards and stretched billboards).
     pivot: new Vector3(0, 0.5, 0),

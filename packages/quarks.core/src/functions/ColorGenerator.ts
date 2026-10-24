@@ -1,4 +1,6 @@
+import type {Color4Like} from '../Like';
 import {Vector4} from '../math';
+import {vector4FromColor} from '../math/fromLike';
 import {ColorToJSON, describePart, JSONToColor, warnFormat} from '../util/JSONUtil';
 import {ColorRange} from './ColorRange';
 import type {ColorGeneratorJSON, ConstantColorJSON} from './FunctionJSON';
@@ -56,8 +58,23 @@ export interface FunctionColorGenerator {
 }
 /** One colour, always the same (Unity's Color). */
 export class ConstantColor implements ColorGenerator {
+    private _colorValue: Vector4;
+
+    /**
+     * The colour, linear RGBA.
+     * Set it from any `Color4Like`, such as a Babylon `Color4`; the value is copied.
+     */
+    get color(): Vector4 {
+        return this._colorValue;
+    }
+
+    set color(value: Color4Like) {
+        this._colorValue = vector4FromColor(value);
+    }
+
     /** @param color - The colour, linear RGBA. */
-    constructor(public color: Vector4) {
+    constructor(color: Color4Like) {
+        this._colorValue = vector4FromColor(color);
         this.type = 'value';
     }
 

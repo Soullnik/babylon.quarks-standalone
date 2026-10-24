@@ -1,5 +1,7 @@
 import type {Vector3ArrayJSON} from '../functions/FunctionJSON';
+import type {Vector3Like} from '../Like';
 import {Vector3} from '../math';
+import {vector3From} from '../math/fromLike';
 import {Particle} from '../Particle';
 import {readVector3} from '../util/JSONUtil';
 import {Behavior, BehaviorJSON} from './Behavior';
@@ -29,12 +31,28 @@ export class GravityForce implements Behavior {
      */
     temp: Vector3 = new Vector3();
 
+    private _centerValue: Vector3;
+
+    /**
+     * The point pulled toward, in the simulation space.
+     * Set it from any `Vector3Like`, such as a Babylon `Vector3`; the value is copied.
+     */
+    get center(): Vector3 {
+        return this._centerValue;
+    }
+
+    set center(value: Vector3Like) {
+        this._centerValue = vector3From(value);
+    }
+
     constructor(
         /** The point pulled toward, in the simulation space. */
-        public center: Vector3,
+        center: Vector3Like,
         /** Strength of the pull at distance 1, in units per second squared. */
         public magnitude: number
-    ) {}
+    ) {
+        this._centerValue = vector3From(center);
+    }
 
     initialize(particle: Particle): void {}
 

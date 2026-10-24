@@ -1,4 +1,5 @@
 import {Constants} from '@babylonjs/core/Engines/constants';
+import {Color4} from '@babylonjs/core/Maths/math.color';
 import {Vector3 as BVector3} from '@babylonjs/core/Maths/math.vector';
 import '@babylonjs/core/Rendering/depthRendererSceneComponent';
 import {
@@ -11,7 +12,6 @@ import {
     PiecewiseBezier,
     PointEmitter,
     RenderMode,
-    Vector4,
 } from 'babylon.quarks';
 import {createSharedTexture, SHARED_ASSETS} from '../shared/common';
 import type {DemoContext} from '../types';
@@ -32,7 +32,7 @@ export function init({scene, camera, batchRenderer, systems}: DemoContext) {
         startLife: new ConstantValue(2),
         startSpeed: new ConstantValue(10),
         startSize: new ConstantValue(2),
-        startColor: new ConstantColor(new Vector4(1, 1, 1, 1)),
+        startColor: new ConstantColor(new Color4(1, 1, 1, 1)),
         worldSpace: true,
         emissionOverTime: new ConstantValue(60),
         shape: new PointEmitter(),

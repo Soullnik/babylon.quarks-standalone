@@ -4,6 +4,7 @@ import {ImportMeshAsync} from '@babylonjs/core/Loading/sceneLoader';
 import {PBRMaterial} from '@babylonjs/core/Materials/PBR/pbrMaterial';
 import {StandardMaterial} from '@babylonjs/core/Materials/standardMaterial';
 import {Texture} from '@babylonjs/core/Materials/Textures/texture';
+import {Color4} from '@babylonjs/core/Maths/math.color';
 import {Vector3 as BVector3} from '@babylonjs/core/Maths/math.vector';
 import {Mesh} from '@babylonjs/core/Meshes/mesh';
 import {
@@ -19,8 +20,6 @@ import {
     RenderMode,
     Rotation3DOverLife,
     SpeedOverLife,
-    Vector3,
-    Vector4,
 } from 'babylon.quarks';
 import '../shared/loaders';
 import type {DemoContext} from '../types';
@@ -86,7 +85,7 @@ export async function init({scene, camera, batchRenderer, systems}: DemoContext)
         startLife: new IntervalValue(alphaTestConfig.life.min, alphaTestConfig.life.max),
         startSpeed: new ConstantValue(alphaTestConfig.speed),
         startSize: new IntervalValue(alphaTestConfig.size.min, alphaTestConfig.size.max),
-        startColor: new ConstantColor(new Vector4(1, 1, 1, 1)),
+        startColor: new ConstantColor(new Color4(1, 1, 1, 1)),
         worldSpace: false,
         emissionOverTime: new ConstantValue(0),
         emissionBursts: [
@@ -114,7 +113,7 @@ export async function init({scene, camera, batchRenderer, systems}: DemoContext)
     leaves.addBehavior(
         new Rotation3DOverLife(
             new AxisAngleGenerator(
-                new Vector3(
+                new BVector3(
                     alphaTestConfig.angularVelocityAxis.x,
                     alphaTestConfig.angularVelocityAxis.y,
                     alphaTestConfig.angularVelocityAxis.z
