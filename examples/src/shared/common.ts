@@ -1,6 +1,7 @@
 import {Texture} from '@babylonjs/core/Materials/Textures/texture';
+import {Color3, Color4} from '@babylonjs/core/Maths/math.color';
 import type {Scene} from '@babylonjs/core/scene';
-import {ColorOverLife, ColorRange, type FunctionColorGenerator, Gradient, Vector3, Vector4} from 'babylon.quarks';
+import {ColorOverLife, ColorRange, type FunctionColorGenerator, Gradient} from 'babylon.quarks';
 
 export const SHARED_ASSETS = {
     atlas: 'textures/texture1.png',
@@ -12,21 +13,21 @@ export const SHARED_ASSETS = {
 };
 
 /** ColorOverLife helper: ColorRange is a value generator but typed as function-only in quarks.core. */
-export function createColorOverLifeRange(start: Vector4, end: Vector4) {
+export function createColorOverLifeRange(start: Color4, end: Color4) {
     return new ColorOverLife(new ColorRange(start, end) as unknown as FunctionColorGenerator);
 }
 
 /** ColorOverLife that fades every particle from `start` at birth to `end` at death, like Unity's gradient. */
-export function createColorOverLifeGradient(start: Vector4, end: Vector4) {
+export function createColorOverLifeGradient(start: Color4, end: Color4) {
     return new ColorOverLife(
         new Gradient(
             [
-                [new Vector3(start.x, start.y, start.z), 0],
-                [new Vector3(end.x, end.y, end.z), 1],
+                [new Color3(start.r, start.g, start.b), 0],
+                [new Color3(end.r, end.g, end.b), 1],
             ],
             [
-                [start.w, 0],
-                [end.w, 1],
+                [start.a, 0],
+                [end.a, 1],
             ]
         )
     );

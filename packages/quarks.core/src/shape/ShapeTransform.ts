@@ -1,4 +1,6 @@
+import type {QuaternionLike, Vector3Like} from '../Like';
 import {Quaternion, Vector3} from '../math';
+import {quaternionFrom, vector3From} from '../math/fromLike';
 import {Particle} from '../Particle';
 import type {ShapeJSON} from './EmitterUtil';
 
@@ -25,17 +27,51 @@ export interface ShapeTransformJSON {
  * start speed — which is what Unity does.
  */
 export class ShapeTransform {
-    /** Offset of the shape in the system. */
-    position: Vector3;
-    /** Rotation of the shape in the system. */
-    rotation: Quaternion;
-    /** Scale of the shape, applied before the rotation. */
-    scale: Vector3;
+    private _positionValue: Vector3;
+    private _rotationValue: Quaternion;
+    private _scaleValue: Vector3;
 
-    constructor(position?: Vector3, rotation?: Quaternion, scale?: Vector3) {
-        this.position = position ?? new Vector3();
-        this.rotation = rotation ?? new Quaternion();
-        this.scale = scale ?? new Vector3(1, 1, 1);
+    /**
+     * Offset of the shape in the system.
+     * Set it from any `Vector3Like`, such as a Babylon `Vector3`; the value is copied.
+     */
+    get position(): Vector3 {
+        return this._positionValue;
+    }
+
+    set position(value: Vector3Like) {
+        this._positionValue = vector3From(value);
+    }
+
+    /**
+     * Rotation of the shape in the system.
+     * Set it from any `QuaternionLike`, such as a Babylon `Quaternion`; the value is copied.
+     */
+    get rotation(): Quaternion {
+        return this._rotationValue;
+    }
+
+    set rotation(value: QuaternionLike) {
+        this._rotationValue = quaternionFrom(value);
+    }
+
+    /**
+     * Scale of the shape, applied before the rotation.
+     * Set it from any `Vector3Like`, such as a Babylon `Vector3`; the value is copied.
+     */
+    get scale(): Vector3 {
+        return this._scaleValue;
+    }
+
+    set scale(value: Vector3Like) {
+        this._scaleValue = vector3From(value);
+    }
+
+    /** The offset, rotation and scale are copied; each left out is the identity. */
+    constructor(position?: Vector3Like, rotation?: QuaternionLike, scale?: Vector3Like) {
+        this._positionValue = position ? vector3From(position) : new Vector3();
+        this._rotationValue = rotation ? quaternionFrom(rotation) : new Quaternion();
+        this._scaleValue = scale ? vector3From(scale) : new Vector3(1, 1, 1);
     }
 
     /** Moves a freshly initialized particle from shape space into system space. */

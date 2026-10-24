@@ -2,19 +2,11 @@ import {Constants} from '@babylonjs/core/Engines/constants';
 import {StandardMaterial} from '@babylonjs/core/Materials/standardMaterial';
 import {DynamicTexture} from '@babylonjs/core/Materials/Textures/dynamicTexture';
 import {Texture} from '@babylonjs/core/Materials/Textures/texture';
-import {Color3} from '@babylonjs/core/Maths/math.color';
+import {Color3, Color4} from '@babylonjs/core/Maths/math.color';
 import {Vector3 as BVector3} from '@babylonjs/core/Maths/math.vector';
 import {MeshBuilder} from '@babylonjs/core/Meshes/meshBuilder';
 import type {Scene} from '@babylonjs/core/scene';
-import {
-    ConstantColor,
-    ConstantValue,
-    ParticleSystem,
-    PointEmitter,
-    RenderMode,
-    TrailSettings,
-    Vector4,
-} from 'babylon.quarks';
+import {ConstantColor, ConstantValue, ParticleSystem, PointEmitter, RenderMode, TrailSettings} from 'babylon.quarks';
 import type {DemoContext} from '../types';
 
 /**
@@ -105,7 +97,7 @@ export function init({scene, camera, batchRenderer, systems, demoState}: DemoCon
             startLife: new ConstantValue(1e6),
             startSpeed: new ConstantValue(0),
             startSize: new ConstantValue(0.7),
-            startColor: new ConstantColor(new Vector4(1, 1, 1, 1)),
+            startColor: new ConstantColor(new Color4(1, 1, 1, 1)),
             emissionOverTime: new ConstantValue(0),
             emissionBursts: [{time: 0, count: new ConstantValue(1), cycle: 1, interval: 0.01, probability: 1}],
             shape: new PointEmitter(),

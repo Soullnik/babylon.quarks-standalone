@@ -171,7 +171,7 @@ const VARIANTS: Array<[string, ParticleSystemParameters]> = [
                 colorFromParticle: true,
                 dieWithParticle: true,
                 recordWorldSpace: true,
-                sideAxis: new Vector3(0, 0, 1),
+                sideAxis: {x: 0, y: 0, z: 1},
                 tessellation: 3,
                 curveTension: 0.5,
             },
@@ -289,7 +289,7 @@ describe('ParticleSystem serialisation contract', () => {
 
         it('clones to an equal, independent copy', () => {
             const original = make();
-            original.tint = new Vector4(1, 0.5, 0.25, 1);
+            original.tint = {r: 1, g: 0.5, b: 0.25, a: 1};
             original.emissionMultiplier = 2;
             const copy = original.clone();
             expect(settings(copy)).toEqual(settings(original));

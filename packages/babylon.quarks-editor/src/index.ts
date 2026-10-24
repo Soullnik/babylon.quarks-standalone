@@ -10,7 +10,6 @@ export {
     findBehavior,
     hexToRgb,
     rgbToHex,
-    rgbaToVector4,
     stopToCss,
     stopsToCssGradient,
 } from './core/colors.js';

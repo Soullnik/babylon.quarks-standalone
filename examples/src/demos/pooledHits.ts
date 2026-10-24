@@ -1,6 +1,6 @@
 import {Constants} from '@babylonjs/core/Engines/constants';
 import {StandardMaterial} from '@babylonjs/core/Materials/standardMaterial';
-import {Color3} from '@babylonjs/core/Maths/math.color';
+import {Color3, Color4} from '@babylonjs/core/Maths/math.color';
 import {Vector3 as BVector3} from '@babylonjs/core/Maths/math.vector';
 import {MeshBuilder} from '@babylonjs/core/Meshes/meshBuilder';
 import {TransformNode} from '@babylonjs/core/Meshes/transformNode';
@@ -19,8 +19,6 @@ import {
     RenderMode,
     SizeOverLife,
     SphereEmitter,
-    Vector3,
-    Vector4,
 } from 'babylon.quarks';
 import {createColorOverLifeGradient, createSharedTexture} from '../shared/common';
 import type {DemoContext} from '../types';
@@ -48,7 +46,7 @@ function createHitTemplate({scene, batchRenderer}: DemoContext): TransformNode {
         startLife: new ConstantValue(0.25),
         startSpeed: new ConstantValue(0),
         startSize: new ConstantValue(5),
-        startColor: new ConstantColor(new Vector4(1, 0.95, 0.7, 1)),
+        startColor: new ConstantColor(new Color4(1, 0.95, 0.7, 1)),
         emissionOverTime: new ConstantValue(0),
         emissionBursts: burst(1),
         shape: new PointEmitter(),
@@ -70,7 +68,7 @@ function createHitTemplate({scene, batchRenderer}: DemoContext): TransformNode {
         startLife: new ConstantValue(0.5),
         startSpeed: new ConstantValue(0),
         startSize: new ConstantValue(6),
-        startColor: new ConstantColor(new Vector4(1, 0.6, 0.2, 0.8)),
+        startColor: new ConstantColor(new Color4(1, 0.6, 0.2, 0.8)),
         emissionOverTime: new ConstantValue(0),
         emissionBursts: burst(1),
         shape: new PointEmitter(),
@@ -84,7 +82,7 @@ function createHitTemplate({scene, batchRenderer}: DemoContext): TransformNode {
         renderOrder: 1,
     });
     ring.addBehavior(new SizeOverLife(new PiecewiseBezier([[new Bezier(0.2, 0.7, 0.9, 1), 0]])));
-    ring.addBehavior(createColorOverLifeGradient(new Vector4(1, 0.6, 0.2, 0.8), new Vector4(1, 0.2, 0.1, 0)));
+    ring.addBehavior(createColorOverLifeGradient(new Color4(1, 0.6, 0.2, 0.8), new Color4(1, 0.2, 0.1, 0)));
 
     const sparks = new ParticleSystem({
         scene,
@@ -93,7 +91,7 @@ function createHitTemplate({scene, batchRenderer}: DemoContext): TransformNode {
         startLife: new IntervalValue(0.5, 0.9),
         startSpeed: new IntervalValue(8, 16),
         startSize: new IntervalValue(0.25, 0.45),
-        startColor: new RandomColor(new Vector4(1, 0.9, 0.5, 1), new Vector4(1, 0.5, 0.1, 1)),
+        startColor: new RandomColor(new Color4(1, 0.9, 0.5, 1), new Color4(1, 0.5, 0.1, 1)),
         worldSpace: true,
         emissionOverTime: new ConstantValue(0),
         emissionBursts: burst(60),
@@ -108,7 +106,7 @@ function createHitTemplate({scene, batchRenderer}: DemoContext): TransformNode {
         rendererEmitterSettings: {speedFactor: 0.06, lengthFactor: 1},
         renderOrder: 3,
     });
-    sparks.addBehavior(new ApplyForce(new Vector3(0, -1, 0), new ConstantValue(25)));
+    sparks.addBehavior(new ApplyForce(new BVector3(0, -1, 0), new ConstantValue(25)));
     sparks.addBehavior(new SizeOverLife(new PiecewiseBezier([[new Bezier(1, 0.9, 0.5, 0), 0]])));
 
     for (const system of [flash, ring, sparks]) {

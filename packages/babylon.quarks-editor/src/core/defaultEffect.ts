@@ -9,7 +9,6 @@ import {
     IntervalValue,
     ParticleSystem,
     RenderMode,
-    Vector4,
 } from 'babylon.quarks';
 import {DEFAULT_GRADIENT_STOPS, buildGradient} from './colors.js';
 import {uniqueEntryName, type SceneEntry} from './sceneEntries.js';
@@ -32,7 +31,7 @@ export function createDefaultEffect(
         startLife: new IntervalValue(1.2, 1.8),
         startSpeed: new IntervalValue(3, 5),
         startSize: new IntervalValue(0.25, 0.5),
-        startColor: new ConstantColor(new Vector4(1, 1, 1, 1)),
+        startColor: new ConstantColor({r: 1, g: 1, b: 1, a: 1}),
         emissionOverTime: new ConstantValue(80),
         shape: new ConeEmitter({radius: 0.3, angle: 0.25}),
         renderMode: RenderMode.BillBoard,

@@ -6,6 +6,7 @@ import {Plane} from '@babylonjs/core/Maths/math.plane';
 import {TransformNode} from '@babylonjs/core/Meshes/transformNode';
 import type {DepthRenderer} from '@babylonjs/core/Rendering/depthRenderer';
 import {Scene} from '@babylonjs/core/scene';
+import type {Vector3Like} from 'quarks.core';
 import {EmitSubParticleSystem, IParticleSystem, Vector3} from 'quarks.core';
 import {batchSettingsEqual, shaderKeyEqual, storedBatchSettings} from './batchKey';
 import {ParticleSystem} from './ParticleSystem';
@@ -137,7 +138,7 @@ export interface VFXBatchSettings {
      * billboards). On stretched billboards x runs from the head to the tail and
      * y across, and z is unused. Absent or zero: no offset. Meshes ignore it.
      */
-    pivot?: Vector3;
+    pivot?: Vector3Like;
     /** Draw order within the batch, see {@link SortMode}. Unset is `'none'`. Systems that differ are batched apart. */
     sortMode?: SortMode;
     /**

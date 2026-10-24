@@ -1,7 +1,7 @@
 import {Constants} from '@babylonjs/core/Engines/constants';
 import {StandardMaterial} from '@babylonjs/core/Materials/standardMaterial';
 import type {Texture} from '@babylonjs/core/Materials/Textures/texture';
-import {Color3} from '@babylonjs/core/Maths/math.color';
+import {Color3, Color4} from '@babylonjs/core/Maths/math.color';
 import {Vector3 as BVector3} from '@babylonjs/core/Maths/math.vector';
 import type {Mesh} from '@babylonjs/core/Meshes/mesh';
 import {MeshBuilder} from '@babylonjs/core/Meshes/meshBuilder';
@@ -19,8 +19,6 @@ import {
     RenderMode,
     SizeOverLife,
     SphereEmitter,
-    Vector3,
-    Vector4,
 } from 'babylon.quarks';
 import {createSharedTexture} from '../shared/common';
 import type {DemoContext} from '../types';
@@ -32,10 +30,10 @@ const TILE = {glow: 1};
 const PATH = {x: 14, z: 7};
 
 /** Colour over life: `tint` dimming toward `tail`, fading out at the end. */
-function cooling(tint: Vector3, tail: Vector3) {
+function cooling(tint: Color3, tail: Color3) {
     return new Gradient(
         [
-            [new Vector3(1, 1, 1), 0],
+            [new Color3(1, 1, 1), 0],
             [tint, 0.15],
             [tail, 1],
         ],
@@ -58,7 +56,7 @@ function createOrb(
     texture: Texture,
     name: string,
     color: Color3,
-    tail: Vector3,
+    tail: Color3,
     byDistance: boolean,
     add: (system: ParticleSystem) => void
 ): Mesh {
@@ -68,7 +66,7 @@ function createOrb(
     mat.emissiveColor = color;
     orb.material = mat;
     orb.position.y = 1;
-    const tint = new Vector3(color.r, color.g, color.b);
+    const tint = color.clone();
 
     const halo = new ParticleSystem({
         scene,
@@ -77,7 +75,7 @@ function createOrb(
         startLife: new ConstantValue(1 + 1 / 60),
         startSpeed: new ConstantValue(0),
         startSize: new ConstantValue(3.6),
-        startColor: new ConstantColor(new Vector4(color.r, color.g, color.b, 0.55)),
+        startColor: new ConstantColor(new Color4(color.r, color.g, color.b, 0.55)),
         // Local space: the halo is carried along by its parent.
         worldSpace: false,
         emissionOverTime: new ConstantValue(1),
@@ -101,7 +99,7 @@ function createOrb(
         startLife: new IntervalValue(2.6, 3.2),
         startSpeed: new IntervalValue(0, 0.6),
         startSize: new IntervalValue(1.4, 2),
-        startColor: new ConstantColor(new Vector4(1, 1, 1, 0.75)),
+        startColor: new ConstantColor(new Color4(1, 1, 1, 0.75)),
         // World space: emitted particles stay behind as the orb moves on.
         worldSpace: true,
         // The same average rate either way: about 80 particles a second at the orb's mean speed.
@@ -166,7 +164,7 @@ export function init({scene, camera, batchRenderer, systems, demoState}: DemoCon
         texture,
         'followByTime',
         new Color3(0.35, 0.85, 1),
-        new Vector3(0.1, 0.25, 0.9),
+        new Color3(0.1, 0.25, 0.9),
         false,
         add
     );
@@ -175,7 +173,7 @@ export function init({scene, camera, batchRenderer, systems, demoState}: DemoCon
         texture,
         'followByDistance',
         new Color3(1, 0.6, 0.2),
-        new Vector3(0.9, 0.15, 0.05),
+        new Color3(0.9, 0.15, 0.05),
         true,
         add
     );

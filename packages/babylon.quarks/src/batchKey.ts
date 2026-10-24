@@ -1,5 +1,5 @@
 import {Constants} from '@babylonjs/core/Engines/constants';
-import type {Vector3} from 'quarks.core';
+import type {Vector3Like} from 'quarks.core';
 import type {VFXBatchSettings} from './BatchedRenderer';
 import {
     normalizeErosion,
@@ -105,7 +105,10 @@ export function storedBatchSettings(settings: VFXBatchSettings): StoredBatchSett
         renderingGroupId: settings.renderingGroupId ?? 0,
         applyFog: settings.applyFog ?? true,
         applyImageProcessing: settings.applyImageProcessing ?? true,
-        pivot: quad && pivot && (pivot.x !== 0 || pivot.y !== 0 || pivot.z !== 0) ? pivot.clone() : undefined,
+        pivot:
+            quad && pivot && (pivot.x !== 0 || pivot.y !== 0 || pivot.z !== 0)
+                ? {x: pivot.x, y: pivot.y, z: pivot.z}
+                : undefined,
         sortMode: settings.sortMode ?? 'none',
         renderFace: isMesh ? validRenderFace(settings.renderFace) : 'both',
         minParticleSize: quad ? Math.max(0, settings.minParticleSize ?? 0) : 0,
@@ -204,7 +207,7 @@ export function batchSettingsEqual(a: StoredBatchSettings, b: StoredBatchSetting
 }
 
 /** True when both pivots put the quad in the same place; a missing pivot is zero. */
-function pivotEqual(a: Vector3 | undefined, b: Vector3 | undefined): boolean {
+function pivotEqual(a: Vector3Like | undefined, b: Vector3Like | undefined): boolean {
     return (a?.x ?? 0) === (b?.x ?? 0) && (a?.y ?? 0) === (b?.y ?? 0) && (a?.z ?? 0) === (b?.z ?? 0);
 }
 

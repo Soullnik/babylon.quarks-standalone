@@ -1,6 +1,6 @@
 import {Constants} from '@babylonjs/core/Engines/constants';
 import {StandardMaterial} from '@babylonjs/core/Materials/standardMaterial';
-import {Color3} from '@babylonjs/core/Maths/math.color';
+import {Color3, Color4} from '@babylonjs/core/Maths/math.color';
 import {Vector3 as BVector3} from '@babylonjs/core/Maths/math.vector';
 import {MeshBuilder} from '@babylonjs/core/Meshes/meshBuilder';
 import {
@@ -21,8 +21,6 @@ import {
     RotationOverLife,
     SizeOverLife,
     SphereEmitter,
-    Vector3,
-    Vector4,
     WidthOverLength,
 } from 'babylon.quarks';
 import {createSharedTexture} from '../shared/common';
@@ -34,10 +32,10 @@ const REFRESH_INTERVAL = 2.8;
 /** 10×10 `texture1.png`, counted from the top left. */
 const TILE = {dot: 0, glow: 1, ring: 4, star: 84};
 
-const GOLD = new Vector4(1, 0.78, 0.28, 1);
+const GOLD = new Color4(1, 0.78, 0.28, 1);
 
 /** Colour over life: `from` at birth to `to` at death, fading in quickly and out at the end. */
-function goldFade(from: Vector3, to: Vector3, fadeOut = 0.6) {
+function goldFade(from: Color3, to: Color3, fadeOut = 0.6) {
     return new Gradient(
         [
             [from, 0],
@@ -116,7 +114,7 @@ export function init({scene, camera, batchRenderer, systems, demoState}: DemoCon
         renderOrder: 1,
     });
     shockwave.addBehavior(new SizeOverLife(new PiecewiseBezier([[new Bezier(0.05, 0.6, 0.9, 1), 0]])));
-    shockwave.addBehavior(new ColorOverLife(goldFade(new Vector3(1, 1, 1), new Vector3(1, 0.6, 0.15), 0.4)));
+    shockwave.addBehavior(new ColorOverLife(goldFade(new Color3(1, 1, 1), new Color3(1, 0.6, 0.15), 0.4)));
     shockwave.emitter.position.y = 0.05;
     add(shockwave);
 
@@ -128,7 +126,7 @@ export function init({scene, camera, batchRenderer, systems, demoState}: DemoCon
         startLife: new ConstantValue(1.8),
         startSpeed: new ConstantValue(0),
         startSize: new ConstantValue(9),
-        startColor: new ConstantColor(new Vector4(1, 0.7, 0.25, 0.8)),
+        startColor: new ConstantColor(new Color4(1, 0.7, 0.25, 0.8)),
         worldSpace: false,
         emissionOverTime: new ConstantValue(0),
         emissionBursts: [{time: 0, count: new ConstantValue(1), cycle: 1, interval: 0, probability: 1}],
@@ -142,7 +140,7 @@ export function init({scene, camera, batchRenderer, systems, demoState}: DemoCon
         renderMode: RenderMode.HorizontalBillBoard,
         renderOrder: 0,
     });
-    groundGlow.addBehavior(new ColorOverLife(goldFade(new Vector3(1, 1, 1), new Vector3(1, 0.8, 0.4), 0.5)));
+    groundGlow.addBehavior(new ColorOverLife(goldFade(new Color3(1, 1, 1), new Color3(1, 0.8, 0.4), 0.5)));
     groundGlow.emitter.position.y = 0.04;
     add(groundGlow);
 
@@ -154,7 +152,7 @@ export function init({scene, camera, batchRenderer, systems, demoState}: DemoCon
         startLife: new IntervalValue(0.9, 1.3),
         startSpeed: new IntervalValue(3, 5),
         startSize: new IntervalValue(1.4, 2.4),
-        startColor: new RandomColor(new Vector4(1, 0.8, 0.4, 0.7), new Vector4(1, 0.95, 0.75, 0.85)),
+        startColor: new RandomColor(new Color4(1, 0.8, 0.4, 0.7), new Color4(1, 0.95, 0.75, 0.85)),
         worldSpace: false,
         emissionOverTime: new ConstantValue(70),
         shape: new ConeEmitter({radius: 0.6, angle: 0, thickness: 1}),
@@ -167,7 +165,7 @@ export function init({scene, camera, batchRenderer, systems, demoState}: DemoCon
         renderMode: RenderMode.BillBoard,
         renderOrder: 2,
     });
-    column.addBehavior(new ColorOverLife(goldFade(new Vector3(1, 1, 1), new Vector3(1, 0.7, 0.3))));
+    column.addBehavior(new ColorOverLife(goldFade(new Color3(1, 1, 1), new Color3(1, 0.7, 0.3))));
     column.addBehavior(new SizeOverLife(new PiecewiseBezier([[new Bezier(0.6, 1, 1, 0.4), 0]])));
     // The cone emits along its local +z; tip it up.
     column.emitter.rotation.x = -Math.PI / 2;
@@ -196,8 +194,8 @@ export function init({scene, camera, batchRenderer, systems, demoState}: DemoCon
         rendererEmitterSettings: {startLength: new ConstantValue(40), followLocalOrigin: false},
         renderOrder: 3,
     });
-    spiral.addBehavior(new OrbitOverLife(new ConstantValue(4.5), new Vector3(0, 0, 1)));
-    spiral.addBehavior(new ColorOverLife(goldFade(new Vector3(1, 1, 0.9), new Vector3(1, 0.55, 0.1))));
+    spiral.addBehavior(new OrbitOverLife(new ConstantValue(4.5), new BVector3(0, 0, 1)));
+    spiral.addBehavior(new ColorOverLife(goldFade(new Color3(1, 1, 0.9), new Color3(1, 0.55, 0.1))));
     spiral.addBehavior(new WidthOverLength(new PiecewiseBezier([[new Bezier(1, 0.8, 0.4, 0), 0]])));
     spiral.emitter.rotation.x = -Math.PI / 2;
     add(spiral);
@@ -211,7 +209,7 @@ export function init({scene, camera, batchRenderer, systems, demoState}: DemoCon
         startSpeed: new IntervalValue(3, 6),
         startSize: new IntervalValue(0.35, 0.7),
         startRotation: new IntervalValue(-Math.PI, Math.PI),
-        startColor: new RandomColor(new Vector4(1, 0.85, 0.35, 1), new Vector4(1, 1, 0.85, 1)),
+        startColor: new RandomColor(new Color4(1, 0.85, 0.35, 1), new Color4(1, 1, 0.85, 1)),
         worldSpace: false,
         emissionOverTime: new ConstantValue(0),
         emissionBursts: [{time: 0.25, count: new ConstantValue(40), cycle: 1, interval: 0, probability: 1}],
@@ -225,9 +223,9 @@ export function init({scene, camera, batchRenderer, systems, demoState}: DemoCon
         renderMode: RenderMode.BillBoard,
         renderOrder: 4,
     });
-    stars.addBehavior(new ApplyForce(new Vector3(0, -1, 0), new ConstantValue(6)));
+    stars.addBehavior(new ApplyForce(new BVector3(0, -1, 0), new ConstantValue(6)));
     stars.addBehavior(new RotationOverLife(new IntervalValue(-4, 4)));
-    stars.addBehavior(new ColorOverLife(goldFade(new Vector3(1, 1, 1), new Vector3(1, 0.7, 0.2), 0.55)));
+    stars.addBehavior(new ColorOverLife(goldFade(new Color3(1, 1, 1), new Color3(1, 0.7, 0.2), 0.55)));
     stars.emitter.position.y = 2.8;
     add(stars);
 

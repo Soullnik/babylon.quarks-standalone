@@ -1,4 +1,5 @@
 import {Constants} from '@babylonjs/core/Engines/constants';
+import {Color3, Color4} from '@babylonjs/core/Maths/math.color';
 import {Vector3 as BVector3} from '@babylonjs/core/Maths/math.vector';
 import {
     ApplyForce,
@@ -11,8 +12,6 @@ import {
     ParticleSystem,
     RandomColor,
     RenderMode,
-    Vector3,
-    Vector4,
 } from 'babylon.quarks';
 import {createSharedTexture} from '../shared/common';
 import type {DemoContext} from '../types';
@@ -27,7 +26,7 @@ export function init({scene, camera, batchRenderer, systems}: DemoContext) {
     camera.setPosition(new BVector3(0, 6, 22));
     const texture = createSharedTexture(scene);
 
-    const make = (x: number, tint: Vector4) => {
+    const make = (x: number, tint: Color4) => {
         const system = new ParticleSystem({
             scene,
             duration: 1,
@@ -35,7 +34,7 @@ export function init({scene, camera, batchRenderer, systems}: DemoContext) {
             startLife: new ConstantValue(2.5),
             startSpeed: new IntervalValue(4, 6),
             startSize: new IntervalValue(0.15, 0.3),
-            startColor: new RandomColor(tint, new Vector4(1, 1, 1, 1)),
+            startColor: new RandomColor(tint, new Color4(1, 1, 1, 1)),
             worldSpace: false,
             emissionOverTime: new ConstantValue(200),
             shape: new ConeEmitter({radius: 0.3, angle: 0.25}),
@@ -51,8 +50,8 @@ export function init({scene, camera, batchRenderer, systems}: DemoContext) {
             new ColorOverLife(
                 new Gradient(
                     [
-                        [new Vector3(1, 1, 1), 0],
-                        [new Vector3(1, 1, 1), 1],
+                        [new Color3(1, 1, 1), 0],
+                        [new Color3(1, 1, 1), 1],
                     ],
                     [
                         [1, 0],
@@ -68,11 +67,11 @@ export function init({scene, camera, batchRenderer, systems}: DemoContext) {
     };
 
     // Gravity is a world force (the default): down stays down.
-    const gravity = make(-5, new Vector4(1, 0.8, 0.3, 1));
-    gravity.addBehavior(new ApplyForce(new Vector3(0, -1, 0), new ConstantValue(12)));
+    const gravity = make(-5, new Color4(1, 0.8, 0.3, 1));
+    gravity.addBehavior(new ApplyForce(new BVector3(0, -1, 0), new ConstantValue(12)));
 
     // A thrust along the emitter's own X: it leans with the emitter.
-    const thrust = make(5, new Vector4(0.4, 0.8, 1, 1));
+    const thrust = make(5, new Color4(0.4, 0.8, 1, 1));
     thrust.addBehavior(new ForceOverLife(new ConstantValue(12), new ConstantValue(0), new ConstantValue(0), 'local'));
 }
 

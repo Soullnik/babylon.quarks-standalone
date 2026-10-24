@@ -44,8 +44,8 @@ import {
     ConstantValue,
     IntervalValue,
     ConstantColor,
-    Vector4,
 } from 'babylon.quarks';
+import {Color4} from '@babylonjs/core/Maths/math.color';
 
 // One renderer per scene; it batches every system added to it into shared draw calls.
 const batchRenderer = new BatchedRenderer('particles', scene);
@@ -57,7 +57,7 @@ const system = new ParticleSystem({
     startLife: new IntervalValue(4, 5),
     startSpeed: new ConstantValue(1),
     startSize: new IntervalValue(1, 2),
-    startColor: new ConstantColor(new Vector4(1, 1, 1, 1)),
+    startColor: new ConstantColor(new Color4(1, 1, 1, 1)),
     emissionOverTime: new ConstantValue(20),
     shape: new PointEmitter(),
     renderMode: RenderMode.BillBoard,

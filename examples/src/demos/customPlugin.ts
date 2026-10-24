@@ -1,4 +1,5 @@
 import {Constants} from '@babylonjs/core/Engines/constants';
+import {Color4} from '@babylonjs/core/Maths/math.color';
 import {Vector3 as BVector3} from '@babylonjs/core/Maths/math.vector';
 import {
     ConstantValue,
@@ -8,7 +9,6 @@ import {
     RandomColor,
     RenderMode,
     ValueGeneratorFromJSON,
-    Vector4,
     type Behavior,
     type FunctionValueGenerator,
     type GeneratorMemory,
@@ -129,7 +129,7 @@ export function init({scene, camera, batchRenderer, systems}: DemoContext) {
         startLife: new ConstantValue(10000),
         startSpeed: new ConstantValue(0),
         startSize: new ConstantValue(0.1),
-        startColor: new RandomColor(new Vector4(1, 1, 1, 1), new Vector4(0.85, 0.85, 1, 1)),
+        startColor: new RandomColor(new Color4(1, 1, 1, 1), new Color4(0.85, 0.85, 1, 1)),
         emissionOverTime: new ConstantValue(0),
         emissionBursts: [{time: 0, count: new ConstantValue(2500), cycle: 1, interval: 1, probability: 1}],
         shape: new GridEmitter({width: 15, height: 15, column: 50, row: 50}),

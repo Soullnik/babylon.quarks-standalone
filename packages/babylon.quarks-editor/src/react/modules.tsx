@@ -32,11 +32,10 @@ import {
     RandomQuatGenerator,
     RenderMode,
     SizeOverLife,
-    Vector2,
-    Vector3,
     Vector3Function,
-    Vector4,
     normalizeTextureUV,
+    type Color4Like,
+    type Vector3Like,
 } from 'babylon.quarks';
 import React, {useMemo} from 'react';
 import {
@@ -142,8 +141,14 @@ function SubHeader(props: {title: string; hint: string}) {
     );
 }
 
-/** Three number inputs editing a Vector3 by value. */
-function AxisField(props: {value: Vector3; onChange: (next: Vector3) => void}) {
+/** `v` scaled to length 1, or `v` itself when it has no length. */
+function unitOrZero(v: Vector3Like): Vector3Like {
+    const length = Math.hypot(v.x, v.y, v.z);
+    return length > 0 ? {x: v.x / length, y: v.y / length, z: v.z / length} : v;
+}
+
+/** Three number inputs editing a vector by value: each edit hands over a new `{x, y, z}`. */
+function AxisField(props: {value: Vector3Like; onChange: (next: Vector3Like) => void}) {
     return (
         <div style={{display: 'flex', gap: 6}}>
             {(['x', 'y', 'z'] as const).map((axis) => (
@@ -152,9 +157,8 @@ function AxisField(props: {value: Vector3; onChange: (next: Vector3) => void}) {
                     value={props.value[axis]}
                     step={0.1}
                     onChange={(v) => {
-                        const next = props.value.clone();
-                        next[axis] = v;
-                        props.onChange(next);
+                        const {x, y, z} = props.value;
+                        props.onChange({x, y, z, [axis]: v});
                     }}
                 />
             ))}
@@ -162,17 +166,17 @@ function AxisField(props: {value: Vector3; onChange: (next: Vector3) => void}) {
     );
 }
 
-function ColorInput(props: {value: Vector4; onChange: (next: Vector4) => void}) {
+function ColorInput(props: {value: Color4Like; onChange: (next: Color4Like) => void}) {
     const {value, onChange} = props;
     return (
         <div style={{display: 'flex', gap: 6, alignItems: 'center'}}>
             <input
                 type="color"
                 className="qe-hover"
-                value={rgbToHex(value.x, value.y, value.z)}
+                value={rgbToHex(value.r, value.g, value.b)}
                 onChange={(e) => {
                     const rgb = hexToRgb(e.target.value);
-                    onChange(new Vector4(rgb.r, rgb.g, rgb.b, value.w));
+                    onChange({r: rgb.r, g: rgb.g, b: rgb.b, a: value.a});
                 }}
                 style={{
                     width: 42,
@@ -184,10 +188,10 @@ function ColorInput(props: {value: Vector4; onChange: (next: Vector4) => void}) 
                 }}
             />
             <NumberField
-                value={value.w}
+                value={value.a}
                 min={0}
                 step={0.05}
-                onChange={(a) => onChange(new Vector4(value.x, value.y, value.z, Math.min(1, a)))}
+                onChange={(a) => onChange({r: value.r, g: value.g, b: value.b, a: Math.min(1, a)})}
             />
         </div>
     );
@@ -204,11 +208,11 @@ export function MainModule({binding}: ModuleProps) {
         ? twoColor.a
         : startColor instanceof ConstantColor
           ? startColor.color
-          : new Vector4(1, 1, 1, 1);
-    const colorB = twoColor ? twoColor.b : new Vector4(1, 0.5, 0.2, 1);
+          : {r: 1, g: 1, b: 1, a: 1};
+    const colorB: Color4Like = twoColor ? twoColor.b : {r: 1, g: 0.5, b: 0.2, a: 1};
     const twoColors = twoColor !== null;
     /** The two-colour generator of the current mode. */
-    const makeTwoColors = (a: Vector4, b: Vector4) =>
+    const makeTwoColors = (a: Color4Like, b: Color4Like) =>
         colorMode === 'range' ? new ColorRange(a, b) : new RandomColor(a, b);
     const rotation = system.startRotation;
     const isEuler = rotation instanceof EulerGenerator;
@@ -510,7 +514,7 @@ export function MainModule({binding}: ModuleProps) {
                                     ? new RandomQuatGenerator()
                                     : mode === 'axisAngle'
                                       ? new AxisAngleGenerator(
-                                            new Vector3(0, 1, 0),
+                                            {x: 0, y: 1, z: 0},
                                             new ConstantValue(rotationState.value)
                                         )
                                       : mode === 'euler'
@@ -1220,7 +1224,7 @@ export function RendererModule({
                             onChange={(v) =>
                                 binding.apply((s) => {
                                     (s.rendererEmitterSettings as TrailSettings).sideAxis = v
-                                        ? new Vector3(0, 1, 0)
+                                        ? {x: 0, y: 1, z: 0}
                                         : undefined;
                                 })
                             }
@@ -1233,8 +1237,7 @@ export function RendererModule({
                                 onChange={(axis) =>
                                     binding.apply((s) => {
                                         // The axis's length scales the width: keep it a unit vector.
-                                        (s.rendererEmitterSettings as TrailSettings).sideAxis =
-                                            axis.length() > 0 ? axis.normalize() : axis;
+                                        (s.rendererEmitterSettings as TrailSettings).sideAxis = unitOrZero(axis);
                                     })
                                 }
                             />
@@ -1318,7 +1321,7 @@ export function RendererModule({
                                 step={0.1}
                                 onChange={(v) =>
                                     binding.apply((s) => {
-                                        const next = s.flip?.clone() ?? new Vector2(0, 0);
+                                        const next = {x: s.flip?.x ?? 0, y: s.flip?.y ?? 0};
                                         next[axis] = Math.min(1, Math.max(0, v));
                                         s.flip = next.x === 0 && next.y === 0 ? undefined : next;
                                     })
@@ -1705,12 +1708,12 @@ export function RendererModule({
                                     step={0.05}
                                     onChange={(v) =>
                                         binding.apply((s) => {
-                                            const next = s.ringBufferLoopRange.clone();
+                                            const next = {x: s.ringBufferLoopRange.x, y: s.ringBufferLoopRange.y};
                                             next[end] = Math.min(1, Math.max(0, v));
-                                            s.ringBufferLoopRange = new Vector2(
-                                                Math.min(next.x, next.y),
-                                                Math.max(next.x, next.y)
-                                            );
+                                            s.ringBufferLoopRange = {
+                                                x: Math.min(next.x, next.y),
+                                                y: Math.max(next.x, next.y),
+                                            };
                                         })
                                     }
                                 />
@@ -1728,7 +1731,7 @@ export function RendererModule({
                                 step={0.05}
                                 onChange={(v) =>
                                     binding.apply((s) => {
-                                        const next = (s.pivot ?? new Vector3()).clone();
+                                        const next = {x: s.pivot?.x ?? 0, y: s.pivot?.y ?? 0, z: s.pivot?.z ?? 0};
                                         next[axis] = v;
                                         s.pivot = next;
                                     })

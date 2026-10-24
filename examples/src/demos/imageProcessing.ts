@@ -17,8 +17,6 @@ import {
     PiecewiseBezier,
     RenderMode,
     SizeOverLife,
-    Vector3,
-    Vector4,
 } from 'babylon.quarks';
 import {createSharedTexture} from '../shared/common';
 import type {DemoContext} from '../types';
@@ -60,7 +58,7 @@ export function init({scene, camera, batchRenderer, systems}: DemoContext) {
             startLife: new IntervalValue(0.8, 1.2),
             startSpeed: new IntervalValue(2, 3),
             startSize: new IntervalValue(1, 1.6),
-            startColor: new ConstantColor(new Vector4(1, 1, 1, 1)),
+            startColor: new ConstantColor(new Color4(1, 1, 1, 1)),
             worldSpace: true,
             emissionOverTime: new ConstantValue(60),
             shape: new ConeEmitter({radius: 0.4, angle: 0.15}),
@@ -77,9 +75,9 @@ export function init({scene, camera, batchRenderer, systems}: DemoContext) {
             new ColorOverLife(
                 new Gradient(
                     [
-                        [new Vector3(1, 0.95, 0.7), 0],
-                        [new Vector3(1, 0.45, 0.1), 0.4],
-                        [new Vector3(0.6, 0.1, 0.02), 1],
+                        [new Color3(1, 0.95, 0.7), 0],
+                        [new Color3(1, 0.45, 0.1), 0.4],
+                        [new Color3(0.6, 0.1, 0.02), 1],
                     ],
                     [
                         [1, 0],

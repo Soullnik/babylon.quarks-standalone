@@ -1,7 +1,9 @@
 import {ConstantValue, ValueGenerator, ValueGeneratorFromJSON} from '../functions';
 import type {ValueGeneratorJSON, Vector3ArrayJSON} from '../functions/FunctionJSON';
 import {IParticleSystem} from '../IParticleSystem';
+import type {Vector3Like} from '../Like';
 import {Vector3} from '../math';
+import {vector3From} from '../math/fromLike';
 import {Particle} from '../Particle';
 import {readVector3} from '../util/JSONUtil';
 import {Behavior, BehaviorJSON} from './Behavior';
@@ -40,15 +42,30 @@ export class ApplyForce implements Behavior {
     /** {@link direction} in the simulation space, refreshed by {@link frameUpdate}. */
     readonly _direction = new Vector3();
 
+    private _directionValue: Vector3;
+
+    /**
+     * The direction of the force; its length scales it.
+     * Set it from any `Vector3Like`, such as a Babylon `Vector3`; the value is copied.
+     */
+    get direction(): Vector3 {
+        return this._directionValue;
+    }
+
+    set direction(value: Vector3Like) {
+        this._directionValue = vector3From(value);
+    }
+
     constructor(
         /** The direction of the force; its length scales it. */
-        public direction: Vector3,
+        direction: Vector3Like,
         /** The force's strength, in units per second squared, rolled per particle. */
         public magnitude: ValueGenerator,
         /** The space the direction is authored in; `'world'` by default. */
         public space: BehaviorSpace = 'world'
     ) {
-        this._direction.copy(direction);
+        this._directionValue = vector3From(direction);
+        this._direction.copy(this.direction);
     }
 
     initialize(particle: Particle, particleSystem: IParticleSystem): void {

@@ -118,6 +118,13 @@ API reaches but no entry point exports is listed in the report as `ae-forgotten-
 it, or keep it out of the public signature. The reports list `@internal` members too, marked as
 such, so a change to one also needs `npm run api`; they are still no promise to users.
 
+One exception is accepted on purpose: quarks.core's own math (`Vector2`, `Vector3`, `Vector4`,
+`Quaternion`, `Matrix3`, `Matrix4`) is internal, and shows as `ae-forgotten-export` where the
+extension contract reaches it (particle state, the `gen*` methods of generators, scratch members of
+behaviors). Public inputs take the structural types in `quarks.core/src/Like.ts` (`Vector3Like`,
+`Color4Like` and the rest), never the math classes, and `test/coreReexports.test.ts` keeps the math
+out of `babylon.quarks`' exports.
+
 ## Commit and PR conventions
 
 - Commit messages follow the conventional prefix style used in the history:

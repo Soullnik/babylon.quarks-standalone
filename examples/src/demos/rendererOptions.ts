@@ -1,5 +1,6 @@
 import {VertexBuffer} from '@babylonjs/core/Buffers/buffer';
 import {Constants} from '@babylonjs/core/Engines/constants';
+import {Color4} from '@babylonjs/core/Maths/math.color';
 import {Vector3 as BVector3} from '@babylonjs/core/Maths/math.vector';
 import {MeshBuilder} from '@babylonjs/core/Meshes/meshBuilder';
 import {TransformNode} from '@babylonjs/core/Meshes/transformNode';
@@ -17,7 +18,6 @@ import {
     RenderMode,
     SizeOverLife,
     SphereEmitter,
-    Vector4,
 } from 'babylon.quarks';
 import {createSharedTexture} from '../shared/common';
 import type {DemoContext} from '../types';
@@ -65,7 +65,7 @@ export function init({scene, camera, batchRenderer, systems}: DemoContext) {
         startLife: new ConstantValue(3),
         startSpeed: new IntervalValue(0.3, 0.6),
         startSize: new ConstantValue(2.6),
-        startColor: new RandomColor(new Vector4(1, 0.3, 0.2, 1), new Vector4(0.2, 0.5, 1, 1)),
+        startColor: new RandomColor(new Color4(1, 0.3, 0.2, 1), new Color4(0.2, 0.5, 1, 1)),
         worldSpace: false,
         emissionOverTime: new ConstantValue(4),
         shape: new SphereEmitter({radius: 0.8, thickness: 1, arc: Math.PI * 2}),
@@ -104,7 +104,7 @@ export function init({scene, camera, batchRenderer, systems}: DemoContext) {
         startLife: new ConstantValue(1.6),
         startSpeed: new ConstantValue(4),
         startSize: new ConstantValue(1),
-        startColor: new ConstantColor(new Vector4(1, 0.85, 0.3, 1)),
+        startColor: new ConstantColor(new Color4(1, 0.85, 0.3, 1)),
         worldSpace: false,
         emissionOverTime: new ConstantValue(12),
         shape: new ConeEmitter({radius: 0.3, angle: 1}),
@@ -128,7 +128,7 @@ export function init({scene, camera, batchRenderer, systems}: DemoContext) {
         startLife: new ConstantValue(1.8),
         startSpeed: new IntervalValue(0.5, 1.5),
         startSize: new IntervalValue(0.05, 3),
-        startColor: new ConstantColor(new Vector4(0.6, 0.9, 1, 0.7)),
+        startColor: new ConstantColor(new Color4(0.6, 0.9, 1, 0.7)),
         worldSpace: false,
         emissionOverTime: new ConstantValue(10),
         shape: new SphereEmitter({radius: 0.5, thickness: 1, arc: Math.PI * 2}),
@@ -152,7 +152,7 @@ export function init({scene, camera, batchRenderer, systems}: DemoContext) {
         startLife: new ConstantValue(1.5),
         startSpeed: new ConstantValue(2),
         startSize: new ConstantValue(0.3),
-        startColor: new ConstantColor(new Vector4(0.5, 1, 0.5, 1)),
+        startColor: new ConstantColor(new Color4(0.5, 1, 0.5, 1)),
         worldSpace: true,
         emissionOverTime: new ConstantValue(40),
         shape: new ConeEmitter({radius: 0.4, angle: 0.3}),
@@ -186,7 +186,7 @@ export function init({scene, camera, batchRenderer, systems}: DemoContext) {
         startSpeed: new ConstantValue(0.4),
         startSize: new ConstantValue(1.2),
         startRotation: new RandomQuatGenerator(),
-        startColor: new RandomColor(new Vector4(1, 0.6, 0.3, 1), new Vector4(0.4, 0.8, 1, 1)),
+        startColor: new RandomColor(new Color4(1, 0.6, 0.3, 1), new Color4(0.4, 0.8, 1, 1)),
         worldSpace: false,
         emissionOverTime: new ConstantValue(3),
         shape: new SphereEmitter({radius: 1, thickness: 1, arc: Math.PI * 2}),

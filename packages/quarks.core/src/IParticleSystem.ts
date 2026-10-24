@@ -1,5 +1,6 @@
 import {FunctionValueGenerator, ValueGenerator} from './functions';
-import {Matrix4, Vector2, Vector3} from './math';
+import type {Vector2Like, Vector3Like} from './Like';
+import {Matrix4, Vector3} from './math';
 import type {Particle} from './Particle';
 import {IParticle} from './Particle';
 import {ParticleStore} from './ParticleStore';
@@ -132,7 +133,7 @@ export interface TrailSettings {
      * as set. Unset (the default): a camera-facing ribbon.
      * @type {Vector3}
      */
-    sideAxis?: Vector3;
+    sideAxis?: Vector3Like;
     /**
      * Draw each segment between two recorded samples as this many more
      * segments, along a curve through the samples (Niagara's ribbon
@@ -339,7 +340,7 @@ export interface IParticleSystem {
      * picked at random when the particle is born — Unity's renderer Flip.
      * Absent: nothing is mirrored.
      */
-    flip?: Vector2;
+    flip?: Vector2Like;
     /** Emission progress: time in the cycle, burst and distance counters. */
     readonly emissionState: EmissionState;
 

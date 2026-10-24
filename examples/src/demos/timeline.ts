@@ -1,4 +1,5 @@
 import {Constants} from '@babylonjs/core/Engines/constants';
+import {Color4} from '@babylonjs/core/Maths/math.color';
 import {Vector3 as BVector3} from '@babylonjs/core/Maths/math.vector';
 import {
     ApplyForce,
@@ -15,8 +16,6 @@ import {
     RenderMode,
     SizeOverLife,
     SphereEmitter,
-    Vector3,
-    Vector4,
 } from 'babylon.quarks';
 import {createColorOverLifeGradient, createSharedTexture} from '../shared/common';
 import type {DemoContext} from '../types';
@@ -44,7 +43,7 @@ export function init(ctx: DemoContext) {
         startLife: new ConstantValue(0.5),
         startSpeed: new ConstantValue(-3),
         startSize: new IntervalValue(0.3, 0.6),
-        startColor: new ConstantColor(new Vector4(0.5, 0.7, 1, 1)),
+        startColor: new ConstantColor(new Color4(0.5, 0.7, 1, 1)),
         emissionOverTime: new ConstantValue(80),
         shape: new SphereEmitter({radius: 1.6, thickness: 0.1, arc: Math.PI * 2}),
         texture,
@@ -64,7 +63,7 @@ export function init(ctx: DemoContext) {
         startLife: new IntervalValue(0.4, 0.8),
         startSpeed: new IntervalValue(10, 18),
         startSize: new IntervalValue(0.3, 0.5),
-        startColor: new RandomColor(new Vector4(1, 1, 1, 1), new Vector4(0.5, 0.7, 1, 1)),
+        startColor: new RandomColor(new Color4(1, 1, 1, 1), new Color4(0.5, 0.7, 1, 1)),
         worldSpace: true,
         emissionOverTime: new ConstantValue(0),
         emissionBursts: [{time: 0, count: new ConstantValue(120), cycle: 1, interval: 0, probability: 1}],
@@ -78,7 +77,7 @@ export function init(ctx: DemoContext) {
         renderMode: RenderMode.StretchedBillBoard,
         rendererEmitterSettings: {speedFactor: 0.05, lengthFactor: 1},
     });
-    release.addBehavior(new ApplyForce(new Vector3(0, -1, 0), new ConstantValue(12)));
+    release.addBehavior(new ApplyForce(new BVector3(0, -1, 0), new ConstantValue(12)));
 
     const smoke = new ParticleSystem({
         scene,
@@ -87,7 +86,7 @@ export function init(ctx: DemoContext) {
         startLife: new IntervalValue(1, 1.6),
         startSpeed: new IntervalValue(0.5, 1.5),
         startSize: new IntervalValue(1.5, 2.5),
-        startColor: new ConstantColor(new Vector4(0.6, 0.65, 0.8, 0.5)),
+        startColor: new ConstantColor(new Color4(0.6, 0.65, 0.8, 0.5)),
         worldSpace: true,
         emissionOverTime: new ConstantValue(25),
         shape: new PointEmitter(),
@@ -99,7 +98,7 @@ export function init(ctx: DemoContext) {
         vTileCount: 10,
         renderMode: RenderMode.BillBoard,
     });
-    smoke.addBehavior(createColorOverLifeGradient(new Vector4(0.6, 0.65, 0.8, 0.5), new Vector4(0.3, 0.3, 0.4, 0)));
+    smoke.addBehavior(createColorOverLifeGradient(new Color4(0.6, 0.65, 0.8, 0.5), new Color4(0.3, 0.3, 0.4, 0)));
     smoke.addBehavior(new SizeOverLife(new PiecewiseBezier([[new Bezier(0.5, 0.8, 1, 1.2), 0]])));
 
     const prefab = new QuarksPrefab('blast', scene);

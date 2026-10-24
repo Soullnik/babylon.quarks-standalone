@@ -1,7 +1,9 @@
+import type {Vector3Like} from '../Like';
 import {Particle} from '../Particle';
 import {ParticleStore} from '../ParticleStore';
 import type {Vector3ArrayJSON} from '../functions/FunctionJSON';
 import {Vector3} from '../math';
+import {vector3From} from '../math/fromLike';
 import {readVector3} from '../util/JSONUtil';
 import SimplexNoise from '../util/SimplexNoise';
 import {createSeededRandom} from '../util/random';
@@ -64,18 +66,61 @@ export class TurbulenceField implements Behavior {
      */
     temp2 = new Vector3();
 
+    private _scaleValue: Vector3;
+
+    /**
+     * Size of one noise cell per axis, in the simulation space.
+     * Set it from any `Vector3Like`, such as a Babylon `Vector3`; the value is copied.
+     */
+    get scale(): Vector3 {
+        return this._scaleValue;
+    }
+
+    set scale(value: Vector3Like) {
+        this._scaleValue = vector3From(value);
+    }
+    private _velocityMultiplierValue: Vector3;
+
+    /**
+     * Push per axis, in units per second squared.
+     * Set it from any `Vector3Like`, such as a Babylon `Vector3`; the value is copied.
+     */
+    get velocityMultiplier(): Vector3 {
+        return this._velocityMultiplierValue;
+    }
+
+    set velocityMultiplier(value: Vector3Like) {
+        this._velocityMultiplierValue = vector3From(value);
+    }
+    private _timeScaleValue: Vector3;
+
+    /**
+     * How fast the field drifts per axis, in noise time per second.
+     * Set it from any `Vector3Like`, such as a Babylon `Vector3`; the value is copied.
+     */
+    get timeScale(): Vector3 {
+        return this._timeScaleValue;
+    }
+
+    set timeScale(value: Vector3Like) {
+        this._timeScaleValue = vector3From(value);
+    }
+
     constructor(
         /** Size of one noise cell per axis, in the simulation space. */
-        public scale: Vector3,
+        scale: Vector3Like,
         /** How many layers of noise are summed; more is finer and dearer. */
         public octaves: number,
         /** Push per axis, in units per second squared. */
-        public velocityMultiplier: Vector3,
+        velocityMultiplier: Vector3Like,
         /** How fast the field drifts per axis, in noise time per second. */
-        public timeScale: Vector3,
+        timeScale: Vector3Like,
         /** The seed the field is built from; 0 by default. */
         public seed = 0
     ) {
+        this._scaleValue = vector3From(scale);
+        this._velocityMultiplierValue = vector3From(velocityMultiplier);
+        this._timeScaleValue = vector3From(timeScale);
         const random = createSeededRandom(seed);
         this.generator = new SimplexNoise(random);
         this.initialOffset.set(

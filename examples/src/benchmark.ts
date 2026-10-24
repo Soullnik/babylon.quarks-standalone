@@ -15,7 +15,6 @@ import {
     IntervalValue,
     ParticleSystem,
     RenderMode,
-    Vector4,
 } from 'babylon.quarks';
 import {SHARED_ASSETS, createColorOverLifeGradient, createSharedTexture} from './shared/common';
 import {createEngineFromQuery} from './shared/engineFactory';
@@ -106,7 +105,7 @@ const quarksBackend: () => Backend = () => {
                     startSpeed: new IntervalValue(3, 5),
                     startSize: new IntervalValue(0.2, 0.4),
                     startColor: new ConstantColor(
-                        new Vector4(COLOR_START.r, COLOR_START.g, COLOR_START.b, COLOR_START.a)
+                        new Color4(COLOR_START.r, COLOR_START.g, COLOR_START.b, COLOR_START.a)
                     ),
                     emissionOverTime: new ConstantValue(rate),
                     // quarks' angle is a half-angle; Babylon's native cone uses a full angle.
@@ -120,8 +119,8 @@ const quarksBackend: () => Backend = () => {
                 // addColorGradient; a ColorRange would pick one fixed colour per particle.
                 system.addBehavior(
                     createColorOverLifeGradient(
-                        new Vector4(COLOR_START.r, COLOR_START.g, COLOR_START.b, COLOR_START.a),
-                        new Vector4(COLOR_END.r, COLOR_END.g, COLOR_END.b, COLOR_END.a)
+                        new Color4(COLOR_START.r, COLOR_START.g, COLOR_START.b, COLOR_START.a),
+                        new Color4(COLOR_END.r, COLOR_END.g, COLOR_END.b, COLOR_END.a)
                     )
                 );
                 system.emitter.position = position;

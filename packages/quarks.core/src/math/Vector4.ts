@@ -27,6 +27,42 @@ class Vector4 {
         this.w = w;
     }
 
+    /** Alias of {@link Vector4.x}, so a colour kept in this vector reads as `{r, g, b, a}`. */
+    get r(): number {
+        return this.x;
+    }
+
+    set r(value: number) {
+        this.x = value;
+    }
+
+    /** Alias of {@link Vector4.y}, so a colour kept in this vector reads as `{r, g, b, a}`. */
+    get g(): number {
+        return this.y;
+    }
+
+    set g(value: number) {
+        this.y = value;
+    }
+
+    /** Alias of {@link Vector4.z}, so a colour kept in this vector reads as `{r, g, b, a}`. */
+    get b(): number {
+        return this.z;
+    }
+
+    set b(value: number) {
+        this.z = value;
+    }
+
+    /** Alias of {@link Vector4.w}, so a colour kept in this vector reads as `{r, g, b, a}`. */
+    get a(): number {
+        return this.w;
+    }
+
+    set a(value: number) {
+        this.w = value;
+    }
+
     /** Alias of {@link Vector4.z}, for rectangles. */
     get width() {
         return this.z;

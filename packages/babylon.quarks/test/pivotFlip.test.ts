@@ -82,11 +82,11 @@ describe('billboard pivot and flip', () => {
         const {json, restored} = roundTrip(ps);
         expect(json.pivot).toEqual([0.5, -0.25, 0.1]);
         expect(json.flip).toEqual([0.3, 1]);
-        expect(restored.pivot!.toArray()).toEqual([0.5, -0.25, 0.1]);
+        expect(restored.pivot).toEqual({x: 0.5, y: -0.25, z: 0.1});
         expect([restored.flip!.x, restored.flip!.y]).toEqual([0.3, 1]);
 
         const copy = ps.clone();
-        expect(copy.pivot!.toArray()).toEqual([0.5, -0.25, 0.1]);
+        expect(copy.pivot).toEqual({x: 0.5, y: -0.25, z: 0.1});
         expect([copy.flip!.x, copy.flip!.y]).toEqual([0.3, 1]);
         expect(copy.pivot).not.toBe(ps.pivot);
         expect(copy.flip).not.toBe(ps.flip);
