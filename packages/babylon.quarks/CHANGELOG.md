@@ -4,10 +4,36 @@ All notable changes to the `babylon.quarks` package are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project follows the `quarks.core` 0.x version line.
 
-## [0.29.0] — Unreleased
+## [0.29.0] — 2026-10-24
 
 Phase 7 of the road to 1.0: what still behaves differently from Unity is brought in line before
-the API and the look of effects are frozen.
+the API and the look of effects are frozen. Cones tilt and fill like Unity's and emit from their
+volume, Scaling Mode has Unity's Local, Hierarchy and Shape, curves can be random between two,
+Limit Velocity has Separate Axes, a system has a Stop Action and a Ring Buffer Mode, and the
+particles take the scene's image processing as Babylon's own materials do.
+
+### Upgrading from 0.28
+
+Effects in a scene without image processing, at scale 1 and without cones, look as before. Check
+these, in this order:
+
+1. **Scenes with image processing** (tone mapping, exposure, contrast, a vignette or grading, also
+   when set up by `createDefaultEnvironment()` or a `DefaultRenderingPipeline`): the particles now
+   take it. Re-tune colours that were authored to look right without it, or set
+   `applyImageProcessing: false` on a system to keep the old look.
+2. **Scaled emitters or scaled parents:** the default Scaling Mode is now `'local'`. Set
+   `scalingMode: 'hierarchy'` where a parent's scale should reach the effect. Files saved before
+   0.29 read as `'hierarchy'` and keep their look; save them again to write format 2.
+3. **Cones:** particles between the centre and the rim lean out more (Unity's tilt). Re-tune an
+   effect that relied on the narrower middle.
+4. **`autoDestroy`** still works but is deprecated: use `stopAction: 'destroy'`. Files are
+   written with `stopAction`, which a 0.28 runtime does not read.
+5. **TypeScript:** narrow `LimitSpeedOverLife.speed` before calling `genValue` on it
+   (`!(speed instanceof Vector3Function)`); a custom behavior reading `emitter.matrixWorld` gets
+   the matrix with the Scaling Mode's scale.
+6. **Files are format 2.** babylon.quarks 0.28 warns about them and reads their systems with its
+   own Scaling Mode. Install `babylon.quarks-editor` 0.29 with `babylon.quarks` 0.29, and export
+   from the Unity exporter 0.29 for this runtime.
 
 ### Breaking
 
