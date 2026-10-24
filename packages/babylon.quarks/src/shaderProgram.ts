@@ -73,10 +73,11 @@ export interface ShaderContext {
     /** Whether the mesh batch has a second UV set to read for {@link UVChannel} 1. */
     meshUV2: boolean;
     /**
-     * The scene's image processing as `ImageProcessingConfiguration.prepareDefines` writes it,
-     * or null for none. Compiled in only when the settings apply it, see {@link imageProcessingDefines}.
+     * The scene's image processing as `ImageProcessingConfiguration.prepareDefines` writes it;
+     * null or left out for none. Compiled in only when the settings apply it, see
+     * {@link ParticleSystem.applyImageProcessing}.
      */
-    imageProcessing: ShaderImageProcessing | null;
+    imageProcessing?: ShaderImageProcessing | null;
 }
 
 /**
@@ -405,9 +406,9 @@ function blendDefines(settings: ShaderSettings): string[] {
  */
 export function compilesImageProcessing(
     settings: Pick<ShaderSettings, 'applyImageProcessing' | 'materialTransparent' | 'materialBlendMode'>,
-    ip: ShaderImageProcessing | null
+    ip: ShaderImageProcessing | null | undefined
 ): boolean {
-    if (!settings.applyImageProcessing || ip === null) {
+    if (settings.applyImageProcessing === false || !ip) {
         return false;
     }
     if (ip.IMAGEPROCESSINGPOSTPROCESS) {
@@ -417,9 +418,34 @@ export function compilesImageProcessing(
 }
 
 /**
- * The scene's image processing, when {@link compilesImageProcessing}: its defines as Babylon writes
- * them (a number always, a flag when set) and the uniforms and samplers its effects read.
+ * The defines, uniforms and samplers the scene's image processing `ip` adds to a material with
+ * `settings`: nothing unless {@link compilesImageProcessing}, otherwise its defines as Babylon
+ * writes them (a number always, a flag when set) and the uniforms and samplers its effects read.
+ * A batch swaps these in place on its material when the configuration changes what compiles.
+ * @internal
  */
+export function imageProcessingParts(
+    settings: Pick<ShaderSettings, 'applyImageProcessing' | 'materialTransparent' | 'materialBlendMode'>,
+    ip: ShaderImageProcessing | null | undefined
+): {defines: string[]; uniforms: string[]; samplers: string[]} {
+    const parts = {defines: [] as string[], uniforms: [] as string[], samplers: [] as string[]};
+    if (!ip || !compilesImageProcessing(settings, ip)) {
+        return parts;
+    }
+    for (const key of IMAGE_PROCESSING_DEFINES) {
+        const value = ip[key];
+        if (typeof value === 'number') {
+            parts.defines.push(`${key} ${value}`);
+        } else if (value) {
+            parts.defines.push(key);
+        }
+    }
+    PrepareUniformsForImageProcessing(parts.uniforms, ip);
+    PrepareSamplersForImageProcessing(parts.samplers, ip);
+    return parts;
+}
+
+/** Appends {@link imageProcessingParts} to a program's lists. */
 function imageProcessingDefines(
     settings: ShaderSettings,
     context: ShaderContext,
@@ -427,20 +453,10 @@ function imageProcessingDefines(
     uniforms: string[],
     samplers: string[]
 ): void {
-    const ip = context.imageProcessing;
-    if (!compilesImageProcessing(settings, ip) || ip === null) {
-        return;
-    }
-    for (const key of IMAGE_PROCESSING_DEFINES) {
-        const value = ip[key];
-        if (typeof value === 'number') {
-            defines.push(`${key} ${value}`);
-        } else if (value) {
-            defines.push(key);
-        }
-    }
-    PrepareUniformsForImageProcessing(uniforms, ip);
-    PrepareSamplersForImageProcessing(samplers, ip);
+    const parts = imageProcessingParts(settings, context.imageProcessing);
+    defines.push(...parts.defines);
+    uniforms.push(...parts.uniforms);
+    samplers.push(...parts.samplers);
 }
 
 /** Soft particles, when on and a depth texture is there to read, and the alpha test. */

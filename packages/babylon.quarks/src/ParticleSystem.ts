@@ -999,16 +999,26 @@ export class ParticleSystem implements IParticleSystem {
     }
 
     /**
-     * Whether the scene's image processing (exposure, contrast, tone mapping, vignette, colour
-     * curves, colour grading, dithering of `scene.imageProcessingConfiguration`) applies to the
-     * particles, as it does to Babylon's own particle systems and materials; true by default.
-     * A scene whose configuration does nothing leaves the colour as it is, and one applied by a
-     * post process gets the colour in linear space. Particles that multiply the frame
-     * (`ALPHA_MULTIPLY`) are a factor rather than light and are not tone mapped. Saved in the
+     * Whether the particles' material applies the scene's image processing (exposure, contrast,
+     * tone mapping, vignette, colour curves, colour grading, dithering of
+     * `scene.imageProcessingConfiguration`), as Babylon's own particle systems and materials do;
+     * true by default. A scene whose configuration does nothing leaves the colour as it is, and
+     * one applied by a post process gets the colour in linear space. Particles that multiply the
+     * frame (`ALPHA_MULTIPLY`) are a factor rather than light and are not tone mapped.
+     *
+     * As in Babylon, the processing runs on each particle before it is blended: tone mapping
+     * clamps an HDR colour to the displayable range, and an additive particle picks up what the
+     * configuration does to black (a contrast below 1, colour curves or an
+     * opaque vignette lift it). The configuration is the scene's;
+     * there is no per-system one.
+     *
+     * Switched off, the material writes its colour as authored, and leaves it in gamma space under
+     * a post process, which still processes the frame the particles are in. To keep particles out
+     * of a post process, draw them with a camera the pipeline is not attached to. Saved in the
      * effect JSON only when switched off.
      */
     get applyImageProcessing(): boolean {
-        return this.rendererSettings.applyImageProcessing;
+        return this.rendererSettings.applyImageProcessing !== false;
     }
 
     set applyImageProcessing(apply: boolean) {

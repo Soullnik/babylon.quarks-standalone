@@ -56,15 +56,21 @@ the API and the look of effects are frozen.
   `DefaultRenderingPipeline` with image processing on (`applyByPostProcess`), the particles now
   leave their colour in linear space for the post process, as Babylon's materials do; before they
   were gamma-corrected twice and looked washed out. Set `applyImageProcessing: false` on a system
-  to keep the old look.
+  to keep the old look. Check effects in scenes set up by any of these, which turn image
+  processing on or hand it to a post process without saying so: `scene.createDefaultEnvironment()`
+  (tone mapping, exposure and contrast), a `DefaultRenderingPipeline` with
+  `imageProcessingEnabled` (its default), a `PrePassRenderer` (SSAO2, SSR, motion blur) and a
+  `ReflectionProbe` rendering in linear space.
+  Tone mapping clamps HDR particle colours, and a contrast below 1 or colour curves lift black,
+  which an additive particle then adds.
 
 ### Added
 
 - **Scene image processing** (`ParticleSystem.applyImageProcessing`, default true; JSON writes it
   only when false): the scene's `imageProcessingConfiguration` (exposure, contrast, tone mapping,
   vignette, colour curves, colour grading, dithering) is compiled into every render mode, in GLSL
-  and WGSL, through Babylon's own includes, bound on every draw, and recompiled when the
-  configuration changes what the shader needs. A post process that applies it gets the colour in
+  and WGSL, through Babylon's own includes, bound on every draw, and switched in place, on
+  the same material, when the configuration changes what the shader needs. A post process that applies it gets the colour in
   linear space. It runs on the straight colour after fog and before the blend resolve, so alpha
   stays coverage; particles that multiply the frame (`ALPHA_MULTIPLY`) are a factor rather than
   light and are not tone mapped. Systems that differ are batched apart. On WebGPU, a 2D colour

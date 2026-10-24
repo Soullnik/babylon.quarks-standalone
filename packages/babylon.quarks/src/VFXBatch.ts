@@ -13,7 +13,7 @@ import {VFXBatchSettings} from './BatchedRenderer';
 import type {ParticleSystem} from './ParticleSystem';
 import {storedBatchSettings} from './batchKey';
 import {GRADIENT_MAP_WEIGHTS, MeshLightingSettings, readsUV1, StoredBatchSettings, TextureUV} from './batchSettings';
-import {compilesImageProcessing, ShaderImageProcessing} from './shaderProgram';
+import {imageProcessingParts, ShaderImageProcessing} from './shaderProgram';
 import {DepthBinding, softDepthParams} from './softDepth';
 
 export * from './batchSettings';
@@ -211,7 +211,7 @@ export abstract class VFXBatch {
      * @internal
      */
     protected imageProcessing(): ShaderImageProcessing | null {
-        if (!this.settings.applyImageProcessing) {
+        if (this.settings.applyImageProcessing === false) {
             return null;
         }
         const defines: ShaderImageProcessing = {
@@ -238,44 +238,56 @@ export abstract class VFXBatch {
 
     /**
      * Binds the scene's image processing to a material compiled with `compiled`: its values on every
-     * bind, unless a post process applies them, and a rebuild whenever the configuration changes
-     * what the material has to compile (tone mapping switched on, a vignette, a colour grading
-     * texture). A colour grading texture is set on the material too, so that the batch, like
-     * Babylon's own materials, is not drawn before it has loaded.
+     * bind, unless a post process applies them, and the material's defines, uniforms and samplers
+     * swapped in place whenever the configuration changes what it has to compile (tone mapping
+     * switched on, a vignette, a colour grading texture, a post process taking over). The material
+     * stays the same one: a configuration that flips back and forth within a frame, as a reflection
+     * probe rendering in linear space does, only switches between the effects the engine has
+     * cached for each set of defines. A colour grading texture is set on the material too, so
+     * that the batch, like Babylon's own materials, is not drawn before it has loaded.
      * @internal
      */
     protected bindImageProcessing(material: ShaderMaterial, compiled: ShaderImageProcessing | null): void {
-        this.imageProcessingObserver?.remove();
-        this.imageProcessingObserver = null;
-        if (!this.settings.applyImageProcessing) {
+        this.releaseImageProcessing();
+        if (this.settings.applyImageProcessing === false) {
             return;
         }
         const config = this.scene.imageProcessingConfiguration;
-        const applies = compilesImageProcessing(this.settings, compiled);
-        const key = applies ? imageProcessingKey(compiled) : '';
+        let current = compiled;
+        let parts = imageProcessingParts(this.settings, current);
+        let key = parts.defines.join('\n');
         const grading = () => {
-            if (applies && compiled?.COLORGRADING && config.colorGradingTexture) {
+            if (parts.samplers.includes('txColorTransform') && config.colorGradingTexture) {
                 material.setTexture('txColorTransform', config.colorGradingTexture);
+            } else {
+                material.removeTexture('txColorTransform');
             }
         };
         grading();
         this.imageProcessingObserver = config.onUpdateParameters.add(() => {
             const next = this.imageProcessing();
-            const nextKey = compilesImageProcessing(this.settings, next) ? imageProcessingKey(next) : '';
+            const nextParts = imageProcessingParts(this.settings, next);
+            const nextKey = nextParts.defines.join('\n');
             if (nextKey !== key) {
-                this.rebuildMaterial();
-            } else {
-                grading();
+                const options = material.options;
+                swapEntries(options.defines as string[], parts.defines, nextParts.defines);
+                swapEntries(options.uniforms, parts.uniforms, nextParts.uniforms);
+                swapEntries(options.samplers, parts.samplers, nextParts.samplers);
+                current = next;
+                parts = nextParts;
+                key = nextKey;
+            }
+            grading();
+        });
+        material.onBindObservable.add(() => {
+            if (!current?.IMAGEPROCESSING || current.IMAGEPROCESSINGPOSTPROCESS || parts.defines.length === 0) {
+                return;
+            }
+            const effect = material.getEffect();
+            if (effect) {
+                config.bind(effect);
             }
         });
-        if (applies && compiled?.IMAGEPROCESSING && !compiled.IMAGEPROCESSINGPOSTPROCESS) {
-            material.onBindObservable.add(() => {
-                const effect = material.getEffect();
-                if (effect) {
-                    config.bind(effect);
-                }
-            });
-        }
     }
 
     /** Stops following the scene's image processing. @internal */
@@ -567,15 +579,16 @@ export abstract class VFXBatch {
     }
 }
 
-/** What of `ip` decides the shader: its defines, one string per distinct material. */
-function imageProcessingKey(ip: ShaderImageProcessing | null): string {
-    if (ip === null) {
-        return '';
+/**
+ * Replaces, in a material option list, the entries `previous` added with those of `next`: one
+ * occurrence each, so an entry the rest of the program also lists is kept.
+ */
+function swapEntries(list: string[], previous: readonly string[], next: readonly string[]): void {
+    for (const entry of previous) {
+        const at = list.lastIndexOf(entry);
+        if (at !== -1) {
+            list.splice(at, 1);
+        }
     }
-    let key = '';
-    for (const name in ip) {
-        const value = ip[name as keyof ShaderImageProcessing];
-        key += typeof value === 'number' ? `${name}=${value};` : value ? `${name};` : '';
-    }
-    return key;
+    list.push(...next);
 }

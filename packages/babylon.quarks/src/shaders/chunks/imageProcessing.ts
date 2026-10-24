@@ -65,12 +65,23 @@ fn quarksSampleTexture3D(colorTransform: texture_2d<f32>, colorTransformSampler:
 const BROKEN_2D_SAMPLE =
     'textureSample(txColorTransform,txColorTransformSampler,colorTransformInput,uniforms.colorTransformSettings.yz).rgb';
 
-ShaderStore.IncludesShadersStoreWGSL['quarksImageProcessingFunctions'] =
-    SAMPLE_TEXTURE_3D_WGSL +
-    ShaderStore.IncludesShadersStoreWGSL['imageProcessingFunctions'].replace(
-        BROKEN_2D_SAMPLE,
-        'quarksSampleTexture3D(txColorTransform,txColorTransformSampler,colorTransformInput,uniforms.colorTransformSettings.yz)'
-    );
+const babylonFunctionsWGSL = ShaderStore.IncludesShadersStoreWGSL['imageProcessingFunctions'];
+
+/**
+ * Whether Babylon's WGSL include still has the broken call, and so is registered patched. The
+ * tests pin this for the Babylon version the library is built against, and the shader validation
+ * compiles 2D colour grading in WGSL, so a Babylon release that changes the include is noticed.
+ * @internal
+ */
+export const PATCHES_IMAGE_PROCESSING_WGSL = babylonFunctionsWGSL.includes(BROKEN_2D_SAMPLE);
+
+ShaderStore.IncludesShadersStoreWGSL['quarksImageProcessingFunctions'] = PATCHES_IMAGE_PROCESSING_WGSL
+    ? SAMPLE_TEXTURE_3D_WGSL +
+      babylonFunctionsWGSL.replace(
+          BROKEN_2D_SAMPLE,
+          'quarksSampleTexture3D(txColorTransform,txColorTransformSampler,colorTransformInput,uniforms.colorTransformSettings.yz)'
+      )
+    : babylonFunctionsWGSL;
 
 /** Fragment-side declaration, GLSL. */
 export const imageProcessingDeclarationGLSL = /* glsl */ `

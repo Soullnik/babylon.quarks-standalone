@@ -333,5 +333,10 @@ export function shaderVariants(): ShaderVariant[] {
     for (const target of TARGETS)
         for (const ip of IMAGE_PROCESSING)
             for (const blend of IMAGE_PROCESSING_BLEND) for (const map of MAP) add([target, ip, blend, map]);
+
+    // With the rest of the fragment: soft, alpha-tested, fogged and with every texture effect.
+    const everySurface = SURFACE[SURFACE.length - 3];
+    for (const target of TARGETS.filter((t) => SURFACE_TARGETS.includes(t.name)))
+        for (const ip of IMAGE_PROCESSING) add([target, ip, everySurface, MAP[MAP.length - 1], EVERYTHING_ELSE]);
     return out;
 }
