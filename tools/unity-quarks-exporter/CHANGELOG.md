@@ -2,6 +2,12 @@
 
 All notable changes to the Unity Quarks Exporter are documented here.
 
+## [0.29.0] — Unreleased
+
+### Added
+
+- **Cone Volume** → a cone with `emitFrom: 1` (Volume) and its `length`; it no longer warns.
+
 ## [0.28.0] — 2026-10-23
 
 The exporter is no longer experimental: it is tested on every change and held to the library's

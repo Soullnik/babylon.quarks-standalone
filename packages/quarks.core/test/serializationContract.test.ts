@@ -230,6 +230,8 @@ const shapes: Record<string, () => EmitterShape> = {
             arc: 3,
             thickness: 0.5,
             angle: 0.4,
+            emitFrom: 1,
+            length: 2,
             mode: EmitterMode.PingPong,
             spread: 0.25,
             speed: curve(),
@@ -264,7 +266,7 @@ const shapes: Record<string, () => EmitterShape> = {
             spread: 0.25,
             speed: curve(),
         }),
-    grid: () => new GridEmitter({width: 2, height: 3, row: 4, column: 5}),
+    grid: () => new GridEmitter({width: 2, height: 3, row: 4, column: 5, sampling: 1}),
     rectangle: () =>
         new RectangleEmitter({
             width: 2,

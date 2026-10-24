@@ -6,6 +6,7 @@ import {MeshBuilder} from '@babylonjs/core/Meshes/meshBuilder.js';
 import {TransformNode} from '@babylonjs/core/Meshes/transformNode.js';
 import type {Scene} from '@babylonjs/core/scene.js';
 import type {ParticleSystem} from 'babylon.quarks';
+import {ConeEmitFrom} from 'babylon.quarks';
 import {EDITOR_SCENE_NODE_METADATA} from './editorScene.js';
 import './lineShaders.js';
 import {getShapeType, readShapeParams} from './shapes.js';
@@ -120,7 +121,12 @@ function buildEmitterWireframe(system: ParticleSystem, scene: Scene): Mesh[] {
                 lines('wf-cone-spoke-b', [Vector3.Zero(), arcPoint(radius, arc)]);
             }
 
-            const preview = Math.max(radius * 2, 1.25);
+            // Emit from Volume draws the volume itself, out to its length; the base a stretch of the
+            // directions.
+            const preview =
+                params.coneEmitFrom === ConeEmitFrom.Volume
+                    ? Math.max(params.length, 0.001)
+                    : Math.max(radius * 2, 1.25);
             const farRadius = radius + preview * Math.tan(angle);
             const spokeCount = Math.max(4, Math.ceil((arc / (Math.PI * 2)) * 12));
             for (let i = 0; i <= spokeCount; i++) {
