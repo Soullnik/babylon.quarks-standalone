@@ -214,3 +214,42 @@ describe('Separate Axes', () => {
         expect(findBehavior<SizeBySpeed>(system.behaviors, 'SizeBySpeed')!.size).toBeInstanceOf(Vector3Function);
     });
 });
+
+describe('curve modules with a constant or a range', () => {
+    const scene = useScene();
+    let mounted: Mounted | null = null;
+    afterEach(() => {
+        mounted?.unmount();
+        mounted = null;
+    });
+
+    it('keeps exported constant limits per axis, and a range as two flat curves', () => {
+        const system = makeSystem(scene.get());
+        system.addBehavior(
+            new LimitSpeedOverLife(
+                new Vector3Function(new ConstantValue(2), new IntervalValue(0.5, 1), new ConstantValue(3)),
+                1
+            )
+        );
+        const binding = new EffectBinding(system);
+        const element = () => <LimitSpeedOverLifeModule binding={binding} />;
+        mounted = mount(element());
+        binding.subscribe(() => mounted!.render(element()));
+        const section = openModule(mounted.container, 'Limit Speed over Lifetime');
+        const limit = () => findBehavior<LimitSpeedOverLife>(system.behaviors, 'LimitSpeedOverLife')!;
+
+        // Off: the X limit, a constant 2, becomes a flat curve at 2.
+        click(controlsOf(rowOf(section, 'Separate axes'))[0]);
+        const one = limit().speed as PiecewiseBezier;
+        expect(one).toBeInstanceOf(PiecewiseBezier);
+        expect(one.genValue([], 0.5)).toBeCloseTo(2);
+
+        // On again from a range: every axis gets the two flat curves at its ends.
+        binding.apply(() => (limit().speed = new IntervalValue(0.5, 1)));
+        click(controlsOf(rowOf(section, 'Separate axes'))[0]);
+        const y = (limit().speed as Vector3Function).y as RandomBetweenCurves;
+        expect(y).toBeInstanceOf(RandomBetweenCurves);
+        expect(y.curve1.genValue([], 0.5)).toBeCloseTo(0.5);
+        expect(y.curve2.genValue([], 0.5)).toBeCloseTo(1);
+    });
+});

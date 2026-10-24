@@ -480,3 +480,43 @@ describe('behavior fusion', () => {
         }
     );
 });
+
+describe('fused separate-axes speed limit', () => {
+    it('clamps each axis as the behavior does on its own', () => {
+        const build = (): Behavior[] => [
+            new ForceOverLife(new ConstantValue(0), new ConstantValue(0), new ConstantValue(0)),
+            new LimitSpeedOverLife(
+                new Vector3Function(new ConstantValue(0.5), new ConstantValue(0.25), new ConstantValue(1)),
+                1
+            ),
+        ];
+        const fusedBehaviors = build();
+        const separateBehaviors = build();
+        const fused = makePool(COUNT);
+        const separate = makePool(COUNT);
+        for (const p of fused) {
+            p.age = 0;
+            for (const b of fusedBehaviors) b.initialize(p, system);
+        }
+        for (const p of separate) {
+            p.age = 0;
+            for (const b of separateBehaviors) b.initialize(p, system);
+        }
+        expect(planBehaviorFusion(fusedBehaviors)).toHaveLength(1);
+        for (let frame = 0; frame < 60; frame++) {
+            runPlan(fusedBehaviors, fused, DELTA);
+            runSeparately(separateBehaviors, separate, DELTA);
+        }
+        for (let i = 0; i < COUNT; i++) {
+            const v = fused[i].velocity;
+            expect(Math.abs(v.x)).toBeLessThanOrEqual(0.5 + 1e-3);
+            expect(Math.abs(v.y)).toBeLessThanOrEqual(0.25 + 1e-3);
+            expect(Math.abs(v.z)).toBeLessThanOrEqual(1 + 1e-3);
+            expect(v.x).toBeCloseTo(separate[i].velocity.x, 6);
+            expect(v.y).toBeCloseTo(separate[i].velocity.y, 6);
+            expect(v.z).toBeCloseTo(separate[i].velocity.z, 6);
+        }
+        // The largest starting component keeps its sign while it is cut down.
+        expect(fused[COUNT - 1].velocity.x).toBeGreaterThan(0.49);
+    });
+});

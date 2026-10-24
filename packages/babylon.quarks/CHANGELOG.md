@@ -11,6 +11,9 @@ the API and the look of effects are frozen.
 
 ### Breaking
 
+- `LimitSpeedOverLife.speed` is typed `FunctionValueGenerator | ValueGenerator | Vector3Function`
+  (it was `FunctionValueGenerator`), for Separate Axes and constant limits. Code that reads it
+  with `genValue(memory, t)` narrows it first: `!(speed instanceof Vector3Function)`.
 - **Cone particles between the centre and the rim tilt by `atan(r · tan(angle))`**, as Unity's
   Cone, instead of `angle · r`. Each particle follows the cone's side line through its start
   point, so the cone's far end is a disc of radius `radius + length · tan(angle)` filled as evenly
@@ -75,6 +78,9 @@ the API and the look of effects are frozen.
 
 ### Fixed
 
+- A local-space force, orbit or per-axis speed limit under an emitter scaled to 0 on an axis read
+  a NaN rotation from it, and turned the velocity into NaN (forces) or stopped limiting
+  (limits). `EmitterFrame` rebuilds the rotation from the axes that remain.
 - **Noise** rolls a random Frequency, Strength, Position or Rotation amount, or Remap (a range or
   two curves) into every particle. Only the first particle got its own value; the others read a
   missing one and their position became NaN.

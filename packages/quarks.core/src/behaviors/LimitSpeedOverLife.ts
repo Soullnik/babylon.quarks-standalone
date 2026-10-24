@@ -1,4 +1,4 @@
-import {FunctionValueGenerator, GeneratorFromJSON, ValueGenerator, Vector3Function} from '../functions';
+import {FunctionValueGenerator, ValueGenerator, ValueGeneratorFromJSON, Vector3Function} from '../functions';
 import type {ValueGeneratorJSON, Vector3FunctionJSON} from '../functions/FunctionJSON';
 import {IParticleSystem} from '../IParticleSystem';
 import {Vector3} from '../math';
@@ -75,8 +75,11 @@ export class LimitSpeedOverLife implements Behavior {
         public space: BehaviorSpace = 'local'
     ) {}
 
-    /** Whether the frame is read: per-axis limits authored in another space than the simulation's. */
-    private convertsSpace(): boolean {
+    /**
+     * Whether the frame is read: per-axis limits authored in another space than the simulation's.
+     * @internal
+     */
+    _convertsSpace(): boolean {
         const worldSpace = this.ps === undefined || this.ps.worldSpace;
         return this.speed instanceof Vector3Function && worldSpace !== (this.space === 'world');
     }
@@ -85,8 +88,9 @@ export class LimitSpeedOverLife implements Behavior {
      * Limits each axis of `velocity` (in the simulation space) by the per-axis limits at `t`.
      * The excess is worked out in {@link space} and taken off in the simulation space, so an axis
      * the emitter's scale flattens keeps its velocity rather than losing it.
+     * @internal
      */
-    private limitAxes(particle: Particle, t: number, step: number, motionScale: number, convert: boolean) {
+    _limitAxes(particle: Particle, t: number, step: number, motionScale: number, convert: boolean) {
         const limit = (this.speed as Vector3Function).genValue(particle.memory, this._limit, t);
         const velocity = this._velocity.copy(particle.velocity);
         const worldSpace = this.ps === undefined || this.ps.worldSpace;
@@ -116,7 +120,7 @@ export class LimitSpeedOverLife implements Behavior {
     update(particle: Particle, delta: number): void {
         if (this.speed instanceof Vector3Function) {
             const t = particle.age / particle.life;
-            this.limitAxes(particle, t, this.dampenStep(delta), this.motionScale(), this.convertsSpace());
+            this._limitAxes(particle, t, this.dampenStep(delta), this.motionScale(), this._convertsSpace());
             return;
         }
         const speed = particle.velocity.length();
@@ -132,11 +136,11 @@ export class LimitSpeedOverLife implements Behavior {
         const dampenStep = this.dampenStep(delta);
         const motionScale = this.motionScale();
         if (generator instanceof Vector3Function) {
-            const convert = this.convertsSpace();
+            const convert = this._convertsSpace();
             for (let i = 0; i < count; i++) {
                 const particle = particles[i];
                 if (particle.age < particle.life) {
-                    this.limitAxes(particle, particle.age / particle.life, dampenStep, motionScale, convert);
+                    this._limitAxes(particle, particle.age / particle.life, dampenStep, motionScale, convert);
                 }
             }
             return;
@@ -165,11 +169,15 @@ export class LimitSpeedOverLife implements Behavior {
 
     /**
      * Reads {@link LimitSpeedOverLife.toJSON} output; a field the JSON leaves out takes its
-     * default.
+     * default, and a speed that is neither a number generator nor a `Vector3Function` warns and
+     * reads as 0.
      */
     static fromJSON(json: LimitSpeedOverLifeJSON): Behavior {
         return new LimitSpeedOverLife(
-            GeneratorFromJSON(json.speed) as FunctionValueGenerator | ValueGenerator | Vector3Function,
+            // A per-axis limit, or one for the speed; anything else warns and reads as 0.
+            json.speed?.type === 'Vector3Function'
+                ? (Vector3Function.fromJSON(json.speed as Vector3FunctionJSON) as Vector3Function)
+                : ValueGeneratorFromJSON(json.speed as ValueGeneratorJSON),
             typeof json.dampen === 'number' ? json.dampen : 1,
             readBehaviorSpace(json.space, 'local')
         );
@@ -181,7 +189,7 @@ export class LimitSpeedOverLife implements Behavior {
             speed.x.refreshTable?.();
             speed.y.refreshTable?.();
             speed.z.refreshTable?.();
-            if (this.ps !== undefined && this.convertsSpace()) {
+            if (this.ps !== undefined && this._convertsSpace()) {
                 this._frame.refresh(this.ps);
             }
         } else {

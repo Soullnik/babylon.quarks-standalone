@@ -1,4 +1,4 @@
-import {PiecewiseBezier, RandomBetweenCurves, Vector3Function} from 'babylon.quarks';
+import {IntervalValue, PiecewiseBezier, RandomBetweenCurves, Vector3Function} from 'babylon.quarks';
 import React from 'react';
 import {AnyGenerator, withCurves} from '../core/values.js';
 import {CheckboxField, Row} from './fields.js';
@@ -19,9 +19,13 @@ export interface AxesCurveFieldProps {
     onChange: (generator: AxisCurve | Vector3Function) => void;
 }
 
-/** The curve or curves `generator` holds, as a fresh copy. */
+/**
+ * The curve or curves `generator` holds, as a fresh copy: a constant as a flat curve, a random
+ * range as two flat ones.
+ */
 function curveOf(generator: AnyGenerator | undefined): AxisCurve {
-    return withCurves(generator, generator instanceof RandomBetweenCurves ? 'curves' : 'curve');
+    const two = generator instanceof RandomBetweenCurves || generator instanceof IntervalValue;
+    return withCurves(generator, two ? 'curves' : 'curve');
 }
 
 /**

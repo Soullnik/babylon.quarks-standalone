@@ -6,6 +6,7 @@ import {
     LimitSpeedOverLifeJSON,
     Matrix4,
     Quaternion,
+    readFormat,
     SpriteParticle,
     Vector3,
     Vector3Function,
@@ -104,6 +105,17 @@ describe('LimitSpeedOverLife separate axes JSON', () => {
         expect(read.toJSON()).toEqual(json);
     });
 
+    it('warns and reads 0 for a speed that is a rotation', () => {
+        const warnings: string[] = [];
+        const json = {type: 'LimitSpeedOverLife', speed: {type: 'Euler', angleX: {type: 'ConstantValue', value: 1}}};
+        const read = readFormat({onWarning: (message) => warnings.push(message)}, () =>
+            LimitSpeedOverLife.fromJSON(json as never)
+        ) as LimitSpeedOverLife;
+        expect(read.speed).toBeInstanceOf(ConstantValue);
+        expect((read.speed as ConstantValue).value).toBe(0);
+        expect(warnings).toHaveLength(1);
+    });
+
     it('reads an unknown space as local', () => {
         const json = {...new LimitSpeedOverLife(axes(1, 2, 3), 0.5).toJSON(), space: 'up'} as unknown;
         expect((LimitSpeedOverLife.fromJSON(json as LimitSpeedOverLifeJSON) as LimitSpeedOverLife).space).toBe('local');
@@ -115,5 +127,20 @@ describe('LimitSpeedOverLife separate axes JSON', () => {
         expect(copy.space).toBe('world');
         expect(copy.speed).not.toBe(behavior.speed);
         expect(copy.toJSON()).toEqual(behavior.toJSON());
+    });
+});
+
+describe('LimitSpeedOverLife separate axes under a flattened emitter', () => {
+    it('keeps limiting the axes that remain when one axis of the emitter is scaled to 0', () => {
+        const flattened = new Matrix4().compose(
+            new Vector3(0, 0, 0),
+            new Quaternion().setFromAxisAngle(new Vector3(0, 0, 1), Math.PI / 2),
+            new Vector3(1, 0, 1)
+        );
+        const system = {worldSpace: true, emitter: {matrixWorld: flattened}} as unknown as IParticleSystem;
+        // Local X is world +Y after the quarter turn about Z; its limit of 1 still applies.
+        const v = run(new LimitSpeedOverLife(axes(1, 1, 100), 1), system, new Vector3(0, 10, 0), false);
+        expect(Number.isFinite(v.y)).toBe(true);
+        expect(v.y).toBeCloseTo(10 - 9 * THIRD, 4);
     });
 });

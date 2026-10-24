@@ -1,5 +1,44 @@
 import {IParticleSystem} from '../IParticleSystem';
-import {Quaternion, Vector3} from '../math';
+import {Matrix4, Quaternion, Vector3} from '../math';
+
+const axes = [new Vector3(), new Vector3(), new Vector3()];
+const basis = new Matrix4();
+const X_AXIS = new Vector3(1, 0, 0);
+const Y_AXIS = new Vector3(0, 1, 0);
+const live = [false, false, false];
+
+/**
+ * The rotation of a matrix with a zero axis, which `decompose` cannot divide out: the zero axes
+ * are rebuilt square to the others (or as the identity's when all are zero), so the axes that
+ * remain keep their direction.
+ */
+function rotationOfFlattened(matrix: Matrix4, target: Quaternion): Quaternion {
+    matrix.extractBasis(axes[0], axes[1], axes[2]);
+    let count = 0;
+    for (let i = 0; i < 3; i++) {
+        live[i] = axes[i].lengthSq() > 0;
+        if (live[i]) {
+            axes[i].normalize();
+            count++;
+        }
+    }
+    if (count === 0) {
+        return target.set(0, 0, 0, 1);
+    }
+    if (count === 1) {
+        // One axis left: give it any square partner, then complete the basis below.
+        const i = live.indexOf(true);
+        const j = (i + 1) % 3;
+        const axis = axes[i];
+        const helper = Math.abs(axis.x) < 0.9 ? X_AXIS : Y_AXIS;
+        axes[j].crossVectors(axis, helper).normalize();
+        live[j] = true;
+    }
+    // Two axes left: the third is their cross product, in the order that keeps the basis right-handed.
+    const k = live.indexOf(false);
+    axes[k].crossVectors(axes[(k + 1) % 3], axes[(k + 2) % 3]).normalize();
+    return target.setFromRotationMatrix(basis.makeBasis(axes[0], axes[1], axes[2]));
+}
 
 /**
  * The space a behavior's vectors are authored in, as Unity's Space setting on
@@ -50,7 +89,12 @@ export class EmitterFrame {
 
     /** Decomposes the emitter's current world matrix. */
     refresh(particleSystem: IParticleSystem): void {
-        particleSystem.emitter.matrixWorld.decompose(this.position, this.quaternion, this.scale);
+        const matrix = particleSystem.emitter.matrixWorld;
+        matrix.decompose(this.position, this.quaternion, this.scale);
+        if (this.scale.x === 0 || this.scale.y === 0 || this.scale.z === 0) {
+            // A flattened emitter: decompose divides by the zero and leaves no rotation.
+            rotationOfFlattened(matrix, this.quaternion);
+        }
         this.quaternionInverse.copy(this.quaternion).invert();
         this.scaleInverse.set(inverseOf(this.scale.x), inverseOf(this.scale.y), inverseOf(this.scale.z));
     }

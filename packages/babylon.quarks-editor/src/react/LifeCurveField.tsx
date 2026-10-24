@@ -1,4 +1,4 @@
-import {PiecewiseBezier, RandomBetweenCurves} from 'babylon.quarks';
+import {IntervalValue, PiecewiseBezier, RandomBetweenCurves} from 'babylon.quarks';
 import React from 'react';
 import {AnyGenerator, buildCurve, CurvePiece, readPieces, withCurves} from '../core/values.js';
 import {CurveEditor} from './CurveEditor.js';
@@ -23,7 +23,8 @@ export interface LifeCurveFieldProps {
  */
 export function LifeCurveField(props: LifeCurveFieldProps): React.ReactElement {
     const {generator} = props;
-    const two = generator instanceof RandomBetweenCurves;
+    // A random range shows as two flat curves, and an edit turns it into them.
+    const two = generator instanceof RandomBetweenCurves || generator instanceof IntervalValue;
     const edit = (pieces: CurvePiece[], upper: boolean) => {
         if (!two) {
             props.onChange(buildCurve(pieces));
