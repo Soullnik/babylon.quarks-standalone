@@ -20,10 +20,12 @@ import {
     BoxEmitFrom,
     ColorOverLife,
     ColorRange,
+    ConeEmitFrom,
     ConstantColor,
     ConstantValue,
     EulerGenerator,
     Gradient,
+    GridSampling,
     IntervalValue,
     RandomColor,
     RandomColorBetweenGradient,
@@ -113,6 +115,7 @@ const PARAM_LABELS: {[key: string]: string} = {
     column: 'Columns',
     row: 'Rows',
     depth: 'Depth',
+    length: 'Length',
     speed: 'Speed (lengths/s)',
 };
 
@@ -725,17 +728,20 @@ export function ShapeModule({binding}: ModuleProps) {
                     onChange={(next) => binding.apply((s) => (s.emitterShape = createShape(next, params)))}
                 />
             </Row>
-            {keys.map((key) => (
-                <Row key={key} label={PARAM_LABELS[key]}>
-                    <NumberField
-                        value={params[key] as number}
-                        min={0}
-                        onChange={(v) =>
-                            binding.apply((s) => (s.emitterShape = createShape(type, {...params, [key]: v})))
-                        }
-                    />
-                </Row>
-            ))}
+            {keys
+                // A cone's Length only shapes Emit from Volume; Unity shows it for Cone Volume alone.
+                .filter((key) => key !== 'length' || params.coneEmitFrom === ConeEmitFrom.Volume)
+                .map((key) => (
+                    <Row key={key} label={PARAM_LABELS[key]}>
+                        <NumberField
+                            value={params[key] as number}
+                            min={0}
+                            onChange={(v) =>
+                                binding.apply((s) => (s.emitterShape = createShape(type, {...params, [key]: v})))
+                            }
+                        />
+                    </Row>
+                ))}
             {type === 'mesh_surface' && (
                 <Row label="Source mesh">
                     <SelectField
@@ -763,6 +769,34 @@ export function ShapeModule({binding}: ModuleProps) {
                         ]}
                         onChange={(emitFrom) =>
                             binding.apply((s) => (s.emitterShape = createShape(type, {...params, emitFrom})))
+                        }
+                    />
+                </Row>
+            )}
+            {type === 'cone' && (
+                <Row label="Emit from">
+                    <SelectField
+                        value={params.coneEmitFrom}
+                        options={[
+                            {value: ConeEmitFrom.Base, label: 'Base'},
+                            {value: ConeEmitFrom.Volume, label: 'Volume'},
+                        ]}
+                        onChange={(coneEmitFrom) =>
+                            binding.apply((s) => (s.emitterShape = createShape(type, {...params, coneEmitFrom})))
+                        }
+                    />
+                </Row>
+            )}
+            {type === 'grid' && (
+                <Row label="Sampling">
+                    <SelectField
+                        value={params.sampling}
+                        options={[
+                            {value: GridSampling.Random, label: 'Random'},
+                            {value: GridSampling.Sequential, label: 'Sequential'},
+                        ]}
+                        onChange={(sampling) =>
+                            binding.apply((s) => (s.emitterShape = createShape(type, {...params, sampling})))
                         }
                     />
                 </Row>

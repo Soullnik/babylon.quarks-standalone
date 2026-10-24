@@ -1,6 +1,7 @@
 import {
     BoxEmitter,
     CircleEmitter,
+    ConeEmitFrom,
     ConeEmitter,
     ConstantValue,
     createSeededRandom,
@@ -12,6 +13,7 @@ import {
     EmitterShape,
     EmitterShapes,
     GridEmitter,
+    GridSampling,
     HemisphereEmitter,
     PointEmitter,
     RectangleEmitter,
@@ -225,17 +227,157 @@ describe('GridEmitter', () => {
     });
 });
 
+describe('ConeEmitter', () => {
+    const tilt = (v: Vector3) => Math.atan2(Math.hypot(v.x, v.y), v.z);
+
+    it('tilts a particle by atan(r · tan(angle)) at the fraction r of the radius, as Unity', () => {
+        const angle = Math.PI / 3;
+        for (const {p, v} of sample(new ConeEmitter({radius: 2, angle}), 500)) {
+            const r = radial(p) / 2;
+            expect(tilt(v)).toBeCloseTo(Math.atan(r * Math.tan(angle)), 6);
+            expect(v.length()).toBeCloseTo(SPEED, 6);
+            // Heads away from the axis, in the plane through it and its start point.
+            if (r > 1e-3) expect((p.x * v.y - p.y * v.x) / (radial(p) * SPEED)).toBeCloseTo(0, 6);
+        }
+    });
+
+    it('heads the rim out at the full angle', () => {
+        for (const {v} of sample(new ConeEmitter({radius: 1, thickness: 0, angle: 0.5}), 50)) {
+            expect(tilt(v)).toBeCloseTo(0.5, 6);
+        }
+    });
+
+    it('sprays a cone of no radius from its apex through the whole angle, as Unity', () => {
+        const points = sample(new ConeEmitter({radius: 0, angle: 0.5}), 500);
+        for (const {p, v} of points) {
+            expect(p.length()).toBe(0);
+            expect(tilt(v)).toBeLessThanOrEqual(0.5 + 1e-9);
+        }
+        expect(Math.max(...points.map(({v}) => tilt(v)))).toBeGreaterThan(0.45);
+    });
+
+    it('opens to a flat disc at π/2, the centre still along z', () => {
+        for (const {p, v} of sample(new ConeEmitter({radius: 1, angle: Math.PI / 2}), 200)) {
+            if (radial(p) > 1e-3) expect(v.z).toBeCloseTo(0, 6);
+        }
+    });
+
+    it('emits from the base unless told to fill the volume, and ignores the length there', () => {
+        expect(new ConeEmitter().emitFrom).toBe(ConeEmitFrom.Base);
+        expect(new ConeEmitter().length).toBe(5);
+        for (const {p} of sample(new ConeEmitter({length: 4}), 100)) expect(p.z).toBe(0);
+    });
+
+    it('fills the volume along the side lines, from the base out to its length', () => {
+        const radius = 1;
+        const angle = Math.PI / 4;
+        const length = 2;
+        const points = sample(new ConeEmitter({radius, angle, length, emitFrom: ConeEmitFrom.Volume}));
+        for (const {p, v} of points) {
+            expect(p.z).toBeGreaterThanOrEqual(0);
+            expect(p.z).toBeLessThanOrEqual(length + 1e-9);
+            // Inside the cone's frustum, which widens by tan(angle) per unit of height.
+            expect(radial(p)).toBeLessThanOrEqual(radius + p.z * Math.tan(angle) + 1e-9);
+            // On its own side line: back at the base the point is where the velocity started.
+            const back = p.z / v.z;
+            const base = Math.hypot(p.x - v.x * back, p.y - v.y * back);
+            expect(base).toBeLessThanOrEqual(radius + 1e-9);
+            expect(tilt(v)).toBeCloseTo(Math.atan((base / radius) * Math.tan(angle)), 6);
+        }
+        // Heights are spread evenly along the length.
+        expect(fraction(points, ({p}) => p.z < length / 2)).toBeCloseTo(0.5, 1);
+    });
+
+    it('keeps a near-flat volume continuous, following side lines past 89° as if at 89°', () => {
+        const reach = (angle: number) => {
+            const shape = new ConeEmitter({radius: 1, thickness: 0, angle, length: 1, emitFrom: 1});
+            return Math.max(...sample(shape, 400).map(({p}) => radial(p)));
+        };
+        const cap = 1 + 1 / Math.cos((89 * Math.PI) / 180);
+        for (const angle of [Math.PI / 2 - 1e-5, Math.PI / 2 - 1e-9, Math.PI / 2]) {
+            expect(reach(angle)).toBeLessThanOrEqual(cap + 1e-6);
+            expect(reach(angle)).toBeGreaterThan(cap * 0.95);
+        }
+        // Below 89° the cone keeps Unity's own geometry.
+        expect(reach(Math.PI / 4)).toBeCloseTo(2, 1);
+    });
+
+    it('reads a negative or non-finite length as 0', () => {
+        for (const length of [-3, NaN, Infinity]) {
+            const shape = new ConeEmitter({length, emitFrom: ConeEmitFrom.Volume});
+            for (const {p} of sample(shape, 50)) {
+                expect(p.z).toBe(0);
+                expect(Number.isFinite(p.x) && Number.isFinite(p.y)).toBe(true);
+            }
+        }
+    });
+
+    it('fills the volume in the shape transform, which scales the length too', () => {
+        const transform = new ShapeTransform();
+        transform.scale.set(1, 1, 3);
+        const shape = new ConeEmitter({radius: 1, angle: 0, length: 2, emitFrom: ConeEmitFrom.Volume, transform});
+        const points = sample(shape, 400);
+        for (const {p} of points) expect(p.z).toBeLessThanOrEqual(6 + 1e-9);
+        expect(Math.max(...points.map(({p}) => p.z))).toBeGreaterThan(5.5);
+    });
+});
+
+describe('GridEmitter sampling', () => {
+    const cells = (shape: GridEmitter, count: number) => sample(shape, count).map(({p}) => `${p.x},${p.y}`);
+
+    it('picks cells at random by default', () => {
+        expect(new GridEmitter().sampling).toBe(GridSampling.Random);
+    });
+
+    it('visits every cell in turn, row by row from -x, -y, then starts over', () => {
+        const shape = new GridEmitter({width: 2, height: 2, column: 2, row: 2, sampling: GridSampling.Sequential});
+        expect(cells(shape, 6)).toEqual(['-0.5,-0.5', '0.5,-0.5', '-0.5,0.5', '0.5,0.5', '-0.5,-0.5', '0.5,-0.5']);
+    });
+
+    it('puts one particle in every cell for a burst of row × column', () => {
+        const shape = new GridEmitter({width: 3, height: 4, column: 3, row: 4, sampling: GridSampling.Sequential});
+        expect(new Set(cells(shape, 12)).size).toBe(12);
+    });
+
+    it('starts over at the first cell on reset, and a clone at its own first cell', () => {
+        const shape = new GridEmitter({width: 2, height: 2, column: 2, row: 2, sampling: GridSampling.Sequential});
+        cells(shape, 3);
+        const copy = shape.clone() as GridEmitter;
+        shape.reset();
+        expect(cells(shape, 1)).toEqual(['-0.5,-0.5']);
+        expect(cells(copy, 1)).toEqual(['-0.5,-0.5']);
+    });
+
+    it('keeps its place when the grid shrinks under it', () => {
+        const shape = new GridEmitter({width: 2, height: 2, column: 2, row: 2, sampling: GridSampling.Sequential});
+        cells(shape, 3);
+        shape.column = 1;
+        shape.row = 1;
+        expect(cells(shape, 2)).toEqual(['0,0', '0,0']);
+    });
+});
+
 describe('the shape registry', () => {
     const nonDefault: Record<string, ShapeJSON> = {
         box: {type: 'box', width: 2, height: 3, depth: 4, emitFrom: 1, boxThickness: [0.1, 0.2, 0.3]},
         circle: {type: 'circle', radius: 2, arc: 1, thickness: 0.5, mode: 1, spread: 0.25},
-        cone: {type: 'cone', radius: 2, arc: 1, thickness: 0.5, angle: 0.4, mode: 2, spread: 0.25},
+        cone: {
+            type: 'cone',
+            radius: 2,
+            arc: 1,
+            thickness: 0.5,
+            angle: 0.4,
+            emitFrom: 1,
+            length: 3,
+            mode: 2,
+            spread: 0.25,
+        },
         donut: {type: 'donut', radius: 2, arc: 1, thickness: 0.5, donutRadius: 0.3, mode: 3, spread: 0.25},
         edge: {type: 'edge', radius: 2, mode: 1, spread: 0.25},
         point: {type: 'point'},
         sphere: {type: 'sphere', radius: 2, arc: 1, thickness: 0.5, mode: 1, spread: 0.25},
         hemisphere: {type: 'hemisphere', radius: 2, arc: 1, thickness: 0.5, mode: 1, spread: 0.25},
-        grid: {type: 'grid', width: 2, height: 3, column: 4, row: 5},
+        grid: {type: 'grid', width: 2, height: 3, column: 4, row: 5, sampling: 1},
         rectangle: {type: 'rectangle', width: 2, height: 3, thickness: 0.5, mode: 1, spread: 0.25},
     };
     const transform = new ShapeTransform();

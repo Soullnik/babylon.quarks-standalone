@@ -1,9 +1,12 @@
 import {
     BoxEmitFrom,
+    BoxEmitter,
     ColorOverLife,
+    ConeEmitFrom,
     ConeEmitter,
     EmitterMode,
     GridEmitter,
+    GridSampling,
     PointEmitter,
     SphereEmitter,
 } from 'babylon.quarks';
@@ -25,6 +28,7 @@ import {
     readShapeParams,
     SHAPE_PARAM_KEYS,
     SHAPE_TYPES,
+    ShapeParams,
     ShapeType,
 } from '../src/core/shapes';
 
@@ -120,5 +124,28 @@ describe('shapes', () => {
         const grid = createShape('grid', {...DEFAULT_SHAPE_PARAMS, column: 3, row: 2}) as GridEmitter;
         expect(grid.column).toBe(3);
         expect(grid.row).toBe(2);
+    });
+
+    it("keeps a cone's Emit from apart from a box's, and a grid's sampling", () => {
+        const params: ShapeParams = {
+            ...DEFAULT_SHAPE_PARAMS,
+            emitFrom: BoxEmitFrom.Shell,
+            coneEmitFrom: ConeEmitFrom.Volume,
+            length: 3,
+            sampling: GridSampling.Sequential,
+        };
+        const cone = createShape('cone', params) as ConeEmitter;
+        expect([cone.emitFrom, cone.length]).toEqual([ConeEmitFrom.Volume, 3]);
+        const box = createShape('box', params) as BoxEmitter;
+        expect(box.emitFrom).toBe(BoxEmitFrom.Shell);
+        expect(readShapeParams(cone)).toMatchObject({
+            coneEmitFrom: ConeEmitFrom.Volume,
+            emitFrom: DEFAULT_SHAPE_PARAMS.emitFrom,
+            length: 3,
+        });
+        expect(readShapeParams(box)).toMatchObject({emitFrom: BoxEmitFrom.Shell, coneEmitFrom: ConeEmitFrom.Base});
+        const grid = createShape('grid', params) as GridEmitter;
+        expect(grid.sampling).toBe(GridSampling.Sequential);
+        expect(readShapeParams(grid).sampling).toBe(GridSampling.Sequential);
     });
 });

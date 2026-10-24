@@ -287,7 +287,9 @@
               "type": "ConstantValue",
               "value": 1
             },
-            "angle": 0.43633232
+            "angle": 0.43633232,
+            "emitFrom": 1,
+            "length": 2
           },
           "startLife": {
             "type": "ConstantValue",

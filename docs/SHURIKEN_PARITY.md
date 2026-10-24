@@ -19,6 +19,8 @@ Three tiers: ✅ shipped · 🟡 runtime supports it, editor UI missing · 🔴 
 
 ## Shape
 - ✅ cone/sphere/hemisphere/circle/donut/rectangle/point/grid/mesh-surface with base params
+- ✅ cone tilt as Unity (`atan(r · tan(angle))`), Emit from Base / Volume with Length (`ConeEmitter.emitFrom`, `length`)
+- ✅ grid cells at random or in turn (`GridEmitter.sampling`, as Niagara's Grid Location)
 - ✅ emitter mode (random/loop/ping-pong/burst) + spread per shape
 - ✅ randomize direction (`ChangeEmitDirection`, angle generator)
 - 🟡 per-shape speed generator

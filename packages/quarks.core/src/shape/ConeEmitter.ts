@@ -8,8 +8,22 @@ import {
 import {EmissionState, IParticleSystem} from '../IParticleSystem';
 import {Particle} from '../Particle';
 import {shellRadius} from '../util/MathUtil';
+import {random} from '../util/random';
 import {EmitterMode, EmitterShape, getValueFromEmitterMode, ShapeJSON} from './EmitterUtil';
 import {ShapeTransform} from './ShapeTransform';
+
+/** The cosine of 89°: how far from the axis {@link ConeEmitFrom.Volume} follows a side line at most. */
+const MIN_VOLUME_COS = Math.cos((89 * Math.PI) / 180);
+
+/**
+ * Which part of a cone particles start from (Unity's Cone Emit from).
+ */
+export enum ConeEmitFrom {
+    /** The base disc, as Unity's Base. */
+    Base,
+    /** Anywhere along the cone, from the base out to {@link ConeEmitter.length}, as Unity's Volume. */
+    Volume,
+}
 
 /**
  * Interface representing the parameters for a cone emitter.
@@ -37,6 +51,16 @@ export interface ConeEmitterParameters {
      */
     angle?: number;
     /**
+     * Which part of the cone particles start from; {@link ConeEmitFrom.Base}, the default, for the
+     * base disc only.
+     */
+    emitFrom?: ConeEmitFrom;
+    /**
+     * Height of the cone along +z that {@link ConeEmitFrom.Volume} fills (Unity's Length); a
+     * negative or non-finite value is read as 0. Defaults to 5, as in Unity. The base ignores it.
+     */
+    length?: number;
+    /**
      * The mode of the emitter.
      * {@link EmitterMode}
      */
@@ -60,7 +84,10 @@ export interface ConeEmitterParameters {
 
 /**
  * Emits from a disc in the xy plane into a cone along +z (Unity's Cone shape): a particle at the
- * disc's rim heads out at the cone's angle, one at the centre straight along z.
+ * disc's rim heads out at the cone's angle, one at the centre straight along z, and one between
+ * them along the cone's side lines, tilted by atan(r · tan(angle)) at the fraction r of the radius.
+ * With {@link ConeEmitFrom.Volume}, particles start anywhere on those lines up to
+ * {@link ConeEmitter.length} along z.
  */
 export class ConeEmitter implements EmitterShape {
     /** Always `'cone'`. */
@@ -79,6 +106,14 @@ export class ConeEmitter implements EmitterShape {
      * π/2.
      */
     angle: number;
+    /** Which part of the cone particles start from, see {@link ConeEmitFrom}. */
+    emitFrom: ConeEmitFrom;
+    /**
+     * Height along +z of the volume {@link ConeEmitFrom.Volume} fills; read as 0 when negative or
+     * not finite. Side lines steeper than 89° from the axis are followed as if at 89°, so a cone
+     * opened to 90° fills out to about 57 times the length past the rim, not infinitely far.
+     */
+    length: number;
     /** How the start point moves along the arc, see {@link EmitterMode}. */
     mode: EmitterMode;
     /**
@@ -107,6 +142,8 @@ export class ConeEmitter implements EmitterShape {
         this.arc = parameters.arc ?? 2.0 * Math.PI;
         this.thickness = parameters.thickness ?? 1;
         this.angle = parameters.angle ?? Math.PI / 6;
+        this.emitFrom = parameters.emitFrom ?? ConeEmitFrom.Base;
+        this.length = parameters.length ?? 5;
         this.mode = parameters.mode ?? EmitterMode.Random;
         this.spread = parameters.spread ?? 0;
         this.speed = parameters.speed ?? new ConstantValue(1);
@@ -134,15 +171,26 @@ export class ConeEmitter implements EmitterShape {
         p.position.y = r * sinTheta;
         p.position.z = 0;
 
-        // Unity's cone opens between 0 and 90 degrees.
-        const angle = Math.min(Math.max(this.angle, 0), Math.PI / 2) * r;
-        // The direction tilts from +z toward the point by the angle; normalised, since the point is
-        // inside the unit disc and the tilt alone would slow particles away from the rim.
-        p.velocity
-            .set(0, 0, Math.cos(angle))
-            .addScaledVector(p.position, r > 0 ? Math.sin(angle) / r : 0)
-            .multiplyScalar(p.startSpeed);
+        // Unity's cone opens between 0 and 90 degrees. A particle at the fraction r of the radius
+        // follows the line from the base out to the same fraction of the far rim, so it tilts by
+        // atan(r · tan(angle)): the rim by the full angle, the centre not at all.
+        const angle = Math.min(Math.max(this.angle, 0), Math.PI / 2);
+        const tilt = r > 0 ? Math.atan(r * Math.tan(angle)) : 0;
+        const sinTilt = Math.sin(tilt);
+        const cosTilt = Math.cos(tilt);
+        p.velocity.set(sinTilt * cosTheta, sinTilt * sinTheta, cosTilt).multiplyScalar(p.startSpeed);
         p.position.multiplyScalar(Math.max(0, this.radius));
+        if (this.emitFrom === ConeEmitFrom.Volume) {
+            // Up the side line to a random height. A side line steeper than 89° from the axis is
+            // followed as if at 89°, so a cone opened to 90° reaches a finite way out instead of
+            // jumping to infinity.
+            const length = Number.isFinite(this.length) ? Math.max(0, this.length) : 0;
+            const height = random() * length;
+            const distance = height / Math.max(cosTilt, MIN_VOLUME_COS);
+            p.position.x += sinTilt * cosTheta * distance;
+            p.position.y += sinTilt * sinTheta * distance;
+            p.position.z = cosTilt * distance;
+        }
         this.transform?.apply(p);
     }
 
@@ -154,6 +202,8 @@ export class ConeEmitter implements EmitterShape {
             arc: this.arc,
             thickness: this.thickness,
             angle: this.angle,
+            emitFrom: this.emitFrom,
+            length: this.length,
             mode: this.mode,
             spread: this.spread,
             speed: this.speed.toJSON(),
@@ -168,6 +218,8 @@ export class ConeEmitter implements EmitterShape {
             arc: json.arc,
             thickness: json.thickness,
             angle: json.angle,
+            emitFrom: json.emitFrom,
+            length: json.length,
             mode: json.mode,
             speed: json.speed ? ValueGeneratorFromJSON(json.speed) : undefined,
             transform: ShapeTransform.fromJSON(json.transform),
@@ -182,6 +234,8 @@ export class ConeEmitter implements EmitterShape {
             arc: this.arc,
             thickness: this.thickness,
             angle: this.angle,
+            emitFrom: this.emitFrom,
+            length: this.length,
             mode: this.mode,
             speed: this.speed.clone(),
             transform: this.transform?.clone(),

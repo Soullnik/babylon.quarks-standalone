@@ -30,14 +30,21 @@ export interface ShapeJSON {
     height?: number;
     /** Depth of a box. */
     depth?: number;
-    /** Where a box emits from (its volume, shell or edges), a `BoxEmitFrom` value. */
+    /**
+     * Where a box emits from (its volume, shell or edges), a `BoxEmitFrom` value; where a cone
+     * does (its base or volume), a `ConeEmitFrom` value.
+     */
     emitFrom?: number;
+    /** Height of the volume a cone emits from with `ConeEmitFrom.Volume`. */
+    length?: number;
     /** Thickness of a box's shell along x, y and z. */
     boxThickness?: number[];
     /** Columns of a grid. */
     column?: number;
     /** Rows of a grid. */
     row?: number;
+    /** How a grid picks its cells, a `GridSampling` value. */
+    sampling?: number;
     /** Uuid of the mesh a mesh-surface shape emits from. */
     mesh?: string;
     /** The {@link EmitterMode} of the shape's arc. */

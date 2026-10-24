@@ -6,6 +6,7 @@ import {MeshBuilder} from '@babylonjs/core/Meshes/meshBuilder.js';
 import {TransformNode} from '@babylonjs/core/Meshes/transformNode.js';
 import type {Scene} from '@babylonjs/core/scene.js';
 import type {ParticleSystem} from 'babylon.quarks';
+import {ConeEmitFrom} from 'babylon.quarks';
 import {EDITOR_SCENE_NODE_METADATA} from './editorScene.js';
 import './lineShaders.js';
 import {getShapeType, readShapeParams} from './shapes.js';
@@ -120,8 +121,16 @@ function buildEmitterWireframe(system: ParticleSystem, scene: Scene): Mesh[] {
                 lines('wf-cone-spoke-b', [Vector3.Zero(), arcPoint(radius, arc)]);
             }
 
-            const preview = Math.max(radius * 2, 1.25);
-            const farRadius = radius + preview * Math.tan(angle);
+            // Emit from Volume draws the volume itself, out to its length; the base a stretch of the
+            // directions.
+            const preview =
+                params.coneEmitFrom === ConeEmitFrom.Volume
+                    ? Math.max(Number.isFinite(params.length) ? params.length : 0, 0.001)
+                    : Math.max(radius * 2, 1.25);
+            // The rays and the far rim end at the same point, which a near-flat cone keeps in view.
+            const travel = preview / Math.max(Math.cos(angle), 0.05);
+            const farRadius = radius + Math.sin(angle) * travel;
+            const farZ = Math.cos(angle) * travel;
             const spokeCount = Math.max(4, Math.ceil((arc / (Math.PI * 2)) * 12));
             for (let i = 0; i <= spokeCount; i++) {
                 const theta = (i / spokeCount) * arc;
@@ -131,10 +140,9 @@ function buildEmitterWireframe(system: ParticleSystem, scene: Scene): Mesh[] {
                     Math.sin(angle) * Math.sin(theta),
                     Math.cos(angle)
                 );
-                const travel = preview / Math.max(Math.cos(angle), 0.05);
                 lines(`wf-cone-ray-${i}`, [rim, rim.add(dir.scale(travel))], DIRECTION_COLOR);
             }
-            lines('wf-cone-far', xyArc(farRadius, arc, 32, preview), DIRECTION_COLOR);
+            lines('wf-cone-far', xyArc(farRadius, arc, 32, farZ), DIRECTION_COLOR);
             break;
         }
         case 'sphere': {
