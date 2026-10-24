@@ -20,17 +20,34 @@ import type { ValueGenerator } from 'babylon.quarks';
 import type { Vector3Generator } from 'babylon.quarks';
 
 // @public
+export type AnyGenerator = ScalarGenerator | Vector3Generator | RotationGenerator;
+
+// @public
+export type AssetDragPayload = {
+    kind: 'asset';
+    id: number;
+} | {
+    kind: 'folder';
+    path: string;
+};
+
+// @public
+export interface AssetLoadProgress {
+    done: number;
+    failed: number;
+    loaded: number;
+    total: number;
+}
+
+// @public
 export function AssetsPanel(props: AssetsPanelProps): React_2.ReactElement;
 
 // @public
 export interface AssetsPanelProps {
-    // Warning: (ae-forgotten-export) The symbol "EffectAsset" needs to be exported by the entry point index.d.ts
     assets: EffectAsset[];
     folderInputRef: React_2.RefObject<HTMLInputElement | null>;
     instanceCounts: ReadonlyMap<number, number>;
-    // Warning: (ae-forgotten-export) The symbol "AssetLoadProgress" needs to be exported by the entry point index.d.ts
     loading: AssetLoadProgress | null;
-    // Warning: (ae-forgotten-export) The symbol "AssetDragPayload" needs to be exported by the entry point index.d.ts
     onAddToScene: (payload: AssetDragPayload) => void;
     onDelete: (payload: AssetDragPayload) => void;
     onImportFiles: (files: FileList | File[]) => void;
@@ -78,8 +95,6 @@ export function ColorBySpeedModule(input: ModuleProps): React_2.JSX.Element;
 // @public
 export function ColorOverLifeModule(input: ModuleProps): React_2.JSX.Element;
 
-// Warning: (ae-forgotten-export) The symbol "ValueFieldBaseProps" needs to be exported by the entry point index.d.ts
-//
 // @public
 export interface ConstantValueFieldProps extends ValueFieldBaseProps {
     curve: false;
@@ -113,17 +128,24 @@ export function CurveEditor(props: {
 }): JSX.Element;
 
 // @public
+export interface CurvePiece {
+    p: [number, number, number, number];
+    start: number;
+}
+
+// @public
 export interface CurveValueFieldProps extends ValueFieldBaseProps {
     curve?: true;
-    // Warning: (ae-forgotten-export) The symbol "ScalarGenerator" needs to be exported by the entry point index.d.ts
     onChange: (generator: ScalarGenerator) => void;
 }
+
+// @public
+export type EditorListener = () => void;
 
 // @public
 export interface EditorProject {
     id: string;
     name: string;
-    // Warning: (ae-forgotten-export) The symbol "ProjectStore" needs to be exported by the entry point index.d.ts
     store: ProjectStore;
 }
 
@@ -138,6 +160,34 @@ export interface EditorWorkspaceProps extends Omit<EffectEditorHostProps, 'proje
 }
 
 // @public
+export interface EffectAsset {
+    id: number;
+    json: unknown;
+    missingFiles: string[];
+    name: string;
+    path: string;
+}
+
+// @public
+export class EffectBinding {
+    constructor(system: ParticleSystem, subSystems?: ParticleSystem[], root?: TransformNode);
+    addSubSystem(sub: ParticleSystem): void;
+    apply(mutate: (system: ParticleSystem) => void): void;
+    exportJSON(name?: string): string;
+    getRevision(): number;
+    getTree(): EffectTreeNode;
+    markChanged(): void;
+    onBeforeChange?: () => void;
+    promoteToMain(next: ParticleSystem): void;
+    removeSubSystem(sub: ParticleSystem): void;
+    restart(): void;
+    readonly root: TransformNode;
+    subscribe(listener: EditorListener): () => void;
+    readonly subSystems: ParticleSystem[];
+    system: ParticleSystem;
+}
+
+// @public
 export const EffectEditor: React_2.MemoExoticComponent<(props: EffectEditorProps) => React_2.JSX.Element>;
 
 // @public
@@ -145,10 +195,8 @@ export function EffectEditorHost(props: EffectEditorHostProps): React_2.ReactEle
 
 // @public
 export interface EffectEditorHostHandle {
-    // Warning: (ae-forgotten-export) The symbol "EffectBinding" needs to be exported by the entry point index.d.ts
     binding: EffectBinding;
     exportJson: () => string;
-    // Warning: (ae-forgotten-export) The symbol "EffectHistory" needs to be exported by the entry point index.d.ts
     history: EffectHistory;
     importAssets: (files: FileList | File[]) => Promise<void>;
     // @deprecated (undocumented)
@@ -187,6 +235,28 @@ export interface EffectEditorProps {
     resolveTexture?: (url: string) => Texture | null | undefined;
     selectedSystem: ParticleSystem;
     textureOptions?: TextureOption[];
+}
+
+// @public
+export class EffectHistory {
+    attach(binding: EffectBinding): void;
+    get canRedo(): boolean;
+    get canUndo(): boolean;
+    capture(): void;
+    clear(): void;
+    redo(): unknown | null;
+    restoreStacks(stacks: HistoryStacks | undefined): void;
+    saveStacks(): HistoryStacks;
+    undo(): unknown | null;
+}
+
+// @public
+export interface EffectTreeNode {
+    children: EffectTreeNode[];
+    depth: number;
+    name: string;
+    node: TransformNode;
+    system?: ParticleSystem;
 }
 
 // @public
@@ -230,7 +300,22 @@ export function GradientEditor(props: {
 }): JSX.Element;
 
 // @public
+export interface GradientStop {
+    a: number;
+    b: number;
+    g: number;
+    pos: number;
+    r: number;
+}
+
+// @public
 export function GravityModule(input: ModuleProps): React_2.JSX.Element;
+
+// @public
+export interface HistoryStacks {
+    redo: string[];
+    undo: string[];
+}
 
 // @public
 export const inputStyle: CSSProperties;
@@ -298,6 +383,16 @@ export interface PlaybackState {
 }
 
 // @public
+export interface ProjectMeta {
+    assetCount: number;
+    createdAt: number;
+    id: string;
+    name: string;
+    sizeBytes: number;
+    updatedAt: number;
+}
+
+// @public
 export function ProjectsPage(props: ProjectsPageProps): React_2.ReactElement;
 
 // @public
@@ -306,10 +401,26 @@ export interface ProjectsPageProps {
         href: string;
         label: string;
     };
-    // Warning: (ae-forgotten-export) The symbol "ProjectMeta" needs to be exported by the entry point index.d.ts
     onOpen: (project: ProjectMeta) => void;
     store: ProjectStore;
     title?: string;
+}
+
+// @public
+export interface ProjectStore {
+    createProject(name: string): Promise<ProjectMeta>;
+    deleteAssets(projectId: string, paths: string[]): Promise<void>;
+    deleteProject(id: string): Promise<void>;
+    duplicateProject(id: string, name: string): Promise<ProjectMeta>;
+    estimate(): Promise<StorageEstimate_2>;
+    getProject(id: string): Promise<ProjectMeta | null>;
+    listProjects(): Promise<ProjectMeta[]>;
+    loadAssets(projectId: string): Promise<StoredAsset[]>;
+    loadScene(projectId: string): Promise<StoredScene | null>;
+    putAssets(projectId: string, assets: StoredAsset[]): Promise<void>;
+    renameProject(id: string, name: string): Promise<void>;
+    requestPersistence(): Promise<boolean>;
+    saveScene(projectId: string, scene: StoredScene): Promise<void>;
 }
 
 // @public
@@ -370,11 +481,22 @@ export function Row(props: {
 export const rowStyle: CSSProperties;
 
 // @public
+export type ScalarGenerator = ValueGenerator | FunctionValueGenerator;
+
+// @public
+export interface SceneEntry {
+    assetId: number | null;
+    name: string;
+    path: string;
+    root: TransformNode;
+    systems: ParticleSystem[];
+}
+
+// @public
 export function ScenePanel(props: ScenePanelProps): React_2.ReactElement;
 
 // @public
 export interface ScenePanelProps {
-    // Warning: (ae-forgotten-export) The symbol "SceneEntry" needs to be exported by the entry point index.d.ts
     entries: SceneEntry[];
     focusedRoot: TransformNode | null;
     onCreateDefault: () => void;
@@ -410,6 +532,36 @@ export function SizeOverLifeModule(input: ModuleProps): React_2.JSX.Element;
 
 // @public
 export function SpeedOverLifeModule(input: ModuleProps): React_2.JSX.Element;
+
+// @public
+interface StorageEstimate_2 {
+    persisted: boolean;
+    quota: number | null;
+    usage: number | null;
+}
+export { StorageEstimate_2 as StorageEstimate }
+
+// @public
+export interface StoredAsset {
+    json: unknown;
+    missingFiles: string[];
+    name: string;
+    path: string;
+}
+
+// @public
+export interface StoredScene {
+    entries: StoredSceneEntry[];
+    savedAt: number;
+}
+
+// @public
+export interface StoredSceneEntry {
+    assetPath: string | null;
+    json: unknown;
+    name: string;
+    visible: boolean;
+}
 
 // @public
 export function SubEmittersModule(props: {
@@ -462,6 +614,14 @@ export const theme: {
 };
 
 // @public
+export interface TimelineGroupRow {
+    depth: number;
+    kind: 'group';
+    name: string;
+    node: TransformNode;
+}
+
+// @public
 export function TimelinePanel(props: TimelinePanelProps): React_2.ReactElement;
 
 // @public
@@ -484,6 +644,24 @@ export interface TimelinePanelProps {
 }
 
 // @public
+export type TimelineRow = TimelineGroupRow | TimelineSystemRow;
+
+// @public
+export interface TimelineSystemRow {
+    depth: number;
+    duration: number;
+    isRoot: boolean;
+    kind: 'track';
+    looping: boolean;
+    name: string;
+    node: TransformNode;
+    removable: boolean;
+    startOffset: number;
+    startOffsetVariable: boolean;
+    system: ParticleSystem;
+}
+
+// @public
 export function TimelineTrackRow(props: TimelineTrackRowProps): React_2.ReactElement;
 
 // @public
@@ -498,7 +676,6 @@ export interface TimelineTrackRowProps {
     onToggleGroupSelect: () => void;
     onToggleVisible?: () => void;
     pxPerSecond: number;
-    // Warning: (ae-forgotten-export) The symbol "TimelineRow" needs to be exported by the entry point index.d.ts
     row: TimelineRow;
     selected: boolean;
 }
@@ -527,12 +704,17 @@ export function TurbulenceModule(input: ModuleProps): React_2.JSX.Element;
 export function ValueField(props: CurveValueFieldProps | ConstantValueFieldProps): React_2.ReactElement;
 
 // @public
-export function WidthOverTrailModule(input: ModuleProps): React_2.JSX.Element;
+export interface ValueFieldBaseProps {
+    curveMax?: number;
+    generator: AnyGenerator | undefined;
+    hint?: string;
+    hintKey?: string;
+    label: string;
+    min?: number;
+}
 
-// Warnings were encountered during analysis:
-//
-// dist/react/CurveEditor.d.ts:8:5 - (ae-forgotten-export) The symbol "CurvePiece" needs to be exported by the entry point index.d.ts
-// dist/react/GradientEditor.d.ts:4:5 - (ae-forgotten-export) The symbol "GradientStop" needs to be exported by the entry point index.d.ts
+// @public
+export function WidthOverTrailModule(input: ModuleProps): React_2.JSX.Element;
 
 // (No @packageDocumentation comment for this package)
 

@@ -17,7 +17,7 @@ import {NumberField, Row, SelectField} from './fields.js';
 const captionStyle: React.CSSProperties = {fontSize: 10.5, opacity: 0.6, flex: 'none'};
 
 /** Props every {@link ValueField} takes. */
-interface ValueFieldBaseProps {
+export interface ValueFieldBaseProps {
     /** The row's label. */
     label: string;
     /** Tooltip text of the label. */

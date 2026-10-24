@@ -13,7 +13,10 @@ import {fileURLToPath} from 'node:url';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const update = process.argv.includes('--update');
 
-/** Every entry point a package exports, by report name and built declaration file. */
+/**
+ * Every entry point a package exports, by report name and built declaration file. babylon.quarks's
+ * `require` types (`index.d.cts`) are the same bundle rollup writes to `index.d.ts`.
+ */
 const ENTRIES = [
     {pkg: 'quarks.core', name: 'quarks.core', types: 'dist/types/index.d.ts'},
     {pkg: 'babylon.quarks', name: 'babylon.quarks', types: 'dist/types/index.d.ts'},
@@ -45,6 +48,7 @@ for (const entry of ENTRIES) {
                 reportFolder: path.join(dir, 'api'),
                 reportTempFolder: path.join(root, 'node_modules/.cache/api-report'),
             },
+            newlineKind: 'lf',
             docModel: {enabled: false},
             dtsRollup: {enabled: false},
             tsdocMetadata: {enabled: false},

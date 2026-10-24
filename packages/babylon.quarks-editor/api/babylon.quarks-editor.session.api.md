@@ -15,6 +15,23 @@ import type { Texture } from '@babylonjs/core/Materials/Textures/texture.js';
 import { TransformNode } from '@babylonjs/core/Meshes/transformNode.js';
 
 // @public
+export type AssetDragPayload = {
+    kind: 'asset';
+    id: number;
+} | {
+    kind: 'folder';
+    path: string;
+};
+
+// @public
+export interface AssetLoadProgress {
+    done: number;
+    failed: number;
+    loaded: number;
+    total: number;
+}
+
+// @public
 export function createEditorSession(options: EditorSessionOptions): EditorSession;
 
 // @public
@@ -24,20 +41,19 @@ export interface EditorFrameStats {
 }
 
 // @public
+export type EditorListener = () => void;
+
+// @public
 export interface EditorProject {
     id: string;
     name: string;
-    // Warning: (ae-forgotten-export) The symbol "ProjectStore" needs to be exported by the entry point session.d.ts
     store: ProjectStore;
 }
 
 // @public
 export interface EditorSession {
-    // Warning: (ae-forgotten-export) The symbol "AssetDragPayload" needs to be exported by the entry point session.d.ts
     addToScene(payload: AssetDragPayload): void;
-    // Warning: (ae-forgotten-export) The symbol "EffectAsset" needs to be exported by the entry point session.d.ts
     readonly assets: EffectAsset[];
-    // Warning: (ae-forgotten-export) The symbol "EffectBinding" needs to be exported by the entry point session.d.ts
     readonly binding: EffectBinding | null;
     readonly camera: ArcRotateCamera;
     clearDropPreview(): void;
@@ -52,7 +68,6 @@ export interface EditorSession {
     readonly gizmoManager: GizmoManager;
     readonly ground: Mesh;
     hideDropPreview(): void;
-    // Warning: (ae-forgotten-export) The symbol "EffectHistory" needs to be exported by the entry point session.d.ts
     readonly history: EffectHistory;
     historyStep(redo: boolean): void;
     importAssets(files: FileList | File[]): Promise<void>;
@@ -69,7 +84,6 @@ export interface EditorSession {
     savePrefabAsNew(path: string): void;
     saveScene(): Promise<boolean>;
     readonly scene: Scene;
-    // Warning: (ae-forgotten-export) The symbol "SceneEntry" needs to be exported by the entry point session.d.ts
     readonly sceneEntries: SceneEntry[];
     setEmitterWireframesVisible(visible: boolean): void;
     start(): void;
@@ -86,7 +100,6 @@ export interface EditorSessionOptions {
     engine: AbstractEngine;
     getSelectedNode?: () => TransformNode | null;
     isAssetDragActive?: () => boolean;
-    // Warning: (ae-forgotten-export) The symbol "PlaybackState" needs to be exported by the entry point session.d.ts
     playback: PlaybackState;
     project?: EditorProject;
     resolveTexture?: (url: string, scene: Scene) => Texture | null | undefined;
@@ -96,7 +109,6 @@ export interface EditorSessionOptions {
 // @public
 export interface EditorSessionView {
     assetsChanged(assets: EffectAsset[]): void;
-    // Warning: (ae-forgotten-export) The symbol "AssetLoadProgress" needs to be exported by the entry point session.d.ts
     assetsLoadingChanged(progress: AssetLoadProgress | null): void;
     assetsRevealed(): void;
     bindingChanged(binding: EffectBinding | null): void;
@@ -125,6 +137,34 @@ export interface EditorSessionView {
 }
 
 // @public
+export interface EffectAsset {
+    id: number;
+    json: unknown;
+    missingFiles: string[];
+    name: string;
+    path: string;
+}
+
+// @public
+export class EffectBinding {
+    constructor(system: ParticleSystem, subSystems?: ParticleSystem[], root?: TransformNode);
+    addSubSystem(sub: ParticleSystem): void;
+    apply(mutate: (system: ParticleSystem) => void): void;
+    exportJSON(name?: string): string;
+    getRevision(): number;
+    getTree(): EffectTreeNode;
+    markChanged(): void;
+    onBeforeChange?: () => void;
+    promoteToMain(next: ParticleSystem): void;
+    removeSubSystem(sub: ParticleSystem): void;
+    restart(): void;
+    readonly root: TransformNode;
+    subscribe(listener: EditorListener): () => void;
+    readonly subSystems: ParticleSystem[];
+    system: ParticleSystem;
+}
+
+// @public
 export interface EffectEditorHostHandle {
     binding: EffectBinding;
     exportJson: () => string;
@@ -138,9 +178,114 @@ export interface EffectEditorHostHandle {
 }
 
 // @public
+export class EffectHistory {
+    attach(binding: EffectBinding): void;
+    get canRedo(): boolean;
+    get canUndo(): boolean;
+    capture(): void;
+    clear(): void;
+    redo(): unknown | null;
+    restoreStacks(stacks: HistoryStacks | undefined): void;
+    saveStacks(): HistoryStacks;
+    undo(): unknown | null;
+}
+
+// @public
+export interface EffectTreeNode {
+    children: EffectTreeNode[];
+    depth: number;
+    name: string;
+    node: TransformNode;
+    system?: ParticleSystem;
+}
+
+// @public
+export interface HistoryStacks {
+    redo: string[];
+    undo: string[];
+}
+
+// @public
+export interface PlaybackState {
+    focusElapsedByRoot: Map<number, number>;
+    focusFinishedByRoot: Set<number>;
+    focusRootId: number | null;
+    scrubbing: boolean;
+    speed: number;
+    stagePlaying: boolean;
+    stepQueued: boolean;
+}
+
+// @public
 export interface PrefabInfo {
     name: string;
     path: string;
+}
+
+// @public
+export interface ProjectMeta {
+    assetCount: number;
+    createdAt: number;
+    id: string;
+    name: string;
+    sizeBytes: number;
+    updatedAt: number;
+}
+
+// @public
+export interface ProjectStore {
+    createProject(name: string): Promise<ProjectMeta>;
+    deleteAssets(projectId: string, paths: string[]): Promise<void>;
+    deleteProject(id: string): Promise<void>;
+    duplicateProject(id: string, name: string): Promise<ProjectMeta>;
+    estimate(): Promise<StorageEstimate_2>;
+    getProject(id: string): Promise<ProjectMeta | null>;
+    listProjects(): Promise<ProjectMeta[]>;
+    loadAssets(projectId: string): Promise<StoredAsset[]>;
+    loadScene(projectId: string): Promise<StoredScene | null>;
+    putAssets(projectId: string, assets: StoredAsset[]): Promise<void>;
+    renameProject(id: string, name: string): Promise<void>;
+    requestPersistence(): Promise<boolean>;
+    saveScene(projectId: string, scene: StoredScene): Promise<void>;
+}
+
+// @public
+export interface SceneEntry {
+    assetId: number | null;
+    name: string;
+    path: string;
+    root: TransformNode;
+    systems: ParticleSystem[];
+}
+
+// @public
+interface StorageEstimate_2 {
+    persisted: boolean;
+    quota: number | null;
+    usage: number | null;
+}
+export { StorageEstimate_2 as StorageEstimate }
+
+// @public
+export interface StoredAsset {
+    json: unknown;
+    missingFiles: string[];
+    name: string;
+    path: string;
+}
+
+// @public
+export interface StoredScene {
+    entries: StoredSceneEntry[];
+    savedAt: number;
+}
+
+// @public
+export interface StoredSceneEntry {
+    assetPath: string | null;
+    json: unknown;
+    name: string;
+    visible: boolean;
 }
 
 ```

@@ -115,7 +115,8 @@ and CI, fails when the build's API differs from the committed report, so every c
 public surface shows in review as a diff of the report. After an intended change, run
 `npm run build && npm run build:editor && npm run api` and commit the reports with it. A type the
 API reaches but no entry point exports is listed in the report as `ae-forgotten-export`; export
-it, or keep it out of the public signature.
+it, or keep it out of the public signature. The reports list `@internal` members too, marked as
+such, so a change to one also needs `npm run api`; they are still no promise to users.
 
 ## Commit and PR conventions
 
