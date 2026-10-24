@@ -3,7 +3,7 @@
     "version": 4.5,
     "type": "Object3D",
     "generator": "babylon.quarks Unity exporter {version}",
-    "quarksFormat": 1
+    "quarksFormat": 2
   },
   "geometries": [],
   "materials": [
@@ -343,7 +343,6 @@
           "transparent": true,
           "depthWrite": false,
           "worldSpace": false,
-          "scalingMode": "hierarchy",
           "behaviors": []
         }
       },
@@ -446,7 +445,6 @@
           "transparent": true,
           "depthWrite": false,
           "worldSpace": false,
-          "scalingMode": "hierarchy",
           "behaviors": []
         }
       },
@@ -549,7 +547,6 @@
           "transparent": true,
           "depthWrite": false,
           "worldSpace": false,
-          "scalingMode": "hierarchy",
           "behaviors": []
         }
       },
@@ -652,7 +649,6 @@
           "transparent": true,
           "depthWrite": false,
           "worldSpace": false,
-          "scalingMode": "hierarchy",
           "behaviors": []
         }
       },
@@ -755,7 +751,6 @@
           "transparent": false,
           "depthWrite": true,
           "worldSpace": false,
-          "scalingMode": "hierarchy",
           "behaviors": []
         }
       },
@@ -858,7 +853,6 @@
           "transparent": true,
           "depthWrite": false,
           "worldSpace": false,
-          "scalingMode": "hierarchy",
           "behaviors": []
         }
       },
@@ -961,7 +955,6 @@
           "transparent": true,
           "depthWrite": false,
           "worldSpace": false,
-          "scalingMode": "hierarchy",
           "behaviors": []
         }
       },
@@ -1064,7 +1057,6 @@
           "transparent": true,
           "depthWrite": false,
           "worldSpace": false,
-          "scalingMode": "hierarchy",
           "behaviors": []
         }
       },
@@ -1167,7 +1159,6 @@
           "transparent": true,
           "depthWrite": false,
           "worldSpace": false,
-          "scalingMode": "hierarchy",
           "behaviors": []
         }
       },
@@ -1270,7 +1261,6 @@
           "transparent": true,
           "depthWrite": false,
           "worldSpace": false,
-          "scalingMode": "hierarchy",
           "behaviors": []
         }
       },
@@ -1373,7 +1363,6 @@
           "transparent": false,
           "depthWrite": true,
           "worldSpace": false,
-          "scalingMode": "hierarchy",
           "behaviors": []
         }
       },
@@ -1477,7 +1466,6 @@
           "depthWrite": true,
           "worldSpace": false,
           "alphaTest": 0.4,
-          "scalingMode": "hierarchy",
           "behaviors": []
         }
       },
@@ -1580,7 +1568,6 @@
           "transparent": true,
           "depthWrite": false,
           "worldSpace": false,
-          "scalingMode": "hierarchy",
           "behaviors": []
         }
       },
@@ -1683,7 +1670,6 @@
           "transparent": true,
           "depthWrite": false,
           "worldSpace": false,
-          "scalingMode": "hierarchy",
           "behaviors": []
         }
       },
@@ -1786,7 +1772,6 @@
           "transparent": true,
           "depthWrite": false,
           "worldSpace": false,
-          "scalingMode": "hierarchy",
           "behaviors": []
         }
       },
@@ -1889,7 +1874,6 @@
           "transparent": true,
           "depthWrite": false,
           "worldSpace": false,
-          "scalingMode": "hierarchy",
           "behaviors": []
         }
       },
@@ -1992,7 +1976,6 @@
           "transparent": true,
           "depthWrite": false,
           "worldSpace": false,
-          "scalingMode": "hierarchy",
           "behaviors": []
         }
       },
@@ -2095,7 +2078,6 @@
           "transparent": true,
           "depthWrite": false,
           "worldSpace": false,
-          "scalingMode": "hierarchy",
           "behaviors": []
         }
       }

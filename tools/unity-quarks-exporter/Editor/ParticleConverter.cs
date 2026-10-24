@@ -747,11 +747,8 @@ namespace BabylonQuarks.UnityExporter
         }
 
         /// <summary>
-        /// Unity's Scaling Mode. Hierarchy and babylon.quarks' 'hierarchy' both scale the whole
-        /// effect, particles and motion, with the emitter's world scale. Local is the same with
-        /// only the system's own scale, so it is exported as 'hierarchy' and warns when a parent
-        /// is scaled. Shape scales only the emission shape; babylon.quarks' 'shape' scales the
-        /// particles' size too, so a scaled Shape system warns.
+        /// Unity's Scaling Mode, which babylon.quarks has under the same names; Local, the default
+        /// in both, is left out.
         /// </summary>
         private static void AddScalingMode(ParticleSystem ps, ParticleSystem.MainModule main, JObject obj)
         {
@@ -760,26 +757,8 @@ namespace BabylonQuarks.UnityExporter
                 case ParticleSystemScalingMode.Hierarchy:
                     obj.Set("scalingMode", "hierarchy");
                     break;
-                case ParticleSystemScalingMode.Local:
-                    obj.Set("scalingMode", "hierarchy");
-                    for (Transform parent = ps.transform.parent; parent != null; parent = parent.parent)
-                    {
-                        if (parent.localScale != Vector3.one)
-                        {
-                            Debug.LogWarning($"[Quarks Exporter] '{ps.name}': Scaling Mode Local ignores the scale of '{parent.name}'; babylon.quarks applies it, as Unity's Hierarchy mode does.");
-                            break;
-                        }
-                    }
-                    break;
                 case ParticleSystemScalingMode.Shape:
-                    for (Transform t = ps.transform; t != null; t = t.parent)
-                    {
-                        if (t.localScale != Vector3.one)
-                        {
-                            Debug.LogWarning($"[Quarks Exporter] '{ps.name}': Scaling Mode Shape scales only the shape in Unity; babylon.quarks also scales the particles by the scale of '{t.name}'.");
-                            break;
-                        }
-                    }
+                    obj.Set("scalingMode", "shape");
                     break;
             }
         }

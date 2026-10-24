@@ -263,18 +263,17 @@ export function MainModule({binding}: ModuleProps) {
             <Row label="World space">
                 <CheckboxField value={system.worldSpace} onChange={(v) => binding.apply((s) => (s.worldSpace = v))} />
             </Row>
-            {system.worldSpace && (
-                <Row label="Scaling mode">
-                    <SelectField<ScalingMode>
-                        value={system.scalingMode}
-                        options={[
-                            {value: 'shape', label: 'Shape (sizes and shape only)'},
-                            {value: 'hierarchy', label: 'Hierarchy (motion scales too)'},
-                        ]}
-                        onChange={(mode) => binding.apply((s) => (s.scalingMode = mode))}
-                    />
-                </Row>
-            )}
+            <Row label="Scaling mode">
+                <SelectField<ScalingMode>
+                    value={system.scalingMode}
+                    options={[
+                        {value: 'local', label: 'Local (own scale only)'},
+                        {value: 'hierarchy', label: 'Hierarchy (parents too)'},
+                        {value: 'shape', label: 'Shape (shape only)'},
+                    ]}
+                    onChange={(mode) => binding.apply((s) => (s.scalingMode = mode))}
+                />
+            </Row>
             <Row label="Prewarm">
                 <CheckboxField value={system.prewarm} onChange={(v) => binding.apply((s) => (s.prewarm = v))} />
             </Row>
