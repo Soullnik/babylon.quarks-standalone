@@ -183,6 +183,11 @@ QuarksUtil.play(effect);
 
 See the [examples app](https://github.com/Soullnik/babylon.quarks-standalone/tree/main/examples) in the monorepo for 24 interactive demos and usage patterns.
 
+## Custom behaviors and shapes
+
+Write your own behaviors and emitter shapes, and register them with `loadPlugin` so effect files
+can save and load them: see [Extending babylon.quarks](https://github.com/Soullnik/babylon.quarks-standalone/blob/main/docs/EXTENDING.md).
+
 ## Links
 
 - [API documentation](https://soullnik.github.io/babylon.quarks-standalone/docs/)

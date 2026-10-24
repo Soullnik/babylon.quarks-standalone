@@ -1,4 +1,4 @@
-import {Behavior, FusionStep, planBehaviorFusion} from 'quarks.core';
+import {Behavior, FusionStep, planBehaviorFusion, stockBehaviorType} from 'quarks.core';
 
 /** Built-in behaviors that write a particle's size / colour, and those that touch neither. */
 const SIZE_BEHAVIORS = new Set(['SizeOverLife', 'SizeBySpeed']);
@@ -67,8 +67,13 @@ export class BehaviorPlan {
         let changesSize = false;
         let changesColor = false;
         for (let i = 0; i < behaviors.length; i++) {
-            const type = behaviors[i].type;
-            if (SIZE_BEHAVIORS.has(type)) {
+            // Only a built-in running its own update is known to write what its type says; a
+            // custom behavior, whatever its type string, may write anything.
+            const type = stockBehaviorType(behaviors[i]);
+            if (type === undefined) {
+                changesSize = true;
+                changesColor = true;
+            } else if (SIZE_BEHAVIORS.has(type)) {
                 changesSize = true;
             } else if (COLOR_BEHAVIORS.has(type)) {
                 changesColor = true;

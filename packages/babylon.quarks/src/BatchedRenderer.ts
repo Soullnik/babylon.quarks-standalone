@@ -649,11 +649,11 @@ export class BatchedRenderer extends TransformNode {
         const subTargetsOf = (system: IParticleSystem): Array<IParticleSystem> => {
             const targets: Array<IParticleSystem> = [];
             for (const behavior of (system as ParticleSystem).behaviors ?? []) {
-                if (behavior.type !== 'EmitSubParticleSystem') {
+                if (!(behavior instanceof EmitSubParticleSystem)) {
                     continue;
                 }
                 // A uuid string is a link the loader could not resolve: no target.
-                const sub = (behavior as EmitSubParticleSystem).subParticleSystem;
+                const sub = behavior.subParticleSystem;
                 const target = typeof sub === 'object' ? sub.system : undefined;
                 if (target !== undefined && known.has(target)) {
                     targets.push(target);

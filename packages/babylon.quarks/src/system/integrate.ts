@@ -5,6 +5,7 @@ import {
     Particle,
     ParticleStore,
     RendererEmitterSettings,
+    runsUpdateAll,
     TrailParticle,
     TrailSettings,
     Vector3,
@@ -97,8 +98,8 @@ export function runBehaviorSteps(
             continue;
         }
         const behavior = stepBehaviors[0];
-        if (behavior.updateAll !== undefined) {
-            behavior.updateAll(particles, particleCount, delta);
+        if (runsUpdateAll(behavior)) {
+            behavior.updateAll!(particles, particleCount, delta);
             continue;
         }
         for (let i = 0; i < particleCount; i++) {

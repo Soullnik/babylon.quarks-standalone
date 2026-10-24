@@ -85,7 +85,8 @@ export interface Behavior {
      * monomorphic. Implementations must skip dead particles (`age >= life`)
      * exactly as the per-particle path does, and must produce identical results.
      *
-     * Behaviors that do not implement it keep working unchanged.
+     * Behaviors that do not implement it keep working unchanged. A subclass that overrides
+     * `update` but not `updateAll` has its `update` called, not the inherited `updateAll`.
      */
     updateAll?(particles: Array<Particle>, count: number, delta: number): void;
     /** Called once per step before the particles are updated, with the step's length in seconds. */

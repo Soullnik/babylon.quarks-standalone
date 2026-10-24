@@ -11,6 +11,7 @@ import {Quaternion, Vector4View} from '../math';
 import {Particle} from '../Particle';
 import {ParticleStore} from '../ParticleStore';
 import {Behavior} from './Behavior';
+import {stockBehaviorType} from './StockBehavior';
 
 /**
  * Compiles a run of behaviors into a single loop over the particles.
@@ -34,6 +35,8 @@ import {Behavior} from './Behavior';
  *
  * A behavior that is not recognised keeps its own pass, in its original place
  * in the order, so nothing here depends on the built-in set being complete.
+ * Recognition is by implementation, not by name: a custom behavior that shares a built-in's
+ * `type`, or a subclass with its own `update`, keeps its own pass.
  */
 
 /**
@@ -242,7 +245,9 @@ function orbitInPlace(angle: string, ax: string, ay: string, az: string): string
  * recompiling.
  */
 function fragmentFor(behavior: Behavior, k: number): Fragment | null {
-    switch (behavior.type) {
+    // Only a behavior that runs a built-in's own update is replaced by that built-in's code; a
+    // custom one with the same type string, or a subclass with its own update, keeps its pass.
+    switch (stockBehaviorType(behavior)) {
         case 'ColorOverLife':
             return {
                 setup: colorSetup(`g${k}`, `behaviors[${k}].color`),

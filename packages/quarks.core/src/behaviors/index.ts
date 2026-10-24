@@ -22,6 +22,7 @@ export * from './SizeBySpeed';
 export * from './SizeOverLife';
 export * from './speedFraction';
 export * from './SpeedOverLife';
+export * from './StockBehavior';
 export * from './TurbulenceField';
 export * from './VelocityOverLife';
 export * from './WidthOverLength';

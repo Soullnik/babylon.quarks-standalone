@@ -2080,6 +2080,9 @@ export interface RotationOverLifeJSON extends BehaviorJSON {
     angularVelocity: ValueGeneratorJSON;
 }
 
+// @internal
+export function runsUpdateAll(behavior: Behavior): boolean;
+
 // @public
 export function seededRandom(s: number): number;
 
@@ -2332,6 +2335,9 @@ export class SpriteParticle implements Particle {
     set uvTile(value: number);
     velocity: Vector3;
 }
+
+// @internal
+export function stockBehaviorType(behavior: Behavior): string | undefined;
 
 // @public
 export interface StretchedBillBoardSettings {
