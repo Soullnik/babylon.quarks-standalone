@@ -34,11 +34,25 @@ interface SequenceState {
 }
 
 /**
- * Apply sequences to particles.
- * {@link Sequencer}
+ * Moves particles onto the points of one sequence after another, so that together they draw a
+ * picture, such as a word or a logo, then re-form into the next: a scripted formation, as a
+ * three.quarks sequence.
+ *
+ * Each sequence plays over its time range, in seconds since the behavior started (the system
+ * began playing, or was restarted). While it plays, every particle moves in a straight line from
+ * where it was to its own point of the sequence, which a {@link Sequencer} picks from the
+ * particle's order of emission (the n-th particle emitted takes point n, wrapping around). Each
+ * particle starts `delay` seconds after the one before it, so a cloud forms in order rather than
+ * all at once. Between ranges, particles stay where they are and the system's forces and
+ * velocity move them as usual.
+ *
+ * The sequences play once: the time and the emission count only go back to zero when the system
+ * restarts, not on each loop of a looping system, so particles emitted late in a long-running
+ * system take ever later starts. Use it with a system that emits its particles at the start
+ * (a burst) and plays the sequences once. Applies in every render mode.
  */
 export class ApplySequences implements Behavior {
-    /** The ease every move between two sequence points follows. */
+    /** The ease every move between two sequence points follows: linear (a straight ramp from 0 to 1). */
     static BEZIER: Bezier = new Bezier(0, 0, 1, 1);
     type = 'ApplySequences';
     /** The sequences in time order, each with the time range it plays in. */
@@ -55,12 +69,13 @@ export class ApplySequences implements Behavior {
      */
     index = 0;
     /**
-     * Particles seen so far; each takes the next point of a sequence.
+     * Particles emitted since the behavior started; each takes the next point of a sequence. Goes
+     * back to 0 on {@link reset}.
      * @internal
      */
     pCount = 0;
 
-    /** Seconds between one particle's start of a move and the next one's. */
+    /** Seconds between one particle's start of a move and the next one's; 0 moves them all together. */
     delay: number;
     /**
      * Scratch value.

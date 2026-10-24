@@ -81,6 +81,11 @@ as before.
 - **[Extending babylon.quarks](https://github.com/Soullnik/babylon.quarks-standalone/blob/main/docs/EXTENDING.md):** the contract for custom behaviors and
   emitter shapes (the hooks and when they run, what a behavior sees, the compiled pass, plugins
   and saving), with every example run by the tests.
+- `ApplySequences` documents what it does and its limits: sequences play once, in seconds since
+  the system started, and each particle starts `delay` after the one before. `Noise`,
+  `TurbulenceField`, `OrbitOverLife` and `VelocityOverLife` say which to pick for what.
+- Tests hold the editor-facing `params` of every registered behavior and shape to the class's
+  fields and JSON, and every live parameter's in-place update to what a new material holds.
 - `ShaderImageProcessing`, the type of `ShaderContext.imageProcessing`, is exported.
 - `Gradient.evaluate(t, target?)`, as Unity's `Gradient.Evaluate`: the colour at `t` as
   `{r, g, b, a}`, written into `target` (such as a Babylon `Color4`) when one is given, for tools
