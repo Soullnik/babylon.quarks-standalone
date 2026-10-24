@@ -354,11 +354,15 @@ function fragmentFor(behavior: Behavior, k: number): Fragment | null {
             };
         case 'LimitSpeedOverLife':
             return {
+                // Per-axis limits (a Vector3Function) go through the behavior's own update, which
+                // writes the particle's velocity view of the same column.
                 setup: `const b${k} = behaviors[${k}];
+                    const vec3_${k} = b${k}.speed instanceof deps.Vector3Function;
                     ${scalarSetup(`g${k}`, `b${k}.speed`)}
                     const dampen${k} = b${k}.dampenStep(delta);
                     const ms${k} = typeof b${k}.motionScale === 'function' ? b${k}.motionScale() : 1;`,
-                body: `{const vx = vel[o3], vy = vel[o3 + 1], vz = vel[o3 + 2];
+                body: `if (vec3_${k}) b${k}.update(p, delta);
+                    else {const vx = vel[o3], vy = vel[o3 + 1], vz = vel[o3 + 2];
                     const speed = Math.sqrt(vx * vx + vy * vy + vz * vz);
                     ${scalarValue(`g${k}`, 'limitBase', 't')}
                     const limit = limitBase * ms${k};

@@ -209,7 +209,12 @@ const behaviors: Record<string, () => Behavior> = {
         behavior.appendSequencer(new IntervalValue(0, 1), sequencer);
         return behavior;
     },
-    LimitSpeedOverLife: () => new LimitSpeedOverLife(curve(), 0.5),
+    LimitSpeedOverLife: () =>
+        new LimitSpeedOverLife(
+            new Vector3Function(curve(), new ConstantValue(2), new IntervalValue(1, 3)),
+            0.5,
+            'world'
+        ),
     ApplyCollision: () => new ApplyCollision({resolve: () => false} as never, 0.6),
 };
 

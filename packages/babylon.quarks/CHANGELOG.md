@@ -62,6 +62,16 @@ the API and the look of effects are frozen.
   (`GridSampling.Random`, the default, or `GridSampling.Sequential`). Sequential fills the cells in
   turn, row by row from −x, −y, so a burst of `row × column` particles puts one in every cell; a
   restart starts over at the first cell. The editor's Shape module offers it.
+- **Separate Axes for Limit Velocity over Lifetime** (Unity's option of the same name):
+  `LimitSpeedOverLife.speed` takes a `Vector3Function`, a limit per axis, and the new
+  `LimitSpeedOverLife.space` (`'local'`, the default, or `'world'`) says which axes they are
+  measured along. Each component of the velocity is limited on its own and keeps its sign; a world
+  limit is scaled by the system's `motionScale` in a world-space system. `space` is written only
+  when not `'local'`. One limit for the speed works as before. The editor's Limit Speed, Size over
+  Lifetime and Size by Speed modules get a Separate Axes switch, and the new Limit Velocity Axes
+  demo compares the two.
+- `EmitterFrame.fromSimulation`, the inverse of `toSimulation`, for behaviors that measure a
+  vector in their own space.
 
 ### Fixed
 

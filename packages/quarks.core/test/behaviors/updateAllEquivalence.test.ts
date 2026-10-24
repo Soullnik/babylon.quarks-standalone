@@ -23,6 +23,7 @@ import {
     SpeedOverLife,
     SpriteParticle,
     Vector3,
+    Vector3Function,
     withRandomSource,
 } from '../../src';
 
@@ -98,6 +99,15 @@ const cases: Array<[string, () => Behavior]> = [
     ['SpeedOverLife', () => new SpeedOverLife(new PiecewiseBezier([[new Bezier(1, 0.7, 0.4, 0.2), 0]]))],
     ['GravityForce', () => new GravityForce(new Vector3(0, 5, 0), 4)],
     ['LimitSpeedOverLife', () => new LimitSpeedOverLife(new PiecewiseBezier([[new Bezier(2, 2, 2, 2), 0]]), 0.5)],
+    [
+        'LimitSpeedOverLife separate axes',
+        () =>
+            new LimitSpeedOverLife(
+                new Vector3Function(new ConstantValue(0.5), new IntervalValue(0.2, 1), new ConstantValue(2)),
+                0.5,
+                'world'
+            ),
+    ],
     ['OrbitOverLife', () => new OrbitOverLife(new ConstantValue(2), new Vector3(0, 1, 0))],
     ['ForceOverLife', () => new ForceOverLife(new ConstantValue(1), new ConstantValue(-2), new ConstantValue(0.5))],
     ['Noise', () => new Noise(new ConstantValue(2), new ConstantValue(1))],

@@ -322,8 +322,9 @@ export const BehaviorTypes: {[key: string]: BehaviorPlugin} = {
         type: 'LimitSpeedOverLife',
         constructor: LimitSpeedOverLife,
         params: [
-            ['speed', ['value', 'valueFunc']],
+            ['speed', ['value', 'valueFunc', 'vec3Func']],
             ['dampen', ['number']],
+            ['space', ['string']],
         ],
         loadJSON: LimitSpeedOverLife.fromJSON,
     },

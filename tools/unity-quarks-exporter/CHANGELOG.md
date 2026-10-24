@@ -13,6 +13,10 @@ All notable changes to the Unity Quarks Exporter are documented here.
 - **Random Between Two Curves** → `RandomBetweenCurves` with both curves, wherever a curve is
   exported (start values, over-lifetime modules, Width over Trail, Texture Sheet Animation with
   cycles); it was the upper curve with a warning.
+- **Limit Velocity over Lifetime with Separate Axes** → a per-axis `Vector3Function` limit with
+  its Space; it was the X limit for the speed, with a warning.
+- **Size by Speed with Separate Axes** → a per-axis `Vector3Function`; it was the X curve, with a
+  warning.
 
 ## [0.28.0] — 2026-10-23
 

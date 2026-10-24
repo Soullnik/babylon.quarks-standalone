@@ -70,6 +70,19 @@ export class EmitterFrame {
     }
 
     /**
+     * The inverse of {@link toSimulation}: converts the direction `vector`, in the simulation
+     * space, into `space`. A vector already in `space` is left as it is.
+     */
+    fromSimulation(vector: Vector3, space: BehaviorSpace, worldSpace: boolean): Vector3 {
+        if (worldSpace && space === 'local') {
+            vector.applyQuaternion(this.quaternionInverse).multiply(this.scaleInverse);
+        } else if (!worldSpace && space === 'world') {
+            vector.multiply(this.scale).applyQuaternion(this.quaternion);
+        }
+        return vector;
+    }
+
+    /**
      * Converts the point `point`, authored in `space`, into the simulation
      * space, as {@link toSimulation} does for a direction but with the
      * emitter's position taken into account.

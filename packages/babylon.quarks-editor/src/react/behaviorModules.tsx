@@ -29,6 +29,7 @@ import {
     TextureSequencer,
     TurbulenceField,
     Vector3,
+    Vector3Function,
     VelocityOverLife,
     WidthOverLength,
 } from 'babylon.quarks';
@@ -36,6 +37,7 @@ import React from 'react';
 import {EffectBinding} from '../core/binding.js';
 import {buildGradient, DEFAULT_GRADIENT_STOPS, findBehavior, readGradientStops} from '../core/colors.js';
 import {buildScalar, readScalar} from '../core/values.js';
+import {AxesCurveField} from './AxesCurveField.js';
 import {CheckboxField, NumberField, Row, SelectField} from './fields.js';
 import {GradientEditor} from './GradientEditor.js';
 import {iconStyle} from './icons.js';
@@ -119,12 +121,24 @@ export function LimitSpeedOverLifeModule({binding}: ModuleProps) {
             {(behavior) => (
                 <>
                     <div style={{marginTop: 6}}>
-                        <LifeCurveField
+                        <AxesCurveField
                             generator={behavior.speed}
                             maxValue={8}
-                            onChange={(curve) => binding.apply(() => (behavior.speed = curve))}
+                            onChange={(speed) => binding.apply(() => (behavior.speed = speed))}
                         />
                     </div>
+                    {behavior.speed instanceof Vector3Function && (
+                        <Row label="Space" hint="The axes each limit is measured along: the emitter's or the world's.">
+                            <SelectField
+                                value={behavior.space}
+                                options={[
+                                    {value: 'local', label: 'Local'},
+                                    {value: 'world', label: 'World'},
+                                ]}
+                                onChange={(v) => binding.apply(() => (behavior.space = v))}
+                            />
+                        </Row>
+                    )}
                     <Row label="Dampen">
                         <NumberField
                             value={behavior.dampen}
@@ -942,10 +956,10 @@ export function SizeBySpeedModule({binding}: ModuleProps) {
             {(behavior) => (
                 <>
                     <div style={{marginTop: 6}}>
-                        <LifeCurveField
+                        <AxesCurveField
                             generator={behavior.size}
                             maxValue={2}
-                            onChange={(curve) => binding.apply(() => (behavior.size = curve))}
+                            onChange={(size) => binding.apply(() => (behavior.size = size))}
                         />
                     </div>
                     <SpeedRangeRows binding={binding} behavior={behavior} />

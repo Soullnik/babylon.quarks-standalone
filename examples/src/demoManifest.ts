@@ -75,6 +75,16 @@ export const demoManifest: DemoManifestEntry[] = [
         preview: {icon: 'FS', gradient: 'linear-gradient(135deg, #ffd166 0%, #8c4a1a 100%)'},
     },
     {
+        key: 'LimitVelocityAxesDemo',
+        name: 'Limit Velocity Axes',
+        module: 'limitVelocityAxes',
+        sourcePath: 'examples/src/demos/limitVelocityAxes.ts',
+        description:
+            'Limit Velocity over Lifetime: one speed limit keeps a burst round, Separate Axes in local space flatten it into a leaning disc.',
+        tags: ['force', 'limit', 'velocity'],
+        preview: {icon: 'LV', gradient: 'linear-gradient(135deg, #66c2ff 0%, #1a3f8c 100%)'},
+    },
+    {
         key: 'TurbulenceDemo',
         name: 'Noise Turbulence',
         module: 'turbulence',

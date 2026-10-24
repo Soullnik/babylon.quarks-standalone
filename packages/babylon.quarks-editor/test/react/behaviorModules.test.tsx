@@ -6,15 +6,20 @@ import {
     FrameOverLife,
     GravityForce,
     IntervalValue,
+    LimitSpeedOverLife,
     PiecewiseBezier,
     RandomBetweenCurves,
+    SizeBySpeed,
     SpeedOverLife,
+    Vector3Function,
 } from 'babylon.quarks';
 import {EffectBinding} from '../../src/core/binding';
 import {findBehavior} from '../../src/core/colors';
 import {
     AttractorModule,
     EmitDirectionModule,
+    LimitSpeedOverLifeModule,
+    SizeBySpeedModule,
     SpeedOverLifeModule,
     TextureSheetModule,
 } from '../../src/react/behaviorModules';
@@ -158,5 +163,54 @@ describe('Speed over Lifetime module', () => {
         expect(speed()).toBeInstanceOf(PiecewiseBezier);
         click(controlsOf(rowOf(section, 'Two curves'))[0]);
         expect(speed()).toBeInstanceOf(RandomBetweenCurves);
+    });
+});
+
+describe('Separate Axes', () => {
+    const scene = useScene();
+    let mounted: Mounted | null = null;
+    afterEach(() => {
+        mounted?.unmount();
+        mounted = null;
+    });
+
+    it('gives Limit Speed over Lifetime a limit per axis and a space', () => {
+        const system = makeSystem(scene.get());
+        system.addBehavior(new LimitSpeedOverLife(new PiecewiseBezier([[new Bezier(2, 2, 2, 2), 0]]), 0.5));
+        const binding = new EffectBinding(system);
+        const element = () => <LimitSpeedOverLifeModule binding={binding} />;
+        mounted = mount(element());
+        binding.subscribe(() => mounted!.render(element()));
+        const section = openModule(mounted.container, 'Limit Speed over Lifetime');
+        const limit = () => findBehavior<LimitSpeedOverLife>(system.behaviors, 'LimitSpeedOverLife')!;
+        expect(hasRow(section, 'Space')).toBe(false);
+
+        click(controlsOf(rowOf(section, 'Separate axes'))[0]);
+        const speed = limit().speed as Vector3Function;
+        expect(speed).toBeInstanceOf(Vector3Function);
+        expect((speed.y as PiecewiseBezier).toJSON()).toEqual(
+            new PiecewiseBezier([[new Bezier(2, 2, 2, 2), 0]]).toJSON()
+        );
+        expect(section.querySelectorAll('svg[width]')).toHaveLength(3);
+        pick(controlsOf(rowOf(section, 'Space'))[0], 'world');
+        expect(limit().space).toBe('world');
+
+        click(controlsOf(rowOf(section, 'Separate axes'))[0]);
+        expect(limit().speed).toBeInstanceOf(PiecewiseBezier);
+        expect(hasRow(section, 'Space')).toBe(false);
+    });
+
+    it('gives Size by Speed a curve per axis', () => {
+        const system = makeSystem(scene.get());
+        system.addBehavior(
+            new SizeBySpeed(new PiecewiseBezier([[new Bezier(1, 1, 1, 1), 0]]), new IntervalValue(0, 5))
+        );
+        const binding = new EffectBinding(system);
+        const element = () => <SizeBySpeedModule binding={binding} />;
+        mounted = mount(element());
+        binding.subscribe(() => mounted!.render(element()));
+        const section = openModule(mounted.container, 'Size by Speed');
+        click(controlsOf(rowOf(section, 'Separate axes'))[0]);
+        expect(findBehavior<SizeBySpeed>(system.behaviors, 'SizeBySpeed')!.size).toBeInstanceOf(Vector3Function);
     });
 });

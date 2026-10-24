@@ -443,6 +443,15 @@ describe('behavior fusion', () => {
                 ),
                 new ApplyForce(new Vector3(1, 0, 0), new IntervalValue(1, 3), 'local'),
                 new ApplyForce(new Vector3(0, -1, 0), new ConstantValue(2)),
+                new LimitSpeedOverLife(
+                    new Vector3Function(new ConstantValue(0.5), new IntervalValue(0.2, 1), new ConstantValue(0.3)),
+                    0.5
+                ),
+                new LimitSpeedOverLife(
+                    new Vector3Function(new ConstantValue(1), new ConstantValue(0.4), new ConstantValue(0.6)),
+                    0.5,
+                    'world'
+                ),
             ];
             const fusedBehaviors = build();
             const separateBehaviors = build();

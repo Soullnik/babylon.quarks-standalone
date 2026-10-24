@@ -774,18 +774,29 @@
             {
               "type": "SizeBySpeed",
               "size": {
-                "type": "PiecewiseBezier",
-                "functions": [
-                  {
-                    "function": {
-                      "p0": 0.5,
-                      "p1": 0.6666667,
-                      "p2": 0.8333333,
-                      "p3": 1
-                    },
-                    "start": 0
-                  }
-                ]
+                "type": "Vector3Function",
+                "x": {
+                  "type": "PiecewiseBezier",
+                  "functions": [
+                    {
+                      "function": {
+                        "p0": 0.5,
+                        "p1": 0.6666667,
+                        "p2": 0.8333333,
+                        "p3": 1
+                      },
+                      "start": 0
+                    }
+                  ]
+                },
+                "y": {
+                  "type": "ConstantValue",
+                  "value": 1.5
+                },
+                "z": {
+                  "type": "ConstantValue",
+                  "value": 1
+                }
               },
               "speedRange": {
                 "type": "IntervalValue",
