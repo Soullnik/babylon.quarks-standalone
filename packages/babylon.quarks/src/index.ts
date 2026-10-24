@@ -81,6 +81,7 @@ export type {
     FogTarget,
     ShaderContext,
     ShaderDepth,
+    ShaderImageProcessing,
     ShaderProgram,
     ShaderSettings,
 } from './shaderProgram';
