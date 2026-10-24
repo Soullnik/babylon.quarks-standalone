@@ -161,12 +161,14 @@ export class Gradient implements FunctionColorGenerator {
 
     /**
      * The colour at `t` (0 to 1) from the keys, as Unity's `Gradient.Evaluate`: for tools and UI
-     * that show a gradient. Written into `target` when one is given, such as a Babylon `Color4`,
-     * else into a new `{r, g, b, a}`.
+     * that show a gradient. Returned as a new `{r, g, b, a}`.
      */
-    evaluate<T extends Color4Like = Color4Like>(t: number, target?: T): T {
+    evaluate(t: number): Color4Like;
+    /** The colour at `t` (0 to 1) written into `target`, such as a Babylon `Color4`, and returned. */
+    evaluate<T extends Color4Like>(t: number, target: T): T;
+    evaluate(t: number, target?: Color4Like): Color4Like {
         this.genColorExact(tempColor, t);
-        const out = target ?? ({r: 0, g: 0, b: 0, a: 0} as T);
+        const out = target ?? {r: 0, g: 0, b: 0, a: 0};
         out.r = tempColor.x;
         out.g = tempColor.y;
         out.b = tempColor.z;

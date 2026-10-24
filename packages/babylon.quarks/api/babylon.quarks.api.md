@@ -1252,7 +1252,8 @@ export class Gradient implements FunctionColorGenerator {
     // (undocumented)
     clone(): FunctionColorGenerator;
     color: ContinuousLinearFunction<Vector3>;
-    evaluate<T extends Color4Like = Color4Like>(t: number, target?: T): T;
+    evaluate(t: number): Color4Like;
+    evaluate<T extends Color4Like>(t: number, target: T): T;
     static fromJSON(json: GradientJSON): Gradient;
     // (undocumented)
     genColor(memory: GeneratorMemory, color: Vector4, t: number): Vector4;
@@ -1965,7 +1966,8 @@ export class ParticleSystem implements IParticleSystem {
     set erosion(erosion: ParticleErosionOptions | undefined);
     // @internal
     finishedEventFired: boolean;
-    flip?: Vector2Like;
+    get flip(): Vector2Like | undefined;
+    set flip(value: Vector2Like | undefined);
     static fromJSON(json: ParticleSystemJSONParameters, meta: BabylonMetaData, scene?: Scene): ParticleSystem;
     getBeamEnd(out: Vector3Like): boolean;
     getRendererSettings(): VFXBatchSettings;
@@ -2039,7 +2041,8 @@ export class ParticleSystem implements IParticleSystem {
     get rim(): MeshRim | undefined;
     set rim(rim: Partial<MeshRim> | undefined);
     get ringBufferActive(): boolean;
-    ringBufferLoopRange: Vector2Like;
+    get ringBufferLoopRange(): Vector2Like;
+    set ringBufferLoopRange(value: Vector2Like);
     ringBufferMode: RingBufferMode;
     scalingMode: ScalingMode;
     get seed(): number | undefined;

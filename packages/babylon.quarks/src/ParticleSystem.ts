@@ -250,9 +250,18 @@ export class ParticleSystem implements IParticleSystem {
     /**
      * Fraction of billboard particles mirrored along U (x) and V (y), each
      * picked at random when the particle is born — Unity's renderer Flip.
-     * Undefined: nothing is mirrored. Meshes ignore it. Any `{x, y}`, such as a Babylon `Vector2`.
+     * Undefined: nothing is mirrored. Meshes ignore it. Set it from any `{x, y}`, such as a
+     * Babylon `Vector2`; the value is copied, and (0, 0) reads back as undefined.
      */
-    flip?: Vector2Like;
+    get flip(): Vector2Like | undefined {
+        return this._flip;
+    }
+
+    set flip(value: Vector2Like | undefined) {
+        this._flip = nonZeroFlip(value);
+    }
+
+    private _flip?: Vector2Like;
     /** Particles emitted per second, read over the system's time. Default 10. */
     emissionOverTime: ValueGenerator | FunctionValueGenerator;
     /** Particles emitted per world unit the emitter moves (Unity's Rate over Distance). Default 0. */
@@ -277,9 +286,18 @@ export class ParticleSystem implements IParticleSystem {
      * 1. (0, 1), the default, replays its whole life. Both ends are read clamped into 0..1 and in
      * order, however the vector was set. A range of no length, such as (0.5, 0.5), holds the
      * particle still at that point of its life; behaviors that act by age stop with it, those
-     * that act per second (rotation speed, forces) still run.
+     * that act per second (rotation speed, forces) still run. Set it from any `{x, y}`, such as a
+     * Babylon `Vector2`; the value is copied clamped and in order.
      */
-    ringBufferLoopRange: Vector2Like;
+    get ringBufferLoopRange(): Vector2Like {
+        return this._ringBufferLoopRange;
+    }
+
+    set ringBufferLoopRange(value: Vector2Like) {
+        this._ringBufferLoopRange = validLoopRange(value);
+    }
+
+    private _ringBufferLoopRange: Vector2Like = {x: 0, y: 1};
     /**
      * The system emits nothing of its own and only spawns what an `EmitSubParticleSystem` on
      * another system sends it (a Unity sub emitter). Default false.
@@ -1182,6 +1200,14 @@ export class ParticleSystem implements IParticleSystem {
         this.behaviors = parameters.behaviors ?? [];
         this.worldSpace = parameters.worldSpace ?? false;
         this.rendererEmitterSettings = parameters.rendererEmitterSettings ?? {};
+        const sideAxis = (this.rendererEmitterSettings as TrailSettings).sideAxis;
+        if (sideAxis !== undefined) {
+            // A copy, as for every vector the API takes: the caller keeps their own object.
+            this.rendererEmitterSettings = {
+                ...this.rendererEmitterSettings,
+                sideAxis: {x: sideAxis.x, y: sideAxis.y, z: sideAxis.z},
+            } as TrailSettings;
+        }
 
         if (parameters.renderMode === RenderMode.Trail) {
             // The defaults the renderMode setter gives a trail, for settings left out, on a copy so
@@ -1239,7 +1265,7 @@ export class ParticleSystem implements IParticleSystem {
             erosion: normalizeErosion(parameters.erosion),
             uvDistortion: normalizeUVDistortion(parameters.uvDistortion),
         };
-        this.flip = nonZeroFlip(parameters.flip);
+        this.flip = parameters.flip;
         this.playbackSpeed = parameters.playbackSpeed ?? 1;
         this.cullingMode = validCullingMode(parameters.cullingMode);
         this.scalingMode = validScalingMode(parameters.scalingMode);

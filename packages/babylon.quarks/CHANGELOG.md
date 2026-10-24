@@ -11,8 +11,9 @@ on purpose.
 
 ### Breaking
 
-The public surface is cleaned before it is frozen. Every item below was deprecated or had no
-effect; files written by earlier releases still load as before.
+The public surface is cleaned before it is frozen. Every item below but the last, the switch to
+Babylon's math types, was deprecated or had no effect; files written by earlier releases still load
+as before.
 
 - **Deprecated aliases are removed:**
   - `ParticleSystem.autoDestroy`, the `autoDestroy` constructor parameter and
@@ -55,8 +56,11 @@ effect; files written by earlier releases still load as before.
     `AxisAngleGenerator.axis`, `OrbitOverLife.axis`, `VelocityOverLife.orbitalOffset`,
     `TurbulenceField.scale`/`velocityMultiplier`/`timeScale`, `TextureSequencer.position`,
     `ShapeTransform.position`/`rotation`/`scale`, `ParticleSystem.pivot`, `flip`,
-    `ringBufferLoopRange` and `TrailSettings.sideAxis`. Setting one copies the value; reading it
-    gives an object you can still edit in place (`force.direction.x = 1`).
+    `ringBufferLoopRange` and `TrailSettings.sideAxis`. Setting one copies the value (`sideAxis` when
+    the system is built); reading it gives an object you can still edit in place
+    (`force.direction.x = 1`). A colour read back, such as `ConstantColor.color`, has `r`, `g`, `b`
+    and `a` as accessors over quarks' own storage, so copy it field by field
+    (`new Color4(c.r, c.g, c.b, c.a)`) rather than spreading it or passing it to `JSON.stringify`.
   - `ParticleSystem.pivot`, `flip`, `ringBufferLoopRange` and `TrailSettings.sideAxis` read back
     as plain objects, without vector methods.
   - `getWorldBounds(min, max)` and `getBeamEnd(out)` fill any `{x, y, z}`, such as a Babylon

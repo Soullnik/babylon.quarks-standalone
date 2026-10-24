@@ -2,8 +2,10 @@ import {loadPlugin} from 'quarks.core';
 import {MeshSurfaceEmitterPlugin} from './MeshSurfaceEmitter';
 
 // quarks.core's API, without its vector, quaternion and matrix classes: the simulation's own
-// math stays internal, and the public API takes Babylon's types (`IVector3Like`, `IColor4Like`
-// and the rest), see test/coreReexports.test.ts.
+// math stays internal, and the public API takes structural types (`Vector3Like`, `Color4Like`
+// and the rest) that Babylon's classes satisfy, see test/coreReexports.test.ts. They are
+// quarks.core's own, not Babylon's `IVector3Like` and friends, because quarks.core does not
+// depend on Babylon and Babylon marks those @internal.
 export {
     ApplyCollision,
     ApplyForce,

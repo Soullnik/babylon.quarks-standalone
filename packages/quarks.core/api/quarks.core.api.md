@@ -1001,7 +1001,8 @@ export class Gradient implements FunctionColorGenerator {
     // (undocumented)
     clone(): FunctionColorGenerator;
     color: ContinuousLinearFunction<Vector3>;
-    evaluate<T extends Color4Like = Color4Like>(t: number, target?: T): T;
+    evaluate(t: number): Color4Like;
+    evaluate<T extends Color4Like>(t: number, target: T): T;
     static fromJSON(json: GradientJSON): Gradient;
     // (undocumented)
     genColor(memory: GeneratorMemory, color: Vector4, t: number): Vector4;
