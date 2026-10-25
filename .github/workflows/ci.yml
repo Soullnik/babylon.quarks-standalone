@@ -44,6 +44,10 @@ jobs:
             - name: Build packages
               run: npm run build && npm run build:editor
 
+            # The public API of every entry point matches its committed report.
+            - name: Check API reports
+              run: npm run api:check
+
             # Every exported symbol needs TSDoc; internals are tagged @internal.
             - name: Check API docs
               run: npm run docs:check

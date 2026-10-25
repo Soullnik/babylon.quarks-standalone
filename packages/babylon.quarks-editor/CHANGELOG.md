@@ -4,6 +4,16 @@ All notable changes to the `babylon.quarks-editor` package are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project follows the `quarks.core` 0.x version line.
 
+## [0.30.0] — Unreleased
+
+### Added
+
+- The `./session` and `./react` entry points export the types their signatures use (`EffectAsset`,
+  `ProjectStore`, `EffectBinding`, `EffectHistory`, `SceneEntry`, `PlaybackState`, `CurvePiece`,
+  `GradientStop`, `ScalarGenerator`, `TimelineRow`, `ValueFieldBaseProps` and the rest), so a host
+  can name them from the entry point it imports. Each entry point's API is recorded in
+  `api/*.api.md` and checked in CI.
+
 ## [0.29.0] — 2026-10-24
 
 ### Changed
