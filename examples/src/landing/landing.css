@@ -918,9 +918,9 @@ h3 {
     margin: 0;
     padding: 0;
     display: grid;
+    --pipeline-gap: 28px;
     grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 16px;
-    counter-reset: none;
+    gap: var(--pipeline-gap);
 }
 
 .pipeline li {
@@ -934,17 +934,17 @@ h3 {
     border: 1px solid var(--line);
 }
 
-/* Connector arrows between steps. */
+/* Connector arrows between steps: a chevron centred in the gap, level with the step number. */
 .pipeline li + li::before {
     content: '';
     position: absolute;
-    left: -13px;
-    top: 34px;
-    width: 10px;
-    height: 10px;
-    border-top: 2px solid var(--line-strong);
-    border-right: 2px solid var(--line-strong);
-    transform: rotate(45deg);
+    left: calc(var(--pipeline-gap) / -2);
+    top: 37px;
+    width: 8px;
+    height: 8px;
+    border-top: 2px solid var(--muted);
+    border-right: 2px solid var(--muted);
+    transform: translate(-70%, -50%) rotate(45deg);
 }
 
 .step-index {
@@ -973,16 +973,18 @@ h3 {
     text-underline-offset: 3px;
 }
 
+/* Two columns: the order wraps, so the step numbers carry it and the arrows go. */
 @media (max-width: 900px) {
     .pipeline {
         grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
-    .pipeline li:nth-child(3)::before {
+    .pipeline li + li::before {
         display: none;
     }
 }
 
+/* One column: every step points down to the next. */
 @media (max-width: 520px) {
     .pipeline {
         grid-template-columns: minmax(0, 1fr);
@@ -990,9 +992,9 @@ h3 {
 
     .pipeline li + li::before {
         display: block;
-        left: 28px;
-        top: -13px;
-        transform: rotate(135deg);
+        left: 50%;
+        top: calc(var(--pipeline-gap) / -2);
+        transform: translate(-50%, -70%) rotate(135deg);
     }
 }
 
