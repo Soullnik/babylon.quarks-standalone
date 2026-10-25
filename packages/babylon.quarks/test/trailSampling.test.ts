@@ -485,7 +485,7 @@ describe('trail settings in JSON, clones and the loader', () => {
             minVertexDistance: 0.2,
             lifetime: 0.4,
         });
-        for (const copy of [ParticleSystem.fromJSON(system.toJSON(META()), META(), {}, scene), system.clone()]) {
+        for (const copy of [ParticleSystem.fromJSON(system.toJSON(META()), META(), scene), system.clone()]) {
             expect(copy.rendererEmitterSettings).toMatchObject({
                 textureMode: 'tile',
                 textureScale: 0.5,
@@ -543,7 +543,7 @@ describe('trail settings in JSON, clones and the loader', () => {
         const load = (sideAxis: unknown) => {
             const rendererEmitterSettings = {...json.rendererEmitterSettings};
             Reflect.set(rendererEmitterSettings, 'sideAxis', sideAxis);
-            return ParticleSystem.fromJSON({...json, rendererEmitterSettings}, META(), {}, scene);
+            return ParticleSystem.fromJSON({...json, rendererEmitterSettings}, META(), scene);
         };
         for (const bad of [[0, 0, 0], {x: 'a'}, [1, NaN, 0], 'up', [1]]) {
             const loaded = load(bad);

@@ -176,7 +176,7 @@ describe('mesh particle lighting', () => {
             const meta = emptyMeta();
             const json = system.toJSON(meta);
             expect(meta.materials[json.material!].lighting).toBe(lighting);
-            expect(ParticleSystem.fromJSON(json, meta, {}, scene).lighting).toBe(lighting);
+            expect(ParticleSystem.fromJSON(json, meta, scene).lighting).toBe(lighting);
             expect(system.clone().lighting).toBe(lighting);
         }
         const meta = emptyMeta();

@@ -9,6 +9,38 @@ and the project follows the `quarks.core` 0.x version line.
 Phase 8 of the road to 1.0: the public API is frozen, so 0.30 is the last release that changes it
 on purpose.
 
+### Breaking
+
+The public surface is cleaned before it is frozen. Every item below was deprecated or had no
+effect; files written by earlier releases still load as before.
+
+- **Deprecated aliases are removed:**
+  - `ParticleSystem.autoDestroy`, the `autoDestroy` constructor parameter and
+    `QuarksUtil.setAutoDestroy`: use `stopAction: 'destroy'` and `QuarksUtil.setStopAction`.
+    A file's `autoDestroy: true` still reads as `'destroy'`.
+  - `IParticleSystem.autoDestroy` (quarks.core): read `stopAction`.
+  - The `speedFactor` constructor parameter: set it in `rendererEmitterSettings`. A file's
+    top-level `speedFactor` is still read.
+  - `EulerGenerator.eular`: use `euler`.
+  - `Matrix4.extractPosition`, `multiplyToArray` and `setRotationFromQuaternion`: use
+    `copyPosition` and `makeRotationFromQuaternion`.
+  - `MeshSettings.startRotationX/Y/Z`, which were never read: `MeshSettings` has no fields. Set the
+    system's `startRotation` to an `EulerGenerator`.
+  - `TrailParticle.previous` and `RecordState`, the old trail history that was no longer filled,
+    and quarks.core's `LinkedList`, which only it used.
+- **Dead parameters are removed:** `ParticleSystem.fromJSON(json, meta, scene)` no longer takes a
+  `dependencies` map, and `toJSON` no longer takes `SerializationOptions`, which nothing read
+  (also removed from `IParticleSystem.toJSON` and `ParticleEmitter.toJSON`).
+- **Read-only state:** `ParticleSystem.particleNum` is a getter, and `particles` and
+  `emissionState` are `readonly`, on the class and on quarks.core's `IParticleSystem`; the renderer
+  keeps them. Code that wrote them, through either type, no longer compiles, and in JavaScript
+  `ps.particleNum = 0` throws a `TypeError`.
+- **The prefab's clip track is `'clip'`,** not `'three'`: `AnimationData.type` is `'clip' | 'ps'`
+  and `QuarksPrefab.addThreeAnimation` is `addClipAnimation`. Files are written with `'clip'`;
+  a `'three'` track from three.quarks or an older babylon.quarks is read as a clip track. A 0.29
+  runtime and three.quarks skip a `'clip'` track.
+- **editor:** the session handle's `importGallery` alias is removed; use `importAssets`.
+
 ### Added
 
 - **API reports:** the public API of `babylon.quarks`, `quarks.core` and each entry point of

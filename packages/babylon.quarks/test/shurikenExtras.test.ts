@@ -119,7 +119,7 @@ describe('align to direction and sub emitter inheritance', () => {
         expect(makeSystem().toJSON().alignToDirection).toBeUndefined();
         const json = makeSystem({alignToDirection: true}).toJSON();
         expect(json.alignToDirection).toBe(true);
-        const loaded = ParticleSystem.fromJSON(json, {textures: {}, materials: {}, geometries: {}}, {}, scene);
+        const loaded = ParticleSystem.fromJSON(json, {textures: {}, materials: {}, geometries: {}}, scene);
         expect(loaded.alignToDirection).toBe(true);
         expect(loaded.clone().alignToDirection).toBe(true);
     });

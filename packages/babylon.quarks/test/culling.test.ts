@@ -279,12 +279,12 @@ describe('visibility culling', () => {
         expect(makeSystem().toJSON().cullingMode).toBeUndefined();
         const json = makeSystem({cullingMode: 'pauseAndCatchUp'}).toJSON();
         expect(json.cullingMode).toBe('pauseAndCatchUp');
-        const loaded = ParticleSystem.fromJSON(json, {textures: {}, materials: {}, geometries: {}}, {}, scene);
+        const loaded = ParticleSystem.fromJSON(json, {textures: {}, materials: {}, geometries: {}}, scene);
         expect(loaded.cullingMode).toBe('pauseAndCatchUp');
         expect(loaded.clone().cullingMode).toBe('pauseAndCatchUp');
         json.cullingMode = 'nonsense' as never;
-        expect(
-            ParticleSystem.fromJSON(json, {textures: {}, materials: {}, geometries: {}}, {}, scene).cullingMode
-        ).toBe('always');
+        expect(ParticleSystem.fromJSON(json, {textures: {}, materials: {}, geometries: {}}, scene).cullingMode).toBe(
+            'always'
+        );
     });
 });

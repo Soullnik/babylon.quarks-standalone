@@ -267,7 +267,7 @@ describe('scaling mode', () => {
             const ps = system(mode, 1);
             const json = ps.toJSON(meta);
             expect(json.scalingMode).toBe(mode);
-            expect(ParticleSystem.fromJSON(json, meta, {}, scene).scalingMode).toBe(mode);
+            expect(ParticleSystem.fromJSON(json, meta, scene).scalingMode).toBe(mode);
             expect(ps.clone().scalingMode).toBe(mode);
         }
         expect('scalingMode' in system('local', 1).toJSON(meta)).toBe(false);

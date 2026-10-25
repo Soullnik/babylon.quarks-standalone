@@ -26,8 +26,6 @@ afterAll(() => {
  */
 const HANDLED_BY: Record<keyof ParticleSystemParameters, 'table' | 'elsewhere'> = {
     stopAction: 'table',
-    // Read into stopAction by the constructor and by the JSON reader, not written.
-    autoDestroy: 'elsewhere',
     looping: 'table',
     prewarm: 'table',
     prewarmTime: 'table',
@@ -54,7 +52,6 @@ const HANDLED_BY: Record<keyof ParticleSystemParameters, 'table' | 'elsewhere'> 
     instancingNormals: 'elsewhere',
     renderMode: 'table',
     rendererEmitterSettings: 'elsewhere',
-    speedFactor: 'elsewhere',
     material: 'elsewhere',
     texture: 'elsewhere',
     startTileIndex: 'table',
@@ -148,7 +145,7 @@ describe('settings table', () => {
         const json = ps.toJSON(meta);
         expect(json).not.toHaveProperty('looping');
         expect(json).toMatchObject({duration: 3, uTileCount: 4, worldSpace: true});
-        const loaded = ParticleSystem.fromJSON(json, meta, {}, scene);
+        const loaded = ParticleSystem.fromJSON(json, meta, scene);
         for (const setting of SETTINGS) {
             expect([setting.param, setting.toJSON(setting.get(loaded))]).toEqual([
                 setting.param,
@@ -195,7 +192,7 @@ describe('settings table', () => {
             behaviors: [],
             worldSpace: false,
         };
-        const loaded = ParticleSystem.fromJSON(json as never, {geometries: {}, materials: {}, textures: {}}, {}, scene);
+        const loaded = ParticleSystem.fromJSON(json as never, {geometries: {}, materials: {}, textures: {}}, scene);
         expect(loaded.looping).toBe(false);
         expect(loaded.duration).toBe(2);
         expect(loaded.uTileCount).toBe(2);

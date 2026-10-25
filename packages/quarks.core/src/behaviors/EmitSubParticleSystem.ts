@@ -115,15 +115,7 @@ export class EmitSubParticleSystem implements Behavior {
         }
     }
 
-    initialize(particle: Particle): void {
-        /*particle.emissionState = {
-            burstIndex: 0,
-            burstWaveIndex: 0,
-            time: 0,
-            waitEmiting: 0,
-            matrix: new Matrix4(),
-        } as EmissionState;*/
-    }
+    initialize(particle: Particle): void {}
 
     update(particle: Particle, delta: number): void {
         if (this.mode === SubParticleEmitMode.Frame) {

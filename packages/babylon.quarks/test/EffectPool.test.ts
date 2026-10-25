@@ -98,7 +98,7 @@ describe('seeded systems, instantiate and the effect pool', () => {
         expect(makeSystem().toJSON().seed).toBeUndefined();
         const json = makeSystem({seed: 3}).toJSON();
         expect(json.seed).toBe(3);
-        const loaded = ParticleSystem.fromJSON(json, {textures: {}, materials: {}, geometries: {}}, {}, scene);
+        const loaded = ParticleSystem.fromJSON(json, {textures: {}, materials: {}, geometries: {}}, scene);
         expect(loaded.seed).toBe(3);
         expect(loaded.clone().seed).toBe(3);
     });

@@ -95,7 +95,7 @@ describe('QuarksUtil parity helpers', () => {
         QuarksUtil.pause(root);
         QuarksUtil.stop(root);
         QuarksUtil.restart(root);
-        QuarksUtil.setAutoDestroy(root, true);
+        QuarksUtil.setStopAction(root, 'destroy');
 
         expect(playSpyA).toHaveBeenCalled();
         expect(playSpyB).toHaveBeenCalled();
@@ -105,8 +105,8 @@ describe('QuarksUtil parity helpers', () => {
         expect(stopSpyB).toHaveBeenCalled();
         expect(restartSpyA).toHaveBeenCalled();
         expect(restartSpyB).toHaveBeenCalled();
-        expect(systemA.autoDestroy).toBe(true);
-        expect(systemB.autoDestroy).toBe(true);
+        expect(systemA.stopAction).toBe('destroy');
+        expect(systemB.stopAction).toBe('destroy');
     });
 
     it('adds all emitter systems to the provided batch renderer', () => {

@@ -37,16 +37,17 @@ function particleSystemOf(animation: AnimationData): ParticleSystem | undefined 
 /** One track on a {@link QuarksPrefab} timeline. */
 export interface AnimationData extends IAnimationData {
     /**
-     * `'ps'` plays a particle system, `'three'` plays a {@link QuarksTimelineClip}. The names are
-     * the effect format's, shared with three.quarks, where a `'three'` track plays a three.js
-     * `AnimationClip`; here the clip is whatever the host registered on the target node.
+     * `'ps'` plays a particle system, `'clip'` plays a {@link QuarksTimelineClip}: whatever the host
+     * registered on the target node, such as a Babylon `AnimationGroup` (Unity Timeline's Animation
+     * Track). Files from three.quarks and before babylon.quarks 0.30 name a clip track `'three'`;
+     * it is read as `'clip'`.
      */
-    type: 'three' | 'ps';
-    /** The node the track drives: a {@link ParticleEmitter} for `'ps'`, any node for `'three'`. */
+    type: 'clip' | 'ps';
+    /** The node the track drives: a {@link ParticleEmitter} for `'ps'`, any node for `'clip'`. */
     target: TransformNode;
     /** Restart when the track ends instead of letting it finish. */
     loop: boolean;
-    /** The clip a `'three'` track plays. */
+    /** The clip a `'clip'` track plays. */
     clip?: QuarksTimelineClip;
     /** The id of the clip on `target`, written to and read from JSON. */
     clipUUID?: string;
@@ -58,11 +59,11 @@ export interface AnimationJSON {
     startTime: number;
     /** How long it lasts, in seconds. */
     duration: number;
-    /** What it plays; see {@link AnimationData.type}. */
-    type: 'three' | 'ps';
+    /** What it plays; see {@link AnimationData.type}. Older files write a clip track as `'three'`. */
+    type: 'clip' | 'ps' | 'three';
     /** The id of the node it drives. */
     targetUUID: string;
-    /** A `'three'` track's clip id on that node. */
+    /** A `'clip'` track's clip id on that node. */
     clipUUID?: string;
     /** Whether the track restarts when it ends. */
     loop: boolean;
@@ -219,7 +220,7 @@ export class QuarksPrefab extends TransformNode implements IPrefab {
      * @param loop - Play the clip again when the track ends.
      * @param clipUUID - Saved in JSON to find the clip on load; defaults to `clip.uuid`.
      */
-    addThreeAnimation(
+    addClipAnimation(
         target: TransformNode,
         clip?: QuarksTimelineClip,
         startTime = 0,
@@ -231,7 +232,7 @@ export class QuarksPrefab extends TransformNode implements IPrefab {
         const data: AnimationData = {
             startTime,
             duration: animationDuration,
-            type: 'three',
+            type: 'clip',
             loop,
             target,
             clip,
@@ -274,7 +275,7 @@ export class QuarksPrefab extends TransformNode implements IPrefab {
         }
         this._pausedSystems.clear();
         this.animationData.forEach((animation) => {
-            if (animation.type === 'three' && this.isInside(animation, this.currentTime)) {
+            if (animation.type === 'clip' && this.isInside(animation, this.currentTime)) {
                 animation.clip?.play?.();
             }
         });
@@ -383,7 +384,7 @@ export class QuarksPrefab extends TransformNode implements IPrefab {
                 this.leaveTrack(animation, false);
                 return;
             }
-            if (isActive && animation.type === 'three') {
+            if (isActive && animation.type === 'clip') {
                 animation.clip?.setTime?.(Math.max(time - animation.startTime, 0));
             }
         });
@@ -514,9 +515,9 @@ export class QuarksPrefab extends TransformNode implements IPrefab {
                 );
                 return;
             }
-            if (animationJSON.type === 'three' && target) {
+            if ((animationJSON.type === 'clip' || animationJSON.type === 'three') && target) {
                 const clip = this.resolveTimelineClip(target, animationJSON.clipUUID);
-                this.addThreeAnimation(
+                this.addClipAnimation(
                     target,
                     clip,
                     animationJSON.startTime,
@@ -541,7 +542,7 @@ export class QuarksPrefab extends TransformNode implements IPrefab {
                 duration: animation.duration,
                 type: animation.type,
                 targetUUID: quarksNodeId(animation.target),
-                clipUUID: animation.type === 'three' ? (animation.clipUUID ?? animation.clip?.uuid) : undefined,
+                clipUUID: animation.type === 'clip' ? (animation.clipUUID ?? animation.clip?.uuid) : undefined,
                 loop: animation.loop,
             })),
         };
@@ -555,7 +556,7 @@ export class QuarksPrefab extends TransformNode implements IPrefab {
         }
         if (Array.isArray(json.animationData)) {
             prefab._tempAnimationJSON = json.animationData.filter(
-                (item: AnimationJSON | null) => item?.type === 'ps' || item?.type === 'three'
+                (item: AnimationJSON | null) => item?.type === 'ps' || item?.type === 'clip' || item?.type === 'three'
             );
         }
         return prefab;

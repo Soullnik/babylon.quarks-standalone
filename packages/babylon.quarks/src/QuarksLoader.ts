@@ -9,7 +9,6 @@ import {VertexData} from '@babylonjs/core/Meshes/mesh.vertexData';
 import {TransformNode} from '@babylonjs/core/Meshes/transformNode';
 import {Scene} from '@babylonjs/core/scene';
 import {
-    Behavior,
     currentFormatPath,
     EmitSubParticleSystem,
     QuarksFormatError,
@@ -1495,8 +1494,7 @@ export class QuarksLoader {
             // keeps such an effect's look. 'local' became the default with Unity's meaning.
             json = {...json, scalingMode: 'hierarchy'};
         }
-        const dependencies: {[uuid: string]: Behavior} = {};
-        const ps = ParticleSystem.fromJSON(json, meta, dependencies, this.scene);
+        const ps = ParticleSystem.fromJSON(json, meta, this.scene);
         if (json?.shape?.type === 'mesh_surface' && typeof json.shape.mesh === 'string') {
             meshSurfaceLinks.set(ps, json.shape.mesh);
         }

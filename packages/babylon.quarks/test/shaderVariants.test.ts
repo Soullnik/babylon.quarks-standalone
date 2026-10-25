@@ -243,7 +243,6 @@ describe('the sheet and soft fade inputs are normalised', () => {
         const loaded = ParticleSystem.fromJSON(
             {...ps.toJSON(meta), uTileCount: 3.9, vTileCount: Infinity},
             meta,
-            {},
             scene
         );
         expect(loaded.uTileCount).toBe(3);
@@ -263,7 +262,7 @@ describe('the sheet and soft fade inputs are normalised', () => {
         const json = ps.toJSON(meta);
         expect(json.softFarFade).toBe(0.25);
         expect(json.softNearFade).toBeUndefined();
-        const loaded = ParticleSystem.fromJSON({...json, softNearFade: -1}, meta, {}, scene);
+        const loaded = ParticleSystem.fromJSON({...json, softNearFade: -1}, meta, scene);
         expect(loaded.softNearFade).toBe(0);
         expect(loaded.softFarFade).toBe(0.25);
     });

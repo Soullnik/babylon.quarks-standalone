@@ -141,7 +141,7 @@ describe('mesh particle rim', () => {
         const meta = emptyMeta();
         const json = system.toJSON(meta);
         expect(meta.materials[json.material!].rim).toEqual(rim);
-        expect(ParticleSystem.fromJSON(json, meta, {}, scene).rim).toEqual(rim);
+        expect(ParticleSystem.fromJSON(json, meta, scene).rim).toEqual(rim);
         expect(system.clone().rim).toEqual(rim);
 
         const loader = new QuarksLoader(scene);

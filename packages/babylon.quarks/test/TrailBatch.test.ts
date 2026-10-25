@@ -324,7 +324,7 @@ describe('TrailBatch', () => {
             dieWithParticle: true,
             recordWorldSpace: true,
         });
-        for (const copy of [ParticleSystem.fromJSON(json, meta, {}, scene), system.clone()]) {
+        for (const copy of [ParticleSystem.fromJSON(json, meta, scene), system.clone()]) {
             expect(copy.rendererEmitterSettings).toMatchObject({
                 uvFromHead: true,
                 colorFromParticle: true,

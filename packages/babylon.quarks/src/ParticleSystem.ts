@@ -26,7 +26,6 @@ import {
     readFormatPart,
     RendererEmitterSettings,
     RotationGenerator,
-    SerializationOptions,
     setRandomSource,
     SphereEmitter,
     StretchedBillBoardSettings,
@@ -185,22 +184,6 @@ export class ParticleSystem implements IParticleSystem {
     ignoreStopAction = false;
 
     /**
-     * Whether the system disposes itself when it finishes: `stopAction === 'destroy'`. Setting it
-     * true sets that stop action, and false turns a `'destroy'` one into `'none'`.
-     * @deprecated Use {@link stopAction}.
-     */
-    get autoDestroy(): boolean {
-        return this.stopAction === 'destroy';
-    }
-
-    set autoDestroy(value: boolean) {
-        if (value) {
-            this.stopAction = 'destroy';
-        } else if (this.stopAction === 'destroy') {
-            this.stopAction = 'none';
-        }
-    }
-    /**
      * Start a looping system as if it had already run one full cycle (Unity's Prewarm), so a fire
      * or a mist is full from its first frame. Default false.
      */
@@ -308,12 +291,16 @@ export class ParticleSystem implements IParticleSystem {
      * Default false.
      */
     worldSpace: boolean;
-    /** How many of {@link particles} are alive. Read only. */
-    particleNum: number;
+    /** How many of {@link particles} are alive. */
+    get particleNum(): number {
+        return this.liveCount;
+    }
+    /** The live particle count behind {@link particleNum}, which the spawner and the step keep. @internal */
+    liveCount = 0;
     /** Set by {@link pause}: the renderer skips the system's simulation while true. */
     paused: boolean;
-    /** The particle pool; the first {@link particleNum} are alive. Read only. */
-    particles: Array<Particle>;
+    /** The particle pool; the first {@link particleNum} are alive. */
+    readonly particles: Array<Particle>;
     /** Column storage shared by this system's particles; behaviors read and write it. */
     readonly store: ParticleStore = new ParticleStore(64);
     /** Where particles are born and which way they start (Unity's Shape module). Default a `SphereEmitter`. */
@@ -330,7 +317,7 @@ export class ParticleSystem implements IParticleSystem {
     /** Modules run on every particle each step, in order (`ColorOverLife`, `SizeOverLife`, forces, ...). */
     behaviors: Array<Behavior>;
     /** Emission progress: time in the cycle, burst and distance counters. */
-    emissionState: EmissionState;
+    readonly emissionState: EmissionState;
     /** The emitter's velocity over the last step, which `InheritVelocity` reads. */
     emitterVelocity: Vector3 = new Vector3();
 
@@ -1173,9 +1160,7 @@ export class ParticleSystem implements IParticleSystem {
             },
         });
 
-        this.stopAction = validStopAction(
-            parameters.stopAction ?? (parameters.autoDestroy === true ? 'destroy' : undefined)
-        );
+        this.stopAction = validStopAction(parameters.stopAction);
         this.duration = parameters.duration ?? 1;
         this.startDelay = parameters.startDelay ?? new ConstantValue(0);
         this.looping = parameters.looping ?? true;
@@ -1209,9 +1194,6 @@ export class ParticleSystem implements IParticleSystem {
         if (parameters.renderMode === RenderMode.StretchedBillBoard) {
             const settings = {...this.rendererEmitterSettings} as StretchedBillBoardSettings;
             this.rendererEmitterSettings = settings;
-            if (parameters.speedFactor !== undefined) {
-                settings.speedFactor = parameters.speedFactor;
-            }
             settings.speedFactor = settings.speedFactor ?? 0;
             settings.lengthFactor = settings.lengthFactor ?? 0;
         }
@@ -1282,7 +1264,7 @@ export class ParticleSystem implements IParticleSystem {
         this.emitter = new ParticleEmitter(this, parameters.scene);
 
         this.paused = false;
-        this.particleNum = 0;
+        this.liveCount = 0;
         this.emissionState = {
             isBursting: false,
             burstParticleIndex: 0,
@@ -1424,7 +1406,7 @@ export class ParticleSystem implements IParticleSystem {
      * particles stay, and `particleDied` is not fired.
      */
     clear(): void {
-        this.particleNum = 0;
+        this.liveCount = 0;
         this.bounds.valid = false;
         for (const behavior of this.behaviors) {
             if (behavior instanceof EmitSubParticleSystem) {
@@ -1490,7 +1472,7 @@ export class ParticleSystem implements IParticleSystem {
         }
         this.destroyed = true;
         // Nothing updates a disposed system again, so its particles would never die.
-        this.particleNum = 0;
+        this.liveCount = 0;
         if (this._renderer) this._renderer.deleteSystem(this);
         disposeEmitterForSystem(this.emitter);
         this.events.fire({type: 'destroy', particleSystem: this});
@@ -1525,7 +1507,7 @@ export class ParticleSystem implements IParticleSystem {
         }
         this.emission.memory.length = 0;
         this.paused = false;
-        this.particleNum = 0;
+        this.liveCount = 0;
         this.bounds.valid = false;
         this.clock.reset();
         if (this.seedValue !== undefined) {
@@ -1934,7 +1916,7 @@ export class ParticleSystem implements IParticleSystem {
             liveParticleCount = removeDeadTrails(particles, store, liveParticleCount, onDied);
         }
         // A particleDied listener may have disposed the system, which drops every particle.
-        this.particleNum = this.destroyed ? 0 : liveParticleCount;
+        this.liveCount = this.destroyed ? 0 : liveParticleCount;
         this.notifyFinished();
     }
 
@@ -2073,7 +2055,7 @@ export class ParticleSystem implements IParticleSystem {
      * file use `serializeEffect`, which turns them into plain data. Runtime-only state
      * (`tint`, `beamEnd`, the playing time) is not written.
      */
-    toJSON(metaData?: BabylonMetaData | string, _options: SerializationOptions = {}): ParticleSystemJSONParameters {
+    toJSON(metaData?: BabylonMetaData | string): ParticleSystemJSONParameters {
         return particleSystemToJSON(this, metaData);
     }
 
@@ -2083,21 +2065,11 @@ export class ParticleSystem implements IParticleSystem {
      * unknown shape, behavior or curve type warns and takes its default. Sub emitter targets stay
      * uuids until `QuarksLoader` links them.
      */
-    static fromJSON(
-        json: ParticleSystemJSONParameters,
-        meta: BabylonMetaData,
-        dependencies: {[uuid: string]: Behavior} = {},
-        scene?: Scene
-    ): ParticleSystem {
+    static fromJSON(json: ParticleSystemJSONParameters, meta: BabylonMetaData, scene?: Scene): ParticleSystem {
         const ps = new ParticleSystem(particleSystemParametersFromJSON(json, meta, scene));
         ps.behaviors = (json.behaviors ?? [])
             .map((behaviorJson, index) => {
-                const behavior = readFormatPart(`behaviors[${index}]`, () => BehaviorFromJSON(behaviorJson, ps));
-                const target = (behaviorJson as {subParticleSystem?: unknown}).subParticleSystem;
-                if (behavior && behavior.type === 'EmitSubParticleSystem' && typeof target === 'string') {
-                    dependencies[target] = behavior;
-                }
-                return behavior;
+                return readFormatPart(`behaviors[${index}]`, () => BehaviorFromJSON(behaviorJson, ps));
             })
             .filter((behavior) => behavior !== null) as Behavior[];
         return ps;

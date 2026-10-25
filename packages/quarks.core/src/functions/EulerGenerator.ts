@@ -11,15 +11,6 @@ export class EulerGenerator implements RotationGenerator {
     /** The Euler the angles are written into; its `order` is the generator's order. */
     euler: Euler;
 
-    /** @deprecated Misspelt; use {@link euler}. Removed in a later minor release. */
-    get eular(): Euler {
-        return this.euler;
-    }
-    /** @deprecated Misspelt; use {@link euler}. */
-    set eular(value: Euler) {
-        this.euler = value;
-    }
-
     /**
      * @param angleX - The angle about x, in radians.
      * @param angleY - The angle about y, in radians.
