@@ -305,6 +305,7 @@ namespace UnityEngine
             public MinMaxCurve limitX { get; set; } = 1f;
             public MinMaxCurve limitY { get; set; } = 1f;
             public MinMaxCurve limitZ { get; set; } = 1f;
+            public ParticleSystemSimulationSpace space { get; set; } = ParticleSystemSimulationSpace.Local;
             public float dampen { get; set; } = 1f;
         }
 
