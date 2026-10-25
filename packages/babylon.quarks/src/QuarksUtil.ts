@@ -86,16 +86,6 @@ export class QuarksUtil {
         });
     }
 
-    /**
-     * Sets {@link ParticleSystem.autoDestroy} on every system under `root`.
-     * @deprecated Use {@link QuarksUtil.setStopAction} with `'destroy'`.
-     */
-    static setAutoDestroy(root: Node, autoDestroy: boolean): void {
-        QuarksUtil.runOnAllParticleEmitters(root, (emitter) => {
-            (emitter.system as unknown as ParticleSystem).autoDestroy = autoDestroy;
-        });
-    }
-
     /** Ends emission on every system under `root` and lets the particles die out, see {@link ParticleSystem.endEmit}. */
     static endEmit(root: Node): void {
         QuarksUtil.runOnAllParticleEmitters(root, (emitter) => {

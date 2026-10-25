@@ -98,26 +98,16 @@ describe('stopAction', () => {
         expect(ps.emitter.isDisposed()).toBe(true);
     });
 
-    it('reads the old autoDestroy as destroy, in code and in files', () => {
-        const coded = system({autoDestroy: true});
-        expect(coded.stopAction).toBe('destroy');
-        expect(coded.autoDestroy).toBe(true);
-        coded.autoDestroy = false;
-        expect(coded.stopAction).toBe('none');
-        coded.stopAction = 'disable';
-        coded.autoDestroy = false;
-        expect(coded.stopAction).toBe('disable');
-        coded.dispose();
-
+    it('reads the old autoDestroy of a file as destroy', () => {
         const json = {...system().toJSON(metaData()), autoDestroy: true};
-        const read = ParticleSystem.fromJSON(json as never, metaData() as never, {}, scene);
+        const read = ParticleSystem.fromJSON(json as never, metaData() as never, scene);
         expect(read.stopAction).toBe('destroy');
         read.dispose();
     });
 
     it('takes a stop action over an old autoDestroy false beside it', () => {
         const json = {...system({stopAction: 'disable'}).toJSON(metaData()), autoDestroy: false};
-        const read = ParticleSystem.fromJSON(json as never, metaData() as never, {}, scene);
+        const read = ParticleSystem.fromJSON(json as never, metaData() as never, scene);
         expect(read.stopAction).toBe('disable');
         read.dispose();
     });
@@ -149,7 +139,7 @@ describe('stopAction', () => {
         expect(json.stopAction).toBe('disable');
         expect(json).not.toHaveProperty('autoDestroy');
         expect(system().toJSON(metaData())).not.toHaveProperty('stopAction');
-        const read = ParticleSystem.fromJSON(json, metaData() as never, {}, scene);
+        const read = ParticleSystem.fromJSON(json, metaData() as never, scene);
         expect(read.stopAction).toBe('disable');
         const copy = ps.clone();
         expect(copy.stopAction).toBe('disable');
@@ -321,7 +311,7 @@ describe('ringBufferMode', () => {
         const plain = system().toJSON(metaData());
         expect(plain).not.toHaveProperty('ringBufferMode');
         expect(plain).not.toHaveProperty('ringBufferLoopRange');
-        const read = ParticleSystem.fromJSON(json, metaData() as never, {}, scene);
+        const read = ParticleSystem.fromJSON(json, metaData() as never, scene);
         expect(read.ringBufferMode).toBe('loopUntilReplaced');
         expect(read.ringBufferLoopRange).toEqual(new Vector2(0.2, 0.9));
         const copy = ps.clone();

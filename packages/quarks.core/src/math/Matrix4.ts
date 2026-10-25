@@ -51,32 +51,6 @@ class Matrix4 {
     }
 
     /**
-     * @deprecated Use {@link Matrix4#copyPosition .copyPosition()} instead.
-     */
-    extractPosition(m: Matrix4): Matrix4 {
-        console.warn('THREE.Matrix4: .extractPosition() has been renamed to .copyPosition().');
-        return this.copyPosition(m);
-    }
-
-    /**
-     * Sets this matrix to a x b and stores the result into the flat array r.
-     * r can be either a regular Array or a TypedArray.
-     *
-     * @deprecated This method has been removed completely.
-     */
-    multiplyToArray(a: Matrix4, b: Matrix4, r: number[]): Matrix4 {
-        console.error('THREE.Matrix4: .multiplyToArray() has been removed.');
-        return this;
-    }
-
-    /**
-     * @deprecated Use {@link Matrix4#makeRotationFromQuaternion .makeRotationFromQuaternion()} instead.
-     */
-    setRotationFromQuaternion(q: Quaternion): Matrix4 {
-        return this.makeRotationFromQuaternion(q);
-    }
-
-    /**
      * Sets the entries, given in row-major order (n11 n12 n13 n14 is the first row).
      * @returns This matrix.
      */

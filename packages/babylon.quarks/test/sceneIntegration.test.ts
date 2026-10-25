@@ -154,7 +154,7 @@ describe('scene integration', () => {
         expect(json.applyFog).toBe(false);
         expect(json.playbackSpeed).toBe(2);
 
-        const loaded = ParticleSystem.fromJSON(json, {textures: {}, materials: {}, geometries: {}}, {}, scene);
+        const loaded = ParticleSystem.fromJSON(json, {textures: {}, materials: {}, geometries: {}}, scene);
         expect(loaded.renderingGroupId).toBe(3);
         expect(loaded.applyFog).toBe(false);
         expect(loaded.playbackSpeed).toBe(2);

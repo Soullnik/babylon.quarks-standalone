@@ -59,15 +59,6 @@ export interface JsonMetaData {
     geometries: {[uuid: string]: Resource};
 }
 
-/** Options for {@link IParticleSystem.toJSON}. */
-export interface SerializationOptions {
-    /**
-     * Use URL for image.
-     * @type {boolean}
-     */
-    useUrlForImage?: boolean;
-}
-
 /** The render-mode-specific settings of a system: one of the shapes below, by its render mode. */
 export type RendererEmitterSettings = TrailSettings | MeshSettings | BillBoardSettings | StretchedBillBoardSettings;
 
@@ -208,27 +199,12 @@ export interface TrailSettings {
 export type TrailTextureMode = 'stretch' | 'tile' | 'distributePerSegment' | 'repeatPerSegment';
 
 /**
- * Settings of a mesh system; none are read. A mesh particle's start rotation about each axis is the
+ * Settings of a mesh system: none. A mesh particle's start rotation about each axis is the
  * system's `startRotation`, a rotation generator such as an `EulerGenerator` (Unity's 3D Start
  * Rotation).
  */
-export interface MeshSettings {
-    /**
-     * Never read.
-     * @deprecated Set the system's `startRotation` to an `EulerGenerator` instead.
-     */
-    startRotationX?: ValueGenerator | FunctionValueGenerator;
-    /**
-     * Never read.
-     * @deprecated Set the system's `startRotation` to an `EulerGenerator` instead.
-     */
-    startRotationY?: ValueGenerator | FunctionValueGenerator;
-    /**
-     * Never read.
-     * @deprecated Set the system's `startRotation` to an `EulerGenerator` instead.
-     */
-    startRotationZ?: ValueGenerator | FunctionValueGenerator;
-}
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type -- an extension point, as BillBoardSettings
+export interface MeshSettings {}
 
 /** The scene node a system emits from, as the simulation sees it. */
 export interface IEmitter {
@@ -311,12 +287,6 @@ export interface IParticleSystem {
      */
     readonly isDisposed?: boolean;
     /**
-     * Whether the system is disposed once it has finished.
-     * @deprecated Read {@link IParticleSystem.stopAction}: true is `'destroy'`.
-     * @type {boolean}
-     */
-    autoDestroy: boolean;
-    /**
      * What the system does once it has finished, as Unity's Stop Action: nothing (`'none'`),
      * disable its emitter (`'disable'`) or dispose itself (`'destroy'`). Undefined is `'none'`.
      */
@@ -341,7 +311,7 @@ export interface IParticleSystem {
      * Number of particles.
      * @type {number}
      */
-    particleNum: number;
+    readonly particleNum: number;
     /**
      * Duration of the system.
      * @type {number}
@@ -356,14 +326,12 @@ export interface IParticleSystem {
      * Array of particles.
      * @type {Array<IParticle>}
      */
-    particles: Array<IParticle>;
+    readonly particles: Array<IParticle>;
     /**
      * Emitter for the particles.
      * @type {IEmitter}
      */
     emitter: IEmitter;
-    //_renderer?: BatchedRenderer;
-    //instancingGeometry: BufferGeometry;
     /** Settings of the renderer that draws the particles, such as the trail or beam setup. */
     rendererEmitterSettings: RendererEmitterSettings;
     /**
@@ -373,9 +341,7 @@ export interface IParticleSystem {
      */
     flip?: Vector2;
     /** Emission progress: time in the cycle, burst and distance counters. */
-    emissionState: EmissionState;
-
-    //getRendererSettings(): VFXBatchSettings;
+    readonly emissionState: EmissionState;
 
     /** True while paused: the system is not simulated. */
     paused: boolean;
@@ -406,7 +372,7 @@ export interface IParticleSystem {
      * Writes the system's settings, putting its shared resources into `metaData`; the shapes of both
      * are the renderer's.
      */
-    toJSON(metaData: unknown, options: SerializationOptions): unknown;
+    toJSON(metaData: unknown): unknown;
 
     /**
      * Spawns what `delta` seconds of emission call for, on `subEmissionState` from the emitter at

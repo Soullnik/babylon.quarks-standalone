@@ -1,6 +1,6 @@
 import {TransformNode} from '@babylonjs/core/Meshes/transformNode';
 import {Scene} from '@babylonjs/core/scene';
-import {IParticleSystem, Matrix4, SerializationOptions, Vector3} from 'quarks.core';
+import {IParticleSystem, Matrix4, Vector3} from 'quarks.core';
 import {quarksNodeId} from './nodeId';
 import type {BabylonMetaData, ScalingMode} from './system/types';
 
@@ -211,7 +211,7 @@ export class ParticleEmitter extends TransformNode {
      * `visible` is the node's own enabled flag, not the one it inherits from its parents. To write
      * a whole effect, with its children and resources, use `serializeEffect`.
      */
-    toJSON(meta?: BabylonMetaData, options: SerializationOptions = {}): ParticleEmitterJSON {
+    toJSON(meta?: BabylonMetaData): ParticleEmitterJSON {
         return {
             uuid: quarksNodeId(this),
             type: 'ParticleEmitter',
@@ -228,7 +228,7 @@ export class ParticleEmitter extends TransformNode {
                 : undefined,
             scale: [this.scaling.x, this.scaling.y, this.scaling.z],
             visible: this.isEnabled(false),
-            ps: this.system.toJSON(meta, options),
+            ps: this.system.toJSON(meta),
         };
     }
 }

@@ -2,7 +2,6 @@ import {GeneratorMemory} from './functions';
 import {EmissionState} from './IParticleSystem';
 import {Matrix4, Quaternion, QuaternionView, Vector3, Vector3View, Vector4, Vector4View} from './math';
 import {ParticleStore} from './ParticleStore';
-import {LinkedList} from './util/LinkedList';
 
 /**
  * The state every particle has, whatever kind: where it is, how it moves, how it looks and how old
@@ -491,24 +490,6 @@ export class SpriteParticle implements Particle {
 const EMPTY_HISTORY = new Float32Array(0);
 
 /**
- * One recorded sample of a trail in the old linked-list history.
- * @deprecated Trails record into a flat ring buffer now (`TrailParticle.historyPositions` and its siblings).
- */
-export class RecordState {
-    /**
-     * Creates a new record state.
-     * @param {Vector3} position - The position of the particle.
-     * @param {number} size - The size of the particle.
-     * @param {Vector4} color - The color of the particle.
-     */
-    constructor(
-        public position: Vector3,
-        public size: number,
-        public color: Vector4
-    ) {}
-}
-
-/**
  * Particle implementation for trail-based particles.
  */
 export class TrailParticle implements Particle {
@@ -628,28 +609,6 @@ export class TrailParticle implements Particle {
      * @type {Vector4}
      */
     color: Vector4;
-    /**
-     * Previous states of the particle.
-     *
-     * @deprecated The trail history now lives in the flat ring buffer below
-     * (`historyPositions` / `historySizes` / `historyColors`), which records a
-     * sample without allocating. This list is no longer populated or rendered.
-     * @internal
-     */
-    get previous(): LinkedList<RecordState> {
-        return (this._previous ??= new LinkedList<RecordState>());
-    }
-
-    /**
-     * Replaces the old history list.
-     * @deprecated See the getter.
-     * @internal
-     */
-    set previous(value: LinkedList<RecordState>) {
-        this._previous = value;
-    }
-
-    private _previous: LinkedList<RecordState> | undefined = undefined;
     /**
      * UV tile index, kept in the store's `uvTile` column.
      * @type {number}

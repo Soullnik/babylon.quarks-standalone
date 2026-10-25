@@ -52,7 +52,7 @@ matrix is not written.
 | `Group` (and three.js object types) | a `TransformNode` | any other node |
 | `ParticleEmitter` | `ps`: a particle system (`ParticleSystem.toJSON`) | a `ParticleEmitter` |
 | `Mesh` | `geometry` and `material` uuids | a `Mesh`: its positions, indices, uvs, uvs2 and normals; an unindexed mesh gets its vertices in order; clones share one geometry |
-| `QuarksPrefab` | `animationData`, `timeScale` | a `QuarksPrefab` |
+| `QuarksPrefab` | `animationData` (each track's `type` is `'ps'`, a particle system, or `'clip'`, a timeline clip; `'three'`, as three.quarks and babylon.quarks before 0.30 write a clip track, reads as `'clip'`), `timeScale` | a `QuarksPrefab` |
 
 A particle system (`ps`) writes each setting only when it differs from the default its constructor
 gives a system that leaves the setting out, and a missing field reads as that default. Its shape, its start
@@ -70,6 +70,10 @@ three.quarks and babylon.quarks before 0.27 do not, since they read some fields 
 A shape's or behavior's own `toJSON()` still writes every field.
 
 `ps.version` (`'3.0'`) is written for three.quarks, which reads it; babylon.quarks does not.
+
+Since 0.30 a prefab's clip tracks are written as `'clip'`, which three.quarks does not know: it skips
+them, as babylon.quarks 0.29 does. Writing for three.quarks is not a goal of the format; reading its
+files is.
 
 A system's blend mode is its material entry's `alphaMode`, which babylon.quarks always writes. A
 material entry without one, as three.js writes, reads its three.js `blending`, and alpha blending

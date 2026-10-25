@@ -210,7 +210,7 @@ describe('editor session', () => {
         expect(handle.scene).toBe(s.scene);
         expect(handle.renderer).toBe(s.renderer);
         expect(handle.history).toBe(s.history);
-        expect(handle.importGallery).toBe(handle.importAssets);
+        expect(handle).not.toHaveProperty('importGallery');
         expect(JSON.parse(handle.exportJson()).metadata).toBeDefined();
         // In memory, nothing is ever dirty.
         expect(state.sceneDirty).toBe(true);

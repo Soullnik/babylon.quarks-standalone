@@ -99,7 +99,7 @@ describe('RandomBetweenCurves in a system', () => {
         const ps = system({startSpeed: new RandomBetweenCurves(line(1), line(3))});
         const meta = emptyMeta();
         const json = ps.toJSON(meta);
-        const loaded = ParticleSystem.fromJSON(json, meta, {}, scene);
+        const loaded = ParticleSystem.fromJSON(json, meta, scene);
         expect(loaded.startSpeed).toBeInstanceOf(RandomBetweenCurves);
         expect(loaded.startSpeed.toJSON()).toEqual(ps.startSpeed.toJSON());
         expect(ps.clone().startSpeed.toJSON()).toEqual(ps.startSpeed.toJSON());

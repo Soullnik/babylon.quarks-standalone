@@ -292,7 +292,7 @@ describe('image processing', () => {
         const ps = system({applyImageProcessing: false});
         const json = ps.toJSON(emptyMeta());
         expect(json.applyImageProcessing).toBe(false);
-        expect(ParticleSystem.fromJSON(json, emptyMeta(), {}, scene).applyImageProcessing).toBe(false);
+        expect(ParticleSystem.fromJSON(json, emptyMeta(), scene).applyImageProcessing).toBe(false);
         expect(ps.clone().applyImageProcessing).toBe(false);
         const loaded = new QuarksLoader(scene).parse(JSON.parse(JSON.stringify(serializeEffect(ps.emitter))));
         const read: ParticleSystem[] = [];
