@@ -24,6 +24,7 @@ import {
     normalizeBursts,
     validCullingMode,
     validRenderFace,
+    validScalingMode,
     validSortMode,
     validTileCount,
 } from './normalize';
@@ -240,12 +241,7 @@ export const SETTINGS: ReadonlyArray<SettingDescriptor> = [
     ),
     plain('playbackSpeed', (s) => s.playbackSpeed, 1, number),
     plain('cullingMode', (s) => s.cullingMode, 'always', validCullingMode),
-    plain(
-        'scalingMode',
-        (s) => s.scalingMode,
-        'shape',
-        (json) => (json === 'hierarchy' ? 'hierarchy' : 'shape')
-    ),
+    plain('scalingMode', (s) => s.scalingMode, 'local', validScalingMode),
     plain('seed', (s) => s.seed, undefined, number),
     plain('sortMode', (s) => s.sortMode, 'none', validSortMode),
     plain('renderFace', (s) => s.renderFace, 'both', validRenderFace),

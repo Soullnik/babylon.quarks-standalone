@@ -337,6 +337,8 @@ interface LoadedMeta {
     textures: {[uuid: string]: Texture | null};
     geometries: {[uuid: string]: GeometryArrays};
     materials: {[uuid: string]: QuarksMaterialJSON};
+    /** The file's `quarksFormat`; 0 for a file written before the field existed. */
+    format: number;
 }
 
 /**
@@ -623,6 +625,7 @@ export class QuarksLoader {
             textures: {},
             geometries: {},
             materials: {},
+            format: typeof format === 'number' ? format : 0,
         };
 
         const {geometries, images, textures: textureList, materials} = json;
@@ -1486,6 +1489,12 @@ export class QuarksLoader {
     }
 
     private parseParticleSystem(json: ParticleSystemJSONParameters, meta: LoadedMeta): ParticleSystem {
+        if (meta.format < 2 && json !== null && typeof json === 'object' && json.scalingMode !== 'hierarchy') {
+            // Before format 2 the emitter's whole world scale reached every system's shape and
+            // particle size, and a local-space system's motion too: 'hierarchy' is the mode that
+            // keeps such an effect's look. 'local' became the default with Unity's meaning.
+            json = {...json, scalingMode: 'hierarchy'};
+        }
         const dependencies: {[uuid: string]: Behavior} = {};
         const ps = ParticleSystem.fromJSON(json, meta, dependencies, this.scene);
         if (json?.shape?.type === 'mesh_surface' && typeof json.shape.mesh === 'string') {

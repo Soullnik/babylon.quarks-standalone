@@ -41,7 +41,7 @@ export class EmitterFrame {
     readonly position = new Vector3();
     /** The emitter's world rotation. */
     readonly quaternion = new Quaternion();
-    /** The emitter's world scale per axis. */
+    /** The scale per axis of the emitter's `matrixWorld`, which its scaling mode sets. */
     readonly scale = new Vector3(1, 1, 1);
     /** Inverse of {@link quaternion}. */
     readonly quaternionInverse = new Quaternion();

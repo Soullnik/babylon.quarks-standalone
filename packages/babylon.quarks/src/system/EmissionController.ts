@@ -176,11 +176,6 @@ export class EmissionController {
             }
         }
 
-        // Only spawns in world space consume the normal matrix, and computing it
-        // inverts a 4x4 — skip it for local-space systems.
-        if (system.worldSpace) {
-            this.spawner.normalMatrix.getNormalMatrix(emitterMatrix);
-        }
         const qualityFactor = system.emissionFactor();
 
         if (system.emissionBursts.length > 0 && !endedBefore) {

@@ -17,6 +17,29 @@ the API and the look of effects are frozen.
   as its base. The rim and the centre are unchanged; particles in between lean out more than
   before. Re-tune a cone effect that relied on the old, narrower middle. Cones in three.quarks
   files tilt the new way too, so they lean out further in the middle than in three.quarks.
+- **Scaling Mode works as Unity's, in world and local space, and defaults to `'local'`.** The
+  emitter's scale now reaches the shape, the particles' size and their motion in every mode except
+  where the mode leaves it out: `'local'` (new, the default) uses only the emitter's own `scaling`
+  and leaves its parents' out; `'hierarchy'` uses the whole world scale, as before; `'shape'` now
+  scales only the emission shape, leaving the particles' size and speed alone (it used to scale
+  their size too). Before, a local-space system took its emitter's whole world scale whatever the
+  mode. An effect whose emitter or its parents are scaled looks different unless it was
+  `'hierarchy'`: set `scalingMode: 'hierarchy'` to keep a parent's scale on it, or leave it at
+  `'local'` to keep the effect its own size under a scaled parent. Effects at scale 1 are
+  unchanged.
+  - **Files from before this release keep their look:** the format goes to 2, and a system in a
+    file of format 1 or without `quarksFormat` (older babylon.quarks, three.quarks, the Unity
+    exporter before 0.29) reads as `'hierarchy'`, which gives it the emitter's whole world scale
+    as before (except a world-space system's speed, which now scales too). Save it again to keep
+    that, or set the mode you want. A 0.28 loader warns about a format 2 file and reads its
+    systems as its own default.
+  - **`ParticleEmitter.matrixWorld` (`IEmitter.matrixWorld`) is the matrix the system simulates
+    and draws in:** the world matrix with each axis's length set by the mode. A custom behavior
+    that reads it gets that scale. `ParticleEmitter.shapeScale` is what `'shape'` gives the shape.
+  - **Negative scales mirror the start velocity as they mirror the position,** in every mode; a
+    world-space `'hierarchy'` system used to mirror the position only.
+  - **A sub emission's speed** takes its parent particle's frame, as its size did: it no longer
+    scales with the sub emitter's own scale in `'hierarchy'`.
 
 ### Added
 

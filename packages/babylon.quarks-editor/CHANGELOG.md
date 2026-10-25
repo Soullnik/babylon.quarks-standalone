@@ -4,6 +4,15 @@ All notable changes to the `babylon.quarks-editor` package are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project follows the `quarks.core` 0.x version line.
 
+## [0.29.0] — Unreleased
+
+### Changed
+
+- **Scaling mode** offers Local (the default), Hierarchy and Shape, as Unity's, for world- and
+  local-space systems alike.
+- **Shape module:** a cone's Emit from (Base, Volume) and Length, shown for Volume only, and a
+  grid's Sampling (Random, Sequential).
+
 ## [0.28.0] — 2026-10-23
 
 ### Breaking

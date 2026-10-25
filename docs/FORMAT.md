@@ -31,6 +31,7 @@ changelog.
 | Version | Release | Change |
 | --- | --- | --- |
 | 1 | 0.27 | First numbered version. `serializeEffect` writes whole documents. |
+| 2 | 0.29 | `scalingMode` defaults to `'local'` with Unity's meaning. A system in an older file reads as `'hierarchy'`, which keeps its look. |
 
 What older writers produced is checked against real files in `packages/babylon.quarks/test/fixtures`:
 effects written by three.quarks, by the Unity exporter and by babylon.quarks 0.27.0. Each must load,

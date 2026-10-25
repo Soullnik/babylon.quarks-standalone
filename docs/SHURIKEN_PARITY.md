@@ -9,7 +9,7 @@ Three tiers: ✅ shipped · 🟡 runtime supports it, editor UI missing · 🔴 
 - ✅ start delay (constant/random, ignored with prewarm, re-armed by restart)
 - ✅ 3D start size (uniform / per-axis `Vector3Function`), gradient start color (single `Gradient` and random-between-two-gradients `RandomColorBetweenGradient`)
 - ✅ max particles (`maxParticles`), simulation speed (`playbackSpeed`), culling mode (`cullingMode`: always / pause / pause and catch up), random seed (`seed`)
-- ✅ scaling mode (`scalingMode`: shape / hierarchy, for world-space systems under a scaled parent)
+- ✅ scaling mode (`scalingMode`: local / hierarchy / shape with Unity's meaning, world and local space)
 - 🔴 stop action, ring buffer
 
 ## Emission

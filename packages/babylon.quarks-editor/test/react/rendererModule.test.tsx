@@ -187,7 +187,7 @@ describe('Main module', () => {
         mounted = null;
     });
 
-    it('offers the scaling mode for world-space systems', () => {
+    it('offers the scaling mode in world and local space', () => {
         const system = makeSystem(scene.get());
         const binding = new EffectBinding(system);
         const element = () => <MainModule binding={binding} />;
@@ -195,7 +195,9 @@ describe('Main module', () => {
         binding.subscribe(() => mounted!.render(element()));
         const {container} = mounted;
         openModule(container, 'Main');
-        expect(hasRow(container, 'Scaling mode')).toBe(false);
+        expect(system.scalingMode).toBe('local');
+        pick(controlsOf(rowOf(container, 'Scaling mode'))[0], 'shape');
+        expect(system.scalingMode).toBe('shape');
         click(controlsOf(rowOf(container, 'World space'))[0]);
         pick(controlsOf(rowOf(container, 'Scaling mode'))[0], 'hierarchy');
         expect(system.worldSpace).toBe(true);
