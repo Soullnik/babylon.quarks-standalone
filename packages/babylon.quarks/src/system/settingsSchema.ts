@@ -23,9 +23,12 @@ import {
     DEFAULT_SOFT_FAR_FADE,
     normalizeBursts,
     validCullingMode,
+    validLoopRange,
     validRenderFace,
+    validRingBufferMode,
     validScalingMode,
     validSortMode,
+    validStopAction,
     validTileCount,
 } from './normalize';
 import type {
@@ -143,7 +146,7 @@ function vectorJSON(value: unknown): number[] | undefined {
 
 /** Every plain and generator setting, in the order `toJSON` writes them. */
 export const SETTINGS: ReadonlyArray<SettingDescriptor> = [
-    plain('autoDestroy', (s) => s.autoDestroy, false, boolean),
+    plain('stopAction', (s) => s.stopAction, 'none', validStopAction),
     plain('looping', (s) => s.looping, true, boolean),
     plain('prewarm', (s) => s.prewarm, false, boolean),
     plain('prewarmTime', (s) => s.prewarmTime, 0, number),
@@ -229,6 +232,15 @@ export const SETTINGS: ReadonlyArray<SettingDescriptor> = [
         clone: (value) => (value as BurstParameters[]).map((burst) => ({...burst, count: burst.count.clone()})),
     },
     plain('maxParticles', (s) => s.maxParticles, undefined, number),
+    plain('ringBufferMode', (s) => s.ringBufferMode, 'disabled', validRingBufferMode),
+    {
+        param: 'ringBufferLoopRange',
+        get: (s) => s.ringBufferLoopRange,
+        isDefault: (value) => (value as Vector2).x === 0 && (value as Vector2).y === 1,
+        toJSON: vectorJSON,
+        fromJSON: (json) => (Array.isArray(json) ? validLoopRange(new Vector2(json[0], json[1])) : undefined),
+        clone: (value) => (value as Vector2).clone(),
+    },
     plain('onlyUsedByOther', (s) => s.onlyUsedByOther, false, boolean),
     plain('renderMode', (s) => s.renderMode, RenderMode.BillBoard, number),
     plain('renderOrder', (s) => s.renderOrder, 0, number),
@@ -321,6 +333,10 @@ export function settingsFromJSON(json: ParticleSystemJSONParameters): Partial<Pa
         if (read !== undefined) {
             parameters[setting.param] = read;
         }
+    }
+    // Files before 0.29 wrote the stop action as `autoDestroy`.
+    if (parameters.stopAction === undefined && fields.autoDestroy === true) {
+        parameters.stopAction = 'destroy';
     }
     return parameters as Partial<ParticleSystemParameters>;
 }

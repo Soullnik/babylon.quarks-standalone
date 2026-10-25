@@ -194,6 +194,26 @@ describe('seeded systems, instantiate and the effect pool', () => {
         renderer.dispose();
     });
 
+    it.each(['destroy', 'disable'] as const)('replays copies whose systems have stop action %s', (stopAction) => {
+        const renderer = new BatchedRenderer('r', scene);
+        const root = new TransformNode('fx', scene);
+        const system = makeSystem({looping: false, stopAction});
+        system.emitter.parent = root;
+        const pool = new EffectPool(root, {renderer, maxSize: 1});
+        for (let round = 0; round < 2; round++) {
+            const copy = pool.acquire()!;
+            expect(copy).not.toBeNull();
+            let systemOfCopy: ParticleSystem | undefined;
+            QuarksUtil.runOnAllParticleEmitters(copy, (e) => (systemOfCopy = e.system as ParticleSystem));
+            // The pool keeps the authored stop action and skips it.
+            expect(systemOfCopy!.stopAction).toBe(stopAction);
+            for (let i = 0; i < 120; i++) renderer.update(STEP);
+            expect(pool.activeCount).toBe(0);
+            expect(copy.isDisposed()).toBe(false);
+            expect(systemOfCopy!.emitter.isEnabled(false)).toBe(true);
+        }
+    });
+
     it('stops a looping copy gracefully, releases on demand, and respects maxSize', () => {
         const renderer = new BatchedRenderer('r', scene);
         const root = new TransformNode('fx', scene);

@@ -110,6 +110,8 @@ export function parseEffectFromJson(
     const systems: ParticleSystem[] = [];
     QuarksUtil.runOnAllParticleEmitters(root, (emitter: ParticleEmitter) => {
         const system = emitter.system as ParticleSystem;
+        // The editor previews over and over; the stop action is saved, not applied.
+        system.ignoreStopAction = true;
         if (registerRenderer && renderer) {
             renderer.addSystem(system);
         }

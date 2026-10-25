@@ -320,6 +320,20 @@ export function MainModule({binding}: ModuleProps) {
                     onChange={(mode) => binding.apply((s) => (s.cullingMode = mode as CullingMode))}
                 />
             </Row>
+            <Row
+                label="Stop action"
+                hint="What the system does once it has finished, as Unity's Stop Action. The editor saves it but does not apply it, so previews replay."
+            >
+                <SelectField
+                    value={system.stopAction}
+                    options={[
+                        {value: 'none', label: 'None'},
+                        {value: 'disable', label: 'Disable'},
+                        {value: 'destroy', label: 'Destroy'},
+                    ]}
+                    onChange={(v) => binding.apply((s) => (s.stopAction = v))}
+                />
+            </Row>
             <ValueField
                 label="Start delay"
                 generator={system.startDelay}
@@ -1662,6 +1676,48 @@ export function RendererModule({
                     />
                 )}
             </Row>
+            {system.maxParticles !== undefined && system.renderMode !== RenderMode.Trail && (
+                <Row
+                    label="Ring buffer"
+                    hint="What a full system does with new particles, as Unity's Ring Buffer Mode."
+                >
+                    <SelectField
+                        value={system.ringBufferMode}
+                        options={[
+                            {value: 'disabled', label: 'Disabled'},
+                            {value: 'pauseUntilReplaced', label: 'Pause until replaced'},
+                            {value: 'loopUntilReplaced', label: 'Loop until replaced'},
+                        ]}
+                        onChange={(v) => binding.apply((s) => (s.ringBufferMode = v))}
+                    />
+                </Row>
+            )}
+            {system.maxParticles !== undefined &&
+                system.renderMode !== RenderMode.Trail &&
+                system.ringBufferMode === 'loopUntilReplaced' && (
+                    <Row label="Loop range" hint="The part of its life a particle plays again, from 0 to 1.">
+                        <div style={{display: 'flex', gap: 6}}>
+                            {(['x', 'y'] as const).map((end) => (
+                                <NumberField
+                                    key={end}
+                                    value={system.ringBufferLoopRange[end]}
+                                    min={0}
+                                    step={0.05}
+                                    onChange={(v) =>
+                                        binding.apply((s) => {
+                                            const next = s.ringBufferLoopRange.clone();
+                                            next[end] = Math.min(1, Math.max(0, v));
+                                            s.ringBufferLoopRange = new Vector2(
+                                                Math.min(next.x, next.y),
+                                                Math.max(next.x, next.y)
+                                            );
+                                        })
+                                    }
+                                />
+                            ))}
+                        </div>
+                    </Row>
+                )}
             {system.renderMode !== RenderMode.Mesh && system.renderMode !== RenderMode.Trail && (
                 <Row label="Pivot">
                     <div style={{display: 'flex', gap: 6}}>

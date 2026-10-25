@@ -25,7 +25,9 @@ afterAll(() => {
  * the code that handles the document's meta, the render mode's settings, the shape or the behaviors.
  */
 const HANDLED_BY: Record<keyof ParticleSystemParameters, 'table' | 'elsewhere'> = {
-    autoDestroy: 'table',
+    stopAction: 'table',
+    // Read into stopAction by the constructor and by the JSON reader, not written.
+    autoDestroy: 'elsewhere',
     looping: 'table',
     prewarm: 'table',
     prewarmTime: 'table',
@@ -41,6 +43,8 @@ const HANDLED_BY: Record<keyof ParticleSystemParameters, 'table' | 'elsewhere'> 
     emissionOverDistance: 'table',
     emissionBursts: 'table',
     maxParticles: 'table',
+    ringBufferMode: 'table',
+    ringBufferLoopRange: 'table',
     onlyUsedByOther: 'table',
     behaviors: 'elsewhere',
     instancingGeometry: 'elsewhere',

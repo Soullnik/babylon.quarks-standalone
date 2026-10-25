@@ -161,7 +161,9 @@ Each of these logs a warning naming the system.
   so every exported one carries `flip` with V set to `1 − Unity's Flip V` (usually `1`), which
   turns it back the right way.
 - **Max Particles** caps live particles per system like Unity's; emission past it is dropped
-  rather than queued.
+  rather than queued, or replaces the oldest with a **Ring Buffer Mode**.
+- **Stop Action** Disable and Destroy are exported; Callback is the runtime's `finished` event,
+  which always fires.
 - **Mesh env map:** if the particle material exposes a Cubemap (`_Cube`, `_Cubemap`,
   `_ReflectionCubemap`, …, or any Cubemap-typed texture property), it is baked into a 3×2
   `reflectionAtlas` (px py pz / nx ny nz) so babylon.quarks can sample reflections on iOS.

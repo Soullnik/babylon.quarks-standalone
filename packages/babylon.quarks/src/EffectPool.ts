@@ -49,7 +49,8 @@ interface RestTransform {
  * it; a copy whose every system has finished goes back to the pool by itself,
  * so a one-shot effect needs nothing more. A looping effect is ended with
  * {@link stop}, which lets its particles die out before the copy returns, or
- * dropped at once with {@link release}.
+ * dropped at once with {@link release}. A ring buffer effect (`ringBufferMode`)
+ * never finishes, since its particles never die: release it.
  *
  * Idle copies are parked disabled, which costs the renderer nothing, and keep
  * their place in its batches, so acquiring one allocates nothing.
@@ -168,9 +169,9 @@ export class EffectPool {
         const systems: ParticleSystem[] = [];
         QuarksUtil.runOnAllParticleEmitters(copy, (emitter) => {
             const system = emitter.system as unknown as ParticleSystem;
-            // The pool owns the copy's life; a system disposing itself would
-            // pull one emitter out of an effect that is meant to play again.
-            system.autoDestroy = false;
+            // The pool owns the copy's life; a system disposing or disabling itself
+            // would pull one emitter out of an effect that is meant to play again.
+            system.ignoreStopAction = true;
             system.addEventListener('finished', this.onSystemFinished);
             systems.push(system);
         });

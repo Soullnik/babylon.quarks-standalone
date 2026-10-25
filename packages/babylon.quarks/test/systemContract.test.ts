@@ -65,7 +65,9 @@ type Parameter<K extends keyof ParticleSystemParameters> = (() => ParticleSystem
  * one (covered there).
  */
 const PARAMETERS: {[K in keyof Required<ParticleSystemParameters>]: Parameter<K>} = {
-    autoDestroy: () => true,
+    stopAction: () => 'disable',
+    // A deprecated alias of stopAction, covered there.
+    autoDestroy: 'not-a-setting',
     looping: () => false,
     prewarm: () => true,
     prewarmTime: () => 0.5,
@@ -87,6 +89,8 @@ const PARAMETERS: {[K in keyof Required<ParticleSystemParameters>]: Parameter<K>
     emissionOverDistance: () => new ConstantValue(4),
     emissionBursts: () => [{time: 0.2, count: new IntervalValue(3, 6), cycle: 2, interval: 0.1, probability: 0.5}],
     maxParticles: () => 77,
+    ringBufferMode: () => 'loopUntilReplaced',
+    ringBufferLoopRange: () => new Vector2(0.2, 0.7),
     onlyUsedByOther: () => true,
     behaviors: () => [
         new ColorOverLife(new Gradient()),
@@ -331,7 +335,10 @@ describe('ParticleSystem serialisation contract', () => {
 
     it('sets every parameter in at least one variant', () => {
         const unset = Object.entries(PARAMETERS)
-            .filter(([key, make]) => make === 'not-a-setting' && !['scene', 'material', 'speedFactor'].includes(key))
+            .filter(
+                ([key, make]) =>
+                    make === 'not-a-setting' && !['scene', 'material', 'speedFactor', 'autoDestroy'].includes(key)
+            )
             .map(([key]) => key)
             .filter((key) => !VARIANTS.some(([, overrides]) => key in overrides));
         expect(unset).toEqual([]);

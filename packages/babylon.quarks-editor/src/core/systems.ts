@@ -49,6 +49,8 @@ export function createChildSystem(parent: ParticleSystem, options: ChildSystemOp
         worldSpace: true,
     });
     child.emitter.name = options.name ?? (oneShot ? 'sub-emitter' : 'child-system');
+    // The editor previews over and over; the stop action is saved, not applied.
+    child.ignoreStopAction = true;
     if (oneShot) {
         child.onlyUsedByOther = true;
     }

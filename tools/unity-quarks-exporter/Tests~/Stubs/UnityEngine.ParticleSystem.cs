@@ -9,6 +9,8 @@ namespace UnityEngine
     public enum ParticleSystemGradientMode { Color = 0, Gradient = 1, TwoColors = 2, TwoGradients = 3, RandomColor = 4 }
     public enum ParticleSystemSimulationSpace { Local = 0, World = 1, Custom = 2 }
     public enum ParticleSystemScalingMode { Hierarchy = 0, Local = 1, Shape = 2 }
+    public enum ParticleSystemStopAction { None = 0, Disable = 1, Destroy = 2, Callback = 3 }
+    public enum ParticleSystemRingBufferMode { Disabled = 0, PauseUntilReplaced = 1, LoopUntilReplaced = 2 }
     public enum ParticleSystemCullingMode { Automatic = 0, PauseAndCatchup = 1, Pause = 2, AlwaysSimulate = 3 }
     public enum ParticleSystemSortMode { None = 0, Distance = 1, OldestInFront = 2, YoungestInFront = 3, Depth = 4 }
     public enum ParticleSystemRenderMode { Billboard = 0, Stretch = 1, HorizontalBillboard = 2, VerticalBillboard = 3, Mesh = 4, None = 5 }
@@ -212,6 +214,9 @@ namespace UnityEngine
             public float simulationSpeed { get; set; } = 1f;
             public ParticleSystemScalingMode scalingMode { get; set; } = ParticleSystemScalingMode.Local;
             public int maxParticles { get; set; } = 1000;
+            public ParticleSystemStopAction stopAction { get; set; } = ParticleSystemStopAction.None;
+            public ParticleSystemRingBufferMode ringBufferMode { get; set; } = ParticleSystemRingBufferMode.Disabled;
+            public Vector2 ringBufferLoopRange { get; set; } = new Vector2(0, 1);
             public ParticleSystemCullingMode cullingMode { get; set; }
         }
 

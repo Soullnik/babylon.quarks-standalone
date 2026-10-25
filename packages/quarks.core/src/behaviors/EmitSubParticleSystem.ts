@@ -130,9 +130,36 @@ export class EmitSubParticleSystem implements Behavior {
             this.emit(particle, delta);
         } else if (this.mode === SubParticleEmitMode.Birth && particle.age === 0) {
             this.emit(particle, delta);
-        } else if (this.mode === SubParticleEmitMode.Death && particle.age + delta >= particle.life) {
+        } else if (
+            this.mode === SubParticleEmitMode.Death &&
+            particle.age + delta >= particle.life &&
+            // A ring buffer's particles are held or looped at the end of their life, not killed.
+            !this.particleSystem.ringBufferActive
+        ) {
             this.emit(particle, delta);
         }
+    }
+
+    /**
+     * Whether emissions that parent particles started into the target are still running, so the
+     * target has more particles to come. The parent is not finished while it has any.
+     */
+    hasPendingEmission(): boolean {
+        const target = this.target;
+        if (target === undefined) {
+            return false;
+        }
+        for (let i = 0; i < this.subEmissions.length; i++) {
+            if (target.hasPendingEmission(this.subEmissions[i])) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** The system this behavior emits into, when it is set, linked and not disposed. */
+    get targetSystem(): IParticleSystem | undefined {
+        return this.target;
     }
 
     /**

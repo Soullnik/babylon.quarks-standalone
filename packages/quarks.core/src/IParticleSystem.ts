@@ -311,10 +311,22 @@ export interface IParticleSystem {
      */
     readonly isDisposed?: boolean;
     /**
-     * Whether the ParticleSystem should be automatically disposed when it finishes emitting particles.
-     * @type {string}
+     * Whether the system is disposed once it has finished.
+     * @deprecated Read {@link IParticleSystem.stopAction}: true is `'destroy'`.
+     * @type {boolean}
      */
     autoDestroy: boolean;
+    /**
+     * What the system does once it has finished, as Unity's Stop Action: nothing (`'none'`),
+     * disable its emitter (`'disable'`) or dispose itself (`'destroy'`). Undefined is `'none'`.
+     */
+    stopAction?: 'none' | 'disable' | 'destroy';
+    /**
+     * Whether particles outlive their lifetime: held or looped at the end of it until new ones
+     * replace them, as with Unity's Ring Buffer Mode on a full system. A Death sub emitter does
+     * not fire for them, since they do not die.
+     */
+    readonly ringBufferActive?: boolean;
     /**
      * Whether the system is in world space.
      * @type {boolean}
@@ -369,8 +381,11 @@ export interface IParticleSystem {
     paused: boolean;
     /** True after `endEmit()` — emission window closed (non-looping duration elapsed). */
     readonly isEmitEnded: boolean;
-    /** Whether more particles can still spawn (bursts, rate, distance). */
-    hasPendingEmission(): boolean;
+    /**
+     * Whether more particles can still spawn (bursts, rate, distance): from the system's own
+     * emission, or with `state` from one a sub emitter runs into it for a parent particle.
+     */
+    hasPendingEmission(state?: EmissionState): boolean;
     /** Non-looping system with no live particles and no pending emission. */
     isFinished(): boolean;
     /** Freezes the system where it is until {@link IParticleSystem.play}. */

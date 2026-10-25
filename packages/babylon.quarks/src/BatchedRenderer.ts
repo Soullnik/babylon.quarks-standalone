@@ -704,7 +704,7 @@ export class BatchedRenderer extends TransformNode {
                     !this.isSystemInView(system);
                 system.update(delta, stepDeadline, catchUpDeadline);
             }
-            // An autoDestroy system disposes itself from inside update and drops
+            // A system whose stop action is destroy disposes itself from inside update and drops
             // out of the list; stay on the slot it vacated.
             if (systems[i] !== system) {
                 i--;

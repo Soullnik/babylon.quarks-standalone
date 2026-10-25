@@ -15,6 +15,7 @@ import {shareEffectResources} from './effectResources';
 import {MeshSurfaceEmitter} from './MeshSurfaceEmitter';
 import {ParticleEmitter} from './ParticleEmitter';
 import {ParticleSystem} from './ParticleSystem';
+import type {StopAction} from './system/types';
 
 /**
  * Helpers that act on a whole effect: every particle system under a root node, as a loaded effect
@@ -78,7 +79,17 @@ export class QuarksUtil {
         });
     }
 
-    /** Sets {@link ParticleSystem.autoDestroy} on every system under `root`. */
+    /** Sets {@link ParticleSystem.stopAction} on every system under `root`. */
+    static setStopAction(root: Node, stopAction: StopAction): void {
+        QuarksUtil.runOnAllParticleEmitters(root, (emitter) => {
+            (emitter.system as unknown as ParticleSystem).stopAction = stopAction;
+        });
+    }
+
+    /**
+     * Sets {@link ParticleSystem.autoDestroy} on every system under `root`.
+     * @deprecated Use {@link QuarksUtil.setStopAction} with `'destroy'`.
+     */
     static setAutoDestroy(root: Node, autoDestroy: boolean): void {
         QuarksUtil.runOnAllParticleEmitters(root, (emitter) => {
             (emitter.system as unknown as ParticleSystem).autoDestroy = autoDestroy;
