@@ -9,11 +9,13 @@ import type {Scene} from '@babylonjs/core/scene';
 import {
     Bezier,
     CircleEmitter,
+    ConeEmitFrom,
     ConeEmitter,
     ConstantValue,
     DonutEmitter,
     EmitterMode,
     GridEmitter,
+    GridSampling,
     HemisphereEmitter,
     IntervalValue,
     ParticleSystem,
@@ -50,6 +52,7 @@ function createShapeSystem({
     texture,
     shape,
     position,
+    rate = 1000,
 }: {
     scene: Scene;
     batchRenderer: DemoContext['batchRenderer'];
@@ -57,6 +60,8 @@ function createShapeSystem({
     texture: Texture;
     shape: EmitterShape;
     position?: BVector3;
+    /** Particles per second. */
+    rate?: number;
 }) {
     const ps = new ParticleSystem({
         scene,
@@ -67,7 +72,7 @@ function createShapeSystem({
         startSize: new IntervalValue(0.1, 0.1),
         startColor: new RandomColor(new Vector4(1, 0.91, 0.51, 1), new Vector4(1, 0.44, 0.16, 1)),
         worldSpace: true,
-        emissionOverTime: new ConstantValue(1000),
+        emissionOverTime: new ConstantValue(rate),
         shape,
         renderMode: RenderMode.Mesh,
         texture,
@@ -87,7 +92,8 @@ function createShapeSystem({
 }
 
 export function init({scene, camera, batchRenderer, systems}: DemoContext) {
-    camera.setPosition(new BVector3(0, 0, 24));
+    camera.setTarget(new BVector3(2.5, 0, 0));
+    camera.setPosition(new BVector3(2.5, 0, 24));
     const texture = createSharedTexture(scene);
 
     createShapeSystem({
@@ -162,6 +168,25 @@ export function init({scene, camera, batchRenderer, systems}: DemoContext) {
         position: new BVector3(5, 0, 2),
     });
 
+    createShapeSystem({
+        scene,
+        batchRenderer,
+        systems,
+        texture,
+        shape: new ConeEmitter({radius: 0.5, angle: Math.PI / 6, length: 2, emitFrom: ConeEmitFrom.Volume}),
+        position: new BVector3(10, -5, 2),
+    });
+    // In turn, cell by cell: a wave that sweeps the grid row by row.
+    createShapeSystem({
+        scene,
+        batchRenderer,
+        systems,
+        texture,
+        shape: new GridEmitter({width: 2, height: 2, column: 10, row: 10, sampling: GridSampling.Sequential}),
+        position: new BVector3(10, 0, 2),
+        rate: 60,
+    });
+
     systems[2].emitter.rotation.x = -Math.PI / 2;
 
     createLabel(scene, 'Point', new BVector3(-5, -7, 2));
@@ -172,4 +197,6 @@ export function init({scene, camera, batchRenderer, systems}: DemoContext) {
     createLabel(scene, 'Donut', new BVector3(0, 3, 2));
     createLabel(scene, 'Rectangle', new BVector3(5, -7, 2));
     createLabel(scene, 'Grid', new BVector3(5, -2, 2));
+    createLabel(scene, 'Cone volume', new BVector3(10, -7, 2));
+    createLabel(scene, 'Grid in turn', new BVector3(10, -2, 2));
 }

@@ -4,12 +4,14 @@ import {
     BoxEmitFrom,
     BoxEmitter,
     CircleEmitter,
+    ConeEmitFrom,
     ConeEmitter,
     ConstantValue,
     DonutEmitter,
     EdgeEmitter,
     EmitterMode,
     GridEmitter,
+    GridSampling,
     HemisphereEmitter,
     MeshSurfaceEmitter,
     PointEmitter,
@@ -82,6 +84,12 @@ export interface ShapeParams {
     depth: number;
     /** Where a box emits from: its volume, its faces or its edges. */
     emitFrom: BoxEmitFrom;
+    /** Where a cone emits from: its base or its volume. */
+    coneEmitFrom: ConeEmitFrom;
+    /** Height of a cone's volume (Unity's Length), for Emit from Volume. */
+    length: number;
+    /** How a grid picks its cells: at random or in turn. */
+    sampling: GridSampling;
     /** How fast an edge emitter's loop / ping-pong point travels, in lengths per second. */
     speed: number;
     /** The mesh a mesh surface emitter emits from. */
@@ -103,6 +111,9 @@ export const DEFAULT_SHAPE_PARAMS: ShapeParams = {
     row: 10,
     depth: 1,
     emitFrom: BoxEmitFrom.Volume,
+    coneEmitFrom: ConeEmitFrom.Base,
+    length: 5,
+    sampling: GridSampling.Random,
     speed: 1,
     mesh: undefined,
 };
@@ -131,7 +142,11 @@ export function readShapeParams(shape: EmitterShape): ShapeParams {
         column: num('column', DEFAULT_SHAPE_PARAMS.column),
         row: num('row', DEFAULT_SHAPE_PARAMS.row),
         depth: num('depth', DEFAULT_SHAPE_PARAMS.depth),
-        emitFrom: num('emitFrom', DEFAULT_SHAPE_PARAMS.emitFrom) as BoxEmitFrom,
+        // A box and a cone both name it emitFrom, with different enums: each keeps its own.
+        emitFrom: shape instanceof BoxEmitter ? shape.emitFrom : DEFAULT_SHAPE_PARAMS.emitFrom,
+        coneEmitFrom: shape instanceof ConeEmitter ? shape.emitFrom : DEFAULT_SHAPE_PARAMS.coneEmitFrom,
+        length: num('length', DEFAULT_SHAPE_PARAMS.length),
+        sampling: num('sampling', DEFAULT_SHAPE_PARAMS.sampling) as GridSampling,
         speed: anyShape.speed instanceof ConstantValue ? anyShape.speed.value : DEFAULT_SHAPE_PARAMS.speed,
         mesh: anyShape.mesh as Mesh | undefined,
     };
@@ -143,7 +158,7 @@ export const SHAPE_PARAM_KEYS: {[K in ShapeType]: Array<keyof ShapeParams>} = {
     point: [],
     sphere: ['radius', 'arc', 'thickness'],
     hemisphere: ['radius', 'arc', 'thickness'],
-    cone: ['radius', 'arc', 'thickness', 'angle'],
+    cone: ['radius', 'arc', 'thickness', 'angle', 'length'],
     circle: ['radius', 'arc', 'thickness'],
     donut: ['radius', 'arc', 'thickness', 'donutRadius'],
     rectangle: ['width', 'height'],
@@ -180,6 +195,8 @@ export function createShape(type: ShapeType, params: ShapeParams): EmitterShape 
                 arc: params.arc,
                 thickness: params.thickness,
                 angle: params.angle,
+                emitFrom: params.coneEmitFrom,
+                length: params.length,
                 mode: params.mode,
                 spread: params.spread,
             });
@@ -213,6 +230,7 @@ export function createShape(type: ShapeType, params: ShapeParams): EmitterShape 
                 height: params.height,
                 column: params.column,
                 row: params.row,
+                sampling: params.sampling,
             });
         case 'box':
             return new BoxEmitter({

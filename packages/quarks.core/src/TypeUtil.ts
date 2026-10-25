@@ -6,8 +6,9 @@ export interface Constructable<T> {
 /**
  * The kind of a field an editor shows for a shape or behavior: a number, an angle (`'radian'`), a
  * vector, a generator of some kind, a reference to a mesh or system, an enum (`'emitterMode'`,
- * `'boxEmitFrom'`), a shape's local transform (`'shapeTransform'`), the properties a sub emitter
- * inherits (`'subEmitterInherit'`, a list of `SubEmitterInheritance`), and so on.
+ * `'boxEmitFrom'`, `'coneEmitFrom'`, `'gridSampling'`), a shape's local transform
+ * (`'shapeTransform'`), the properties a sub emitter inherits (`'subEmitterInherit'`, a list of
+ * `SubEmitterInheritance`), and so on.
  */
 export type FieldType =
     | 'vec3'
@@ -25,6 +26,8 @@ export type FieldType =
     | 'geometry'
     | 'emitterMode'
     | 'boxEmitFrom'
+    | 'coneEmitFrom'
+    | 'gridSampling'
     | 'subEmitterInherit'
     | 'shapeTransform'
     | 'vec3Func';

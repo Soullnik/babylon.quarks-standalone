@@ -347,8 +347,10 @@ namespace BabylonQuarks.UnityExporter
                 case ParticleSystemShapeType.Cone:
                     return ShapeBase("cone", shape).Set("angle", shape.angle * Mathf.Deg2Rad);
                 case ParticleSystemShapeType.ConeVolume:
-                    Debug.LogWarning($"[Quarks Exporter] '{owner}': shape Cone Volume emits from the cone's base in babylon.quarks; its Length is not exported.");
-                    return ShapeBase("cone", shape).Set("angle", shape.angle * Mathf.Deg2Rad);
+                    return ShapeBase("cone", shape)
+                        .Set("angle", shape.angle * Mathf.Deg2Rad)
+                        .Set("emitFrom", ConeEmitFromVolume)
+                        .Set("length", Mathf.Max(0f, shape.length));
                 case ParticleSystemShapeType.Sphere:
                     return ShapeBase("sphere", shape);
                 case ParticleSystemShapeType.Hemisphere:
@@ -393,6 +395,9 @@ namespace BabylonQuarks.UnityExporter
         private const int BoxEmitFromVolume = 0;
         private const int BoxEmitFromShell = 1;
         private const int BoxEmitFromEdge = 2;
+
+        // quarks ConeEmitFrom: Base=0, Volume=1.
+        private const int ConeEmitFromVolume = 1;
 
         /// <summary>Unity sizes its box shapes by the shape's Scale; all of them move particles along +Z.</summary>
         private static JObject BoxShape(ParticleSystem.ShapeModule shape, Vector3 size, int emitFrom)

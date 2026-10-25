@@ -4,6 +4,32 @@ All notable changes to the `babylon.quarks` package are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project follows the `quarks.core` 0.x version line.
 
+## [0.29.0] — Unreleased
+
+Phase 7 of the road to 1.0: what still behaves differently from Unity is brought in line before
+the API and the look of effects are frozen.
+
+### Breaking
+
+- **Cone particles between the centre and the rim tilt by `atan(r · tan(angle))`**, as Unity's
+  Cone, instead of `angle · r`. Each particle follows the cone's side line through its start
+  point, so the cone's far end is a disc of radius `radius + length · tan(angle)` filled as evenly
+  as its base. The rim and the centre are unchanged; particles in between lean out more than
+  before. Re-tune a cone effect that relied on the old, narrower middle. Cones in three.quarks
+  files tilt the new way too, so they lean out further in the middle than in three.quarks.
+
+### Added
+
+- **Cone Emit from Volume and Length** (Unity's Cone Volume): `ConeEmitter.emitFrom`
+  (`ConeEmitFrom.Base`, the default, or `ConeEmitFrom.Volume`) and `ConeEmitter.length` (5 by
+  default, as in Unity). In Volume, particles start anywhere on their side line from the base up
+  to `length` along z. The Unity exporter writes Cone Volume with its Length instead of warning,
+  and the editor's Shape module and wireframe show both.
+- **Grid sampling** (Niagara's Grid Location by particle index): `GridEmitter.sampling`
+  (`GridSampling.Random`, the default, or `GridSampling.Sequential`). Sequential fills the cells in
+  turn, row by row from −x, −y, so a burst of `row × column` particles puts one in every cell; a
+  restart starts over at the first cell. The editor's Shape module offers it.
+
 ## [0.28.0] — 2026-10-23
 
 The release after phase 6 of the audit and the 0.28 cleanup: alpha means coverage in every blend

@@ -13,7 +13,7 @@ import type {Node} from '@babylonjs/core/node';
 import {Scene} from '@babylonjs/core/scene';
 import * as fs from 'fs';
 import * as path from 'path';
-import {loadPlugin} from 'quarks.core';
+import {ConeEmitFrom, ConeEmitter, loadPlugin} from 'quarks.core';
 import {BatchedRenderer} from '../src/BatchedRenderer';
 import {MeshSurfaceEmitterPlugin} from '../src/MeshSurfaceEmitter';
 import type {ParticleEmitter} from '../src/ParticleEmitter';
@@ -140,6 +140,11 @@ describe('Unity exporter output', () => {
         expect(dust.blending).toBe(Constants.ALPHA_COMBINE);
         // Local is Hierarchy without the parents' scale; the scaled parent warns.
         expect(dust.scalingMode).toBe('hierarchy');
+        // Cone Volume, with its Length.
+        const cone = dust.emitterShape as ConeEmitter;
+        expect(cone.type).toBe('cone');
+        expect(cone.emitFrom).toBe(ConeEmitFrom.Volume);
+        expect(cone.length).toBe(2);
     });
 
     it('keeps trails, sub-emitters and a hidden mesh emitter source', () => {
