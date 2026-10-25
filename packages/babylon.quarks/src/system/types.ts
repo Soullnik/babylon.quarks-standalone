@@ -340,6 +340,8 @@ export interface ParticleSystemParameters {
     renderingGroupId?: number;
     /** Whether the scene's fog applies, see {@link ParticleSystem.applyFog}. Default true. */
     applyFog?: boolean;
+    /** Whether the scene's image processing applies, see {@link ParticleSystem.applyImageProcessing}. Default true. */
+    applyImageProcessing?: boolean;
     /** Scene the emitter node is created in. Default Babylon's last created scene. */
     scene?: Scene;
 }
@@ -428,6 +430,8 @@ export interface ParticleSystemJSONParameters {
     renderingGroupId?: number;
     /** Written only when false. */
     applyFog?: boolean;
+    /** Written only when false. */
+    applyImageProcessing?: boolean;
     /** Written only when not 1. */
     playbackSpeed?: number;
     /** Written only when not `'always'`. */

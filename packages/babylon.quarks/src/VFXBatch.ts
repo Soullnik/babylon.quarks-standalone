@@ -1,9 +1,11 @@
 import {BoundingInfo} from '@babylonjs/core/Culling/boundingInfo';
 import {BaseTexture} from '@babylonjs/core/Materials/Textures/baseTexture';
 import type {Effect} from '@babylonjs/core/Materials/effect';
+import type {ImageProcessingConfiguration} from '@babylonjs/core/Materials/imageProcessingConfiguration';
 import {ShaderMaterial} from '@babylonjs/core/Materials/shaderMaterial';
 import {Vector2 as BVector2, Vector3 as BVector3, Vector4 as BVector4, Matrix} from '@babylonjs/core/Maths/math.vector';
 import {Mesh} from '@babylonjs/core/Meshes/mesh';
+import type {Observer} from '@babylonjs/core/Misc/observable';
 import type {Node} from '@babylonjs/core/node';
 import {Scene} from '@babylonjs/core/scene';
 import {IParticleSystem, Vector3} from 'quarks.core';
@@ -11,6 +13,7 @@ import {VFXBatchSettings} from './BatchedRenderer';
 import type {ParticleSystem} from './ParticleSystem';
 import {storedBatchSettings} from './batchKey';
 import {GRADIENT_MAP_WEIGHTS, MeshLightingSettings, readsUV1, StoredBatchSettings, TextureUV} from './batchSettings';
+import {imageProcessingParts, ShaderImageProcessing} from './shaderProgram';
 import {DepthBinding, softDepthParams} from './softDepth';
 
 export * from './batchSettings';
@@ -197,6 +200,100 @@ export abstract class VFXBatch {
             effect.setFloat4('vFogInfos', mode, scene.fogStart, scene.fogEnd, scene.fogDensity);
             effect.setColor3('vFogColor', scene.fogColor);
         });
+    }
+
+    /** The observer of the scene's image processing that rebuilds the material when its defines change. */
+    private imageProcessingObserver: Observer<ImageProcessingConfiguration> | null = null;
+
+    /**
+     * The scene's image processing as the material compiles it, see {@link ShaderContext.imageProcessing}:
+     * null when the batch does not apply it.
+     * @internal
+     */
+    protected imageProcessing(): ShaderImageProcessing | null {
+        if (this.settings.applyImageProcessing === false) {
+            return null;
+        }
+        const defines: ShaderImageProcessing = {
+            IMAGEPROCESSING: false,
+            WHITEBALANCE: false,
+            VIGNETTE: false,
+            VIGNETTEBLENDMODEMULTIPLY: false,
+            VIGNETTEBLENDMODEOPAQUE: false,
+            TONEMAPPING: 0,
+            CONTRAST: false,
+            EXPOSURE: false,
+            COLORCURVES: false,
+            COLORGRADING: false,
+            COLORGRADING3D: false,
+            SAMPLER3DGREENDEPTH: false,
+            SAMPLER3DBGRMAP: false,
+            DITHER: false,
+            IMAGEPROCESSINGPOSTPROCESS: false,
+            SKIPFINALCOLORCLAMP: false,
+        };
+        this.scene.imageProcessingConfiguration.prepareDefines(defines);
+        return defines;
+    }
+
+    /**
+     * Binds the scene's image processing to a material compiled with `compiled`: its values on every
+     * bind, unless a post process applies them, and the material's defines, uniforms and samplers
+     * swapped in place whenever the configuration changes what it has to compile (tone mapping
+     * switched on, a vignette, a colour grading texture, a post process taking over). The material
+     * stays the same one: a configuration that flips back and forth within a frame, as a reflection
+     * probe rendering in linear space does, only switches between the effects the engine has
+     * cached for each set of defines. A colour grading texture is set on the material too, so
+     * that the batch, like Babylon's own materials, is not drawn before it has loaded.
+     * @internal
+     */
+    protected bindImageProcessing(material: ShaderMaterial, compiled: ShaderImageProcessing | null): void {
+        this.releaseImageProcessing();
+        if (this.settings.applyImageProcessing === false) {
+            return;
+        }
+        const config = this.scene.imageProcessingConfiguration;
+        let current = compiled;
+        let parts = imageProcessingParts(this.settings, current);
+        let key = parts.defines.join('\n');
+        const grading = () => {
+            if (parts.samplers.includes('txColorTransform') && config.colorGradingTexture) {
+                material.setTexture('txColorTransform', config.colorGradingTexture);
+            } else {
+                material.removeTexture('txColorTransform');
+            }
+        };
+        grading();
+        this.imageProcessingObserver = config.onUpdateParameters.add(() => {
+            const next = this.imageProcessing();
+            const nextParts = imageProcessingParts(this.settings, next);
+            const nextKey = nextParts.defines.join('\n');
+            if (nextKey !== key) {
+                const options = material.options;
+                swapEntries(options.defines as string[], parts.defines, nextParts.defines);
+                swapEntries(options.uniforms, parts.uniforms, nextParts.uniforms);
+                swapEntries(options.samplers, parts.samplers, nextParts.samplers);
+                current = next;
+                parts = nextParts;
+                key = nextKey;
+            }
+            grading();
+        });
+        material.onBindObservable.add(() => {
+            if (!current?.IMAGEPROCESSING || current.IMAGEPROCESSINGPOSTPROCESS || parts.defines.length === 0) {
+                return;
+            }
+            const effect = material.getEffect();
+            if (effect) {
+                config.bind(effect);
+            }
+        });
+    }
+
+    /** Stops following the scene's image processing. @internal */
+    protected releaseImageProcessing(): void {
+        this.imageProcessingObserver?.remove();
+        this.imageProcessingObserver = null;
     }
 
     /**
@@ -477,6 +574,21 @@ export abstract class VFXBatch {
 
     /** @internal */
     dispose(): void {
+        this.releaseImageProcessing();
         this.mesh.dispose();
     }
+}
+
+/**
+ * Replaces, in a material option list, the entries `previous` added with those of `next`: one
+ * occurrence each, so an entry the rest of the program also lists is kept.
+ */
+function swapEntries(list: string[], previous: readonly string[], next: readonly string[]): void {
+    for (const entry of previous) {
+        const at = list.lastIndexOf(entry);
+        if (at !== -1) {
+            list.splice(at, 1);
+        }
+    }
+    list.push(...next);
 }

@@ -1,4 +1,5 @@
 import {NullEngine} from '@babylonjs/core/Engines/nullEngine';
+import {ShaderStore} from '@babylonjs/core/Engines/shaderStore';
 import {ShaderMaterial} from '@babylonjs/core/Materials/shaderMaterial';
 import {RawTexture} from '@babylonjs/core/Materials/Textures/rawTexture';
 import {Scene} from '@babylonjs/core/scene';
@@ -6,7 +7,7 @@ import {ConstantColor, ConstantValue, PointEmitter, Vector4} from 'quarks.core';
 import {BatchedRenderer} from '../src/BatchedRenderer';
 import {storedBatchSettings} from '../src/batchKey';
 import {ParticleSystem, ParticleSystemParameters} from '../src/ParticleSystem';
-import {shaderProgram, ShaderProgram} from '../src/shaderProgram';
+import {IMAGE_PROCESSING_DEFINES, shaderProgram, ShaderProgram} from '../src/shaderProgram';
 import {sheetCell} from '../src/shaders/chunks/sheet';
 import {shaderVariants} from '../src/shaderVariants';
 import {RenderMode} from '../src/VFXBatch';
@@ -20,6 +21,19 @@ import {RenderMode} from '../src/VFXBatch';
 const variants = shaderVariants();
 const programs = variants.map((v) => v.program);
 
+/**
+ * `source` with Babylon's `#include<name>` lines replaced by the include they name, from the
+ * GLSL or the WGSL store: the image processing declarations live there.
+ */
+function expandIncludes(source: string, wgsl = false): string {
+    const store = wgsl ? ShaderStore.IncludesShadersStoreWGSL : ShaderStore.IncludesShadersStore;
+    return source.replace(/#include<(\w+)>/g, (line, name: string) => {
+        const include = store[name];
+        expect(include).toBeDefined();
+        return include ?? line;
+    });
+}
+
 /** The identifiers after `#ifdef`, `#ifndef`, `#if defined(` and `#elif defined(` in a source. */
 function definesReferenced(source: string): Set<string> {
     const out = new Set<string>();
@@ -31,14 +45,15 @@ function definesReferenced(source: string): Set<string> {
 /** The uniform names a GLSL source declares. */
 function uniformsDeclared(glsl: string): Set<string> {
     const out = new Set<string>();
-    for (const [, name] of glsl.matchAll(/^\s*uniform\s+(?!sampler)\w+\s+(\w+)\s*;/gm)) out.add(name);
+    for (const [, name] of glsl.matchAll(/(?:^|(?<=;))\s*uniform\s+(?!sampler)\w+\s+(\w+)\s*;/gm)) out.add(name);
     return out;
 }
 
 /** The sampler names a GLSL source declares. */
 function samplersDeclared(glsl: string): Set<string> {
     const out = new Set<string>();
-    for (const [, name] of glsl.matchAll(/^\s*uniform\s+sampler\w+\s+(\w+)\s*;/gm)) out.add(name);
+    for (const [, name] of glsl.matchAll(/(?:^|(?<=;))\s*uniform\s+(?:highp\s+)?sampler\w+\s+(\w+)\s*;/gm))
+        out.add(name);
     return out;
 }
 
@@ -64,8 +79,10 @@ describe('the shader variants cover the shaders', () => {
 
     it('emit every define the shaders test, and no define they do not', () => {
         const sources = programs.flatMap((p) => [p.vertex.glsl, p.vertex.wgsl, p.fragment.glsl, p.fragment.wgsl]);
-        const referenced = union(sources.map(definesReferenced));
-        const emitted = union(programs.map((p) => new Set(p.defines)));
+        // The image processing includes are Babylon's: their defines are passed through as its
+        // configuration prepares them, every one of them in some variant.
+        const referenced = union([...sources.map(definesReferenced), new Set(IMAGE_PROCESSING_DEFINES)]);
+        const emitted = union(programs.map((p) => new Set(p.defines.map((define) => define.split(' ')[0]))));
         expect([...emitted].sort()).toEqual([...referenced].sort());
     });
 
@@ -77,7 +94,7 @@ describe('the shader variants cover the shaders', () => {
         const listedSamplers = new Set<string>();
         const listedAttributes = new Set<string>();
         for (const program of programs) {
-            const source = program.vertex.glsl + '\n' + program.fragment.glsl;
+            const source = program.vertex.glsl + '\n' + expandIncludes(program.fragment.glsl);
             const uniforms = uniformsDeclared(source);
             const samplers = samplersDeclared(source);
             const attributes = attributesDeclared(program.vertex.glsl);
@@ -172,7 +189,12 @@ function materialOf(parameters: Partial<ParticleSystemParameters>): {
     renderer.update(1 / 60);
     const batch = renderer.batches[0];
     const material = batch.mesh.material as ShaderMaterial;
-    const program = shaderProgram(batch.settings, {depth: null, envAtlasReady: false, meshUV2: false});
+    const program = shaderProgram(batch.settings, {
+        depth: null,
+        envAtlasReady: false,
+        meshUV2: false,
+        imageProcessing: null,
+    });
     renderer.dispose();
     ps.dispose();
     return {material, program};

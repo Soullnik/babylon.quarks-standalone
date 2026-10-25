@@ -174,6 +174,14 @@ function featureBlocks(source: string): string[] {
     return blocks;
 }
 
+/** The last blocks of every fragment main(): the soft fade, image processing, the blend resolve. */
+const AFTER_FOG = [
+    'SOFT_PARTICLES',
+    'defined(IMAGEPROCESSINGPOSTPROCESS) && !defined(BLEND_MULTIPLY)',
+    'defined(BLEND_PREMULTIPLY)',
+    'defined(IMAGEPROCESSINGPOSTPROCESS) && defined(BLEND_MULTIPLY)',
+];
+
 describe('GLSL and WGSL apply the fragment features in the same order', () => {
     test.each([
         ['particle_frag', particleFragGLSL, particleFragWGSL],
@@ -181,9 +189,10 @@ describe('GLSL and WGSL apply the fragment features in the same order', () => {
         ['trail_frag', trailFragGLSL, trailFragWGSL],
     ])('%s', (_name, glsl, wgsl) => {
         expect(featureBlocks(glsl)).toEqual(featureBlocks(wgsl));
-        // The soft fade runs after fog, and only the blend resolve after it.
+        // The soft fade runs after fog, and only the scene's image processing and the blend
+        // resolve after it.
         const blocks = featureBlocks(glsl);
-        expect(blocks.slice(-2)).toEqual(['SOFT_PARTICLES', 'defined(BLEND_PREMULTIPLY)']);
+        expect(blocks.slice(-4)).toEqual(AFTER_FOG);
         expect(blocks.lastIndexOf('FOG')).toBeLessThan(blocks.lastIndexOf('SOFT_PARTICLES'));
     });
 });
@@ -275,7 +284,7 @@ describe('soft particles and the depth texture', () => {
         expect(depthTextureOf(renderer)).toBe(depth);
         expect(featureBlocks(trailFragGLSL)).toEqual(featureBlocks(trailFragWGSL));
         const blocks = featureBlocks(trailFragGLSL);
-        expect(blocks.slice(-2)).toEqual(['SOFT_PARTICLES', 'defined(BLEND_PREMULTIPLY)']);
+        expect(blocks.slice(-4)).toEqual(AFTER_FOG);
         for (const source of [trailVertGLSL, trailVertWGSL]) {
             expect(source).toContain('#ifdef SOFT_PARTICLES');
             expect(source).toContain('abs(point.z)');

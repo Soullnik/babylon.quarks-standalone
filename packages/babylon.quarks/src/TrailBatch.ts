@@ -234,7 +234,13 @@ export class TrailBatch extends VFXBatch {
 
     /** @internal */
     rebuildMaterial(): void {
-        const program = shaderProgram(this.settings, {depth: this.depth, envAtlasReady: false, meshUV2: false});
+        const imageProcessing = this.imageProcessing();
+        const program = shaderProgram(this.settings, {
+            depth: this.depth,
+            envAtlasReady: false,
+            meshUV2: false,
+            imageProcessing,
+        });
         const {defines, attributes, uniforms, samplers} = program;
         // Stable name: the trail shader source never varies, so registering it once
         // keeps Effect.ShadersStore bounded and lets Babylon reuse compiled effects.
@@ -260,6 +266,7 @@ export class TrailBatch extends VFXBatch {
             mat.setTexture('map', this.settings.texture);
         }
         this.bindFog(mat);
+        this.bindImageProcessing(mat, imageProcessing);
         this.bindSoft(mat);
         this.bindSurface(mat);
         mat.backFaceCulling = false;
