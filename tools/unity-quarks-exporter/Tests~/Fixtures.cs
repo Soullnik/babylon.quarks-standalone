@@ -152,9 +152,9 @@ namespace BabylonQuarks.UnityExporter.Tests
         /// <summary>
         /// Mesh particles in a scaled group: a box shape, 3D start rotation and separate-axes spin,
         /// Hierarchy scaling, a mesh with a second UV set and no normals, and an opaque URP material
-        /// with Alpha Clipping and back-face culling. A second system covers what the runtime lacks
-        /// and warns about Random Between Two Curves and separate-axes limits, with Local
-        /// scaling under a scaled parent.
+        /// with Alpha Clipping and back-face culling. A second system covers Cone Volume, Random
+        /// Between Two Curves and Local scaling under a scaled parent, and warns about
+        /// separate-axes limits, which the runtime lacks.
         /// </summary>
         private static GameObject MeshParticles()
         {

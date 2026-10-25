@@ -4,6 +4,7 @@ import type {ValueGeneratorJSON} from './FunctionJSON';
 import {GeneratorMemory} from './GeneratorMemory';
 import {IntervalValue} from './IntervalValue';
 import {PiecewiseBezier} from './PiecewiseBezier';
+import {RandomBetweenCurves} from './RandomBetweenCurves';
 
 /**
  * `startGen`/`genValue` follow the per-particle slot pattern documented in
@@ -64,6 +65,8 @@ export function ValueGeneratorFromJSON(json: ValueGeneratorJSON | undefined): Fu
             return IntervalValue.fromJSON(json);
         case 'PiecewiseBezier':
             return PiecewiseBezier.fromJSON(json);
+        case 'RandomBetweenCurves':
+            return RandomBetweenCurves.fromJSON(json);
         default:
             warnFormat(`${describePart('value generator', json)}; using 0.`);
             return new ConstantValue(0);

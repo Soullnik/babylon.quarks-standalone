@@ -10,6 +10,9 @@ All notable changes to the Unity Quarks Exporter are documented here.
 - **Scaling Mode** Local, Hierarchy and Shape map to the runtime's modes of the same names, which
   now behave as Unity's; Local and Shape no longer warn. Exports are format 2 and need
   babylon.quarks 0.29 or later; an older runtime reads Local as its own default.
+- **Random Between Two Curves** → `RandomBetweenCurves` with both curves, wherever a curve is
+  exported (start values, over-lifetime modules, Width over Trail, Texture Sheet Animation with
+  cycles); it was the upper curve with a warning.
 
 ## [0.28.0] — 2026-10-23
 

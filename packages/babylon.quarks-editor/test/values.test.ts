@@ -1,4 +1,4 @@
-import {Bezier, ConstantValue, IntervalValue, PiecewiseBezier} from 'babylon.quarks';
+import {Bezier, ConstantValue, IntervalValue, PiecewiseBezier, RandomBetweenCurves} from 'babylon.quarks';
 import {
     buildCurve,
     buildScalar,
@@ -35,6 +35,27 @@ describe('scalar values', () => {
         }) as PiecewiseBezier;
         expect(curve).toBeInstanceOf(PiecewiseBezier);
         expect(readScalar(curve).curve).toEqual([1, 0.5, 0.5, 0]);
+    });
+
+    it('reads and builds Random Between Two Curves from both curves', () => {
+        const curves = new RandomBetweenCurves(
+            new PiecewiseBezier([[new Bezier(0, 0.1, 0.2, 0.3), 0]]),
+            new PiecewiseBezier([
+                [new Bezier(1, 1.1, 1.2, 1.3), 0],
+                [new Bezier(1.3, 1, 1, 1), 0.5],
+            ])
+        );
+        const state = readScalar(curves);
+        expect(state).toMatchObject({mode: 'curves', curve: [0, 0.1, 0.2, 0.3], curve2: [1, 1.1, 1.2, 1.3]});
+        const built = buildScalar(state) as RandomBetweenCurves;
+        expect(built).toBeInstanceOf(RandomBetweenCurves);
+        expect(readScalar(built)).toEqual(state);
+        // The pieces of each curve, every segment of them.
+        expect(readPieces(curves).map((p) => p.start)).toEqual([0]);
+        expect(readPieces(curves, true).map((p) => p.start)).toEqual([0, 0.5]);
+        // From a single curve, both bounds start as that curve.
+        const fromCurve = buildScalar({...readScalar(curves.curve1), mode: 'curves'}) as RandomBetweenCurves;
+        expect(fromCurve.toJSON().curve2).toEqual(fromCurve.toJSON().curve1);
     });
 
     it('round-trips a state through build and read', () => {

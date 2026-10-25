@@ -13,7 +13,7 @@ import type {Node} from '@babylonjs/core/node';
 import {Scene} from '@babylonjs/core/scene';
 import * as fs from 'fs';
 import * as path from 'path';
-import {ConeEmitFrom, ConeEmitter, loadPlugin} from 'quarks.core';
+import {ConeEmitFrom, ConeEmitter, loadPlugin, RandomBetweenCurves} from 'quarks.core';
 import {BatchedRenderer} from '../src/BatchedRenderer';
 import {MeshSurfaceEmitterPlugin} from '../src/MeshSurfaceEmitter';
 import type {ParticleEmitter} from '../src/ParticleEmitter';
@@ -145,6 +145,8 @@ describe('Unity exporter output', () => {
         expect(cone.type).toBe('cone');
         expect(cone.emitFrom).toBe(ConeEmitFrom.Volume);
         expect(cone.length).toBe(2);
+        // Random Between Two Curves, with both of its curves.
+        expect(dust.startSpeed).toBeInstanceOf(RandomBetweenCurves);
     });
 
     it('keeps trails, sub-emitters and a hidden mesh emitter source', () => {

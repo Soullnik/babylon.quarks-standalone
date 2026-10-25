@@ -5,6 +5,7 @@ import {
     Matrix4,
     PiecewiseBezier,
     random,
+    RandomBetweenCurves,
     ValueGenerator,
     Vector3,
 } from 'quarks.core';
@@ -107,6 +108,10 @@ export class EmissionController {
         }
         if (rate.type !== 'function') {
             return false;
+        }
+        if (rate instanceof RandomBetweenCurves) {
+            // Every mix lies between the two curves, so it emits later if either does.
+            return this.emitsFrom(rate.curve1, timeRatio) || this.emitsFrom(rate.curve2, timeRatio);
         }
         if (rate instanceof PiecewiseBezier) {
             // A Bezier stays within its control points, so this is exact however short a pulse.

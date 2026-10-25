@@ -26,7 +26,7 @@
  * - **Stateless / deterministic** (`ConstantValue`, `PiecewiseBezier`,
  *   `Gradient`, `RandomColor`) — `startGen` is a no-op; `genValue` derives
  *   output from inputs (`t`, params) alone.
- * - **Sample-once stochastic** (`IntervalValue`, `ColorRange`,
+ * - **Sample-once stochastic** (`IntervalValue`, `RandomBetweenCurves`, `ColorRange`,
  *   `RandomColorBetweenGradient`, `RandomQuatGenerator`) — `startGen` pushes
  *   one random sample into memory; `genValue` reads it. This is what keeps a
  *   given particle's "random" startSize/color/rotation fixed for its life.
@@ -41,6 +41,8 @@
  * - `indexCount` lives on the generator (shared across particles), not on
  *   memory. It is overwritten on every spawn; that is safe because each
  *   `genValue` call during a spawn happens before the next spawn's `startGen`.
+ *   So a stochastic instance must not be shared between two settings or two
+ *   systems: give each its own, by `clone()`.
  * - The values stored in memory are not aliased — each particle's memory is
  *   its own array, so two particles can hold different samples at the same
  *   slot without interference.

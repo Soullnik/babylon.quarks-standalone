@@ -1,12 +1,15 @@
 import type {FunctionValueGenerator, RotationGenerator, ValueGenerator, Vector3Generator} from 'babylon.quarks';
-import {Bezier, ConstantValue, IntervalValue, PiecewiseBezier} from 'babylon.quarks';
+import {Bezier, ConstantValue, IntervalValue, PiecewiseBezier, RandomBetweenCurves} from 'babylon.quarks';
 
 /** A generator of one number: a constant or random value, or a curve over the particle's life. */
 export type ScalarGenerator = ValueGenerator | FunctionValueGenerator;
 /** Any generator a value field can be pointed at; ones that are not scalar read as the default. */
 export type AnyGenerator = ScalarGenerator | Vector3Generator | RotationGenerator;
-/** How a value field produces its number: Unity's Constant, Random Between Two Constants or Curve. */
-export type ScalarMode = 'constant' | 'random' | 'curve';
+/**
+ * How a value field produces its number: Unity's Constant, Random Between Two Constants, Curve or
+ * Random Between Two Curves.
+ */
+export type ScalarMode = 'constant' | 'random' | 'curve' | 'curves';
 
 /** Editable snapshot of a scalar value generator. */
 export interface ScalarValueState {
@@ -18,8 +21,10 @@ export interface ScalarValueState {
     min: number;
     /** Upper end of the random range (mode: random). */
     max: number;
-    /** Cubic bezier control values over normalized lifetime (mode: curve). */
+    /** Cubic bezier control values over normalized lifetime (mode: curve; the first curve of curves). */
     curve: [number, number, number, number];
+    /** The second curve's control values (mode: curves); the first curve's when left out. */
+    curve2?: [number, number, number, number];
 }
 
 /**
@@ -27,7 +32,14 @@ export interface ScalarValueState {
  * Anything else, including a missing generator, reads as the constant 1.
  */
 export function readScalar(generator: AnyGenerator | undefined): ScalarValueState {
-    const state: ScalarValueState = {mode: 'constant', value: 1, min: 0.5, max: 1.5, curve: [0, 1, 1, 0]};
+    const state: ScalarValueState = {
+        mode: 'constant',
+        value: 1,
+        min: 0.5,
+        max: 1.5,
+        curve: [0, 1, 1, 0],
+        curve2: [0, 1, 1, 0],
+    };
     if (generator instanceof ConstantValue) {
         state.mode = 'constant';
         state.value = generator.value;
@@ -40,13 +52,22 @@ export function readScalar(generator: AnyGenerator | undefined): ScalarValueStat
         state.value = (generator.a + generator.b) / 2;
     } else if (generator instanceof PiecewiseBezier) {
         state.mode = 'curve';
-        const first = generator.functions[0]?.[0];
-        if (first) {
-            state.curve = [first.p[0], first.p[1], first.p[2], first.p[3]];
-            state.value = first.p[0];
-        }
+        state.curve = firstSegment(generator) ?? state.curve;
+        state.curve2 = state.curve;
+        state.value = state.curve[0];
+    } else if (generator instanceof RandomBetweenCurves) {
+        state.mode = 'curves';
+        state.curve = firstSegment(generator.curve1) ?? state.curve;
+        state.curve2 = firstSegment(generator.curve2) ?? state.curve;
+        state.value = state.curve[0];
     }
     return state;
+}
+
+/** The control values of a curve's first segment, if it has one. */
+function firstSegment(curve: PiecewiseBezier): [number, number, number, number] | undefined {
+    const first = curve.functions[0]?.[0];
+    return first ? [first.p[0], first.p[1], first.p[2], first.p[3]] : undefined;
 }
 
 /** The generator a value field's state describes; a curve state builds a one-segment curve. */
@@ -60,6 +81,11 @@ export function buildScalar(state: ScalarValueState): ScalarGenerator {
             return new IntervalValue(Math.min(state.min, state.max), Math.max(state.min, state.max));
         case 'curve':
             return new PiecewiseBezier([[new Bezier(...state.curve), 0]]);
+        case 'curves':
+            return new RandomBetweenCurves(
+                new PiecewiseBezier([[new Bezier(...state.curve), 0]]),
+                new PiecewiseBezier([[new Bezier(...(state.curve2 ?? state.curve)), 0]])
+            );
     }
 }
 
@@ -71,8 +97,14 @@ export interface CurvePiece {
     p: [number, number, number, number];
 }
 
-/** Reads pieces from a PiecewiseBezier (or synthesizes one segment for other generators). */
-export function readPieces(generator: AnyGenerator | undefined): CurvePiece[] {
+/**
+ * Reads pieces from a PiecewiseBezier, or from the first curve of a RandomBetweenCurves (the
+ * second with `second`), and synthesizes one segment for other generators.
+ */
+export function readPieces(generator: AnyGenerator | undefined, second = false): CurvePiece[] {
+    if (generator instanceof RandomBetweenCurves) {
+        return readPieces(second ? generator.curve2 : generator.curve1);
+    }
     if (generator instanceof PiecewiseBezier && generator.functions.length > 0) {
         return generator.functions.map(([bezier, start]) => ({
             start,
@@ -87,6 +119,27 @@ export function readPieces(generator: AnyGenerator | undefined): CurvePiece[] {
 export function buildCurve(pieces: CurvePiece[]): PiecewiseBezier {
     const sorted = [...pieces].sort((a, b) => a.start - b.start);
     return new PiecewiseBezier(sorted.map((piece) => [new Bezier(...piece.p), piece.start] as [Bezier, number]));
+}
+
+/**
+ * `generator` as one curve (`'curve'`) or two (`'curves'`, Unity's Random Between Two Curves),
+ * keeping every segment: one curve becomes both bounds of two, and two keep their first as one.
+ */
+export function withCurves(generator: AnyGenerator | undefined, mode: 'curve'): PiecewiseBezier;
+export function withCurves(generator: AnyGenerator | undefined, mode: 'curves'): RandomBetweenCurves;
+export function withCurves(
+    generator: AnyGenerator | undefined,
+    mode: 'curve' | 'curves'
+): PiecewiseBezier | RandomBetweenCurves;
+export function withCurves(
+    generator: AnyGenerator | undefined,
+    mode: 'curve' | 'curves'
+): PiecewiseBezier | RandomBetweenCurves {
+    const first = buildCurve(readPieces(generator));
+    if (mode === 'curve') {
+        return first;
+    }
+    return new RandomBetweenCurves(first, buildCurve(readPieces(generator, generator instanceof RandomBetweenCurves)));
 }
 
 /** Splits the piece containing x into two exact halves using Bezier.split. */

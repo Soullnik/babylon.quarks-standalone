@@ -576,11 +576,12 @@ namespace BabylonQuarks.UnityExporter
             // WidthOverLength writes absolute widths, so the particle size is folded in up front
             // (and any size-over-lifetime change is lost along a curved trail).
             float sizeScale = trails.sizeAffectsWidth ? ConstantOf(ps.main.startSize3D ? ps.main.startSizeX : ps.main.startSize) : 1f;
-            if (width.mode == ParticleSystemCurveMode.TwoCurves) ValueConverter.WarnTwoCurves();
-            var curve = width.mode == ParticleSystemCurveMode.TwoCurves ? width.curveMax : width.curve;
+            float multiplier = width.curveMultiplier * sizeScale;
             behaviors.Add(new JObject()
                 .Set("type", "WidthOverLength")
-                .Set("width", ValueConverter.Bezier(curve, width.curveMultiplier * sizeScale)));
+                .Set("width", width.mode == ParticleSystemCurveMode.TwoCurves
+                    ? ValueConverter.TwoCurves(width.curveMin, width.curveMax, multiplier)
+                    : ValueConverter.Bezier(width.curve, multiplier)));
         }
 
         private static JToken BuildTrailSettings(ParticleSystem ps)
@@ -673,13 +674,12 @@ namespace BabylonQuarks.UnityExporter
                     || frameOverTime.mode == ParticleSystemCurveMode.TwoCurves;
                 // Cycles replay the curve that many times over the particle's life; a constant or
                 // random frame is the same in every cycle.
-                if (curved && cycles > 1 && frameOverTime.mode == ParticleSystemCurveMode.TwoCurves) ValueConverter.WarnTwoCurves();
-                JToken frame = curved && cycles > 1
-                    ? ValueConverter.Bezier(
-                        frameOverTime.mode == ParticleSystemCurveMode.TwoCurves ? frameOverTime.curveMax : frameOverTime.curve,
-                        frameOverTime.curveMultiplier * frameScale,
-                        cycles)
-                    : ScaleCurve(frameOverTime, frameScale);
+                float frameMultiplier = frameOverTime.curveMultiplier * frameScale;
+                JToken frame = !curved || cycles <= 1
+                    ? ScaleCurve(frameOverTime, frameScale)
+                    : frameOverTime.mode == ParticleSystemCurveMode.TwoCurves
+                        ? ValueConverter.TwoCurves(frameOverTime.curveMin, frameOverTime.curveMax, frameMultiplier, cycles)
+                        : ValueConverter.Bezier(frameOverTime.curve, frameMultiplier, cycles);
                 behaviors.Add(new JObject()
                     .Set("type", "FrameOverLife")
                     .Set("frame", frame));
@@ -975,8 +975,7 @@ namespace BabylonQuarks.UnityExporter
                 case ParticleSystemCurveMode.TwoConstants: return ValueConverter.Interval(c.constantMin * scale, c.constantMax * scale);
                 case ParticleSystemCurveMode.Curve: return ValueConverter.Bezier(c.curve, c.curveMultiplier * scale);
                 case ParticleSystemCurveMode.TwoCurves:
-                    ValueConverter.WarnTwoCurves();
-                    return ValueConverter.Bezier(c.curveMax, c.curveMultiplier * scale);
+                    return ValueConverter.TwoCurves(c.curveMin, c.curveMax, c.curveMultiplier * scale);
                 default: return ValueConverter.Constant(c.constant * scale);
             }
         }
