@@ -2,6 +2,7 @@ export * from './behaviors/';
 export * from './functions/';
 export * from './IParticleSystem';
 export * from './IPrefab';
+export * from './Like';
 export * from './math';
 export * from './Particle';
 export * from './ParticleStore';

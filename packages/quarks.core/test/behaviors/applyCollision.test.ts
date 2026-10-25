@@ -6,7 +6,9 @@ const floor: PhysicsResolver = {
         if (position.y > 0) {
             return false;
         }
-        normal.set(0, 1, 0);
+        normal.x = 0;
+        normal.y = 1;
+        normal.z = 0;
         return true;
     },
 };

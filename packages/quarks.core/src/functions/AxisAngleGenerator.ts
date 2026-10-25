@@ -1,4 +1,6 @@
+import type {Vector3Like} from '../Like';
 import {Quaternion, Vector3} from '../math';
+import {vector3From} from '../math/fromLike';
 import type {AxisAngleJSON} from './FunctionJSON';
 import {GeneratorMemory} from './GeneratorMemory';
 import {RotationGenerator} from './RotationGenerator';
@@ -13,15 +15,30 @@ const unitAxis = new Vector3();
 export class AxisAngleGenerator implements RotationGenerator {
     /** Always `'rotation'`. */
     type: 'rotation';
+    private _axisValue: Vector3;
+
+    /**
+     * The axis. Any length: it is normalised when used, and a zero axis is read as +z.
+     * Set it from any `Vector3Like`, such as a Babylon `Vector3`; the value is copied.
+     */
+    get axis(): Vector3 {
+        return this._axisValue;
+    }
+
+    set axis(value: Vector3Like) {
+        this._axisValue = vector3From(value);
+    }
+
     /**
      * @param axis - The axis. Any length: it is normalised when used, and a zero axis is read as +z.
      * @param angle - The angle in radians, scaled by `delta` in {@link
      *   AxisAngleGenerator.genValue}.
      */
     constructor(
-        public axis: Vector3,
+        axis: Vector3Like,
         public angle: FunctionValueGenerator | ValueGenerator
     ) {
+        this._axisValue = vector3From(axis);
         this.type = 'rotation';
     }
 

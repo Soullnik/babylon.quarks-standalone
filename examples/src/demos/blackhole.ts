@@ -1,4 +1,5 @@
 import {Constants} from '@babylonjs/core/Engines/constants';
+import {Color3, Color4} from '@babylonjs/core/Maths/math.color';
 import {Vector3 as BVector3} from '@babylonjs/core/Maths/math.vector';
 import {
     Bezier,
@@ -19,8 +20,6 @@ import {
     RenderMode,
     SizeOverLife,
     SphereEmitter,
-    Vector3,
-    Vector4,
 } from 'babylon.quarks';
 import {createSharedTexture} from '../shared/common';
 import type {DemoContext} from '../types';
@@ -38,8 +37,8 @@ const DISK_TILT = 0.16;
 function fade(fadeIn: number, fadeOut: number) {
     return new Gradient(
         [
-            [new Vector3(1, 1, 1), 0],
-            [new Vector3(1, 1, 1), 1],
+            [new Color3(1, 1, 1), 0],
+            [new Color3(1, 1, 1), 1],
         ],
         [
             [0, 0],
@@ -51,7 +50,7 @@ function fade(fadeIn: number, fadeOut: number) {
 }
 
 /** One steady sprite: one particle a second that lives a step longer, so the next overlaps it. */
-function steadySprite(params: {size: number; color: Vector4; tile: number; blend: number; order: number}) {
+function steadySprite(params: {size: number; color: Color4; tile: number; blend: number; order: number}) {
     return {
         duration: 1,
         looping: true,
@@ -92,7 +91,7 @@ export function init({scene, camera, batchRenderer, systems}: DemoContext) {
             texture,
             ...steadySprite({
                 size: 26,
-                color: new Vector4(0.55, 0.25, 0.08, 0.6),
+                color: new Color4(0.55, 0.25, 0.08, 0.6),
                 tile: TILE.glow,
                 blend: Constants.ALPHA_ADD,
                 order: 0,
@@ -104,10 +103,10 @@ export function init({scene, camera, batchRenderer, systems}: DemoContext) {
     // the emitter's z axis, which is the disk's normal once the emitter is tipped flat.
     const diskColor = new Gradient(
         [
-            [new Vector3(0.55, 0.08, 0.02), 0],
-            [new Vector3(1, 0.42, 0.08), 0.35],
-            [new Vector3(1, 0.85, 0.5), 0.7],
-            [new Vector3(1, 1, 1), 1],
+            [new Color3(0.55, 0.08, 0.02), 0],
+            [new Color3(1, 0.42, 0.08), 0.35],
+            [new Color3(1, 0.85, 0.5), 0.7],
+            [new Color3(1, 1, 1), 1],
         ],
         [
             [0.85, 0],
@@ -122,7 +121,7 @@ export function init({scene, camera, batchRenderer, systems}: DemoContext) {
         startLife: new IntervalValue(3, 5),
         startSpeed: new ConstantValue(0),
         startSize: new IntervalValue(0.4, 1.1),
-        startColor: new ConstantColor(new Vector4(1, 1, 1, 1)),
+        startColor: new ConstantColor(new Color4(1, 1, 1, 1)),
         worldSpace: false,
         emissionOverTime: new ConstantValue(520),
         shape: new DonutEmitter({radius: 8, donutRadius: 1.4, thickness: 1, arc: Math.PI * 2}),
@@ -135,8 +134,8 @@ export function init({scene, camera, batchRenderer, systems}: DemoContext) {
         renderMode: RenderMode.BillBoard,
         renderOrder: 1,
     });
-    disk.addBehavior(new OrbitOverLife(new IntervalValue(0.9, 1.4), new Vector3(0, 0, 1)));
-    disk.addBehavior(new GravityForce(new Vector3(0, 0, 0), 40));
+    disk.addBehavior(new OrbitOverLife(new IntervalValue(0.9, 1.4), new BVector3(0, 0, 1)));
+    disk.addBehavior(new GravityForce(new BVector3(0, 0, 0), 40));
     disk.addBehavior(new ColorBySpeed(diskColor, new IntervalValue(0.3, 3.5)));
     disk.addBehavior(new SizeOverLife(new PiecewiseBezier([[new Bezier(0, 1, 1, 0), 0]])));
     disk.emitter.rotation.x = -Math.PI / 2 + DISK_TILT;
@@ -151,7 +150,7 @@ export function init({scene, camera, batchRenderer, systems}: DemoContext) {
         startLife: new IntervalValue(1.5, 2.5),
         startSpeed: new ConstantValue(0),
         startSize: new IntervalValue(0.25, 0.6),
-        startColor: new RandomColor(new Vector4(1, 0.75, 0.4, 0.9), new Vector4(1, 0.95, 0.85, 1)),
+        startColor: new RandomColor(new Color4(1, 0.75, 0.4, 0.9), new Color4(1, 0.95, 0.85, 1)),
         worldSpace: false,
         emissionOverTime: new ConstantValue(320),
         shape: new DonutEmitter({radius: 4.6, donutRadius: 0.7, thickness: 1, arc: Math.PI * 2}),
@@ -164,7 +163,7 @@ export function init({scene, camera, batchRenderer, systems}: DemoContext) {
         renderMode: RenderMode.BillBoard,
         renderOrder: 1,
     });
-    innerDisk.addBehavior(new OrbitOverLife(new IntervalValue(2.2, 3), new Vector3(0, 0, 1)));
+    innerDisk.addBehavior(new OrbitOverLife(new IntervalValue(2.2, 3), new BVector3(0, 0, 1)));
     innerDisk.addBehavior(new ColorOverLife(fade(0.15, 0.6)));
     innerDisk.emitter.rotation.x = -Math.PI / 2 + DISK_TILT;
     add(innerDisk);
@@ -176,7 +175,7 @@ export function init({scene, camera, batchRenderer, systems}: DemoContext) {
             texture,
             ...steadySprite({
                 size: 5.2,
-                color: new Vector4(0, 0, 0, 1),
+                color: new Color4(0, 0, 0, 1),
                 tile: TILE.dot,
                 blend: Constants.ALPHA_COMBINE,
                 order: 2,
@@ -191,7 +190,7 @@ export function init({scene, camera, batchRenderer, systems}: DemoContext) {
             texture,
             ...steadySprite({
                 size: 6.2,
-                color: new Vector4(1, 0.82, 0.55, 1),
+                color: new Color4(1, 0.82, 0.55, 1),
                 tile: TILE.ring,
                 blend: Constants.ALPHA_ADD,
                 order: 3,
@@ -209,7 +208,7 @@ export function init({scene, camera, batchRenderer, systems}: DemoContext) {
             startLife: new IntervalValue(0.8, 1.4),
             startSpeed: new IntervalValue(9, 14),
             startSize: new IntervalValue(0.08, 0.2),
-            startColor: new RandomColor(new Vector4(0.5, 0.75, 1, 0.9), new Vector4(0.85, 0.9, 1, 1)),
+            startColor: new RandomColor(new Color4(0.5, 0.75, 1, 0.9), new Color4(0.85, 0.9, 1, 1)),
             worldSpace: false,
             emissionOverTime: new ConstantValue(90),
             shape: new ConeEmitter({radius: 0.25, angle: 0.06, thickness: 1}),
@@ -239,7 +238,7 @@ export function init({scene, camera, batchRenderer, systems}: DemoContext) {
         startLife: new IntervalValue(6, 10),
         startSpeed: new ConstantValue(0),
         startSize: new IntervalValue(0.05, 0.14),
-        startColor: new RandomColor(new Vector4(0.7, 0.8, 1, 0.6), new Vector4(1, 0.95, 0.9, 1)),
+        startColor: new RandomColor(new Color4(0.7, 0.8, 1, 0.6), new Color4(1, 0.95, 0.9, 1)),
         worldSpace: false,
         emissionOverTime: new ConstantValue(30),
         shape: new SphereEmitter({radius: 40, thickness: 0.3, arc: Math.PI * 2}),

@@ -28,10 +28,10 @@ import {
     SpeedOverLife,
     TextureSequencer,
     TurbulenceField,
-    Vector3,
     Vector3Function,
     VelocityOverLife,
     WidthOverLength,
+    type Vector3Like,
 } from 'babylon.quarks';
 import React from 'react';
 import {EffectBinding} from '../core/binding.js';
@@ -313,7 +313,7 @@ export function AttractorModule({binding}: ModuleProps) {
             binding={binding}
             title="Attractor"
             type="GravityForce"
-            create={() => new GravityForce(new Vector3(0, 0, 0), 1)}
+            create={() => new GravityForce({x: 0, y: 0, z: 0}, 1)}
         >
             {(behavior) => (
                 <>
@@ -349,7 +349,7 @@ export function GravityModule({binding}: ModuleProps) {
             binding={binding}
             title="Gravity"
             type="ApplyForce"
-            create={() => new ApplyForce(new Vector3(0, -1, 0), new ConstantValue(9.81))}
+            create={() => new ApplyForce({x: 0, y: -1, z: 0}, new ConstantValue(9.81))}
         >
             {(behavior) => (
                 <>
@@ -406,7 +406,7 @@ export function Rotation3DOverLifeModule({binding}: ModuleProps) {
             title="Rotation over Lifetime (3D)"
             type="Rotation3DOverLife"
             create={() =>
-                new Rotation3DOverLife(new AxisAngleGenerator(new Vector3(0, 1, 0), new ConstantValue(Math.PI)))
+                new Rotation3DOverLife(new AxisAngleGenerator({x: 0, y: 1, z: 0}, new ConstantValue(Math.PI)))
             }
         >
             {(behavior) => {
@@ -436,10 +436,7 @@ export function Rotation3DOverLifeModule({binding}: ModuleProps) {
                                     binding.apply(() => {
                                         behavior.angularVelocity =
                                             next === 'axisAngle'
-                                                ? new AxisAngleGenerator(
-                                                      new Vector3(0, 1, 0),
-                                                      new ConstantValue(Math.PI)
-                                                  )
+                                                ? new AxisAngleGenerator({x: 0, y: 1, z: 0}, new ConstantValue(Math.PI))
                                                 : next === 'euler'
                                                   ? new EulerGenerator(
                                                         new ConstantValue(0),
@@ -525,7 +522,7 @@ export function SequencesModule({binding, textureOptions}: ModuleProps & {textur
             image.crossOrigin = 'anonymous';
             image.src = imageUrl;
             await image.decode();
-            const sequencer = new TextureSequencer(0.05, 0.05, new Vector3());
+            const sequencer = new TextureSequencer(0.05, 0.05, {x: 0, y: 0, z: 0});
             sequencer.fromImage(image, threshold);
             const last = behavior.sequencers[behavior.sequencers.length - 1];
             const start = last ? last[0].b : 0;
@@ -616,7 +613,7 @@ export function SequencesModule({binding, textureOptions}: ModuleProps & {textur
                                             label="Position"
                                             value={texture.position}
                                             step={0.1}
-                                            onChange={(v) => binding.apply(() => texture.position.copy(v))}
+                                            onChange={(v) => binding.apply(() => (texture.position = v))}
                                         />
                                     </>
                                 )}
@@ -739,19 +736,18 @@ export function NoiseModule({binding}: ModuleProps) {
     );
 }
 
-/** Three numeric inputs for a Vector3 field, replacing the whole vector on any edit. */
+/** Three numeric inputs for a vector field, replacing the whole vector on any edit. */
 function Vector3Row(props: {
     label: string;
     hintKey?: string;
-    value: Vector3;
+    value: Vector3Like;
     min?: number;
     step?: number;
-    onChange: (v: Vector3) => void;
+    onChange: (v: Vector3Like) => void;
 }) {
     const set = (axis: 'x' | 'y' | 'z', n: number) => {
-        const next = props.value.clone();
-        next[axis] = n;
-        props.onChange(next);
+        const {x, y, z} = props.value;
+        props.onChange({x, y, z, [axis]: n});
     };
     return (
         <Row label={props.label} hintKey={props.hintKey}>
@@ -771,7 +767,7 @@ export function TurbulenceModule({binding}: ModuleProps) {
             binding={binding}
             title="Turbulence"
             type="TurbulenceField"
-            create={() => new TurbulenceField(new Vector3(1, 1, 1), 3, new Vector3(1, 1, 1), new Vector3(1, 1, 1))}
+            create={() => new TurbulenceField({x: 1, y: 1, z: 1}, 3, {x: 1, y: 1, z: 1}, {x: 1, y: 1, z: 1})}
         >
             {(behavior) => (
                 <>
@@ -1001,7 +997,7 @@ export function OrbitOverLifeModule({binding}: ModuleProps) {
             binding={binding}
             title="Orbit over Lifetime"
             type="OrbitOverLife"
-            create={() => new OrbitOverLife(new ConstantValue(Math.PI), new Vector3(0, 1, 0))}
+            create={() => new OrbitOverLife(new ConstantValue(Math.PI), {x: 0, y: 1, z: 0})}
         >
             {(behavior) => (
                 <ValueField

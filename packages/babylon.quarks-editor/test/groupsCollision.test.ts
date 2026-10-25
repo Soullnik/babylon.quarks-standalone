@@ -1,6 +1,6 @@
 import {Vector3 as BVector3} from '@babylonjs/core/Maths/math.vector';
 import {TransformNode} from '@babylonjs/core/Meshes/transformNode';
-import {getPhysicsResolver, setPhysicsResolver, Vector3} from 'babylon.quarks';
+import {getPhysicsResolver, setPhysicsResolver} from 'babylon.quarks';
 import {ensureGroundResolver, GroundPlaneResolver} from '../src/core/collision';
 import {groupNodes, ungroupNode} from '../src/core/groups';
 import {useScene} from './helpers';
@@ -43,9 +43,9 @@ describe('ground collision', () => {
 
     it('reflects at and below the plane', () => {
         const resolver = new GroundPlaneResolver(1);
-        const normal = new Vector3();
-        expect(resolver.resolve(new Vector3(0, 2, 0), normal)).toBe(false);
-        expect(resolver.resolve(new Vector3(0, 1, 0), normal)).toBe(true);
+        const normal = new BVector3();
+        expect(resolver.resolve(new BVector3(0, 2, 0), normal)).toBe(false);
+        expect(resolver.resolve(new BVector3(0, 1, 0), normal)).toBe(true);
         expect([normal.x, normal.y, normal.z]).toEqual([0, 1, 0]);
         expect(new GroundPlaneResolver().y).toBe(0);
     });

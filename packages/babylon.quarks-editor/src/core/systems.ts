@@ -6,7 +6,6 @@ import {
     IntervalValue,
     ParticleSystem,
     RenderMode,
-    Vector4,
     type ParticleEmitter,
 } from 'babylon.quarks';
 import type {EffectBinding} from './binding.js';
@@ -36,7 +35,7 @@ export function createChildSystem(parent: ParticleSystem, options: ChildSystemOp
         startLife: new IntervalValue(0.3, oneShot ? 0.6 : 1.2),
         startSpeed: new IntervalValue(1, 3),
         startSize: new IntervalValue(0.05, 0.2),
-        startColor: new ConstantColor(new Vector4(1, 0.9, 0.6, 1)),
+        startColor: new ConstantColor({r: 1, g: 0.9, b: 0.6, a: 1}),
         emissionOverTime: new ConstantValue(oneShot ? 0 : 30),
         emissionBursts: oneShot
             ? [{time: 0, count: new ConstantValue(8), cycle: 1, interval: 0.01, probability: 1}]

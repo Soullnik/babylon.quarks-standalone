@@ -71,6 +71,8 @@ export class ApplyCollision implements Behavior {
     // (undocumented)
     reset(): void;
     resolver: PhysicsResolver | undefined;
+    // Warning: (ae-forgotten-export) The symbol "Vector3" needs to be exported by the entry point index.d.ts
+    //
     // @internal
     tempV: Vector3;
     // (undocumented)
@@ -89,12 +91,13 @@ export interface ApplyCollisionJSON extends BehaviorJSON {
 // @public
 export class ApplyForce implements Behavior {
     constructor(
-    direction: Vector3,
+    direction: Vector3Like,
     magnitude: ValueGenerator,
     space?: BehaviorSpace);
     // (undocumented)
     clone(): Behavior;
-    direction: Vector3;
+    get direction(): Vector3;
+    set direction(value: Vector3Like);
     readonly _direction: Vector3;
     readonly _frame: EmitterFrame;
     // (undocumented)
@@ -166,13 +169,14 @@ export interface ApplySequencesJSON extends BehaviorJSON {
 
 // @public
 export class AxisAngleGenerator implements RotationGenerator {
-    constructor(axis: Vector3, angle: FunctionValueGenerator | ValueGenerator);
+    constructor(axis: Vector3Like, angle: FunctionValueGenerator | ValueGenerator);
     // (undocumented)
     angle: FunctionValueGenerator | ValueGenerator;
-    // (undocumented)
-    axis: Vector3;
+    get axis(): Vector3;
+    set axis(value: Vector3Like);
     clone(): RotationGenerator;
     static fromJSON(json: AxisAngleJSON): AxisAngleGenerator;
+    // Warning: (ae-forgotten-export) The symbol "Quaternion" needs to be exported by the entry point index.d.ts
     genValue(memory: GeneratorMemory, quat: Quaternion, delta: number, t?: number): Quaternion;
     startGen(memory: GeneratorMemory): void;
     toJSON(): AxisAngleJSON;
@@ -451,9 +455,6 @@ export interface BurstParametersJSON {
 export function cacheEnvAtlas(cube: BaseTexture, atlas: Texture): void;
 
 // @public
-export function ceilPowerOfTwo(value: number): number;
-
-// @public
 export class ChangeEmitDirection implements Behavior {
     constructor(angle: ValueGenerator);
     // (undocumented)
@@ -519,7 +520,16 @@ export interface CircleEmitterParameters {
 }
 
 // @public
-export function clamp(value: number, min: number, max: number): number;
+export interface Color3Like {
+    b: number;
+    g: number;
+    r: number;
+}
+
+// @public
+export interface Color4Like extends Color3Like {
+    a: number;
+}
 
 // @public
 export class ColorBySpeed implements Behavior {
@@ -554,6 +564,7 @@ export interface ColorBySpeedJSON extends BehaviorJSON {
 // @public
 export interface ColorGenerator {
     clone(): ColorGenerator;
+    // Warning: (ae-forgotten-export) The symbol "Vector4" needs to be exported by the entry point index.d.ts
     genColor(memory: GeneratorMemory, color: Vector4): Vector4;
     startGen(memory: GeneratorMemory): void;
     toJSON(): ColorGeneratorJSON;
@@ -605,11 +616,11 @@ export interface ColorOverLifeJSON extends BehaviorJSON {
 
 // @public (undocumented)
 export class ColorRange implements ColorGenerator {
-    constructor(a: Vector4, b: Vector4);
-    // (undocumented)
-    a: Vector4;
-    // (undocumented)
-    b: Vector4;
+    constructor(a: Color4Like, b: Color4Like);
+    get a(): Vector4;
+    set a(value: Color4Like);
+    get b(): Vector4;
+    set b(value: Color4Like);
     // (undocumented)
     clone(): ColorGenerator;
     static fromJSON(json: ColorRangeJSON): ColorRange;
@@ -679,10 +690,10 @@ export interface ConeEmitterParameters {
 
 // @public
 export class ConstantColor implements ColorGenerator {
-    constructor(color: Vector4);
+    constructor(color: Color4Like);
     clone(): ColorGenerator;
-    // (undocumented)
-    color: Vector4;
+    get color(): Vector4;
+    set color(value: Color4Like);
     static fromJSON(json: ConstantColorJSON): ConstantColor;
     genColor(memoryGenerator: GeneratorMemory, color: Vector4): Vector4;
     startGen(memory: GeneratorMemory): void;
@@ -780,22 +791,10 @@ export type CullingMode = 'always' | 'pause' | 'pauseAndCatchUp';
 export function currentFormatPath(): string;
 
 // @public
-export function damp(x: number, y: number, lambda: number, dt: number): number;
-
-// @public
 export function decodeSoftDepth(sample: number, params: Vector4_2): number;
 
 // @public
 export function defaultMeshLighting(): MeshLightingSettings;
-
-// @public
-export const DEG2RAD: number;
-
-// @public
-export function degToRad(degrees: number): number;
-
-// @public
-export function denormalize(value: number, array: number[]): number;
 
 // @public
 export interface DepthTextureOptions {
@@ -814,6 +813,8 @@ export class DonutEmitter implements EmitterShape {
     donutRadius: number;
     static fromJSON(json: ShapeJSON): DonutEmitter;
     initialize(p: Particle, emissionState: EmissionState): void;
+    // Warning: (ae-forgotten-export) The symbol "Matrix4" needs to be exported by the entry point index.d.ts
+    //
     // @internal
     _m1: Matrix4;
     memory: GeneratorMemory;
@@ -1043,47 +1044,6 @@ export type ErosionJSON = Omit<ParticleErosionOptions, 'mask'> & {
 };
 
 // @public
-export function euclideanModulo(n: number, m: number): number;
-
-// @public
-export class Euler {
-    [Symbol.iterator](): Generator<number | EulerOrder, void, unknown>;
-    constructor(x?: number, y?: number, z?: number, order?: EulerOrder);
-    clone(): Euler;
-    copy(euler: Euler): this;
-    static DEFAULT_ORDER: EulerOrder;
-    equals(euler: Euler): boolean;
-    fromArray(array: [number, number, number, EulerOrder?]): this;
-    readonly isEuler: boolean;
-    // @internal
-    _onChange(callback: (euler?: Euler) => void): this;
-    // @internal
-    _onChangeCallback(euler?: Euler): void;
-    get order(): EulerOrder;
-    set order(value: EulerOrder);
-    // @internal
-    _order: EulerOrder;
-    reorder(newOrder: EulerOrder): this;
-    set(x: number, y: number, z: number, order?: EulerOrder): this;
-    setFromQuaternion(q: Quaternion, order: EulerOrder, update?: boolean): this;
-    setFromRotationMatrix(m: Matrix4, order?: EulerOrder, update?: boolean): this;
-    setFromVector3(v: Vector3, order?: EulerOrder): this;
-    toArray(array?: Array<number | EulerOrder>, offset?: number): (number | EulerOrder)[];
-    get x(): number;
-    set x(value: number);
-    // @internal
-    _x: number;
-    get y(): number;
-    set y(value: number);
-    // @internal
-    _y: number;
-    get z(): number;
-    set z(value: number);
-    // @internal
-    _z: number;
-}
-
-// @public
 export class EulerGenerator implements RotationGenerator {
     constructor(angleX: FunctionValueGenerator | ValueGenerator, angleY: FunctionValueGenerator | ValueGenerator, angleZ: FunctionValueGenerator | ValueGenerator, eulerOrder?: EulerOrder);
     // (undocumented)
@@ -1093,6 +1053,7 @@ export class EulerGenerator implements RotationGenerator {
     // (undocumented)
     angleZ: FunctionValueGenerator | ValueGenerator;
     clone(): RotationGenerator;
+    // Warning: (ae-forgotten-export) The symbol "Euler" needs to be exported by the entry point index.d.ts
     euler: Euler;
     static fromJSON(json: EulerJSON): EulerGenerator;
     genValue(memory: GeneratorMemory, quat: Quaternion, delta: number, t?: number): Quaternion;
@@ -1115,9 +1076,6 @@ export type EulerOrder = 'XYZ' | 'YXZ' | 'ZXY' | 'ZYX' | 'YZX' | 'XZY' | 'XYX' |
 
 // @public
 export type FieldType = 'vec3' | 'value' | 'number' | 'range' | 'colorFunc' | 'valueFunc' | 'rotationFunc' | 'radian' | 'mesh' | 'particleSystem' | 'boolean' | 'string' | 'geometry' | 'emitterMode' | 'boxEmitFrom' | 'coneEmitFrom' | 'gridSampling' | 'subEmitterInherit' | 'shapeTransform' | 'vec3Func';
-
-// @public
-export function floorPowerOfTwo(value: number): number;
 
 // @public
 export type FogTarget = 'color' | 'black' | 'white';
@@ -1257,9 +1215,6 @@ export interface FusionStep {
 }
 
 // @public
-export function generateUUID(): string;
-
-// @public
 export function GeneratorFromJSON(json: FunctionJSON | undefined): FunctionValueGenerator | ValueGenerator | RotationGenerator | Vector3Generator;
 
 // @public
@@ -1291,12 +1246,14 @@ export function getValueFromEmitterMode(mode: EmitterMode, currentValue: number,
 
 // @public (undocumented)
 export class Gradient implements FunctionColorGenerator {
-    constructor(color?: Array<[Vector3, number]>, alpha?: Array<[number, number]>);
+    constructor(color?: Array<[Color3Like, number]>, alpha?: Array<[number, number]>);
     alpha: ContinuousLinearFunction<number>;
     clearTable(): void;
     // (undocumented)
     clone(): FunctionColorGenerator;
     color: ContinuousLinearFunction<Vector3>;
+    evaluate(t: number): Color4Like;
+    evaluate<T extends Color4Like>(t: number, target: T): T;
     static fromJSON(json: GradientJSON): Gradient;
     // (undocumented)
     genColor(memory: GeneratorMemory, color: Vector4, t: number): Vector4;
@@ -1343,9 +1300,10 @@ export interface GradientRangeJSON {
 // @public
 export class GravityForce implements Behavior {
     constructor(
-    center: Vector3,
+    center: Vector3Like,
     magnitude: number);
-    center: Vector3;
+    get center(): Vector3;
+    set center(value: Vector3Like);
     // (undocumented)
     clone(): Behavior;
     // (undocumented)
@@ -1532,9 +1490,6 @@ export interface IntervalValueJSON {
 }
 
 // @public
-export function inverseLerp(x: number, y: number, value: number): number;
-
-// @public
 export interface IParticle {
     age: number;
     color: Vector4;
@@ -1558,7 +1513,7 @@ export interface IParticleSystem {
     emitter: IEmitter;
     emitterVelocity?: Vector3;
     endEmit(): void;
-    flip?: Vector2;
+    flip?: Vector2Like;
     hasPendingEmission(state?: EmissionState): boolean;
     readonly isDisposed?: boolean;
     readonly isEmitEnded: boolean;
@@ -1592,9 +1547,6 @@ export interface IPrefab {
 }
 
 // @public
-export function isPowerOfTwo(value: number): boolean;
-
-// @public
 export interface JsonMetaData {
     geometries: {
         [uuid: string]: Resource;
@@ -1603,9 +1555,6 @@ export interface JsonMetaData {
         [uuid: string]: Resource | null;
     };
 }
-
-// @public
-export function lerp(x: number, y: number, t: number): number;
 
 // @public
 export class LimitSpeedOverLife implements Behavior {
@@ -1658,116 +1607,10 @@ export interface LimitSpeedOverLifeJSON extends BehaviorJSON {
 export function loadPlugin(plugin: Plugin_2): void;
 
 // @public
-export function mapLinear(x: number, a1: number, a2: number, b1: number, b2: number): number;
-
-// @public
 export function mapUVEqual(a: TextureUV | undefined, b: TextureUV | undefined): boolean;
 
 // @public
 export type MaterialTextureRef = string | BaseTexture | null;
-
-// @public
-export const MathUtils: {
-    DEG2RAD: number;
-    RAD2DEG: number;
-    generateUUID: typeof generateUUID;
-    clamp: typeof clamp;
-    euclideanModulo: typeof euclideanModulo;
-    mapLinear: typeof mapLinear;
-    inverseLerp: typeof inverseLerp;
-    lerp: typeof lerp;
-    damp: typeof damp;
-    pingpong: typeof pingpong;
-    smoothstep: typeof smoothstep;
-    smootherstep: typeof smootherstep;
-    randInt: typeof randInt;
-    randFloat: typeof randFloat;
-    randFloatSpread: typeof randFloatSpread;
-    seededRandom: typeof seededRandom;
-    degToRad: typeof degToRad;
-    radToDeg: typeof radToDeg;
-    isPowerOfTwo: typeof isPowerOfTwo;
-    ceilPowerOfTwo: typeof ceilPowerOfTwo;
-    floorPowerOfTwo: typeof floorPowerOfTwo;
-    setQuaternionFromProperEuler: typeof setQuaternionFromProperEuler;
-    normalize: typeof normalize;
-    denormalize: typeof denormalize;
-};
-
-// @public
-export class Matrix3 {
-    constructor(n11?: number, n12?: number, n13?: number, n21?: number, n22?: number, n23?: number, n31?: number, n32?: number, n33?: number);
-    clone(): Matrix3;
-    copy(m: Matrix3): this;
-    determinant(): number;
-    elements: number[];
-    equals(matrix: Matrix3): boolean;
-    extractBasis(xAxis: Vector3, yAxis: Vector3, zAxis: Vector3): this;
-    fromArray(array: number[], offset?: number): this;
-    getNormalMatrix(matrix4: Matrix4): this;
-    identity(): this;
-    invert(): this;
-    readonly isMatrix3: boolean;
-    makeRotation(theta: number): this;
-    makeScale(x: number, y: number): this;
-    makeTranslation(x: number | Vector2, y: number): this;
-    multiply(m: Matrix3): this;
-    multiplyMatrices(a: Matrix3, b: Matrix3): this;
-    multiplyScalar(s: number): this;
-    premultiply(m: Matrix3): this;
-    rotate(theta: number): this;
-    scale(sx: number, sy: number): this;
-    set(n11: number, n12: number, n13: number, n21: number, n22: number, n23: number, n31: number, n32: number, n33: number): this;
-    setFromMatrix4(m: Matrix4): this;
-    setUvTransform(tx: number, ty: number, sx: number, sy: number, rotation: number, cx: number, cy: number): this;
-    toArray(array?: number[], offset?: number): number[];
-    translate(tx: number, ty: number): this;
-    transpose(): this;
-    transposeIntoArray(r: number[]): this;
-}
-
-// @public
-export class Matrix4 {
-    constructor(n11?: number, n12?: number, n13?: number, n14?: number, n21?: number, n22?: number, n23?: number, n24?: number, n31?: number, n32?: number, n33?: number, n34?: number, n41?: number, n42?: number, n43?: number, n44?: number);
-    clone(): Matrix4;
-    compose(position: Vector3, quaternion: Quaternion, scale: Vector3): this;
-    copy(m: Matrix4): this;
-    copyPosition(m: Matrix4): this;
-    decompose(position: Vector3, quaternion: Quaternion, scale: Vector3): this;
-    determinant(): number;
-    elements: number[];
-    equals(matrix: Matrix4): boolean;
-    extractBasis(xAxis: Vector3, yAxis: Vector3, zAxis: Vector3): this;
-    extractRotation(m: Matrix4): this;
-    fromArray(array: number[], offset?: number): this;
-    getMaxScaleOnAxis(): number;
-    identity(): this;
-    invert(): this;
-    readonly isMatrix4: boolean;
-    lookAt(eye: Vector3, target: Vector3, up: Vector3): this;
-    makeBasis(xAxis: Vector3, yAxis: Vector3, zAxis: Vector3): this;
-    makeOrthographic(left: number, right: number, top: number, bottom: number, near: number, far: number, coordinateSystem?: number): this;
-    makePerspective(left: number, right: number, top: number, bottom: number, near: number, far: number, coordinateSystem?: number): this;
-    makeRotationAxis(axis: Vector3, angle: number): this;
-    makeRotationFromEuler(euler: Euler): this;
-    makeRotationFromQuaternion(q: Quaternion): this;
-    makeRotationX(theta: number): this;
-    makeRotationY(theta: number): this;
-    makeRotationZ(theta: number): this;
-    makeScale(x: number, y: number, z: number): this;
-    makeShear(xy: number, xz: number, yx: number, yz: number, zx: number, zy: number): this;
-    makeTranslation(x: number | Vector3, y?: number, z?: number): this;
-    multiply(m: Matrix4): this;
-    multiplyMatrices(a: Matrix4, b: Matrix4): this;
-    multiplyScalar(s: number): this;
-    premultiply(m: Matrix4): this;
-    scale(v: Vector3): this;
-    set(n11: number, n12: number, n13: number, n14: number, n21: number, n22: number, n23: number, n24: number, n31: number, n32: number, n33: number, n34: number, n41: number, n42: number, n43: number, n44: number): this;
-    setFromMatrix3(m: Matrix3): this;
-    setPosition(x: number | Vector3, y?: number, z?: number): this;
-    toArray(array?: number[], offset?: number): number[];
-    transpose(): this;
-}
 
 // @public
 export const MAX_TRAIL_TESSELLATION = 16;
@@ -1878,9 +1721,6 @@ export interface NoiseJSON extends BehaviorJSON {
 }
 
 // @public
-export function normalize(value: number, array: number[]): number;
-
-// @public
 export function normalizeErosion(erosion: ParticleErosionOptions | null | undefined): ParticleErosion | undefined;
 
 // @public
@@ -1909,9 +1749,10 @@ export interface ObjectValueType<T> {
 export class OrbitOverLife implements Behavior {
     constructor(
     orbitSpeed: FunctionValueGenerator | ValueGenerator,
-    axis?: Vector3,
+    axis?: Vector3Like,
     space?: BehaviorSpace);
-    axis: Vector3;
+    get axis(): Vector3;
+    set axis(value: Vector3Like);
     readonly _axis: Vector3;
     readonly _center: Vector3;
     // (undocumented)
@@ -2125,11 +1966,12 @@ export class ParticleSystem implements IParticleSystem {
     set erosion(erosion: ParticleErosionOptions | undefined);
     // @internal
     finishedEventFired: boolean;
-    flip?: Vector2;
+    get flip(): Vector2Like | undefined;
+    set flip(value: Vector2Like | undefined);
     static fromJSON(json: ParticleSystemJSONParameters, meta: BabylonMetaData, scene?: Scene): ParticleSystem;
-    getBeamEnd(out: Vector3): boolean;
+    getBeamEnd(out: Vector3Like): boolean;
     getRendererSettings(): VFXBatchSettings;
-    getWorldBounds(min: Vector3, max: Vector3): boolean;
+    getWorldBounds(min: Vector3Like, max: Vector3Like): boolean;
     get gradientMap(): ParticleGradientMap | undefined;
     set gradientMap(gradientMap: Partial<ParticleGradientMap> | undefined);
     hasPendingEmission(state?: EmissionState): boolean;
@@ -2171,8 +2013,8 @@ export class ParticleSystem implements IParticleSystem {
     readonly particles: Array<Particle>;
     pause(): void;
     paused: boolean;
-    get pivot(): Vector3 | undefined;
-    set pivot(v: Vector3 | undefined);
+    get pivot(): Vector3Like | undefined;
+    set pivot(v: Vector3Like | undefined);
     play(): void;
     get playbackSpeed(): number;
     set playbackSpeed(speed: number);
@@ -2199,7 +2041,8 @@ export class ParticleSystem implements IParticleSystem {
     get rim(): MeshRim | undefined;
     set rim(rim: Partial<MeshRim> | undefined);
     get ringBufferActive(): boolean;
-    ringBufferLoopRange: Vector2;
+    get ringBufferLoopRange(): Vector2Like;
+    set ringBufferLoopRange(value: Vector2Like);
     ringBufferMode: RingBufferMode;
     scalingMode: ScalingMode;
     get seed(): number | undefined;
@@ -2234,7 +2077,8 @@ export class ParticleSystem implements IParticleSystem {
     get time(): number;
     get timeDilation(): number;
     set timeDilation(dilation: number);
-    tint?: Vector4;
+    get tint(): Color4Like | undefined;
+    set tint(value: Color4Like | undefined);
     toJSON(metaData?: BabylonMetaData | string): ParticleSystemJSONParameters;
     get transparent(): boolean;
     set transparent(transparent: boolean);
@@ -2337,7 +2181,7 @@ export interface ParticleSystemParameters {
     emissionOverDistance?: ValueGenerator | FunctionValueGenerator;
     emissionOverTime?: ValueGenerator | FunctionValueGenerator;
     erosion?: ParticleErosionOptions;
-    flip?: Vector2;
+    flip?: Vector2Like;
     gradientMap?: Partial<ParticleGradientMap>;
     instancingGeometry?: Float32Array;
     instancingIndices?: Uint32Array | Uint16Array;
@@ -2353,7 +2197,7 @@ export interface ParticleSystemParameters {
     maxParticleSize?: number;
     minParticleSize?: number;
     onlyUsedByOther?: boolean;
-    pivot?: Vector3;
+    pivot?: Vector3Like;
     playbackSpeed?: number;
     prewarm?: boolean;
     prewarmTime?: number;
@@ -2363,7 +2207,7 @@ export interface ParticleSystemParameters {
     renderMode?: RenderMode;
     renderOrder?: number;
     rim?: Partial<MeshRim>;
-    ringBufferLoopRange?: Vector2;
+    ringBufferLoopRange?: Vector2Like;
     ringBufferMode?: RingBufferMode;
     scalingMode?: ScalingMode;
     scene?: Scene;
@@ -2403,7 +2247,7 @@ export type ParticleUVDistortionOptions = Partial<Omit<ParticleUVDistortion, 'ma
 
 // @public
 export interface PhysicsResolver {
-    resolve(position: Vector3, normal: Vector3): boolean;
+    resolve(position: Vector3Like, normal: Vector3Like): boolean;
 }
 
 // @public
@@ -2450,9 +2294,6 @@ export abstract class PiecewiseFunction<T> {
     setFunction(index: number, func: T): void;
     setStartX(index: number, x: number): void;
 }
-
-// @public
-export function pingpong(x: number, length?: number): number;
 
 // @public
 export function planBehaviorFusion(behaviors: Array<Behavior>): Array<FusionStep>;
@@ -2743,90 +2584,12 @@ export class QuarksUtil {
 }
 
 // @public
-export class Quaternion {
-    [Symbol.iterator](): Generator<number, void, unknown>;
-    constructor(x?: number, y?: number, z?: number, w?: number);
-    angleTo(q: Quaternion): number;
-    clone(): Quaternion;
-    conjugate(): this;
-    copy(quaternion: Quaternion): this;
-    dot(v: Quaternion): number;
-    equals(quaternion: Quaternion): boolean;
-    fromArray(array: number[], offset?: number): this;
-    identity(): this;
-    invert(): this;
-    readonly isQuaternion: boolean;
-    length(): number;
-    lengthSq(): number;
-    multiply(q: Quaternion): this;
-    multiplyQuaternions(a: Quaternion, b: Quaternion): this;
-    static multiplyQuaternionsFlat(dst: number[], dstOffset: number, src0: number[], srcOffset0: number, src1: number[], srcOffset1: number): number[];
-    normalize(): this;
-    // @internal
-    _onChange(callback: () => void): this;
-    // @internal
-    _onChangeCallback(): void;
-    premultiply(q: Quaternion): this;
-    random(): this;
-    rotateTowards(q: Quaternion, step: number): this;
-    set(x: number, y: number, z: number, w: number): this;
-    setFromAxisAngle(axis: Vector3, angle: number): this;
-    setFromEuler(euler: Euler, update?: boolean): this;
-    setFromRotationMatrix(m: Matrix4): this;
-    setFromUnitVectors(vFrom: Vector3, vTo: Vector3): this;
-    slerp(qb: Quaternion, t: number): this;
-    static slerpFlat(dst: number[], dstOffset: number, src0: number[], srcOffset0: number, src1: number[], srcOffset1: number, t: number): void;
-    slerpQuaternions(qa: Quaternion, qb: Quaternion, t: number): this;
-    toArray(array?: number[], offset?: number): number[];
-    toJSON(): number[];
-    get w(): number;
-    set w(value: number);
-    // @internal
-    _w: number;
-    get x(): number;
-    set x(value: number);
-    // @internal
-    _x: number;
-    get y(): number;
-    set y(value: number);
-    // @internal
-    _y: number;
-    get z(): number;
-    set z(value: number);
-    // @internal
-    _z: number;
+export interface QuaternionLike {
+    w: number;
+    x: number;
+    y: number;
+    z: number;
 }
-
-// @public
-export class QuaternionView extends Quaternion {
-    constructor(data: Float32Array, offset: number);
-    bind(data: Float32Array, offset: number): void;
-    data: Float32Array;
-    offset: number;
-    // @internal
-    _w: number;
-    // @internal
-    _x: number;
-    // @internal
-    _y: number;
-    // @internal
-    _z: number;
-}
-
-// @public
-export const RAD2DEG: number;
-
-// @public
-export function radToDeg(radians: number): number;
-
-// @public
-export function randFloat(low: number, high: number): number;
-
-// @public
-export function randFloatSpread(range: number): number;
-
-// @public
-export function randInt(low: number, high: number): number;
 
 // @public
 export function random(): number;
@@ -2858,11 +2621,11 @@ export interface RandomBetweenCurvesJSON {
 
 // @public (undocumented)
 export class RandomColor implements ColorGenerator {
-    constructor(a: Vector4, b: Vector4);
-    // (undocumented)
-    a: Vector4;
-    // (undocumented)
-    b: Vector4;
+    constructor(a: Color4Like, b: Color4Like);
+    get a(): Vector4;
+    set a(value: Color4Like);
+    get b(): Vector4;
+    set b(value: Color4Like);
     // (undocumented)
     clone(): ColorGenerator;
     static fromJSON(json: RandomColorJSON): RandomColor;
@@ -3115,9 +2878,6 @@ export interface RotationOverLifeJSON extends BehaviorJSON {
 export type ScalingMode = 'local' | 'hierarchy' | 'shape';
 
 // @public
-export function seededRandom(s: number): number;
-
-// @public
 export interface SequenceJSON {
     range: IntervalValueJSON;
     sequencer: SequencerJSON;
@@ -3150,9 +2910,6 @@ export interface SerializeEffectOptions {
 
 // @public
 export function setPhysicsResolver(resolver: PhysicsResolver | undefined): void;
-
-// @public
-export function setQuaternionFromProperEuler(q: Quaternion, a: number, b: number, c: number, order: EulerOrder): void;
 
 // @public
 export function setRandomSource(next: RandomSource | null): RandomSource;
@@ -3232,14 +2989,17 @@ export interface ShapeJSON {
 
 // @public
 export class ShapeTransform {
-    constructor(position?: Vector3, rotation?: Quaternion, scale?: Vector3);
+    constructor(position?: Vector3Like, rotation?: QuaternionLike, scale?: Vector3Like);
     apply(p: Particle): void;
     clone(): ShapeTransform;
     static fromJSON(json: ShapeTransformJSON | undefined): ShapeTransform | undefined;
     isIdentity(): boolean;
-    position: Vector3;
-    rotation: Quaternion;
-    scale: Vector3;
+    get position(): Vector3;
+    set position(value: Vector3Like);
+    get rotation(): Quaternion;
+    set rotation(value: QuaternionLike);
+    get scale(): Vector3;
+    set scale(value: Vector3Like);
     toJSON(): ShapeTransformJSON;
     static toShapeJSON(transform: ShapeTransform | undefined): Pick<ShapeJSON, 'transform'>;
 }
@@ -3309,12 +3069,6 @@ export class SizeOverLife implements Behavior {
 export interface SizeOverLifeJSON extends BehaviorJSON {
     size: ValueGeneratorJSON | Vector3GeneratorJSON;
 }
-
-// @public
-export function smootherstep(x: number, min: number, max: number): number;
-
-// @public
-export function smoothstep(x: number, min: number, max: number): number;
 
 // @public
 export type SoftDepthEncoding = 'linear' | 'nonLinear' | 'viewZ';
@@ -3471,7 +3225,7 @@ export interface StoredBatchSettings {
     materialTransparent: boolean;
     maxParticleSize: number;
     minParticleSize: number;
-    pivot?: Vector3;
+    pivot?: Vector3Like;
     reflectionAtlas: BaseTexture | null;
     reflectionLevel: number;
     reflectionTexture: BaseTexture | null;
@@ -3519,13 +3273,14 @@ export enum SubParticleEmitMode {
 
 // @public
 export class TextureSequencer implements Sequencer {
-    constructor(scaleX?: number, scaleY?: number, position?: Vector3);
+    constructor(scaleX?: number, scaleY?: number, position?: Vector3Like);
     clone(): Sequencer;
     fromImage(img: CanvasImageSource, threshold: number): void;
     static fromJSON(json: TextureSequencerJSON): Sequencer;
+    // Warning: (ae-forgotten-export) The symbol "Vector2" needs to be exported by the entry point index.d.ts
     locations: Vector2[];
-    // (undocumented)
-    position: Vector3;
+    get position(): Vector3;
+    set position(value: Vector3Like);
     // (undocumented)
     scaleX: number;
     // (undocumented)
@@ -3636,7 +3391,7 @@ export interface TrailSettings {
     lifetime?: number;
     minVertexDistance?: number;
     recordWorldSpace?: boolean;
-    sideAxis?: Vector3;
+    sideAxis?: Vector3Like;
     startLength: ValueGenerator | FunctionValueGenerator;
     tessellation?: number;
     textureMode?: TrailTextureMode;
@@ -3665,10 +3420,10 @@ export function trailTextureScale(settings: Partial<TrailOptions> | undefined): 
 // @public
 export class TurbulenceField implements Behavior {
     constructor(
-    scale: Vector3,
+    scale: Vector3Like,
     octaves: number,
-    velocityMultiplier: Vector3,
-    timeScale: Vector3,
+    velocityMultiplier: Vector3Like,
+    timeScale: Vector3Like,
     seed?: number);
     // (undocumented)
     clone(): Behavior;
@@ -3684,14 +3439,16 @@ export class TurbulenceField implements Behavior {
     readonly initialOffset: Vector3;
     octaves: number;
     reset(): void;
-    scale: Vector3;
+    get scale(): Vector3;
+    set scale(value: Vector3Like);
     seed: number;
     // @internal
     temp: Vector3;
     // @internal
     temp2: Vector3;
     timeOffset: Vector3;
-    timeScale: Vector3;
+    get timeScale(): Vector3;
+    set timeScale(value: Vector3Like);
     // (undocumented)
     toJSON(): TurbulenceFieldJSON;
     // (undocumented)
@@ -3700,7 +3457,8 @@ export class TurbulenceField implements Behavior {
     update(particle: Particle, delta: number): void;
     // (undocumented)
     updateAll(particles: Array<Particle>, count: number, delta: number): void;
-    velocityMultiplier: Vector3;
+    get velocityMultiplier(): Vector3;
+    set velocityMultiplier(value: Vector3Like);
 }
 
 // @public
@@ -3749,149 +3507,15 @@ export function ValueGeneratorFromJSON(json: ValueGeneratorJSON | undefined): Fu
 export type ValueGeneratorJSON = ConstantValueJSON | IntervalValueJSON | PiecewiseBezierJSON | RandomBetweenCurvesJSON;
 
 // @public
-export class Vector2 {
-    [Symbol.iterator](): Generator<number, void, unknown>;
-    constructor(x?: number, y?: number);
-    add(v: Vector2): this;
-    addScalar(s: number): this;
-    addScaledVector(v: Vector2, s: number): this;
-    addVectors(a: Vector2, b: Vector2): this;
-    angle(): number;
-    angleTo(v: Vector2): number;
-    applyMatrix3(m: Matrix3): this;
-    ceil(): this;
-    clamp(min: Vector2, max: Vector2): this;
-    clampLength(min: number, max: number): this;
-    clampScalar(minVal: number, maxVal: number): this;
-    clone(): Vector2;
-    copy(v: Vector2): this;
-    cross(v: Vector2): number;
-    distanceTo(v: Vector2): number;
-    distanceToSquared(v: Vector2): number;
-    divide(v: Vector2): this;
-    divideScalar(scalar: number): this;
-    dot(v: Vector2): number;
-    equals(v: Vector2): boolean;
-    floor(): this;
-    fromArray(array: number[], offset?: number): this;
-    getComponent(index: number): number;
-    get height(): number;
-    set height(value: number);
-    readonly isVector2: boolean;
-    length(): number;
-    lengthSq(): number;
-    lerp(v: Vector2, alpha: number): this;
-    lerpVectors(v1: Vector2, v2: Vector2, alpha: number): this;
-    manhattanDistanceTo(v: Vector2): number;
-    manhattanLength(): number;
-    max(v: Vector2): this;
-    min(v: Vector2): this;
-    multiply(v: Vector2): this;
-    multiplyScalar(scalar: number): this;
-    negate(): this;
-    normalize(): this;
-    random(): this;
-    rotateAround(center: Vector2, angle: number): this;
-    round(): this;
-    roundToZero(): this;
-    set(x: number, y: number): this;
-    setComponent(index: number, value: number): this;
-    setLength(length: number): this;
-    setScalar(scalar: number): this;
-    setX(x: number): this;
-    setY(y: number): this;
-    sub(v: Vector2): this;
-    subScalar(s: number): this;
-    subVectors(a: Vector2, b: Vector2): this;
-    toArray(array?: number[], offset?: number): number[];
-    get width(): number;
-    set width(value: number);
-    x: number;
-    y: number;
-}
-
-// @public
 export interface Vector2JSON {
     x: number;
     y: number;
 }
 
 // @public
-export class Vector3 {
-    [Symbol.iterator](): Generator<number, void, unknown>;
-    constructor(x?: number, y?: number, z?: number);
-    abs(): this;
-    add(v: Vector3): this;
-    addScalar(s: number): this;
-    addScaledVector(v: Vector3, s: number): this;
-    addVectors(a: Vector3, b: Vector3): this;
-    angleTo(v: Vector3): number;
-    applyAxisAngle(axis: Vector3, angle: number): this;
-    applyEuler(euler: Euler): this;
-    applyMatrix3(m: Matrix3): this;
-    applyMatrix4(m: Matrix4): this;
-    applyNormalMatrix(m: Matrix3): this;
-    applyQuaternion(q: Quaternion): this;
-    ceil(): this;
-    clamp(min: Vector3, max: Vector3): this;
-    clampLength(min: number, max: number): this;
-    clampScalar(minVal: number, maxVal: number): this;
-    clone(): Vector3;
-    copy(v: Vector3): this;
-    cross(v: Vector3): this;
-    crossVectors(a: Vector3, b: Vector3): this;
-    distanceTo(v: Vector3): number;
-    distanceToSquared(v: Vector3): number;
-    divide(v: Vector3): this;
-    divideScalar(scalar: number): this;
-    dot(v: Vector3): number;
-    equals(v: Vector3): boolean;
-    floor(): this;
-    fromArray(array: number[], offset?: number): this;
-    getComponent(index: number): number;
-    readonly isVector3: boolean;
-    length(): number;
-    lengthSq(): number;
-    lerp(v: Vector3, alpha: number): this;
-    lerpVectors(v1: Vector3, v2: Vector3, alpha: number): this;
-    manhattanDistanceTo(v: Vector3): number;
-    manhattanLength(): number;
-    max(v: Vector3): this;
-    min(v: Vector3): this;
-    multiply(v: Vector3): this;
-    multiplyScalar(scalar: number): this;
-    multiplyVectors(a: Vector3, b: Vector3): this;
-    negate(): this;
-    normalize(): this;
-    projectOnPlane(planeNormal: Vector3): this;
-    projectOnVector(v: Vector3): this;
-    random(): this;
-    randomDirection(): this;
-    reflect(normal: Vector3): this;
-    round(): this;
-    roundToZero(): this;
-    set(x: number, y: number, z: number): this;
-    setComponent(index: number, value: number): this;
-    setFromCylindricalCoords(radius: number, theta: number, y: number): this;
-    setFromEuler(e: Euler): this;
-    setFromMatrix3Column(m: Matrix3, index: number): this;
-    setFromMatrixColumn(m: Matrix4, index: number): this;
-    setFromMatrixPosition(m: Matrix4): this;
-    setFromMatrixScale(m: Matrix4): this;
-    setFromSphericalCoords(radius: number, phi: number, theta: number): this;
-    setLength(length: number): this;
-    setScalar(scalar: number): this;
-    setX(x: number): this;
-    setY(y: number): this;
-    setZ(z: number): this;
-    sub(v: Vector3): this;
-    subScalar(s: number): this;
-    subVectors(a: Vector3, b: Vector3): this;
-    toArray(array?: number[], offset?: number): number[];
-    transformDirection(m: Matrix4): this;
+export interface Vector2Like {
     x: number;
     y: number;
-    z: number;
 }
 
 // @public
@@ -3946,71 +3570,7 @@ export interface Vector3JSON {
 }
 
 // @public
-export class Vector3View extends Vector3 {
-    constructor(data: Float32Array, offset: number);
-    bind(data: Float32Array, offset: number): void;
-    data: Float32Array;
-    offset: number;
-    x: number;
-    y: number;
-    z: number;
-}
-
-// @public
-export class Vector4 {
-    [Symbol.iterator](): Generator<number, void, unknown>;
-    constructor(x?: number, y?: number, z?: number, w?: number);
-    add(v: Vector4): Vector4;
-    addScalar(scalar: number): Vector4;
-    addScaledVector(v: Vector4, s: number): Vector4;
-    addVectors(a: Vector4, b: Vector4): Vector4;
-    applyMatrix4(m: Matrix4): this;
-    ceil(): this;
-    clamp(min: Vector4, max: Vector4): this;
-    clampLength(min: number, max: number): Vector4;
-    clampScalar(minVal: number, maxVal: number): this;
-    clone(): Vector4;
-    copy(v: Vector4): Vector4;
-    divideScalar(scalar: number): Vector4;
-    dot(v: Vector4): number;
-    equals(v: Vector4): boolean;
-    floor(): this;
-    fromArray(array: number[], offset?: number): this;
-    getComponent(index: number): number;
-    get height(): number;
-    set height(value: number);
-    readonly isVector4: boolean;
-    length(): number;
-    lengthSq(): number;
-    lerp(v: Vector4, alpha: number): this;
-    lerpVectors(v1: Vector4, v2: Vector4, alpha: number): this;
-    manhattanLength(): number;
-    max(v: Vector4): this;
-    min(v: Vector4): this;
-    multiply(v: Vector4): Vector4;
-    multiplyScalar(scalar: number): Vector4;
-    negate(): this;
-    normalize(): Vector4;
-    random(): this;
-    round(): this;
-    roundToZero(): this;
-    set(x: number, y: number, z: number, w: number): Vector4;
-    setAxisAngleFromQuaternion(q: Quaternion): this;
-    setAxisAngleFromRotationMatrix(m: Matrix4): this;
-    setComponent(index: number, value: number): Vector4;
-    setLength(length: number): Vector4;
-    setScalar(scalar: number): Vector4;
-    setW(w: number): Vector4;
-    setX(x: number): Vector4;
-    setY(y: number): Vector4;
-    setZ(z: number): Vector4;
-    sub(v: Vector4): Vector4;
-    subScalar(scalar: number): Vector4;
-    subVectors(a: Vector4, b: Vector4): Vector4;
-    toArray(array?: number[], offset?: number): number[];
-    w: number;
-    get width(): number;
-    set width(value: number);
+export interface Vector3Like {
     x: number;
     y: number;
     z: number;
@@ -4025,22 +3585,10 @@ export interface Vector4JSON {
 }
 
 // @public
-export class Vector4View extends Vector4 {
-    constructor(data: Float32Array, offset: number);
-    bind(data: Float32Array, offset: number): void;
-    data: Float32Array;
-    offset: number;
-    w: number;
-    x: number;
-    y: number;
-    z: number;
-}
-
-// @public
 export class VelocityOverLife implements Behavior {
     constructor(linearX?: FunctionValueGenerator | ValueGenerator, linearY?: FunctionValueGenerator | ValueGenerator, linearZ?: FunctionValueGenerator | ValueGenerator, orbitalX?: FunctionValueGenerator | ValueGenerator, orbitalY?: FunctionValueGenerator | ValueGenerator, orbitalZ?: FunctionValueGenerator | ValueGenerator, space?: VelocityOverLifeSpace,
     radial?: FunctionValueGenerator | ValueGenerator,
-    orbitalOffset?: Vector3);
+    orbitalOffset?: Vector3Like);
     _axisX: Vector3;
     // @internal
     _axisY: Vector3;
@@ -4060,7 +3608,8 @@ export class VelocityOverLife implements Behavior {
     linearY: FunctionValueGenerator | ValueGenerator;
     // (undocumented)
     linearZ: FunctionValueGenerator | ValueGenerator;
-    orbitalOffset: Vector3;
+    get orbitalOffset(): Vector3;
+    set orbitalOffset(value: Vector3Like);
     // (undocumented)
     orbitalX: FunctionValueGenerator | ValueGenerator;
     // (undocumented)
@@ -4200,7 +3749,7 @@ export interface VFXBatchSettings {
     materialTransparent: boolean;
     maxParticleSize?: number;
     minParticleSize?: number;
-    pivot?: Vector3;
+    pivot?: Vector3Like;
     reflectionAtlas: BaseTexture | null;
     reflectionLevel: number;
     reflectionTexture: BaseTexture | null;
@@ -4221,12 +3770,6 @@ export interface VFXBatchSettings {
 
 // @public
 export const warnFormat: (message: string) => void;
-
-// @public
-export const WebGLCoordinateSystem = 2000;
-
-// @public
-export const WebGPUCoordinateSystem = 2001;
 
 // @public
 export class WidthOverLength implements Behavior {
@@ -4260,6 +3803,10 @@ export interface WidthOverLengthJSON extends BehaviorJSON {
 
 // @public
 export function withRandomSource<T>(generator: RandomSource, fn: () => T): T;
+
+// Warnings were encountered during analysis:
+//
+// dist/types/index.d.ts:15:1 - (ae-misplaced-package-tag) The @packageDocumentation comment must appear at the top of entry point *.d.ts file
 
 // (No @packageDocumentation comment for this package)
 

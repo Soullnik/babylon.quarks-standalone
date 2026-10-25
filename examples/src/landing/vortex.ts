@@ -1,4 +1,5 @@
 import {Constants} from '@babylonjs/core/Engines/constants';
+import {Color3, Color4} from '@babylonjs/core/Maths/math.color';
 import {Vector3 as BVector3} from '@babylonjs/core/Maths/math.vector';
 // Side-effect import: registers Scene.createPickingRay, used to project the cursor into the world.
 import '@babylonjs/core/Culling/ray';
@@ -19,14 +20,12 @@ import {
     ParticleSystem,
     PiecewiseBezier,
     PointEmitter,
-    Vector3 as QVector3,
     RandomColor,
     RenderMode,
     RotationOverLife,
     SizeOverLife,
     SphereEmitter,
     TurbulenceField,
-    Vector4,
     WidthOverLength,
 } from 'babylon.quarks';
 import {SHARED_ASSETS, createSharedTexture} from '../shared/common';
@@ -46,13 +45,13 @@ const T2 = {
 };
 
 /** Hero palette — cool indigo bed, cyan→violet→magenta energy ramp, near-white core. */
-const WHITE = new QVector3(1, 1, 1);
+const WHITE = new Color3(1, 1, 1);
 
 /**
  * Alpha envelope over particle life: fade in, hold, fade out. Multiplies the particle's
  * startColor, so every layer breathes instead of popping in and out of existence.
  */
-function fadeEnvelope(fadeIn: number, fadeOut: number, tintA: QVector3 = WHITE, tintB: QVector3 = WHITE) {
+function fadeEnvelope(fadeIn: number, fadeOut: number, tintA: Color3 = WHITE, tintB: Color3 = WHITE) {
     return new Gradient(
         [
             [tintA, 0],
@@ -125,7 +124,7 @@ function initVortex({scene, camera, batchRenderer, systems}: DemoContext): Vorte
     // -PI/2 + tilt, and the orbit axis is the resulting world-space disk normal: the orbits are
     // authored in world space so they pivot on the vortex core wherever their emitter is.
     const DISK_TILT = 0.22;
-    const diskAxis = new QVector3(0, Math.cos(DISK_TILT), Math.sin(DISK_TILT));
+    const diskAxis = new BVector3(0, Math.cos(DISK_TILT), Math.sin(DISK_TILT));
     const layFlat = (system: ParticleSystem) => {
         system.emitter.rotation.x = -Math.PI / 2 + DISK_TILT;
     };
@@ -140,7 +139,7 @@ function initVortex({scene, camera, batchRenderer, systems}: DemoContext): Vorte
         startSpeed: new IntervalValue(0.05, 0.2),
         startSize: new IntervalValue(12, 22),
         startRotation: new IntervalValue(-Math.PI, Math.PI),
-        startColor: new RandomColor(new Vector4(0.3, 0.38, 0.95, 0.32), new Vector4(0.48, 0.3, 0.95, 0.42)),
+        startColor: new RandomColor(new Color4(0.3, 0.38, 0.95, 0.32), new Color4(0.48, 0.3, 0.95, 0.42)),
         worldSpace: true,
         emissionOverTime: new ConstantValue(1),
         shape: new SphereEmitter({radius: 22, thickness: 0.6, arc: Math.PI * 2}),
@@ -169,7 +168,7 @@ function initVortex({scene, camera, batchRenderer, systems}: DemoContext): Vorte
         startLife: new IntervalValue(3.5, 5),
         startSpeed: new IntervalValue(0.02, 0.12),
         startSize: new IntervalValue(8, 12),
-        startColor: new RandomColor(new Vector4(0.55, 0.75, 1, 0.55), new Vector4(0.7, 0.6, 1, 0.65)),
+        startColor: new RandomColor(new Color4(0.55, 0.75, 1, 0.55), new Color4(0.7, 0.6, 1, 0.65)),
         worldSpace: true,
         emissionOverTime: new ConstantValue(1.4),
         shape: new PointEmitter(),
@@ -195,7 +194,7 @@ function initVortex({scene, camera, batchRenderer, systems}: DemoContext): Vorte
         startLife: new IntervalValue(1.4, 2.2),
         startSpeed: new ConstantValue(0.05),
         startSize: new IntervalValue(2.2, 3.4),
-        startColor: new ConstantColor(new Vector4(0.9, 0.95, 1, 0.9)),
+        startColor: new ConstantColor(new Color4(0.9, 0.95, 1, 0.9)),
         worldSpace: true,
         emissionOverTime: new ConstantValue(2.5),
         shape: new PointEmitter(),
@@ -222,7 +221,7 @@ function initVortex({scene, camera, batchRenderer, systems}: DemoContext): Vorte
         startLife: new IntervalValue(5, 8),
         startSpeed: new IntervalValue(0, 0.1),
         startSize: new IntervalValue(0.6, 1.6),
-        startColor: new RandomColor(new Vector4(0.4, 0.75, 1, 0.3), new Vector4(0.8, 0.5, 1, 0.4)),
+        startColor: new RandomColor(new Color4(0.4, 0.75, 1, 0.3), new Color4(0.8, 0.5, 1, 0.4)),
         worldSpace: true,
         emissionOverTime: new ConstantValue(40),
         shape: new DonutEmitter({radius: 7, donutRadius: 3.2, thickness: 1, arc: Math.PI * 2}),
@@ -237,7 +236,7 @@ function initVortex({scene, camera, batchRenderer, systems}: DemoContext): Vorte
     });
     disk.addBehavior(new ColorOverLife(fadeEnvelope(0.2, 0.7)));
     disk.addBehavior(new OrbitOverLife(new IntervalValue(0.25, 0.5), diskAxis, 'world'));
-    disk.addBehavior(new GravityForce(new QVector3(0, 0, 0), 4));
+    disk.addBehavior(new GravityForce(new BVector3(0, 0, 0), 4));
     layFlat(disk);
     batchRenderer.addSystem(disk);
     systems.push(disk);
@@ -251,7 +250,7 @@ function initVortex({scene, camera, batchRenderer, systems}: DemoContext): Vorte
         startLife: new IntervalValue(4.5, 6.5),
         startSpeed: new IntervalValue(0.02, 0.1),
         startSize: new IntervalValue(0.3, 0.5),
-        startColor: new RandomColor(new Vector4(0.5, 0.9, 1, 0.5), new Vector4(0.75, 0.55, 1, 0.6)),
+        startColor: new RandomColor(new Color4(0.5, 0.9, 1, 0.5), new Color4(0.75, 0.55, 1, 0.6)),
         worldSpace: true,
         emissionOverTime: new ConstantValue(1.8),
         shape: new DonutEmitter({radius: 10.3, donutRadius: 0.8, thickness: 0.5, arc: Math.PI * 2}),
@@ -267,7 +266,7 @@ function initVortex({scene, camera, batchRenderer, systems}: DemoContext): Vorte
     });
     comets.addBehavior(new ColorOverLife(fadeEnvelope(0.2, 0.7)));
     comets.addBehavior(new OrbitOverLife(new IntervalValue(0.5, 0.95), diskAxis, 'world'));
-    comets.addBehavior(new GravityForce(new QVector3(0, 0, 0), 22));
+    comets.addBehavior(new GravityForce(new BVector3(0, 0, 0), 22));
     comets.addBehavior(new WidthOverLength(new PiecewiseBezier([[new Bezier(1, 0.7, 0.35, 0.05), 0]])));
     layFlat(comets);
     batchRenderer.addSystem(comets);
@@ -283,7 +282,7 @@ function initVortex({scene, camera, batchRenderer, systems}: DemoContext): Vorte
         startLife: new IntervalValue(6, 10),
         startSpeed: new IntervalValue(0.05, 0.25),
         startSize: new IntervalValue(0.08, 0.22),
-        startColor: new RandomColor(new Vector4(0.7, 0.85, 1, 0.5), new Vector4(0.9, 0.8, 1, 0.85)),
+        startColor: new RandomColor(new Color4(0.7, 0.85, 1, 0.5), new Color4(0.9, 0.8, 1, 0.85)),
         worldSpace: true,
         emissionOverTime: new ConstantValue(16),
         shape: new SphereEmitter({radius: 18, thickness: 1, arc: Math.PI * 2}),
@@ -299,12 +298,12 @@ function initVortex({scene, camera, batchRenderer, systems}: DemoContext): Vorte
     });
     dust.addBehavior(new ColorOverLife(fadeEnvelope(0.15, 0.75)));
     dust.addBehavior(
-        new TurbulenceField(new QVector3(6, 6, 6), 2, new QVector3(0.55, 0.55, 0.55), new QVector3(0.15, 0.12, 0.18))
+        new TurbulenceField(new BVector3(6, 6, 6), 2, new BVector3(0.55, 0.55, 0.55), new BVector3(0.15, 0.12, 0.18))
     );
     dust.addBehavior(new LimitSpeedOverLife(constantCurve(1.1), 0.12));
     // Uniform force steered toward the cursor each frame — the dust field "leans" the way you
     // point without an attractor singularity.
-    const cursorForce = new ApplyForce(new QVector3(0, 0, 0), new ConstantValue(0.5));
+    const cursorForce = new ApplyForce(new BVector3(0, 0, 0), new ConstantValue(0.5));
     dust.addBehavior(cursorForce);
     batchRenderer.addSystem(dust);
     systems.push(dust);
@@ -321,7 +320,7 @@ function initVortex({scene, camera, batchRenderer, systems}: DemoContext): Vorte
         startLife: new IntervalValue(2, 3.2),
         startSpeed: new IntervalValue(0.05, 0.25),
         startSize: new IntervalValue(0.16, 0.3),
-        startColor: new RandomColor(new Vector4(0.55, 0.9, 1, 0.65), new Vector4(0.8, 0.6, 1, 0.75)),
+        startColor: new RandomColor(new Color4(0.55, 0.9, 1, 0.65), new Color4(0.8, 0.6, 1, 0.75)),
         worldSpace: true,
         emissionOverTime: cursorEmission,
         shape: new PointEmitter(),
@@ -338,7 +337,7 @@ function initVortex({scene, camera, batchRenderer, systems}: DemoContext): Vorte
     cursorComets.addBehavior(new ColorOverLife(fadeEnvelope(0.1, 0.55)));
     // Fling ribbons along the cursor's motion, then let the vortex capture them.
     cursorComets.addBehavior(new InheritVelocity(new ConstantValue(0.55), 'initial'));
-    cursorComets.addBehavior(new GravityForce(new QVector3(0, 0, 0), 45));
+    cursorComets.addBehavior(new GravityForce(new BVector3(0, 0, 0), 45));
     cursorComets.addBehavior(new OrbitOverLife(new IntervalValue(0.3, 0.6), diskAxis, 'world'));
     cursorComets.addBehavior(new LimitSpeedOverLife(constantCurve(7), 0.25));
     cursorComets.addBehavior(new WidthOverLength(new PiecewiseBezier([[new Bezier(1, 0.7, 0.35, 0.05), 0]])));
@@ -392,7 +391,7 @@ function updateVortex({scene, camera}: DemoContext, state: VortexState, pointer:
     const ly = state.pointerY * 0.65;
     const lz = -0.18;
     const len = Math.hypot(lx, ly, lz) || 1;
-    state.cursorForce.direction.set(lx / len, ly / len, lz / len);
+    state.cursorForce.direction = {x: lx / len, y: ly / len, z: lz / len};
 
     // Ride the pointer: project it onto the plane through the vortex centre facing the camera,
     // park the comet emitter there, and scale emission with pointer speed so ribbons only appear

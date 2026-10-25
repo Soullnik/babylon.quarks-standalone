@@ -1,7 +1,9 @@
 import {FunctionValueGenerator, ValueGenerator, ValueGeneratorFromJSON} from '../functions';
 import type {ValueGeneratorJSON, Vector3ArrayJSON} from '../functions/FunctionJSON';
 import {IParticleSystem} from '../IParticleSystem';
+import type {Vector3Like} from '../Like';
 import {Quaternion, Vector3} from '../math';
+import {vector3From} from '../math/fromLike';
 import {Particle} from '../Particle';
 import {Behavior, BehaviorJSON} from './Behavior';
 import {BehaviorSpace, EmitterFrame, readBehaviorSpace} from './EmitterFrame';
@@ -54,14 +56,29 @@ export class OrbitOverLife implements Behavior {
     /** The pivot in the simulation space; refreshed by {@link frameUpdate}. */
     readonly _center = new Vector3();
 
+    private _axisValue: Vector3;
+
+    /**
+     * The axis orbited, in {@link OrbitOverLife.space | space}; its length is ignored.
+     * Set it from any `Vector3Like`, such as a Babylon `Vector3`; the value is copied.
+     */
+    get axis(): Vector3 {
+        return this._axisValue;
+    }
+
+    set axis(value: Vector3Like) {
+        this._axisValue = vector3From(value);
+    }
+
     constructor(
         /** Angular speed around the axis over the particle's life, in radians per second. */
         public orbitSpeed: FunctionValueGenerator | ValueGenerator,
         /** The axis orbited, in {@link OrbitOverLife.space | space}; its length is ignored. */
-        public axis: Vector3 = new Vector3(0, 1, 0),
+        axis: Vector3Like = new Vector3(0, 1, 0),
         /** The space the axis and the pivot are authored in; `'local'` (the emitter's) by default. */
         public space: BehaviorSpace = 'local'
     ) {
+        this._axisValue = vector3From(axis);
         this.rotation = new Quaternion();
         this.refreshAxis();
     }

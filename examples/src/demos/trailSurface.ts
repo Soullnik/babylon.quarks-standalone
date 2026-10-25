@@ -3,7 +3,7 @@ import {Constants} from '@babylonjs/core/Engines/constants';
 import {StandardMaterial} from '@babylonjs/core/Materials/standardMaterial';
 import {DynamicTexture} from '@babylonjs/core/Materials/Textures/dynamicTexture';
 import {Texture} from '@babylonjs/core/Materials/Textures/texture';
-import {Color3} from '@babylonjs/core/Maths/math.color';
+import {Color3, Color4} from '@babylonjs/core/Maths/math.color';
 import {Vector3 as BVector3} from '@babylonjs/core/Maths/math.vector';
 import {MeshBuilder} from '@babylonjs/core/Meshes/meshBuilder';
 import {TransformNode} from '@babylonjs/core/Meshes/transformNode';
@@ -20,7 +20,6 @@ import {
     RandomColor,
     RenderMode,
     SizeOverLife,
-    Vector4,
 } from 'babylon.quarks';
 import {createSharedTexture} from '../shared/common';
 import type {DemoContext} from '../types';
@@ -106,7 +105,7 @@ export function init({scene, camera, batchRenderer, systems}: DemoContext) {
         startLife: new IntervalValue(0.8, 1.2),
         startSpeed: new IntervalValue(2, 4),
         startSize: new ConstantValue(0.14),
-        startColor: new RandomColor(new Vector4(1, 0.5, 0.2, 1), new Vector4(1, 0.9, 0.4, 1)),
+        startColor: new RandomColor(new Color4(1, 0.5, 0.2, 1), new Color4(1, 0.9, 0.4, 1)),
         worldSpace: false,
         emissionOverTime: new ConstantValue(60),
         shape: new MeshSurfaceEmitter(knot),
@@ -152,7 +151,7 @@ export function init({scene, camera, batchRenderer, systems}: DemoContext) {
         startLife: new IntervalValue(1.2, 1.8),
         startSpeed: new ConstantValue(0),
         startSize: new IntervalValue(2, 4),
-        startColor: new ConstantColor(new Vector4(1, 1, 1, 1)),
+        startColor: new ConstantColor(new Color4(1, 1, 1, 1)),
         worldSpace: false,
         emissionOverTime: new ConstantValue(2),
         shape: new PointEmitter(),

@@ -7,6 +7,7 @@ import {Vector2 as BVector2, Vector3 as BVector3} from '@babylonjs/core/Maths/ma
 import {Mesh} from '@babylonjs/core/Meshes/mesh';
 import {VertexData} from '@babylonjs/core/Meshes/mesh.vertexData';
 import {Scene} from '@babylonjs/core/scene';
+import type {Color4Like} from 'quarks.core';
 import {
     IParticle,
     Matrix3,
@@ -15,7 +16,6 @@ import {
     SpriteParticle,
     StretchedBillBoardSettings,
     Vector3,
-    Vector4,
 } from 'quarks.core';
 import {VFXBatchSettings} from './BatchedRenderer';
 import {hasSizeLimits, takesPivotAndSizeLimits, tilesSheet} from './batchKey';
@@ -936,12 +936,12 @@ export class SpriteBatch extends VFXBatch {
     }
 
     /** Multiplies `count` RGBA colours starting at `base` by a system's {@link ParticleSystem.tint}. */
-    private static applyTint(colors: Float32Array, base: number, count: number, tint: Vector4): void {
+    private static applyTint(colors: Float32Array, base: number, count: number, tint: Color4Like): void {
         for (let j = 0, o = base; j < count; j++, o += 4) {
-            colors[o] *= tint.x;
-            colors[o + 1] *= tint.y;
-            colors[o + 2] *= tint.z;
-            colors[o + 3] *= tint.w;
+            colors[o] *= tint.r;
+            colors[o + 1] *= tint.g;
+            colors[o + 2] *= tint.b;
+            colors[o + 3] *= tint.a;
         }
     }
 

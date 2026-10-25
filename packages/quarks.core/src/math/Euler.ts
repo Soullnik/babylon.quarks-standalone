@@ -7,8 +7,8 @@ const _matrix = /*@__PURE__*/ new Matrix4();
 const _quaternion = /*@__PURE__*/ new Quaternion();
 
 /**
- * The axis order an {@link Euler} applies its rotations in (intrinsic, as three.js): the six
- * Tait–Bryan orders, which every conversion supports, and the six proper Euler orders, which only
+ * The axis order Euler angles apply their rotations in, such as an `EulerGenerator`'s
+ * (intrinsic, as three.js): the six Tait–Bryan orders, which every conversion supports, and the six proper Euler orders, which only
  * round-trip as data.
  */
 export type EulerOrder = 'XYZ' | 'YXZ' | 'ZXY' | 'ZYX' | 'YZX' | 'XZY' | 'XYX' | 'YZY' | 'ZXZ' | 'XZX' | 'YXY' | 'ZYZ';

@@ -28,6 +28,10 @@ export type ContinuousLinearSubTypeOf<T> = T extends number
 /**
  * A piecewise linear function over [0, 1] through keys: the alpha or colour keys of a {@link
  * Gradient}. Before the first key it holds the first value, after the last the last.
+ *
+ * Build number keys directly. Vector and colour keys hold quarks' internal math: build a
+ * gradient's colour keys through the {@link Gradient} constructor, which takes `Color3Like`, and
+ * read or edit existing keys in place.
  */
 export class ContinuousLinearFunction<T extends number | Vector3 | Vector4> {
     /** The keys as `[value, position]`, sorted by position. */

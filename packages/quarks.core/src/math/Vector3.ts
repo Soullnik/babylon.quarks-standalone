@@ -26,6 +26,33 @@ class Vector3 {
         this.z = z;
     }
 
+    /** Alias of {@link Vector3.x}, so a colour kept in this vector reads as `{r, g, b}`. */
+    get r(): number {
+        return this.x;
+    }
+
+    set r(value: number) {
+        this.x = value;
+    }
+
+    /** Alias of {@link Vector3.y}, so a colour kept in this vector reads as `{r, g, b}`. */
+    get g(): number {
+        return this.y;
+    }
+
+    set g(value: number) {
+        this.y = value;
+    }
+
+    /** Alias of {@link Vector3.z}, so a colour kept in this vector reads as `{r, g, b}`. */
+    get b(): number {
+        return this.z;
+    }
+
+    set b(value: number) {
+        this.z = value;
+    }
+
     /**
      * Sets the components to (x, y, z).
      * @returns This vector.

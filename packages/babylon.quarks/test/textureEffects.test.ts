@@ -575,7 +575,7 @@ describe('texture effects', () => {
         const startColor = new ConstantColor(new Vector4(1, 0.5, 0.25, 1));
         const tinted = system({startColor, emissionOverTime: new ConstantValue(0)});
         const plain = system({startColor, emissionOverTime: new ConstantValue(0)});
-        tinted.tint = new Vector4(0.5, 1, 1, 0.25);
+        tinted.tint = {r: 0.5, g: 1, b: 1, a: 0.25};
         for (const s of [tinted, plain]) {
             s.emissionBursts = [{time: 0, count: new ConstantValue(1), cycle: 1, interval: 0, probability: 1}];
             renderer.addSystem(s);

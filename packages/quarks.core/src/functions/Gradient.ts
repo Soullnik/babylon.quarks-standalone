@@ -1,4 +1,6 @@
+import type {Color3Like, Color4Like} from '../Like';
 import {Vector3, Vector4} from '../math';
+import {vector3FromColor} from '../math/fromLike';
 import {warnFormat} from '../util/JSONUtil';
 import {FunctionColorGenerator} from './ColorGenerator';
 import {ColorRange} from './ColorRange';
@@ -15,11 +17,15 @@ export class Gradient implements FunctionColorGenerator {
     color: ContinuousLinearFunction<Vector3>;
     /** The alpha keys: alpha at positions in [0, 1], interpolated linearly. */
     alpha: ContinuousLinearFunction<number>;
-    // Unity's default: opaque white from 0 to 1.
+    /**
+     * @param color - The colour keys: an RGB colour (`{r, g, b}`, such as a Babylon `Color3`) at a
+     *   position in [0, 1]. Opaque white from 0 to 1 by default. The colours are copied.
+     * @param alpha - The alpha keys: an alpha at a position in [0, 1]. 1 from 0 to 1 by default.
+     */
     constructor(
-        color: Array<[Vector3, number]> = [
-            [new Vector3(1, 1, 1), 0],
-            [new Vector3(1, 1, 1), 1],
+        color: Array<[Color3Like, number]> = [
+            [{r: 1, g: 1, b: 1}, 0],
+            [{r: 1, g: 1, b: 1}, 1],
         ],
         alpha: Array<[number, number]> = [
             [1, 0],
@@ -27,7 +33,10 @@ export class Gradient implements FunctionColorGenerator {
         ]
     ) {
         this.type = 'function';
-        this.color = new ContinuousLinearFunction<Vector3>(color, 'Color');
+        this.color = new ContinuousLinearFunction<Vector3>(
+            color.map(([key, t]): [Vector3, number] => [vector3FromColor(key), t]),
+            'Color'
+        );
         this.alpha = new ContinuousLinearFunction<number>(alpha, 'Number');
     }
 
@@ -148,6 +157,23 @@ export class Gradient implements FunctionColorGenerator {
             return color;
         }
         return this.genColorExact(color, t);
+    }
+
+    /**
+     * The colour at `t` (0 to 1) from the keys, as Unity's `Gradient.Evaluate`: for tools and UI
+     * that show a gradient. Returned as a new `{r, g, b, a}`.
+     */
+    evaluate(t: number): Color4Like;
+    /** The colour at `t` (0 to 1) written into `target`, such as a Babylon `Color4`, and returned. */
+    evaluate<T extends Color4Like>(t: number, target: T): T;
+    evaluate(t: number, target?: Color4Like): Color4Like {
+        this.genColorExact(tempColor, t);
+        const out = target ?? {r: 0, g: 0, b: 0, a: 0};
+        out.r = tempColor.x;
+        out.g = tempColor.y;
+        out.b = tempColor.z;
+        out.a = tempColor.w;
+        return out;
     }
 
     /** Evaluates the gradient keys themselves, ignoring any sampled table. */

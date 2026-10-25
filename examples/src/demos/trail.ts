@@ -1,4 +1,5 @@
 import {Constants} from '@babylonjs/core/Engines/constants';
+import {Color3, Color4} from '@babylonjs/core/Maths/math.color';
 import {Vector3 as BVector3} from '@babylonjs/core/Maths/math.vector';
 import {
     ApplyCollision,
@@ -15,8 +16,6 @@ import {
     RandomColorBetweenGradient,
     RenderMode,
     SizeOverLife,
-    Vector3,
-    Vector4,
 } from 'babylon.quarks';
 import {createSharedTexture} from '../shared/common';
 import type {DemoContext} from '../types';
@@ -32,7 +31,7 @@ export function init({scene, camera, batchRenderer, systems}: DemoContext) {
         startLife: new IntervalValue(3.8, 4.4),
         startSpeed: new IntervalValue(10, 15),
         startSize: new ConstantValue(0.2),
-        startColor: new ConstantColor(new Vector4(1, 1, 1, 1)),
+        startColor: new ConstantColor(new Color4(1, 1, 1, 1)),
         worldSpace: true,
         emissionOverTime: new ConstantValue(0),
         emissionBursts: [{time: 0, count: new ConstantValue(100), cycle: 1, interval: 0.01, probability: 1}],
@@ -52,8 +51,8 @@ export function init({scene, camera, batchRenderer, systems}: DemoContext) {
             new RandomColorBetweenGradient(
                 new Gradient(
                     [
-                        [new Vector3(1, 0, 0), 0],
-                        [new Vector3(1, 0, 0), 1],
+                        [new Color3(1, 0, 0), 0],
+                        [new Color3(1, 0, 0), 1],
                     ],
                     [
                         [1, 0],
@@ -62,8 +61,8 @@ export function init({scene, camera, batchRenderer, systems}: DemoContext) {
                 ),
                 new Gradient(
                     [
-                        [new Vector3(0, 1, 0), 0],
-                        [new Vector3(0, 1, 0), 1],
+                        [new Color3(0, 1, 0), 0],
+                        [new Color3(0, 1, 0), 1],
                     ],
                     [
                         [1, 0],
@@ -73,13 +72,15 @@ export function init({scene, camera, batchRenderer, systems}: DemoContext) {
             )
         )
     );
-    trail.addBehavior(new ApplyForce(new Vector3(0, -1, 0), new ConstantValue(20)));
+    trail.addBehavior(new ApplyForce(new BVector3(0, -1, 0), new ConstantValue(20)));
     trail.addBehavior(
         new ApplyCollision(
             {
                 resolve(pos, normal) {
                     if (pos.y <= -6) {
-                        normal.set(0, 1, 0);
+                        normal.x = 0;
+                        normal.y = 1;
+                        normal.z = 0;
                         return true;
                     }
                     return false;

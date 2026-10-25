@@ -3,6 +3,7 @@ import {Constants} from '@babylonjs/core/Engines/constants';
 import {StandardMaterial} from '@babylonjs/core/Materials/standardMaterial';
 import {CubeTexture} from '@babylonjs/core/Materials/Textures/cubeTexture';
 import {Texture} from '@babylonjs/core/Materials/Textures/texture';
+import {Color4} from '@babylonjs/core/Maths/math.color';
 import {Vector3 as BVector3} from '@babylonjs/core/Maths/math.vector';
 import {MeshBuilder} from '@babylonjs/core/Meshes/meshBuilder';
 import {
@@ -15,7 +16,6 @@ import {
     RandomQuatGenerator,
     RenderMode,
     Rotation3DOverLife,
-    Vector4,
 } from 'babylon.quarks';
 import type {DemoContext} from '../types';
 
@@ -72,7 +72,7 @@ export async function init({scene, camera, batchRenderer, systems}: DemoContext)
         startLife: new IntervalValue(2.0, 3.0),
         startSpeed: new ConstantValue(1),
         startSize: new ConstantValue(0.1),
-        startColor: new ConstantColor(new Vector4(1, 1, 1, 1)),
+        startColor: new ConstantColor(new Color4(1, 1, 1, 1)),
         startRotation: new RandomQuatGenerator(),
         worldSpace: true,
         emissionOverTime: new ConstantValue(60),

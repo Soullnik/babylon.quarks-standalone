@@ -11,8 +11,9 @@ on purpose.
 
 ### Breaking
 
-The public surface is cleaned before it is frozen. Every item below was deprecated or had no
-effect; files written by earlier releases still load as before.
+The public surface is cleaned before it is frozen. Every item below but the last, the switch to
+Babylon's math types, was deprecated or had no effect; files written by earlier releases still load
+as before.
 
 - **Deprecated aliases are removed:**
   - `ParticleSystem.autoDestroy`, the `autoDestroy` constructor parameter and
@@ -40,6 +41,36 @@ effect; files written by earlier releases still load as before.
   a `'three'` track from three.quarks or an older babylon.quarks is read as a clip track. A 0.29
   runtime and three.quarks skip a `'clip'` track.
 - **editor:** the session handle's `importGallery` alias is removed; use `importAssets`.
+- **quarks' own math is no longer exported; the API takes Babylon's types.** `Vector2`, `Vector3`,
+  `Vector4`, `Quaternion`, `Matrix3` and `Matrix4` were quarks.core's simulation math, exported
+  next to Babylon's classes of the same names, so an editor's auto-import picked the wrong one.
+  Every public input now takes a structural type, `Vector2Like`, `Vector3Like`, `QuaternionLike`,
+  `Color3Like` or `Color4Like` (exported): a Babylon `Vector3`, `Quaternion`, `Color3` or `Color4`
+  is accepted as it is, and so is a plain `{x, y, z}` or `{r, g, b, a}`. Values are copied, so the
+  caller keeps their own object. To upgrade, import the math from `@babylonjs/core` instead of
+  `babylon.quarks`:
+  - **Colours are `{r, g, b, a}`, not a `Vector4`:** `new ConstantColor(new Color4(1, 0.5, 0, 1))`,
+    `new ColorRange(a, b)`, `new RandomColor(a, b)`, `ParticleSystem.tint`, and `Gradient` keys as
+    `Color3` (`[[new Color3(1, 1, 1), 0], ...]`). Code that read a tint's `x`/`w` reads `r`/`a`.
+  - **Vectors are any `{x, y, z}`:** `ApplyForce.direction`, `GravityForce.center`,
+    `AxisAngleGenerator.axis`, `OrbitOverLife.axis`, `VelocityOverLife.orbitalOffset`,
+    `TurbulenceField.scale`/`velocityMultiplier`/`timeScale`, `TextureSequencer.position`,
+    `ShapeTransform.position`/`rotation`/`scale`, `ParticleSystem.pivot`, `flip`,
+    `ringBufferLoopRange` and `TrailSettings.sideAxis`. Setting one copies the value (`sideAxis` when
+    the system is built); reading it gives an object you can still edit in place
+    (`force.direction.x = 1`). A colour read back, such as `ConstantColor.color`, has `r`, `g`, `b`
+    and `a` as accessors over quarks' own storage, so copy it field by field
+    (`new Color4(c.r, c.g, c.b, c.a)`) rather than spreading it or passing it to `JSON.stringify`.
+  - `ParticleSystem.pivot`, `flip`, `ringBufferLoopRange` and `TrailSettings.sideAxis` read back
+    as plain objects, without vector methods.
+  - `getWorldBounds(min, max)` and `getBeamEnd(out)` fill any `{x, y, z}`, such as a Babylon
+    `Vector3`.
+  - `PhysicsResolver.resolve(position, normal)` (quarks.core) takes `Vector3Like` values: write
+    the normal's `x`, `y` and `z` instead of calling `normal.set`.
+  - Custom behaviors, shapes and generators still receive quarks' internal vectors in
+    `initialize`, `update` and `genValue`/`genColor`, as before; the type is inferred from the
+    interface they implement.
+  - **editor:** `rgbaToVector4` is removed; pass `{r, g, b, a}`.
 
 ### Added
 
@@ -48,6 +79,9 @@ effect; files written by earlier releases still load as before.
   Extractor), and `npm run check` and CI fail when a change alters it without updating the report.
   Every change to the public surface is now visible in review.
 - `ShaderImageProcessing`, the type of `ShaderContext.imageProcessing`, is exported.
+- `Gradient.evaluate(t, target?)`, as Unity's `Gradient.Evaluate`: the colour at `t` as
+  `{r, g, b, a}`, written into `target` (such as a Babylon `Color4`) when one is given, for tools
+  and UI that draw a gradient.
 
 ## [0.29.0] — 2026-10-24
 

@@ -1,3 +1,4 @@
+import type {Vector3Like} from 'quarks.core';
 import {RendererEmitterSettings, StretchedBillBoardSettings, Vector3} from 'quarks.core';
 import type {VFXBatchSettings} from '../BatchedRenderer';
 import {RenderMode} from '../VFXBatch';
@@ -9,6 +10,12 @@ const BOUNDS_REFRESH_STEPS = 4;
 export interface BoundsSpace {
     /** Its world matrix, column-major. */
     readonly matrixWorld: {readonly elements: ArrayLike<number>};
+}
+
+function setXYZ(out: Vector3Like, x: number, y: number, z: number): void {
+    out.x = x;
+    out.y = y;
+    out.z = z;
 }
 
 /** The largest axis of the scale in a column-major 4x4 matrix. */
@@ -122,7 +129,7 @@ export class BoundsTracker {
      * The padded bounds in world space into `min` and `max`, for bounds kept in `space`; false
      * while there are none.
      */
-    toWorld(min: Vector3, max: Vector3, space: BoundsSpace): boolean {
+    toWorld(min: Vector3Like, max: Vector3Like, space: BoundsSpace): boolean {
         if (!this.valid) {
             return false;
         }
@@ -130,8 +137,8 @@ export class BoundsTracker {
         const bmax = this.max;
         if (this.inWorld) {
             const pad = this.padding;
-            min.set(bmin.x - pad, bmin.y - pad, bmin.z - pad);
-            max.set(bmax.x + pad, bmax.y + pad, bmax.z + pad);
+            setXYZ(min, bmin.x - pad, bmin.y - pad, bmin.z - pad);
+            setXYZ(max, bmax.x + pad, bmax.y + pad, bmax.z + pad);
             return true;
         }
         // Local bounds: the box of the eight transformed corners, padded by the
@@ -159,8 +166,8 @@ export class BoundsTracker {
             if (wz < minZ) minZ = wz;
             if (wz > maxZ) maxZ = wz;
         }
-        min.set(minX - pad, minY - pad, minZ - pad);
-        max.set(maxX + pad, maxY + pad, maxZ + pad);
+        setXYZ(min, minX - pad, minY - pad, minZ - pad);
+        setXYZ(max, maxX + pad, maxY + pad, maxZ + pad);
         return true;
     }
 

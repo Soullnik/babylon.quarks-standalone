@@ -1,6 +1,6 @@
 /** @jest-environment jsdom */
 import type {Texture} from '@babylonjs/core/Materials/Textures/texture';
-import {RenderMode, TrailSettings, Vector2} from 'babylon.quarks';
+import {RenderMode, TrailSettings} from 'babylon.quarks';
 import {EffectBinding} from '../../src/core/binding';
 import {MainModule, RendererModule} from '../../src/react/modules';
 import {makeSystem, useScene} from '../helpers';
@@ -74,9 +74,9 @@ describe('Renderer module', () => {
         const {system, container} = setup();
         const [u, v] = controlsOf(rowOf(container, 'Flip U/V'));
         type(u, '0.5');
-        expect(system.flip).toEqual(new Vector2(0.5, 0));
+        expect(system.flip).toEqual({x: 0.5, y: 0});
         type(v, '2');
-        expect(system.flip).toEqual(new Vector2(0.5, 1));
+        expect(system.flip).toEqual({x: 0.5, y: 1});
         type(u, '0');
         type(v, '0');
         expect(system.flip).toBeUndefined();

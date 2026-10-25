@@ -21,9 +21,8 @@ import type { RotationGenerator } from 'babylon.quarks';
 import type { Texture } from '@babylonjs/core/Materials/Textures/texture.js';
 import { TransformNode } from '@babylonjs/core/Meshes/transformNode.js';
 import type { ValueGenerator } from 'babylon.quarks';
-import { Vector3 } from 'babylon.quarks';
 import type { Vector3Generator } from 'babylon.quarks';
-import { Vector4 } from 'babylon.quarks';
+import { Vector3Like } from 'babylon.quarks';
 
 // @public
 export type AnyGenerator = ScalarGenerator | Vector3Generator | RotationGenerator;
@@ -179,7 +178,7 @@ export interface GradientStop {
 // @public
 export class GroundPlaneResolver {
     constructor(y?: number);
-    resolve(position: Vector3, normal: Vector3): boolean;
+    resolve(position: Vector3Like, normal: Vector3Like): boolean;
     // (undocumented)
     y: number;
 }
@@ -264,14 +263,6 @@ export interface RendererMaterialPatch {
     texture?: Texture | null;
     transparent?: boolean;
 }
-
-// @public
-export function rgbaToVector4(stop: {
-    r: number;
-    g: number;
-    b: number;
-    a: number;
-}): Vector4;
 
 // @public
 export function rgbToHex(r: number, g: number, b: number): string;

@@ -2,7 +2,7 @@ import {Constants} from '@babylonjs/core/Engines/constants';
 import {StandardMaterial} from '@babylonjs/core/Materials/standardMaterial';
 import {DynamicTexture} from '@babylonjs/core/Materials/Textures/dynamicTexture';
 import type {Texture} from '@babylonjs/core/Materials/Textures/texture';
-import {Color3} from '@babylonjs/core/Maths/math.color';
+import {Color3, Color4} from '@babylonjs/core/Maths/math.color';
 import {Vector3 as BVector3} from '@babylonjs/core/Maths/math.vector';
 import {MeshBuilder} from '@babylonjs/core/Meshes/meshBuilder';
 import type {Scene} from '@babylonjs/core/scene';
@@ -26,7 +26,6 @@ import {
     RenderMode,
     SizeOverLife,
     SphereEmitter,
-    Vector4,
     type EmitterShape,
 } from 'babylon.quarks';
 import {createSharedTexture} from '../shared/common';
@@ -70,7 +69,7 @@ function createShapeSystem({
         startLife: new IntervalValue(1, 1),
         startSpeed: new IntervalValue(1, 1),
         startSize: new IntervalValue(0.1, 0.1),
-        startColor: new RandomColor(new Vector4(1, 0.91, 0.51, 1), new Vector4(1, 0.44, 0.16, 1)),
+        startColor: new RandomColor(new Color4(1, 0.91, 0.51, 1), new Color4(1, 0.44, 0.16, 1)),
         worldSpace: true,
         emissionOverTime: new ConstantValue(rate),
         shape,

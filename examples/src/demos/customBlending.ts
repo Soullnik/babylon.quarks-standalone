@@ -1,5 +1,6 @@
 import {Constants} from '@babylonjs/core/Engines/constants';
 import type {Texture} from '@babylonjs/core/Materials/Textures/texture';
+import {Color4} from '@babylonjs/core/Maths/math.color';
 import {Vector3 as BVector3} from '@babylonjs/core/Maths/math.vector';
 import {
     Bezier,
@@ -11,7 +12,6 @@ import {
     RenderMode,
     SpeedOverLife,
     SphereEmitter,
-    Vector4,
 } from 'babylon.quarks';
 import {createSharedTexture, SHARED_ASSETS} from '../shared/common';
 import type {DemoContext} from '../types';
@@ -20,7 +20,7 @@ interface BlendSystemOptions extends Pick<DemoContext, 'scene' | 'batchRenderer'
     texture: Texture;
     blendMode: number;
     position: BVector3;
-    color: Vector4;
+    color: Color4;
 }
 
 function addBlendSystem({scene, batchRenderer, systems, texture, blendMode, position, color}: BlendSystemOptions) {
@@ -61,7 +61,7 @@ export function init({scene, camera, batchRenderer, systems}: DemoContext) {
         texture,
         blendMode: Constants.ALPHA_ONEONE_ONEONE,
         position: new BVector3(-5, 0, 0),
-        color: new Vector4(0.5, 0.5, 0.5, 1),
+        color: new Color4(0.5, 0.5, 0.5, 1),
     });
     addBlendSystem({
         scene,
@@ -70,7 +70,7 @@ export function init({scene, camera, batchRenderer, systems}: DemoContext) {
         texture,
         blendMode: Constants.ALPHA_MAX,
         position: new BVector3(0, 0, 0),
-        color: new Vector4(0.5, 0.5, 0.5, 1),
+        color: new Color4(0.5, 0.5, 0.5, 1),
     });
     addBlendSystem({
         scene,
@@ -79,6 +79,6 @@ export function init({scene, camera, batchRenderer, systems}: DemoContext) {
         texture,
         blendMode: Constants.ALPHA_EXCLUSION,
         position: new BVector3(5, 0, 0),
-        color: new Vector4(0.5, 0.5, 0.5, 1),
+        color: new Color4(0.5, 0.5, 0.5, 1),
     });
 }

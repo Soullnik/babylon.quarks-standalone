@@ -1,5 +1,12 @@
 import {Constants} from '@babylonjs/core/Engines/constants';
-import type {ColorGeneratorJSON, RotationGeneratorJSON, ValueGeneratorJSON, Vector3GeneratorJSON} from 'quarks.core';
+import type {
+    ColorGeneratorJSON,
+    RotationGeneratorJSON,
+    ValueGeneratorJSON,
+    Vector2Like,
+    Vector3GeneratorJSON,
+    Vector3Like,
+} from 'quarks.core';
 import {
     ColorGenerator,
     ColorGeneratorFromJSON,
@@ -12,10 +19,7 @@ import {
     RotationGenerator,
     ValueGenerator,
     ValueGeneratorFromJSON,
-    Vector2,
-    Vector3,
     Vector3Generator,
-    Vector4,
 } from 'quarks.core';
 import type {ParticleSystem} from '../ParticleSystem';
 import {RenderMode} from '../VFXBatch';
@@ -187,7 +191,7 @@ export const SETTINGS: ReadonlyArray<SettingDescriptor> = [
     generator(
         'startColor',
         (s) => s.startColor,
-        () => new ConstantColor(new Vector4(1, 1, 1, 1)),
+        () => new ConstantColor({r: 1, g: 1, b: 1, a: 1}),
         (json: ColorGeneratorJSON) => ColorGeneratorFromJSON(json) as ColorGenerator | FunctionColorGenerator
     ),
     generator(
@@ -236,10 +240,10 @@ export const SETTINGS: ReadonlyArray<SettingDescriptor> = [
     {
         param: 'ringBufferLoopRange',
         get: (s) => s.ringBufferLoopRange,
-        isDefault: (value) => (value as Vector2).x === 0 && (value as Vector2).y === 1,
+        isDefault: (value) => (value as Vector2Like).x === 0 && (value as Vector2Like).y === 1,
         toJSON: vectorJSON,
-        fromJSON: (json) => (Array.isArray(json) ? validLoopRange(new Vector2(json[0], json[1])) : undefined),
-        clone: (value) => (value as Vector2).clone(),
+        fromJSON: (json) => (Array.isArray(json) ? validLoopRange({x: json[0], y: json[1]}) : undefined),
+        clone: (value) => ({x: (value as Vector2Like).x, y: (value as Vector2Like).y}),
     },
     plain('onlyUsedByOther', (s) => s.onlyUsedByOther, false, boolean),
     plain('renderMode', (s) => s.renderMode, RenderMode.BillBoard, number),
@@ -295,16 +299,22 @@ export const SETTINGS: ReadonlyArray<SettingDescriptor> = [
         get: (s) => s.pivot,
         isDefault: (value) => value === undefined,
         toJSON: vectorJSON,
-        fromJSON: (json) => (Array.isArray(json) ? new Vector3(json[0] ?? 0, json[1] ?? 0, json[2] ?? 0) : undefined),
-        clone: (value) => (value as Vector3 | undefined)?.clone(),
+        fromJSON: (json) => (Array.isArray(json) ? {x: json[0] ?? 0, y: json[1] ?? 0, z: json[2] ?? 0} : undefined),
+        clone: (value) => {
+            const v = value as Vector3Like | undefined;
+            return v === undefined ? undefined : {x: v.x, y: v.y, z: v.z};
+        },
     },
     {
         param: 'flip',
         get: (s) => s.flip,
         isDefault: (value) => value === undefined,
         toJSON: vectorJSON,
-        fromJSON: (json) => (Array.isArray(json) ? new Vector2(json[0] ?? 0, json[1] ?? 0) : undefined),
-        clone: (value) => (value as Vector2 | undefined)?.clone(),
+        fromJSON: (json) => (Array.isArray(json) ? {x: json[0] ?? 0, y: json[1] ?? 0} : undefined),
+        clone: (value) => {
+            const v = value as Vector2Like | undefined;
+            return v === undefined ? undefined : {x: v.x, y: v.y};
+        },
     },
 ];
 

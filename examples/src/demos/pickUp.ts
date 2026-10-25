@@ -1,4 +1,5 @@
 import {Constants} from '@babylonjs/core/Engines/constants';
+import {Color4} from '@babylonjs/core/Maths/math.color';
 import {Vector3 as BVector3} from '@babylonjs/core/Maths/math.vector';
 import {
     Bezier,
@@ -15,7 +16,6 @@ import {
     RenderMode,
     SizeOverLife,
     SphereEmitter,
-    Vector4,
 } from 'babylon.quarks';
 import {createColorOverLifeRange, createSharedTexture} from '../shared/common';
 import type {DemoContext} from '../types';
@@ -32,9 +32,9 @@ function restartTracked(tracked: ParticleSystem[]) {
 export function init({scene, camera, batchRenderer, systems, demoState}: DemoContext) {
     camera.setPosition(new BVector3(0, 14, 32));
     const texture = createSharedTexture(scene);
-    const yellow = new Vector4(1, 1, 0.3, 1);
-    const darkOrange = new Vector4(1, 0.7, 0.1, 1);
-    const red = new Vector4(1, 0, 0, 1);
+    const yellow = new Color4(1, 1, 0.3, 1);
+    const darkOrange = new Color4(1, 0.7, 0.1, 1);
+    const red = new Color4(1, 0, 0, 1);
     const tracked: ParticleSystem[] = [];
 
     const circle = new ParticleSystem({
@@ -44,7 +44,7 @@ export function init({scene, camera, batchRenderer, systems, demoState}: DemoCon
         startLife: new ConstantValue(0.6),
         startSpeed: new ConstantValue(0),
         startSize: new IntervalValue(2, 10),
-        startColor: new ConstantColor(new Vector4(1, 1, 1, 0.5)),
+        startColor: new ConstantColor(new Color4(1, 1, 1, 0.5)),
         worldSpace: false,
         emissionOverTime: new ConstantValue(40),
         emissionBursts: [{time: 0, count: new ConstantValue(100), cycle: 1, interval: 0.01, probability: 1}],
@@ -60,7 +60,7 @@ export function init({scene, camera, batchRenderer, systems, demoState}: DemoCon
     });
     circle.addBehavior(new OrbitOverLife(new IntervalValue(6, 8)));
     circle.addBehavior(new SizeOverLife(new PiecewiseBezier([[new Bezier(0, 0.88, 0.88, 0), 0]])));
-    circle.addBehavior(createColorOverLifeRange(new Vector4(0.2, 0.6, 1, 1), new Vector4(0.2, 0.2, 1, 1)));
+    circle.addBehavior(createColorOverLifeRange(new Color4(0.2, 0.6, 1, 1), new Color4(0.2, 0.2, 1, 1)));
     batchRenderer.addSystem(circle);
     systems.push(circle);
     tracked.push(circle);
@@ -125,7 +125,7 @@ export function init({scene, camera, batchRenderer, systems, demoState}: DemoCon
         startLife: new ConstantValue(0.6),
         startSpeed: new ConstantValue(0),
         startSize: new ConstantValue(60),
-        startColor: new RandomColor(new Vector4(1, 0.2, 0, 1), red),
+        startColor: new RandomColor(new Color4(1, 0.2, 0, 1), red),
         worldSpace: false,
         emissionOverTime: new ConstantValue(0),
         emissionBursts: [{time: 0.4, count: new ConstantValue(2), cycle: 1, interval: 0.01, probability: 1}],
