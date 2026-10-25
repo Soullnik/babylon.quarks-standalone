@@ -3,6 +3,7 @@ import {
     ConeEmitter,
     ConstantColor,
     ConstantValue,
+    EmitSubParticleSystem,
     IntervalValue,
     ParticleSystem,
     RenderMode,
@@ -65,13 +66,13 @@ export function createChildSystem(parent: ParticleSystem, options: ChildSystemOp
 export function unlinkSubEmitterReferences(systems: ParticleSystem[], removed: ParticleSystem[]): void {
     const removedEmitters = new Set(removed.map((system) => system.emitter));
     for (const system of systems) {
-        const behaviors = system.behaviors as Array<{type?: string; subParticleSystem?: ParticleEmitter}>;
+        const behaviors = system.behaviors;
         for (let i = behaviors.length - 1; i >= 0; i--) {
             const behavior = behaviors[i];
             if (
-                behavior.type === 'EmitSubParticleSystem' &&
-                behavior.subParticleSystem &&
-                removedEmitters.has(behavior.subParticleSystem)
+                behavior instanceof EmitSubParticleSystem &&
+                typeof behavior.subParticleSystem === 'object' &&
+                removedEmitters.has(behavior.subParticleSystem as ParticleEmitter)
             ) {
                 behaviors.splice(i, 1);
             }
