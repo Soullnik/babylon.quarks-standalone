@@ -41,6 +41,10 @@ export interface VelocityOverLifeJSON extends BehaviorJSON {
  * Move particles with a direct velocity over their life (Unity's "Velocity over Lifetime").
  * Applied as a positional displacement, so it is not affected by speed modifiers,
  * forces, or speed limits. Orbital speeds rotate particles around the emitter axes.
+ *
+ * For an orbit around a single axis of any direction, or around the world origin, use
+ * `OrbitOverLife`; this one orbits the emitter's three axes, with a radial speed and an offset
+ * pivot as Unity's module has.
  */
 export class VelocityOverLife implements Behavior {
     type = 'VelocityOverLife';

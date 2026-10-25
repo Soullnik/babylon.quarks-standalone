@@ -146,7 +146,6 @@ export class ApplySequences implements Behavior {
     initialize(particle: Particle): void;
     // @internal
     pCount: number;
-    // (undocumented)
     reset(): void;
     sequencers: Array<[IntervalValue, Sequencer]>;
     // @internal
