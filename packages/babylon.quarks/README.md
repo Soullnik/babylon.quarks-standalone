@@ -22,8 +22,9 @@ High-performance particle system for [Babylon.js](https://www.babylonjs.com/). B
 - **Trails** — texture modes (stretch, tile, per segment) with a texture scale, a minimum vertex distance and a lifetime (Unity's TrailRenderer settings), swept weapon trails along an emitter axis, world-space recording behind a moving emitter, and `clearTrails()` for teleports.
 - **Scene integration** — render order and rendering groups, layer masks, fog, bounds and frustum culling with Unity's culling modes, sort modes, screen-size limits, and an `EffectPool` that plays one-shot effects without allocating.
 - **Visual authoring** — design effects in our own [effect editor](https://soullnik.github.io/babylon.quarks-standalone/editor.html) or export them from Unity, then load with `QuarksLoader` (quarks.art-exported JSON also works — same format).
-- **Cross-engine format** — the same effect JSON runs in three.js (three.quarks) and Babylon.js.
+- **Open effect format** — documented JSON with a [JSON Schema](https://github.com/Soullnik/babylon.quarks-standalone/blob/main/docs/FORMAT.md#schema); files from three.quarks and older releases load, upgraded as they are read.
 - **Adaptive performance** — optional frame-budget quality scaling built into `BatchedRenderer`.
+- **Garbage-free frames** — a steady frame allocates nothing per particle, in every render mode and with every behavior, checked in CI. The bundle is about 100 kB gzipped, with a size budget in CI.
 - **WebGL and WebGPU** — runs on both Babylon engines with native GLSL and WGSL shaders; nothing is transpiled or downloaded at run time.
 
 ## Install

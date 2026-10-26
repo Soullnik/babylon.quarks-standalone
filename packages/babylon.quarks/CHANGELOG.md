@@ -41,6 +41,10 @@ Phase 9 of the road to 1.0: the file format and the platforms are made ready to 
 - Golden files saved by every published release from 0.27.0 to 0.30.0, each of which must load as
   the effect it was written from.
 
+- **Bundle size budget:** `npm run check:pack` fails when a published bundle grows past its
+  gzipped budget in `scripts/size-budget.json` (110 kB for each babylon.quarks bundle, about
+  101 kB today), so growth is decided in the PR that causes it.
+
 ### Changed
 
 - **A steady frame allocates nothing per particle**, so a large effect no longer hands the

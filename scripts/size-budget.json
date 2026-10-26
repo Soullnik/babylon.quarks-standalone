@@ -1,0 +1,7 @@
+{
+    "$comment": "Gzipped bytes each published bundle may reach; npm run check:pack fails past them. Raise a budget only on purpose, in the PR that needs it, and say why there.",
+    "packages/babylon.quarks/dist/babylon.quarks.esm.js": 110000,
+    "packages/babylon.quarks/dist/babylon.quarks.cjs": 110000,
+    "packages/babylon.quarks/dist/babylon.quarks.umd.min.js": 110000,
+    "packages/babylon.quarks-editor/dist": 115000
+}

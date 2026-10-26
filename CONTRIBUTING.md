@@ -68,6 +68,7 @@ npm run docs:check                             # renders the API docs of quarks.
 npm run check:demos                            # every demo in headless Chromium, fails on page/console errors or a missing gallery preview
 npm run validate:shaders                       # every shader variant, GLSL and WGSL, through a real compiler (CI runs it)
 npm run check:allocations                      # what a steady frame allocates, per render mode and behavior; nothing per particle (CI runs it)
+npm run check:pack                             # tarball contents, a consumer project importing them, and each bundle's gzipped size budget (scripts/size-budget.json)
 ```
 
 CI also runs the build, typecheck, tests and shader compile against the lowest Babylon.js release

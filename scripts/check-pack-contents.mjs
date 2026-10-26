@@ -1,8 +1,9 @@
 import {execFileSync, execSync} from 'node:child_process';
-import {mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync} from 'node:fs';
+import {mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {dirname, join} from 'node:path';
 import {fileURLToPath} from 'node:url';
+import {gzipSync} from 'node:zlib';
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -211,6 +212,38 @@ export const binding: typeof EffectBinding = EffectBinding;
 }
 
 /**
+ * Keeps each published bundle within its gzipped size budget (`scripts/size-budget.json`), so
+ * growth is a decision a PR makes and says so, not something found after a release. A budget on a
+ * directory covers every `.js` file under it.
+ */
+function assertSizeBudgets() {
+    const budgets = JSON.parse(readFileSync(join(repoRoot, 'scripts/size-budget.json'), 'utf8'));
+    const scripts = (path) =>
+        statSync(path).isDirectory()
+            ? readdirSync(path, {recursive: true})
+                  .filter((name) => name.endsWith('.js'))
+                  .map((name) => join(path, name))
+            : [path];
+    const over = [];
+    for (const [target, budget] of Object.entries(budgets)) {
+        if (target.startsWith('$')) {
+            continue;
+        }
+        const files = scripts(join(repoRoot, target));
+        const raw = Buffer.concat(files.map((file) => readFileSync(file)));
+        const gzipped = gzipSync(raw, {level: 9}).length;
+        const share = Math.round((gzipped / budget) * 100);
+        console.log(`${target}: ${(gzipped / 1000).toFixed(1)} kB gzipped, ${share}% of its budget`);
+        if (gzipped > budget) {
+            over.push(`${target} is ${gzipped} bytes gzipped, over its budget of ${budget}`);
+        }
+    }
+    if (over.length > 0) {
+        throw new Error(`${over.join('\n')}\nSee scripts/size-budget.json.`);
+    }
+}
+
+/**
  * Main entrypoint for pack verification script.
  */
 function main() {
@@ -239,6 +272,7 @@ function main() {
     ]);
     assertNoRuntimeDependencies('babylon.quarks-editor');
 
+    assertSizeBudgets();
     assertConsumersCanImport();
 
     console.log('Pack artifacts are valid.');
