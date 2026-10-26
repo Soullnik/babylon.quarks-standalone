@@ -2,10 +2,12 @@
 
 All notable changes to the Unity Quarks Exporter are documented here.
 
-## [1.0.0-rc.1] — Unreleased
+## [1.0.0-rc.1] — 2026-10-26
 
 ### Changed
 
+- The exporter's version follows babylon.quarks 1.0.0-rc.1, and so does the version in
+  `metadata.generator`.
 - Exports are format 3: a system no longer writes three.quarks' `version: '3.0'`. babylon.quarks
   0.29 and 0.30 read them as they are meant, after a warning that the format is newer.
 - Exports no longer write three.js fields babylon.quarks never read: a material's `blending` and

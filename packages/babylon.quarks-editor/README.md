@@ -10,8 +10,13 @@ Shuriken-style effect editor for [babylon.quarks](https://www.npmjs.com/package/
 npm install babylon.quarks-editor babylon.quarks @babylonjs/core @babylonjs/materials react react-dom @heroicons/react @tanstack/react-virtual
 ```
 
-The editor is an ES module package (`import`, not `require`). Its version follows babylon.quarks:
-editor 0.30.x needs babylon.quarks 0.30.x.
+Until babylon.quarks 1.0.0 is out, editor 0.31 and the 1.0 release candidate are on the `next` tag:
+install `babylon.quarks-editor@next babylon.quarks@next` in place of the first two.
+
+The editor is an ES module package (`import`, not `require`). It stays on 0.x while babylon.quarks
+reaches 1.0, and each editor release names the babylon.quarks line it works with: editor 0.31.x
+needs babylon.quarks 1.0 (from 1.0.0-rc.1, installed with `@next` until 1.0.0 is out), and editor
+0.30.x needs babylon.quarks 0.30.x.
 
 ## Usage
 

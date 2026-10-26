@@ -2,12 +2,18 @@
 
 All notable changes to the `babylon.quarks-editor` package are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
-and the project follows the `quarks.core` 0.x version line.
+and the editor keeps its own 0.x version line; each release names the babylon.quarks line it
+needs in its peer dependency.
 
-## [Unreleased]
+## [0.31.0] — 2026-10-26
+
+Released with babylon.quarks 1.0.0-rc.1, on npm's `next` tag with it. The editor stays on 0.x
+while the library reaches 1.0.
 
 ### Breaking
 
+- The peer dependency on babylon.quarks is `~1.0.0-rc.1`: this candidate and the 1.0.x releases
+  after it. An editor release that names 1.0.0 itself follows with it.
 - Peer ranges are `@babylonjs/core` `^9.24.0` and `@babylonjs/materials` `^9.23.0`, the releases
   babylon.quarks now needs and CI tests against.
 

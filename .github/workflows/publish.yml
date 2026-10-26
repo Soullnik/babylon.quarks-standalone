@@ -59,14 +59,29 @@ jobs:
             # only bumps one of them — `npm publish` errors on a version that's already on the
             # registry, which would otherwise fail the whole job over a package that has nothing new
             # to publish. Skip instead of failing when the current version is already published.
+            # A prerelease of babylon.quarks (1.0.0-rc.1) goes out on the `next` dist-tag, so
+            # `npm install babylon.quarks` keeps installing the last release; npm also refuses a
+            # prerelease without a tag. The editor goes on the same tag, since its peer range
+            # names the prerelease and `latest` would pair it with a library it cannot install with.
+            - name: Choose the dist-tag
+              run: |
+                  version=$(node -p "require('./packages/babylon.quarks/package.json').version")
+                  case "$version" in
+                    *-*) echo "DIST_TAG=next" >> "$GITHUB_ENV" ;;
+                    *) echo "DIST_TAG=latest" >> "$GITHUB_ENV" ;;
+                  esac
+
             - name: Publish babylon.quarks
               run: |
                   name=$(node -p "require('./packages/babylon.quarks/package.json').name")
                   version=$(node -p "require('./packages/babylon.quarks/package.json').version")
                   if npm view "$name@$version" version >/dev/null 2>&1; then
-                    echo "$name@$version is already published, skipping."
+                    # Still point the tag at it, so a re-run or a release that only bumps the
+                    # other package leaves the tags where this release says.
+                    echo "$name@$version is already published, tagging it $DIST_TAG."
+                    npm dist-tag add "$name@$version" "$DIST_TAG"
                   else
-                    npm publish --workspace=babylon.quarks --access public
+                    npm publish --workspace=babylon.quarks --access public --tag "$DIST_TAG"
                   fi
 
             - name: Publish babylon.quarks-editor
@@ -74,7 +89,10 @@ jobs:
                   name=$(node -p "require('./packages/babylon.quarks-editor/package.json').name")
                   version=$(node -p "require('./packages/babylon.quarks-editor/package.json').version")
                   if npm view "$name@$version" version >/dev/null 2>&1; then
-                    echo "$name@$version is already published, skipping."
+                    # Still point the tag at it, so a re-run or a release that only bumps the
+                    # other package leaves the tags where this release says.
+                    echo "$name@$version is already published, tagging it $DIST_TAG."
+                    npm dist-tag add "$name@$version" "$DIST_TAG"
                   else
-                    npm publish --workspace=babylon.quarks-editor --access public
+                    npm publish --workspace=babylon.quarks-editor --access public --tag "$DIST_TAG"
                   fi
