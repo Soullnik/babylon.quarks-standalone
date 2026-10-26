@@ -1,11 +1,10 @@
-import {VertexBuffer} from '@babylonjs/core/Buffers/buffer';
+import {Buffer, VertexBuffer} from '@babylonjs/core/Buffers/buffer';
 import {Constants} from '@babylonjs/core/Engines/constants';
 import type {Effect} from '@babylonjs/core/Materials/effect';
 import {ShaderMaterial} from '@babylonjs/core/Materials/shaderMaterial';
 import {RawTexture} from '@babylonjs/core/Materials/Textures/rawTexture';
 import {Vector2 as BVector2, Vector3 as BVector3} from '@babylonjs/core/Maths/math.vector';
 import {Mesh} from '@babylonjs/core/Meshes/mesh';
-import {VertexData} from '@babylonjs/core/Meshes/mesh.vertexData';
 import {Scene} from '@babylonjs/core/scene';
 import type {Color4Like} from 'quarks.core';
 import {
@@ -71,6 +70,8 @@ export class SpriteBatch extends VFXBatch {
     private colorVB!: VertexBuffer;
     private uvTileVB!: VertexBuffer;
     private velocityVB?: VertexBuffer;
+    /** The batch's geometry, interleaved; see {@link setupBuffers}. */
+    private geometryBuffer?: Buffer;
 
     constructor(settings: VFXBatchSettings, scene: Scene, depth: DepthBinding | null = null) {
         super(settings, scene, depth);
@@ -83,28 +84,53 @@ export class SpriteBatch extends VFXBatch {
     /** @internal */
     setupBuffers(): void {
         this.mesh?.dispose();
+        this.geometryBuffer?.dispose();
         this.mesh = new Mesh('spriteBatch', this.scene);
         this.configureMesh();
 
-        const vertexData = new VertexData();
-        vertexData.positions = this.settings.instancingGeometry;
-        vertexData.indices = this.settings.instancingIndices;
-        const vertexCount = this.settings.instancingGeometry.length / 3;
+        const positions = this.settings.instancingGeometry;
+        const vertexCount = positions.length / 3;
         const uvs = this.settings.instancingUVs;
-        // WebGL (especially iOS) raises INVALID_OPERATION if the shader reads
-        // `attribute vec2 uv` but the buffer is missing or shorter than vertices.
-        if (uvs && uvs.length >= vertexCount * 2) {
-            vertexData.uvs = uvs;
-        } else {
-            vertexData.uvs = new Float32Array(vertexCount * 2);
+        const normals = this.settings.instancingNormals;
+        const uvs2 = this.meshUV2() ? this.settings.instancingUVs2! : null;
+        // The geometry goes up as one interleaved buffer, position, uv, then normal and the second
+        // UV set when the batch has them: one vertex buffer binding instead of up to four. WebGPU
+        // allows 8 by default, and a batch also binds five per-instance buffers (six drawn along
+        // velocity); four geometry buffers took a mesh with a second UV set to 9, and no pipeline
+        // could be made for it.
+        const parts: Array<[string, ArrayLike<number> | null, number]> = [
+            [VertexBuffer.PositionKind, positions, 3],
+            // WebGL (especially iOS) raises INVALID_OPERATION if the shader reads
+            // `attribute vec2 uv` but the buffer is missing or shorter than vertices.
+            [VertexBuffer.UVKind, uvs && uvs.length >= vertexCount * 2 ? uvs : null, 2],
+        ];
+        if (normals) {
+            parts.push([VertexBuffer.NormalKind, normals, 3]);
         }
-        if (this.meshUV2()) {
-            vertexData.uvs2 = this.settings.instancingUVs2!;
+        if (uvs2) {
+            parts.push([VertexBuffer.UV2Kind, uvs2, 2]);
         }
-        if (this.settings.instancingNormals) {
-            vertexData.normals = this.settings.instancingNormals;
+        const stride = parts.reduce((sum, [, , size]) => sum + size, 0);
+        const data = new Float32Array(vertexCount * stride);
+        let offset = 0;
+        for (const [, values, size] of parts) {
+            if (values) {
+                for (let v = 0; v < vertexCount; v++) {
+                    for (let c = 0; c < size; c++) {
+                        data[v * stride + offset + c] = values[v * size + c] ?? 0;
+                    }
+                }
+            }
+            offset += size;
         }
-        vertexData.applyToMesh(this.mesh, false);
+        const engine = this.scene.getEngine();
+        this.geometryBuffer = new Buffer(engine, data, false, stride);
+        offset = 0;
+        for (const [kind, , size] of parts) {
+            this.mesh.setVerticesBuffer(this.geometryBuffer.createVertexBuffer(kind, offset, size), true, vertexCount);
+            offset += size;
+        }
+        this.mesh.setIndices(this.settings.instancingIndices, vertexCount);
 
         this.buildExpandableBuffers();
     }
@@ -1225,5 +1251,8 @@ export class SpriteBatch extends VFXBatch {
             this.mesh.material.dispose();
         }
         super.dispose();
+        // The mesh's vertex buffers are views of it and do not own it.
+        this.geometryBuffer?.dispose();
+        this.geometryBuffer = undefined;
     }
 }
