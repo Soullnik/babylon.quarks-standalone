@@ -126,11 +126,8 @@ namespace BabylonQuarks.UnityExporter
 
             BuildTextureSheet(ps, obj, behaviors, trailOnly);
 
-            obj.Set("blending", material.Blending)
-                .Set("transparent", material.Transparent)
-                .Set("depthWrite", material.DepthWrite)
-                .Set("worldSpace", main.simulationSpace != ParticleSystemSimulationSpace.Local);
-            if (material.AlphaTest > 0f) obj.Set("alphaTest", material.AlphaTest);
+            // Blending, depth and alpha test are the material entry's.
+            obj.Set("worldSpace", main.simulationSpace != ParticleSystemSimulationSpace.Local);
             // Render Face only means something for a mesh; billboards always face the camera.
             if (renderMode == 2 && material.RenderFace != "both") obj.Set("renderFace", material.RenderFace);
             if (material.SoftParticles)

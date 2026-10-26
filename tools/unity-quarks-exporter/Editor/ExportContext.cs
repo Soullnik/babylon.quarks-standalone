@@ -104,15 +104,12 @@ namespace BabylonQuarks.UnityExporter
                 .Set("type", "QuarksMaterial")
                 .Set("transparent", info.Transparent)
                 .Set("alphaMode", info.Blending)
-                .Set("blending", info.Blending)
                 .Set("depthTest", true)
                 .Set("depthWrite", info.DepthWrite)
                 .Set("alphaTest", info.AlphaTest);
             if (textureUuid != null)
             {
-                // Write both keys: `texture` for QuarksMaterial and `map` for three.js compatibility.
                 m.Set("texture", textureUuid);
-                m.Set("map", textureUuid);
                 // The map's Tiling / Offset; Unity applies them to the flipbook cell's UV, as
                 // babylon.quarks does on UV channel 0.
                 Vector2 tiling = mat.mainTextureScale, offset = mat.mainTextureOffset;
@@ -156,7 +153,6 @@ namespace BabylonQuarks.UnityExporter
             string texUuid = NewId("quarks_texture");
             var t = new JObject()
                 .Set("uuid", texUuid)
-                .Set("name", tex.name)
                 .Set("image", imageUuid)
                 .Set("wrap", envAtlas
                     // The six faces sit side by side; repeating would bleed one face into another.
@@ -483,7 +479,6 @@ namespace BabylonQuarks.UnityExporter
             MeshSourceNodes.Add(new JObject()
                 .Set("uuid", nodeUuid)
                 .Set("name", mesh.name + " (emitter source)")
-                .Set("layers", 1)
                 .Set("matrix", new JArray().Add(1).Add(0).Add(0).Add(0).Add(0).Add(1).Add(0).Add(0).Add(0).Add(0).Add(1).Add(0).Add(0).Add(0).Add(0).Add(1))
                 .Set("type", "Mesh")
                 .Set("isVisible", false)

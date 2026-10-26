@@ -19,11 +19,13 @@
                 "default": "./dist/babylon.quarks.cjs"
             }
         },
+        "./schema/effect.schema.json": "./schema/effect.schema.json",
         "./package.json": "./package.json"
     },
     "files": [
         "dist",
         "src",
+        "schema",
         "LICENSE",
         "README.md",
         "CHANGELOG.md"

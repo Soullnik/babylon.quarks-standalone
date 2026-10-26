@@ -12,8 +12,21 @@ const base = process.env.GITHUB_ACTIONS === 'true' && repositoryName ? `/${repos
 const quarksPackage = JSON.parse(readFileSync(resolve(__dirname, '../packages/babylon.quarks/package.json'), 'utf8'));
 process.env.VITE_QUARKS_VERSION = quarksPackage.version;
 
+// The effect file schema is published beside the site, at the URL its `$id` names, so editors can
+// fetch it from a file's `$schema`.
+const effectSchema = readFileSync(resolve(__dirname, '../packages/babylon.quarks/schema/effect.schema.json'), 'utf8');
+const effectSchemaPath = `schema/effect-${JSON.parse(effectSchema).properties.metadata.properties.quarksFormat.const}.schema.json`;
+
 export default defineConfig({
     base,
+    plugins: [
+        {
+            name: 'quarks-effect-schema',
+            generateBundle() {
+                this.emitFile({type: 'asset', fileName: effectSchemaPath, source: effectSchema});
+            },
+        },
+    ],
     server: {
         port: 3010,
         // Cloudflare quick tunnels hit Vite with a *.trycloudflare.com Host header; any other host

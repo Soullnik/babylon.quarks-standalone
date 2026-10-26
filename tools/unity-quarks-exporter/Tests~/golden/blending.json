@@ -12,7 +12,6 @@
       "type": "QuarksMaterial",
       "transparent": true,
       "alphaMode": 2,
-      "blending": 2,
       "depthTest": true,
       "depthWrite": false,
       "alphaTest": 0
@@ -22,7 +21,6 @@
       "type": "QuarksMaterial",
       "transparent": true,
       "alphaMode": 7,
-      "blending": 7,
       "depthTest": true,
       "depthWrite": false,
       "alphaTest": 0
@@ -32,7 +30,6 @@
       "type": "QuarksMaterial",
       "transparent": true,
       "alphaMode": 1,
-      "blending": 1,
       "depthTest": true,
       "depthWrite": false,
       "alphaTest": 0
@@ -42,7 +39,6 @@
       "type": "QuarksMaterial",
       "transparent": true,
       "alphaMode": 4,
-      "blending": 4,
       "depthTest": true,
       "depthWrite": false,
       "alphaTest": 0
@@ -52,7 +48,6 @@
       "type": "QuarksMaterial",
       "transparent": false,
       "alphaMode": 0,
-      "blending": 0,
       "depthTest": true,
       "depthWrite": true,
       "alphaTest": 0
@@ -62,7 +57,6 @@
       "type": "QuarksMaterial",
       "transparent": true,
       "alphaMode": 2,
-      "blending": 2,
       "depthTest": true,
       "depthWrite": false,
       "alphaTest": 0
@@ -72,7 +66,6 @@
       "type": "QuarksMaterial",
       "transparent": true,
       "alphaMode": 1,
-      "blending": 1,
       "depthTest": true,
       "depthWrite": false,
       "alphaTest": 0
@@ -82,7 +75,6 @@
       "type": "QuarksMaterial",
       "transparent": true,
       "alphaMode": 10,
-      "blending": 10,
       "depthTest": true,
       "depthWrite": false,
       "alphaTest": 0
@@ -92,7 +84,6 @@
       "type": "QuarksMaterial",
       "transparent": true,
       "alphaMode": 4,
-      "blending": 4,
       "depthTest": true,
       "depthWrite": false,
       "alphaTest": 0
@@ -102,7 +93,6 @@
       "type": "QuarksMaterial",
       "transparent": true,
       "alphaMode": 2,
-      "blending": 2,
       "depthTest": true,
       "depthWrite": false,
       "alphaTest": 0
@@ -112,7 +102,6 @@
       "type": "QuarksMaterial",
       "transparent": false,
       "alphaMode": 0,
-      "blending": 0,
       "depthTest": true,
       "depthWrite": true,
       "alphaTest": 0
@@ -122,7 +111,6 @@
       "type": "QuarksMaterial",
       "transparent": false,
       "alphaMode": 0,
-      "blending": 0,
       "depthTest": true,
       "depthWrite": true,
       "alphaTest": 0.4
@@ -132,7 +120,6 @@
       "type": "QuarksMaterial",
       "transparent": true,
       "alphaMode": 2,
-      "blending": 2,
       "depthTest": true,
       "depthWrite": false,
       "alphaTest": 0
@@ -142,7 +129,6 @@
       "type": "QuarksMaterial",
       "transparent": true,
       "alphaMode": 7,
-      "blending": 7,
       "depthTest": true,
       "depthWrite": false,
       "alphaTest": 0
@@ -152,7 +138,6 @@
       "type": "QuarksMaterial",
       "transparent": true,
       "alphaMode": 1,
-      "blending": 1,
       "depthTest": true,
       "depthWrite": false,
       "alphaTest": 0
@@ -162,7 +147,6 @@
       "type": "QuarksMaterial",
       "transparent": true,
       "alphaMode": 3,
-      "blending": 3,
       "depthTest": true,
       "depthWrite": false,
       "alphaTest": 0
@@ -172,7 +156,6 @@
       "type": "QuarksMaterial",
       "transparent": true,
       "alphaMode": 4,
-      "blending": 4,
       "depthTest": true,
       "depthWrite": false,
       "alphaTest": 0
@@ -182,12 +165,10 @@
       "type": "QuarksMaterial",
       "transparent": true,
       "alphaMode": 2,
-      "blending": 2,
       "depthTest": true,
       "depthWrite": false,
       "alphaTest": 0,
       "texture": "quarks_texture-37",
-      "map": "quarks_texture-37",
       "reflectionAtlas": "quarks_texture-38",
       "reflectionLevel": 1
     }
@@ -195,7 +176,6 @@
   "textures": [
     {
       "uuid": "quarks_texture-37",
-      "name": "mirrorOnce",
       "image": "quarks_image-36",
       "wrap": [
         1002,
@@ -204,7 +184,6 @@
     },
     {
       "uuid": "quarks_texture-38",
-      "name": "sky_envAtlas",
       "image": "quarks_image-36",
       "wrap": [
         1001,
@@ -223,7 +202,6 @@
   "object": {
     "uuid": "node-0",
     "name": "Blending",
-    "layers": 1,
     "matrix": [
       1,
       0,
@@ -247,7 +225,6 @@
       {
         "uuid": "node-1",
         "name": "UrpAlpha",
-        "layers": 1,
         "matrix": [
           1,
           0,
@@ -337,9 +314,6 @@
           "uTileCount": 1,
           "vTileCount": 1,
           "blendTiles": false,
-          "blending": 2,
-          "transparent": true,
-          "depthWrite": false,
           "worldSpace": false,
           "behaviors": []
         }
@@ -347,7 +321,6 @@
       {
         "uuid": "node-2",
         "name": "UrpPremultiply",
-        "layers": 1,
         "matrix": [
           1,
           0,
@@ -437,9 +410,6 @@
           "uTileCount": 1,
           "vTileCount": 1,
           "blendTiles": false,
-          "blending": 7,
-          "transparent": true,
-          "depthWrite": false,
           "worldSpace": false,
           "behaviors": []
         }
@@ -447,7 +417,6 @@
       {
         "uuid": "node-3",
         "name": "UrpAdditive",
-        "layers": 1,
         "matrix": [
           1,
           0,
@@ -537,9 +506,6 @@
           "uTileCount": 1,
           "vTileCount": 1,
           "blendTiles": false,
-          "blending": 1,
-          "transparent": true,
-          "depthWrite": false,
           "worldSpace": false,
           "behaviors": []
         }
@@ -547,7 +513,6 @@
       {
         "uuid": "node-4",
         "name": "UrpMultiply",
-        "layers": 1,
         "matrix": [
           1,
           0,
@@ -637,9 +602,6 @@
           "uTileCount": 1,
           "vTileCount": 1,
           "blendTiles": false,
-          "blending": 4,
-          "transparent": true,
-          "depthWrite": false,
           "worldSpace": false,
           "behaviors": []
         }
@@ -647,7 +609,6 @@
       {
         "uuid": "node-5",
         "name": "UrpOpaque",
-        "layers": 1,
         "matrix": [
           1,
           0,
@@ -737,9 +698,6 @@
           "uTileCount": 1,
           "vTileCount": 1,
           "blendTiles": false,
-          "blending": 0,
-          "transparent": false,
-          "depthWrite": true,
           "worldSpace": false,
           "behaviors": []
         }
@@ -747,7 +705,6 @@
       {
         "uuid": "node-6",
         "name": "UrpOdd",
-        "layers": 1,
         "matrix": [
           1,
           0,
@@ -837,9 +794,6 @@
           "uTileCount": 1,
           "vTileCount": 1,
           "blendTiles": false,
-          "blending": 2,
-          "transparent": true,
-          "depthWrite": false,
           "worldSpace": false,
           "behaviors": []
         }
@@ -847,7 +801,6 @@
       {
         "uuid": "node-7",
         "name": "LegacyAdditive",
-        "layers": 1,
         "matrix": [
           1,
           0,
@@ -937,9 +890,6 @@
           "uTileCount": 1,
           "vTileCount": 1,
           "blendTiles": false,
-          "blending": 1,
-          "transparent": true,
-          "depthWrite": false,
           "worldSpace": false,
           "behaviors": []
         }
@@ -947,7 +897,6 @@
       {
         "uuid": "node-8",
         "name": "LegacySoftAdditive",
-        "layers": 1,
         "matrix": [
           1,
           0,
@@ -1037,9 +986,6 @@
           "uTileCount": 1,
           "vTileCount": 1,
           "blendTiles": false,
-          "blending": 10,
-          "transparent": true,
-          "depthWrite": false,
           "worldSpace": false,
           "behaviors": []
         }
@@ -1047,7 +993,6 @@
       {
         "uuid": "node-9",
         "name": "LegacyMultiply",
-        "layers": 1,
         "matrix": [
           1,
           0,
@@ -1137,9 +1082,6 @@
           "uTileCount": 1,
           "vTileCount": 1,
           "blendTiles": false,
-          "blending": 4,
-          "transparent": true,
-          "depthWrite": false,
           "worldSpace": false,
           "behaviors": []
         }
@@ -1147,7 +1089,6 @@
       {
         "uuid": "node-10",
         "name": "NoMaterial",
-        "layers": 1,
         "matrix": [
           1,
           0,
@@ -1237,9 +1178,6 @@
           "uTileCount": 1,
           "vTileCount": 1,
           "blendTiles": false,
-          "blending": 2,
-          "transparent": true,
-          "depthWrite": false,
           "worldSpace": false,
           "behaviors": []
         }
@@ -1247,7 +1185,6 @@
       {
         "uuid": "node-11",
         "name": "StdOpaque",
-        "layers": 1,
         "matrix": [
           1,
           0,
@@ -1337,9 +1274,6 @@
           "uTileCount": 1,
           "vTileCount": 1,
           "blendTiles": false,
-          "blending": 0,
-          "transparent": false,
-          "depthWrite": true,
           "worldSpace": false,
           "behaviors": []
         }
@@ -1347,7 +1281,6 @@
       {
         "uuid": "node-12",
         "name": "StdCutout",
-        "layers": 1,
         "matrix": [
           1,
           0,
@@ -1437,18 +1370,13 @@
           "uTileCount": 1,
           "vTileCount": 1,
           "blendTiles": false,
-          "blending": 0,
-          "transparent": false,
-          "depthWrite": true,
           "worldSpace": false,
-          "alphaTest": 0.4,
           "behaviors": []
         }
       },
       {
         "uuid": "node-13",
         "name": "StdFade",
-        "layers": 1,
         "matrix": [
           1,
           0,
@@ -1538,9 +1466,6 @@
           "uTileCount": 1,
           "vTileCount": 1,
           "blendTiles": false,
-          "blending": 2,
-          "transparent": true,
-          "depthWrite": false,
           "worldSpace": false,
           "behaviors": []
         }
@@ -1548,7 +1473,6 @@
       {
         "uuid": "node-14",
         "name": "StdTransparent",
-        "layers": 1,
         "matrix": [
           1,
           0,
@@ -1638,9 +1562,6 @@
           "uTileCount": 1,
           "vTileCount": 1,
           "blendTiles": false,
-          "blending": 7,
-          "transparent": true,
-          "depthWrite": false,
           "worldSpace": false,
           "behaviors": []
         }
@@ -1648,7 +1569,6 @@
       {
         "uuid": "node-15",
         "name": "StdAdditive",
-        "layers": 1,
         "matrix": [
           1,
           0,
@@ -1738,9 +1658,6 @@
           "uTileCount": 1,
           "vTileCount": 1,
           "blendTiles": false,
-          "blending": 1,
-          "transparent": true,
-          "depthWrite": false,
           "worldSpace": false,
           "behaviors": []
         }
@@ -1748,7 +1665,6 @@
       {
         "uuid": "node-16",
         "name": "StdSubtractive",
-        "layers": 1,
         "matrix": [
           1,
           0,
@@ -1838,9 +1754,6 @@
           "uTileCount": 1,
           "vTileCount": 1,
           "blendTiles": false,
-          "blending": 3,
-          "transparent": true,
-          "depthWrite": false,
           "worldSpace": false,
           "behaviors": []
         }
@@ -1848,7 +1761,6 @@
       {
         "uuid": "node-17",
         "name": "StdModulate",
-        "layers": 1,
         "matrix": [
           1,
           0,
@@ -1938,9 +1850,6 @@
           "uTileCount": 1,
           "vTileCount": 1,
           "blendTiles": false,
-          "blending": 4,
-          "transparent": true,
-          "depthWrite": false,
           "worldSpace": false,
           "behaviors": []
         }
@@ -1948,7 +1857,6 @@
       {
         "uuid": "node-18",
         "name": "Reflective",
-        "layers": 1,
         "matrix": [
           1,
           0,
@@ -2038,9 +1946,6 @@
           "uTileCount": 1,
           "vTileCount": 1,
           "blendTiles": false,
-          "blending": 2,
-          "transparent": true,
-          "depthWrite": false,
           "worldSpace": false,
           "behaviors": []
         }

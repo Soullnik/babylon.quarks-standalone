@@ -12,12 +12,10 @@
       "type": "QuarksMaterial",
       "transparent": true,
       "alphaMode": 1,
-      "blending": 1,
       "depthTest": true,
       "depthWrite": false,
       "alphaTest": 0,
       "texture": "quarks_texture-2",
-      "map": "quarks_texture-2",
       "mapUV": {
         "tiling": [
           2,
@@ -33,7 +31,6 @@
   "textures": [
     {
       "uuid": "quarks_texture-2",
-      "name": "sparkTiled",
       "image": "quarks_image-1",
       "wrap": [
         1000,
@@ -50,7 +47,6 @@
   "object": {
     "uuid": "node-0",
     "name": "Sparks",
-    "layers": 1,
     "matrix": [
       1,
       0,
@@ -182,9 +178,6 @@
       "uTileCount": 2,
       "vTileCount": 2,
       "blendTiles": false,
-      "blending": 1,
-      "transparent": true,
-      "depthWrite": false,
       "worldSpace": true,
       "softParticles": true,
       "softNearFade": 0.1,

@@ -1,0 +1,1050 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://soullnik.github.io/babylon.quarks-standalone/schema/effect-3.schema.json",
+    "title": "babylon.quarks effect, format 3",
+    "description": "An effect file as babylon.quarks writes it with serializeEffect, format 3 (metadata.quarksFormat). Files of older formats, and three.quarks files, still load but need not validate. Behaviors and emitter shapes are extensible through plugins, so only their type is checked. See docs/FORMAT.md.",
+    "type": "object",
+    "required": ["metadata", "object"],
+    "additionalProperties": false,
+    "properties": {
+        "$schema": {
+            "type": "string",
+            "description": "The schema this file is written against, for editors; readers ignore it."
+        },
+        "metadata": {
+            "type": "object",
+            "required": ["quarksFormat"],
+            "additionalProperties": false,
+            "properties": {
+                "version": {
+                    "type": "number",
+                    "description": "The three.js object format version of the envelope, 4.5."
+                },
+                "type": {
+                    "const": "Object3D"
+                },
+                "generator": {
+                    "type": "string",
+                    "description": "The tool that wrote the file."
+                },
+                "quarksFormat": {
+                    "const": 3
+                }
+            }
+        },
+        "geometries": {
+            "type": "array",
+            "items": {
+                "$ref": "#/$defs/geometry"
+            }
+        },
+        "materials": {
+            "type": "array",
+            "items": {
+                "$ref": "#/$defs/material"
+            }
+        },
+        "textures": {
+            "type": "array",
+            "items": {
+                "$ref": "#/$defs/texture"
+            }
+        },
+        "images": {
+            "type": "array",
+            "items": {
+                "$ref": "#/$defs/image"
+            }
+        },
+        "object": {
+            "$ref": "#/$defs/node"
+        }
+    },
+    "$defs": {
+        "uuid": {
+            "type": "string",
+            "minLength": 1
+        },
+        "vec2": {
+            "type": "array",
+            "items": {
+                "type": "number"
+            },
+            "minItems": 2,
+            "maxItems": 2
+        },
+        "vec3": {
+            "type": "array",
+            "items": {
+                "type": "number"
+            },
+            "minItems": 3,
+            "maxItems": 3
+        },
+        "vector3": {
+            "type": "object",
+            "required": ["x", "y", "z"],
+            "additionalProperties": false,
+            "properties": {
+                "x": {
+                    "type": "number"
+                },
+                "y": {
+                    "type": "number"
+                },
+                "z": {
+                    "type": "number"
+                }
+            }
+        },
+        "color": {
+            "type": "object",
+            "required": ["r", "g", "b", "a"],
+            "additionalProperties": false,
+            "properties": {
+                "r": {
+                    "type": "number"
+                },
+                "g": {
+                    "type": "number"
+                },
+                "b": {
+                    "type": "number"
+                },
+                "a": {
+                    "type": "number"
+                }
+            }
+        },
+        "image": {
+            "type": "object",
+            "required": ["uuid", "url"],
+            "additionalProperties": false,
+            "properties": {
+                "uuid": {
+                    "$ref": "#/$defs/uuid"
+                },
+                "url": {
+                    "type": "string",
+                    "description": "Relative to the file, absolute, or a data: URI."
+                }
+            }
+        },
+        "texture": {
+            "type": "object",
+            "required": ["uuid"],
+            "additionalProperties": false,
+            "properties": {
+                "uuid": {
+                    "$ref": "#/$defs/uuid"
+                },
+                "image": {
+                    "$ref": "#/$defs/uuid"
+                },
+                "invertY": {
+                    "type": "boolean"
+                },
+                "noMipmap": {
+                    "type": "boolean"
+                },
+                "samplingMode": {
+                    "type": "integer"
+                },
+                "wrap": {
+                    "type": "array",
+                    "items": {
+                        "enum": [1000, 1001, 1002]
+                    },
+                    "minItems": 2,
+                    "maxItems": 2
+                },
+                "repeat": {
+                    "$ref": "#/$defs/vec2"
+                },
+                "offset": {
+                    "$ref": "#/$defs/vec2"
+                },
+                "rotation": {
+                    "type": "number"
+                }
+            }
+        },
+        "geometry": {
+            "type": "object",
+            "required": ["uuid", "type"],
+            "additionalProperties": false,
+            "properties": {
+                "uuid": {
+                    "$ref": "#/$defs/uuid"
+                },
+                "type": {
+                    "const": "QuarksGeometry"
+                },
+                "positions": {
+                    "type": "array",
+                    "items": {
+                        "type": "number"
+                    }
+                },
+                "indices": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer",
+                        "minimum": 0
+                    }
+                },
+                "uvs": {
+                    "type": "array",
+                    "items": {
+                        "type": "number"
+                    }
+                },
+                "uvs2": {
+                    "type": "array",
+                    "items": {
+                        "type": "number"
+                    }
+                },
+                "normals": {
+                    "type": "array",
+                    "items": {
+                        "type": "number"
+                    }
+                },
+                "url": {
+                    "type": "string",
+                    "description": "A separate geometry file, relative to the effect, that QuarksLoader.load() fetches; instead of the inline arrays."
+                }
+            },
+            "oneOf": [
+                {
+                    "required": ["positions", "indices"],
+                    "not": {
+                        "required": ["url"]
+                    }
+                },
+                {
+                    "required": ["url"],
+                    "not": {
+                        "anyOf": [
+                            {
+                                "required": ["positions"]
+                            },
+                            {
+                                "required": ["indices"]
+                            }
+                        ]
+                    }
+                }
+            ]
+        },
+        "textureUV": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+                "channel": {
+                    "enum": [0, 1]
+                },
+                "tiling": {
+                    "$ref": "#/$defs/vec2"
+                },
+                "offset": {
+                    "$ref": "#/$defs/vec2"
+                },
+                "scroll": {
+                    "$ref": "#/$defs/vec2"
+                }
+            }
+        },
+        "material": {
+            "type": "object",
+            "required": ["uuid"],
+            "additionalProperties": false,
+            "properties": {
+                "uuid": {
+                    "$ref": "#/$defs/uuid"
+                },
+                "type": {
+                    "type": "string"
+                },
+                "transparent": {
+                    "type": "boolean"
+                },
+                "alphaMode": {
+                    "type": "integer",
+                    "description": "A Babylon alpha mode constant."
+                },
+                "depthTest": {
+                    "type": "boolean"
+                },
+                "depthWrite": {
+                    "type": "boolean"
+                },
+                "alphaTest": {
+                    "type": "number"
+                },
+                "texture": {
+                    "$ref": "#/$defs/uuid"
+                },
+                "reflectionAtlas": {
+                    "$ref": "#/$defs/uuid"
+                },
+                "reflectionLevel": {
+                    "type": "number"
+                },
+                "lighting": {
+                    "enum": ["fixed", "unlit", "scene"]
+                },
+                "rim": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "color": {
+                            "$ref": "#/$defs/vec3"
+                        },
+                        "power": {
+                            "type": "number"
+                        },
+                        "strength": {
+                            "type": "number"
+                        },
+                        "mode": {
+                            "enum": ["add", "mix", "fade"]
+                        }
+                    }
+                },
+                "mapUV": {
+                    "$ref": "#/$defs/textureUV"
+                },
+                "gradientMap": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "ramp": {
+                            "$ref": "#/$defs/uuid"
+                        },
+                        "channel": {
+                            "enum": ["r", "g", "b", "a", "luminance"]
+                        }
+                    }
+                },
+                "erosion": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "mask": {
+                            "$ref": "#/$defs/uuid"
+                        },
+                        "maskUV": {
+                            "$ref": "#/$defs/textureUV"
+                        },
+                        "softness": {
+                            "type": "number"
+                        },
+                        "edgeWidth": {
+                            "type": "number"
+                        },
+                        "edgeColor": {
+                            "$ref": "#/$defs/vec3"
+                        }
+                    }
+                },
+                "uvDistortion": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "map": {
+                            "$ref": "#/$defs/uuid"
+                        },
+                        "mapUV": {
+                            "$ref": "#/$defs/textureUV"
+                        },
+                        "strength": {
+                            "type": "number"
+                        }
+                    }
+                }
+            }
+        },
+        "node": {
+            "type": "object",
+            "required": ["uuid", "type"],
+            "additionalProperties": false,
+            "properties": {
+                "uuid": {
+                    "$ref": "#/$defs/uuid"
+                },
+                "type": {
+                    "enum": ["Group", "ParticleEmitter", "Mesh", "QuarksPrefab"]
+                },
+                "name": {
+                    "type": "string"
+                },
+                "matrix": {
+                    "type": "array",
+                    "items": {
+                        "type": "number"
+                    },
+                    "minItems": 16,
+                    "maxItems": 16
+                },
+                "visible": {
+                    "const": false
+                },
+                "isVisible": {
+                    "const": false
+                },
+                "children": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/$defs/node"
+                    }
+                },
+                "ps": {
+                    "$ref": "#/$defs/particleSystem"
+                },
+                "geometry": {
+                    "$ref": "#/$defs/uuid"
+                },
+                "material": {
+                    "$ref": "#/$defs/uuid"
+                },
+                "timeScale": {
+                    "type": "number"
+                },
+                "animationData": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/$defs/track"
+                    }
+                }
+            },
+            "allOf": [
+                {
+                    "if": {
+                        "properties": {
+                            "type": {
+                                "const": "ParticleEmitter"
+                            }
+                        }
+                    },
+                    "then": {
+                        "required": ["ps"]
+                    }
+                },
+                {
+                    "if": {
+                        "properties": {
+                            "type": {
+                                "const": "Mesh"
+                            }
+                        }
+                    },
+                    "then": {
+                        "required": ["geometry"]
+                    }
+                }
+            ]
+        },
+        "track": {
+            "type": "object",
+            "required": ["startTime", "duration", "type", "targetUUID", "loop"],
+            "additionalProperties": false,
+            "properties": {
+                "startTime": {
+                    "type": "number"
+                },
+                "duration": {
+                    "type": "number"
+                },
+                "type": {
+                    "enum": ["clip", "ps"]
+                },
+                "targetUUID": {
+                    "$ref": "#/$defs/uuid"
+                },
+                "clipUUID": {
+                    "type": "string"
+                },
+                "loop": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "particleSystem": {
+            "type": "object",
+            "required": ["shape", "material"],
+            "additionalProperties": false,
+            "properties": {
+                "stopAction": {
+                    "enum": ["none", "disable", "destroy"]
+                },
+                "looping": {
+                    "type": "boolean"
+                },
+                "prewarm": {
+                    "type": "boolean"
+                },
+                "prewarmTime": {
+                    "type": "number",
+                    "minimum": 0
+                },
+                "duration": {
+                    "type": "number"
+                },
+                "startDelay": {
+                    "$ref": "#/$defs/valueGenerator"
+                },
+                "shape": {
+                    "$ref": "#/$defs/shape"
+                },
+                "startLife": {
+                    "$ref": "#/$defs/valueGenerator"
+                },
+                "startSpeed": {
+                    "$ref": "#/$defs/valueGenerator"
+                },
+                "startRotation": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/$defs/valueGenerator"
+                        },
+                        {
+                            "$ref": "#/$defs/rotationGenerator"
+                        }
+                    ]
+                },
+                "startSize": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/$defs/valueGenerator"
+                        },
+                        {
+                            "$ref": "#/$defs/vector3Generator"
+                        }
+                    ]
+                },
+                "startColor": {
+                    "$ref": "#/$defs/colorGenerator"
+                },
+                "emissionOverTime": {
+                    "$ref": "#/$defs/valueGenerator"
+                },
+                "emissionOverDistance": {
+                    "$ref": "#/$defs/valueGenerator"
+                },
+                "emissionBursts": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/$defs/burst"
+                    }
+                },
+                "maxParticles": {
+                    "type": "integer",
+                    "minimum": 0
+                },
+                "ringBufferMode": {
+                    "enum": ["disabled", "pauseUntilReplaced", "loopUntilReplaced"]
+                },
+                "ringBufferLoopRange": {
+                    "$ref": "#/$defs/vec2"
+                },
+                "onlyUsedByOther": {
+                    "type": "boolean"
+                },
+                "rendererEmitterSettings": {
+                    "$ref": "#/$defs/rendererEmitterSettings"
+                },
+                "instancingGeometry": {
+                    "$ref": "#/$defs/uuid"
+                },
+                "renderMode": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "0 billboard, 1 stretched, 2 mesh, 3 trail, 4 horizontal, 5 vertical, 6 beam."
+                },
+                "renderOrder": {
+                    "type": "number"
+                },
+                "renderingGroupId": {
+                    "type": "integer",
+                    "minimum": 0
+                },
+                "applyFog": {
+                    "type": "boolean"
+                },
+                "applyImageProcessing": {
+                    "type": "boolean"
+                },
+                "playbackSpeed": {
+                    "type": "number"
+                },
+                "cullingMode": {
+                    "enum": ["always", "pause", "pauseAndCatchUp"]
+                },
+                "scalingMode": {
+                    "enum": ["local", "hierarchy", "shape"]
+                },
+                "seed": {
+                    "type": "integer"
+                },
+                "sortMode": {
+                    "enum": ["none", "distance", "oldestInFront", "youngestInFront"]
+                },
+                "renderFace": {
+                    "enum": ["both", "front", "back"]
+                },
+                "alignToDirection": {
+                    "type": "boolean"
+                },
+                "minParticleSize": {
+                    "type": "number"
+                },
+                "maxParticleSize": {
+                    "type": "number"
+                },
+                "layers": {
+                    "type": "integer"
+                },
+                "startTileIndex": {
+                    "$ref": "#/$defs/valueGenerator"
+                },
+                "uTileCount": {
+                    "type": "integer",
+                    "minimum": 1
+                },
+                "vTileCount": {
+                    "type": "integer",
+                    "minimum": 1
+                },
+                "blendTiles": {
+                    "type": "boolean"
+                },
+                "softParticles": {
+                    "type": "boolean"
+                },
+                "softFarFade": {
+                    "type": "number",
+                    "minimum": 0
+                },
+                "softNearFade": {
+                    "type": "number",
+                    "minimum": 0
+                },
+                "blending": {
+                    "type": "integer",
+                    "description": "A Babylon alpha mode; the material entry's alphaMode wins."
+                },
+                "transparent": {
+                    "type": "boolean",
+                    "description": "The material entry's value wins."
+                },
+                "depthTest": {
+                    "type": "boolean",
+                    "description": "The material entry's value wins."
+                },
+                "depthWrite": {
+                    "type": "boolean",
+                    "description": "The material entry's value wins."
+                },
+                "alphaTest": {
+                    "type": "number",
+                    "description": "The material entry's value wins."
+                },
+                "material": {
+                    "$ref": "#/$defs/uuid"
+                },
+                "behaviors": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/$defs/behavior"
+                    }
+                },
+                "worldSpace": {
+                    "type": "boolean"
+                },
+                "pivot": {
+                    "$ref": "#/$defs/vec3"
+                },
+                "flip": {
+                    "$ref": "#/$defs/vec2"
+                }
+            }
+        },
+        "burst": {
+            "type": "object",
+            "required": ["time", "count"],
+            "additionalProperties": false,
+            "properties": {
+                "time": {
+                    "type": "number"
+                },
+                "count": {
+                    "$ref": "#/$defs/valueGenerator"
+                },
+                "cycle": {
+                    "type": "integer",
+                    "minimum": 1
+                },
+                "interval": {
+                    "type": "number"
+                },
+                "probability": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                }
+            }
+        },
+        "rendererEmitterSettings": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+                "speedFactor": {
+                    "type": "number"
+                },
+                "lengthFactor": {
+                    "type": "number"
+                },
+                "startLength": {
+                    "$ref": "#/$defs/valueGenerator"
+                },
+                "followLocalOrigin": {
+                    "type": "boolean"
+                },
+                "uvFromHead": {
+                    "type": "boolean"
+                },
+                "colorFromParticle": {
+                    "type": "boolean"
+                },
+                "dieWithParticle": {
+                    "type": "boolean"
+                },
+                "recordWorldSpace": {
+                    "type": "boolean"
+                },
+                "sideAxis": {
+                    "$ref": "#/$defs/vec3"
+                },
+                "tessellation": {
+                    "type": "integer",
+                    "minimum": 1
+                },
+                "curveTension": {
+                    "type": "number"
+                },
+                "textureMode": {
+                    "enum": ["stretch", "tile", "repeatPerSegment", "distributePerSegment"]
+                },
+                "textureScale": {
+                    "type": "number"
+                },
+                "minVertexDistance": {
+                    "type": "number",
+                    "minimum": 0
+                },
+                "lifetime": {
+                    "type": "number"
+                }
+            }
+        },
+        "shape": {
+            "type": "object",
+            "required": ["type"],
+            "properties": {
+                "type": {
+                    "type": "string",
+                    "minLength": 1
+                }
+            },
+            "description": "An emitter shape: its type and the fields that differ from that type's defaults. Plugins add types."
+        },
+        "behavior": {
+            "type": "object",
+            "required": ["type"],
+            "properties": {
+                "type": {
+                    "type": "string",
+                    "minLength": 1
+                }
+            },
+            "description": "A behavior: its type and the fields that differ from that type's defaults. Plugins add types."
+        },
+        "bezier": {
+            "type": "object",
+            "required": ["p0", "p1", "p2", "p3"],
+            "additionalProperties": false,
+            "properties": {
+                "p0": {
+                    "type": "number"
+                },
+                "p1": {
+                    "type": "number"
+                },
+                "p2": {
+                    "type": "number"
+                },
+                "p3": {
+                    "type": "number"
+                }
+            }
+        },
+        "piecewiseBezier": {
+            "type": "object",
+            "required": ["type", "functions"],
+            "additionalProperties": false,
+            "properties": {
+                "type": {
+                    "const": "PiecewiseBezier"
+                },
+                "functions": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "required": ["function", "start"],
+                        "additionalProperties": false,
+                        "properties": {
+                            "function": {
+                                "$ref": "#/$defs/bezier"
+                            },
+                            "start": {
+                                "type": "number"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "valueGenerator": {
+            "oneOf": [
+                {
+                    "type": "object",
+                    "required": ["type", "value"],
+                    "additionalProperties": false,
+                    "properties": {
+                        "type": {
+                            "const": "ConstantValue"
+                        },
+                        "value": {
+                            "type": "number"
+                        }
+                    }
+                },
+                {
+                    "type": "object",
+                    "required": ["type", "a", "b"],
+                    "additionalProperties": false,
+                    "properties": {
+                        "type": {
+                            "const": "IntervalValue"
+                        },
+                        "a": {
+                            "type": "number"
+                        },
+                        "b": {
+                            "type": "number"
+                        }
+                    }
+                },
+                {
+                    "$ref": "#/$defs/piecewiseBezier"
+                },
+                {
+                    "type": "object",
+                    "required": ["type", "curve1", "curve2"],
+                    "additionalProperties": false,
+                    "properties": {
+                        "type": {
+                            "const": "RandomBetweenCurves"
+                        },
+                        "curve1": {
+                            "$ref": "#/$defs/piecewiseBezier"
+                        },
+                        "curve2": {
+                            "$ref": "#/$defs/piecewiseBezier"
+                        }
+                    }
+                }
+            ]
+        },
+        "linearFunction": {
+            "type": "object",
+            "required": ["type", "subType", "keys"],
+            "additionalProperties": false,
+            "properties": {
+                "type": {
+                    "const": "CLinearFunction"
+                },
+                "subType": {
+                    "enum": ["Number", "Vector3", "Vector4", "Color"]
+                },
+                "keys": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "required": ["value", "pos"],
+                        "additionalProperties": false,
+                        "properties": {
+                            "value": {
+                                "anyOf": [
+                                    {
+                                        "type": "number"
+                                    },
+                                    {
+                                        "type": "object",
+                                        "additionalProperties": {
+                                            "type": "number"
+                                        }
+                                    }
+                                ]
+                            },
+                            "pos": {
+                                "type": "number"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "gradient": {
+            "type": "object",
+            "required": ["type"],
+            "additionalProperties": false,
+            "properties": {
+                "type": {
+                    "const": "Gradient"
+                },
+                "color": {
+                    "$ref": "#/$defs/linearFunction"
+                },
+                "alpha": {
+                    "$ref": "#/$defs/linearFunction"
+                }
+            }
+        },
+        "colorGenerator": {
+            "oneOf": [
+                {
+                    "type": "object",
+                    "required": ["type", "color"],
+                    "additionalProperties": false,
+                    "properties": {
+                        "type": {
+                            "const": "ConstantColor"
+                        },
+                        "color": {
+                            "$ref": "#/$defs/color"
+                        }
+                    }
+                },
+                {
+                    "type": "object",
+                    "required": ["type", "a", "b"],
+                    "additionalProperties": false,
+                    "properties": {
+                        "type": {
+                            "enum": ["ColorRange", "RandomColor"]
+                        },
+                        "a": {
+                            "$ref": "#/$defs/color"
+                        },
+                        "b": {
+                            "$ref": "#/$defs/color"
+                        }
+                    }
+                },
+                {
+                    "$ref": "#/$defs/gradient"
+                },
+                {
+                    "type": "object",
+                    "required": ["type", "gradient1", "gradient2"],
+                    "additionalProperties": false,
+                    "properties": {
+                        "type": {
+                            "const": "RandomColorBetweenGradient"
+                        },
+                        "gradient1": {
+                            "$ref": "#/$defs/gradient"
+                        },
+                        "gradient2": {
+                            "$ref": "#/$defs/gradient"
+                        }
+                    }
+                }
+            ]
+        },
+        "rotationGenerator": {
+            "oneOf": [
+                {
+                    "type": "object",
+                    "required": ["type", "axis", "angle"],
+                    "additionalProperties": false,
+                    "properties": {
+                        "type": {
+                            "const": "AxisAngle"
+                        },
+                        "axis": {
+                            "$ref": "#/$defs/vector3"
+                        },
+                        "angle": {
+                            "$ref": "#/$defs/valueGenerator"
+                        }
+                    }
+                },
+                {
+                    "type": "object",
+                    "required": ["type", "angleX", "angleY", "angleZ"],
+                    "additionalProperties": false,
+                    "properties": {
+                        "type": {
+                            "const": "Euler"
+                        },
+                        "angleX": {
+                            "$ref": "#/$defs/valueGenerator"
+                        },
+                        "angleY": {
+                            "$ref": "#/$defs/valueGenerator"
+                        },
+                        "angleZ": {
+                            "$ref": "#/$defs/valueGenerator"
+                        },
+                        "eulerOrder": {
+                            "enum": ["XYZ", "XZY", "YXZ", "YZX", "ZXY", "ZYX"]
+                        }
+                    }
+                },
+                {
+                    "type": "object",
+                    "required": ["type"],
+                    "additionalProperties": false,
+                    "properties": {
+                        "type": {
+                            "const": "RandomQuat"
+                        }
+                    }
+                }
+            ]
+        },
+        "vector3Generator": {
+            "type": "object",
+            "required": ["type", "x", "y", "z"],
+            "additionalProperties": false,
+            "properties": {
+                "type": {
+                    "const": "Vector3Function"
+                },
+                "x": {
+                    "$ref": "#/$defs/valueGenerator"
+                },
+                "y": {
+                    "$ref": "#/$defs/valueGenerator"
+                },
+                "z": {
+                    "$ref": "#/$defs/valueGenerator"
+                }
+            }
+        }
+    }
+}

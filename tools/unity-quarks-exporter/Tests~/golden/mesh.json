@@ -59,30 +59,25 @@
       "type": "QuarksMaterial",
       "transparent": false,
       "alphaMode": 0,
-      "blending": 0,
       "depthTest": true,
       "depthWrite": true,
       "alphaTest": 0.3,
-      "texture": "quarks_texture-4",
-      "map": "quarks_texture-4"
+      "texture": "quarks_texture-4"
     },
     {
       "uuid": "quarks_material-8",
       "type": "QuarksMaterial",
       "transparent": true,
       "alphaMode": 2,
-      "blending": 2,
       "depthTest": true,
       "depthWrite": false,
       "alphaTest": 0,
-      "texture": "quarks_texture-7",
-      "map": "quarks_texture-7"
+      "texture": "quarks_texture-7"
     }
   ],
   "textures": [
     {
       "uuid": "quarks_texture-4",
-      "name": "spark",
       "image": "quarks_image-3",
       "wrap": [
         1000,
@@ -91,7 +86,6 @@
     },
     {
       "uuid": "quarks_texture-7",
-      "name": "spark",
       "image": "quarks_image-3",
       "wrap": [
         1000,
@@ -108,7 +102,6 @@
   "object": {
     "uuid": "node-0",
     "name": "Debris",
-    "layers": 1,
     "matrix": [
       2,
       0,
@@ -132,7 +125,6 @@
       {
         "uuid": "node-1",
         "name": "Chunks",
-        "layers": 1,
         "matrix": [
           5.9604645E-08,
           0,
@@ -243,11 +235,7 @@
           "uTileCount": 1,
           "vTileCount": 1,
           "blendTiles": false,
-          "blending": 0,
-          "transparent": false,
-          "depthWrite": true,
           "worldSpace": true,
-          "alphaTest": 0.3,
           "renderFace": "front",
           "scalingMode": "hierarchy",
           "behaviors": [
@@ -285,7 +273,6 @@
       {
         "uuid": "node-2",
         "name": "Dust",
-        "layers": 1,
         "matrix": [
           1,
           0,
@@ -404,9 +391,6 @@
           "uTileCount": 1,
           "vTileCount": 1,
           "blendTiles": false,
-          "blending": 2,
-          "transparent": true,
-          "depthWrite": false,
           "worldSpace": false,
           "behaviors": [
             {

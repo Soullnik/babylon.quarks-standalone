@@ -218,6 +218,7 @@ function main() {
         'dist/babylon.quarks.esm.js',
         'dist/babylon.quarks.cjs',
         'dist/babylon.quarks.umd.min.js',
+        'schema/effect.schema.json',
         'dist/types/index.d.ts',
         'LICENSE',
         'README.md',
