@@ -794,7 +794,10 @@ h3 {
 }
 
 .tile img {
+    display: block;
     width: 100%;
+    max-width: 100%;
+    height: auto;
     aspect-ratio: 16 / 9;
     object-fit: cover;
     border-radius: 10px;
@@ -904,6 +907,15 @@ h3 {
 
     .tile-wide {
         grid-template-columns: minmax(0, 1fr);
+    }
+
+    /* Stacked under its text the picture takes its height from its width. The 100% height of the
+       side-by-side layout would resolve, in Safari, against the whole card rather than the row,
+       and push the picture out of the bottom of the card. */
+    .tile-wide img {
+        height: auto;
+        min-height: 0;
+        aspect-ratio: 16 / 9;
     }
 
     .tile-flip img {
