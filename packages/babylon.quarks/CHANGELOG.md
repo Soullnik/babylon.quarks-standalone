@@ -28,8 +28,14 @@ Phase 9 of the road to 1.0: the file format and the platforms are made ready to 
 - **Effect file schema:** `babylon.quarks/schema/effect.schema.json`, a JSON Schema (draft
   2020-12) of the files this release writes, also published at
   `https://soullnik.github.io/babylon.quarks-standalone/schema/effect-3.schema.json`. A file can
-  name it in `$schema` for editor completion; the loader ignores the field. Tests validate the
-  golden fixtures, the example effects and the Unity exporter's output against it.
+  name it in `$schema` for editor completion; the loader ignores the field. Tests validate effects
+  built in code, the golden fixtures, the example effects and the Unity exporter's golden output
+  against it.
+
+### Fixed
+
+- `serializeEffect` given several roots wrote the group it adds around them with its matrix as an
+  object of numbered keys, not an array. The loader read it, but other tools would not.
 - Golden files saved by every published release from 0.27.0 to 0.30.0, each of which must load as
   the effect it was written from.
 

@@ -502,7 +502,7 @@ export function serializeEffect(
             uuid: `${name}-root`,
             type: 'Group',
             name,
-            matrix: Matrix.Identity().asArray().slice(),
+            matrix: Array.from(Matrix.Identity().asArray()),
             children: root.map((node) => writer.node(node)),
         };
     } else {

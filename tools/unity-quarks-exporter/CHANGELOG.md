@@ -10,8 +10,8 @@ All notable changes to the Unity Quarks Exporter are documented here.
   0.29 and 0.30 read them as they are meant, after a warning that the format is newer.
 - Exports no longer write three.js fields babylon.quarks never read: a material's `blending` and
   `map`, a texture's `name`, a node's `layers`, and a system's `blending`, `transparent`,
-  `depthWrite` and `alphaTest` (the material entry holds them). Exports validate against
-  babylon.quarks' effect schema.
+  `depthWrite` and `alphaTest` (the material entry holds them). The golden exports the
+  tests compare with validate against babylon.quarks' effect schema.
 
 ## [0.30.0] — 2026-10-24
 

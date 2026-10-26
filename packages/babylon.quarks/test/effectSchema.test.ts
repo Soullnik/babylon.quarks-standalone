@@ -5,13 +5,34 @@
  * schema must reject what a reader would warn about.
  */
 import {NullEngine} from '@babylonjs/core/Engines/nullEngine';
+import {StandardMaterial} from '@babylonjs/core/Materials/standardMaterial';
+import {RawTexture} from '@babylonjs/core/Materials/Textures/rawTexture';
+import {Texture} from '@babylonjs/core/Materials/Textures/texture';
+import {Mesh} from '@babylonjs/core/Meshes/mesh';
+import {MeshBuilder} from '@babylonjs/core/Meshes/meshBuilder';
+import {TransformNode} from '@babylonjs/core/Meshes/transformNode';
 import {Scene} from '@babylonjs/core/scene';
 import Ajv2020 from 'ajv/dist/2020';
 import * as fs from 'fs';
 import * as path from 'path';
-import {loadPlugin} from 'quarks.core';
-import {MeshSurfaceEmitterPlugin} from '../src/MeshSurfaceEmitter';
+import {
+    ColorOverLife,
+    ConeEmitter,
+    ConstantValue,
+    EulerGenerator,
+    Gradient,
+    IntervalValue,
+    loadPlugin,
+    PiecewiseBezier,
+    RandomColorBetweenGradient,
+    SizeOverLife,
+    Vector3Function,
+} from 'quarks.core';
+import {RenderMode} from '../src/batchSettings';
+import {MeshSurfaceEmitter, MeshSurfaceEmitterPlugin} from '../src/MeshSurfaceEmitter';
+import {ParticleSystem} from '../src/ParticleSystem';
 import {QuarksLoader} from '../src/QuarksLoader';
+import {QuarksPrefab} from '../src/QuarksPrefab';
 import {QUARKS_FORMAT_VERSION, serializeEffect} from '../src/QuarksSerializer';
 import {settingJSONKey, SETTINGS} from '../src/system/settingsSchema';
 
@@ -75,6 +96,80 @@ describe('effect schema', () => {
             expect(errors(JSON.parse(fs.readFileSync(file, 'utf8')))).toEqual([]);
         }
     );
+
+    it('is published under a name for its format', () => {
+        expect(schema.$id).toMatch(new RegExp(`/effect-${QUARKS_FORMAT_VERSION}\\.schema\\.json$`));
+    });
+
+    describe('validates an effect built in code and saved', () => {
+        const save = (root: TransformNode | TransformNode[]): unknown =>
+            JSON.parse(JSON.stringify(serializeEffect(root, {onWarning: () => {}})));
+        const texture = () => new Texture('https://example.com/a.png', scene);
+
+        it('with a mesh node, its StandardMaterial and diffuse texture', () => {
+            const mesh = MeshBuilder.CreateBox('box', {}, scene);
+            const material = new StandardMaterial('m', scene);
+            material.diffuseTexture = texture();
+            material.alphaCutOff = 0.5;
+            mesh.material = material;
+            expect(errors(save(mesh))).toEqual([]);
+        });
+
+        it('with a mesh node without vertices', () => {
+            expect(errors(save(new Mesh('empty', scene)))).toEqual([]);
+        });
+
+        it('with several roots', () => {
+            const a = new ParticleSystem({scene});
+            const b = new ParticleSystem({scene});
+            expect(errors(save([a.emitter, b.emitter]))).toEqual([]);
+        });
+
+        it.each(Object.values(RenderMode).filter((mode): mode is RenderMode => typeof mode === 'number'))(
+            'in render mode %d, with a texture',
+            (renderMode) => {
+                const system = new ParticleSystem({scene, renderMode, texture: texture()});
+                expect(errors(save(system.emitter))).toEqual([]);
+            }
+        );
+
+        it('with settings off their defaults, behaviors and generators of each kind', () => {
+            const system = new ParticleSystem({
+                scene,
+                seed: 1.5,
+                maxParticles: 100,
+                startRotation: new EulerGenerator(new ConstantValue(1), new IntervalValue(0, 1), new ConstantValue(0)),
+                startSize: new Vector3Function(new ConstantValue(1), new ConstantValue(2), new ConstantValue(3)),
+                startColor: new RandomColorBetweenGradient(new Gradient(), new Gradient()),
+                emissionBursts: [{time: 0, count: new ConstantValue(5), cycle: 3, interval: 0.1, probability: 0.5}],
+                prewarm: true,
+                stopAction: 'destroy',
+                cullingMode: 'pauseAndCatchUp',
+                scalingMode: 'shape',
+                uTileCount: 4,
+                vTileCount: 4,
+                startTileIndex: new IntervalValue(0, 3),
+                worldSpace: true,
+                shape: new ConeEmitter({radius: 2, angle: 0.3}),
+                texture: RawTexture.CreateRGBATexture(new Uint8Array(4), 1, 1, scene),
+            });
+            system.addBehavior(new ColorOverLife(new Gradient()));
+            system.addBehavior(new SizeOverLife(new PiecewiseBezier()));
+            expect(errors(save(system.emitter))).toEqual([]);
+        });
+
+        it('in a prefab, with a particle track, a clip track and a mesh surface shape', () => {
+            const prefab = new QuarksPrefab('fx', scene);
+            const source = MeshBuilder.CreateBox('source', {}, scene);
+            source.isVisible = false;
+            source.parent = prefab;
+            const system = new ParticleSystem({scene, shape: new MeshSurfaceEmitter(source)});
+            system.emitter.parent = prefab;
+            prefab.addParticleSystemAnimation(system.emitter, 0, 1);
+            prefab.addClipAnimation(source, undefined, 0, 1, true, 'clip-1');
+            expect(errors(save(prefab))).toEqual([]);
+        });
+    });
 
     it('names every setting a system writes', () => {
         const named = Object.keys(schema.$defs.particleSystem.properties);

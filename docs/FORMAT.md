@@ -55,8 +55,14 @@ The schema describes what a current writer produces, not everything the loader a
 an older format, three.quarks' fields or an older way of writing a setting is valid to the loader
 and not to the schema. Documents, nodes, systems, materials, textures and curves are closed, so a
 misspelt setting is an error. Shapes and behaviors only need a `type`, since plugins add their
-own. Every file saved by `serializeEffect`, the editor or the Unity exporter must validate; the
-tests check the golden fixtures, the example effects and the exporter's golden output.
+own. A file saved by `serializeEffect` or the editor validates. The tests check effects built in
+code with every kind of node, material and texture, the golden fixtures and example effects as
+saved today, and the Unity exporter's golden output.
+
+Each format version has its own schema URL. When the version goes up, the release that raises it
+adds its upgrade step to `formatMigrations.ts`, copies the old schema to
+`examples/public/schema/effect-<old version>.schema.json` so files that name it keep their checks,
+and raises the schema's `quarksFormat` and `$id`.
 
 ## Nodes
 

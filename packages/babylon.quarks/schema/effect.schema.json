@@ -286,6 +286,10 @@
                 "texture": {
                     "$ref": "#/$defs/uuid"
                 },
+                "map": {
+                    "$ref": "#/$defs/uuid",
+                    "description": "A mesh node material's diffuse texture, as three.js names it; `texture` is read when it is absent."
+                },
                 "reflectionAtlas": {
                     "$ref": "#/$defs/uuid"
                 },
@@ -363,6 +367,10 @@
                             "type": "number"
                         }
                     }
+                },
+                "side": {
+                    "enum": [0, 1, 2],
+                    "description": "A mesh node material's culling, in three.js' numbers: 2, the default, draws both sides; 0 (front) or 1 (back) culls back faces."
                 }
             }
         },
@@ -430,18 +438,6 @@
                     },
                     "then": {
                         "required": ["ps"]
-                    }
-                },
-                {
-                    "if": {
-                        "properties": {
-                            "type": {
-                                "const": "Mesh"
-                            }
-                        }
-                    },
-                    "then": {
-                        "required": ["geometry"]
                     }
                 }
             ]
@@ -559,8 +555,7 @@
                     "$ref": "#/$defs/uuid"
                 },
                 "renderMode": {
-                    "type": "integer",
-                    "minimum": 0,
+                    "enum": [0, 1, 2, 3, 4, 5, 6],
                     "description": "0 billboard, 1 stretched, 2 mesh, 3 trail, 4 horizontal, 5 vertical, 6 beam."
                 },
                 "renderOrder": {
@@ -586,7 +581,7 @@
                     "enum": ["local", "hierarchy", "shape"]
                 },
                 "seed": {
-                    "type": "integer"
+                    "type": "number"
                 },
                 "sortMode": {
                     "enum": ["none", "distance", "oldestInFront", "youngestInFront"]
