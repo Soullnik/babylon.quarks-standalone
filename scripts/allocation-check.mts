@@ -20,7 +20,9 @@
  * Node runs it with `--expose-gc` and a fixed new space large enough that no collection falls in a
  * window of frames within budget; a window that saw one is left out.
  */
+import {FreeCamera} from '@babylonjs/core/Cameras/freeCamera';
 import {NullEngine} from '@babylonjs/core/Engines/nullEngine';
+import {Vector3 as BabylonVector3} from '@babylonjs/core/Maths/math.vector';
 import {Logger} from '@babylonjs/core/Misc/logger';
 import {Scene} from '@babylonjs/core/scene';
 import {PerformanceObserver} from 'node:perf_hooks';
@@ -62,7 +64,7 @@ import {
     WidthOverLength,
 } from 'quarks.core';
 import {BatchedRenderer} from '../packages/babylon.quarks/src/BatchedRenderer';
-import {RenderMode} from '../packages/babylon.quarks/src/batchSettings';
+import {RenderMode, type SortMode} from '../packages/babylon.quarks/src/batchSettings';
 import {ParticleSystem} from '../packages/babylon.quarks/src/ParticleSystem';
 
 /** Bytes a frame may allocate per particle more, between a small and a large system. */
@@ -106,6 +108,7 @@ interface Case {
     renderMode: RenderMode;
     behaviors: () => Behavior[];
     shape?: () => EmitterShape;
+    sortMode?: SortMode;
 }
 
 /** Behaviors measured elsewhere, with the reason. */
@@ -129,6 +132,19 @@ const behaviorCases: Array<[string, () => Behavior, RenderMode?]> = [
     ['InheritVelocity', () => new InheritVelocity(new ConstantValue(0.5), 'current')],
     ['LimitSpeedOverLife', () => new LimitSpeedOverLife(curve(), 0.5)],
     ['Noise', () => new Noise(new ConstantValue(1), new ConstantValue(1), new ConstantValue(1), new ConstantValue(1))],
+    [
+        'Noise',
+        () =>
+            new Noise(
+                new ConstantValue(1),
+                new ConstantValue(1),
+                new ConstantValue(1),
+                new ConstantValue(1),
+                new ConstantValue(0.5),
+                curve()
+            ),
+        RenderMode.Mesh,
+    ],
     ['OrbitOverLife', () => new OrbitOverLife(new ConstantValue(3), new Vector3(0, 1, 0))],
     [
         'Rotation3DOverLife',
@@ -152,7 +168,21 @@ const behaviorCases: Array<[string, () => Behavior, RenderMode?]> = [
             ),
     ],
     ['WidthOverLength', () => new WidthOverLength(curve()), RenderMode.Trail],
+    ['ColorOverLife', () => new ColorOverLife(fade()), RenderMode.Trail],
 ];
+
+/** The behaviors that apply in `renderMode`, all at once, as an effect stacks them. */
+function everyBehavior(renderMode: RenderMode): Behavior[] {
+    const only: Record<string, RenderMode> = {Rotation3DOverLife: RenderMode.Mesh, WidthOverLength: RenderMode.Trail};
+    const seen = new Set<string>();
+    const behaviors: Behavior[] = [];
+    for (const [name, behavior] of behaviorCases) {
+        if (seen.has(name) || (name in only && only[name] !== renderMode)) continue;
+        seen.add(name);
+        behaviors.push(behavior());
+    }
+    return behaviors;
+}
 
 function cases(): Case[] {
     const modes = Object.values(RenderMode).filter((mode): mode is RenderMode => typeof mode === 'number');
@@ -161,6 +191,17 @@ function cases(): Case[] {
             name: `${RenderMode[renderMode]}, no behaviors`,
             renderMode,
             behaviors: () => [],
+        })),
+        ...modes.map((renderMode) => ({
+            name: `${RenderMode[renderMode]}, every behavior`,
+            renderMode,
+            behaviors: () => everyBehavior(renderMode),
+        })),
+        ...(['oldestInFront', 'distance'] as const).map((sortMode) => ({
+            name: `BillBoard, sorted ${sortMode}`,
+            renderMode: RenderMode.BillBoard,
+            behaviors: () => [],
+            sortMode,
         })),
         ...behaviorCases.map(([name, behavior, renderMode = RenderMode.BillBoard]) => ({
             name: `${name}${renderMode === RenderMode.BillBoard ? '' : `, ${RenderMode[renderMode]}`}`,
@@ -174,6 +215,8 @@ const engine = new NullEngine();
 
 function build(testCase: Case, count: number, emitting: boolean) {
     const scene = new Scene(engine);
+    // Sorting by distance sorts from the camera.
+    if (testCase.sortMode !== undefined) new FreeCamera('camera', new BabylonVector3(0, 0, -10), scene);
     const system = new ParticleSystem({
         scene,
         duration: 1,
@@ -196,6 +239,7 @@ function build(testCase: Case, count: number, emitting: boolean) {
               ? {speedFactor: 1, lengthFactor: 1}
               : {}) as never,
         behaviors: testCase.behaviors(),
+        sortMode: testCase.sortMode,
         uTileCount: 4,
         vTileCount: 4,
     });
@@ -227,12 +271,14 @@ async function bytesPerFrame(renderer: BatchedRenderer): Promise<number> {
         for (let i = 0; i < WINDOW_FRAMES; i++) renderer.update(1 / 60);
         const after = process.memoryUsage().heapUsed;
         await settle();
-        if (collections === seen) {
+        // A window a collection ran in, even one the observer has not reported yet and that so
+        // reads as freeing memory, says nothing about what the frames allocated.
+        if (collections === seen && after >= before) {
             least = Math.min(least, (after - before) / WINDOW_FRAMES);
         }
     }
     // Infinity when every window saw a collection: a frame that fills the new space allocates far
-    // past any budget.
+    // past any budget, and the case fails.
     return least;
 }
 
@@ -252,8 +298,8 @@ const fail = (line: string) => {
 };
 
 console.log('Bytes a steady frame allocates\n');
-console.log(`  ${'case'.padEnd(30)} ${'per frame'.padStart(10)} ${'per particle'.padStart(13)}`);
-console.log('  ' + '-'.repeat(55));
+console.log(`  ${'case'.padEnd(34)} ${'per frame'.padStart(10)} ${'per particle'.padStart(13)}`);
+console.log('  ' + '-'.repeat(59));
 const covered = new Set<string>();
 const only = process.argv[2];
 // The engine's code warmed once before any case is measured, so the first is not charged for it.
@@ -263,11 +309,14 @@ for (const testCase of cases()) {
     if (only !== undefined && !testCase.name.startsWith(only)) continue;
     const few = await steady(testCase, FEW);
     const many = await steady(testCase, MANY);
-    const perParticle = Math.max(0, (many.bytes - few.bytes) / (many.particles - few.particles));
+    const perParticle =
+        Number.isFinite(few.bytes) && Number.isFinite(many.bytes)
+            ? Math.max(0, (many.bytes - few.bytes) / (many.particles - few.particles))
+            : Infinity;
     // Both sizes carry the per-frame part; the smaller reading has less of the engine's own
     // tiering in it.
     const perFrame = Math.min(few.bytes, many.bytes);
-    const line = `  ${testCase.name.padEnd(30)} ${perFrame.toFixed(0).padStart(10)} ${perParticle.toFixed(2).padStart(13)}`;
+    const line = `  ${testCase.name.padEnd(34)} ${perFrame.toFixed(0).padStart(10)} ${perParticle.toFixed(2).padStart(13)}`;
     console.log(perParticle > PER_PARTICLE || perFrame > PER_FRAME ? fail(line) : line);
 }
 
@@ -285,8 +334,9 @@ for (const renderMode of [RenderMode.BillBoard, RenderMode.Mesh, RenderMode.Trai
     // What emitting MANY a second allocates more than emitting FEW, per particle emitted.
     const few = await emitting(testCase, FEW);
     const many = await emitting(testCase, MANY);
-    const perSpawn = Math.max(0, (many - few) / ((MANY - FEW) / 60));
-    const line = `  ${testCase.name.padEnd(30)} ${perSpawn.toFixed(0).padStart(10)}`;
+    const perSpawn =
+        Number.isFinite(few) && Number.isFinite(many) ? Math.max(0, (many - few) / ((MANY - FEW) / 60)) : Infinity;
+    const line = `  ${testCase.name.padEnd(34)} ${perSpawn.toFixed(0).padStart(10)}`;
     console.log(perSpawn > PER_SPAWN ? fail(line) : line);
 }
 

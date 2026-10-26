@@ -3420,7 +3420,7 @@ export function trailTextureMode(settings: Partial<TrailOptions> | undefined): T
 // @public
 export function trailTextureScale(settings: Partial<TrailOptions> | undefined): number;
 
-// @public (undocumented)
+// @public
 export class TurbulenceField implements Behavior {
     constructor(
     scale: Vector3Like,

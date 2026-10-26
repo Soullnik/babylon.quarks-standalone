@@ -43,22 +43,31 @@ Phase 9 of the road to 1.0: the file format and the platforms are made ready to 
 
 ### Changed
 
-- **A steady frame allocates nothing per particle**, in every render mode and with every stock
-  behavior, so a large effect no longer hands the garbage collector work in proportion to its
-  size. `npm run check:allocations` measures it in CI.
+- **A steady frame allocates nothing per particle**, so a large effect no longer hands the
+  garbage collector work in proportion to its size. `npm run check:allocations` measures it in CI:
+  each render mode bare and with every stock behavior at once, sorted batches, and each stock
+  behavior on its own (Noise also turning mesh particles through a remap curve, Color over
+  Lifetime also on trails).
   - Batches upload their buffers through kept views, rounded up to whole chunks, instead of a new
-    view of each buffer every frame (about 1.3 KB a frame per batch).
+    view of each buffer every frame (about 1.3 KB a frame per batch). A sorted batch keeps the
+    views of both buffers it swaps between.
   - Noise and Turbulence Field read the simplex field through a typed array instead of passing
     and returning numbers, which the engine boxed: 64 bytes per particle per frame for Noise, and
-    several hundred for Turbulence Field. Noise with a rotation amount no longer reads each
-    particle's angle through its boxed getter.
-  - Force over Lifetime reads its curves from their sampled tables, as Size over Lifetime does,
-    and Color by Speed updates its particles in one loop, as Color over Lifetime does.
+    several hundred for Turbulence Field. Noise turning mesh particles works on the quaternion's
+    values instead of through its view (up to 80 bytes per particle), reads a remap curve from its
+    sampled table, and no longer reads each particle's angle through its boxed getter.
+  - Force over Lifetime reads its curves from their sampled tables, as Size over Lifetime does.
+    Color by Speed reads its gradient from its sampled table and updates its particles in one
+    loop, as Color over Lifetime does: a stepped gradient key is blended over 1/256 of the speed
+    range, as one in Color over Lifetime already is over 1/256 of the lifetime.
   - Emitting a particle still allocates about 250 bytes, most of it the particle's generator
     memory being grown again after it was emptied for reuse.
 
 ### Fixed
 
+- Noise with a rotation amount threw on a trail, whose particles have no rotation: it took them
+  for mesh particles and turned a quaternion they do not have. They now take no turn and still
+  move with the noise.
 - `serializeEffect` given several roots wrote the group it adds around them with its matrix as an
   object of numbered keys, not an array. The loader read it, but other tools would not.
 

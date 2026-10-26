@@ -2470,7 +2470,7 @@ export interface TrailSettings {
 // @public
 export type TrailTextureMode = 'stretch' | 'tile' | 'distributePerSegment' | 'repeatPerSegment';
 
-// @public (undocumented)
+// @public
 export class TurbulenceField implements Behavior {
     constructor(
     scale: Vector3Like,

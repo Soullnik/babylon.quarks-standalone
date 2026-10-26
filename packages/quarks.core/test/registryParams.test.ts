@@ -19,7 +19,7 @@ const OWN_UI: {[type: string]: string[]} = {
  * (a leading or trailing `_`) and scratch values (`temp…`) are left out by name.
  */
 const STATE: {[type: string]: string[]} = {
-    Noise: ['duration', 'scrollOffset', 'scrollMemory'],
+    Noise: ['duration', 'scrollOffset', 'scrollMemory', 'remapTable', 'remapOf'],
     TurbulenceField: ['timeOffset', 'initialOffset', 'generator'],
     FrameOverLife: ['salt'],
     OrbitOverLife: ['rotation'],

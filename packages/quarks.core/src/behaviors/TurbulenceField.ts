@@ -28,6 +28,9 @@ export interface TurbulenceFieldJSON extends BehaviorJSON {
     seed?: number;
 }
 
+/** The point {@link TurbulenceField} samples the field at, and the value there. */
+const point = new Float64Array(4);
+
 /**
  * Push particles around with a turbulent vector field sampled at their
  * position (Unity's Noise module in its Position mode, Niagara's Curl Noise
@@ -47,9 +50,6 @@ export interface TurbulenceFieldJSON extends BehaviorJSON {
  * For each particle wobbling on its own curve instead, or for noise in the
  * rotation, use `Noise`.
  */
-/** The point {@link TurbulenceField} samples the field at, and the value there. */
-const point = new Float64Array(4);
-
 export class TurbulenceField implements Behavior {
     type = 'TurbulenceField';
     /**

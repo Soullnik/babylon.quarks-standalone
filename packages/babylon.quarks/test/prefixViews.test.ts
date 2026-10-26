@@ -37,6 +37,20 @@ describe('PrefixViews', () => {
         expect(views.of(old, 3).buffer).toBe(old.buffer);
     });
 
+    it('keeps the views of both buffers a sorted batch swaps between', () => {
+        const views = new PrefixViews(4);
+        const front = new Float32Array(16);
+        const back = new Float32Array(16);
+        const ofFront = views.of(front, 3);
+        const ofBack = views.of(back, 3);
+        expect(views.of(front, 3)).toBe(ofFront);
+        expect(views.of(back, 3)).toBe(ofBack);
+        // A third buffer replaces the one used longest ago.
+        views.of(new Float32Array(32), 3);
+        expect(views.of(back, 3)).toBe(ofBack);
+        expect(views.of(front, 3)).not.toBe(ofFront);
+    });
+
     it('works on index buffers', () => {
         const indices = new Uint32Array(600);
         const view = new PrefixViews<Uint32Array>().of(indices, 6);
@@ -46,6 +60,10 @@ describe('PrefixViews', () => {
 });
 
 describe('copyPrefix and copyRange', () => {
+    it('throw past the end of the target, as set does', () => {
+        expect(() => copyRange(new Float32Array(4), 2, new Float32Array(8), 1, 5)).toThrow(RangeError);
+    });
+
     const source = Float32Array.from({length: 12}, (_, i) => i + 0.5);
 
     it('copy what set with a subarray copies', () => {
