@@ -23,7 +23,7 @@ import {textureSourceUrl} from './textureSource';
  * reads every earlier version, and files written before the field existed, and warns about a
  * file from a newer version.
  */
-export const QUARKS_FORMAT_VERSION = 2;
+export const QUARKS_FORMAT_VERSION = 3;
 
 /** An image a texture reads: a url, a root-relative path, or a `data:` URI. */
 export interface QuarksImageJSON {

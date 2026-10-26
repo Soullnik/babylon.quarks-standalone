@@ -5,7 +5,7 @@ three.js object layout the format grew from, with quarks' own entries inside it.
 
 ```jsonc
 {
-  "metadata": {"version": 4.5, "type": "Object3D", "generator": "babylon.quarks", "quarksFormat": 1},
+  "metadata": {"version": 4.5, "type": "Object3D", "generator": "babylon.quarks", "quarksFormat": 3},
   "geometries": [],   // QuarksGeometry (inline arrays), BufferGeometry, PlaneGeometry, SphereGeometry
   "materials": [],    // QuarksMaterial for particle systems, MeshBasicMaterial for mesh nodes
   "textures": [],     // a texture: its image and sampler state
@@ -22,7 +22,11 @@ changelog.
 
 - A file **without** `quarksFormat` was written before the field existed (babylon.quarks before
   0.27, three.quarks, the Unity exporter). The loader reads it.
-- A file with an **older** version loads. The readers keep accepting every older form: a burst's
+- A file with an **older** version loads, and means what it meant when it was written. As it is
+  read, it goes through one upgrade step for each later version that changed what a file means
+  (`formatMigrations.ts`), so a file of any version reaches today's meaning, as Unity upgrades an
+  asset an older version wrote. Older ways of writing the same thing are accepted by the readers
+  themselves, since a system's or a behavior's JSON can be read on its own: a burst's
   `cycleCount`, a numeric burst `count` or `startTileIndex`, a Gradient's `functions`, a texture
   sequencer's `{x, y, z}` position, `map` for `texture` on a material, `uv1`/`uv2` attributes.
 - A file with a **newer** version loads with a warning. Settings this version does not know are
@@ -32,11 +36,12 @@ changelog.
 | --- | --- | --- |
 | 1 | 0.27 | First numbered version. `serializeEffect` writes whole documents. |
 | 2 | 0.29 | `scalingMode` defaults to `'local'` with Unity's meaning. A system in an older file reads as `'hierarchy'`, which keeps its look. |
+| 3 | 1.0 | Nothing is written for three.quarks: no `ps.version`, and the start and emission curves and `behaviors` only when they differ from their defaults. A prefab's clip track is `'clip'`; an older file's `'three'` track reads as `'clip'`. babylon.quarks 0.29 and 0.30 read these files as they are meant, after a newer-format warning. |
 
 What older writers produced is checked against real files in `packages/babylon.quarks/test/fixtures`:
-effects written by three.quarks, by the Unity exporter and by babylon.quarks 0.27.0. Each must load,
-save to the format its snapshot holds, and the 0.27.0 files must load as the files they were written
-from.
+effects written by three.quarks, by the Unity exporter, and by each published babylon.quarks from
+0.27.0 on, one save of the same effects per release. Each must load and save to the format its
+snapshot holds, and each release's save must load as the file it was written from.
 
 ## Nodes
 
@@ -55,25 +60,19 @@ matrix is not written.
 | `QuarksPrefab` | `animationData` (each track's `type` is `'ps'`, a particle system, or `'clip'`, a timeline clip; `'three'`, as three.quarks and babylon.quarks before 0.30 write a clip track, reads as `'clip'`), `timeScale` | a `QuarksPrefab` |
 
 A particle system (`ps`) writes each setting only when it differs from the default its constructor
-gives a system that leaves the setting out, and a missing field reads as that default. Its shape, its start
-and emission curves (`startLife`, `startSpeed`, `startRotation`, `startSize`, `startColor`,
-`emissionOverTime`, `emissionOverDistance`, `startTileIndex`), `instancingGeometry`, `material` and
-`behaviors` are always written, because loaders from 0.27 and earlier, and three.quarks, fail on a
-file without them. A curve written as a bare number reads as a constant; a flag written as a number
-reads as true unless it is 0. Files that write every setting, as earlier
-releases did, still load.
+gives a system that leaves the setting out, and a missing field reads as that default. Its shape,
+`instancingGeometry` and `material` are always written; `behaviors` only when there are any. A curve
+written as a bare number reads as a constant; a flag written as a number reads as true unless it is
+0. Files that write every setting, as earlier releases did, still load.
 
 The shape and each behavior write their `type` and each field only when it differs from the default
 the type reads a missing field as (`EmitterToJSON`, `BehaviorToJSON`); a field the type needs, such
-as a behavior's curve, is always written. babylon.quarks 0.27 and later read these files;
-three.quarks and babylon.quarks before 0.27 do not, since they read some fields without a default.
-A shape's or behavior's own `toJSON()` still writes every field.
+as a behavior's curve, is always written. A shape's or behavior's own `toJSON()` still writes every
+field.
 
-`ps.version` (`'3.0'`) is written for three.quarks, which reads it; babylon.quarks does not.
-
-Since 0.30 a prefab's clip tracks are written as `'clip'`, which three.quarks does not know: it skips
-them, as babylon.quarks 0.29 does. Writing for three.quarks is not a goal of the format; reading its
-files is.
+Writing for three.quarks, and for babylon.quarks before 0.28, is not a goal of the format: they read
+some fields without a default, and three.quarks skips a `'clip'` track, as babylon.quarks 0.29 does.
+Reading their files is.
 
 A system's blend mode is its material entry's `alphaMode`, which babylon.quarks always writes. A
 material entry without one, as three.js writes, reads its three.js `blending`, and alpha blending

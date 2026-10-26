@@ -61,11 +61,6 @@ export interface SettingDescriptor {
     get(system: ParticleSystem): unknown;
     /** Whether `value` is what the constructor gives a system that leaves the setting out. */
     isDefault(value: unknown): boolean;
-    /**
-     * Written even when it is the default, because the loaders of releases up to 0.27 fail on a
-     * file without it.
-     */
-    readonly always?: boolean;
     /** The value as JSON. */
     toJSON(value: unknown): unknown;
     /** The constructor parameter for a JSON value that is present; undefined takes the default. */
@@ -126,13 +121,11 @@ function generator<J>(
     param: keyof ParticleSystemParameters,
     get: (system: ParticleSystem) => Generator,
     defaultValue: () => Generator,
-    read: (json: J) => unknown,
-    always = true
+    read: (json: J) => unknown
 ): SettingDescriptor {
     const defaultJSON = JSON.stringify(defaultValue().toJSON());
     return {
         param,
-        always,
         get,
         isDefault: (value) => JSON.stringify((value as Generator).toJSON()) === defaultJSON,
         toJSON: (value) => (value as Generator).toJSON(),
@@ -159,8 +152,7 @@ export const SETTINGS: ReadonlyArray<SettingDescriptor> = [
         'startDelay',
         (s) => s.startDelay,
         () => new ConstantValue(0),
-        ValueGeneratorFromJSON,
-        false
+        ValueGeneratorFromJSON
     ),
     generator(
         'startLife',
@@ -328,7 +320,7 @@ export function settingsToJSON(system: ParticleSystem): Record<string, unknown> 
     const json: Record<string, unknown> = {};
     for (const setting of SETTINGS) {
         const value = setting.get(system);
-        if (setting.always || !setting.isDefault(value)) {
+        if (!setting.isDefault(value)) {
             json[settingJSONKey(setting)] = setting.toJSON(value);
         }
     }

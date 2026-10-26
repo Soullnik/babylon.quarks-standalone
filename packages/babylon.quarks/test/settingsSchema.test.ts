@@ -115,27 +115,10 @@ describe('settings table', () => {
         }
     );
 
-    it('writes only what differs from the defaults, and what older loaders require', () => {
+    it('writes only what differs from the defaults, besides the shape and its references', () => {
         const ps = new ParticleSystem({scene});
         const json = ps.toJSON({geometries: {}, materials: {}, textures: {}});
-        // The loaders of 0.27 and earlier, and three.quarks, read these without a check.
-        expect(Object.keys(json).sort()).toEqual(
-            [
-                'version',
-                'shape',
-                'startLife',
-                'startSpeed',
-                'startRotation',
-                'startSize',
-                'startColor',
-                'emissionOverTime',
-                'emissionOverDistance',
-                'startTileIndex',
-                'instancingGeometry',
-                'material',
-                'behaviors',
-            ].sort()
-        );
+        expect(Object.keys(json).sort()).toEqual(['instancingGeometry', 'material', 'shape']);
         ps.dispose();
     });
 

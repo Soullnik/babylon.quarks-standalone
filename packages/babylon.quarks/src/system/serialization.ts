@@ -161,19 +161,16 @@ export function particleSystemToJSON(
     const materialUUID = materialMeta(system, meta);
     const rendererSettingsJSON = rendererEmitterSettingsJSON(system);
 
-    // Only what differs from the defaults the constructor and fromJSON give a setting left out.
-    // The shape, the settings the table marks `always`, the geometry, the material and the
-    // behaviors list are always written: the loaders of 0.27 and earlier need them. Within the
-    // shape and each behavior, only the fields that differ from their defaults, which 0.27 reads
-    // and three.quarks may not (see docs/FORMAT.md).
+    // Only what differs from the defaults the constructor and fromJSON give a setting left out,
+    // within the shape and each behavior too (see docs/FORMAT.md). The shape and the geometry and
+    // material references are always written.
     return {
-        version: '3.0',
         shape: EmitterToJSON(system.emitterShape),
         ...settingsToJSON(system),
         instancingGeometry: geometryUUID,
         ...(rendererSettingsJSON ? {rendererEmitterSettings: rendererSettingsJSON} : {}),
         material: materialUUID,
-        behaviors: system.behaviors.map((b) => BehaviorToJSON(b, system)),
+        ...(system.behaviors.length > 0 ? {behaviors: system.behaviors.map((b) => BehaviorToJSON(b, system))} : {}),
     };
 }
 

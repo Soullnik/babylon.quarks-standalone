@@ -1,0 +1,485 @@
+{
+    "metadata": {
+        "version": 4.5,
+        "type": "Object3D",
+        "generator": "babylon.quarks",
+        "quarksFormat": 2
+    },
+    "geometries": [
+        {
+            "uuid": "quarks_geometry_1",
+            "type": "QuarksGeometry",
+            "positions": [-0.5, -0.5, 0, 0.5, -0.5, 0, 0.5, 0.5, 0, -0.5, 0.5, 0],
+            "indices": [0, 1, 2, 0, 2, 3],
+            "uvs": [0, 0, 1, 0, 1, 1, 0, 1],
+            "normals": [0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1]
+        }
+    ],
+    "materials": [
+        {
+            "uuid": "quarks_material_3",
+            "type": "QuarksMaterial",
+            "transparent": true,
+            "alphaMode": 2,
+            "depthTest": true,
+            "depthWrite": false,
+            "alphaTest": 0,
+            "texture": "quarks_texture_2",
+            "reflectionLevel": 1
+        },
+        {
+            "uuid": "quarks_material_4",
+            "type": "QuarksMaterial",
+            "transparent": true,
+            "alphaMode": 2,
+            "depthTest": true,
+            "depthWrite": false,
+            "alphaTest": 0,
+            "texture": "quarks_texture_2",
+            "reflectionLevel": 1
+        },
+        {
+            "uuid": "quarks_material_6",
+            "type": "QuarksMaterial",
+            "transparent": true,
+            "alphaMode": 1,
+            "depthTest": true,
+            "depthWrite": false,
+            "alphaTest": 0,
+            "texture": "quarks_texture_5",
+            "reflectionLevel": 1
+        }
+    ],
+    "textures": [
+        {
+            "uuid": "quarks_texture_2",
+            "image": "quarks_image_1",
+            "wrap": [1001, 1001]
+        },
+        {
+            "uuid": "quarks_texture_5",
+            "image": "quarks_image_2",
+            "wrap": [1001, 1001]
+        }
+    ],
+    "images": [
+        {
+            "uuid": "quarks_image_1",
+            "url": "./textures/circle.png"
+        },
+        {
+            "uuid": "quarks_image_2",
+            "url": "./textures/bubble_half_thick.png"
+        }
+    ],
+    "object": {
+        "uuid": "3f4abd90-548d-445e-9f04-5ebed3a67e53",
+        "type": "Group",
+        "name": "AcidBoiling",
+        "matrix": [1, 0, 0, 0, 0, -5.3212485084941363e-8, -1, 0, 0, 1, -5.3212485084941363e-8, 0, 0, 0, 0, 1],
+        "children": [
+            {
+                "uuid": "f01fc129-a495-4ca8-8647-78620737b849",
+                "type": "Group",
+                "name": "SubEmitter",
+                "matrix": [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1],
+                "children": [
+                    {
+                        "uuid": "e3770769-e787-4474-b28f-2ce43a7bc10d",
+                        "type": "ParticleEmitter",
+                        "name": "SubEmitterEmitter",
+                        "matrix": [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1],
+                        "ps": {
+                            "version": "3.0",
+                            "shape": {
+                                "type": "sphere",
+                                "radius": 0.2
+                            },
+                            "duration": 5,
+                            "startLife": {
+                                "type": "IntervalValue",
+                                "a": 0.1,
+                                "b": 0.25
+                            },
+                            "startSpeed": {
+                                "type": "IntervalValue",
+                                "a": 1,
+                                "b": 3
+                            },
+                            "startRotation": {
+                                "type": "ConstantValue",
+                                "value": 0
+                            },
+                            "startSize": {
+                                "type": "IntervalValue",
+                                "a": 0.04,
+                                "b": 0.05
+                            },
+                            "startColor": {
+                                "type": "ConstantColor",
+                                "color": {
+                                    "r": 0.44705883,
+                                    "g": 1,
+                                    "b": 0,
+                                    "a": 1
+                                }
+                            },
+                            "emissionOverTime": {
+                                "type": "ConstantValue",
+                                "value": 0
+                            },
+                            "emissionOverDistance": {
+                                "type": "ConstantValue",
+                                "value": 0
+                            },
+                            "emissionBursts": [
+                                {
+                                    "time": 0,
+                                    "count": {
+                                        "type": "IntervalValue",
+                                        "a": 2,
+                                        "b": 3
+                                    },
+                                    "probability": 1,
+                                    "interval": 0.01,
+                                    "cycle": 1
+                                }
+                            ],
+                            "onlyUsedByOther": true,
+                            "renderMode": 1,
+                            "scalingMode": "hierarchy",
+                            "layers": 1,
+                            "startTileIndex": {
+                                "type": "ConstantValue",
+                                "value": 0
+                            },
+                            "blending": 2,
+                            "worldSpace": true,
+                            "instancingGeometry": "quarks_geometry_1",
+                            "rendererEmitterSettings": {
+                                "speedFactor": 0,
+                                "lengthFactor": 2
+                            },
+                            "material": "quarks_material_3",
+                            "behaviors": [
+                                {
+                                    "type": "ForceOverLife",
+                                    "x": {
+                                        "type": "ConstantValue",
+                                        "value": 0
+                                    },
+                                    "y": {
+                                        "type": "ConstantValue",
+                                        "value": -8.82
+                                    },
+                                    "z": {
+                                        "type": "ConstantValue",
+                                        "value": 0
+                                    }
+                                },
+                                {
+                                    "type": "SizeOverLife",
+                                    "size": {
+                                        "type": "PiecewiseBezier",
+                                        "functions": [
+                                            {
+                                                "function": {
+                                                    "p0": 1,
+                                                    "p1": 1,
+                                                    "p2": 0,
+                                                    "p3": 0
+                                                },
+                                                "start": 0
+                                            }
+                                        ]
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                ]
+            },
+            {
+                "uuid": "3b2aa3f7-a29a-44ab-8eee-163baefb5f47",
+                "type": "Group",
+                "name": "JumpingParticles",
+                "matrix": [1, 0, 0, 0, 0, 1, -2.3841855067985307e-7, 0, 0, 2.3841855067985307e-7, 1, 0, 0, 0, 0, 1],
+                "children": [
+                    {
+                        "uuid": "61de2746-fbf7-4485-af85-323458fcd49d",
+                        "type": "ParticleEmitter",
+                        "name": "JumpingParticlesEmitter",
+                        "matrix": [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1],
+                        "ps": {
+                            "version": "3.0",
+                            "shape": {
+                                "type": "cone",
+                                "radius": 1,
+                                "angle": 0.08726646259971647
+                            },
+                            "startLife": {
+                                "type": "IntervalValue",
+                                "a": 0.3,
+                                "b": 0.6
+                            },
+                            "startSpeed": {
+                                "type": "IntervalValue",
+                                "a": 4,
+                                "b": 8
+                            },
+                            "startRotation": {
+                                "type": "ConstantValue",
+                                "value": 0
+                            },
+                            "startSize": {
+                                "type": "ConstantValue",
+                                "value": 0.04
+                            },
+                            "startColor": {
+                                "type": "ConstantColor",
+                                "color": {
+                                    "r": 1,
+                                    "g": 1,
+                                    "b": 1,
+                                    "a": 1
+                                }
+                            },
+                            "emissionOverTime": {
+                                "type": "ConstantValue",
+                                "value": 40
+                            },
+                            "emissionOverDistance": {
+                                "type": "ConstantValue",
+                                "value": 0
+                            },
+                            "scalingMode": "hierarchy",
+                            "layers": 1,
+                            "startTileIndex": {
+                                "type": "ConstantValue",
+                                "value": 0
+                            },
+                            "blending": 2,
+                            "worldSpace": true,
+                            "instancingGeometry": "quarks_geometry_1",
+                            "material": "quarks_material_4",
+                            "behaviors": [
+                                {
+                                    "type": "ForceOverLife",
+                                    "x": {
+                                        "type": "ConstantValue",
+                                        "value": 0
+                                    },
+                                    "y": {
+                                        "type": "ConstantValue",
+                                        "value": -16.66
+                                    },
+                                    "z": {
+                                        "type": "ConstantValue",
+                                        "value": 0
+                                    }
+                                },
+                                {
+                                    "type": "SizeOverLife",
+                                    "size": {
+                                        "type": "PiecewiseBezier",
+                                        "functions": [
+                                            {
+                                                "function": {
+                                                    "p0": 1,
+                                                    "p1": 1,
+                                                    "p2": 1,
+                                                    "p3": 1
+                                                },
+                                                "start": 0
+                                            },
+                                            {
+                                                "function": {
+                                                    "p0": 1,
+                                                    "p1": 0.6666666649644146,
+                                                    "p2": 0.3333333350355853,
+                                                    "p3": 0
+                                                },
+                                                "start": 0.47603834
+                                            }
+                                        ]
+                                    }
+                                },
+                                {
+                                    "type": "RotationOverLife",
+                                    "angularVelocity": {
+                                        "type": "IntervalValue",
+                                        "a": 7.8539815,
+                                        "b": 18.849556
+                                    }
+                                },
+                                {
+                                    "type": "ColorOverLife",
+                                    "color": {
+                                        "type": "Gradient",
+                                        "color": {
+                                            "type": "CLinearFunction",
+                                            "subType": "Color",
+                                            "keys": [
+                                                {
+                                                    "value": {
+                                                        "r": 1,
+                                                        "g": 1,
+                                                        "b": 1
+                                                    },
+                                                    "pos": 0.21809719996948196
+                                                },
+                                                {
+                                                    "value": {
+                                                        "r": 0,
+                                                        "g": 1,
+                                                        "b": 0.17254902
+                                                    },
+                                                    "pos": 0.835187304493782
+                                                }
+                                            ]
+                                        },
+                                        "alpha": {
+                                            "type": "CLinearFunction",
+                                            "subType": "Number",
+                                            "keys": [
+                                                {
+                                                    "value": 0,
+                                                    "pos": 0
+                                                },
+                                                {
+                                                    "value": 1,
+                                                    "pos": 0.2235294117647059
+                                                },
+                                                {
+                                                    "value": 1,
+                                                    "pos": 0.8348668650339514
+                                                },
+                                                {
+                                                    "value": 0,
+                                                    "pos": 1
+                                                }
+                                            ]
+                                        }
+                                    }
+                                },
+                                {
+                                    "type": "SpeedOverLife",
+                                    "speed": {
+                                        "type": "ConstantValue",
+                                        "value": 1
+                                    }
+                                },
+                                {
+                                    "type": "LimitSpeedOverLife",
+                                    "speed": {
+                                        "type": "ConstantValue",
+                                        "value": 0.6
+                                    },
+                                    "dampen": 0.2
+                                }
+                            ]
+                        }
+                    }
+                ]
+            },
+            {
+                "uuid": "5cfbf971-dfa8-45f8-8667-d86adab808ff",
+                "type": "ParticleEmitter",
+                "name": "AcidBoilingEmitter",
+                "matrix": [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1],
+                "ps": {
+                    "version": "3.0",
+                    "shape": {
+                        "type": "circle",
+                        "radius": 1.5
+                    },
+                    "duration": 5,
+                    "startLife": {
+                        "type": "IntervalValue",
+                        "a": 0.3,
+                        "b": 0.5
+                    },
+                    "startSpeed": {
+                        "type": "ConstantValue",
+                        "value": 0
+                    },
+                    "startRotation": {
+                        "type": "ConstantValue",
+                        "value": 0
+                    },
+                    "startSize": {
+                        "type": "IntervalValue",
+                        "a": 0.4,
+                        "b": 0.6
+                    },
+                    "startColor": {
+                        "type": "ConstantColor",
+                        "color": {
+                            "r": 0,
+                            "g": 1,
+                            "b": 0.007843138,
+                            "a": 1
+                        }
+                    },
+                    "emissionOverTime": {
+                        "type": "ConstantValue",
+                        "value": 20
+                    },
+                    "emissionOverDistance": {
+                        "type": "ConstantValue",
+                        "value": 0
+                    },
+                    "renderMode": 5,
+                    "scalingMode": "hierarchy",
+                    "layers": 1,
+                    "startTileIndex": {
+                        "type": "ConstantValue",
+                        "value": 0
+                    },
+                    "worldSpace": true,
+                    "instancingGeometry": "quarks_geometry_1",
+                    "material": "quarks_material_6",
+                    "behaviors": [
+                        {
+                            "type": "ForceOverLife",
+                            "x": {
+                                "type": "ConstantValue",
+                                "value": 0
+                            },
+                            "y": {
+                                "type": "ConstantValue",
+                                "value": 0
+                            },
+                            "z": {
+                                "type": "ConstantValue",
+                                "value": 0
+                            }
+                        },
+                        {
+                            "type": "SizeOverLife",
+                            "size": {
+                                "type": "PiecewiseBezier",
+                                "functions": [
+                                    {
+                                        "function": {
+                                            "p0": 0,
+                                            "p1": 0,
+                                            "p2": 0.33333333333333337,
+                                            "p3": 1
+                                        },
+                                        "start": 0
+                                    }
+                                ]
+                            }
+                        },
+                        {
+                            "type": "EmitSubParticleSystem",
+                            "subParticleSystem": "e3770769-e787-4474-b28f-2ce43a7bc10d",
+                            "mode": 0
+                        }
+                    ]
+                }
+            }
+        ]
+    }
+}
