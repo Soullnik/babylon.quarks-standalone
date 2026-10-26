@@ -172,15 +172,16 @@ gallery misses a demo.
 
 1. `npm run check` from the repo root.
 2. Update `packages/babylon.quarks/CHANGELOG.md` and bump the version in
-   `packages/babylon.quarks/package.json` (keep the `quarks.core` 0.x line alignment). If the
+   `packages/babylon.quarks/package.json` (`quarks.core` takes the same version). If the
    editor changed too, do the same for `packages/babylon.quarks-editor/CHANGELOG.md` and
    `package.json`.
    - **A new minor moves the editor with it.** The editor imports the library's newest API, so
      its peer dependency on `babylon.quarks` is the library's own minor line, `~X.Y.0`, or the
      prerelease itself (`~1.0.0-rc.1`); bump it with the library's minor and publish the editor in
      the same release. The editor stays on 0.x from babylon.quarks 1.0 on, so it bumps its own
-     minor (0.31 with 1.0) rather than taking the library's version. `npm run check:pack` fails
-     when the peer is out of step.
+     minor (0.31 with 1.0) rather than taking the library's version. Any change to its peer
+     range is a new editor version (0.31.1 with 1.0.0), since npm cannot republish one.
+     `npm run check:pack` fails when the peer is out of step.
    - **The Unity exporter takes every version.** Set the library's version in
      `tools/unity-quarks-exporter/package.json` and `ExporterInfo.Version`
      (`tools/unity-quarks-exporter/Editor/ExporterInfo.cs`), and add a

@@ -2,7 +2,7 @@
 
 All notable changes to the `babylon.quarks` package are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
-and the project follows the `quarks.core` 0.x version line.
+and the package's version moves in lockstep with `quarks.core`.
 
 ## [1.0.0-rc.1] — 2026-10-26
 
@@ -53,10 +53,8 @@ The API is the one 0.30 froze, so code written for 0.30 compiles unchanged. Chec
   name it in `$schema` for editor completion; the loader ignores the field. Tests validate effects
   built in code, the golden fixtures, the example effects and the Unity exporter's golden output
   against it.
-
 - Golden files saved by every published release from 0.27.0 to 0.30.0, each of which must load as
   the effect it was written from.
-
 - **Bundle size budget:** `npm run check:pack` fails when a published bundle grows past its
   gzipped budget in `scripts/size-budget.json` (110 kB for each babylon.quarks bundle, about
   101 kB today), so growth is decided in the PR that causes it.

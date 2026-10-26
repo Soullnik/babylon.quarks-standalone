@@ -76,7 +76,10 @@ jobs:
                   name=$(node -p "require('./packages/babylon.quarks/package.json').name")
                   version=$(node -p "require('./packages/babylon.quarks/package.json').version")
                   if npm view "$name@$version" version >/dev/null 2>&1; then
-                    echo "$name@$version is already published, skipping."
+                    # Still point the tag at it, so a re-run or a release that only bumps the
+                    # other package leaves the tags where this release says.
+                    echo "$name@$version is already published, tagging it $DIST_TAG."
+                    npm dist-tag add "$name@$version" "$DIST_TAG"
                   else
                     npm publish --workspace=babylon.quarks --access public --tag "$DIST_TAG"
                   fi
@@ -86,7 +89,10 @@ jobs:
                   name=$(node -p "require('./packages/babylon.quarks-editor/package.json').name")
                   version=$(node -p "require('./packages/babylon.quarks-editor/package.json').version")
                   if npm view "$name@$version" version >/dev/null 2>&1; then
-                    echo "$name@$version is already published, skipping."
+                    # Still point the tag at it, so a re-run or a release that only bumps the
+                    # other package leaves the tags where this release says.
+                    echo "$name@$version is already published, tagging it $DIST_TAG."
+                    npm dist-tag add "$name@$version" "$DIST_TAG"
                   else
                     npm publish --workspace=babylon.quarks-editor --access public --tag "$DIST_TAG"
                   fi
