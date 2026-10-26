@@ -10,6 +10,7 @@ import {
     Vector3,
 } from 'quarks.core';
 import type {VFXBatchSettings} from '../BatchedRenderer';
+import {copyPrefix} from '../prefixViews';
 import {trailLifetime, trailMinVertexDistance} from '../trailSettings';
 import type {BoundsTracker} from './BoundsTracker';
 import {SIMULATION_STEP} from './SimulationClock';
@@ -56,18 +57,18 @@ export function snapshotPreviousState(
     const vector3Rows = particleCount * 3;
     store.useSizeSnapshot(snapshotSize);
     store.useColorSnapshot(snapshotColor);
-    store.previousPosition.set(store.position.subarray(0, vector3Rows));
+    copyPrefix(store.previousPosition, 0, store.position, vector3Rows);
     if (snapshotSize) {
-        store.previousSize.set(store.size.subarray(0, vector3Rows));
+        copyPrefix(store.previousSize, 0, store.size, vector3Rows);
     }
     if (keepVelocity) {
         if (store.keepPreviousVelocity()) {
             rebind();
         }
-        store.previousVelocity.set(store.velocity.subarray(0, vector3Rows));
+        copyPrefix(store.previousVelocity, 0, store.velocity, vector3Rows);
     }
     if (snapshotColor) {
-        store.previousColor.set(store.color.subarray(0, particleCount * 4));
+        copyPrefix(store.previousColor, 0, store.color, particleCount * 4);
     }
 }
 

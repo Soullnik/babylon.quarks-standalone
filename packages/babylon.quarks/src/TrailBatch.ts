@@ -6,6 +6,7 @@ import {Scene} from '@babylonjs/core/scene';
 import {IParticleSystem, Matrix4, Quaternion, TrailParticle, TrailSettings, Vector3} from 'quarks.core';
 import {VFXBatchSettings} from './BatchedRenderer';
 import type {ParticleSystem} from './ParticleSystem';
+import {copyRange, PrefixViews} from './prefixViews';
 import {shaderProgram} from './shaderProgram';
 import {sheetCell} from './shaders/chunks/sheet';
 import {registerShaders, shaderLanguageFor} from './shaders/shaderLanguageSupport';
@@ -111,6 +112,17 @@ export class TrailBatch extends VFXBatch {
     private indexBuffer!: Uint32Array;
     /** True while the batch is parked on the degenerate draw, see uploadGeometry. */
     private drawsNothing = false;
+    /** The filled start of each geometry buffer, as uploaded; see {@link PrefixViews}. */
+    private readonly uploadViews = {
+        position: new PrefixViews(),
+        uv: new PrefixViews(),
+        uv1: new PrefixViews(),
+        previous: new PrefixViews(),
+        next: new PrefixViews(),
+        width: new PrefixViews(),
+        color: new PrefixViews(),
+        index: new PrefixViews<Uint32Array>(),
+    };
     private previousVB!: VertexBuffer;
     private nextVB!: VertexBuffer;
     private sideVB!: VertexBuffer;
@@ -309,11 +321,11 @@ export class TrailBatch extends VFXBatch {
     private cutLastSegment(drawn: TrailSamples, count: number, perSegment: number, keep: number, swept: boolean): void {
         const first = count - 1 - perSegment;
         const scratch = this.cutScratch_.reserve(perSegment + 1);
-        scratch.position.set(drawn.position.subarray(first * 3, count * 3));
-        scratch.side.set(drawn.side.subarray(first * 3, count * 3));
-        scratch.size.set(drawn.size.subarray(first, count));
-        scratch.color.set(drawn.color.subarray(first * 4, count * 4));
-        scratch.distance.set(drawn.distance.subarray(first, count));
+        copyRange(scratch.position, 0, drawn.position, first * 3, count * 3);
+        copyRange(scratch.side, 0, drawn.side, first * 3, count * 3);
+        copyRange(scratch.size, 0, drawn.size, first, count);
+        copyRange(scratch.color, 0, drawn.color, first * 4, count * 4);
+        copyRange(scratch.distance, 0, drawn.distance, first, count);
         for (let j = 1; j <= perSegment; j++) {
             const at = keep * j;
             const i = Math.min(perSegment - 1, Math.floor(at));
@@ -919,12 +931,15 @@ export class TrailBatch extends VFXBatch {
         const geometry = this.mesh.geometry;
         const indexBuffer = geometry?.getIndexBuffer();
         if (index > 0 && triangles > 0) {
-            // Upload only the vertices written this frame; the buffers are sized for
-            // the high-water mark of every system in the batch.
-            this.mesh.updateVerticesData(VertexBuffer.PositionKind, this.positionBuffer.subarray(0, index * 3));
-            this.mesh.updateVerticesData(VertexBuffer.UVKind, this.uvBuffer.subarray(0, index * 2));
+            // Upload only the vertices written this frame, to the next whole chunk; the buffers are
+            // sized for the high-water mark of every system in the batch.
+            this.mesh.updateVerticesData(
+                VertexBuffer.PositionKind,
+                this.uploadViews.position.of(this.positionBuffer, index * 3)
+            );
+            this.mesh.updateVerticesData(VertexBuffer.UVKind, this.uploadViews.uv.of(this.uvBuffer, index * 2));
             if (this.uv1Buffer) {
-                this.mesh.updateVerticesData(VertexBuffer.UV2Kind, this.uv1Buffer.subarray(0, index * 2));
+                this.mesh.updateVerticesData(VertexBuffer.UV2Kind, this.uploadViews.uv1.of(this.uv1Buffer, index * 2));
             }
             // Straight to the GPU buffer. Going through `mesh.updateIndices` with a
             // range whose length changes every frame makes Babylon copy the
@@ -933,14 +948,18 @@ export class TrailBatch extends VFXBatch {
             if (indexBuffer) {
                 this.scene
                     .getEngine()
-                    .updateDynamicIndexBuffer(indexBuffer, this.indexBuffer.subarray(0, triangles * 3), 0);
+                    .updateDynamicIndexBuffer(
+                        indexBuffer,
+                        this.uploadViews.index.of(this.indexBuffer, triangles * 3),
+                        0
+                    );
             }
-            this.previousVB.update(this.previousBuffer.subarray(0, index * 3));
-            this.nextVB.update(this.nextBuffer.subarray(0, index * 3));
-            this.widthVB.update(this.widthBuffer.subarray(0, index));
+            this.previousVB.update(this.uploadViews.previous.of(this.previousBuffer, index * 3));
+            this.nextVB.update(this.uploadViews.next.of(this.nextBuffer, index * 3));
+            this.widthVB.update(this.uploadViews.width.of(this.widthBuffer, index));
 
             const colorVB = this.mesh.getVertexBuffer(VertexBuffer.ColorKind);
-            if (colorVB) colorVB.update(this.colorBuffer.subarray(0, index * 4));
+            if (colorVB) colorVB.update(this.uploadViews.color.of(this.colorBuffer, index * 4));
 
             if (this.mesh.subMeshes && this.mesh.subMeshes.length > 0) {
                 this.mesh.subMeshes[0].indexCount = triangles * 3;
@@ -961,7 +980,9 @@ export class TrailBatch extends VFXBatch {
             if (!this.drawsNothing) {
                 this.indexBuffer.fill(0, 0, 6);
                 if (indexBuffer) {
-                    this.scene.getEngine().updateDynamicIndexBuffer(indexBuffer, this.indexBuffer.subarray(0, 6), 0);
+                    this.scene
+                        .getEngine()
+                        .updateDynamicIndexBuffer(indexBuffer, this.uploadViews.index.of(this.indexBuffer, 6), 0);
                 }
                 this.drawsNothing = true;
             }

@@ -552,6 +552,8 @@ export class ColorBySpeed implements Behavior {
     type: string;
     // (undocumented)
     update(particle: Particle, delta: number): void;
+    // (undocumented)
+    updateAll(particles: Array<Particle>, count: number, delta: number): void;
 }
 
 // @public

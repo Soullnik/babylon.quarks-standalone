@@ -5,6 +5,7 @@ import {
     ParticleStore,
     Quaternion,
     SpriteParticle,
+    TrailParticle,
     withRandomSource,
 } from '../../src';
 
@@ -81,5 +82,24 @@ describe.each([false, true])('Noise rotation on mesh particles (updateAll: %s)',
             meshNoise.update(mesh, 1 / 60);
         }
         expect(angleOf(mesh.rotation as Quaternion)).toBeCloseTo(Math.abs(sprite.rotation as number), 5);
+    });
+
+    it('leaves a particle with no rotation, as a trail head, unturned, and still moves it', () => {
+        const store = new ParticleStore(1);
+        const trail = new TrailParticle(store, 0);
+        trail.life = 10;
+        const noise = new Noise(new ConstantValue(1), new ConstantValue(1), new ConstantValue(1), new ConstantValue(1));
+        withRandomSource(createSeededRandom(5), () => noise.initialize(trail));
+        for (let i = 1; i <= 10; i++) {
+            trail.age = i / 60;
+            noise.frameUpdate(1 / 60);
+            if (bulk) {
+                noise.updateAll([trail], 1, 1 / 60);
+            } else {
+                noise.update(trail, 1 / 60);
+            }
+        }
+        expect(trail.position.length()).toBeGreaterThan(0);
+        expect(Number.isFinite(trail.position.x)).toBe(true);
     });
 });

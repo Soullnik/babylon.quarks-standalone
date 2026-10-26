@@ -21,6 +21,7 @@ import {VFXBatchSettings} from './BatchedRenderer';
 import {hasSizeLimits, takesPivotAndSizeLimits, tilesSheet} from './batchKey';
 import {gather, sortByKey, SortScratch} from './instanceSort';
 import type {ParticleSystem} from './ParticleSystem';
+import {copyPrefix, PrefixViews} from './prefixViews';
 import {drawsAlongVelocity, shaderProgram} from './shaderProgram';
 import {registerShaders, shaderLanguageFor} from './shaders/shaderLanguageSupport';
 import type {DepthBinding} from './softDepth';
@@ -536,6 +537,15 @@ export class SpriteBatch extends VFXBatch {
     private rotationMat2_ = new Matrix3();
     /** Slot 0 holds the zero-alpha instance since the batch last went empty. */
     private clearedInstanceUploaded = false;
+    /** The filled start of each instance buffer, as uploaded; see {@link PrefixViews}. */
+    private readonly uploadViews = {
+        offset: new PrefixViews(),
+        size: new PrefixViews(),
+        color: new PrefixViews(),
+        uvTile: new PrefixViews(),
+        rotation: new PrefixViews(),
+        velocity: new PrefixViews(),
+    };
 
     /** @internal */
     update(): void {
@@ -624,7 +634,7 @@ export class SpriteBatch extends VFXBatch {
                 if (stepFraction !== 0 && particleNum > 0 && store!.previousColor !== store!.color) {
                     SpriteBatch.continueColor(this.colorBuffer, index * 4, store!, particleNum, stepFraction);
                 } else {
-                    this.colorBuffer.set(store!.color.subarray(0, particleNum * 4), index * 4);
+                    copyPrefix(this.colorBuffer, index * 4, store!.color, particleNum * 4);
                 }
             }
             let copiedPositionAndSize = false;
@@ -632,7 +642,7 @@ export class SpriteBatch extends VFXBatch {
                 if (stepFraction !== 0 && particleNum > 0) {
                     SpriteBatch.extrapolate(this.offsetBuffer, index * 3, store, particleNum, stepFraction);
                 } else {
-                    this.offsetBuffer.set(store.position.subarray(0, particleNum * 3), index * 3);
+                    copyPrefix(this.offsetBuffer, index * 3, store.position, particleNum * 3);
                 }
                 if (stepFraction !== 0 && particleNum > 0 && store.previousSize !== store.size) {
                     SpriteBatch.continueVector3(
@@ -644,7 +654,7 @@ export class SpriteBatch extends VFXBatch {
                         stepFraction
                     );
                 } else {
-                    this.sizeBuffer.set(store.size.subarray(0, particleNum * 3), index * 3);
+                    copyPrefix(this.sizeBuffer, index * 3, store.size, particleNum * 3);
                 }
                 copiedPositionAndSize = true;
             } else if (sharedTransform && particleNum > 0) {
@@ -654,7 +664,7 @@ export class SpriteBatch extends VFXBatch {
                 if (stepFraction !== 0) {
                     SpriteBatch.extrapolate(offsets, base, store!, particleNum, stepFraction);
                 } else {
-                    offsets.set(store!.position.subarray(0, particleNum * 3), base);
+                    copyPrefix(offsets, base, store!.position, particleNum * 3);
                 }
                 const me = emitterMatrix.elements;
                 const m00 = me[0],
@@ -693,7 +703,7 @@ export class SpriteBatch extends VFXBatch {
                         stepFraction
                     );
                 } else {
-                    sizes.set(store!.size.subarray(0, particleNum * 3), base);
+                    copyPrefix(sizes, base, store!.size, particleNum * 3);
                 }
                 for (let o = base; o < end; o += 3) {
                     sizes[o] *= absScaleX;
@@ -710,9 +720,9 @@ export class SpriteBatch extends VFXBatch {
             // carry their own parent transform still need to be visited one by one.
             if (sharedTransform && !isMeshRender) {
                 const columns = store!;
-                this.uvTileBuffer.set(columns.uvTile.subarray(0, particleNum), firstIndex);
+                copyPrefix(this.uvTileBuffer, firstIndex, columns.uvTile, particleNum);
                 const rotations = this.rotationBuffer;
-                rotations.set(columns.rotation.subarray(0, particleNum), firstIndex);
+                copyPrefix(rotations, firstIndex, columns.rotation, particleNum);
                 if (residual !== 0) {
                     // Carry the spin on by the time since the last step, as the
                     // per-particle path does.
@@ -738,7 +748,7 @@ export class SpriteBatch extends VFXBatch {
                 // Meshes rotate by quaternion, kept in the store too: turn them in
                 // bulk, by the emitter's rotation when the system is local.
                 const columns = store!;
-                this.uvTileBuffer.set(columns.uvTile.subarray(0, particleNum), firstIndex);
+                copyPrefix(this.uvTileBuffer, firstIndex, columns.uvTile, particleNum);
                 SpriteBatch.writeQuaternions(
                     this.rotationBuffer,
                     firstIndex * 4,
@@ -900,15 +910,15 @@ export class SpriteBatch extends VFXBatch {
             this.sortInstances(index, isMeshRender, usesVelocity);
         }
 
-        // Upload only the slots actually filled this frame: the buffers are sized
+        // Upload only the slots filled this frame, to the next whole chunk: the buffers are sized
         // for the high-water mark and are usually far larger than the live count.
-        this.offsetVB.update(this.offsetBuffer.subarray(0, index * 3));
-        this.sizeVB.update(this.sizeBuffer.subarray(0, index * 3));
-        this.colorVB.update(this.colorBuffer.subarray(0, index * 4));
-        this.uvTileVB.update(this.uvTileBuffer.subarray(0, index));
-        this.rotationVB.update(this.rotationBuffer.subarray(0, isMeshRender ? index * 4 : index));
+        this.offsetVB.update(this.uploadViews.offset.of(this.offsetBuffer, index * 3));
+        this.sizeVB.update(this.uploadViews.size.of(this.sizeBuffer, index * 3));
+        this.colorVB.update(this.uploadViews.color.of(this.colorBuffer, index * 4));
+        this.uvTileVB.update(this.uploadViews.uvTile.of(this.uvTileBuffer, index));
+        this.rotationVB.update(this.uploadViews.rotation.of(this.rotationBuffer, isMeshRender ? index * 4 : index));
         if (usesVelocity && this.velocityVB && this.velocityBuffer) {
-            this.velocityVB.update(this.velocityBuffer.subarray(0, index * 4));
+            this.velocityVB.update(this.uploadViews.velocity.of(this.velocityBuffer, index * 4));
         }
     }
 
@@ -1192,17 +1202,17 @@ export class SpriteBatch extends VFXBatch {
         this.sizeBuffer[0] = 0;
         this.sizeBuffer[1] = 0;
         this.sizeBuffer[2] = 0;
-        this.colorVB.update(this.colorBuffer.subarray(0, 4));
-        this.sizeVB.update(this.sizeBuffer.subarray(0, 3));
-        this.offsetVB.update(this.offsetBuffer.subarray(0, 3));
-        this.uvTileVB.update(this.uvTileBuffer.subarray(0, 1));
+        this.colorVB.update(this.uploadViews.color.of(this.colorBuffer, 4));
+        this.sizeVB.update(this.uploadViews.size.of(this.sizeBuffer, 3));
+        this.offsetVB.update(this.uploadViews.offset.of(this.offsetBuffer, 3));
+        this.uvTileVB.update(this.uploadViews.uvTile.of(this.uvTileBuffer, 1));
         if (isMeshRender) {
-            this.rotationVB.update(this.rotationBuffer.subarray(0, 4));
+            this.rotationVB.update(this.uploadViews.rotation.of(this.rotationBuffer, 4));
         } else {
-            this.rotationVB.update(this.rotationBuffer.subarray(0, 1));
+            this.rotationVB.update(this.uploadViews.rotation.of(this.rotationBuffer, 1));
         }
         if (isStretchedRender && this.velocityVB && this.velocityBuffer) {
-            this.velocityVB.update(this.velocityBuffer.subarray(0, 4));
+            this.velocityVB.update(this.uploadViews.velocity.of(this.velocityBuffer, 4));
         }
     }
 

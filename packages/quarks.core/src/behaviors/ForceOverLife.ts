@@ -130,6 +130,11 @@ export class ForceOverLife implements Behavior {
     }
 
     frameUpdate(delta: number): void {
+        // A curve read from its table is a few loads, which the update loops can inline; read
+        // through the curve itself, every particle's three calls box their numbers.
+        this.x.refreshTable?.();
+        this.y.refreshTable?.();
+        this.z.refreshTable?.();
         // The frame is only read when the authored space differs from the simulation space.
         if (this.ps !== undefined && this.ps.worldSpace !== (this.space === 'world')) {
             this._frame.refresh(this.ps);
