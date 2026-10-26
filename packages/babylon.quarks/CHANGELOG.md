@@ -13,8 +13,10 @@ Phase 9 of the road to 1.0: the file format and the platforms are made ready to 
 - **Effect files are format 3** (`QUARKS_FORMAT_VERSION`). Nothing is written for three.quarks any
   more: a system no longer writes `version: '3.0'`, and its start and emission curves and
   `behaviors` are written only when they differ from their defaults, as every other setting is.
-  babylon.quarks 0.29 and 0.30 read these files as they are meant, after a warning that the format
-  is newer; three.quarks and babylon.quarks 0.27 and earlier do not read them.
+  babylon.quarks 0.30 reads these files as they are meant, after a warning that the format is
+  newer. 0.29 also skips a prefab's clip tracks, and 0.28 reads a system's Scaling Mode with its
+  older meaning, so a system on the `'local'` default looks different there. three.quarks and
+  babylon.quarks 0.27 and earlier do not read them.
   `ParticleSystemJSONParameters.version` is optional and no longer written.
 
 ### Added

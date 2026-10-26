@@ -2107,7 +2107,8 @@ export class ParticleSystem implements IParticleSystem {
      * Builds a system from {@link toJSON} output, resolving its geometry, material and texture
      * uuids through `meta`. A setting the file leaves out takes the constructor's default; an
      * unknown shape, behavior or curve type warns and takes its default. Sub emitter targets stay
-     * uuids until `QuarksLoader` links them.
+     * uuids until `QuarksLoader` links them. `json` is read with today's meaning: the upgrades a
+     * file of an older format needs are applied by `QuarksLoader` to the whole document, not here.
      */
     static fromJSON(json: ParticleSystemJSONParameters, meta: BabylonMetaData, scene?: Scene): ParticleSystem {
         const ps = new ParticleSystem(particleSystemParametersFromJSON(json, meta, scene));

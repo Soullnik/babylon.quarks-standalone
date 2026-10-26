@@ -36,7 +36,7 @@ changelog.
 | --- | --- | --- |
 | 1 | 0.27 | First numbered version. `serializeEffect` writes whole documents. |
 | 2 | 0.29 | `scalingMode` defaults to `'local'` with Unity's meaning. A system in an older file reads as `'hierarchy'`, which keeps its look. |
-| 3 | 1.0 | Nothing is written for three.quarks: no `ps.version`, and the start and emission curves and `behaviors` only when they differ from their defaults. A prefab's clip track is `'clip'`; an older file's `'three'` track reads as `'clip'`. babylon.quarks 0.29 and 0.30 read these files as they are meant, after a newer-format warning. |
+| 3 | 1.0 | Nothing is written for three.quarks: no `ps.version`, and the start and emission curves and `behaviors` only when they differ from their defaults. A prefab's clip track is `'clip'`; an older file's `'three'` track reads as `'clip'`. babylon.quarks 0.30 reads these files as they are meant, after a newer-format warning; 0.29 also skips a prefab's clip tracks, and 0.28 reads Scaling Mode with its older meaning. |
 
 What older writers produced is checked against real files in `packages/babylon.quarks/test/fixtures`:
 effects written by three.quarks, by the Unity exporter, and by each published babylon.quarks from

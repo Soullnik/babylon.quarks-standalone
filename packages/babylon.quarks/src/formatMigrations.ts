@@ -22,7 +22,8 @@ export const FORMAT_MIGRATIONS: ReadonlyArray<FormatMigration> = [
     {
         // 0.29: Scaling Mode took Unity's meaning, with 'local' as the default. Before it, the
         // emitter's whole world scale reached every system's shape and particle size, and a
-        // local-space system's motion too, which is what 'hierarchy' now does.
+        // local-space system's motion too, which is what 'hierarchy' now does. Any other value is
+        // replaced, as the loader did before this chain: the older modes did not mean today's.
         to: 2,
         node(node) {
             if (node.type === 'ParticleEmitter' && isRecord(node.ps) && node.ps.scalingMode !== 'hierarchy') {

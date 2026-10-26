@@ -7,7 +7,7 @@ All notable changes to the Unity Quarks Exporter are documented here.
 ### Changed
 
 - Exports are format 3: a system no longer writes three.quarks' `version: '3.0'`. babylon.quarks
-  0.29 and 0.30 read them after a warning that the format is newer.
+  0.29 and 0.30 read them as they are meant, after a warning that the format is newer.
 
 ## [0.30.0] — 2026-10-24
 
