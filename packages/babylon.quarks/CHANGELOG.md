@@ -10,6 +10,12 @@ Phase 9 of the road to 1.0: the file format and the platforms are made ready to 
 
 ### Breaking
 
+- **`@babylonjs/core` 9.24 or later.** The peer range was `^9.0.0`, but the library already used
+  Babylon's white balance image processing define, added in 9.24, and the `ALPHA_REPLACE_COLOR`
+  blend mode, added before it. On an older 9.x its types did not compile and those features did
+  nothing.
+  The range is now `^9.24.0`, and CI builds, tests and compiles every shader against 9.24.0 and
+  the latest release.
 - **Effect files are format 3** (`QUARKS_FORMAT_VERSION`). Nothing is written for three.quarks any
   more: a system no longer writes `version: '3.0'`, and its start and emission curves and
   `behaviors` are written only when they differ from their defaults, as every other setting is.

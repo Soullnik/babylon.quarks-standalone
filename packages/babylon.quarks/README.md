@@ -32,9 +32,17 @@ High-performance particle system for [Babylon.js](https://www.babylonjs.com/). B
 npm install babylon.quarks @babylonjs/core
 ```
 
-Peer dependency: `@babylonjs/core` 9.x. The package ships ES module and CommonJS builds;
+Peer dependency: `@babylonjs/core` 9.24 or later in 9.x. CI builds, tests and compiles every
+shader against 9.24.0 and against the latest release. The package ships ES module and CommonJS builds;
 `@babylonjs/core` is ES modules only, so `require('babylon.quarks')` needs a Node that can
 `require` ES modules (20.19 or 22.12 and later). Bundlers and `import` work everywhere.
+
+### Browsers
+
+quarks draws with WebGL2, or with WebGPU where the browser has it (see [WebGPU](#webgpu)): current
+Chrome, Edge, Firefox and Safari (15 and later) all have WebGL2. WebGL1 is not supported. CI
+compiles every shader variant in Chromium, in GLSL on WebGL2 and in WGSL on WebGPU, and opens
+every demo there.
 
 ## Quick start
 
