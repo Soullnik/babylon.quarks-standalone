@@ -146,7 +146,9 @@ function assertConsumersCanImport() {
             const session = await import('babylon.quarks-editor/session');
             if (typeof session.createEditorSession !== 'function') throw new Error('babylon.quarks-editor/session: no createEditorSession');
             const ui = await import('babylon.quarks-editor/react');
-            if (typeof ui.EditorWorkspace !== 'function') throw new Error('babylon.quarks-editor/react: no EditorWorkspace');`;
+            if (typeof ui.EditorWorkspace !== 'function') throw new Error('babylon.quarks-editor/react: no EditorWorkspace');
+            const {default: schema} = await import('babylon.quarks/schema/effect.schema.json', {with: {type: 'json'}});
+            if (typeof schema.$id !== 'string') throw new Error('babylon.quarks/schema/effect.schema.json: no $id');`;
         run(process.execPath, ['--input-type=module', '-e', esm], consumer);
         // @babylonjs/core is ESM-only, so `require` works only where Node can require ES modules.
         if (process.features.require_module) {
