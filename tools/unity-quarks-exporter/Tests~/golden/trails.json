@@ -49,19 +49,16 @@
       "type": "QuarksMaterial",
       "transparent": true,
       "alphaMode": 7,
-      "blending": 7,
       "depthTest": true,
       "depthWrite": false,
       "alphaTest": 0,
-      "texture": "quarks_texture-4",
-      "map": "quarks_texture-4"
+      "texture": "quarks_texture-4"
     },
     {
       "uuid": "quarks_material-8",
       "type": "QuarksMaterial",
       "transparent": true,
       "alphaMode": 3,
-      "blending": 3,
       "depthTest": true,
       "depthWrite": false,
       "alphaTest": 0
@@ -71,18 +68,15 @@
       "type": "QuarksMaterial",
       "transparent": true,
       "alphaMode": 6,
-      "blending": 6,
       "depthTest": true,
       "depthWrite": false,
       "alphaTest": 0,
-      "texture": "quarks_texture-9",
-      "map": "quarks_texture-9"
+      "texture": "quarks_texture-9"
     }
   ],
   "textures": [
     {
       "uuid": "quarks_texture-4",
-      "name": "spark",
       "image": "quarks_image-3",
       "wrap": [
         1000,
@@ -91,7 +85,6 @@
     },
     {
       "uuid": "quarks_texture-9",
-      "name": "spark",
       "image": "quarks_image-3",
       "wrap": [
         1000,
@@ -108,7 +101,6 @@
   "object": {
     "uuid": "node-0",
     "name": "Rocket",
-    "layers": 1,
     "matrix": [
       1,
       0,
@@ -201,9 +193,6 @@
       "uTileCount": 1,
       "vTileCount": 1,
       "blendTiles": false,
-      "blending": 7,
-      "transparent": true,
-      "depthWrite": false,
       "worldSpace": false,
       "stopAction": "disable",
       "behaviors": [
@@ -344,7 +333,6 @@
       {
         "uuid": "node-1",
         "name": "Smoke",
-        "layers": 1,
         "matrix": [
           1,
           0,
@@ -454,9 +442,6 @@
           "uTileCount": 1,
           "vTileCount": 1,
           "blendTiles": false,
-          "blending": 3,
-          "transparent": true,
-          "depthWrite": false,
           "worldSpace": false,
           "scalingMode": "shape",
           "behaviors": [
@@ -671,7 +656,6 @@
       {
         "uuid": "node-2",
         "name": "TrailSparks",
-        "layers": 1,
         "matrix": [
           1,
           0,
@@ -761,9 +745,6 @@
           "uTileCount": 1,
           "vTileCount": 1,
           "blendTiles": false,
-          "blending": 6,
-          "transparent": true,
-          "depthWrite": false,
           "worldSpace": false,
           "behaviors": [
             {
@@ -817,7 +798,6 @@
       {
         "uuid": "node-7",
         "name": "Quad (emitter source)",
-        "layers": 1,
         "matrix": [
           1,
           0,

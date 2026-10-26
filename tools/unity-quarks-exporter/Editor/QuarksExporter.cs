@@ -275,7 +275,6 @@ namespace BabylonQuarks.UnityExporter
             var node = new JObject()
                 .Set("uuid", ctx.GetTransformUuid(t))
                 .Set("name", t.name)
-                .Set("layers", 1)
                 .Set("matrix", LocalMatrix(t));
 
             var ps = t.GetComponent<ParticleSystem>();

@@ -25,8 +25,20 @@ Phase 9 of the road to 1.0: the file format and the platforms are made ready to 
   later version that changed what a file means, as Unity upgrades an asset on import. Format 2's
   step gives a system from before 0.29 the Scaling Mode that keeps its look, which the loader did
   before; format 3's names a prefab's `'three'` track `'clip'` and drops `ps.version`.
+- **Effect file schema:** `babylon.quarks/schema/effect.schema.json`, a JSON Schema (draft
+  2020-12) of the files this release writes, also published at
+  `https://soullnik.github.io/babylon.quarks-standalone/schema/effect-3.schema.json`. A file can
+  name it in `$schema` for editor completion; the loader ignores the field. Tests validate effects
+  built in code, the golden fixtures, the example effects and the Unity exporter's golden output
+  against it.
+
 - Golden files saved by every published release from 0.27.0 to 0.30.0, each of which must load as
   the effect it was written from.
+
+### Fixed
+
+- `serializeEffect` given several roots wrote the group it adds around them with its matrix as an
+  object of numbered keys, not an array. The loader read it, but other tools would not.
 
 ## [0.30.0] — 2026-10-24
 

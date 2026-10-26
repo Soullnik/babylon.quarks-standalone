@@ -43,6 +43,27 @@ effects written by three.quarks, by the Unity exporter, and by each published ba
 0.27.0 on, one save of the same effects per release. Each must load and save to the format its
 snapshot holds, and each release's save must load as the file it was written from.
 
+## Schema
+
+`packages/babylon.quarks/schema/effect.schema.json` is a JSON Schema (draft 2020-12) of the
+files this release writes, shipped in the package as `babylon.quarks/schema/effect.schema.json`
+and published at its `$id`,
+<https://soullnik.github.io/babylon.quarks-standalone/schema/effect-3.schema.json>. A file can
+name it in a top-level `$schema` for an editor's completion and checks; the loader ignores it.
+
+The schema describes what a current writer produces, not everything the loader accepts: a file of
+an older format, three.quarks' fields or an older way of writing a setting is valid to the loader
+and not to the schema. Documents, nodes, systems, materials, textures and curves are closed, so a
+misspelt setting is an error. Shapes and behaviors only need a `type`, since plugins add their
+own. A file saved by `serializeEffect` or the editor validates. The tests check effects built in
+code with every kind of node, material and texture, the golden fixtures and example effects as
+saved today, and the Unity exporter's golden output.
+
+Each format version has its own schema URL. When the version goes up, the release that raises it
+adds its upgrade step to `formatMigrations.ts`, copies the old schema to
+`examples/public/schema/effect-<old version>.schema.json` so files that name it keep their checks,
+and raises the schema's `quarksFormat` and `$id`.
+
 ## Nodes
 
 Every node has a `uuid`, a `type`, a `name` and a local `matrix` (column-major, as Babylon's
