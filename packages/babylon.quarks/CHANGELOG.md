@@ -71,8 +71,8 @@ Phase 9 of the road to 1.0: the file format and the platforms are made ready to 
 
 - **A mesh with a second UV set drew nothing on WebGPU.** A mesh batch bound its position,
   normal, UV and UV2 as four vertex buffers, next to five per-instance ones: nine, and WebGPU
-  allows eight by default, so no pipeline could be made for it and the frame it was in was
-  dropped. A batch's geometry is now one interleaved buffer, bound once: a mesh batch takes at
+  allows eight by default, so no pipeline could be made for it, and the whole frame was dropped,
+  every other effect and the scene with it. A batch's geometry is now one interleaved buffer, bound once: a mesh batch takes at
   most six bindings, and a stretched billboard or beam seven. Found on real hardware with the
   trail surface demo.
 - Noise with a rotation amount threw on a trail, whose particles have no rotation: it took them

@@ -61,7 +61,9 @@ function bindingsOf(renderer: BatchedRenderer, s: ParticleSystem): string[][] {
         const vb = batch.mesh.getVertexBuffer(attribute);
         expect(vb).toBeTruthy();
         const buffer = vb!.getBuffer();
-        if (runs.length > 0 && buffer === last && vb!.byteStride === lastStride) {
+        // Babylon merges a view into the binding before it only when it lies within the stride.
+        const fits = vb!.byteOffset + vb!.getSize(true) <= vb!.byteStride;
+        if (runs.length > 0 && buffer === last && vb!.byteStride === lastStride && fits) {
             runs[runs.length - 1].push(attribute);
         } else {
             runs.push([attribute]);
@@ -140,9 +142,8 @@ describe('vertex buffer bindings', () => {
         const batch = renderer.batches[renderer.systemToBatchIndex.get(s)!] as SpriteBatch;
         const geometry = batch['geometryBuffer'] as {dispose(): void};
         const dispose = jest.spyOn(geometry, 'dispose');
-        renderer.deleteSystem(s);
-        batch.dispose();
-        expect(dispose).toHaveBeenCalled();
+        renderer.dispose();
+        expect(dispose).toHaveBeenCalledTimes(1);
         expect(batch['geometryBuffer']).toBeUndefined();
     });
 });

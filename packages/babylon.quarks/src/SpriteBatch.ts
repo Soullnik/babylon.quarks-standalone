@@ -95,9 +95,9 @@ export class SpriteBatch extends VFXBatch {
         const uvs2 = this.meshUV2() ? this.settings.instancingUVs2! : null;
         // The geometry goes up as one interleaved buffer, position, uv, then normal and the second
         // UV set when the batch has them: one vertex buffer binding instead of up to four. WebGPU
-        // allows 8 by default, and a mesh batch also binds five per-instance buffers (six drawn
-        // along velocity); four geometry buffers took a mesh with a second UV set to 9, and no
-        // pipeline could be made for it.
+        // allows 8 by default, and a batch also binds five per-instance buffers (six drawn along
+        // velocity); four geometry buffers took a mesh with a second UV set to 9, and no pipeline
+        // could be made for it.
         const parts: Array<[string, ArrayLike<number> | null, number]> = [
             [VertexBuffer.PositionKind, positions, 3],
             // WebGL (especially iOS) raises INVALID_OPERATION if the shader reads
