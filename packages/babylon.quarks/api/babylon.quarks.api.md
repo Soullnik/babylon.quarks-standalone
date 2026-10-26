@@ -2160,7 +2160,7 @@ export interface ParticleSystemJSONParameters {
     texture?: string;
     transparent?: boolean;
     uTileCount?: number;
-    version: string;
+    version?: string;
     vTileCount?: number;
     worldSpace?: boolean;
 }
@@ -2334,7 +2334,7 @@ export class PointEmitter implements EmitterShape {
 }
 
 // @public
-export const QUARKS_FORMAT_VERSION = 2;
+export const QUARKS_FORMAT_VERSION = 3;
 
 // @public
 export interface QuarksBatchLoadOptions extends QuarksLoadOptions {

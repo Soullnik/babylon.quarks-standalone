@@ -4,6 +4,30 @@ All notable changes to the `babylon.quarks` package are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project follows the `quarks.core` 0.x version line.
 
+## [1.0.0-rc.1] — Unreleased
+
+Phase 9 of the road to 1.0: the file format and the platforms are made ready to be promised.
+
+### Breaking
+
+- **Effect files are format 3** (`QUARKS_FORMAT_VERSION`). Nothing is written for three.quarks any
+  more: a system no longer writes `version: '3.0'`, and its start and emission curves and
+  `behaviors` are written only when they differ from their defaults, as every other setting is.
+  babylon.quarks 0.30 reads these files as they are meant, after a warning that the format is
+  newer. 0.29 also skips a prefab's clip tracks, and 0.28 reads a system's Scaling Mode with its
+  older meaning, so a system on the `'local'` default looks different there. three.quarks and
+  babylon.quarks 0.27 and earlier do not read them.
+  `ParticleSystemJSONParameters.version` is optional and no longer written.
+
+### Added
+
+- **Format migrations:** a file of an older format is upgraded as it is read, one step for each
+  later version that changed what a file means, as Unity upgrades an asset on import. Format 2's
+  step gives a system from before 0.29 the Scaling Mode that keeps its look, which the loader did
+  before; format 3's names a prefab's `'three'` track `'clip'` and drops `ps.version`.
+- Golden files saved by every published release from 0.27.0 to 0.30.0, each of which must load as
+  the effect it was written from.
+
 ## [0.30.0] — 2026-10-24
 
 Phase 8 of the road to 1.0: the public API is frozen, so 0.30 is the last release that changes it

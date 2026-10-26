@@ -360,14 +360,13 @@ export interface BurstParametersJSON {
  * {@link ParticleSystem.fromJSON} reads it; `docs/FORMAT.md` describes the document around it.
  * Each field mirrors the {@link ParticleSystem} member of the same name. Curves and generators
  * are written as quarks.core's `FunctionJSON`; textures, materials and geometries as uuids into
- * the document. Most settings are written only when they differ from their default, and a field
- * that is missing reads as the default, so every field but `version` is optional. The shape, the
- * start and emission curves except `startDelay`, `startTileIndex`, `instancingGeometry`, `material`
- * and `behaviors` are always written, because older loaders and three.quarks need them.
+ * the document. A setting is written only when it differs from its default, and a field that is
+ * missing reads as the default, so every field is optional. The shape, `instancingGeometry` and
+ * `material` are always written.
  */
 export interface ParticleSystemJSONParameters {
-    /** The quarks.core version line the system was written with. */
-    version: string;
+    /** The three.quarks version line, which files before format 3 wrote. Read by nothing. */
+    version?: string;
     /** Written only when not `'none'`. */
     stopAction?: StopAction;
     /** Read from older files: `true` is `stopAction: 'destroy'`. No longer written. */

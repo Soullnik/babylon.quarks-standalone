@@ -34,6 +34,7 @@ import type {
     SphereGeometryJSON,
 } from './effectDocumentJSON';
 import {disposeEffect, retainEffectResources} from './effectResources';
+import {upgradeEffectNodes} from './formatMigrations';
 import {ensureTriangleIndices} from './geometryUtil';
 import {fileNodeId, setQuarksNodeId} from './nodeId';
 import type {ParticleSystemJSONParameters} from './system/types';
@@ -336,8 +337,6 @@ interface LoadedMeta {
     textures: {[uuid: string]: Texture | null};
     geometries: {[uuid: string]: GeometryArrays};
     materials: {[uuid: string]: QuarksMaterialJSON};
-    /** The file's `quarksFormat`; 0 for a file written before the field existed. */
-    format: number;
 }
 
 /**
@@ -609,8 +608,7 @@ export class QuarksLoader {
         if (!isEffectDocument(document)) {
             throw new QuarksFormatError('[QuarksLoader] Not an effect document: it has no "object" to load.');
         }
-        const json = document;
-        const format = json.metadata?.quarksFormat;
+        const format = document.metadata?.quarksFormat;
         if (typeof format === 'number' && format > QUARKS_FORMAT_VERSION) {
             warnFormat(
                 `This effect was written in format ${format}, newer than the ${QUARKS_FORMAT_VERSION} ` +
@@ -624,8 +622,9 @@ export class QuarksLoader {
             textures: {},
             geometries: {},
             materials: {},
-            format: typeof format === 'number' ? format : 0,
         };
+        // A file from an older format is read as the current one: see formatMigrations.ts.
+        const json = upgradeEffectNodes(document, typeof format === 'number' ? format : 0);
 
         const {geometries, images, textures: textureList, materials} = json;
         if (geometries) {
@@ -1488,12 +1487,6 @@ export class QuarksLoader {
     }
 
     private parseParticleSystem(json: ParticleSystemJSONParameters, meta: LoadedMeta): ParticleSystem {
-        if (meta.format < 2 && json !== null && typeof json === 'object' && json.scalingMode !== 'hierarchy') {
-            // Before format 2 the emitter's whole world scale reached every system's shape and
-            // particle size, and a local-space system's motion too: 'hierarchy' is the mode that
-            // keeps such an effect's look. 'local' became the default with Unity's meaning.
-            json = {...json, scalingMode: 'hierarchy'};
-        }
         const ps = ParticleSystem.fromJSON(json, meta, this.scene);
         if (json?.shape?.type === 'mesh_surface' && typeof json.shape.mesh === 'string') {
             meshSurfaceLinks.set(ps, json.shape.mesh);

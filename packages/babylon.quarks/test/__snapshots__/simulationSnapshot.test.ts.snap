@@ -720,11 +720,6 @@ exports[`seeded simulation snapshot beam keeps its particles, bounds and JSON 1`
       "b": 4,
       "type": "IntervalValue",
     },
-    "startTileIndex": {
-      "type": "ConstantValue",
-      "value": 0,
-    },
-    "version": "3.0",
   },
   "meta": {
     "geometries": {
@@ -1504,11 +1499,6 @@ exports[`seeded simulation snapshot billboard, local space keeps its particles, 
       "b": 4,
       "type": "IntervalValue",
     },
-    "startTileIndex": {
-      "type": "ConstantValue",
-      "value": 0,
-    },
-    "version": "3.0",
   },
   "meta": {
     "geometries": {
@@ -2288,11 +2278,6 @@ exports[`seeded simulation snapshot billboard, world space keeps its particles, 
       "b": 4,
       "type": "IntervalValue",
     },
-    "startTileIndex": {
-      "type": "ConstantValue",
-      "value": 0,
-    },
-    "version": "3.0",
     "worldSpace": true,
   },
   "meta": {
@@ -3141,10 +3126,6 @@ exports[`seeded simulation snapshot mesh keeps its particles, bounds and JSON 1`
       "b": 1.4,
       "type": "IntervalValue",
     },
-    "startRotation": {
-      "type": "ConstantValue",
-      "value": 0,
-    },
     "startSize": {
       "a": 0.2,
       "b": 0.6,
@@ -3155,11 +3136,6 @@ exports[`seeded simulation snapshot mesh keeps its particles, bounds and JSON 1`
       "b": 4,
       "type": "IntervalValue",
     },
-    "startTileIndex": {
-      "type": "ConstantValue",
-      "value": 0,
-    },
-    "version": "3.0",
     "worldSpace": true,
   },
   "meta": {
@@ -3958,11 +3934,6 @@ exports[`seeded simulation snapshot stretched billboard keeps its particles, bou
       "b": 4,
       "type": "IntervalValue",
     },
-    "startTileIndex": {
-      "type": "ConstantValue",
-      "value": 0,
-    },
-    "version": "3.0",
     "worldSpace": true,
   },
   "meta": {
@@ -4795,11 +4766,6 @@ exports[`seeded simulation snapshot trail keeps its particles, bounds and JSON 1
       "b": 4,
       "type": "IntervalValue",
     },
-    "startTileIndex": {
-      "type": "ConstantValue",
-      "value": 0,
-    },
-    "version": "3.0",
     "worldSpace": true,
   },
   "meta": {

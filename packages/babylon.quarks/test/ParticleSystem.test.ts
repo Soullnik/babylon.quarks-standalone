@@ -242,7 +242,8 @@ describe('ParticleSystem', () => {
 
         const meta = emptyMeta();
         const json = ps.toJSON(meta);
-        expect(json.version).toBe('3.0');
+        // three.quarks' version line is no longer written.
+        expect(json.version).toBeUndefined();
         expect(json.prewarm).toBe(true);
         expect(json.material).toBeDefined();
         expect(json.instancingGeometry).toBeDefined();
@@ -910,7 +911,7 @@ describe('ParticleSystem', () => {
         ps['rendererSettings'] = saved;
     });
 
-    it('toJSON with string root meta id and texture still emits version 3 payload', () => {
+    it('toJSON with string root meta id and texture writes the material reference', () => {
         const tex = RawTexture.CreateRGBTexture(new Uint8Array([255, 255, 255, 255]), 1, 1, scene);
         const ps = new ParticleSystem({
             scene,
@@ -919,7 +920,7 @@ describe('ParticleSystem', () => {
             texture: tex,
         });
         const json = ps.toJSON('bundle-root');
-        expect(json.version).toBe('3.0');
+        expect(json.material).toBeDefined();
         tex.dispose();
     });
 

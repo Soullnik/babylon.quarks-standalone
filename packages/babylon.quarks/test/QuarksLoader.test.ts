@@ -1465,6 +1465,28 @@ describe('QuarksLoader documents', () => {
         object: {uuid: 'm', type: 'Mesh', geometry: 'geo', material: 'mat'},
     });
 
+    // An older file is upgraded as it is read (formatMigrations.ts), without changing the object given.
+    it.each([
+        [undefined, 'hierarchy'],
+        [1, 'hierarchy'],
+        [2, 'local'],
+        [3, 'local'],
+    ])('reads a system of format %s with the Scaling Mode it was written for', (quarksFormat, expected) => {
+        const document = {
+            ...(quarksFormat === undefined ? {} : {metadata: {quarksFormat}}),
+            object: {
+                uuid: 'e',
+                type: 'ParticleEmitter',
+                ps: {version: '3.0', shape: {type: 'point'}, emissionOverTime: {type: 'ConstantValue', value: 0}},
+            },
+        };
+        const before = JSON.stringify(document);
+        const root = new QuarksLoader(scene).parse(document) as ParticleEmitter;
+        expect((root.system as ParticleSystem).scalingMode).toBe(expected);
+        expect(JSON.stringify(document)).toBe(before);
+        QuarksLoader.disposeEffect(root);
+    });
+
     it("does not read one document's images for the next", () => {
         const loader = new QuarksLoader(scene);
         const first = loader.parse(textured([{uuid: 'img', url: 'https://example.com/a.png'}])) as Mesh;

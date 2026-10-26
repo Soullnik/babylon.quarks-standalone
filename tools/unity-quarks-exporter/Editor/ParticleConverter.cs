@@ -45,7 +45,6 @@ namespace BabylonQuarks.UnityExporter
             JToken startLife = AvoidKnifeEdgeLifetime(main.startLifetime, ps.emission);
 
             var obj = new JObject()
-                .Set("version", "3.0")
                 .Set("looping", main.loop)
                 .Set("prewarm", main.prewarm)
                 .Set("duration", main.duration)
