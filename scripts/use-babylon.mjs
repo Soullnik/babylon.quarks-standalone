@@ -18,28 +18,32 @@ const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
 const readJSON = (path) => JSON.parse(readFileSync(path, 'utf8'));
 
 const rootPackage = readJSON(join(repoRoot, 'package.json'));
-// Workspaces are `dir` or `dir/*`.
-const workspaces = rootPackage.workspaces.flatMap((pattern) =>
-    pattern.endsWith('/*')
-        ? readdirSync(join(repoRoot, pattern.slice(0, -2))).map((name) => join(pattern.slice(0, -2), name))
-        : [pattern]
-);
+// Workspaces are `dir` or `dir/*`; any other pattern would leave a workspace on its own range.
+const workspaces = rootPackage.workspaces.flatMap((pattern) => {
+    const dir = pattern.endsWith('/*') ? pattern.slice(0, -2) : pattern;
+    if (/[*!?{[]/.test(dir)) {
+        throw new Error(`Workspace pattern "${pattern}" is not one this script expands; add it here.`);
+    }
+    return pattern.endsWith('/*') ? readdirSync(join(repoRoot, dir)).map((name) => join(dir, name)) : [dir];
+});
 const manifests = ['package.json', ...workspaces.map((workspace) => join(workspace, 'package.json'))].filter(
     (manifest) => existsSync(join(repoRoot, manifest))
 );
 
+const published = (name) => JSON.parse(execSync(`npm view ${name} versions --json`, {encoding: 'utf8'}));
+
+// `lowest` and `latest` are the ends of the peer range, not npm's dist-tag: a new major Babylon
+// tagged `latest` is outside the range until the range says otherwise.
 function resolveVersion(request) {
+    const peer = readJSON(join(repoRoot, 'packages/babylon.quarks/package.json')).peerDependencies['@babylonjs/core'];
     if (request === 'lowest') {
-        const peer = readJSON(join(repoRoot, 'packages/babylon.quarks/package.json')).peerDependencies[
-            '@babylonjs/core'
-        ];
         return semver.minVersion(peer).version;
     }
     if (request === 'latest') {
-        return execSync('npm view @babylonjs/core@latest version', {encoding: 'utf8'}).trim();
+        return semver.maxSatisfying(published('@babylonjs/core'), peer);
     }
-    if (!semver.valid(request)) {
-        throw new Error(`Expected "lowest", "latest" or a version, got "${request ?? ''}".`);
+    if (!semver.valid(request) || semver.prerelease(request)) {
+        throw new Error(`Expected "lowest", "latest" or a release version, got "${request ?? ''}".`);
     }
     return request;
 }
@@ -51,8 +55,7 @@ const version = resolveVersion(process.argv[2]);
 const versions = new Map();
 function versionOf(name) {
     if (!versions.has(name)) {
-        const published = JSON.parse(execSync(`npm view ${name} versions --json`, {encoding: 'utf8'}));
-        const match = semver.maxSatisfying(published, `>=${semver.major(version)}.0.0 <=${version}`);
+        const match = semver.maxSatisfying(published(name), `>=${semver.major(version)}.0.0 <=${version}`);
         if (!match) {
             throw new Error(`${name} has no release up to ${version} in its major.`);
         }
@@ -96,7 +99,18 @@ writeFileSync(lockPath, `${JSON.stringify(lock, null, 4)}\n`);
 
 console.log(`Installing ${[...versions].map(([name, v]) => `${name}@${v}`).join(', ')}.`);
 execSync('npm install --no-audit --no-fund', {cwd: repoRoot, stdio: 'inherit'});
-const installed = readJSON(join(repoRoot, 'node_modules/@babylonjs/core/package.json')).version;
-if (installed !== version) {
-    throw new Error(`Installed @babylonjs/core ${installed}, expected ${version}.`);
+
+// One copy of each package, at its pin: two Babylons in one build is what this script prevents.
+for (const [name, expected] of versions) {
+    const found = new Set();
+    const walk = (node) => {
+        for (const [dependency, child] of Object.entries(node.dependencies ?? {})) {
+            if (dependency === name && child.version) found.add(child.version);
+            walk(child);
+        }
+    };
+    walk(JSON.parse(execSync(`npm ls ${name} --all --json`, {cwd: repoRoot, encoding: 'utf8'})));
+    if (found.size !== 1 || !found.has(expected)) {
+        throw new Error(`Installed ${name} ${[...found].join(', ') || 'nowhere'}, expected ${expected} only.`);
+    }
 }

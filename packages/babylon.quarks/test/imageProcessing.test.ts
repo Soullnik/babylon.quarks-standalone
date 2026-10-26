@@ -30,7 +30,7 @@ beforeEach(() => {
     scene = new Scene(engine);
     // The scene's default material follows the configuration too. Some Babylon releases make it the
     // first time a batch's material is marked dirty, so it is made here, before observers are counted.
-    expect(scene.defaultMaterial).toBeDefined();
+    void scene.defaultMaterial;
 });
 
 afterEach(() => {

@@ -40,9 +40,10 @@ shader against 9.24.0 and against the latest release. The package ships ES modul
 ### Browsers
 
 quarks draws with WebGL2, or with WebGPU where the browser has it (see [WebGPU](#webgpu)): current
-Chrome, Edge, Firefox and Safari (15 and later) all have WebGL2. WebGL1 is not supported. CI
-compiles every shader variant in Chromium, in GLSL on WebGL2 and in WGSL on WebGPU, and opens
-every demo there.
+Chrome, Edge, Firefox and Safari (15 and later) all have WebGL2. WebGL1 is not supported: Babylon.js
+falls back to it where WebGL2 is missing, and quarks' shaders do not compile there. CI compiles
+every shader variant in Chromium, in GLSL on WebGL2 and in WGSL on WebGPU, and opens every demo in
+Chromium on WebGL2.
 
 ## Quick start
 
