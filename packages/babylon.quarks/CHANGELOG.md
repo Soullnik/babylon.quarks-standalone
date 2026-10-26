@@ -4,9 +4,25 @@ All notable changes to the `babylon.quarks` package are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project follows the `quarks.core` 0.x version line.
 
-## [1.0.0-rc.1] — Unreleased
+## [1.0.0-rc.1] — 2026-10-26
 
-Phase 9 of the road to 1.0: the file format and the platforms are made ready to be promised.
+Phase 9 of the road to 1.0: the file format and the platforms are made ready to be promised. This
+is the release candidate for 1.0.0, published on npm's `next` tag (`npm install babylon.quarks@next`)
+while `latest` stays on 0.30.0. What 1.0 freezes, the API, the file format and the look of an
+effect, is as it will be in 1.0.0 unless the feedback on this candidate shows a mistake.
+
+### Upgrading from 0.30
+
+The API is the one 0.30 froze, so code written for 0.30 compiles unchanged. Check these:
+
+1. **Babylon.js:** `@babylonjs/core` 9.24 or later (and `@babylonjs/materials` 9.23 or later for
+   the editor). The library already needed it; the peer range now says so.
+2. **Files:** files from 0.30 and earlier load as they are, and are upgraded as they are read.
+   Files this release writes are format 3: 0.30 reads them after a warning, but 0.29 skips a
+   prefab's clip tracks and 0.28 reads a `'local'` Scaling Mode with its older meaning, so do not
+   hand them to a runtime older than 0.30.
+3. **Versions:** install `babylon.quarks-editor@next` (0.31.0) with `babylon.quarks@next`. The
+   Unity exporter 1.0.0-rc.1 writes format 3; files from the 0.30 exporter load as they are.
 
 ### Breaking
 
