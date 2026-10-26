@@ -32,12 +32,13 @@ Phase 9 of the road to 1.0: the file format and the platforms are made ready to 
   built in code, the golden fixtures, the example effects and the Unity exporter's golden output
   against it.
 
+- Golden files saved by every published release from 0.27.0 to 0.30.0, each of which must load as
+  the effect it was written from.
+
 ### Fixed
 
 - `serializeEffect` given several roots wrote the group it adds around them with its matrix as an
   object of numbered keys, not an array. The loader read it, but other tools would not.
-- Golden files saved by every published release from 0.27.0 to 0.30.0, each of which must load as
-  the effect it was written from.
 
 ## [0.30.0] — 2026-10-24
 
