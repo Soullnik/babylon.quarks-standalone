@@ -73,7 +73,7 @@
     },
     "homepage": "https://github.com/Soullnik/babylon.quarks-standalone#readme",
     "peerDependencies": {
-        "@babylonjs/core": "^9.0.0"
+        "@babylonjs/core": "^9.24.0"
     },
     "devDependencies": {
         "@babylonjs/core": "^9.31.0",

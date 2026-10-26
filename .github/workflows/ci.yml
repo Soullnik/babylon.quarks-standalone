@@ -175,6 +175,68 @@ jobs:
                   for i in $(seq 1 60); do curl -sf http://127.0.0.1:3010/ >/dev/null && break; sleep 1; done
                   npm run validate:shaders
 
+    # The library built, typechecked, tested and every shader variant compiled against the lowest
+    # Babylon.js release its peer range admits and against the newest one, so the range in
+    # package.json is one that was tried. The other jobs use the locked version. `latest` is the
+    # newest release in the peer range; a new Babylon.js release can turn it red on a PR that did
+    # not change anything it touches, so that leg reports without blocking, and is fixed on its own.
+    babylon:
+        name: Babylon.js ${{ matrix.babylon }}
+        runs-on: ubuntu-latest
+        timeout-minutes: 30
+        continue-on-error: ${{ matrix.babylon == 'latest' }}
+        strategy:
+            fail-fast: false
+            matrix:
+                babylon: [lowest, latest]
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v7
+
+            - name: Setup Node.js
+              uses: actions/setup-node@v7
+              with:
+                  node-version-file: .nvmrc
+                  cache: npm
+
+            - name: Install dependencies
+              run: npm ci
+
+            - name: Install Babylon.js ${{ matrix.babylon }}
+              run: node scripts/use-babylon.mjs ${{ matrix.babylon }}
+
+            - name: Build packages
+              run: npm run build && npm run build:editor
+
+            - name: Typecheck sources and tests
+              run: npm run typecheck
+
+            - name: Run tests
+              run: npx jest
+
+            - name: Build examples
+              run: npm run build:examples
+
+            - name: Read Playwright version
+              id: playwright
+              run: echo "version=$(node -p "require('playwright/package.json').version")" >> "$GITHUB_OUTPUT"
+
+            - name: Cache Playwright browsers
+              uses: actions/cache@v6
+              with:
+                  path: ~/.cache/ms-playwright
+                  key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}-chromium-headless-shell
+
+            # The runner image already has the headless shell's system libraries.
+            - name: Install Chromium for the shader compile
+              run: npx playwright install --only-shell chromium
+
+            - name: Compile every shader variant
+              run: |
+                  npm run preview -w examples -- --host 127.0.0.1 --port 3010 --strictPort &
+                  for i in $(seq 1 60); do curl -sf http://127.0.0.1:3010/ >/dev/null && break; sleep 1; done
+                  npm run validate:shaders
+
     # Pages build only on main / manual dispatch. The docs are written into examples/dist, so they
     # are built after the examples.
     pages:

@@ -57,8 +57,8 @@
     },
     "homepage": "https://github.com/Soullnik/babylon.quarks-standalone#readme",
     "peerDependencies": {
-        "@babylonjs/core": "^9.0.0",
-        "@babylonjs/materials": "^9.0.0",
+        "@babylonjs/core": "^9.24.0",
+        "@babylonjs/materials": "^9.23.0",
         "@heroicons/react": ">=2.0.0",
         "@tanstack/react-virtual": ">=3.0.0",
         "babylon.quarks": "~0.30.0",

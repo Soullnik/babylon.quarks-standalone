@@ -69,6 +69,12 @@ npm run check:demos                            # every demo in headless Chromium
 npm run validate:shaders                       # every shader variant, GLSL and WGSL, through a real compiler (CI runs it)
 ```
 
+CI also runs the build, typecheck, tests and shader compile against the lowest Babylon.js release
+the `@babylonjs/core` peer range admits and against the latest one. To do the same locally, run
+`node scripts/use-babylon.mjs lowest` (or `latest`, or a version) and the checks; the script
+rewrites the package files and the lockfile, so restore them with `git checkout` afterwards. When a
+change needs a newer Babylon.js, raise the peer ranges of babylon.quarks and the editor with it.
+
 The last two need the examples served on port 3010 (`npm run dev -w examples`, or
 `npm run build:examples && npm run preview -w examples` for what CI runs) and a Chromium: Playwright's
 own (`npx playwright install chromium`) or one named in `CHROMIUM_PATH`. `validate:shaders` needs no GPU:
