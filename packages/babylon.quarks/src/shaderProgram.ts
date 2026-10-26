@@ -129,8 +129,12 @@ export interface ShaderProgram {
     samplers: string[];
 }
 
-/** The vertex attributes every sprite shader reads. */
-const SPRITE_ATTRIBUTES = ['position', 'uv', 'offset', 'color', 'size', 'rotation', 'uvTile'];
+/**
+ * The per-instance vertex attributes the sprite shaders read. They follow the geometry's: a batch's
+ * geometry is one interleaved buffer, which WebGPU binds once only when its attributes come one
+ * after another.
+ */
+const SPRITE_INSTANCE_ATTRIBUTES = ['offset', 'color', 'size', 'rotation', 'uvTile'];
 /** The vertex attributes the trail shader reads. */
 const TRAIL_ATTRIBUTES = ['position', 'previous', 'next', 'side', 'width', 'uv', 'color'];
 /** The fog uniforms, declared on every material so a scene can turn its fog on without a recompile. */
@@ -268,7 +272,15 @@ function spriteShaderProgram(settings: ShaderSettings, context: ShaderContext): 
     }
 
     const defines = blendDefines(settings);
-    const attributes = [...SPRITE_ATTRIBUTES];
+    // The geometry's attributes first, in the order of its interleaved buffer.
+    const attributes = ['position', 'uv'];
+    if (isMesh) {
+        attributes.push('normal');
+        if (readsUV1(settings) && context.meshUV2) {
+            attributes.push('uv2');
+        }
+    }
+    attributes.push(...SPRITE_INSTANCE_ATTRIBUTES);
     const uniforms = ['world', 'view', 'projection', ...FOG_UNIFORMS];
     const samplers: string[] = [];
 
@@ -332,12 +344,8 @@ function spriteShaderProgram(settings: ShaderSettings, context: ShaderContext): 
     }
     surfaceDefines(settings, defines, uniforms, samplers);
     imageProcessingDefines(settings, context, defines, uniforms, samplers);
-    if (isMesh) {
-        attributes.push('normal');
-        if (readsUV1(settings) && context.meshUV2) {
-            defines.push('MESH_UV2');
-            attributes.push('uv2');
-        }
+    if (isMesh && readsUV1(settings) && context.meshUV2) {
+        defines.push('MESH_UV2');
     }
     if (drawsAlongVelocity(renderMode)) {
         attributes.push('velocity');

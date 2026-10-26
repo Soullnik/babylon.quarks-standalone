@@ -4,6 +4,7 @@ import type {Scene} from '@babylonjs/core/scene';
 import type {GeometryData} from 'babylon.quarks-editor/react';
 import {QuarksEditorWorkspace, QuarksEffectEditor} from 'babylon.quarks-editor/react';
 import {SHARED_ASSETS, createSharedTexture} from './shared/common';
+import {createEngineFromQuery} from './shared/engineFactory';
 import './shared/loaders';
 
 /** ?effect=session reads a JSON stashed by the demo viewer's "Open in editor" button. */
@@ -61,6 +62,8 @@ const editorProps = {
     ],
     resolveTexture: (url: string, scene: Scene) => createSharedTexture(scene, url),
     resolveGeometry: loadGeometryFromFile,
+    // ?engine=webgpu draws the preview with WebGPU, as on the demo pages.
+    createEngine: createEngineFromQuery,
     // Debug/testing hook: lets the console (and smoke tests) reach the live binding.
     onReady: (handle: unknown) => {
         (window as never as {__quarksEditor: unknown}).__quarksEditor = handle;
