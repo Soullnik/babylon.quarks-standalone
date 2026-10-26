@@ -348,6 +348,8 @@ export class ColorBySpeed implements Behavior {
     type: string;
     // (undocumented)
     update(particle: Particle, delta: number): void;
+    // (undocumented)
+    updateAll(particles: Array<Particle>, count: number, delta: number): void;
 }
 
 // @public
@@ -2468,7 +2470,7 @@ export interface TrailSettings {
 // @public
 export type TrailTextureMode = 'stretch' | 'tile' | 'distributePerSegment' | 'repeatPerSegment';
 
-// @public
+// @public (undocumented)
 export class TurbulenceField implements Behavior {
     constructor(
     scale: Vector3Like,

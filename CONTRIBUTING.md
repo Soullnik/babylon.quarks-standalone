@@ -67,6 +67,7 @@ npm run docs                                   # TypeDoc API docs
 npm run docs:check                             # renders the API docs of quarks.core and babylon.quarks; fails on a missing TSDoc or broken {@link} (CI runs it)
 npm run check:demos                            # every demo in headless Chromium, fails on page/console errors or a missing gallery preview
 npm run validate:shaders                       # every shader variant, GLSL and WGSL, through a real compiler (CI runs it)
+npm run check:allocations                      # what a steady frame allocates, per render mode and behavior; nothing per particle (CI runs it)
 ```
 
 CI also runs the build, typecheck, tests and shader compile against the lowest Babylon.js release

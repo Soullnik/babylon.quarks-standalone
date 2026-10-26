@@ -41,6 +41,22 @@ Phase 9 of the road to 1.0: the file format and the platforms are made ready to 
 - Golden files saved by every published release from 0.27.0 to 0.30.0, each of which must load as
   the effect it was written from.
 
+### Changed
+
+- **A steady frame allocates nothing per particle**, in every render mode and with every stock
+  behavior, so a large effect no longer hands the garbage collector work in proportion to its
+  size. `npm run check:allocations` measures it in CI.
+  - Batches upload their buffers through kept views, rounded up to whole chunks, instead of a new
+    view of each buffer every frame (about 1.3 KB a frame per batch).
+  - Noise and Turbulence Field read the simplex field through a typed array instead of passing
+    and returning numbers, which the engine boxed: 64 bytes per particle per frame for Noise, and
+    several hundred for Turbulence Field. Noise with a rotation amount no longer reads each
+    particle's angle through its boxed getter.
+  - Force over Lifetime reads its curves from their sampled tables, as Size over Lifetime does,
+    and Color by Speed updates its particles in one loop, as Color over Lifetime does.
+  - Emitting a particle still allocates about 250 bytes, most of it the particle's generator
+    memory being grown again after it was emptied for reuse.
+
 ### Fixed
 
 - `serializeEffect` given several roots wrote the group it adds around them with its matrix as an

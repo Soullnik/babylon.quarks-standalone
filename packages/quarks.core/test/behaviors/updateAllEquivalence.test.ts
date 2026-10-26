@@ -2,6 +2,7 @@ import {
     ApplyForce,
     Behavior,
     Bezier,
+    ColorBySpeed,
     ColorOverLife,
     ConstantValue,
     createSeededRandom,
@@ -22,6 +23,7 @@ import {
     SizeOverLife,
     SpeedOverLife,
     SpriteParticle,
+    TurbulenceField,
     Vector3,
     Vector3Function,
     withRandomSource,
@@ -111,6 +113,20 @@ const cases: Array<[string, () => Behavior]> = [
     ['OrbitOverLife', () => new OrbitOverLife(new ConstantValue(2), new Vector3(0, 1, 0))],
     ['ForceOverLife', () => new ForceOverLife(new ConstantValue(1), new ConstantValue(-2), new ConstantValue(0.5))],
     ['Noise', () => new Noise(new ConstantValue(2), new ConstantValue(1))],
+    [
+        'ForceOverLife curves',
+        () =>
+            new ForceOverLife(
+                new PiecewiseBezier([[new Bezier(0, 1, 2, 4), 0]]),
+                new ConstantValue(-2),
+                new PiecewiseBezier([[new Bezier(1, 0, -1, 0), 0]])
+            ),
+    ],
+    ['ColorBySpeed', () => new ColorBySpeed(new Gradient(), new IntervalValue(0, 4))],
+    [
+        'TurbulenceField',
+        () => new TurbulenceField(new Vector3(2, 2, 2), 2, new Vector3(1, 3, 1), new Vector3(1, 1, 1), 7),
+    ],
 ];
 
 describe('behavior updateAll matches the per-particle path', () => {

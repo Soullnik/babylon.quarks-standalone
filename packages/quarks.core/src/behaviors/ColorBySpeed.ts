@@ -41,7 +41,30 @@ export class ColorBySpeed implements Behavior {
         particle.color.w *= particle.startColor.w;
     }
 
-    frameUpdate(delta: number): void {}
+    updateAll(particles: Array<Particle>, count: number, delta: number): void {
+        // Hoisting the generator makes genColor a monomorphic call site here, as in
+        // ColorOverLife, unlike the shared per-particle dispatch in the system.
+        const generator = this.color as FunctionColorGenerator;
+        const range = this.speedRange;
+        for (let i = 0; i < count; i++) {
+            const particle = particles[i];
+            if (particle.age >= particle.life) {
+                continue;
+            }
+            const color = particle.color;
+            const startColor = particle.startColor;
+            generator.genColor(particle.memory, color, speedFraction(particle, range));
+            color.x *= startColor.x;
+            color.y *= startColor.y;
+            color.z *= startColor.z;
+            color.w *= startColor.w;
+        }
+    }
+
+    frameUpdate(delta: number): void {
+        // Refreshed once per frame, before either update path reads it, as ColorOverLife does.
+        this.color.refreshTable?.();
+    }
 
     toJSON(): ColorBySpeedJSON {
         return {

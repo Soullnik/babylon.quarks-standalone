@@ -11,6 +11,11 @@ const GENERATOR_COUNT = 100;
 const generators: Array<SimplexNoise | undefined> = new Array(GENERATOR_COUNT);
 const tempV = new Vector3();
 const tempQ = new Quaternion();
+/**
+ * The noise read for a particle: four slots of two values, a point of the field going in and the
+ * value there coming out in the first, for the X, Y and Z offsets and the angle.
+ */
+const sampled = new Float64Array(8);
 
 /** Simplex generators are built on first use, so constructing a Noise behavior stays cheap. */
 function getGenerator(index: number): SimplexNoise {
@@ -116,11 +121,36 @@ export class Noise implements Behavior {
     private scrollOffset = 0;
     private readonly scrollMemory: number[] = [];
 
-    /** The noise value a generator gives at `time`, through the remap when there is one. */
-    private sample(generator: SimplexNoise, time: number, memory: number[]): number {
-        const raw = generator.noise2D(0, time);
+    /**
+     * Turns `sampled[2 * slot]` and `sampled[2 * slot + 1]`, a point of the noise field, into the
+     * noise value `generator` gives there, through the remap when there is one, in
+     * `sampled[2 * slot]`. Numbers go in and out through the array, not as arguments and a return
+     * value: a number passed to or returned from a call the engine does not inline is boxed, and
+     * this runs up to four times per particle per frame.
+     */
+    private sample(generator: SimplexNoise, memory: number[], slot: number): void {
+        const at = slot * 2;
+        generator.noise2DInPlace(sampled, at);
         const remap = this.remap;
-        return remap === undefined ? raw : remap.genValue(memory, (raw + 1) * 0.5);
+        if (remap !== undefined) {
+            sampled[at] = remap.genValue(memory, (sampled[at] + 1) * 0.5);
+        }
+    }
+
+    /**
+     * Sets every slot of `sampled` to the point the noise is read at for `time`: one line of the
+     * field, the same for every generator.
+     */
+    private static pointAt(time: number): void {
+        sampled[0] = sampled[2] = sampled[4] = sampled[6] = 0;
+        sampled[1] = sampled[3] = sampled[5] = sampled[7] = time;
+    }
+
+    /** {@link Noise.sample} of the X, Y and Z generators, into `sampled[0]`, `[2]` and `[4]`. */
+    private sampleOffset(state: NoiseState, memory: number[]): void {
+        this.sample(state.generatorX, memory, 0);
+        this.sample(state.generatorY, memory, 1);
+        this.sample(state.generatorZ, memory, 2);
     }
 
     initialize(particle: Particle): void {
@@ -191,15 +221,14 @@ export class Noise implements Behavior {
     ): void {
         const last = state.lastRotQ as Quaternion;
         rotation.multiply(last.invert());
-        tempV.set(
-            this.sample(state.generatorX, noiseTime, memory),
-            this.sample(state.generatorY, noiseTime, memory),
-            this.sample(state.generatorZ, noiseTime, memory)
-        );
+        Noise.pointAt(noiseTime);
+        this.sampleOffset(state, memory);
+        tempV.set(sampled[0], sampled[2], sampled[4]);
         const length = tempV.length();
         if (length > 0) {
             tempV.multiplyScalar(1 / length);
-            tempQ.setFromAxisAngle(tempV, this.sample(state.generatorW, noiseTime, memory) * Math.PI * amount);
+            this.sample(state.generatorW, memory, 3);
+            tempQ.setFromAxisAngle(tempV, sampled[6] * Math.PI * amount);
         } else {
             tempQ.set(0, 0, 0, 1);
         }
@@ -227,11 +256,9 @@ export class Noise implements Behavior {
         if (positionAmount > 0) {
             const amount = power * positionAmount;
             particle.position.sub(state.lastPos);
-            tempV.set(
-                this.sample(state.generatorX, noiseTime, memory) * amount,
-                this.sample(state.generatorY, noiseTime, memory) * amount,
-                this.sample(state.generatorZ, noiseTime, memory) * amount
-            );
+            Noise.pointAt(noiseTime);
+            this.sampleOffset(state, memory);
+            tempV.set(sampled[0] * amount, sampled[2] * amount, sampled[4] * amount);
             particle.position.add(tempV);
             state.lastPos.copy(tempV);
         }
@@ -239,7 +266,9 @@ export class Noise implements Behavior {
         if (rotationAmount > 0) {
             const amount = power * rotationAmount;
             if (typeof particle.rotation === 'number') {
-                const noise = this.sample(state.generatorW, noiseTime, memory) * Math.PI * amount;
+                Noise.pointAt(noiseTime);
+                this.sample(state.generatorW, memory, 3);
+                const noise = sampled[6] * Math.PI * amount;
                 particle.rotation = particle.rotation - state.lastRot + noise;
                 state.lastRot = noise;
             } else if (state.lastRotQ !== null) {
@@ -292,9 +321,11 @@ export class Noise implements Behavior {
             if (positionAmount > 0) {
                 const amount = power * positionAmount;
                 const lastPos = state.lastPos;
-                const nx = this.sample(state.generatorX, noiseTime, memory) * amount;
-                const ny = this.sample(state.generatorY, noiseTime, memory) * amount;
-                const nz = this.sample(state.generatorZ, noiseTime, memory) * amount;
+                Noise.pointAt(noiseTime);
+                this.sampleOffset(state, memory);
+                const nx = sampled[0] * amount;
+                const ny = sampled[2] * amount;
+                const nz = sampled[4] * amount;
                 // Rounded between the two steps as the vector view path is.
                 positions[o3] = Math.fround(positions[o3] - lastPos.x) + nx;
                 positions[o3 + 1] = Math.fround(positions[o3 + 1] - lastPos.y) + ny;
@@ -304,11 +335,15 @@ export class Noise implements Behavior {
 
             if (rotationAmount > 0) {
                 const amount = power * rotationAmount;
-                if (typeof particle.rotation === 'number') {
-                    const noise = this.sample(state.generatorW, noiseTime, memory) * Math.PI * amount;
+                // A particle that turns by an angle has no quaternion to carry; asked through
+                // `rotation`, whose angle-or-quaternion answer is boxed, on every particle.
+                if (state.lastRotQ === null) {
+                    Noise.pointAt(noiseTime);
+                    this.sample(state.generatorW, memory, 3);
+                    const noise = sampled[6] * Math.PI * amount;
                     rotations[i] = rotations[i] - state.lastRot + noise;
                     state.lastRot = noise;
-                } else if (state.lastRotQ !== null) {
+                } else {
                     this.rotateByNoise(particle.rotation as Quaternion, state, noiseTime, amount, memory);
                 }
             }

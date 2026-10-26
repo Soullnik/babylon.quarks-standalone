@@ -30,6 +30,9 @@ const G3 = 1.0 / 6.0;
 const F4 = (Math.sqrt(5.0) - 1.0) / 4.0;
 const G4 = (5.0 - Math.sqrt(5.0)) / 20.0;
 
+/** The point the number-returning samplers hand their in-place versions, and its value. */
+const result = new Float64Array(4);
+
 const grad3 = new Float32Array([
     1, 1, 0, -1, 1, 0, 1, -1, 0,
 
@@ -81,6 +84,20 @@ export class SimplexNoise {
      * @returns a number in the interval [-1, 1]
      */
     noise2D(x: number, y: number): number {
+        result[0] = x;
+        result[1] = y;
+        this.noise2DInPlace(result, 0);
+        return result[0];
+    }
+
+    /**
+     * {@link SimplexNoise.noise2D} at the point `io[offset]`, `io[offset + 1]`, written to
+     * `io[offset]`. A number passed to or returned from a call the engine does not inline is
+     * boxed; one read from and written to a typed array is not.
+     */
+    noise2DInPlace(io: Float64Array, offset: number): void {
+        const x = io[offset];
+        const y = io[offset + 1];
         const permMod12 = this.permMod12;
         const perm = this.perm;
         let n0 = 0; // Noise contributions from the ../math corners
@@ -137,7 +154,7 @@ export class SimplexNoise {
         }
         // Add contributions from each corner to get the final noise value.
         // The result is scaled to return values in the interval [-1,1].
-        return 70.0 * (n0 + n1 + n2);
+        io[offset] = 70.0 * (n0 + n1 + n2);
     }
 
     /**
@@ -278,6 +295,23 @@ export class SimplexNoise {
      * @returns a number in the interval [-1, 1]
      */
     noise4D(x: number, y: number, z: number, w: number): number {
+        result[0] = x;
+        result[1] = y;
+        result[2] = z;
+        result[3] = w;
+        this.noise4DInPlace(result, 0);
+        return result[0];
+    }
+
+    /**
+     * {@link SimplexNoise.noise4D} at the point `io[offset]` to `io[offset + 3]`, written to
+     * `io[offset]`, unboxed as {@link SimplexNoise.noise2DInPlace} is.
+     */
+    noise4DInPlace(io: Float64Array, offset: number): void {
+        const x = io[offset];
+        const y = io[offset + 1];
+        const z = io[offset + 2];
+        const w = io[offset + 3];
         const perm = this.perm;
 
         let n0, n1, n2, n3, n4; // Noise contributions from the five corners
@@ -400,7 +434,7 @@ export class SimplexNoise {
             n4 = t4 * t4 * (grad4[gi4] * x4 + grad4[gi4 + 1] * y4 + grad4[gi4 + 2] * z4 + grad4[gi4 + 3] * w4);
         }
         // Sum up and scale the result to cover the range [-1,1]
-        return 27.0 * (n0 + n1 + n2 + n3 + n4);
+        io[offset] = 27.0 * (n0 + n1 + n2 + n3 + n4);
     }
 }
 export default SimplexNoise;

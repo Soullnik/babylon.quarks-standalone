@@ -47,6 +47,9 @@ export interface TurbulenceFieldJSON extends BehaviorJSON {
  * For each particle wobbling on its own curve instead, or for noise in the
  * rotation, use `Noise`.
  */
+/** The point {@link TurbulenceField} samples the field at, and the value there. */
+const point = new Float64Array(4);
+
 export class TurbulenceField implements Behavior {
     type = 'TurbulenceField';
     /**
@@ -156,6 +159,19 @@ export class TurbulenceField implements Behavior {
         particle.velocity.addScaledVector(this.temp, delta);
     }
 
+    /**
+     * The field at a point, through {@link SimplexNoise.noise4DInPlace}: small enough to inline
+     * into the loop, where the numbers then never cross a call that boxes them.
+     */
+    private static sample(generator: SimplexNoise, x: number, y: number, z: number, w: number): number {
+        point[0] = x;
+        point[1] = y;
+        point[2] = z;
+        point[3] = w;
+        generator.noise4DInPlace(point, 0);
+        return point[0];
+    }
+
     updateAll(particles: Array<Particle>, count: number, delta: number): void {
         const store = count > 0 ? (particles[0] as Particle & {store?: ParticleStore}).store : undefined;
         if (store === undefined) {
@@ -199,9 +215,9 @@ export class TurbulenceField implements Behavior {
                 const lx = x * lvl;
                 const ly = y * lvl;
                 const lz = z * lvl;
-                tx += generator.noise4D(lx, ly, lz, timeX * lvl) / lvl;
-                ty += generator.noise4D(lx, ly, lz, timeY * lvl) / lvl;
-                tz += generator.noise4D(lx, ly, lz, timeZ * lvl) / lvl;
+                tx += TurbulenceField.sample(generator, lx, ly, lz, timeX * lvl) / lvl;
+                ty += TurbulenceField.sample(generator, lx, ly, lz, timeY * lvl) / lvl;
+                tz += TurbulenceField.sample(generator, lx, ly, lz, timeZ * lvl) / lvl;
                 lvl *= 2;
             }
             velocities[o3] += tx * multiplierX;

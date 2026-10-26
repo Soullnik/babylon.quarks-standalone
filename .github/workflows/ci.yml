@@ -65,6 +65,30 @@ jobs:
             - name: Verify package tarball contents
               run: npm run check:pack
 
+    # A steady frame allocates nothing per particle, in every render mode and behavior. Its own
+    # job, as it takes a couple of minutes of simulation.
+    allocations:
+        name: Allocation check
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v7
+
+            - name: Setup Node.js
+              uses: actions/setup-node@v7
+              with:
+                  node-version-file: .nvmrc
+                  cache: npm
+
+            - name: Install dependencies
+              run: npm ci
+
+            - name: Build quarks.core
+              run: npm run build:core
+
+            - name: Measure what steady frames allocate
+              run: npm run check:allocations
+
     # The Unity exporter's C# compiled under .NET against stand-ins for the Unity API, its fixtures
     # exported and compared with the golden files the babylon.quarks suite loads.
     exporter:
@@ -272,7 +296,7 @@ jobs:
                   path: examples/dist
 
     deploy:
-        needs: [check, demos, shaders, pages]
+        needs: [check, allocations, demos, shaders, pages]
         if: github.event_name != 'pull_request'
         runs-on: ubuntu-latest
         # Never cancel an in-progress Pages deployment — that leaves it in a failed state.
