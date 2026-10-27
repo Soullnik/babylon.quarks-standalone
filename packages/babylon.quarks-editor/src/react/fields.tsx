@@ -2,7 +2,10 @@ import React, {useEffect, useState} from 'react';
 import {InspectorLabel} from './InspectorLabel.js';
 import {inputStyle, rowStyle} from './theme.js';
 
-/** An inspector row: a label, with an optional hint, and its controls. */
+/**
+ * An inspector row: a label, with an optional hint, and its controls. With an empty label the
+ * controls span the whole row, continuing the row above; the hint is then not shown.
+ */
 export function Row(props: {label: string; hint?: string; hintKey?: string; children: React.ReactNode}) {
     return (
         <div style={rowStyle}>

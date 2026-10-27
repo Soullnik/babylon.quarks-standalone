@@ -49,8 +49,9 @@ plans are in the git history. What 1.x promises is in [STABILITY.md](STABILITY.m
    [docs/AUTHORING.md](docs/AUTHORING.md).
 3. **Editor to done** ([#43](https://github.com/Soullnik/babylon.quarks-standalone/issues/43)):
    a BabylonJS Editor window host, an embedding guide, a keyboard/accessibility pass on the curve
-   and gradient editors, the WebGPU warning when a project opens. The editor stays on 0.x while it
-   settles.
+   and gradient editors, the WebGPU warning when a project opens, soft particles in the viewport
+   (it has no depth texture), min/max captions on Start rotation's random angle. The editor stays
+   on 0.x while it settles.
 4. **Shuriken leftovers** (1.x minors): collision triggers and sub emitters on collision,
    collider shapes beyond planes, Limit Velocity drag, noise quality, texture-based emission.
 5. **Perf, round two** (from the profiling report): a shared store per batch for scenes with

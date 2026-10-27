@@ -28,10 +28,20 @@ async function openModule(page: Page, title: string): Promise<Locator> {
     }
     const body = section.locator(':scope > div');
     if ((await body.count()) === 0) {
-        await section.locator('header').click();
+        // By its left edge, the fold arrow: the header's centre can land on the hint icon, which
+        // keeps the click to itself.
+        await section.locator('header').click({position: {x: 12, y: 12}});
     }
     await page.waitForTimeout(300);
     return section;
+}
+
+/** Waits until the effect has been playing long enough to fill the viewport. */
+async function waitForParticles(page: Page): Promise<void> {
+    await page.waitForFunction(() => {
+        const match = /(\d+) particles/.exec(document.body.innerText);
+        return match !== null && Number(match[1]) > 50;
+    });
 }
 
 async function shot(target: Page | Locator, name: string): Promise<void> {
@@ -50,10 +60,11 @@ async function main(): Promise<void> {
 
     // 1. The projects page and the new project dialog.
     await page.getByRole('button', {name: 'New project'}).click();
-    await page.locator('input').first().fill('Campfire');
+    await page.getByRole('button', {name: 'Cancel'}).waitFor();
+    await page.locator('input:visible').last().fill('Campfire');
     await shot(page, '01-new-project');
     await page.getByRole('button', {name: 'Create'}).click();
-    await page.waitForTimeout(4000);
+    await waitForParticles(page);
 
     // 2. The whole editor with the starting effect.
     await shot(page, '02-editor');
@@ -75,7 +86,7 @@ async function main(): Promise<void> {
     // 9. The editor playing the finished effect, timeline open again.
     await page.setViewportSize(VIEWPORT);
     await page.getByRole('button', {name: 'Expand timeline'}).click();
-    await page.waitForTimeout(1000);
+    await waitForParticles(page);
     await shot(page.locator('body'), '09-playing');
 
     await browser.close();

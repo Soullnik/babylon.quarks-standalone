@@ -9,9 +9,10 @@ needs in its peer dependency.
 
 ### Fixed
 
-- A field row without a label, such as the min and max of _Random between two_ under Start
-  lifetime, Start speed and Start size, spans the whole inspector width. It sat in the 110 px label
-  column, which left each number box about 26 px wide and its value unreadable.
+- A field row without a label spans the whole inspector width: the min and max of _Random between
+  two_, a constant's value, the colour swatch of Start color and the angles of Start rotation. It
+  sat in the 110 px label column, which left each number box about 26 px wide and the min and max
+  unreadable. `Row` with an empty label now lays its children across the row in one block.
 
 ## [0.31.0] — 2026-10-26
 
