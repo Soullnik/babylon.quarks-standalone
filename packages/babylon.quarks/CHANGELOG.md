@@ -4,6 +4,20 @@ All notable changes to the `babylon.quarks` package are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the package's version moves in lockstep with `quarks.core`.
 
+## [Unreleased]
+
+### Added
+
+- **`STABILITY.md`:** what 1.x promises and what it does not, for the API, the effect files, the
+  look of an effect and the platforms, with the deprecation policy.
+- **`docs/MIGRATING-1.0.md`:** one guide from 0.28 to 1.0, gathering the upgrade steps of 0.29,
+  0.30 and 1.0.
+
+### Changed
+
+- `ParticleSystem.seed`'s documentation says what STABILITY.md promises: a seeded effect plays the
+  same on every machine running the same minor version.
+
 ## [1.0.0-rc.1] — 2026-10-26
 
 Phase 9 of the road to 1.0: the file format and the platforms are made ready to be promised. This
