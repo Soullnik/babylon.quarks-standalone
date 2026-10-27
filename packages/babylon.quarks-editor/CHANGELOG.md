@@ -5,6 +5,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the editor keeps its own 0.x version line; each release names the babylon.quarks line it
 needs in its peer dependency.
 
+## [Unreleased]
+
+### Fixed
+
+- A field row without a label, such as the min and max of _Random between two_ under Start
+  lifetime, Start speed and Start size, spans the whole inspector width. It sat in the 110 px label
+  column, which left each number box about 26 px wide and its value unreadable.
+
 ## [0.31.0] — 2026-10-26
 
 Released with babylon.quarks 1.0.0-rc.1, on npm's `next` tag with it. The editor stays on 0.x

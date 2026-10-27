@@ -171,6 +171,14 @@ into `examples/public/landing/`. Recapture them when the vortex or the editor ch
 `npm run check:demos` also opens the landing page and fails if the stage does not start or the
 gallery misses a demo.
 
+## Authoring guide screenshots
+
+The screenshots in `docs/AUTHORING.md` are captured from the editor with `npm run capture:guide`
+into `docs/images/authoring/`, with the examples served (`npm run dev`, or set
+`EXAMPLES_BASE_URL` to a preview of the built site; `CHROMIUM_PATH` as above). The script makes a
+new project and opens the modules the guide shows. Recapture them when those modules change
+visibly.
+
 ## Releases (maintainers)
 
 1. `npm run check` from the repo root.

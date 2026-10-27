@@ -70,8 +70,7 @@ Three tiers: ✅ shipped · 🟡 runtime supports it, editor UI missing · 🔴 
 - ✅ render modes (billboard ×4, trail, beam, mesh), blend mode, texture picker (presets/URL/file), render order, mesh geometry presets
 - ✅ host-provided mesh assets (`geometryOptions`) + load-your-own GLB/glTF (`resolveGeometry` host loader)
 - ✅ texture thumbnail + mesh wireframe previews in the inspector
-- ✅ soft particles (+near/far fade), alpha test, depth write/test
-- 🟡 layer mask (`layerMask`; no field in the editor yet)
+- ✅ soft particles (+near/far fade), alpha test, depth write/test, layer mask (`layerMask`)
 - ✅ texture layout (UV channel, Tiling / Offset, scroll as Unreal's Panner), flip, gradient map, alpha erosion, UV distortion, rim on mesh particles
 - ✅ render face (`renderFace`: both / front / back, mesh particles)
 - ✅ the scene's image processing (`applyImageProcessing`, on by default as on Babylon's own materials)

@@ -6,8 +6,16 @@ import {inputStyle, rowStyle} from './theme.js';
 export function Row(props: {label: string; hint?: string; hintKey?: string; children: React.ReactNode}) {
     return (
         <div style={rowStyle}>
-            <InspectorLabel label={props.label} hint={props.hint} hintKey={props.hintKey} />
-            {props.children}
+            {props.label ? (
+                <>
+                    <InspectorLabel label={props.label} hint={props.hint} hintKey={props.hintKey} />
+                    {props.children}
+                </>
+            ) : (
+                // A row without a label continues the one above it across the whole width, rather
+                // than squeezing its fields into the label column.
+                <div style={{gridColumn: '1 / -1', minWidth: 0}}>{props.children}</div>
+            )}
         </div>
     );
 }

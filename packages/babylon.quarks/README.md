@@ -180,7 +180,7 @@ const system = new ParticleSystem({
 
 ## Author & load effects
 
-Design an effect with one of these tools, then load the exported JSON with `QuarksLoader`:
+Design an effect with one of these tools, then load the exported JSON with `QuarksLoader`. [Authoring an effect](https://github.com/Soullnik/babylon.quarks-standalone/blob/main/docs/AUTHORING.md) walks through the editor step by step:
 
 - **[Effect editor](https://soullnik.github.io/babylon.quarks-standalone/editor.html)** — our in-house Shuriken-style editor ([`babylon.quarks-editor`](https://www.npmjs.com/package/babylon.quarks-editor), embeddable in your own app).
 - **[Unity exporter](https://github.com/Soullnik/babylon.quarks-standalone/tree/main/tools/unity-quarks-exporter)** — a Unity Editor tool that exports Shuriken Particle Systems to the same JSON format.
