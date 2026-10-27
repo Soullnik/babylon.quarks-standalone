@@ -48,7 +48,11 @@ export type QuarksResourceKind = 'effect' | 'geometry' | 'image';
  * Omit either method to keep the default (`baseUrl` join / `fetch`).
  */
 export interface QuarksResourceResolver {
-    /** Resolve a relative url to an absolute / blob / data url. Default: {@link QuarksLoader.joinUrl}. */
+    /**
+     * Resolve a relative url to an absolute / blob / data url. Default: {@link QuarksLoader.joinUrl}.
+     * `baseUrl` is the loader's `baseUrl` (`''` unset) for an effect file, and the folder the
+     * effect's links are relative to for a geometry or image.
+     */
     resolve?(url: string, kind: QuarksResourceKind, baseUrl: string): string | Promise<string>;
     /**
      * Load a JSON asset (effect and geometry files). Default: `fetch(resolvedUrl).json()`.
@@ -73,8 +77,10 @@ export interface QuarksResolveOptions {
 /** Options for a {@link QuarksLoader}, shared by every load it does. */
 export interface QuarksLoaderOptions {
     /**
-     * Prefix joined to relative geometry and image urls (see {@link QuarksLoader.joinUrl}).
-     * Unset, {@link QuarksLoader.load} uses the effect file's own folder and the other loads `''`.
+     * Prefix joined to relative effect, geometry and image urls (see {@link QuarksLoader.joinUrl}).
+     * Unset, an effect url is relative to the page, and {@link QuarksLoader.load} resolves the
+     * effect's geometry and image links against the effect file's own folder; the other loads use
+     * `''`.
      */
     baseUrl?: string;
     /**
@@ -878,8 +884,10 @@ export class QuarksLoader {
 
     /** Fetches one effect JSON; documents are not fetch-cached because resolve mutates them. */
     private async fetchEffectDocument(url: string, signal?: AbortSignal): Promise<{json: unknown; baseUrl: string}> {
+        // The effect's own url is relative to the page (or the loader's baseUrl), not to its folder:
+        // resolving `fx/hit.json` against `fx/` would fetch `fx/fx/hit.json`.
+        const resolvedEffect = await this.resolveResourceUrl(url, 'effect', this.options.baseUrl || '');
         const baseUrl = this.options.baseUrl || url.substring(0, url.lastIndexOf('/') + 1);
-        const resolvedEffect = await this.resolveResourceUrl(url, 'effect', baseUrl);
         const json = await QuarksLoader.fetchJsonWith(this.options.resolver, resolvedEffect, undefined, signal);
         return {json, baseUrl};
     }

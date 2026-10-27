@@ -384,6 +384,33 @@ describe('QuarksLoader matrix decomposition', () => {
         engine.dispose();
     });
 
+    it('fetches a relative effect url relative to the page, and its links relative to its folder', async () => {
+        const engine = new NullEngine();
+        const scene = new Scene(engine);
+        const fetched: string[] = [];
+        const fetchSpy = jest.spyOn(global, 'fetch').mockImplementation(async (input: string | URL | Request) => {
+            fetched.push(String(input));
+            return jsonResponse({object: {uuid: 'root', type: 'Group', children: []}});
+        });
+
+        await new QuarksLoader(scene).load('effects/campfire.json');
+        await new QuarksLoader(scene).loadAll(['effects/campfire.json']);
+        await new QuarksLoader(scene, {baseUrl: 'https://cdn.example.com/fx/'}).load('effects/campfire.json');
+        expect(fetched).toEqual([
+            'effects/campfire.json',
+            'effects/campfire.json',
+            'https://cdn.example.com/fx/effects/campfire.json',
+        ]);
+
+        const resolve = jest.fn((url: string) => url);
+        await new QuarksLoader(scene, {resolver: {resolve}}).load('effects/campfire.json');
+        expect(resolve).toHaveBeenCalledWith('effects/campfire.json', 'effect', '');
+
+        fetchSpy.mockRestore();
+        scene.dispose();
+        engine.dispose();
+    });
+
     it('fetches geometries exported as files relative to the effect and inlines them', async () => {
         const engine = new NullEngine();
         const scene = new Scene(engine);

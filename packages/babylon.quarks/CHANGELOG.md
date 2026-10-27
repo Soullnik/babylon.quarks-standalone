@@ -18,6 +18,16 @@ and the package's version moves in lockstep with `quarks.core`.
 - `ParticleSystem.seed`'s documentation says what STABILITY.md promises: a seeded effect plays the
   same on every machine running the same minor version.
 
+### Fixed
+
+- **`QuarksLoader.load` and `loadAll` fetch a relative effect url from the right place.**
+  `load('effects/campfire.json')` fetched `effects/effects/campfire.json`, because the effect's own
+  url was resolved against its own folder; only absolute urls and files at the page's root loaded.
+  A relative effect url is now relative to the page, or to the loader's `baseUrl` when one is set,
+  and the effect's textures and geometry files are still found next to it. A custom
+  `resolver.resolve` gets the loader's `baseUrl` (`''` when unset) for an effect file, instead of
+  the effect's folder.
+
 ## [1.0.0-rc.1] — 2026-10-26
 
 Phase 9 of the road to 1.0: the file format and the platforms are made ready to be promised. This
