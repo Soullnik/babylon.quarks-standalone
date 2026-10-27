@@ -14,7 +14,8 @@ requests are all welcome.
 - `examples` — Vite app with the demo gallery, effect editor page (`editor.html`), benchmark page
   and API docs entry; deployed to GitHub Pages.
 - `starters/vite` — a standalone Vite project with one effect, opened on StackBlitz from the READMEs;
-  `npm run typecheck` compiles it against the workspace build.
+  `npm run typecheck` compiles it against the workspace build, as long as the folder has no
+  `node_modules` of its own: delete it after trying the starter with `npm install`.
 - `scripts` — repo tooling (preview capture, tarball checks, Unity package build).
 - `ROADMAP.md` — planned work; a good place to find something to pick up.
 
@@ -63,7 +64,7 @@ Individual pieces:
 
 ```bash
 npm run test                                   # jest suites: quarks.core, babylon.quarks, babylon.quarks-editor
-npm run typecheck                              # tsc over sources, tests and the examples (jest only transpiles them; needs `npm run build`)
+npm run typecheck                              # tsc over sources, tests, the examples and the starter (jest only transpiles them; needs `npm run build`)
 npm run test:coverage                          # the same suites with the coverage gate (what CI runs)
 npm run docs                                   # TypeDoc API docs
 npm run docs:check                             # renders the API docs of quarks.core and babylon.quarks; fails on a missing TSDoc or broken {@link} (CI runs it)

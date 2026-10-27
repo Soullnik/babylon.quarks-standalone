@@ -45,10 +45,11 @@ plans are in the git history. What 1.x promises is in [STABILITY.md](STABILITY.m
 
 1. **1.0.0**: the release candidate becomes 1.0.0 once its feedback is in. Then 1.x minors add
    what is below without breaking anything STABILITY.md promises.
-2. **Docs**: a step-by-step effect authoring guide with screenshots, a StackBlitz starter, an
-   integration example with react-babylonjs.
+2. **Docs**: a step-by-step effect authoring guide with screenshots, an integration example with
+   react-babylonjs.
 3. **Editor to done** ([#43](https://github.com/Soullnik/babylon.quarks-standalone/issues/43)):
-   min/max placeholders on random fields, a BabylonJS Editor window host, an embedding guide, a
+   a layer mask field in the Renderer module, min/max placeholders on random fields, React
+   component tests, a BabylonJS Editor window host, an embedding guide, a
    keyboard/accessibility pass on the curve and gradient editors, the WebGPU warning when a
    project opens. The editor stays on 0.x while it settles.
 4. **Shuriken leftovers** (1.x minors): collision triggers and sub emitters on collision,
