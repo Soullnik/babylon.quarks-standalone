@@ -13,6 +13,8 @@ requests are all welcome.
   JSON, built into a `.unitypackage` via `npm run build:unitypackage`.
 - `examples` — Vite app with the demo gallery, effect editor page (`editor.html`), benchmark page
   and API docs entry; deployed to GitHub Pages.
+- `starters/vite` — a standalone Vite project with one effect, opened on StackBlitz from the READMEs;
+  `npm run typecheck` compiles it against the workspace build.
 - `scripts` — repo tooling (preview capture, tarball checks, Unity package build).
 - `ROADMAP.md` — planned work; a good place to find something to pick up.
 
@@ -186,6 +188,9 @@ gallery misses a demo.
      `tools/unity-quarks-exporter/package.json` and `ExporterInfo.Version`
      (`tools/unity-quarks-exporter/Editor/ExporterInfo.cs`), and add a
      `tools/unity-quarks-exporter/CHANGELOG.md` entry. `npm run check:pack` fails when they differ.
+   - **The starter follows the release:** `starters/vite/package.json` depends on
+     `babylon.quarks@next` while the release is a prerelease and on `^<major>.0.0` once it is
+     not.
 3. Check WebGPU on real hardware: `npm run check:demos -- --webgpu` on a machine with a GPU
    (headless software adapters cannot run it), as STABILITY.md promises.
 4. Verify the tarballs: `npm run check:pack` (validates both `babylon.quarks` and
