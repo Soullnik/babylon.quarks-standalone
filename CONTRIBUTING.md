@@ -186,9 +186,11 @@ gallery misses a demo.
      `tools/unity-quarks-exporter/package.json` and `ExporterInfo.Version`
      (`tools/unity-quarks-exporter/Editor/ExporterInfo.cs`), and add a
      `tools/unity-quarks-exporter/CHANGELOG.md` entry. `npm run check:pack` fails when they differ.
-3. Verify the tarballs: `npm run check:pack` (validates both `babylon.quarks` and
+3. Check WebGPU on real hardware: `npm run check:demos -- --webgpu` on a machine with a GPU
+   (headless software adapters cannot run it), as STABILITY.md promises.
+4. Verify the tarballs: `npm run check:pack` (validates both `babylon.quarks` and
    `babylon.quarks-editor`).
-4. Publish a GitHub release — the `publish.yml` workflow publishes both `babylon.quarks` and
+5. Publish a GitHub release — the `publish.yml` workflow publishes both `babylon.quarks` and
    `babylon.quarks-editor` to npm via trusted publishing (OIDC). It can also be run manually
    from the Actions tab. When babylon.quarks is a prerelease (`1.0.0-rc.1`), both go out on the
    `next` dist-tag, so `latest` stays on the last release; mark the GitHub release as a

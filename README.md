@@ -33,7 +33,7 @@ npm install babylon.quarks @babylonjs/core
 
 ## Get started
 
-Requires an existing Babylon.js `Scene`. Peer dependency: `@babylonjs/core` >= 9.
+Requires an existing Babylon.js `Scene`. Peer dependency: `@babylonjs/core` 9.24 or later in 9.x.
 
 ```ts
 import {
@@ -141,6 +141,12 @@ The [benchmark page](https://soullnik.github.io/babylon.quarks-standalone/benchm
 the same scenario in your browser, GPU included, against both the CPU and the GPU built-in
 systems. Systems no camera sees can pause themselves (`cullingMode`), and `EffectPool` keeps
 copies of a one-shot effect ready so playing one allocates nothing.
+
+## Stability
+
+From 1.0 on, the API, the effect files and the look of an effect follow semver: see
+[STABILITY.md](STABILITY.md) for what a minor may and may not change, and
+[docs/MIGRATING-1.0.md](docs/MIGRATING-1.0.md) to upgrade from 0.28 or later.
 
 ## Roadmap
 

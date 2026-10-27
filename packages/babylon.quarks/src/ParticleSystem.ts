@@ -1115,8 +1115,9 @@ export class ParticleSystem implements IParticleSystem {
      * makes while it steps (spawn positions, interval values, random colours
      * and rotations, burst probability) comes from a generator started from
      * this seed, and restarted with it on {@link restart}: the effect plays out
-     * identically every time, on every machine — for replays, lock-step
-     * multiplayer and reproducible tests. Systems this one emits into roll on
+     * identically every time, on every machine running the same minor version —
+     * for replays, lock-step multiplayer and reproducible tests. A minor may draw
+     * in a different order (see STABILITY.md). Systems this one emits into roll on
      * its generator too. Unset (the default), rolls come from the global source
      * (`setRandomSource` in quarks.core). Saved in the effect JSON when set.
      * The behaviors roll on the same generator, and the ones with their own

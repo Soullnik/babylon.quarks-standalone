@@ -204,6 +204,8 @@ can save and load them: see [Extending babylon.quarks](https://github.com/Soulln
 
 - [API documentation](https://soullnik.github.io/babylon.quarks-standalone/docs/)
 - [Changelog](https://github.com/Soullnik/babylon.quarks-standalone/blob/main/packages/babylon.quarks/CHANGELOG.md)
+- [Stability: what 1.x promises](https://github.com/Soullnik/babylon.quarks-standalone/blob/main/STABILITY.md)
+- [Upgrading to 1.0](https://github.com/Soullnik/babylon.quarks-standalone/blob/main/docs/MIGRATING-1.0.md)
 - [Contributing](https://github.com/Soullnik/babylon.quarks-standalone/blob/main/CONTRIBUTING.md)
 - [npm package](https://www.npmjs.com/package/babylon.quarks)
 - [Source (monorepo)](https://github.com/Soullnik/babylon.quarks-standalone/tree/main/packages/babylon.quarks)
