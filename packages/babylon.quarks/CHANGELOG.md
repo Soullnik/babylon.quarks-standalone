@@ -23,8 +23,8 @@ and the package's version moves in lockstep with `quarks.core`.
 - **`QuarksLoader.load` and `loadAll` fetch a relative effect url from the right place.**
   `load('effects/campfire.json')` fetched `effects/effects/campfire.json`, because the effect's own
   url was resolved against its own folder; only absolute urls and files at the page's root loaded.
-  A relative effect url is now relative to the page, or to the loader's `baseUrl` when one is set,
-  and the effect's textures and geometry files are still found next to it. A custom
+  A relative effect url is now relative to the page, or to the loader's `baseUrl` when one is set.
+  Without a `baseUrl`, the effect's textures and geometry files are still found next to it. A custom
   `resolver.resolve` gets the loader's `baseUrl` (`''` when unset) for an effect file, instead of
   the effect's folder.
 

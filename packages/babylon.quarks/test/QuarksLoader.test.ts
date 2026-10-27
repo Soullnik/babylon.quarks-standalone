@@ -384,7 +384,7 @@ describe('QuarksLoader matrix decomposition', () => {
         engine.dispose();
     });
 
-    it('fetches a relative effect url relative to the page, and its links relative to its folder', async () => {
+    it('fetches a relative effect url relative to the page, or to the loader baseUrl', async () => {
         const engine = new NullEngine();
         const scene = new Scene(engine);
         const fetched: string[] = [];
