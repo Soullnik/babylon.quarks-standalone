@@ -1,5 +1,12 @@
 /** @jest-environment jsdom */
-import {Bezier, ConstantValue, PiecewiseBezier, RandomBetweenCurves, type ValueGenerator} from 'babylon.quarks';
+import {
+    Bezier,
+    ConstantValue,
+    IntervalValue,
+    PiecewiseBezier,
+    RandomBetweenCurves,
+    type ValueGenerator,
+} from 'babylon.quarks';
 import type {ScalarGenerator} from '../../src/core/values';
 import {LifeCurveField} from '../../src/react/LifeCurveField';
 import {ValueField} from '../../src/react/ValueField';
@@ -125,5 +132,30 @@ describe('LifeCurveField', () => {
         const again = onChange.mock.calls[1][0] as RandomBetweenCurves;
         expect(again).toBeInstanceOf(RandomBetweenCurves);
         expect(again.curve2.toJSON()).toEqual(twoSegments().toJSON());
+    });
+});
+
+describe('Row without a label', () => {
+    let mounted: Mounted | null = null;
+    afterEach(() => {
+        mounted?.unmount();
+        mounted = null;
+    });
+
+    it('lays its fields across the whole row, not in the label column', () => {
+        mounted = mount(
+            <ValueField
+                label="Start speed"
+                curve={false}
+                generator={new IntervalValue(1.2, 1.8)}
+                onChange={jest.fn()}
+            />
+        );
+        const [min, max] = Array.from(mounted.container.querySelectorAll<HTMLInputElement>('input[type="number"]'));
+        expect([Number(min.value), Number(max.value)]).toEqual([1.2, 1.8]);
+        const cell = min.closest('div[style*="grid-column"]') as HTMLElement | null;
+        expect(cell).not.toBeNull();
+        expect(cell!.style.gridColumn).toBe('1 / -1');
+        expect(cell!.contains(max)).toBe(true);
     });
 });

@@ -74,7 +74,7 @@ scene.onBeforeRenderObservable.add(() => {
 
 ### Load an authored effect
 
-Effects designed in the [effect editor](https://soullnik.github.io/babylon.quarks-standalone/editor.html) or [Unity exporter](tools/unity-quarks-exporter/README.md) (or exported from [quarks.art](https://quarks.art/) — same JSON format) load with `QuarksLoader` instead of being hand-coded:
+Effects designed in the [effect editor](https://soullnik.github.io/babylon.quarks-standalone/editor.html) or [Unity exporter](tools/unity-quarks-exporter/README.md) (or exported from [quarks.art](https://quarks.art/) — same JSON format) load with `QuarksLoader` instead of being hand-coded. [Authoring an effect](docs/AUTHORING.md) walks through the editor step by step, from a new project to the file your app loads:
 
 ```ts
 import {BatchedRenderer, QuarksLoader, QuarksUtil} from 'babylon.quarks';
