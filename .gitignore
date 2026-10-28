@@ -6,6 +6,8 @@
 .vscode/
 .DS_Store
 npm-debug.log*
+# The starter is installed on its own when tried out; the repo keeps no lockfile for it.
+starters/*/package-lock.json
 **/*.tsbuildinfo
 tools/unity-quarks-exporter/Tests~/bin/
 tools/unity-quarks-exporter/Tests~/obj/

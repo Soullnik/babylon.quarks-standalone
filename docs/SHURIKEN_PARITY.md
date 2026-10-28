@@ -1,6 +1,7 @@
 # Unity Shuriken parity checklist
 
-Gap analysis of the effect editor + runtime against Unity's Particle System (Shuriken).
+Gap analysis of the effect editor + runtime against Unity's Particle System (Shuriken), as of
+1.0.0-rc.1 (October 2026).
 Three tiers: ✅ shipped · 🟡 runtime supports it, editor UI missing · 🔴 needs quarks.core work.
 
 ## Main
@@ -24,7 +25,7 @@ Three tiers: ✅ shipped · 🟡 runtime supports it, editor UI missing · 🔴 
 - ✅ grid cells at random or in turn (`GridEmitter.sampling`, as Niagara's Grid Location)
 - ✅ emitter mode (random/loop/ping-pong/burst) + spread per shape
 - ✅ randomize direction (`ChangeEmitDirection`, angle generator)
-- 🟡 per-shape speed generator
+- ✅ per-shape speed of the emitter point in loop / ping-pong mode (`speed`; the editor sets a constant)
 - ✅ edge shape (`EdgeEmitter`), align-to-direction (`alignToDirection`)
 - 🔴 texture-based emission
 
@@ -32,7 +33,7 @@ Three tiers: ✅ shipped · 🟡 runtime supports it, editor UI missing · 🔴 
 - ✅ Speed over Lifetime (curve), Limit Speed over Lifetime (curve + dampen; separate axes per axis in local or world space), Force over Lifetime (XYZ), Gravity
 - ✅ Orbit over Lifetime
 - ✅ Velocity over Lifetime (linear XYZ local/world + orbital XYZ, orbital offset, radial), Inherit Velocity (initial/current)
-- 🔴 Lifetime by Emitter Speed
+- 🔴 Lifetime by Emitter Speed, Limit Velocity drag (`Drag`, multiply by size / velocity)
 
 ## Color / size / rotation
 - ✅ Color over Lifetime (gradient), Size over Lifetime (curve), Rotation over Lifetime (billboards in their plane, meshes about their local Z; separate axes → `Rotation3DOverLife`)
@@ -70,9 +71,10 @@ Three tiers: ✅ shipped · 🟡 runtime supports it, editor UI missing · 🔴 
 - ✅ host-provided mesh assets (`geometryOptions`) + load-your-own GLB/glTF (`resolveGeometry` host loader)
 - ✅ texture thumbnail + mesh wireframe previews in the inspector
 - ✅ soft particles (+near/far fade), alpha test, depth write/test
-- ✅ layer mask (`layerMask`)
+- 🟡 layer mask (`layerMask`; no field in the editor yet)
 - ✅ texture layout (UV channel, Tiling / Offset, scroll as Unreal's Panner), flip, gradient map, alpha erosion, UV distortion, rim on mesh particles
 - ✅ render face (`renderFace`: both / front / back, mesh particles)
+- ✅ the scene's image processing (`applyImageProcessing`, on by default as on Babylon's own materials)
 - ✅ sort mode (`sortMode`: distance / oldest in front / youngest in front), min/max particle size (`minParticleSize` / `maxParticleSize`, billboards and stretched), pivot (`pivot`)
 - 🔴 shadows
 
@@ -92,4 +94,5 @@ Three tiers: ✅ shipped · 🟡 runtime supports it, editor UI missing · 🔴 
 6. ~~Collision module + Turbulence + Noise position/rotation amounts~~ (done)
 7. ~~3D start size + gradient start color + Randomize Direction + host mesh assets (`geometryOptions`)~~ (done)
 8. ~~Noise scroll/remap, radial/orbital-offset velocity, align-to-direction, sub emitter inherit~~ (done)
-9. Remaining core work: collision triggers/shapes → noise quality → texture-based emission
+9. ~~Cone tilt and volume, Scaling Mode, Random Between Two Curves, Limit Velocity separate axes, Stop Action, Ring Buffer~~ (done in 0.29)
+10. After 1.0, in minors: collision triggers and collider shapes → Limit Velocity drag → noise quality → texture-based emission → lights and custom data

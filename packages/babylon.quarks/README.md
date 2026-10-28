@@ -87,6 +87,13 @@ scene.onBeforeRenderObservable.add(() => {
 });
 ```
 
+## Start from a template
+
+[`starters/vite`](https://github.com/Soullnik/babylon.quarks-standalone/tree/main/starters/vite) is
+a Vite + TypeScript project with one effect in a Babylon.js scene.
+[Open it in StackBlitz](https://stackblitz.com/github/Soullnik/babylon.quarks-standalone/tree/main/starters/vite?file=src%2Fmain.ts)
+to edit it in the browser, or copy the folder and run `npm install && npm run dev`.
+
 ## Use in the Babylon.js Playground
 
 The package ships a UMD bundle (`dist/babylon.quarks.umd.min.js`, exposed as the `BabylonQuarks` global) that can be loaded straight from a CDN — no build step needed. Paste this into the [Playground](https://playground.babylonjs.com/):

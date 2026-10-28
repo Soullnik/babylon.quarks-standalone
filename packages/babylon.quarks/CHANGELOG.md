@@ -12,6 +12,9 @@ and the package's version moves in lockstep with `quarks.core`.
   look of an effect and the platforms, with the deprecation policy.
 - **`docs/MIGRATING-1.0.md`:** one guide from 0.28 to 1.0, gathering the upgrade steps of 0.29,
   0.30 and 1.0.
+- **A starter project:** `starters/vite`, a Vite + TypeScript scene with one effect, opened on
+  StackBlitz from the READMEs. `npm run typecheck` compiles it against the workspace build.
+- `ROADMAP.md` and `docs/SHURIKEN_PARITY.md` describe where 1.0 stands.
 
 ### Changed
 
