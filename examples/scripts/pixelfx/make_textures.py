@@ -188,7 +188,7 @@ def hex_shell(w=1024, h=512, columns=22):
     rq, rr, e = hex_cells(lon * grid, lat * grid * 1.15)
     rq = np.mod(rq + (rr - np.mod(rr, 2)) / 2, columns)  # wrap the axial column round the dome
     # Near the pole the longitude cells crowd together; the plates fade into plain glass there.
-    edge = smoothstep(0.8, 0.9, e) * smoothstep(0.92, 0.7, V)
+    edge = smoothstep(0.8, 0.9, e) * smoothstep(0.86, 0.6, V)
     glass = 0.035 + 0.05 * V
     foot = smoothstep(0.035, 0.0, V)
     a = np.maximum(edge, glass)
@@ -198,18 +198,17 @@ def hex_shell(w=1024, h=512, columns=22):
     rgb = rgb * (1 - foot[..., None]) + hexrgb('#d4fbff') * foot[..., None]
     save('hex-shell.png', np.concatenate([rgb, a[..., None]], -1))
     hashv = np.mod(np.sin(rq * 12.9898 + rr * 78.233) * 43758.5453, 1)
-    face = (1 - smoothstep(0.66, 0.78, e)) * (0.35 + 0.65 * hashv) * smoothstep(0.92, 0.7, V)
+    face = (1 - smoothstep(0.66, 0.78, e)) * (0.35 + 0.65 * hashv) * smoothstep(0.86, 0.6, V)
     save('hex-plates.png', np.stack([np.ones_like(face)] * 3 + [face], -1))
 
 
-def sweep(w=256, h=128):
-    """A soft diagonal band in red, wrapping both ways: an erosion mask that, scrolled, sweeps a glint."""
-    u = (np.arange(w) + 0.5) / w
-    v = (np.arange(h)[::-1] + 0.5) / h
-    U, V = np.meshgrid(u, v)
-    d = np.abs(np.mod(U + V, 1) - 0.5) * 2  # 1 on the band, 0 halfway between
-    r = smoothstep(0.75, 1, 1 - d) * 0.55 + smoothstep(0.0, 1, 1 - d) * 0.45
-    save('sweep.png', np.stack([r, r, r, np.ones_like(r)], -1))
+def radial(size=128):
+    """Red 1 at the centre falling linearly to 0 at the rim, 0 outside and on the border: an erosion
+    mask that, laid over a surface by tiling and offset, spreads a cut outward from one point."""
+    c = (np.arange(size) + 0.5) / size * 2 - 1
+    X, Y = np.meshgrid(c, c)
+    r = np.clip(1 - np.sqrt(X * X + Y * Y) / 0.97, 0, 1)
+    save('radial.png', np.stack([r, r, r, np.ones_like(r)], -1))
 
 
 if __name__ == '__main__':
@@ -219,4 +218,4 @@ if __name__ == '__main__':
     noise_map()
     tornado_band()
     hex_shell()
-    sweep()
+    radial()

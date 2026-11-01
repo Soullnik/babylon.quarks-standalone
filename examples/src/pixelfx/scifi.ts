@@ -3,7 +3,7 @@ import {Color4} from '@babylonjs/core/Maths/math.color';
 import type {Mesh} from '@babylonjs/core/Meshes/mesh';
 import type {TransformNode} from '@babylonjs/core/Meshes/transformNode';
 import {BoxEmitter, CircleEmitter, ConeEmitter, RenderMode, SphereEmitter} from 'babylon.quarks';
-import {c3, drag, fadeOut, flicker, gravity, grow, lathe, orbit, popOut, quad, spin, tint, wobble} from './kit';
+import {c3, drag, fadeOut, flicker, gravity, grow, lathe, orbit, popOut, spin, tint, wobble} from './kit';
 import {PALETTE, arcs, flames, flash, pool, smoke, sparks, type Ramp} from './recipes';
 import {shapes, type FxBuilder, type FxDef} from './stage';
 import {image} from './textures';
@@ -338,28 +338,12 @@ export const scifi: FxDef[] = [
                 order: 4,
                 look: {renderFace: 'front', rim: {color: [0.33, 0.8, 1], power: 3, strength: 0.7}},
             });
-            // A glint sweeping over the plates: their faces, cut by a scrolled diagonal band.
-            fx.sys({
-                ...shell,
-                image: 'hex-plates',
-                color: '#8ae8ff',
-                alpha: 0.32,
-                order: 5,
-                look: {
-                    renderFace: 'front',
-                    erosion: {
-                        mask: image(fx.scene, 'sweep').texture,
-                        maskUV: {tiling: [2, 1], scroll: [-0.4, 0]},
-                        softness: 0.06,
-                    },
-                },
-            });
             near.tint = new Color4(1, 1, 1, 1);
             const flare = near.tint;
             // Shots: a heavy one high up that makes the shell flare, a light one low that it shrugs off.
-            const shots: Array<{time: number; y: number; heavy: boolean}> = [
-                {time: 0.5, y: 1.4, heavy: true},
-                {time: 1.6, y: 0.7, heavy: false},
+            const shots: Array<{time: number; y: number; heavy: boolean; turn: number}> = [
+                {time: 0.5, y: 1.4, heavy: true, turn: -0.55},
+                {time: 1.6, y: 0.7, heavy: false, turn: -0.95},
             ];
             fx.every((t) => {
                 let k = 0;
@@ -373,7 +357,12 @@ export const scifi: FxDef[] = [
             for (const [i, s] of shots.entries()) {
                 const hitX = Math.sqrt(R * R - s.y * s.y);
                 const travel = 0.25;
+                // Each shot comes along its own lane, turned toward the camera so it strikes the face of
+                // the shell we see rather than its silhouette.
+                const lane = fx.node(`lane-${i}`);
+                lane.rotation.y = s.turn;
                 fx.sys({
+                    parent: lane,
                     tex: 'dot',
                     mode: RenderMode.StretchedBillBoard,
                     stretch: {speed: 0.06, length: 1},
@@ -395,20 +384,53 @@ export const scifi: FxDef[] = [
                         ),
                     ],
                 });
-                const hit = fx.node(`hit-${i}`, [hitX, s.y, 0]);
+                const hit = fx.node(`hit-${i}`, [hitX, s.y, 0], lane);
                 const t0 = s.time + travel;
-                // The ripple: a ring laid flat on the shell where it was struck, racing outward.
+                // The ripple: a flash racing over the shell from where it was struck, lighting the plates
+                // at its front and leaving them glowing behind it. Erosion does the spreading: a cone mask
+                // laid round the hit by tiling and offset, cut back as the alpha rises over the ripple's
+                // life, its edge band the bright front; the colour fades to nothing behind it.
+                const lat = Math.asin(s.y / R);
+                const reach = s.heavy ? 1.7 : 1.1; // radians over the shell
+                const ru = reach / (Math.PI * 2 * Math.max(Math.cos(lat), 0.35));
+                const rv = reach / (Math.PI / 2);
                 fx.sys({
-                    parent: hit,
-                    tex: 'ring',
-                    geo: quad(),
-                    life: 0.5,
-                    size: s.heavy ? 2.4 : 1.5,
+                    ...shell,
+                    image: 'hex-plates',
+                    parent: lane,
+                    loop: undefined,
+                    life: 0.75,
                     burst: [[t0, 1]],
-                    color: '#8ae8ff',
-                    rotate: [-Math.asin(s.y / R), Math.PI / 2, 0],
-                    order: 6,
-                    b: [tint(BLUE, popOut(0.2)), grow([0, 0.1], [1, 1])],
+                    color: '#a6ecff',
+                    // The lathe's U is 0.5 at -x; turn it to face the shots from +x.
+                    rotate: [0, Math.PI, 0],
+                    order: 5,
+                    b: [
+                        tint(
+                            [
+                                ['#ffffff', 0],
+                                ['#3a8bd8', 0.45],
+                                ['#000000', 1],
+                            ],
+                            [
+                                [0, 0],
+                                [1, 1],
+                            ]
+                        ),
+                    ],
+                    look: {
+                        renderFace: 'front',
+                        erosion: {
+                            mask: image(fx.scene, 'radial').texture,
+                            maskUV: {
+                                tiling: [1 / (2 * ru), 1 / (2 * rv)],
+                                offset: [0.5 - 0.5 / (2 * ru), 0.5 - lat / (Math.PI / 2) / (2 * rv)],
+                            },
+                            softness: 0.04,
+                            edgeWidth: 0.1,
+                            edgeColor: s.heavy ? [1.2, 2.2, 2.6] : [0.7, 1.4, 1.8],
+                        },
+                    },
                 });
                 fx.sys({
                     parent: hit,

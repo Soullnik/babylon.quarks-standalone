@@ -450,7 +450,7 @@ export function sheet(scene: Scene, name: TextureName): TextureSheet {
  * `public/textures/pixelfx/`: flipbooks traced from pixelfx's pixel art, and maps drawn from the
  * formulas of its effects. Unlike the painted ones above they carry their own colour.
  */
-export type ImageName = 'torch-flame' | 'tornado-band' | 'hex-shell' | 'hex-plates' | 'sweep' | 'noise';
+export type ImageName = 'torch-flame' | 'tornado-band' | 'hex-shell' | 'hex-plates' | 'radial' | 'noise';
 
 const IMAGES: Record<ImageName, {u: number; v: number; wrap: boolean}> = {
     // 24 frames of the torch's flame at 12 fps, 6 × 4, each square with the flame's foot at the bottom.
@@ -460,8 +460,8 @@ const IMAGES: Record<ImageName, {u: number; v: number; wrap: boolean}> = {
     // A dome's hex plates over longitude (U) and latitude (V); `hex-plates` is each plate's face alone.
     'hex-shell': {u: 1, v: 1, wrap: true},
     'hex-plates': {u: 1, v: 1, wrap: true},
-    // A diagonal band in red, wrapping: an erosion mask that sweeps a glint when scrolled.
-    sweep: {u: 1, v: 1, wrap: true},
+    // A cone in red, 1 at the centre to 0 at the rim: an erosion mask that spreads a cut from a point.
+    radial: {u: 1, v: 1, wrap: false},
     // Two wrapping noises in red and green, for UV distortion.
     noise: {u: 1, v: 1, wrap: true},
 };
@@ -482,7 +482,7 @@ export function image(scene: Scene, name: ImageName): TextureSheet {
     texture.hasAlpha = true;
     const mode = spec.wrap ? Texture.WRAP_ADDRESSMODE : Texture.CLAMP_ADDRESSMODE;
     texture.wrapU = mode;
-    texture.wrapV = spec.wrap && (name === 'noise' || name === 'sweep') ? mode : Texture.CLAMP_ADDRESSMODE;
+    texture.wrapV = spec.wrap && name === 'noise' ? mode : Texture.CLAMP_ADDRESSMODE;
     const result = {texture, u: spec.u, v: spec.v};
     map.set(name, result);
     return result;
