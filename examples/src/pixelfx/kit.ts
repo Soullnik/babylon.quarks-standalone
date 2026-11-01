@@ -168,6 +168,11 @@ export function flipbook(fps: number, count: number): FrameOverLife {
     return new FrameOverLife(new ConstantValue(0), {fps, frameCount: count});
 }
 
+/** Play a sheet's `count` tiles once over each particle's life: a puff that billows and fades. */
+export function lifeFrames(count: number): FrameOverLife {
+    return new FrameOverLife(curve([0, 0], [1, count - 0.01]));
+}
+
 // ---- systems ----
 
 export type Blend = 'add' | 'alpha';
@@ -236,7 +241,7 @@ export interface SysOptions {
     /** The renderer's texture and mesh options, passed through as they are. */
     look?: Pick<
         ParticleSystemParameters,
-        'mapUV' | 'uvDistortion' | 'erosion' | 'gradientMap' | 'rim' | 'lighting' | 'renderFace'
+        'mapUV' | 'uvDistortion' | 'erosion' | 'gradientMap' | 'rim' | 'lighting' | 'renderFace' | 'pivot'
     >;
 }
 

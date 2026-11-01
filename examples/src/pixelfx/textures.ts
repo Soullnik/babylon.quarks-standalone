@@ -450,18 +450,40 @@ export function sheet(scene: Scene, name: TextureName): TextureSheet {
  * `public/textures/pixelfx/`: flipbooks traced from pixelfx's pixel art, and maps drawn from the
  * formulas of its effects. Unlike the painted ones above they carry their own colour.
  */
-export type ImageName = 'torch-flame' | 'tornado-band' | 'hex-shell' | 'hex-plates' | 'radial' | 'noise';
+export type ImageName =
+    | 'torch-flame'
+    | 'flame-heat'
+    | 'fire-puff-heat'
+    | 'smoke-puff'
+    | 'tornado-band'
+    | 'hex-shell'
+    | 'hex-plates'
+    | 'hex-glint'
+    | 'radial'
+    | 'gradient'
+    | 'noise';
 
-const IMAGES: Record<ImageName, {u: number; v: number; wrap: boolean}> = {
+/** `mask`: an erosion mask read by value, so no mipmaps (they would average values that order a cut); `nearest` keeps per-cell values crisp. */
+const IMAGES: Record<ImageName, {u: number; v: number; wrap: boolean; mask?: 'linear' | 'nearest'}> = {
     // 24 frames of the torch's flame at 12 fps, 6 × 4, each square with the flame's foot at the bottom.
     'torch-flame': {u: 6, v: 4, wrap: false},
+    // The same flame as heat, grey 1 white-hot to 0 dark red, for a gradient map to colour in any ramp.
+    'flame-heat': {u: 6, v: 4, wrap: false},
+    // A ball of flame over its life, 16 frames 4 × 4, as heat; play it once over a particle's life.
+    'fire-puff-heat': {u: 4, v: 4, wrap: false},
+    // A puff of smoke over its life, 16 frames 4 × 4, light grey: the particle colour sets the smoke's.
+    'smoke-puff': {u: 4, v: 4, wrap: false},
     // A funnel's surface: U once round it, V up it. Wraps in U, so scrolling U spins it.
     'tornado-band': {u: 1, v: 1, wrap: true},
     // A dome's hex plates over longitude (U) and latitude (V); `hex-plates` is each plate's face alone.
     'hex-shell': {u: 1, v: 1, wrap: true},
     'hex-plates': {u: 1, v: 1, wrap: true},
+    // When each plate glints, in red: an erosion mask; one plate in five has a time, the rest 0.
+    'hex-glint': {u: 1, v: 1, wrap: true, mask: 'nearest'},
+    // Red 1 at the bottom to 0 at the top: an erosion mask whose cut climbs a surface.
+    gradient: {u: 1, v: 1, wrap: false, mask: 'linear'},
     // A cone in red, 1 at the centre to 0 at the rim: an erosion mask that spreads a cut from a point.
-    radial: {u: 1, v: 1, wrap: false},
+    radial: {u: 1, v: 1, wrap: false, mask: 'linear'},
     // Two wrapping noises in red and green, for UV distortion.
     noise: {u: 1, v: 1, wrap: true},
 };
@@ -478,7 +500,13 @@ export function image(scene: Scene, name: ImageName): TextureSheet {
     const found = map.get(name);
     if (found) return found;
     const spec = IMAGES[name];
-    const texture = new Texture(`textures/pixelfx/${name}.png`, scene);
+    const texture = new Texture(
+        `textures/pixelfx/${name}.png`,
+        scene,
+        !!spec.mask,
+        true,
+        spec.mask === 'nearest' ? Texture.NEAREST_SAMPLINGMODE : Texture.TRILINEAR_SAMPLINGMODE
+    );
     texture.hasAlpha = true;
     const mode = spec.wrap ? Texture.WRAP_ADDRESSMODE : Texture.CLAMP_ADDRESSMODE;
     texture.wrapU = mode;
@@ -486,4 +514,33 @@ export function image(scene: Scene, name: ImageName): TextureSheet {
     const result = {texture, u: spec.u, v: spec.v};
     map.set(name, result);
     return result;
+}
+
+const ramps = new WeakMap<Scene, Map<string, Texture>>();
+
+/**
+ * A gradient-map ramp from colour keys `[hex, t]` given hot to cold (t 0 the hottest), laid cold to
+ * hot along U as a heat map reads it. Made once per ramp and scene, without mipmaps and clamped.
+ */
+export function rampTexture(scene: Scene, keys: Array<[string, number]>): Texture {
+    let map = ramps.get(scene);
+    if (!map) {
+        map = new Map();
+        ramps.set(scene, map);
+    }
+    const id = JSON.stringify(keys);
+    const found = map.get(id);
+    if (found) return found;
+    const width = 256;
+    const texture = new DynamicTexture(`pixelfx-ramp-${map.size}`, {width, height: 4}, scene, false);
+    const ctx = texture.getContext() as unknown as CanvasRenderingContext2D;
+    const gradient = ctx.createLinearGradient(0, 0, width, 0);
+    for (const [hex, t] of keys) gradient.addColorStop(1 - t, hex);
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, width, 4);
+    texture.update(false);
+    texture.wrapU = Texture.CLAMP_ADDRESSMODE;
+    texture.wrapV = Texture.CLAMP_ADDRESSMODE;
+    map.set(id, texture);
+    return texture;
 }

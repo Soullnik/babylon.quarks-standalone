@@ -1,8 +1,23 @@
 import type {TransformNode} from '@babylonjs/core/Meshes/transformNode';
 import {ConeEmitter, type ParticleSystem, RenderMode, SphereEmitter} from 'babylon.quarks';
 import type {SysOptions} from './kit';
-import {drag, fadeOut, flicker, frames, gravity, grow, type Hex, type Num, popOut, spin, tint, wobble} from './kit';
+import {
+    drag,
+    fadeOut,
+    flicker,
+    frames,
+    gravity,
+    grow,
+    type Hex,
+    lifeFrames,
+    type Num,
+    popOut,
+    spin,
+    tint,
+    wobble,
+} from './kit';
 import type {FxBuilder} from './stage';
+import {rampTexture} from './textures';
 
 /**
  * Building blocks shared by the gallery's effects: a fire, its smoke and embers, a flash, a
@@ -80,17 +95,37 @@ export interface FlameOptions extends Placed {
     puff?: boolean;
 }
 
+function scaled(value: Num, k: number): Num {
+    if (typeof value === 'number') return value * k;
+    if (Array.isArray(value)) return [value[0] * k, value[1] * k];
+    return value;
+}
+
 /** Tongues of flame rising from a disc: the core of every fire. */
 export function flames(fx: FxBuilder, o: FlameOptions = {}): ParticleSystem {
     const height = o.height ?? 1.6;
     const life: Num = o.life ?? [0.45, 0.75];
     const meanLife = Array.isArray(life) ? (life[0] + life[1]) / 2 : typeof life === 'number' ? life : 0.6;
+    // pixelfx's own flame tongue (or flame puff) as a heat flipbook, coloured through the ramp.
     return fx.sys({
-        tex: o.puff ? 'smoke' : 'flame',
+        image: o.puff ? 'fire-puff-heat' : 'flame-heat',
+        // Added, so where tongues overlap the heart of the fire burns toward white.
+        blend: o.puff ? 'alpha' : 'add',
+        alpha: o.puff ? 1 : 0.75,
+        look: {
+            gradientMap: {ramp: rampTexture(fx.scene, o.palette ?? PALETTE.fire)},
+            // A tongue's sprite stands on its foot, so it grows up from where it is born.
+            pivot: o.puff ? undefined : {x: 0, y: 0.45, z: 0},
+        },
         rot: o.puff ? true : [-0.2, 0.2],
         life,
-        speed: o.speed ?? [(height / meanLife) * 0.6, (height / meanLife) * 0.9],
-        size: o.size ?? [0.6, 1],
+        // Tongues stay rooted and lick upward, rather than flying off: a flame, not a spray of them.
+        speed:
+            o.speed ??
+            (o.puff
+                ? [(height / meanLife) * 0.6, (height / meanLife) * 0.9]
+                : [(height / meanLife) * 0.15, (height / meanLife) * 0.3]),
+        size: scaled(o.size ?? [0.6, 1], o.puff ? 1 : 1.7),
         rate: o.burst ? undefined : (o.rate ?? 40),
         burst: o.burst,
         shape: new ConeEmitter({radius: o.radius ?? 0.35, angle: o.spread ?? 0.12, thickness: 1}),
@@ -103,8 +138,20 @@ export function flames(fx: FxBuilder, o: FlameOptions = {}): ParticleSystem {
         world: o.world,
         order: o.order ?? 3,
         b: [
-            tint(o.palette ?? PALETTE.fire, fadeOut(0.45, 0.1)),
-            grow([0, 0.7], [0.3, 1], [1, 0.25]),
+            o.puff ? lifeFrames(16) : frames(12, 24),
+            tint([['#ffffff', 0]], o.puff ? popOut(0.8) : fadeOut(0.45, 0.1)),
+            grow(
+                ...((o.puff
+                    ? [
+                          [0, 1],
+                          [1, 1.3],
+                      ]
+                    : [
+                          [0, 0.7],
+                          [0.3, 1],
+                          [1, 0.25],
+                      ]) as Array<[number, number]>)
+            ),
             wobble(2, 0.6),
             drag([0, 1], [1, 0.6]),
         ],
@@ -209,8 +256,10 @@ export function smoke(
         grows?: number;
     } = {}
 ): ParticleSystem {
+    // pixelfx's smoke puff as a flipbook played once over each puff's life.
     return fx.sys({
-        tex: 'smoke',
+        image: 'smoke-puff',
+        randomTile: false,
         blend: 'alpha',
         life: o.life ?? [1.4, 2.2],
         speed: o.speed ?? [0.6, 1.1],
@@ -231,8 +280,8 @@ export function smoke(
         order: o.order ?? 1,
         soft: true,
         b: [
-            tint([['#ffffff', 0]], fadeOut(0.4, 0.15)),
-            grow([0, 0.6], [1, o.grows ?? 2.2]),
+            lifeFrames(16),
+            grow([0, 0.8], [1, 1 + ((o.grows ?? 2.2) - 1) * 0.5]),
             spin([-0.6, 0.6]),
             wobble(0.8, 0.5),
             drag([0, 1], [1, 0.35]),

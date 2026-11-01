@@ -296,7 +296,7 @@ export const fire: FxDef[] = [
                 rate: 30,
                 shape: new CircleEmitter({radius: 0.65, thickness: 0.15}),
                 aim: 'up',
-                at: [0, 0.3, 0],
+                look: {pivot: {x: 0, y: 0.45, z: 0}},
                 order: 4,
                 b: [
                     frames(12, 24),

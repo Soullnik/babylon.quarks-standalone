@@ -60,9 +60,11 @@ def blur(a, s, wrap=False):
 # ---- flipbooks from pixel art ----
 
 
-def flame_atlas(png, meta, scale=8, soft=0.25):
+def flame_atlas(png, meta, scale=8, soft=0.25, heat=False):
     """The torch flame, each frame padded to a square (bottom-aligned) and de-pixelized."""
     img = np.asarray(Image.open(png).convert('RGBA')).astype(np.float32) / 255
+    if heat:
+        img = to_heat(img)
     info = json.load(open(meta))['meta']['pixelfx']
     fw, fh = info['frameSize']
     cols, n = info['columns'], info['frames']
@@ -97,7 +99,16 @@ def flame_atlas(png, meta, scale=8, soft=0.25):
         o = np.concatenate([np.clip(rgb, 0, 1), A2[..., None]], -1)[pad * k:-pad * k, pad * k:-pad * k]
         r, c = i // out_cols, i % out_cols
         res[r * side * k:(r + 1) * side * k, c * side * k:(c + 1) * side * k] = o
-    save('torch-flame.png', res)
+    save('flame-heat.png' if heat else 'torch-flame.png', res)
+
+
+def to_heat(img):
+    """Each pixel's fire colour as its heat, grey in RGB: 1 white-hot to 0 the darkest red. Through a
+    gradient map the same flipbook then burns in any ramp: fire, spirit flame, poison."""
+    cols = np.stack([hexrgb(c) for c in FIRE])
+    d = ((img[..., None, :3] - cols[None, None]) ** 2).sum(-1)
+    h = np.asarray(FIRE_HEAT)[d.argmin(-1)]
+    return np.concatenate([np.repeat(h[..., None], 3, -1), img[..., 3:4]], -1).astype(np.float32)
 
 
 # ---- maps drawn from the effects' formulas ----
@@ -171,7 +182,7 @@ def hex_cells(gx, gy):
     dx = np.abs(gx - hx)
     dy = gy - hy
     e = np.maximum.reduce([dx, np.abs(dx / 2 + dy * s3 / 2), np.abs(dx / 2 - dy * s3 / 2)]) / (s3 / 2)
-    return rq, rr, e
+    return rq, rr, e, gx - hx, dy
 
 
 def hex_shell(w=1024, h=512, columns=22):
@@ -185,21 +196,111 @@ def hex_shell(w=1024, h=512, columns=22):
     U, V = np.meshgrid(u, v)
     grid = np.sqrt(3) * columns / TAU
     lon, lat = U * TAU, V * np.pi / 2
-    rq, rr, e = hex_cells(lon * grid, lat * grid * 1.15)
+    rq, rr, e, ox, oy = hex_cells(lon * grid, lat * grid * 1.15)
     rq = np.mod(rq + (rr - np.mod(rr, 2)) / 2, columns)  # wrap the axial column round the dome
     # Near the pole the longitude cells crowd together; the plates fade into plain glass there.
-    edge = smoothstep(0.8, 0.9, e) * smoothstep(0.86, 0.6, V)
+    keep = smoothstep(0.86, 0.6, V)
+    edge = smoothstep(0.8, 0.9, e) * keep
+    # Each plate's lit top-left edge (force-field.js `bevel`): a thin band inside the seam facing up-left.
+    facing = np.clip((-ox * 0.5 + oy * 0.87) / np.maximum(np.hypot(ox, oy), 1e-4), 0, 1)
+    bevel = smoothstep(0.62, 0.72, e) * (1 - smoothstep(0.74, 0.8, e)) * facing * keep
     glass = 0.035 + 0.05 * V
     foot = smoothstep(0.035, 0.0, V)
-    a = np.maximum(edge, glass)
-    a = np.maximum(a, foot)
-    light, deep = hexrgb('#8ae8ff'), hexrgb('#2582d2')
+    a = np.maximum.reduce([edge, glass, foot, bevel * 0.35])
+    light, deep, lit = hexrgb('#8ae8ff'), hexrgb('#2582d2'), hexrgb('#36b9ee')
     rgb = deep * (1 - edge[..., None]) + light * edge[..., None]
+    rgb = rgb * (1 - bevel[..., None]) + lit * bevel[..., None]
     rgb = rgb * (1 - foot[..., None]) + hexrgb('#d4fbff') * foot[..., None]
     save('hex-shell.png', np.concatenate([rgb, a[..., None]], -1))
     hashv = np.mod(np.sin(rq * 12.9898 + rr * 78.233) * 43758.5453, 1)
-    face = (1 - smoothstep(0.66, 0.78, e)) * (0.35 + 0.65 * hashv) * smoothstep(0.86, 0.6, V)
+    inside = 1 - smoothstep(0.66, 0.78, e)
+    face = inside * (0.35 + 0.65 * hashv) * keep
     save('hex-plates.png', np.stack([np.ones_like(face)] * 3 + [face], -1))
+    # When each plate glints: one plate in five gets a time in 0.2..1 (an erosion level), the rest none.
+    pick = np.mod(np.sin(rq * 39.346 + rr * 11.135) * 24634.6345, 1)
+    when = np.mod(np.sin(rq * 73.156 + rr * 52.235) * 13758.937, 1)
+    glint = np.where(pick < 0.2, 0.2 + 0.8 * when, 0) * (inside > 0.5) * keep
+    save('hex-glint.png', np.stack([glint] * 3 + [np.ones_like(glint)], -1))
+
+
+def gradient(size=128):
+    """Red from 1 at V 0 (the bottom) to 0 at V 1: an erosion mask whose cut climbs a surface."""
+    v = (np.arange(size)[::-1] + 0.5) / size
+    g = np.repeat((1 - v)[:, None], 4, 1)
+    save('gradient.png', np.stack([g, g, g, np.ones_like(g)], -1))
+
+
+def disc_layer(img, cx, cy, r, rgb, a, aa=1.2, wob=0.0, seed=0):
+    """Composites an antialiased disc over `img` (premultiplied RGBA), `aa` pixels of soft edge. `wob`
+    ruffles its rim by that fraction of the radius, so a ball of flame or smoke reads as billowing."""
+    h, w = img.shape[:2]
+    y, x = np.mgrid[0:h, 0:w]
+    d = np.sqrt((x + 0.5 - cx) ** 2 + (y + 0.5 - cy) ** 2)
+    if wob:
+        th = np.arctan2(y + 0.5 - cy, x + 0.5 - cx)
+        rng = np.random.default_rng(seed)
+        ruffle = sum(np.sin(th * f + rng.uniform(0, TAU)) / f ** 0.7 for f in (3, 5, 7, 11))
+        d = d - r * wob * ruffle / 2.2
+    cov = np.clip((r - d) / aa + 0.5, 0, 1) * a
+    img[..., :3] = img[..., :3] * (1 - cov[..., None]) + np.asarray(rgb)[None, None, :] * cov[..., None]
+    img[..., 3] = img[..., 3] * (1 - cov) + cov
+
+
+def unpremultiply(img):
+    out = img.copy()
+    out[..., :3] = img[..., :3] / np.maximum(img[..., 3:4], 1e-4)
+    return out
+
+
+def puff_sheet(name, draw, frames=16, cols=4, tile=128):
+    """A sheet of `frames` tiles, frame i drawn by draw(img, cx, cy, k) with k the life left (1 to 0)."""
+    rows = (frames + cols - 1) // cols
+    sheet = np.zeros((rows * tile, cols * tile, 4), np.float32)
+    for i in range(frames):
+        img = np.zeros((tile, tile, 4), np.float32)
+        draw(img, tile / 2, tile * 0.56, 1 - i / (frames - 1) * 0.999)
+        r, c = i // cols, i % cols
+        sheet[r * tile:(r + 1) * tile, c * tile:(c + 1) * tile] = unpremultiply(img)
+    save(name + '.png', sheet)
+
+
+def fire_puff_frame(img, x, y, k, size=30, heat=False):
+    """pixelfx fire/_lib.js `firePuff`, drawn at full resolution: a ball of flame cooling down the ramp as it
+    ages, a darker rim, a lit core up and to the left, a tongue on top and a hot heart while young."""
+    H = [np.full(3, h, np.float32) for h in FIRE_HEAT] if heat else [hexrgb(c) for c in FIRE]
+    n = len(H)
+    age = 1 - k
+    heat = min(0.999, age ** 0.62 + 0.03)
+    idx = min(n - 2, int(heat * (n - 1)))
+    r = size * (0.55 + 0.45 * min(1, age * 7)) * (1 - age * 0.55)
+    c = H[idx]
+    if idx >= n - 2:
+        disc_layer(img, x, y, r, c, min(1, k * 3) * 0.85, aa=r * 0.5)
+        return
+    disc_layer(img, x, y, r, H[min(n - 1, idx + 2)], 1, wob=0.14, seed=1)
+    disc_layer(img, x - r * 0.16, y - r * 0.22, r * 0.78, c, 1, wob=0.12, seed=2)
+    disc_layer(img, x, y - r * 0.9, r * 0.42, c, 1, wob=0.1, seed=3)
+    if idx <= 3:
+        disc_layer(img, x - r * 0.28, y - r * 0.34, r * 0.36, H[max(0, idx - 1)], 1, wob=0.1, seed=4)
+
+
+SMOKE = ['#7b6f72', '#5d5660', '#433d48', '#2b2630', '#1a171e']
+
+
+def smoke_puff_frame(img, x, y, k, size=26):
+    """pixelfx fire/_lib.js `smokePuff` (big), drawn at full resolution: a body, a denser core sitting low
+    and a lit cap while young, swelling and thinning. Shaded relative to the ramp's lightest grey, so the
+    particle colour sets the smoke's own."""
+    age = 1 - k
+    r = size * (0.65 + min(1, age * 2.5) * 0.45 + age * 0.5)
+    a = min(1, age * 12) * min(1, k * 2.4) * 0.7
+    top = hexrgb(SMOKE[0])
+    grey = hexrgb(SMOKE[min(4, int(age * 1.05 * 5))]) / top
+    soft = r * 0.35
+    disc_layer(img, x, y, r, grey, a * 0.45, aa=soft, wob=0.12, seed=5)
+    disc_layer(img, x + r * 0.05, y + r * 0.06, r * 0.74, grey, a * 0.62, aa=soft, wob=0.12, seed=6)
+    if age < 0.5:
+        disc_layer(img, x - r * 0.22, y - r * 0.3, r * 0.5, np.minimum(1, grey * 1.15), a * 0.4 * (1 - age * 2), aa=soft)
 
 
 def radial(size=128):
@@ -215,7 +316,11 @@ if __name__ == '__main__':
     args = sys.argv[1:]
     if args[:1] == ['--flame']:
         flame_atlas(args[1], args[2])
+        flame_atlas(args[1], args[2], heat=True)
     noise_map()
     tornado_band()
     hex_shell()
     radial()
+    gradient()
+    puff_sheet('fire-puff-heat', lambda *a: fire_puff_frame(*a, heat=True))
+    puff_sheet('smoke-puff', smoke_puff_frame)

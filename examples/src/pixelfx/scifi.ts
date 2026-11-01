@@ -2,9 +2,9 @@ import type {StandardMaterial} from '@babylonjs/core/Materials/standardMaterial'
 import {Color4} from '@babylonjs/core/Maths/math.color';
 import type {Mesh} from '@babylonjs/core/Meshes/mesh';
 import type {TransformNode} from '@babylonjs/core/Meshes/transformNode';
-import {BoxEmitter, CircleEmitter, ConeEmitter, RenderMode, SphereEmitter} from 'babylon.quarks';
-import {c3, drag, fadeOut, flicker, gravity, grow, lathe, orbit, popOut, spin, tint, wobble} from './kit';
-import {PALETTE, arcs, flames, flash, pool, smoke, sparks, type Ramp} from './recipes';
+import {BoxEmitter, CircleEmitter, ConeEmitter, HemisphereEmitter, RenderMode, SphereEmitter} from 'babylon.quarks';
+import {c3, drag, fadeOut, flicker, gravity, grow, lathe, orbit, popOut, quad, spin, tint, wobble} from './kit';
+import {PALETTE, arcs, flames, flash, heart, pool, smoke, sparks, type Ramp} from './recipes';
 import {shapes, type FxBuilder, type FxDef} from './stage';
 import {image} from './textures';
 
@@ -315,10 +315,15 @@ export const scifi: FxDef[] = [
         loop: true,
         period: 2.4,
         build(fx) {
+            // Everything force-field.js draws, in 3D. The shell: a hemisphere mesh mapped by longitude and
+            // latitude with hex plates, each plate's top-left edge lit; its far side dim through the glass;
+            // a hard bright rim. Shots from the right at 0.42 s (heavy, high) and 1.5 s (light, low) each
+            // set off a hot spot, a ripple racing over the shell, sparks, motes, stars and a puff of smoke;
+            // the heavy one cracks the shell. In the quiet part of the loop one plate in five glints in turn,
+            // and near its end a scan climbs the dome. Round its foot, a ring with ten lights chasing.
+            const D = 2.4;
             fx.character();
             const R = 1.9;
-            // The shell: one hemisphere mesh mapped by longitude and latitude with hex plates (the grid of
-            // Sprite Fusion's shield), its far side faint through the glass, its edge lit by a rim.
             const dome: Array<[number, number]> = [];
             for (let i = 0; i <= 16; i++) {
                 const lat = (i / 16) * (Math.PI / 2);
@@ -332,46 +337,156 @@ export const scifi: FxDef[] = [
                 burst: 1,
                 loop: false,
             } as const;
+            // An erosion layer over the shell whose only light is its edge band: as the alpha (the erosion
+            // level) runs over the particle's life, the band sweeps through the mask's values in order.
+            const band = (o: {
+                image: 'hex-shell' | 'hex-plates';
+                mask: 'hex-glint' | 'gradient';
+                time: number;
+                life: number;
+                edge: number;
+                color: [number, number, number];
+                from?: number;
+                to?: number;
+            }) =>
+                fx.sys({
+                    ...shell,
+                    image: o.image,
+                    loop: undefined,
+                    life: o.life,
+                    burst: [[o.time, 1]],
+                    color: '#000000',
+                    order: 5,
+                    b: [
+                        tint(
+                            [['#000000', 0]],
+                            [
+                                [o.from ?? 0, 0],
+                                [o.to ?? 1, 1],
+                            ]
+                        ),
+                    ],
+                    look: {
+                        renderFace: 'front',
+                        erosion: {
+                            mask: image(fx.scene, o.mask).texture,
+                            softness: 0.03,
+                            edgeWidth: o.edge,
+                            edgeColor: o.color,
+                        },
+                    },
+                });
+
             fx.sys({...shell, alpha: 0.25, order: 1, look: {renderFace: 'back'}});
             const near = fx.sys({
                 ...shell,
                 order: 4,
-                look: {renderFace: 'front', rim: {color: [0.33, 0.8, 1], power: 3, strength: 0.7}},
+                look: {renderFace: 'front', rim: {color: [0.6, 0.95, 1], power: 4, strength: 0.75}},
             });
             near.tint = new Color4(1, 1, 1, 1);
             const flare = near.tint;
-            // Shots: a heavy one high up that makes the shell flare, a light one low that it shrugs off.
-            const shots: Array<{time: number; y: number; heavy: boolean; turn: number}> = [
-                {time: 0.5, y: 1.4, heavy: true, turn: -0.55},
-                {time: 1.6, y: 0.7, heavy: false, turn: -0.95},
+            // Glints: in the quiet stretch after the heavy hit, each chosen plate flares and dies in turn.
+            band({
+                image: 'hex-plates',
+                mask: 'hex-glint',
+                time: 0.95,
+                life: 1.75,
+                edge: 0.14,
+                color: [1.4, 2, 2.3],
+                from: 0.12,
+                to: 0.78,
+            });
+            // The scan: a band of light climbing the dome from the foot to the top, once a loop.
+            band({
+                image: 'hex-shell',
+                mask: 'gradient',
+                time: 0.72 * D,
+                life: 0.26 * D,
+                edge: 0.12,
+                color: [0.6, 1.4, 1.8],
+            });
+            // Stars twinkling where plates glint, on the side we see.
+            fx.sys({
+                tex: 'glint',
+                life: 0.4,
+                size: [0.18, 0.3],
+                rate: 4,
+                delay: 1,
+                color: '#d4fbff',
+                shape: new HemisphereEmitter({radius: R * 1.01, thickness: 0}),
+                aim: 'up',
+                order: 6,
+                b: [tint(BLUE, popOut(0.3)), grow([0, 1], [1, 0.4])],
+            });
+
+            // The foot: a ring on the floor, ten lights round it with a pulse chasing round twice a loop.
+            fx.sys({
+                tex: 'ring',
+                mode: RenderMode.HorizontalBillBoard,
+                life: 1e4,
+                size: 2 * R + 0.25,
+                burst: 1,
+                loop: false,
+                color: '#36b9ee',
+                alpha: 0.7,
+                at: [0, 0.02, 0],
+                order: 2,
+            });
+            const lights = Array.from({length: 10}, (_, i) => {
+                const g = (i / 10) * Math.PI * 2 + 0.31;
+                const light = fx.sys({
+                    tex: 'glow',
+                    life: 1e4,
+                    size: 0.45,
+                    burst: 1,
+                    loop: false,
+                    color: '#8ae8ff',
+                    at: [Math.cos(g) * (R - 0.03), 0.06, Math.sin(g) * (R - 0.03)],
+                    order: 3,
+                });
+                light.tint = new Color4(1, 1, 1, 1);
+                return light.tint;
+            });
+
+            // Shots, as in the original: a heavy one high up at 0.42 s, a light one low at 1.5 s. Each comes
+            // along its own lane, turned toward the camera so it strikes the face of the shell we see.
+            const shots = [
+                {hitAt: 0.42, lat: 0.62, heavy: true, turn: -0.55},
+                {hitAt: 1.5, lat: 0.26, heavy: false, turn: -0.95},
             ];
             fx.every((t) => {
                 let k = 0;
                 for (const s of shots) {
-                    const d = t - s.time - 0.25;
+                    const d = t - s.hitAt;
                     if (d > 0) k = Math.max(k, Math.exp(-d * 6) * (s.heavy ? 1 : 0.5));
                 }
                 flare.r = flare.g = flare.b = 1 + 1.2 * k;
+                for (const [i, light] of lights.entries()) {
+                    const pulse = 0.5 + 0.5 * Math.cos(Math.PI * 2 * ((2 * t) / D - i / 10));
+                    light.a = 0.25 + 0.75 * pulse;
+                    light.g = light.b = 1 + 0.6 * pulse;
+                }
             });
             const START = 5;
+            const travel = 0.12;
             for (const [i, s] of shots.entries()) {
-                const hitX = Math.sqrt(R * R - s.y * s.y);
-                const travel = 0.25;
-                // Each shot comes along its own lane, turned toward the camera so it strikes the face of
-                // the shell we see rather than its silhouette.
+                const y = R * Math.sin(s.lat);
+                const hitX = R * Math.cos(s.lat);
+                const n = s.heavy ? 1 : 0.6;
                 const lane = fx.node(`lane-${i}`);
                 lane.rotation.y = s.turn;
+                // The tracer: a hot streak in from the right, a little above, its tail warm.
                 fx.sys({
                     parent: lane,
                     tex: 'dot',
                     mode: RenderMode.StretchedBillBoard,
-                    stretch: {speed: 0.06, length: 1},
+                    stretch: {speed: 0.03, length: 1},
                     life: travel,
                     speed: (START - hitX) / travel,
-                    size: s.heavy ? 0.2 : 0.12,
-                    burst: [[s.time, 1]],
+                    size: s.heavy ? 0.2 : 0.13,
+                    burst: [[s.hitAt - travel, 1]],
                     color: '#fff3a6',
-                    at: [START, s.y, 0],
+                    at: [START, y, 0],
                     aim: 'left',
                     order: 6,
                     b: [
@@ -384,22 +499,20 @@ export const scifi: FxDef[] = [
                         ),
                     ],
                 });
-                const hit = fx.node(`hit-${i}`, [hitX, s.y, 0], lane);
-                const t0 = s.time + travel;
-                // The ripple: a flash racing over the shell from where it was struck, lighting the plates
-                // at its front and leaving them glowing behind it. Erosion does the spreading: a cone mask
-                // laid round the hit by tiling and offset, cut back as the alpha rises over the ripple's
-                // life, its edge band the bright front; the colour fades to nothing behind it.
-                const lat = Math.asin(s.y / R);
-                const reach = s.heavy ? 1.7 : 1.1; // radians over the shell
-                const ru = reach / (Math.PI * 2 * Math.max(Math.cos(lat), 0.35));
+                const hit = fx.node(`hit-${i}`, [hitX, y, 0], lane);
+                const t0 = s.hitAt;
+                // The ripple: a front racing over the shell from the hit, the plates behind it still
+                // humming. Erosion does the spreading: a cone mask laid round the hit by tiling and offset,
+                // cut back as the alpha rises, its edge band the bright front; the colour fades behind it.
+                const reach = s.heavy ? 1.9 : 1.2; // radians over the shell
+                const ru = reach / (Math.PI * 2 * Math.max(Math.cos(s.lat), 0.35));
                 const rv = reach / (Math.PI / 2);
                 fx.sys({
                     ...shell,
                     image: 'hex-plates',
                     parent: lane,
                     loop: undefined,
-                    life: 0.75,
+                    life: 0.85,
                     burst: [[t0, 1]],
                     color: '#a6ecff',
                     // The lathe's U is 0.5 at -x; turn it to face the shots from +x.
@@ -409,7 +522,7 @@ export const scifi: FxDef[] = [
                         tint(
                             [
                                 ['#ffffff', 0],
-                                ['#3a8bd8', 0.45],
+                                ['#3a8bd8', 0.4],
                                 ['#000000', 1],
                             ],
                             [
@@ -424,7 +537,7 @@ export const scifi: FxDef[] = [
                             mask: image(fx.scene, 'radial').texture,
                             maskUV: {
                                 tiling: [1 / (2 * ru), 1 / (2 * rv)],
-                                offset: [0.5 - 0.5 / (2 * ru), 0.5 - lat / (Math.PI / 2) / (2 * rv)],
+                                offset: [0.5 - 0.5 / (2 * ru), 0.5 - s.lat / (Math.PI / 2) / (2 * rv)],
                             },
                             softness: 0.04,
                             edgeWidth: 0.1,
@@ -432,37 +545,128 @@ export const scifi: FxDef[] = [
                         },
                     },
                 });
+                // The hot spot: the struck plates go white, then cool.
                 fx.sys({
                     parent: hit,
-                    tex: 'ring',
-                    mode: RenderMode.VerticalBillBoard,
-                    life: 0.45,
-                    size: s.heavy ? 2.2 : 1.4,
+                    tex: 'glow',
+                    life: 0.5,
+                    size: 1.4 * n,
                     burst: [[t0, 1]],
-                    color: '#8ae8ff',
-                    order: 6,
-                    b: [tint(BLUE, popOut(0.2)), grow([0, 0.2], [1, 1])],
+                    color: '#ffffff',
+                    order: 7,
+                    b: [
+                        tint(
+                            [
+                                ['#ffffff', 0],
+                                ['#36b9ee', 0.5],
+                            ],
+                            popOut(0.1)
+                        ),
+                    ],
+                });
+                // The impact: a white star shrinking, and light that flares and dies.
+                fx.sys({
+                    parent: hit,
+                    tex: 'glint',
+                    life: 0.14,
+                    size: 1.3 * n,
+                    burst: [[t0, 1]],
+                    color: '#d4fbff',
+                    order: 8,
+                    b: [grow([0, 1], [1, 0.2])],
                 });
                 fx.sys({
                     parent: hit,
                     tex: 'glow',
-                    life: 0.2,
-                    size: s.heavy ? 1.6 : 1,
+                    life: 0.45,
+                    size: 4 * n,
                     burst: [[t0, 1]],
-                    color: '#d4fbff',
-                    order: 6,
-                    b: [tint([['#ffffff', 0]], popOut(0.1))],
+                    color: '#36b9ee',
+                    alpha: 0.45,
+                    order: 2,
+                    b: [tint([['#ffffff', 0]], popOut(0.05))],
                 });
+                // What glances off the curve: sparks up and away to the right, cool motes, rising stars,
+                // and a little smoke.
                 sparks(fx, {
                     parent: hit,
-                    count: s.heavy ? 18 : 8,
+                    count: Math.round(24 * n),
                     time: t0,
                     loop: true,
                     aim: 'right',
-                    shape: new ConeEmitter({radius: 0.05, angle: 0.9}),
-                    speed: [3, 6],
+                    shape: new ConeEmitter({radius: 0.05, angle: 0.7}),
+                    gravity: 5,
+                    speed: [3, 7],
                 });
+                fx.sys({
+                    parent: hit,
+                    tex: 'dot',
+                    life: [0.3, 0.6],
+                    speed: [0.8, 2],
+                    size: [0.06, 0.1],
+                    burst: [[t0, Math.round(7 * n)]],
+                    color: ['#8ae8ff', '#d4fbff'],
+                    shape: new ConeEmitter({radius: 0.05, angle: 1.2}),
+                    aim: 'right',
+                    order: 7,
+                    b: [tint([['#ffffff', 0]], popOut(0.5)), drag([0, 1], [1, 0.3])],
+                });
+                fx.sys({
+                    parent: hit,
+                    tex: 'glint',
+                    life: [0.3, 0.5],
+                    speed: 0.15,
+                    size: [0.2, 0.32],
+                    burst: [[t0 + 0.04, 1, Math.round(3 * n), 0.07]],
+                    color: '#d4fbff',
+                    shape: new SphereEmitter({radius: 0.2}),
+                    order: 8,
+                    b: [tint(BLUE, popOut(0.3))],
+                });
+                smoke(fx, {
+                    parent: hit,
+                    burst: [[t0 + 0.03, Math.round(3 * n)]],
+                    life: [0.9, 1.3],
+                    speed: [0.2, 0.5],
+                    size: [0.2, 0.32],
+                    color: '#5b5f78',
+                    alpha: 0.6,
+                    aim: 'right',
+                    radius: 0.05,
+                    spread: 0.8,
+                });
+                // The heavy shot cracks the shell: fractures race out from the hit white-hot, cool and fade.
+                if (s.heavy) {
+                    fx.sys({
+                        parent: hit,
+                        tex: 'crack',
+                        geo: quad(),
+                        life: 0.9,
+                        size: 1.7,
+                        burst: [[t0, 1]],
+                        rotate: [-s.lat, Math.PI / 2, 0],
+                        order: 7,
+                        b: [
+                            tint(
+                                [
+                                    ['#ffffff', 0],
+                                    ['#d4fbff', 0.15],
+                                    ['#8ae8ff', 0.35],
+                                    ['#000000', 1],
+                                ],
+                                [
+                                    [0, 0],
+                                    [1, 0.1],
+                                    [1, 1],
+                                ]
+                            ),
+                        ],
+                        look: {erosion: {mask: image(fx.scene, 'radial').texture, softness: 0.05}},
+                    });
+                }
             }
+            // The dome's own light.
+            heart(fx, {at: [0, R * 0.45, 0], size: R * 2.6, color: '#2582d2', alpha: 0.08});
             pool(fx, {color: '#2582d2', size: 4.2, alpha: 0.3});
         },
     },
