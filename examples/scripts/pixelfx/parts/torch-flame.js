@@ -1,3 +1,4 @@
+// From pixelfx (https://github.com/patch-gg/pixelfx), MIT License, Copyright (c) 2026 Patch.
 // The torch's flame alone, for a flipbook: no wrap, smoke, puffs, licks, embers or light.
 import { fit } from "../../core/index.js";
 import { noiseFor, hotFirst, burn } from "../fire/_lib.js";
