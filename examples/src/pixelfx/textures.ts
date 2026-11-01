@@ -483,6 +483,8 @@ export type ImageName =
     | 'diamond-cells'
     | 'water-band'
     | 'whirl-band'
+    | 'scanlines'
+    | 'light-column'
     | 'radial'
     | 'gradient'
     | 'noise';
@@ -515,6 +517,10 @@ const IMAGES: Record<ImageName, {u: number; v: number; wrap: boolean; wrapV?: bo
     'water-band': {u: 1, v: 1, wrap: true, wrapV: true},
     // The same with its strands sheared once round U, so on a funnel they spiral.
     'whirl-band': {u: 1, v: 1, wrap: true, wrapV: true},
+    // White scanlines across V over a faint fill, tiling both ways: scroll V to roll them.
+    scanlines: {u: 1, v: 1, wrap: true, wrapV: true},
+    // A column of light round U, bright at its foot and fading up V, with faint vertical streaks.
+    'light-column': {u: 1, v: 1, wrap: true},
     // Red 1 at the bottom to 0 at the top: an erosion mask whose cut climbs a surface.
     gradient: {u: 1, v: 1, wrap: false, mask: 'linear'},
     // A cone in red, 1 at the centre to 0 at the rim: an erosion mask that spreads a cut from a point.

@@ -1846,7 +1846,7 @@ export const water: FxDef[] = [
                 rotate: FLAT,
                 at: [0, LEVEL + 0.03, 0],
                 order: 6,
-                b: [tint([['#ffffff', 0]], fadeOut(0.6, 0.2)), orbit(1.6)],
+                b: [tint([['#ffffff', 0]], fadeOut(0.6, 0.2)), orbit(1.6, [0, 0, 1])],
             });
             fx.sys({
                 mesh: 'plank',
@@ -1860,7 +1860,7 @@ export const water: FxDef[] = [
                 at: [0, LEVEL + 0.04, 0],
                 tumble: 0.6,
                 order: 5,
-                b: [orbit(1.2), grow([0, 1], [0.85, 1], [1, 0])],
+                b: [orbit(1.2, [0, 0, 1]), grow([0, 1], [0.85, 1], [1, 0])],
             });
             fx.sys({
                 tex: 'glint',

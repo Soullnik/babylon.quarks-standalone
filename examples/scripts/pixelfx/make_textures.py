@@ -342,6 +342,28 @@ def water_band(name='water-band', w=256, h=512, twist=0):
     save(name + '.png', out)
 
 
+def scanlines(w=64, h=128, rows=16):
+    """White scanlines across V (`rows` of them, tiling both ways) over a faint fill: a hologram's or a
+    pulse's skin. Tint it with the particle colour and scroll V to roll the lines."""
+    v = (np.arange(h) + 0.5) / h
+    f = (v * rows) % 1
+    line = smoothstep(0.32, 0.0, np.abs(f - 0.5) - 0.12)
+    alpha = np.clip(0.12 + 0.88 * line, 0, 1)
+    a = np.repeat(alpha[:, None], w, 1)
+    save('scanlines.png', np.stack([np.ones_like(a)] * 3 + [a], -1))
+
+
+def light_column(w=256, h=256):
+    """A column of light: U round it (tiling), V up it, bright at the foot and fading to nothing at the
+    top, with faint vertical streaks. White, to be tinted."""
+    v = (np.arange(h)[::-1] + 0.5) / h
+    streak = streaks(w, h, 2, 200, 31)
+    fade = (1 - v) ** 1.3
+    foot = smoothstep(0.08, 0.0, v)
+    a = np.clip(fade[:, None] * (0.45 + 0.55 * streak) + 0.6 * foot[:, None], 0, 1)
+    save('light-column.png', np.stack([np.ones_like(a)] * 3 + [a], -1))
+
+
 def gradient(size=128):
     """Red from 1 at V 0 (the bottom) to 0 at V 1: an erosion mask whose cut climbs a surface."""
     v = (np.arange(size)[::-1] + 0.5) / size
@@ -447,6 +469,8 @@ if __name__ == '__main__':
     diamond_shell()
     water_band()
     water_band('whirl-band', twist=1)
+    scanlines()
+    light_column()
     radial()
     gradient()
     puff_sheet('fire-puff-heat', lambda *a: fire_puff_frame(*a, heat=True))
