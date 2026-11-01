@@ -351,9 +351,10 @@ function geometry(scene: Scene, kind: MeshKind): Geometry {
 /**
  * A surface of revolution about +y: `profile` gives `[radius, height]` from the bottom up, and the
  * mesh goes once round in `segments`. U runs round it (0 to 1, the seam doubled so a map wraps
- * cleanly), V up it by the profile's index. Normals point outward.
+ * cleanly), V up it by the profile's index. Normals point outward. `arc` and `start` (radians, from +x
+ * toward +z) sweep only part of the way round, for a half dome or an open shell.
  */
-export function lathe(profile: Array<[number, number]>, segments = 48): Geometry {
+export function lathe(profile: Array<[number, number]>, segments = 48, arc = Math.PI * 2, start = 0): Geometry {
     const rows = profile.length;
     const positions: number[] = [];
     const normals: number[] = [];
@@ -370,7 +371,7 @@ export function lathe(profile: Array<[number, number]>, segments = 48): Geometry
         nr /= len;
         ny /= len;
         for (let i = 0; i <= segments; i++) {
-            const a = (i / segments) * Math.PI * 2;
+            const a = start + (i / segments) * arc;
             const c = Math.cos(a);
             const s = Math.sin(a);
             positions.push(r * c, y, r * s);

@@ -16,6 +16,7 @@ export type TextureName =
     | 'glint'
     | 'flake'
     | 'shard'
+    | 'wedge'
     | 'square'
     | 'bolt'
     | 'crack'
@@ -278,6 +279,22 @@ const SPECS: Record<TextureName, TextureSpec> = {
             },
         },
     },
+    // A wedge along U, its point at U 0 and its fat end at U 1: comic hit lines on a stretched billboard
+    // moving toward its point, so the fat end trails outward.
+    wedge: {
+        size: 64,
+        paint: {
+            canvas: (ctx, s) => {
+                ctx.fillStyle = '#fff';
+                ctx.beginPath();
+                ctx.moveTo(2, s / 2);
+                ctx.lineTo(s - 2, s * 0.12);
+                ctx.lineTo(s - 2, s * 0.88);
+                ctx.closePath();
+                ctx.fill();
+            },
+        },
+    },
     // A filled square: chunks, debris, confetti, pixels.
     square: {
         size: 16,
@@ -462,6 +479,8 @@ export type ImageName =
     | 'hex-shell'
     | 'hex-plates'
     | 'hex-glint'
+    | 'diamond-shell'
+    | 'diamond-cells'
     | 'radial'
     | 'gradient'
     | 'noise';
@@ -487,6 +506,9 @@ const IMAGES: Record<ImageName, {u: number; v: number; wrap: boolean; mask?: 'li
     'hex-plates': {u: 1, v: 1, wrap: true},
     // When each plate glints, in red: an erosion mask; one plate in five has a time, the rest 0.
     'hex-glint': {u: 1, v: 1, wrap: true, mask: 'nearest'},
+    // A diamond lattice over a surface, and one random erosion value per cell, so cells blink out in turn.
+    'diamond-shell': {u: 1, v: 1, wrap: true},
+    'diamond-cells': {u: 1, v: 1, wrap: true, mask: 'nearest'},
     // Red 1 at the bottom to 0 at the top: an erosion mask whose cut climbs a surface.
     gradient: {u: 1, v: 1, wrap: false, mask: 'linear'},
     // A cone in red, 1 at the centre to 0 at the rim: an erosion mask that spreads a cut from a point.

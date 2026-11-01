@@ -278,6 +278,33 @@ def hex_shell(w=1024, h=512, columns=22):
     save('hex-glint.png', np.stack([glint] * 3 + [np.ones_like(glint)], -1))
 
 
+def diamond_shell(w=512, h=512, columns=12, rows=8):
+    """A diamond lattice over a surface (pixelfx impacts/shield-block): U across, V up, both 0..1.
+
+    `diamond-shell`: bright lattice lines over faint glass, a bright foot. `diamond-cells`: an erosion
+    mask with one random value per cell, so a falling level blinks the cells out one by one.
+    """
+    u = (np.arange(w) + 0.5) / w
+    v = (np.arange(h)[::-1] + 0.5) / h
+    U, V = np.meshgrid(u, v)
+    a = U * columns + V * rows
+    b = U * columns - V * rows
+    fa, fb = a - np.floor(a), b - np.floor(b)
+    e = np.minimum.reduce([fa, 1 - fa, fb, 1 - fb])  # 0 on a line, 0.5 at a cell's middle
+    line = smoothstep(0.07, 0.02, e)
+    glass = 0.06 + 0.06 * V
+    foot = smoothstep(0.04, 0.0, V)
+    alpha = np.maximum.reduce([line, glass, foot])
+    light, deep = hexrgb('#a6ecff'), hexrgb('#2c58aa')
+    rgb = deep * (1 - line[..., None]) + light * line[..., None]
+    rgb = rgb * (1 - foot[..., None]) + hexrgb('#dcfbff') * foot[..., None]
+    save('diamond-shell.png', np.concatenate([rgb, alpha[..., None]], -1))
+    ca, cb = np.floor(a), np.floor(b)
+    cell = np.mod(np.sin(ca * 12.9898 + cb * 78.233) * 43758.5453, 1)
+    mask = 0.04 + 0.92 * cell
+    save('diamond-cells.png', np.stack([mask] * 3 + [np.ones_like(mask)], -1))
+
+
 def gradient(size=128):
     """Red from 1 at V 0 (the bottom) to 0 at V 1: an erosion mask whose cut climbs a surface."""
     v = (np.arange(size)[::-1] + 0.5) / size
@@ -380,6 +407,7 @@ if __name__ == '__main__':
     pillar_band()
     blizzard_band()
     hex_shell()
+    diamond_shell()
     radial()
     gradient()
     puff_sheet('fire-puff-heat', lambda *a: fire_puff_frame(*a, heat=True))
