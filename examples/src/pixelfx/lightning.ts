@@ -1,6 +1,21 @@
 import type {StandardMaterial} from '@babylonjs/core/Materials/standardMaterial';
 import {BoxEmitter, CircleEmitter, ConeEmitter, HemisphereEmitter, RenderMode, SphereEmitter} from 'babylon.quarks';
-import {fadeOut, flicker, gravity, grow, popOut, tint} from './kit';
+import {
+    airDrag,
+    curve,
+    fadeOut,
+    flicker,
+    gravity,
+    grow,
+    holdFrame,
+    lathe,
+    lifeFrames,
+    orbit,
+    popOut,
+    spin,
+    tint,
+    wobble,
+} from './kit';
 import {PALETTE, arcs, decal, flash, pool, shockwave, smoke, sparks} from './recipes';
 import {type FxBuilder, type FxDef, shapes} from './stage';
 
@@ -157,11 +172,11 @@ export const lightning: FxDef[] = [
             fx.sys({
                 tex: 'dot',
                 mode: RenderMode.StretchedBillBoard,
-                stretch: {speed: 0.08, length: 1},
+                stretch: {speed: 0.14, length: 1},
                 life: 0.4,
                 speed: -5,
-                size: [0.04, 0.07],
-                rate: 50,
+                size: [0.05, 0.08],
+                rate: 70,
                 duration: release,
                 loop: false,
                 shape: new SphereEmitter({radius: 2, thickness: 0}),
@@ -205,7 +220,35 @@ export const lightning: FxDef[] = [
                 ],
             });
             core(fx, {parent: hand, size: 0.6, duration: release, loop: false});
+            // Rings of charge closing in on the core, quicker as it nears the release.
+            const rings = fx.sys({
+                tex: 'ring',
+                life: 0.45,
+                size: [1.6, 2],
+                rate: 0,
+                duration: release,
+                loop: false,
+                color: '#62a8ff',
+                parent: hand,
+                order: 4,
+                b: [tint([['#ffffff', 0]], fadeOut(0.6, 0.3)), grow([0, 1], [1, 0.25])],
+            });
+            rings.emissionOverTime = curve([0, 0], [0.3, 2], [0.7, 5], [1, 9]);
             flash(fx, {parent: hand, size: 4, delay: release, color: '#e6f8ff'});
+            // The release throws a shell of charge out round the caster, and a ring along the floor.
+            fx.sys({
+                tex: 'ring',
+                life: 0.35,
+                size: 3,
+                burst: [[0, 1]],
+                delay: release,
+                loop: false,
+                color: '#9ad4ff',
+                parent: hand,
+                order: 5,
+                b: [tint([['#ffffff', 0]], popOut(0.3)), grow([0, 0.3], [1, 1.4])],
+            });
+            shockwave(fx, {at: [0, 0.03, 0], size: 6, delay: release, color: '#9ad4ff', life: 0.45});
             arcs(fx, {
                 parent: hand,
                 to: hand,
@@ -244,21 +287,33 @@ export const lightning: FxDef[] = [
                 jump -= dt;
                 if (jump <= 0) {
                     jump = 0.08;
-                    crawl.position.set(
-                        (Math.random() - 0.5) * 0.7,
-                        0.2 + Math.random() * 1.6,
-                        (Math.random() - 0.5) * 0.4
-                    );
+                    // Over the near side of the body, where the camera sees it.
+                    crawl.position.set((Math.random() - 0.5) * 0.6, 0.2 + Math.random() * 1.5, 0.34);
                 }
+                // A faint electric sheen all the time, the whole body flaring on each jolt.
                 const jolt = t % 0.7 < 0.08 ? 1 : 0;
-                material.emissiveColor.set(0.35 * jolt, 0.6 * jolt, 1 * jolt);
+                material.emissiveColor.set(0.08 + 0.35 * jolt, 0.08 + 0.6 * jolt, 0.22 + 0.8 * jolt);
             });
+            // Arcs crawling over the body and leaping across it, from its sides and front to the hop point.
             arcs(fx, {
                 to: crawl,
-                at: [0, 0.9, 0],
-                shape: new BoxEmitter({width: 0.8, height: 1.6, depth: 0.5}),
+                at: [0, 0.95, 0.3],
+                shape: new BoxEmitter({width: 0.9, height: 1.7, depth: 0.15}),
                 rate: 45,
-                width: [0.25, 0.35],
+                width: [0.5, 0.75],
+            });
+            // On every jolt a few long arcs leap off the body into the air around it.
+            arcs(fx, {
+                to: crawl,
+                at: [0, 1, 0.35],
+                shape: new BoxEmitter({width: 1.9, height: 2, depth: 0.3}),
+                burst: [
+                    [0, 4],
+                    [0.7, 4],
+                    [1.4, 4],
+                ],
+                width: [0.6, 0.85],
+                life: [0.08, 0.14],
             });
             zapSparks(fx, {at: [0, 0.9, 0], rate: 25, shape: new SphereEmitter({radius: 0.5}), speed: [2, 4]});
             fx.sys({
@@ -292,31 +347,90 @@ export const lightning: FxDef[] = [
         id: 'lightning/lightning-strike',
         name: 'Lightning strike',
         loop: false,
-        period: 3.8,
+        period: 3.2,
+        view: {height: 2.6, distance: 14},
         build(fx) {
-            const hit = 1.1;
+            // lightning-strike.js in 3D: a sigil charges on the floor (0-0.6 s), forked leaders creep down
+            // from the sky (0.6-0.95 s), the bolt slams in (1 s) and flickers in its channel to 1.7 s, arcs race
+            // out along the cracks, sparks and embers spray, then the channel crumbles to sparks (2-2.6 s).
+            const hit = 1;
             const sky = fx.node('sky', [0.4, 9, 0]);
             const floor = fx.node('floor', [0, 0, 0]);
             fx.sys({
                 tex: 'rune',
                 mode: RenderMode.HorizontalBillBoard,
-                life: 1.3,
-                size: 3,
+                life: 1.1,
+                size: 1.8,
                 burst: 1,
                 color: '#7ac4ff',
                 at: [0, 0.03, 0],
                 order: 2,
-                b: [tint([['#ffffff', 0]], fadeOut(0.85, 0.5)), grow([0, 0.8], [1, 1])],
+                b: [
+                    tint(
+                        [['#ffffff', 0]],
+                        [
+                            [0, 0],
+                            [1, 0.5],
+                            [1, 0.9],
+                            [0, 1],
+                        ]
+                    ),
+                    grow([0, 0.6], [0.5, 1], [1, 1.1]),
+                    spin(1.5),
+                ],
+            });
+            // The leaders: branching arcs stepping down from the cloud before the strike.
+            const step = fx.node('leader', [0.2, 5, 0]);
+            fx.every((t) => {
+                const k = Math.min(1, Math.max(0, (t - 0.6) / 0.38));
+                step.position.y = 9 - 7.6 * k;
+            });
+            arcs(fx, {
+                parent: sky,
+                to: step,
+                shape: new SphereEmitter({radius: 0.8, thickness: 0}),
+                rate: 30,
+                delay: 0.6,
+                duration: 0.38,
+                loop: false,
+                width: [0.12, 0.2],
+                color: '#8a7aff',
             });
             arcs(fx, {
                 parent: floor,
                 to: sky,
                 delay: hit,
-                duration: 0.35,
+                duration: 0.7,
                 loop: false,
-                rate: 40,
-                width: [0.7, 1],
+                rate: 30,
+                width: [0.55, 0.9],
                 life: [0.05, 0.1],
+            });
+            // The channel crumbling: sparks hanging along where the bolt was, falling and going out.
+            fx.sys({
+                tex: 'dot',
+                life: [0.3, 0.6],
+                speed: [0, 0.2],
+                size: [0.05, 0.09],
+                rate: 120,
+                delay: 1.75,
+                duration: 0.6,
+                loop: false,
+                shape: new BoxEmitter({width: 0.3, height: 8, depth: 0.1}),
+                at: [0.2, 4.5, 0],
+                world: true,
+                order: 4,
+                b: [tint(ZAP, flicker()), gravity(1)],
+            });
+            sparks(fx, {
+                at: [0, 0.15, 0],
+                count: 30,
+                delay: hit,
+                speed: [2, 6],
+                aim: 'up',
+                shape: new ConeEmitter({radius: 0.2, angle: 1.3}),
+                palette: PALETTE.ember,
+                gravity: 8,
             });
             flash(fx, {at: [0, 1, 0], size: 7, delay: hit, life: 0.3});
             shockwave(fx, {size: 6, delay: hit, color: BOLT, life: 0.4});
@@ -364,36 +478,82 @@ export const lightning: FxDef[] = [
         loop: true,
         period: 3,
         build(fx) {
+            // plasma-ball.js in 3D: a glass globe on a dark stand; a white-hot core; eight or so violet
+            // tendrils reaching from it to the glass and slowly wandering round, each touching the glass with
+            // a bright foot; the glass itself rimmed in magenta and lit faintly from within.
             const center: [number, number, number] = [0, 1.9, 0];
-            fx.prop(shapes.cylinder(fx.scene, 0.8, 0.35, 0.6), {at: [0, 0.4, 0], color: '#1c1d26'});
-            fx.prop(shapes.sphere(fx.scene, 1.1, 24), {at: center, color: '#6a4aa8', alpha: 0.12});
+            fx.prop(shapes.cylinder(fx.scene, 0.8, 0.35, 0.6), {at: [0, 0.4, 0], color: '#2e2442'});
+            const globe: Array<[number, number]> = [];
+            for (let i = 0; i <= 24; i++) {
+                const lat = -Math.PI / 2 + (i / 24) * Math.PI;
+                globe.push([Math.max(0.001, Math.cos(lat)), Math.sin(lat)]);
+            }
+            for (const [face, alpha, order] of [
+                ['back', 0.35, 1],
+                ['front', 0.8, 7],
+            ] as Array<['back' | 'front', number, number]>) {
+                fx.sys({
+                    tex: 'square',
+                    geo: lathe(globe, 48),
+                    blend: 'add',
+                    life: 1e4,
+                    size: 1.12,
+                    burst: 1,
+                    loop: false,
+                    color: '#7a3ad0',
+                    alpha,
+                    at: center,
+                    order,
+                    look: {renderFace: face, rim: {color: [0.95, 0.6, 1], power: 2.6, strength: 1, mode: 'fade'}},
+                });
+            }
             const coreNode = fx.node('core', center);
-            core(fx, {parent: coreNode, size: 0.7, color: '#e0b8ff'});
-            // Tendrils from the core to the glass: bolts from points on the globe to its centre.
-            fx.sys({
-                beam: coreNode,
-                life: [0.3, 0.6],
-                size: [0.18, 0.28],
-                rate: 16,
-                color: '#d8a8ff',
-                shape: new SphereEmitter({radius: 1.05, thickness: 0}),
-                parent: coreNode,
-                order: 5,
-                b: [tint(PALETTE.plasma, flicker())],
-            });
-            // The bright feet where they touch the glass.
             fx.sys({
                 tex: 'glow',
-                life: [0.3, 0.6],
-                size: [0.3, 0.45],
-                rate: 16,
-                color: '#f0d8ff',
-                shape: new SphereEmitter({radius: 1.05, thickness: 0}),
+                life: 0.5,
+                size: 2.6,
+                rate: 4,
+                color: '#8a4ad8',
+                alpha: 0.3,
+                parent: coreNode,
+                order: 2,
+            });
+            core(fx, {parent: coreNode, size: 0.9, color: '#f0d0ff'});
+            // Tendrils from the core to the glass: bolts from points on the globe to its centre, wandering round.
+            const touch = new SphereEmitter({radius: 1.08, thickness: 0});
+            fx.sys({
+                beam: coreNode,
+                life: [0.5, 0.9],
+                size: [0.4, 0.55],
+                rate: 12,
+                color: '#e0b0ff',
+                shape: touch,
+                parent: coreNode,
+                order: 5,
+                b: [
+                    tint(PALETTE.plasma, [
+                        [0, 0],
+                        [1, 0.1],
+                        [0.8, 0.5],
+                        [1, 0.8],
+                        [0, 1],
+                    ]),
+                    orbit([-0.9, 0.9]),
+                ],
+            });
+            // Bright feet on the glass.
+            fx.sys({
+                tex: 'glow',
+                life: [0.4, 0.8],
+                size: [0.35, 0.55],
+                rate: 14,
+                color: '#f4d8ff',
+                shape: touch,
                 parent: coreNode,
                 order: 6,
-                b: [tint([['#ffffff', 0]], flicker())],
+                b: [tint([['#ffffff', 0]], flicker()), orbit([-0.9, 0.9])],
             });
-            pool(fx, {color: '#9a5cff', size: 3, alpha: 0.25});
+            pool(fx, {color: '#9a5cff', size: 3.4, alpha: 0.4});
         },
     },
     {
@@ -440,17 +600,62 @@ export const lightning: FxDef[] = [
         name: 'Storm cloud',
         loop: true,
         period: 3,
+        view: {height: 2.4, distance: 13},
         build(fx) {
-            const base = 4.6;
+            // storm-cloud.js in 3D: a dark cloud boiling overhead, billows lit on top, a flat dark base with
+            // ragged scud under it; discharges flicker inside; rain slants down; once a loop a bolt cracks to
+            // the floor (1.8 s) with a splash of sparks.
+            const base = 4;
+            // The cloud's billows: puffs held at their fullest frame, living longer than a loop and
+            // rolling slowly, so it boils without ever thinning. Dark beneath, lit on top.
+            for (const [y, width, height, count, size, colors, order] of [
+                [0.2, 4.2, 0.3, 26, [2.0, 2.8], ['#1a1828', '#24223a'], 1],
+                [0.75, 3.4, 0.5, 22, [1.9, 2.6], ['#2e2c48', '#3c3a5c'], 2],
+                [1.3, 2.4, 0.4, 14, [1.6, 2.2], ['#4a4a70', '#5c5c86'], 3],
+            ] as Array<[number, number, number, number, [number, number], [string, string], number]>) {
+                fx.sys({
+                    image: 'smoke-puff',
+                    randomTile: false,
+                    blend: 'alpha',
+                    life: 6,
+                    speed: [0.02, 0.08],
+                    size,
+                    rot: true,
+                    burst: [[0, count]],
+                    rate: count / 6,
+                    color: colors,
+                    alpha: 1,
+                    shape: new BoxEmitter({width, height, depth: 1.2}),
+                    at: [0, base + y, 0],
+                    order,
+                    b: [
+                        holdFrame(7),
+                        tint(
+                            [['#ffffff', 0]],
+                            [
+                                [0, 0],
+                                [1, 0.08],
+                                [1, 0.9],
+                                [0, 1],
+                            ]
+                        ),
+                        spin([-0.15, 0.15]),
+                        wobble(0.3, 0.15),
+                    ],
+                });
+            }
+            // Ragged scud trailing under the base.
             smoke(fx, {
-                at: [0, base, 0],
-                shape: new BoxEmitter({width: 4, height: 0.6, depth: 1.4}),
-                rate: 14,
-                speed: [0.05, 0.2],
-                size: [1.4, 1.9],
-                life: [2.4, 3],
-                color: ['#2a2a3a', '#4a4a5c'],
-                alpha: 0.85,
+                at: [0, base - 0.1, 0],
+                shape: new BoxEmitter({width: 4, height: 0.1, depth: 1}),
+                rate: 5,
+                speed: [0.1, 0.25],
+                size: [0.7, 1.1],
+                life: [1.6, 2.4],
+                color: '#1c1a2c',
+                alpha: 0.7,
+                aim: 'down',
+                spread: 0.4,
                 grows: 1.4,
             });
             // Discharges flickering inside the cloud.
@@ -459,32 +664,47 @@ export const lightning: FxDef[] = [
                 blend: 'add',
                 life: [0.08, 0.16],
                 size: [1.6, 2.4],
-                rate: 10,
+                rate: 6,
                 color: '#9ab8ff',
-                alpha: 0.6,
-                shape: new BoxEmitter({width: 3.6, height: 0.5, depth: 1}),
-                at: [0, base, 0],
-                order: 4,
+                alpha: 0.5,
+                shape: new BoxEmitter({width: 3.2, height: 0.6, depth: 0.6}),
+                at: [0, base + 0.7, 0],
+                order: 5,
                 b: [tint([['#ffffff', 0]], flicker())],
             });
             // Slanted rain.
             fx.sys({
                 tex: 'dot',
                 mode: RenderMode.StretchedBillBoard,
-                stretch: {speed: 0.05, length: 1},
-                life: 0.5,
-                speed: 9,
+                stretch: {speed: 0.09, length: 1},
+                life: 0.42,
+                speed: 9.5,
                 size: 0.03,
-                rate: 120,
-                color: '#9ab0d0',
-                alpha: 0.6,
-                shape: new BoxEmitter({width: 3.6, height: 0.1, depth: 1.2}),
+                rate: 140,
+                color: '#8ab4e8',
+                alpha: 0.7,
+                shape: new BoxEmitter({width: 4, height: 0.1, depth: 1.4}),
                 aim: 'down',
-                rotate: [0, 0, 0.2],
-                at: [0, base - 0.4, 0],
+                rotate: [0, 0, 0.18],
+                at: [0, base - 0.1, 0],
                 order: 3,
             });
-            const cloud = fx.node('cloud', [0.6, base - 0.3, 0]);
+            // Splashes where the rain lands.
+            fx.sys({
+                tex: 'dot',
+                life: [0.1, 0.2],
+                speed: [0.6, 1.2],
+                size: [0.03, 0.05],
+                rate: 60,
+                color: '#8ab4e8',
+                shape: new BoxEmitter({width: 4.4, height: 0, depth: 1.4}),
+                aim: 'up',
+                rotate: [0, 0, 0.0],
+                at: [0.6, 0.02, 0],
+                order: 3,
+                b: [tint([['#ffffff', 0]], fadeOut(0.4, 0.05)), gravity(6)],
+            });
+            const cloud = fx.node('cloud', [0.6, base, 0]);
             const strike = fx.node('strike', [0.9, 0, 0]);
             arcs(fx, {parent: strike, to: cloud, burst: [[1.8, 1, 6, 0.045]], width: [0.45, 0.6], life: [0.05, 0.1]});
             flash(fx, {at: [0.8, 2, 0], size: 6, time: 1.8, loop: true, life: 0.25});
@@ -548,52 +768,124 @@ export const lightning: FxDef[] = [
         loop: false,
         period: 1.9,
         build(fx) {
+            // thunderclap.js in 3D: the caster claps and a dome of charge swells round them (0 to 0.3 s),
+            // crawling with forks; it bursts into a ring racing out over the floor, cyan streaks flung up,
+            // dust rolling outward and embers left glowing on the ground; one last bolt runs down the caster
+            // (0.6 s); the dust thins by 1.5 s and the scorch fades.
             fx.character([0, 0, 0], 1.8, '#2a2d3a');
-            const above = fx.node('above', [0, 1.6, 0]);
-            flash(fx, {at: [0, 1.2, 0], size: 5});
-            // Forked bolts from the caster stabbing the floor around them.
+            const R = 2.1;
+            const hemi: Array<[number, number]> = [];
+            for (let i = 0; i <= 12; i++) {
+                const lat = (i / 12) * (Math.PI / 2);
+                hemi.push([Math.cos(lat), Math.sin(lat)]);
+            }
+            // The dome: a shell whose faces fade toward the camera, so only its rim glows.
+            for (const [face, alpha, order] of [
+                ['back', 0.45, 1],
+                ['front', 0.9, 6],
+            ] as Array<['back' | 'front', number, number]>) {
+                fx.sys({
+                    tex: 'square',
+                    geo: lathe(hemi, 48),
+                    blend: 'add',
+                    life: 0.36,
+                    size: R,
+                    burst: 1,
+                    color: '#4a8cff',
+                    alpha,
+                    order,
+                    look: {renderFace: face, rim: {color: [0.8, 0.96, 1], power: 2.2, strength: 1, mode: 'fade'}},
+                    b: [
+                        tint(
+                            [
+                                ['#ffffff', 0],
+                                ['#7ac4ff', 0.5],
+                            ],
+                            [
+                                [0, 0],
+                                [1, 0.1],
+                                [1, 0.75],
+                                [0, 1],
+                            ]
+                        ),
+                        grow([0, 0.35], [0.45, 0.95], [1, 1.08]),
+                    ],
+                });
+            }
+            flash(fx, {at: [0, 1, 0], size: 5});
+            flash(fx, {at: [0, 0.4, 0], size: 6, time: 0.3, color: '#bfe6ff'});
+            // Forks crawling over the inside of the dome, out from the caster's chest.
+            const chest = fx.node('chest', [0, 1.1, 0]);
             arcs(fx, {
-                parent: above,
-                to: above,
-                shape: new CircleEmitter({radius: 2.6, thickness: 0.3}),
+                to: chest,
+                shape: new HemisphereEmitter({radius: R * 0.9, thickness: 0.15}),
                 aim: 'up',
-                at: [0, -1.55, 0],
                 burst: [
-                    [0, 7],
-                    [0.1, 6],
-                    [0.22, 5],
+                    [0, 6],
+                    [0.06, 6],
+                    [0.12, 7],
+                    [0.2, 7],
                 ],
-                life: [0.15, 0.3],
-                width: [0.5, 0.7],
+                life: [0.08, 0.16],
+                width: [0.5, 0.75],
             });
-            shockwave(fx, {size: 8, life: 0.5, color: '#dff4ff'});
-            smoke(fx, {
-                shape: new CircleEmitter({radius: 0.6, thickness: 0}),
-                aim: 'up',
-                burst: [[0.05, 22]],
-                speed: [3, 4.5],
-                size: [0.5, 0.8],
-                color: '#7a7480',
-                alpha: 0.5,
-                loop: false,
-                spread: 0,
-                life: [0.8, 1.2],
-            });
+            // The dome bursts: a ring racing out, a softer shock under it.
+            shockwave(fx, {tex: 'ring', size: 7, life: 0.55, color: '#9ac4ff', delay: 0.3});
+            shockwave(fx, {size: 5, life: 0.4, color: '#5a8cff', alpha: 0.5, delay: 0.3});
+            // Dust rolling out along the floor, slowing.
             fx.sys({
-                tex: 'square',
+                image: 'smoke-puff',
+                randomTile: false,
                 blend: 'alpha',
-                life: [0.5, 0.8],
-                speed: [3, 5],
-                size: [0.04, 0.07],
+                life: [0.9, 1.3],
+                speed: [2.5, 4],
+                size: [0.5, 0.8],
                 rot: true,
-                burst: [[0.05, 30]],
-                color: '#3a3438',
-                shape: new CircleEmitter({radius: 0.6, thickness: 0}),
-                aim: 'up',
+                color: '#6a6472',
+                alpha: 0.55,
+                burst: [[0.3, 26]],
+                shape: new CircleEmitter({radius: 0.8, thickness: 0}),
+                rotate: [Math.PI / 2, 0, 0],
+                at: [0, 0.2, 0],
                 order: 2,
-                b: [gravity(8)],
+                soft: true,
+                b: [lifeFrames(16), grow([0, 0.8], [1, 1.6]), spin([-0.6, 0.6]), airDrag(3)],
             });
-            zapSparks(fx, {at: [0, 0.3, 0], count: 30, speed: [7, 11]});
+            // Embers left glowing on the floor.
+            fx.sys({
+                tex: 'dot',
+                life: [0.5, 0.9],
+                speed: [1, 3],
+                size: [0.05, 0.08],
+                burst: [[0.3, 36]],
+                color: ['#ffb040', '#ff5a1a'],
+                shape: new CircleEmitter({radius: 0.5, thickness: 0}),
+                rotate: [Math.PI / 2, 0, 0],
+                at: [0, 0.04, 0],
+                order: 3,
+                b: [tint([['#ffffff', 0]], flicker()), airDrag(4)],
+            });
+            // Cyan streaks flung up and out.
+            zapSparks(fx, {
+                at: [0, 0.3, 0],
+                count: 34,
+                speed: [6, 10],
+                time: 0.3,
+                shape: new HemisphereEmitter({radius: 0.6}),
+            });
+            // One last bolt running down the caster.
+            const head = fx.node('head', [0.05, 1.9, 0.1]);
+            const feet = fx.node('feet', [0, 0.05, 0.15]);
+            arcs(fx, {
+                parent: head,
+                to: feet,
+                burst: [
+                    [0.6, 1],
+                    [0.72, 1],
+                ],
+                life: [0.08, 0.12],
+                width: [0.35, 0.5],
+            });
             decal(fx, {
                 tex: 'crack',
                 blend: 'add',
@@ -601,6 +893,7 @@ export const lightning: FxDef[] = [
                 color: '#7ac4ff',
                 alpha: 0.8,
                 life: 1.2,
+                delay: 0.3,
                 colors: [
                     ['#ffffff', 0],
                     ['#5ab8ff', 0.3],
