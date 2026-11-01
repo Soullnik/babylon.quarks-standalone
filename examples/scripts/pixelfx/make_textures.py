@@ -305,6 +305,43 @@ def diamond_shell(w=512, h=512, columns=12, rows=8):
     save('diamond-cells.png', np.stack([mask] * 3 + [np.ones_like(mask)], -1))
 
 
+def streaks(w, h, su, sv, seed):
+    """Wrapping noise drawn out along V: blurred `su` pixels across and `sv` along, so it reads as strands."""
+    rng = np.random.default_rng(seed)
+    n = rng.random((h, w)).astype(np.float32)
+    for axis, s in ((1, su), (0, sv)):
+        r = int(s * 3) + 1
+        x = np.arange(-r, r + 1)
+        g = np.exp(-(x * x) / (2 * s * s))
+        g /= g.sum()
+        n = sum(wt * np.roll(n, int(k), axis) for k, wt in zip(x, g))
+    n -= n.min()
+    return n / n.max()
+
+
+def water_band(name='water-band', w=256, h=512, twist=0):
+    """Running water's surface, tiling both ways: a translucent blue body with pale strands along V and a
+    few white crests, after pixelfx water's glassy jets and sheets. Scroll V to make it flow. `twist`
+    shears the strands round U that many turns over V, so on a funnel scrolled in U and V they spiral.
+    """
+    body = streaks(w, h, 2.5, 40, 21)
+    fine = streaks(w, h, 1.2, 18, 22)
+    crest = streaks(w, h, 3, 6, 23)
+    level = 0.55 * body + 0.45 * fine
+    strand = smoothstep(0.42, 0.68, level)
+    white = smoothstep(0.75, 0.92, crest) * 0.7 + smoothstep(0.74, 0.9, level)
+    gap = smoothstep(0.18, 0.32, body)
+    deep, pale = hexrgb('#2a6fc0'), hexrgb('#bfe6ff')
+    rgb = deep * (1 - strand[..., None]) + pale * strand[..., None]
+    rgb = rgb * (1 - np.clip(white, 0, 1)[..., None]) + np.clip(white, 0, 1)[..., None]
+    alpha = np.clip((0.42 + 0.5 * strand + white) * gap, 0, 1)
+    out = np.concatenate([rgb, alpha[..., None]], -1)
+    if twist:
+        for row in range(h):
+            out[row] = np.roll(out[row], int(round(twist * w * row / h)), 0)
+    save(name + '.png', out)
+
+
 def gradient(size=128):
     """Red from 1 at V 0 (the bottom) to 0 at V 1: an erosion mask whose cut climbs a surface."""
     v = (np.arange(size)[::-1] + 0.5) / size
@@ -408,6 +445,8 @@ if __name__ == '__main__':
     blizzard_band()
     hex_shell()
     diamond_shell()
+    water_band()
+    water_band('whirl-band', twist=1)
     radial()
     gradient()
     puff_sheet('fire-puff-heat', lambda *a: fire_puff_frame(*a, heat=True))

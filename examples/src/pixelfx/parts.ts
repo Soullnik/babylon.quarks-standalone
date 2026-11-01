@@ -57,6 +57,7 @@ export function dust(
                 | 'delay'
                 | 'order'
                 | 'parent'
+                | 'soft'
             >
         > & {
             color: string | [string, string];

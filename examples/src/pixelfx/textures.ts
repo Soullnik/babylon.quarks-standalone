@@ -481,12 +481,14 @@ export type ImageName =
     | 'hex-glint'
     | 'diamond-shell'
     | 'diamond-cells'
+    | 'water-band'
+    | 'whirl-band'
     | 'radial'
     | 'gradient'
     | 'noise';
 
 /** `mask`: an erosion mask read by value, so no mipmaps (they would average values that order a cut); `nearest` keeps per-cell values crisp. */
-const IMAGES: Record<ImageName, {u: number; v: number; wrap: boolean; mask?: 'linear' | 'nearest'}> = {
+const IMAGES: Record<ImageName, {u: number; v: number; wrap: boolean; wrapV?: boolean; mask?: 'linear' | 'nearest'}> = {
     // 24 frames of the torch's flame at 12 fps, 6 × 4, each square with the flame's foot at the bottom.
     'torch-flame': {u: 6, v: 4, wrap: false},
     // The same flame as heat, grey 1 white-hot to 0 dark red, for a gradient map to colour in any ramp.
@@ -509,12 +511,16 @@ const IMAGES: Record<ImageName, {u: number; v: number; wrap: boolean; mask?: 'li
     // A diamond lattice over a surface, and one random erosion value per cell, so cells blink out in turn.
     'diamond-shell': {u: 1, v: 1, wrap: true},
     'diamond-cells': {u: 1, v: 1, wrap: true, mask: 'nearest'},
+    // Running water: pale strands along V over a translucent blue body, tiling both ways; scroll V to flow.
+    'water-band': {u: 1, v: 1, wrap: true, wrapV: true},
+    // The same with its strands sheared once round U, so on a funnel they spiral.
+    'whirl-band': {u: 1, v: 1, wrap: true, wrapV: true},
     // Red 1 at the bottom to 0 at the top: an erosion mask whose cut climbs a surface.
     gradient: {u: 1, v: 1, wrap: false, mask: 'linear'},
     // A cone in red, 1 at the centre to 0 at the rim: an erosion mask that spreads a cut from a point.
     radial: {u: 1, v: 1, wrap: false, mask: 'linear'},
     // Two wrapping noises in red and green, for UV distortion.
-    noise: {u: 1, v: 1, wrap: true},
+    noise: {u: 1, v: 1, wrap: true, wrapV: true},
 };
 
 const images = new WeakMap<Scene, Map<ImageName, TextureSheet>>();
@@ -539,7 +545,7 @@ export function image(scene: Scene, name: ImageName): TextureSheet {
     texture.hasAlpha = true;
     const mode = spec.wrap ? Texture.WRAP_ADDRESSMODE : Texture.CLAMP_ADDRESSMODE;
     texture.wrapU = mode;
-    texture.wrapV = spec.wrap && name === 'noise' ? mode : Texture.CLAMP_ADDRESSMODE;
+    texture.wrapV = spec.wrapV ? Texture.WRAP_ADDRESSMODE : Texture.CLAMP_ADDRESSMODE;
     const result = {texture, u: spec.u, v: spec.v};
     map.set(name, result);
     return result;
