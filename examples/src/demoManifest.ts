@@ -326,4 +326,44 @@ export const demoManifest: DemoManifestEntry[] = [
         tags: ['pixelfx', 'lightning', 'beam'],
         preview: {icon: 'LI', gradient: 'linear-gradient(135deg, #c7f1ff 0%, #3a3dd6 100%)'},
     },
+    {
+        key: 'PixelFxImpactsDemo',
+        name: 'Pixel FX: Impacts',
+        module: 'pixelfxImpacts',
+        sourcePath: 'examples/src/pixelfx/impacts.ts',
+        description:
+            'Hit sparks, crits, bullet impacts, ground slams, heavy landings, parries, ricochets and shield blocks: pixelfx impact effects rebuilt in 3D.',
+        tags: ['pixelfx', 'impact', 'mesh'],
+        preview: {icon: 'IM', gradient: 'linear-gradient(135deg, #fff1b8 0%, #8a4a17 100%)'},
+    },
+    {
+        key: 'PixelFxProjectilesDemo',
+        name: 'Pixel FX: Projectiles',
+        module: 'pixelfxProjectiles',
+        sourcePath: 'examples/src/pixelfx/projectiles.ts',
+        description:
+            'Arrows, tracers, cannonballs, lasers, homing missiles, rockets and muzzle flashes, with trails and hit sub-emitters: pixelfx projectiles rebuilt in 3D.',
+        tags: ['pixelfx', 'projectile', 'trail', 'sub-emitter'],
+        preview: {icon: 'PR', gradient: 'linear-gradient(135deg, #ffe7a8 0%, #5a2a9a 100%)'},
+    },
+    {
+        key: 'PixelFxWaterDemo',
+        name: 'Pixel FX: Water',
+        module: 'pixelfxWater',
+        sourcePath: 'examples/src/pixelfx/water.ts',
+        description:
+            'Bubbles, drips, fountains, geysers, rain, splashes, waterfalls and a whirlpool: pixelfx water effects rebuilt in 3D.',
+        tags: ['pixelfx', 'water', 'sub-emitter'],
+        preview: {icon: 'WA', gradient: 'linear-gradient(135deg, #c8eeff 0%, #123a5a 100%)'},
+    },
+    {
+        key: 'PixelFxScifiDemo',
+        name: 'Pixel FX: Sci-fi',
+        module: 'pixelfxScifi',
+        sourcePath: 'examples/src/pixelfx/scifi.ts',
+        description:
+            'EMP blasts, an energy core, a force field, holograms, a jetpack, laser grids, scanners, teleporters, a tractor beam and warps: pixelfx sci-fi effects rebuilt in 3D.',
+        tags: ['pixelfx', 'sci-fi', 'beam'],
+        preview: {icon: 'SF', gradient: 'linear-gradient(135deg, #9cc4ff 0%, #3c2296 100%)'},
+    },
 ];

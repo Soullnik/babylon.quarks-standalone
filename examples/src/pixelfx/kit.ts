@@ -12,6 +12,7 @@ import {
     AxisAngleGenerator,
     Bezier,
     ColorOverLife,
+    ConeEmitter,
     ConstantColor,
     ConstantValue,
     EmitSubParticleSystem,
@@ -21,6 +22,7 @@ import {
     IntervalValue,
     Noise,
     OrbitOverLife,
+    ParticleEmitter,
     ParticleSystem,
     PiecewiseBezier,
     PointEmitter,
@@ -336,7 +338,8 @@ export function makeSystem(scene: Scene, o: SysOptions, defaults: {loop: boolean
         emissionOverTime: num(o.rate ?? 0),
         emissionOverDistance: o.rateOverDistance === undefined ? undefined : num(o.rateOverDistance),
         emissionBursts: bursts,
-        shape: o.shape ?? new PointEmitter(),
+        // A point emits every way; with an `aim` and no shape, emit straight along the aim.
+        shape: o.shape ?? (o.aim ? new ConeEmitter({radius: 0, angle: 0}) : new PointEmitter()),
         texture: tex.texture,
         uTileCount: tex.u,
         vTileCount: tex.v,
@@ -389,4 +392,18 @@ export function subEmit(
               ? SubParticleEmitMode.Birth
               : SubParticleEmitMode.Frame;
     parent.addBehavior(new EmitSubParticleSystem(parent, true, child.emitter, m, probability));
+}
+
+/**
+ * Tells the systems under `node` that it jumped rather than travelled, so emission over distance
+ * does not fill the jump with particles. Call it after moving a looping flyer back to its start.
+ */
+export function teleported(node: TransformNode): void {
+    for (const child of node.getDescendants(false)) {
+        if (child instanceof ParticleEmitter && 'emissionState' in child.system) {
+            const state = (child.system as ParticleSystem).emissionState;
+            state.previousWorldPos = undefined;
+            state.travelDistance = 0;
+        }
+    }
 }
