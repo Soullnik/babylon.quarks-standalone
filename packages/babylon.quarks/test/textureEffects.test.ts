@@ -799,6 +799,22 @@ describe('texture effects', () => {
             });
             // A mask texture the file does not carry leaves no mask.
             expect(((root as ParticleEmitter).system as ParticleSystem).mask).toBeUndefined();
+            const withTexture = loader.parse({
+                images: [{uuid: 'img', url: 'textures/mask.png'}],
+                textures: [{uuid: 'tex', image: 'img'}],
+                materials: [
+                    {
+                        uuid: 'm',
+                        type: 'QuarksMaterial',
+                        mask: {map: 'tex', channel: 'g', mapUV: {channel: 1, tiling: [2, 1]}},
+                    },
+                ],
+                object: {uuid: 'e', type: 'ParticleEmitter', ps: {...system().toJSON(), material: 'm'}},
+            });
+            const loadedMask = ((withTexture as ParticleEmitter).system as ParticleSystem).mask;
+            expect(loadedMask?.map).toBeInstanceOf(Texture);
+            expect(loadedMask?.channel).toBe('g');
+            expect(loadedMask?.mapUV).toEqual({channel: 1, tiling: [2, 1], offset: [0, 0], scroll: [0, 0]});
             const none = emptyMeta();
             expect('mask' in none.materials[system().toJSON(none).material!]).toBe(false);
         });

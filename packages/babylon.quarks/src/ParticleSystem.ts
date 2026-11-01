@@ -709,9 +709,9 @@ export class ParticleSystem implements IParticleSystem {
 
     /**
      * A mask multiplied into the map, see {@link ParticleMask}: one channel of
-     * a second texture, on its own layout, scales the map before the gradient
-     * map and erosion read it, so a scrolling noise map billows up through a
-     * still flame silhouette. Undefined (the default), or without a map: none.
+     * a second texture, on its own layout, scales the map's alpha before the
+     * gradient map and erosion read it, so a scrolling noise map billows up
+     * through a still flame silhouette. Undefined (the default), or without a map: none.
      * Fields left out take their defaults; assign a new object to change it.
      * Saved with the material in the effect JSON.
      */

@@ -9,10 +9,11 @@ and the package's version moves in lockstep with `quarks.core`.
 ### Added
 
 - **Texture mask (`ParticleSystem.mask`):** one channel of a second texture, laid by its own
-  `TextureUV`, multiplies the map's texel before the gradient map and erosion read it. A noise map
+  `TextureUV`, multiplies the map's alpha before the gradient map and erosion read it. A noise map
   scrolling and distorting on one layout then billows through a still shape on another, the masked
   panner of Unreal's particle materials and the `_Mask` slot of Unity's Shader Graph VFX
-  materials, which until now only came through as a compiled Shader Graph. With
+  materials, which until now only came through as a compiled Shader Graph. Only alpha changes, as
+  with every fade, so colour keeps its brightness up to the mask's edge. With
   `gradientMap.channel: 'a'` the ramp, and an erosion without a mask of its own, read the product,
   so the fire is brightest where noise and shape overlap and wears away from their edges. It works
   in every render mode, in GLSL and WGSL, without a map too (the mask then shapes white), and is

@@ -20,11 +20,14 @@
  *   by up to `distortionStrength` UV units: the heat shimmer, licking and
  *   breathing of fire and auras. On a sprite sheet the pushed UV can reach
  *   the neighbouring tile.
- * - `MASK`: the map's texel (white without a map) is scaled by one channel
- *   of `maskMap` (`maskChannel`, as `gradientMapChannel`), laid by
+ * - `MASK`: the map's alpha (1 without a map) is scaled by one channel of
+ *   `maskMap` (`maskChannel`, as `gradientMapChannel`), laid by
  *   `maskTransform` on `vUV` or, under `MASK_UV1`, on `vUV1`; undistorted,
- *   so a noise map scrolls and distorts through a still shape. The gradient
- *   map and an erosion by the map's alpha then read the product.
+ *   so a noise map scrolls and distorts through a still shape. Only alpha
+ *   changes, as with every fade (`blend.ts`): a gradient map looked up by
+ *   alpha, and an erosion by the map's alpha, then read the product. On a
+ *   sprite sheet, a mask on channel 0 follows the current tile and is not
+ *   blended into the next one.
  * - `GRADIENT_MAP`: the map's texel dotted with `gradientMapChannel` (one
  *   channel, or luminance weights) picks a colour along U of `gradientMap`.
  *   The ramp's alpha multiplies the map's, or replaces it when the lookup is
@@ -151,7 +154,7 @@ export function surfaceColorGLSL(tileBlend: boolean): string {
         #else
             vec2 maskUV = vUV;
         #endif
-        texColor *= clamp(dot(texture2D(maskMap, maskUV * maskTransform.xy + maskTransform.zw), maskChannel), 0.0, 1.0);
+        texColor.a *= clamp(dot(texture2D(maskMap, maskUV * maskTransform.xy + maskTransform.zw), maskChannel), 0.0, 1.0);
     #endif
     #ifdef GRADIENT_MAP
         float rampAt = clamp(dot(texColor, gradientMapChannel), 0.0, 1.0);
@@ -283,7 +286,7 @@ export function surfaceColorWGSL(tileBlend: boolean): string {
         #else
             let maskUV = fragmentInputs.vUV;
         #endif
-        texColor *= clamp(dot(textureSample(maskMap, maskMapSampler, maskUV * uniforms.maskTransform.xy + uniforms.maskTransform.zw), uniforms.maskChannel), 0.0, 1.0);
+        texColor.a *= clamp(dot(textureSample(maskMap, maskMapSampler, maskUV * uniforms.maskTransform.xy + uniforms.maskTransform.zw), uniforms.maskChannel), 0.0, 1.0);
     #endif
     #ifdef GRADIENT_MAP
         let rampAt = clamp(dot(texColor, uniforms.gradientMapChannel), 0.0, 1.0);

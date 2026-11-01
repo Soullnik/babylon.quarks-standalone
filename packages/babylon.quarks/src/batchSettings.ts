@@ -433,17 +433,21 @@ export function uvDistortionEqual(a: ParticleUVDistortion | undefined, b: Partic
 
 /**
  * A mask multiplied into the map: one channel of a second texture, laid by
- * its own {@link TextureUV}, scales the map's texel before the gradient map
- * and erosion read it. A scrolling noise map then runs through a still shape
- * (the masked panner of Unreal's particle materials and the `_Mask` slot of
- * Unity's Shader Graph VFX), and the erosion and the gradient map read the
- * product: energy and fire that billow up inside a flame's silhouette. See
+ * its own {@link TextureUV}, scales the map's alpha (1 without a map) before
+ * the gradient map and erosion read it. A scrolling noise map then runs
+ * through a still shape (the masked panner of Unreal's particle materials
+ * and the `_Mask` slot of Unity's Shader Graph VFX). Only alpha changes, as
+ * with every fade, so the colour keeps its brightness up to the edge; a
+ * gradient map looked up by `'a'` and an erosion without a mask of its own
+ * read the product: energy and fire that billow up inside a flame's
+ * silhouette. On a sprite sheet, a mask on UV channel 0 follows the current
+ * tile and is not blended into the next one. See
  * {@link VFXBatchSettings.mask}.
  */
 export interface ParticleMask {
     /** The mask texture. Required: without one there is no mask. */
     map: BaseTexture | null;
-    /** The texel value that scales the map: one channel, or luminance. Default `'r'`. */
+    /** The mask texel value that scales the map's alpha: one channel, or luminance. Default `'r'`. */
     channel: GradientMapChannel;
     /** How the mask is laid over the particle, see {@link TextureUV}. Default channel 0, untiled, still. */
     mapUV: TextureUV;
