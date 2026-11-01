@@ -22,6 +22,8 @@ export interface FxDef {
     loop: boolean;
     /** Seconds between replays of a one-shot, and the cycle of `every` callbacks for a loop. */
     period: number;
+    /** Where a focused view looks: the height it aims at (1.4 m) and its distance (11 m). */
+    view?: {height?: number; distance?: number};
     build(fx: FxBuilder): void;
 }
 
@@ -225,7 +227,11 @@ export function buildStage(ctx: DemoContext, allDefs: FxDef[]): PixelFxStage {
             return;
         }
         stage.focus = index;
-        stage.goal = {target: cells[index].center.add(new BVector3(0, 1.4, 0)), radius: 11};
+        const view = cells[index].def.view;
+        stage.goal = {
+            target: cells[index].center.add(new BVector3(0, view?.height ?? 1.4, 0)),
+            radius: view?.distance ?? 11,
+        };
         // Play the focused effect again from its start.
         const cell = cells[index];
         cell.time = 0;

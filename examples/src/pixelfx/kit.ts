@@ -20,6 +20,7 @@ import {
     FrameOverLife,
     Gradient,
     IntervalValue,
+    LimitSpeedOverLife,
     Noise,
     OrbitOverLife,
     ParticleEmitter,
@@ -143,6 +144,15 @@ export function drag(...keys: Array<[number, number]>): SpeedOverLife {
     return new SpeedOverLife(curve(...keys));
 }
 
+/**
+ * Air resistance: the velocity, forces included, loses `perSecond` of itself each second (as
+ * `v -= v * k * dt`), so a falling particle settles at `gravity / perSecond`. Unlike {@link drag},
+ * which scales the whole motion, it lets gravity take over once the throw has died.
+ */
+export function airDrag(perSecond: number): LimitSpeedOverLife {
+    return new LimitSpeedOverLife(new ConstantValue(0), 3 * (1 - Math.exp(-perSecond / 60)));
+}
+
 /** Curl-like noise on the position. */
 export function wobble(frequency: Num, power: Num): Noise {
     return new Noise(num(frequency), num(power));
@@ -178,6 +188,11 @@ export function lifeFrames(count: number, power = 1): FrameOverLife {
     const keys: Array<[number, number]> = [];
     for (let i = 0; i <= 8; i++) keys.push([i / 8, last * Math.pow(i / 8, power)]);
     return new FrameOverLife(curve(...keys));
+}
+
+/** Hold one tile of a sheet for the whole life: a puff frozen at its fullest, for long-lived smoke. */
+export function holdFrame(index: number): FrameOverLife {
+    return new FrameOverLife(new ConstantValue(index));
 }
 
 // ---- systems ----
