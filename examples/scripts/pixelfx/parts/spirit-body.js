@@ -1,7 +1,7 @@
 // pixelfx fire/spirit-flame's body alone (tongue, side wisps, strands), for a flipbook.
 // The layered tongue, its noise-torn edges and the shed puffs are adapted from Sprite Fusion's open-source fire
 // (https://www.spritefusion.com/pixel-art-vfx/fire), MIT License, Copyright (c) 2026 Hugo Duprez.
-import {fit, mix, TAU, WHITE} from '../../core/index.js';
+import {fit, TAU} from '../../core/index.js';
 import {hotFirst, noiseFor} from '../fire/_lib.js';
 
 export const meta = {
@@ -52,8 +52,7 @@ export function draw(p, t, o) {
         S = o.seed,
         ph = t / D;
     const N = (rate, seed = 0, off = 0) => NL(t, rate, seed, off);
-    const COLD = mix(H[3], WHITE, 0.15),
-        bob = 0;
+    const bob = 0;
     // the wave: it climbs the flame twice a loop, growing toward the tip, and the whole flame leans with a slow drift
     const lean = N(0.67, S + 2) * 3;
     const wave = (v, r, k = 0) =>
