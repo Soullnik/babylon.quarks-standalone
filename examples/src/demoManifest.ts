@@ -286,4 +286,44 @@ export const demoManifest: DemoManifestEntry[] = [
         tags: ['import', 'rotation'],
         preview: {icon: 'MZ', gradient: 'linear-gradient(135deg, #7ec8ff 0%, #2a3f8e 100%)'},
     },
+    {
+        key: 'PixelFxFireDemo',
+        name: 'Pixel FX: Fire',
+        module: 'pixelfxFire',
+        sourcePath: 'examples/src/pixelfx/fire.ts',
+        description:
+            'Braziers, campfires, breath, rings, tornadoes, fireballs, pillars and meteors: pixelfx fire effects rebuilt in 3D.',
+        tags: ['pixelfx', 'fire'],
+        preview: {icon: 'FI', gradient: 'linear-gradient(135deg, #ffb347 0%, #8a1f17 100%)'},
+    },
+    {
+        key: 'PixelFxExplosionsDemo',
+        name: 'Pixel FX: Explosions',
+        module: 'pixelfxExplosions',
+        sourcePath: 'examples/src/pixelfx/explosions.ts',
+        description:
+            'Barrels, grenades, dirt blasts, fireworks on sub-emitters, an implosion, plasma and a nuke: pixelfx explosions rebuilt in 3D.',
+        tags: ['pixelfx', 'explosion', 'sub-emitter'],
+        preview: {icon: 'EX', gradient: 'linear-gradient(135deg, #ffd27a 0%, #6a1f17 100%)'},
+    },
+    {
+        key: 'PixelFxIceDemo',
+        name: 'Pixel FX: Ice',
+        module: 'pixelfxIce',
+        sourcePath: 'examples/src/pixelfx/ice.ts',
+        description:
+            'Frost novas, freezes, ice lances, spikes, shatters and a blizzard vortex, with lit mesh shards: pixelfx ice effects rebuilt in 3D.',
+        tags: ['pixelfx', 'ice', 'mesh'],
+        preview: {icon: 'IC', gradient: 'linear-gradient(135deg, #e6f8ff 0%, #2a5fa8 100%)'},
+    },
+    {
+        key: 'PixelFxLightningDemo',
+        name: 'Pixel FX: Lightning',
+        module: 'pixelfxLightning',
+        sourcePath: 'examples/src/pixelfx/lightning.ts',
+        description:
+            'Chain lightning, tesla coils, plasma balls, storm clouds and strikes drawn with beam particles: pixelfx lightning effects rebuilt in 3D.',
+        tags: ['pixelfx', 'lightning', 'beam'],
+        preview: {icon: 'LI', gradient: 'linear-gradient(135deg, #c7f1ff 0%, #3a3dd6 100%)'},
+    },
 ];

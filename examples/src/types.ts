@@ -3,6 +3,7 @@ import type {Vector3 as BVector3} from '@babylonjs/core/Maths/math.vector';
 import type {Mesh} from '@babylonjs/core/Meshes/mesh';
 import type {Scene} from '@babylonjs/core/scene';
 import type {BatchedRenderer, EffectPool, ParticleSystem, QuarksPrefab} from 'babylon.quarks';
+import type {PixelFxStage} from './pixelfx/stage';
 
 export interface DemoState {
     totalTime?: number;
@@ -17,6 +18,7 @@ export interface DemoState {
     pooledHits?: {pool: EffectPool; targets: BVector3[]; elapsed: number; period: number; index: number};
     timeline?: {prefab: QuarksPrefab; cycle: number; rest: number};
     trailTexture?: {elapsed: number; trails: ParticleSystem[]; nextJump: number};
+    pixelfx?: PixelFxStage;
 }
 
 export interface DemoContext {

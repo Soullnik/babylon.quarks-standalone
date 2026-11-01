@@ -17,6 +17,10 @@ and the package's version moves in lockstep with `quarks.core`.
 - **A starter project:** `starters/vite`, a Vite + TypeScript scene with one effect, opened on
   StackBlitz from the READMEs. `npm run typecheck` compiles it against the workspace build.
 - `ROADMAP.md` and `docs/SHURIKEN_PARITY.md` describe where 1.0 stands.
+- **Pixel FX demos:** four gallery demos (fire, explosions, ice, lightning) with 45 effects rebuilt
+  in 3D from the pixel-art effects of [pixelfx](https://github.com/patch-gg/pixelfx) (MIT): sub-emitter
+  fireworks, beam lightning, lit mesh shards and soft smoke, on procedural textures. A click on an
+  effect zooms in and replays it; `?fx=<category>/<name>` shows one effect alone.
 
 ### Changed
 
