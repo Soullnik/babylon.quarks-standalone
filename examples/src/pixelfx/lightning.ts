@@ -600,7 +600,7 @@ export const lightning: FxDef[] = [
         name: 'Storm cloud',
         loop: true,
         period: 3,
-        view: {height: 2.4, distance: 13},
+        view: {height: 3.3, distance: 14},
         build(fx) {
             // storm-cloud.js in 3D: a dark cloud boiling overhead, billows lit on top, a flat dark base with
             // ragged scud under it; discharges flicker inside; rain slants down; once a loop a bolt cracks to
@@ -609,9 +609,9 @@ export const lightning: FxDef[] = [
             // The cloud's billows: puffs held at their fullest frame, living longer than a loop and
             // rolling slowly, so it boils without ever thinning. Dark beneath, lit on top.
             for (const [y, width, height, count, size, colors, order] of [
-                [0.2, 4.2, 0.3, 26, [2.0, 2.8], ['#1a1828', '#24223a'], 1],
-                [0.75, 3.4, 0.5, 22, [1.9, 2.6], ['#2e2c48', '#3c3a5c'], 2],
-                [1.3, 2.4, 0.4, 14, [1.6, 2.2], ['#4a4a70', '#5c5c86'], 3],
+                [0.2, 4.2, 0.3, 30, [2.4, 3.2], ['#26243a', '#302e48'], 1],
+                [0.75, 3.4, 0.5, 26, [2.2, 3.0], ['#3e3c5e', '#4c4a70'], 2],
+                [1.3, 2.4, 0.4, 18, [1.9, 2.6], ['#62628e', '#7676a4'], 3],
             ] as Array<[number, number, number, number, [number, number], [string, string], number]>) {
                 fx.sys({
                     image: 'smoke-puff',
@@ -676,8 +676,8 @@ export const lightning: FxDef[] = [
             fx.sys({
                 tex: 'dot',
                 mode: RenderMode.StretchedBillBoard,
-                stretch: {speed: 0.09, length: 1},
-                life: 0.42,
+                stretch: {speed: 1.2, length: 1},
+                life: 0.46,
                 speed: 9.5,
                 size: 0.03,
                 rate: 140,
