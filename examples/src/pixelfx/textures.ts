@@ -444,3 +444,46 @@ export function sheet(scene: Scene, name: TextureName): TextureSheet {
     map.set(name, result);
     return result;
 }
+
+/**
+ * Textures made offline by `examples/scripts/pixelfx/make_textures.py` and served from
+ * `public/textures/pixelfx/`: flipbooks traced from pixelfx's pixel art, and maps drawn from the
+ * formulas of its effects. Unlike the painted ones above they carry their own colour.
+ */
+export type ImageName = 'torch-flame' | 'tornado-band' | 'hex-shell' | 'hex-plates' | 'sweep' | 'noise';
+
+const IMAGES: Record<ImageName, {u: number; v: number; wrap: boolean}> = {
+    // 24 frames of the torch's flame at 12 fps, 6 × 4, each square with the flame's foot at the bottom.
+    'torch-flame': {u: 6, v: 4, wrap: false},
+    // A funnel's surface: U once round it, V up it. Wraps in U, so scrolling U spins it.
+    'tornado-band': {u: 1, v: 1, wrap: true},
+    // A dome's hex plates over longitude (U) and latitude (V); `hex-plates` is each plate's face alone.
+    'hex-shell': {u: 1, v: 1, wrap: true},
+    'hex-plates': {u: 1, v: 1, wrap: true},
+    // A diagonal band in red, wrapping: an erosion mask that sweeps a glint when scrolled.
+    sweep: {u: 1, v: 1, wrap: true},
+    // Two wrapping noises in red and green, for UV distortion.
+    noise: {u: 1, v: 1, wrap: true},
+};
+
+const images = new WeakMap<Scene, Map<ImageName, TextureSheet>>();
+
+/** The named image texture for this scene, loaded once and shared. */
+export function image(scene: Scene, name: ImageName): TextureSheet {
+    let map = images.get(scene);
+    if (!map) {
+        map = new Map();
+        images.set(scene, map);
+    }
+    const found = map.get(name);
+    if (found) return found;
+    const spec = IMAGES[name];
+    const texture = new Texture(`textures/pixelfx/${name}.png`, scene);
+    texture.hasAlpha = true;
+    const mode = spec.wrap ? Texture.WRAP_ADDRESSMODE : Texture.CLAMP_ADDRESSMODE;
+    texture.wrapU = mode;
+    texture.wrapV = spec.wrap && (name === 'noise' || name === 'sweep') ? mode : Texture.CLAMP_ADDRESSMODE;
+    const result = {texture, u: spec.u, v: spec.v};
+    map.set(name, result);
+    return result;
+}

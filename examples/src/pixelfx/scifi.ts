@@ -1,10 +1,12 @@
 import type {StandardMaterial} from '@babylonjs/core/Materials/standardMaterial';
+import {Color4} from '@babylonjs/core/Maths/math.color';
 import type {Mesh} from '@babylonjs/core/Meshes/mesh';
 import type {TransformNode} from '@babylonjs/core/Meshes/transformNode';
-import {BoxEmitter, CircleEmitter, ConeEmitter, HemisphereEmitter, RenderMode, SphereEmitter} from 'babylon.quarks';
-import {c3, drag, fadeOut, flicker, gravity, grow, orbit, popOut, spin, tint, wobble} from './kit';
+import {BoxEmitter, CircleEmitter, ConeEmitter, RenderMode, SphereEmitter} from 'babylon.quarks';
+import {c3, drag, fadeOut, flicker, gravity, grow, lathe, orbit, popOut, quad, spin, tint, wobble} from './kit';
 import {PALETTE, arcs, flames, flash, pool, smoke, sparks, type Ramp} from './recipes';
 import {shapes, type FxBuilder, type FxDef} from './stage';
+import {image} from './textures';
 
 const BLUE: Ramp = [
     ['#ffffff', 0],
@@ -315,8 +317,45 @@ export const scifi: FxDef[] = [
         build(fx) {
             fx.character();
             const R = 1.9;
-            const dome = fx.prop(shapes.sphere(fx.scene, R, 24), {color: '#1d4f9e', glow: '#1d4f9e', alpha: 0.16});
-            const domeMat = own(dome, 'force-dome');
+            // The shell: one hemisphere mesh mapped by longitude and latitude with hex plates (the grid of
+            // Sprite Fusion's shield), its far side faint through the glass, its edge lit by a rim.
+            const dome: Array<[number, number]> = [];
+            for (let i = 0; i <= 16; i++) {
+                const lat = (i / 16) * (Math.PI / 2);
+                dome.push([R * Math.cos(lat), R * Math.sin(lat)]);
+            }
+            const shell = {
+                image: 'hex-shell',
+                geo: lathe(dome, 64),
+                life: 1e4,
+                size: 1,
+                burst: 1,
+                loop: false,
+            } as const;
+            fx.sys({...shell, alpha: 0.25, order: 1, look: {renderFace: 'back'}});
+            const near = fx.sys({
+                ...shell,
+                order: 4,
+                look: {renderFace: 'front', rim: {color: [0.33, 0.8, 1], power: 3, strength: 0.7}},
+            });
+            // A glint sweeping over the plates: their faces, cut by a scrolled diagonal band.
+            fx.sys({
+                ...shell,
+                image: 'hex-plates',
+                color: '#8ae8ff',
+                alpha: 0.32,
+                order: 5,
+                look: {
+                    renderFace: 'front',
+                    erosion: {
+                        mask: image(fx.scene, 'sweep').texture,
+                        maskUV: {tiling: [2, 1], scroll: [-0.4, 0]},
+                        softness: 0.06,
+                    },
+                },
+            });
+            near.tint = new Color4(1, 1, 1, 1);
+            const flare = near.tint;
             // Shots: a heavy one high up that makes the shell flare, a light one low that it shrugs off.
             const shots: Array<{time: number; y: number; heavy: boolean}> = [
                 {time: 0.5, y: 1.4, heavy: true},
@@ -328,7 +367,7 @@ export const scifi: FxDef[] = [
                     const d = t - s.time - 0.25;
                     if (d > 0) k = Math.max(k, Math.exp(-d * 6) * (s.heavy ? 1 : 0.5));
                 }
-                domeMat.alpha = 0.16 + 0.3 * k;
+                flare.r = flare.g = flare.b = 1 + 1.2 * k;
             });
             const START = 5;
             for (const [i, s] of shots.entries()) {
@@ -358,6 +397,19 @@ export const scifi: FxDef[] = [
                 });
                 const hit = fx.node(`hit-${i}`, [hitX, s.y, 0]);
                 const t0 = s.time + travel;
+                // The ripple: a ring laid flat on the shell where it was struck, racing outward.
+                fx.sys({
+                    parent: hit,
+                    tex: 'ring',
+                    geo: quad(),
+                    life: 0.5,
+                    size: s.heavy ? 2.4 : 1.5,
+                    burst: [[t0, 1]],
+                    color: '#8ae8ff',
+                    rotate: [-Math.asin(s.y / R), Math.PI / 2, 0],
+                    order: 6,
+                    b: [tint(BLUE, popOut(0.2)), grow([0, 0.1], [1, 1])],
+                });
                 fx.sys({
                     parent: hit,
                     tex: 'ring',
@@ -389,18 +441,6 @@ export const scifi: FxDef[] = [
                     speed: [3, 6],
                 });
             }
-            // Hex glints wandering over the shell.
-            fx.sys({
-                tex: 'glint',
-                life: [0.3, 0.6],
-                size: [0.25, 0.4],
-                rate: 10,
-                color: '#8ae8ff',
-                shape: new HemisphereEmitter({radius: R, thickness: 0}),
-                aim: 'up',
-                order: 5,
-                b: [tint(BLUE, popOut(0.5))],
-            });
             pool(fx, {color: '#2582d2', size: 4.2, alpha: 0.3});
         },
     },

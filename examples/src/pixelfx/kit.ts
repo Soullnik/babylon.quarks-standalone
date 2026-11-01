@@ -6,7 +6,7 @@ import type {Mesh} from '@babylonjs/core/Meshes/mesh';
 import {MeshBuilder} from '@babylonjs/core/Meshes/meshBuilder';
 import type {TransformNode} from '@babylonjs/core/Meshes/transformNode';
 import type {Scene} from '@babylonjs/core/scene';
-import type {Behavior, ValueGenerator} from 'babylon.quarks';
+import type {Behavior, ParticleSystemParameters, ValueGenerator} from 'babylon.quarks';
 import {
     ApplyForce,
     AxisAngleGenerator,
@@ -35,7 +35,7 @@ import {
     SpeedOverLife,
     SubParticleEmitMode,
 } from 'babylon.quarks';
-import {sheet, type TextureName} from './textures';
+import {image, type ImageName, sheet, type TextureName} from './textures';
 
 /** A number, a `[min, max]` range rolled per particle, or any quarks value generator. */
 export type Num = number | [number, number] | ValueGenerator;
@@ -163,6 +163,11 @@ export function frames(fps: number, count: number): FrameOverLife {
     return new FrameOverLife(new ConstantValue(0), {fps, frameCount: count, random: true});
 }
 
+/** Play a sheet's `count` tiles in order at `fps`, from the first, looping: a flipbook. */
+export function flipbook(fps: number, count: number): FrameOverLife {
+    return new FrameOverLife(new ConstantValue(0), {fps, frameCount: count});
+}
+
 // ---- systems ----
 
 export type Blend = 'add' | 'alpha';
@@ -171,6 +176,8 @@ export type Aim = 'up' | 'down' | 'right' | 'left' | 'front' | 'back';
 export interface SysOptions {
     /** Texture by name; `glow` by default. */
     tex?: TextureName;
+    /** A loaded image texture instead of a painted one: a flipbook or a mesh's map. */
+    image?: ImageName;
     /** Pick a random tile of a sheet texture at birth (true by default for sheets). */
     randomTile?: boolean;
     life: Num;
@@ -221,12 +228,23 @@ export interface SysOptions {
     upright?: boolean;
     /** Draw each particle as a beam from itself to this node (Unity's Line Renderer, Niagara's Beam). */
     beam?: TransformNode;
+    /**
+     * Render each particle as this mesh, in the emitter's space, textured and blended like a sprite
+     * (unlike `mesh`, which is opaque and lit): a funnel, a dome, a decal laid on a surface.
+     */
+    geo?: Geometry;
+    /** The renderer's texture and mesh options, passed through as they are. */
+    look?: Pick<
+        ParticleSystemParameters,
+        'mapUV' | 'uvDistortion' | 'erosion' | 'gradientMap' | 'rim' | 'lighting' | 'renderFace'
+    >;
 }
 
 /** Low-poly shapes for mesh particles: rocks and clods, ice shards, cubes, planks. */
 export type MeshKind = 'rock' | 'shard' | 'cube' | 'plank';
 
-interface Geometry {
+/** A mesh's vertex data, for mesh particles. */
+export interface Geometry {
     positions: Float32Array;
     normals: Float32Array;
     uvs: Float32Array;
@@ -274,6 +292,62 @@ function geometry(scene: Scene, kind: MeshKind): Geometry {
     return result;
 }
 
+/**
+ * A surface of revolution about +y: `profile` gives `[radius, height]` from the bottom up, and the
+ * mesh goes once round in `segments`. U runs round it (0 to 1, the seam doubled so a map wraps
+ * cleanly), V up it by the profile's index. Normals point outward.
+ */
+export function lathe(profile: Array<[number, number]>, segments = 48): Geometry {
+    const rows = profile.length;
+    const positions: number[] = [];
+    const normals: number[] = [];
+    const uvs: number[] = [];
+    const indices: number[] = [];
+    for (let j = 0; j < rows; j++) {
+        const [r, y] = profile[j];
+        const [r0, y0] = profile[Math.max(0, j - 1)];
+        const [r1, y1] = profile[Math.min(rows - 1, j + 1)];
+        // The profile's outward normal in the (radius, height) plane.
+        let nr = y1 - y0;
+        let ny = -(r1 - r0);
+        const len = Math.hypot(nr, ny) || 1;
+        nr /= len;
+        ny /= len;
+        for (let i = 0; i <= segments; i++) {
+            const a = (i / segments) * Math.PI * 2;
+            const c = Math.cos(a);
+            const s = Math.sin(a);
+            positions.push(r * c, y, r * s);
+            normals.push(nr * c, ny, nr * s);
+            uvs.push(i / segments, j / (rows - 1));
+        }
+    }
+    const ring = segments + 1;
+    for (let j = 0; j < rows - 1; j++) {
+        for (let i = 0; i < segments; i++) {
+            const a = j * ring + i;
+            const b = a + ring;
+            indices.push(a, a + 1, b, a + 1, b + 1, b);
+        }
+    }
+    return {
+        positions: new Float32Array(positions),
+        normals: new Float32Array(normals),
+        uvs: new Float32Array(uvs),
+        indices: new Uint32Array(indices),
+    };
+}
+
+/** A unit square in the x-y plane facing +z, UV 0 to 1: a decal to lay on a surface. */
+export function quad(): Geometry {
+    return {
+        positions: new Float32Array([-0.5, -0.5, 0, 0.5, -0.5, 0, 0.5, 0.5, 0, -0.5, 0.5, 0]),
+        normals: new Float32Array([0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1]),
+        uvs: new Float32Array([0, 0, 1, 0, 1, 1, 0, 1]),
+        indices: new Uint32Array([0, 2, 1, 0, 3, 2]),
+    };
+}
+
 const AIMS: Record<Aim, [number, number, number]> = {
     up: [-Math.PI / 2, 0, 0],
     down: [Math.PI / 2, 0, 0],
@@ -290,8 +364,12 @@ const BLENDS: Record<Blend, number> = {
 
 /** Builds one quarks ParticleSystem from the short options above. */
 export function makeSystem(scene: Scene, o: SysOptions, defaults: {loop: boolean; duration: number}): ParticleSystem {
-    const tex = sheet(scene, o.mesh ? 'white' : (o.tex ?? (o.beam ? 'bolt' : 'glow')));
-    const geo = o.mesh ? geometry(scene, o.mesh) : undefined;
+    const tex = o.image
+        ? image(scene, o.image)
+        : sheet(scene, o.mesh ? 'white' : (o.tex ?? (o.beam ? 'bolt' : 'glow')));
+    const geo = o.mesh ? geometry(scene, o.mesh) : o.geo;
+    // `mesh` particles are solid, lit rocks; `geo` particles are see-through, like sprites.
+    const solid = !!o.mesh;
     const tiles = tex.u * tex.v;
     const color = o.color ?? '#ffffff';
     const alpha = o.alpha ?? 1;
@@ -325,15 +403,17 @@ export function makeSystem(scene: Scene, o: SysOptions, defaults: {loop: boolean
         startLife: num(o.life),
         startSpeed: num(o.speed ?? 0),
         startSize: num(o.size),
-        startRotation: geo
-            ? o.upright
-                ? new AxisAngleGenerator(new BVector3(0, 1, 0), new IntervalValue(0, Math.PI * 2))
-                : new RandomQuatGenerator()
-            : o.rot === true
-              ? new IntervalValue(-Math.PI, Math.PI)
-              : o.rot === undefined
-                ? undefined
-                : num(o.rot),
+        startRotation: o.geo
+            ? undefined
+            : geo
+              ? o.upright
+                  ? new AxisAngleGenerator(new BVector3(0, 1, 0), new IntervalValue(0, Math.PI * 2))
+                  : new RandomQuatGenerator()
+              : o.rot === true
+                ? new IntervalValue(-Math.PI, Math.PI)
+                : o.rot === undefined
+                  ? undefined
+                  : num(o.rot),
         startColor,
         emissionOverTime: num(o.rate ?? 0),
         emissionOverDistance: o.rateOverDistance === undefined ? undefined : num(o.rateOverDistance),
@@ -345,9 +425,9 @@ export function makeSystem(scene: Scene, o: SysOptions, defaults: {loop: boolean
         vTileCount: tex.v,
         startTileIndex:
             tiles > 1 && o.randomTile !== false ? new IntervalValue(0, tiles - 0.001) : new ConstantValue(0),
-        blendMode: geo ? Constants.ALPHA_DISABLE : BLENDS[o.blend ?? 'add'],
-        transparent: !geo,
-        depthWrite: geo ? true : undefined,
+        blendMode: solid ? Constants.ALPHA_DISABLE : BLENDS[o.blend ?? 'add'],
+        transparent: !solid,
+        depthWrite: solid ? true : undefined,
         instancingGeometry: geo?.positions,
         instancingNormals: geo?.normals,
         instancingUVs: geo?.uvs,
@@ -359,8 +439,10 @@ export function makeSystem(scene: Scene, o: SysOptions, defaults: {loop: boolean
         softParticles: o.soft,
         softNearFade: o.soft ? 0 : undefined,
         softFarFade: o.soft ? 0.8 : undefined,
+        ...(o.geo ? {lighting: 'unlit' as const} : {}),
+        ...o.look,
     });
-    if (geo && o.tumble) {
+    if (solid && o.tumble) {
         system.addBehavior(
             new Rotation3DOverLife(
                 new AxisAngleGenerator(new BVector3(1, 0.6, 0.3).normalize(), new IntervalValue(-o.tumble, o.tumble))

@@ -1,7 +1,8 @@
 import {CircleEmitter, ConeEmitter, RenderMode, SphereEmitter} from 'babylon.quarks';
-import {drag, fadeOut, flicker, gravity, grow, orbit, spin, tint, wobble} from './kit';
+import {drag, fadeOut, flicker, flipbook, frames, gravity, grow, lathe, orbit, spin, tint, wobble} from './kit';
 import {PALETTE, debris, decal, embers, flames, flash, heart, pool, shockwave, smoke, sparks} from './recipes';
 import {type FxDef, shapes} from './stage';
+import {image} from './textures';
 
 /** pixelfx's fire category, rebuilt as 3D particle effects. */
 export const fire: FxDef[] = [
@@ -232,42 +233,132 @@ export const fire: FxDef[] = [
         loop: true,
         period: 2,
         build(fx) {
-            // Flames rising from a ring while orbiting the axis, flaring wider as they climb.
+            // The funnel: one mesh, narrow at the foot and flaring at the top, its surface a spiral band
+            // of fire (pixelfx's own formula, drawn at full resolution) scrolled round it to spin it.
+            const HT = 3.4;
+            const profile: Array<[number, number]> = [];
+            for (let i = 0; i <= 24; i++) {
+                const v = (i / 24) * 1.2;
+                profile.push([
+                    ((3.5 + 15 * Math.pow(Math.min(v, 1), 1.35) + 6 * Math.max(0, v - 1)) / 80) * HT,
+                    v * HT,
+                ]);
+            }
+            const funnel = fx.node('funnel');
+            const spinning = {
+                image: 'tornado-band',
+                geo: lathe(profile, 48),
+                blend: 'alpha',
+                life: 1e4,
+                size: 1,
+                burst: 1,
+                loop: false,
+                parent: funnel,
+            } as const;
+            // Three turns of the surface a loop, twisted up the column; noise licks at the band.
+            const surface = {
+                mapUV: {scroll: [1.5, 0] as [number, number]},
+                uvDistortion: {
+                    map: image(fx.scene, 'noise').texture,
+                    strength: 0.035,
+                    mapUV: {tiling: [3, 2] as [number, number], scroll: [0.4, -1.2] as [number, number]},
+                },
+            };
+            // The far side, seen through the strands, dimmer; then the near side, darker at its edges.
             fx.sys({
-                tex: 'flame',
-                life: [0.9, 1.2],
-                speed: [3.2, 4],
-                size: [0.5, 0.8],
-                rot: true,
-                rate: 90,
-                shape: new ConeEmitter({radius: 0.35, angle: 0.32, thickness: 0.2}),
-                aim: 'up',
-                order: 3,
-                b: [tint(PALETTE.fire, fadeOut(0.5, 0.1)), orbit(7, [0, 0, 1]), grow([0, 0.6], [1, 1.5])],
-            });
-            fx.sys({
-                tex: 'swirl',
-                mode: RenderMode.HorizontalBillBoard,
-                life: 0.8,
-                size: 2.4,
-                rate: 5,
-                color: '#ff8a2a',
-                at: [0, 0.05, 0],
+                ...spinning,
+                color: '#c08070',
                 order: 2,
-                b: [tint([['#ffffff', 0]], fadeOut(0.5, 0.3)), spin(9)],
+                look: {...surface, renderFace: 'back'},
             });
+            fx.sys({
+                ...spinning,
+                order: 3,
+                look: {
+                    ...surface,
+                    renderFace: 'front',
+                    rim: {color: [0.42, 0.06, 0.04], power: 2, strength: 0.6, mode: 'mix'},
+                },
+            });
+            // Its spine snakes as it turns.
+            fx.every((t) => {
+                const a = (t / 2) * Math.PI * 2;
+                funnel.rotation.z = 0.07 * Math.sin(a * 2) + 0.05 * Math.sin(a);
+                funnel.rotation.x = 0.05 * Math.cos(a * 2);
+            });
+            // The ring of flame whirling at its foot: the torch's flipbook, two turns a loop.
+            fx.sys({
+                image: 'torch-flame',
+                mode: RenderMode.VerticalBillBoard,
+                blend: 'alpha',
+                life: [0.5, 0.8],
+                size: [0.7, 1],
+                rate: 30,
+                shape: new CircleEmitter({radius: 0.65, thickness: 0.15}),
+                aim: 'up',
+                at: [0, 0.3, 0],
+                order: 4,
+                b: [
+                    frames(12, 24),
+                    orbit(Math.PI * 2, [0, 0, 1]),
+                    tint([['#ffffff', 0]], fadeOut(0.6, 0.15)),
+                    grow([0, 0.6], [0.3, 1], [1, 0.7]),
+                ],
+            });
+            // Flame flung off the spinning sides, cooling as it flies.
+            fx.sys({
+                image: 'torch-flame',
+                mode: RenderMode.VerticalBillBoard,
+                blend: 'alpha',
+                life: [0.3, 0.5],
+                speed: [1.5, 3],
+                size: [0.45, 0.7],
+                rate: 40,
+                shape: new ConeEmitter({radius: 0.45, angle: 0.75, thickness: 0.3}),
+                aim: 'up',
+                at: [0, 0.4, 0],
+                world: true,
+                order: 5,
+                b: [
+                    frames(12, 24),
+                    orbit(5, [0, 0, 1]),
+                    tint(
+                        [
+                            ['#ffffff', 0],
+                            ['#ff8a2a', 1],
+                        ],
+                        fadeOut(0.4, 0.1)
+                    ),
+                    grow([0, 1], [1, 0.4]),
+                ],
+            });
+            // Smoke spiralling off the top.
+            smoke(fx, {
+                at: [0, HT * 1.15, 0],
+                rate: 14,
+                life: [1.2, 2],
+                speed: [0.6, 1.2],
+                size: [0.2, 0.35],
+                color: '#9a8c94',
+                alpha: 0.3,
+                radius: 0.8,
+                spread: 0.6,
+            });
+            // Embers orbiting in and out of view.
             fx.sys({
                 tex: 'dot',
-                life: [1.2, 1.6],
-                speed: [2, 3],
-                size: [0.06, 0.1],
-                rate: 25,
-                shape: new ConeEmitter({radius: 0.6, angle: 0.5, thickness: 0.2}),
+                mode: RenderMode.StretchedBillBoard,
+                stretch: {speed: 0.05, length: 1},
+                life: [1.2, 2.4],
+                speed: [0.6, 1.2],
+                size: [0.05, 0.09],
+                rate: 18,
+                shape: new ConeEmitter({radius: 1.1, angle: 0.3, thickness: 0.3}),
                 aim: 'up',
-                order: 4,
-                b: [tint(PALETTE.ember, fadeOut(0.6, 0.02)), orbit(5, [0, 0, 1])],
+                order: 6,
+                b: [tint(PALETTE.ember, fadeOut(0.6, 0.02)), orbit(4.5, [0, 0, 1])],
             });
-            heart(fx, {at: [0, 1.2, 0], size: 2.4, alpha: 0.4});
+            heart(fx, {at: [0, 1.6, 0], size: 3.4, alpha: 0.3});
             pool(fx, {size: 4.5});
         },
     },
@@ -581,10 +672,24 @@ export const fire: FxDef[] = [
                 color: '#3b2216',
             });
             fx.prop(shapes.cylinder(scene, 0.3, 0.11), {at: [0, 2.65, -0.47], rotate: [-0.5, 0, 0], color: '#2a1a12'});
-            flames(fx, {at: [0, 2.75, -0.42], radius: 0.12, height: 1.1, size: [0.4, 0.6], rate: 35});
-            heart(fx, {at: [0, 3, -0.45], size: 1.4, alpha: 0.4});
-            embers(fx, {at: [0, 3, -0.42], rate: 6, radius: 0.1});
-            smoke(fx, {at: [0, 3.6, -0.42], rate: 4, alpha: 0.3, size: [0.3, 0.5]});
+            // The flame: pixelfx's own torch flame as a 24-frame flipbook, one long-lived upright sprite.
+            const FLAME = 1.9;
+            fx.sys({
+                image: 'torch-flame',
+                randomTile: false,
+                mode: RenderMode.VerticalBillBoard,
+                blend: 'alpha',
+                life: 1e4,
+                size: FLAME,
+                burst: 1,
+                loop: false,
+                at: [0, 2.72 + FLAME / 2, -0.42],
+                order: 4,
+                b: [flipbook(12, 24)],
+            });
+            heart(fx, {at: [0, 3.2, -0.42], size: 1.6, alpha: 0.35});
+            embers(fx, {at: [0, 3.3, -0.42], rate: 6, radius: 0.12});
+            smoke(fx, {at: [0, 3.9, -0.42], rate: 5, alpha: 0.4, size: [0.25, 0.4], color: '#5b5566'});
             // Flickering light on the wall behind.
             fx.sys({
                 tex: 'glow',
