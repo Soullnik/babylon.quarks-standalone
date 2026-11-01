@@ -1,19 +1,20 @@
 """Textures for the Pixel FX gallery's mesh and flipbook effects, written to public/textures/pixelfx/.
 
-    python3 examples/scripts/pixelfx/make_textures.py [--flame <torch-flame.png> <torch-flame.json>]
+    python3 examples/scripts/pixelfx/make_textures.py [--part|--heat <name> <sheet.png> <sheet.json>]...
 
 Needs numpy and Pillow. Two kinds of texture come out of it:
 
-* Flipbooks traced from pixelfx (https://github.com/patch-gg/pixelfx, MIT). `parts/torch-flame.js` is the
-  torch's own flame with everything but the tongues turned off; render it with pixelfx's tools
-  (`node tools/render.mjs parts/torch-flame --sheet` after copying it to src/fx/parts/) and pass the sheet
-  with --flame. Each frame is de-pixelized: premultiplied, upscaled, blurred by about half a source pixel,
+* Flipbooks traced from pixelfx (https://github.com/patch-gg/pixelfx, MIT). Each file in `parts/` is one
+  element of a pixelfx effect with the rest turned off (the torch's flame, the spirit flame's body). Copy
+  it to pixelfx's src/fx/parts/, render it with `node tools/render.mjs parts/<name> --sheet --bg none
+  --no-actor`, and pass the sheet: `--part torch-flame <png> <json> --heat flame-heat <png> <json>
+  --part spirit-flame <png> <json>`. Each frame is de-pixelized: premultiplied, upscaled, blurred by about half a source pixel,
   then its alpha edge tightened so the outlines come out as clean curves in the original colours.
 * Maps drawn here from the same formulas the pixel effects use, at full resolution: the fire tornado's
   spiral band (pixelfx fire/fire-tornado), the force field's hex shell (pixelfx scifi/force-field, after
   Sprite Fusion's shield, https://www.spritefusion.com/pixel-art-vfx/shield, MIT) and a wrapping noise.
 
-Without --flame the flipbook already in public/ is left alone.
+Without --part or --heat the flipbooks already in public/ are left alone.
 """
 import json
 import os
@@ -60,8 +61,9 @@ def blur(a, s, wrap=False):
 # ---- flipbooks from pixel art ----
 
 
-def flame_atlas(png, meta, scale=8, soft=0.25, heat=False):
-    """The torch flame, each frame padded to a square (bottom-aligned) and de-pixelized."""
+def part_atlas(name, png, meta, scale=None, soft=0.25, heat=False):
+    """A pixelfx part's sheet, each frame cropped to what any frame draws, padded to a square with its
+    foot at the bottom, and de-pixelized; with `heat`, its fire colours turned to heat first."""
     img = np.asarray(Image.open(png).convert('RGBA')).astype(np.float32) / 255
     if heat:
         img = to_heat(img)
@@ -78,7 +80,8 @@ def flame_atlas(png, meta, scale=8, soft=0.25, heat=False):
     fw, fh = 2 * half, foot - top
     frames = [np.pad(f, ((0, 0), (half, half), (0, 0)))[top:foot, px:px + 2 * half] for f in frames]
     side = max(fw, fh) + 2
-    print('flame frame', fw, 'x', fh, '->', side)
+    scale = scale or min(8, 256 // side)  # tiles of at most 256 px
+    print(name, 'frame', fw, 'x', fh, '->', side)
     out_cols = cols
     rows = (n + out_cols - 1) // out_cols
     k = scale
@@ -99,7 +102,7 @@ def flame_atlas(png, meta, scale=8, soft=0.25, heat=False):
         o = np.concatenate([np.clip(rgb, 0, 1), A2[..., None]], -1)[pad * k:-pad * k, pad * k:-pad * k]
         r, c = i // out_cols, i % out_cols
         res[r * side * k:(r + 1) * side * k, c * side * k:(c + 1) * side * k] = o
-    save('flame-heat.png' if heat else 'torch-flame.png', res)
+    save(name + '.png', res)
 
 
 def to_heat(img):
@@ -163,6 +166,27 @@ def tornado_band(w=512, h=512):
     alpha = 1 - strands + strands * smoothstep(-0.03, 0.03, keep)
     alpha *= smoothstep(0, 0.03, V) * smoothstep(1.2, 1.1, hv)
     save('tornado-band.png', np.concatenate([rgb, alpha[..., None]], -1))
+
+
+def pillar_band(w=256, h=256):
+    """The flame pillar's surface: U runs once round the column, V up one pulse of it; wraps both ways.
+
+    As in flame-pillar.js: seven hotter strands running up the column, wavering, and a bright pulse
+    racing up it (scroll V); a white-hot body whose edges the mesh's rim reddens.
+    """
+    u = (np.arange(w) + 0.5) / w
+    v = (np.arange(h)[::-1] + 0.5) / h
+    U, V = np.meshgrid(u, v)
+    rng = np.random.default_rng(5)
+    heat = 0.66 + 0.12 * (wrap_noise(w, h, 8, 11) - 0.5)
+    for k in range(7):
+        o, wd, f = rng.random(), 0.025 + 0.03 * rng.random(), rng.integers(1, 3)
+        d = np.abs(((U - o - 0.03 * np.sin(TAU * (f * V + k / 7))) + 0.5) % 1 - 0.5)
+        heat += 0.22 * smoothstep(wd, wd * 0.3, d)
+    p = np.abs(((V - 0.05) + 0.5) % 1 - 0.5)
+    heat += 0.2 * smoothstep(0.06, 0.02, p)
+    rgb = fire_colour(np.clip(heat, 0, 1))
+    save('pillar-band.png', np.concatenate([rgb, np.ones_like(heat)[..., None]], -1))
 
 
 def hex_cells(gx, gy):
@@ -313,12 +337,16 @@ def radial(size=128):
 
 
 if __name__ == '__main__':
+    # Flipbooks from pixelfx parts, rendered first with pixelfx's tools (see the module docstring):
+    #   --part <name> <sheet.png> <sheet.json>   colour flipbook public/textures/pixelfx/<name>.png
+    #   --heat <name> <sheet.png> <sheet.json>   the same as heat, for a gradient map
     args = sys.argv[1:]
-    if args[:1] == ['--flame']:
-        flame_atlas(args[1], args[2])
-        flame_atlas(args[1], args[2], heat=True)
+    while args and args[0] in ('--part', '--heat'):
+        part_atlas(args[1], args[2], args[3], heat=args[0] == '--heat')
+        args = args[4:]
     noise_map()
     tornado_band()
+    pillar_band()
     hex_shell()
     radial()
     gradient()

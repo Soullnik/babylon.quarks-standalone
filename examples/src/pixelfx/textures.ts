@@ -453,9 +453,11 @@ export function sheet(scene: Scene, name: TextureName): TextureSheet {
 export type ImageName =
     | 'torch-flame'
     | 'flame-heat'
+    | 'spirit-flame'
     | 'fire-puff-heat'
     | 'smoke-puff'
     | 'tornado-band'
+    | 'pillar-band'
     | 'hex-shell'
     | 'hex-plates'
     | 'hex-glint'
@@ -469,12 +471,15 @@ const IMAGES: Record<ImageName, {u: number; v: number; wrap: boolean; mask?: 'li
     'torch-flame': {u: 6, v: 4, wrap: false},
     // The same flame as heat, grey 1 white-hot to 0 dark red, for a gradient map to colour in any ramp.
     'flame-heat': {u: 6, v: 4, wrap: false},
+    // pixelfx's spirit flame body (rim, hollow heart, side wisps, strands), 36 frames at 12 fps, 8 × 5.
+    'spirit-flame': {u: 8, v: 5, wrap: false},
     // A ball of flame over its life, 16 frames 4 × 4, as heat; play it once over a particle's life.
     'fire-puff-heat': {u: 4, v: 4, wrap: false},
     // A puff of smoke over its life, 16 frames 4 × 4, light grey: the particle colour sets the smoke's.
     'smoke-puff': {u: 4, v: 4, wrap: false},
     // A funnel's surface: U once round it, V up it. Wraps in U, so scrolling U spins it.
     'tornado-band': {u: 1, v: 1, wrap: true},
+    'pillar-band': {u: 1, v: 1, wrap: true},
     // A dome's hex plates over longitude (U) and latitude (V); `hex-plates` is each plate's face alone.
     'hex-shell': {u: 1, v: 1, wrap: true},
     'hex-plates': {u: 1, v: 1, wrap: true},
