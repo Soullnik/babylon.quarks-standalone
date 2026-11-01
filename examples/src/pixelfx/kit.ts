@@ -8,6 +8,7 @@ import type {TransformNode} from '@babylonjs/core/Meshes/transformNode';
 import type {Scene} from '@babylonjs/core/scene';
 import type {Behavior, ParticleSystemParameters, ValueGenerator} from 'babylon.quarks';
 import {
+    ApplyCollision,
     ApplyForce,
     AxisAngleGenerator,
     Bezier,
@@ -151,6 +152,26 @@ export function drag(...keys: Array<[number, number]>): SpeedOverLife {
  */
 export function airDrag(perSecond: number): LimitSpeedOverLife {
     return new LimitSpeedOverLife(new ConstantValue(0), 3 * (1 - Math.exp(-perSecond / 60)));
+}
+
+/**
+ * Bounce off the floor (y = `floor` in the system's space, so use it on world-space systems):
+ * each hit keeps `bounce` of the speed, so chunks hop, skid and settle.
+ */
+export function floorBounce(bounce = 0.4, floor = 0.03): ApplyCollision {
+    return new ApplyCollision(
+        {
+            resolve(position, normal) {
+                if (position.y >= floor) return false;
+                position.y = floor;
+                normal.x = 0;
+                normal.y = 1;
+                normal.z = 0;
+                return true;
+            },
+        },
+        bounce
+    );
 }
 
 /** Curl-like noise on the position. */
@@ -373,6 +394,33 @@ export function lathe(profile: Array<[number, number]>, segments = 48): Geometry
     };
 }
 
+/** A chunk of crystal: an octahedron one unit across on the origin, for `geo`. */
+export function gem(): Geometry {
+    return lathe(
+        [
+            [0, -0.5],
+            [0.5, 0],
+            [0, 0.5],
+        ],
+        4
+    );
+}
+
+/** An ice blade or crystal point: a `sides`-sided spike one unit tall on the origin, for `geo`. */
+export function spike(lean = 0, sides = 4): Geometry {
+    const geo = lathe(
+        [
+            [0.14, 0],
+            [0.1, 0.4],
+            [0, 1],
+        ],
+        sides
+    );
+    // Sheared over by `lean` (x per unit of height), so a random turn about y tips it any way.
+    for (let i = 0; i < geo.positions.length; i += 3) geo.positions[i] += lean * geo.positions[i + 1];
+    return geo;
+}
+
 /** A unit square in the x-y plane facing +z, UV 0 to 1: a decal to lay on a surface. */
 export function quad(): Geometry {
     return {
@@ -439,7 +487,11 @@ export function makeSystem(scene: Scene, o: SysOptions, defaults: {loop: boolean
         startSpeed: num(o.speed ?? 0),
         startSize: num(o.size),
         startRotation: o.geo
-            ? undefined
+            ? o.upright
+                ? new AxisAngleGenerator(new BVector3(0, 1, 0), new IntervalValue(0, Math.PI * 2))
+                : o.tumble
+                  ? new RandomQuatGenerator()
+                  : undefined
             : geo
               ? o.upright
                   ? new AxisAngleGenerator(new BVector3(0, 1, 0), new IntervalValue(0, Math.PI * 2))
@@ -477,7 +529,7 @@ export function makeSystem(scene: Scene, o: SysOptions, defaults: {loop: boolean
         ...(o.geo ? {lighting: 'unlit' as const} : {}),
         ...o.look,
     });
-    if (solid && o.tumble) {
+    if ((solid || o.geo) && o.tumble) {
         system.addBehavior(
             new Rotation3DOverLife(
                 new AxisAngleGenerator(new BVector3(1, 0.6, 0.3).normalize(), new IntervalValue(-o.tumble, o.tumble))

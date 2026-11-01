@@ -458,6 +458,7 @@ export type ImageName =
     | 'smoke-puff'
     | 'tornado-band'
     | 'pillar-band'
+    | 'blizzard-band'
     | 'hex-shell'
     | 'hex-plates'
     | 'hex-glint'
@@ -480,6 +481,7 @@ const IMAGES: Record<ImageName, {u: number; v: number; wrap: boolean; mask?: 'li
     // A funnel's surface: U once round it, V up it. Wraps in U, so scrolling U spins it.
     'tornado-band': {u: 1, v: 1, wrap: true},
     'pillar-band': {u: 1, v: 1, wrap: true},
+    'blizzard-band': {u: 1, v: 1, wrap: true},
     // A dome's hex plates over longitude (U) and latitude (V); `hex-plates` is each plate's face alone.
     'hex-shell': {u: 1, v: 1, wrap: true},
     'hex-plates': {u: 1, v: 1, wrap: true},

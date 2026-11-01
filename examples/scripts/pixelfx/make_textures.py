@@ -168,6 +168,37 @@ def tornado_band(w=512, h=512):
     save('tornado-band.png', np.concatenate([rgb, alpha[..., None]], -1))
 
 
+ICE = ['#151a3d', '#212f6b', '#2c58aa', '#3a8bd8', '#62c8f4', '#a6ecff', '#dcfbff', '#ffffff']
+
+
+def ice_colour(level):
+    """pixelfx's ice palette (ice/blizzard-vortex.js), dark to white, at level 0..1."""
+    stops = np.linspace(0, 1, len(ICE))
+    cols = np.stack([hexrgb(c) for c in ICE])
+    return np.stack([np.interp(level, stops, cols[:, c]) for c in range(3)], -1)
+
+
+def blizzard_band(w=512, h=512):
+    """The snow funnel's surface: U once round it, V up it (0 at the foot, 1 at 1.1x the height).
+
+    As in blizzard-vortex.js's body: thin snow-filled air with three swirls twisted up the column and
+    bright wind streaks along them, fading out over the top 30% and at the foot. The mesh's rim adds
+    the denser edges. U wraps; scroll U to spin.
+    """
+    u = (np.arange(w) + 0.5) / w
+    v = (np.arange(h)[::-1] + 0.5) / h
+    U, V = np.meshgrid(u, v)
+    hv = V * 1.1
+    ns = wrap_noise(w, h, 8, 21) - 0.5
+    swirl = 0.5 + 0.5 * np.sin(TAU * (3 * U) + hv * 14 + 1.2 * ns)
+    streak = smoothstep(0.82, 0.97, 0.5 + 0.5 * np.sin(TAU * (5 * U) + hv * 22 + 2.5 * ns))
+    level = 0.55 + 0.25 * swirl + 0.45 * streak
+    rgb = ice_colour(np.clip(level, 0, 1))
+    alpha = 0.16 + 0.22 * swirl + 0.55 * streak
+    alpha *= smoothstep(0, 0.05, hv) * np.clip((1 - hv) / 0.3 + 0.35, 0, 1) * smoothstep(1.1, 0.95, hv)
+    save('blizzard-band.png', np.concatenate([rgb, np.clip(alpha, 0, 1)[..., None]], -1))
+
+
 def pillar_band(w=256, h=256):
     """The flame pillar's surface: U runs once round the column, V up one pulse of it; wraps both ways.
 
@@ -347,6 +378,7 @@ if __name__ == '__main__':
     noise_map()
     tornado_band()
     pillar_band()
+    blizzard_band()
     hex_shell()
     radial()
     gradient()
