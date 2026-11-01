@@ -14,8 +14,8 @@ plans are in the git history. What 1.x promises is in [STABILITY.md](STABILITY.m
   vendored fork of the three.quarks core and is where the simulation lives.
 - Runtime: batched rendering for every render mode (billboard, stretched, horizontal, vertical,
   mesh, trail, beam), soft particles, texture tiles, texture effects (per-texture UV layout with
-  channel, tiling, offset and scroll; gradient map; alpha erosion; UV distortion; flip; rim on
-  meshes), smoothed trails (tessellation, curve tension, swept side axis), sub emitters, mesh
+  channel, tiling, offset and scroll; gradient map; mask; alpha erosion; UV distortion; flip; rim
+  on meshes), smoothed trails (tessellation, curve tension, swept side axis), sub emitters, mesh
   surface emitter, 20+ behaviors, native WGSL shaders for WebGPU, scene integration (render order,
   rendering groups, layer masks, fog), bounds and frustum culling with Unity's culling modes, sort
   modes, screen-size limits, effect pool, deterministic randomness, adaptive performance, the

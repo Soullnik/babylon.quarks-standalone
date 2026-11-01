@@ -297,8 +297,8 @@ export abstract class VFXBatch {
     }
 
     /**
-     * Seconds of renderer time, set by the renderer before each fill; what UV
-     * and erosion mask scrolling advance by.
+     * Seconds of renderer time, set by the renderer before each fill; what UV,
+     * mask and erosion mask scrolling advance by.
      */
     time = 0;
 
@@ -309,9 +309,12 @@ export abstract class VFXBatch {
 
     /** Sets the texture effects' textures and constants, and advances their scrolling on every bind. */
     protected bindSurface(material: ShaderMaterial): void {
-        const {mapUV, uvDistortion, gradientMap, erosion} = this.settings;
+        const {mapUV, uvDistortion, gradientMap, mask, erosion} = this.settings;
         if (uvDistortion?.map) {
             material.setTexture('distortionMap', uvDistortion.map);
+        }
+        if (mask?.map) {
+            material.setTexture('maskMap', mask.map);
         }
         if (gradientMap?.ramp) {
             material.setTexture('gradientMap', gradientMap.ramp);
@@ -320,7 +323,7 @@ export abstract class VFXBatch {
             material.setTexture('erosionMask', erosion.mask);
         }
         this.writeSurfaceParams(material);
-        if (!mapUV && !uvDistortion && !erosion?.mask && !gradientMap) {
+        if (!mapUV && !uvDistortion && !mask && !erosion?.mask && !gradientMap) {
             return;
         }
         // Wrapped on the CPU: a raw speed × time grows until float32 UVs lose their fraction.
@@ -330,6 +333,7 @@ export abstract class VFXBatch {
         const mapTransform = new BVector4();
         const distortionTransform = new BVector4();
         const maskTransform = new BVector4();
+        const maskMapTransform = new BVector4();
         const gradientRange = new BVector2(0, 1);
         // Only the scroll is wrapped: an offset is kept as given, so a clamped
         // texture moved off its edge stays moved.
@@ -347,7 +351,7 @@ export abstract class VFXBatch {
         const write = () => {
             const time = this.time;
             const effect = material.getEffect();
-            const {mapUV, uvDistortion, gradientMap, erosion} = this.settings;
+            const {mapUV, uvDistortion, gradientMap, mask, erosion} = this.settings;
             if (mapUV) {
                 transform(mapUV, time, mapTransform);
                 material.setVector4('mapTransform', mapTransform);
@@ -357,6 +361,11 @@ export abstract class VFXBatch {
                 transform(uvDistortion.mapUV, time, distortionTransform);
                 material.setVector4('distortionTransform', distortionTransform);
                 effect?.setVector4('distortionTransform', distortionTransform);
+            }
+            if (mask) {
+                transform(mask.mapUV, time, maskMapTransform);
+                material.setVector4('maskTransform', maskMapTransform);
+                effect?.setVector4('maskTransform', maskMapTransform);
             }
             if (erosion?.mask) {
                 transform(erosion.maskUV, time, maskTransform);
@@ -379,9 +388,13 @@ export abstract class VFXBatch {
 
     /** Writes the texture effects' constants (the uniforms their live parameters set). */
     private writeSurfaceParams(material: ShaderMaterial): void {
-        const {uvDistortion, gradientMap, erosion} = this.settings;
+        const {uvDistortion, gradientMap, mask, erosion} = this.settings;
         if (uvDistortion?.map) {
             material.setFloat('distortionStrength', uvDistortion.strength);
+        }
+        if (mask?.map) {
+            const [r, g, b, a] = GRADIENT_MAP_WEIGHTS[mask.channel];
+            material.setVector4('maskChannel', new BVector4(r, g, b, a));
         }
         if (gradientMap?.ramp) {
             const [r, g, b, a] = GRADIENT_MAP_WEIGHTS[gradientMap.channel];

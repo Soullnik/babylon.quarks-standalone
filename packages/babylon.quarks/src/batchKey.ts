@@ -5,6 +5,7 @@ import {
     normalizeErosion,
     normalizeGradientMap,
     normalizeMapUV,
+    normalizeMask,
     normalizeMeshRim,
     normalizeUVDistortion,
     readsUV1,
@@ -71,6 +72,7 @@ export function storedBatchSettings(settings: VFXBatchSettings): StoredBatchSett
     const mapUV = normalizeMapUV(settings.mapUV);
     const uvDistortion = normalizeUVDistortion(settings.uvDistortion);
     const gradientMap = normalizeGradientMap(settings.gradientMap);
+    const mask = normalizeMask(settings.mask);
     const erosion = normalizeErosion(settings.erosion);
     const uTileCount = validTileCount(settings.uTileCount);
     const vTileCount = validTileCount(settings.vTileCount);
@@ -81,7 +83,7 @@ export function storedBatchSettings(settings: VFXBatchSettings): StoredBatchSett
         instancingIndices: isTrail ? NO_INDICES : settings.instancingIndices,
         instancingUVs: isTrail ? undefined : settings.instancingUVs,
         // Normals, and the second UV set when a texture reads it, only reach mesh particles.
-        instancingUVs2: isMesh && readsUV1({mapUV, uvDistortion, erosion}) ? settings.instancingUVs2 : undefined,
+        instancingUVs2: isMesh && readsUV1({mapUV, uvDistortion, mask, erosion}) ? settings.instancingUVs2 : undefined,
         instancingNormals: isMesh ? settings.instancingNormals : undefined,
         renderOrder: settings.renderOrder,
         uTileCount,
@@ -118,6 +120,7 @@ export function storedBatchSettings(settings: VFXBatchSettings): StoredBatchSett
         mapUV,
         uvDistortion,
         gradientMap,
+        mask,
         erosion,
     };
     return stored;
@@ -169,6 +172,8 @@ export function shaderKeyEqual(a: StoredBatchSettings, b: StoredBatchSettings): 
         a.uvDistortion?.mapUV.channel === b.uvDistortion?.mapUV.channel &&
         !a.gradientMap === !b.gradientMap &&
         a.gradientMap?.ramp === b.gradientMap?.ramp &&
+        a.mask?.map === b.mask?.map &&
+        a.mask?.mapUV.channel === b.mask?.mapUV.channel &&
         !a.erosion === !b.erosion &&
         a.erosion?.mask === b.erosion?.mask &&
         a.erosion?.maskUV.channel === b.erosion?.maskUV.channel
@@ -194,6 +199,8 @@ export function liveParamsEqual(a: StoredBatchSettings, b: StoredBatchSettings):
         a.uvDistortion?.strength === b.uvDistortion?.strength &&
         uvLayoutEqual(a.uvDistortion?.mapUV, b.uvDistortion?.mapUV) &&
         a.gradientMap?.channel === b.gradientMap?.channel &&
+        a.mask?.channel === b.mask?.channel &&
+        uvLayoutEqual(a.mask?.mapUV, b.mask?.mapUV) &&
         a.erosion?.softness === b.erosion?.softness &&
         a.erosion?.edgeWidth === b.erosion?.edgeWidth &&
         colorEqual(a.erosion?.edgeColor, b.erosion?.edgeColor) &&

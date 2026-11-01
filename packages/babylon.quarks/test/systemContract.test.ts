@@ -127,6 +127,7 @@ const PARAMETERS: {[K in keyof Required<ParticleSystemParameters>]: Parameter<K>
     gradientMap: () => ({ramp: mask, channel: 'g'}),
     erosion: () => ({mask, maskUV: {tiling: [2, 2]}, softness: 0.2, edgeWidth: 0.1, edgeColor: [1, 0.5, 0]}),
     uvDistortion: () => ({map: mask, mapUV: {scroll: [0.1, 0]}, strength: 0.3}),
+    mask: () => ({map: mask, channel: 'a', mapUV: {channel: 1, scroll: [0, -0.5]}}),
     playbackSpeed: () => 1.5,
     cullingMode: () => 'pause',
     scalingMode: () => 'hierarchy',

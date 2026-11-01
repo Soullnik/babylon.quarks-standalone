@@ -368,6 +368,22 @@
                         }
                     }
                 },
+                "mask": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "description": "A mask multiplied into the map: one channel of a second texture, on its own layout.",
+                    "properties": {
+                        "map": {
+                            "$ref": "#/$defs/uuid"
+                        },
+                        "channel": {
+                            "enum": ["r", "g", "b", "a", "luminance"]
+                        },
+                        "mapUV": {
+                            "$ref": "#/$defs/textureUV"
+                        }
+                    }
+                },
                 "side": {
                     "enum": [0, 1, 2],
                     "description": "A mesh node material's culling, in three.js' numbers: 2, the default, draws both sides; 0 (front) or 1 (back) culls back faces."

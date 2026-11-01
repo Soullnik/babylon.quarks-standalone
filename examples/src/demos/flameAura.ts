@@ -21,7 +21,6 @@ import {
     ConstantColor,
     ConstantValue,
     ForceOverLife,
-    FrameOverLife,
     Gradient,
     IntervalValue,
     MeshSurfaceEmitter,
@@ -30,25 +29,24 @@ import {
     type ParticleSystemParameters,
     PiecewiseBezier,
     PointEmitter,
-    RandomColor,
     RenderMode,
     RotationOverLife,
     SizeOverLife,
-    SphereEmitter,
     Vector3Function,
 } from 'babylon.quarks';
 import type {DemoContext} from '../types';
 
 /*
- * A teal flame aura around a standing figure: licking flames shed from the
- * body's surface, a tall thin plume rising off the head into dark smoke, a
- * soft halo and a glow pooled on the ground with flames splashing round the
- * feet. Every texture is painted below, so the effect needs no asset files.
+ * A teal flame aura around a standing figure: masses of fire standing off the
+ * body's surface, a thin plume rising off the head into dark smoke, a soft
+ * halo and a glow pooled on the ground with flames splashing round the feet.
+ * Every texture is painted below, so the effect needs no asset files.
  *
- * Built only from what a material in Unity's or Unreal's flame shaders does:
- * a greyscale flame sheet recoloured by a gradient map, its UV pushed about
- * by scrolling noise (UV distortion), and its shape dissolved by a noise mask
- * as its alpha falls (alpha erosion).
+ * The fire is the masked panner of Unity's and Unreal's flame materials:
+ * billowing noise scrolls up and wavers (`mapUV` scroll, UV distortion)
+ * through a still flame silhouette (`mask`); the gradient map colours the
+ * product and the particle's alpha wears it away from its faint edges
+ * (`erosion`).
  */
 
 /** A square canvas texture painted by `paint`, wrapping or clamped. */
@@ -123,51 +121,6 @@ const smoothstep = (a: number, b: number, x: number) => {
     return t * t * (3 - 2 * t);
 };
 
-/** Frames per side of the flame flipbook. */
-const FLIPBOOK_SIDE = 4;
-
-/**
- * A looping 4×4 flipbook of one licking flame, greyscale: red is heat (1 in
- * the core at the foot, falling off toward the edges and the tip), alpha the
- * tongue's shape, V running up the tongue. Its ragged edges are noise that
- * rises one whole repeat over the 16 frames and its sway one whole turn, so
- * the last frame runs on into the first.
- */
-function flameFlipbook(image: ImageData, size: number): void {
-    const tile = size / FLIPBOOK_SIDE;
-    const frames = FLIPBOOK_SIDE * FLIPBOOK_SIDE;
-    const ragged = fractalNoise(21, 4, 4);
-    const strands = fractalNoise(44, 4, 3);
-    for (let f = 0; f < frames; f++) {
-        const time = f / frames;
-        const turn = time * Math.PI * 2;
-        const ox = (f % FLIPBOOK_SIDE) * tile;
-        // Canvas rows run top down and a texture's V up, so the sheet's first
-        // row is the bottom of the canvas.
-        const oy = (FLIPBOOK_SIDE - 1 - Math.floor(f / FLIPBOOK_SIDE)) * tile;
-        const width = 0.33 + 0.04 * Math.sin(turn * 2);
-        for (let y = 0; y < tile; y++) {
-            const v = 1 - (y + 0.5) / tile;
-            for (let x = 0; x < tile; x++) {
-                const u = (x + 0.5) / tile;
-                // Keep a margin so distortion never reads the neighbouring frame.
-                const h = v * 1.08 - 0.04;
-                const centre = 0.5 + Math.sin(h * 6 - turn) * 0.08 * h + Math.sin(h * 11 - turn * 2) * 0.03 * h;
-                const half = width * Math.pow(Math.max(0, 1 - h), 0.8) * Math.sqrt(smoothstep(-0.02, 0.2, h));
-                const across = half > 0 ? Math.abs(u - centre) / half : 2;
-                // The noise rises through the flame and eats in further up it.
-                const noise = ragged(u * 0.8, h * 0.7 - time);
-                const body = 1 - across - (noise - 0.45) * (0.6 + h * 1.4);
-                const shape = smoothstep(0, 0.6, body);
-                // Strands running up the tongue, so it reads as fire rather than a drop.
-                const streaks = 0.6 + 0.8 * (strands(u * 2, h * 0.4 - time) - 0.5);
-                const heat = shape * smoothstep(0, 1, body) * (1 - 0.7 * h) * streaks;
-                put(image, size, ox + x, oy + y, heat, heat, heat, shape);
-            }
-        }
-    }
-}
-
 /** Smooth tileable noise in red and green around 0.5, for UV distortion. */
 function distortionNoise(image: ImageData, size: number): void {
     const nr = fractalNoise(5, 4, 3);
@@ -186,6 +139,31 @@ function erosionNoise(image: ImageData, size: number): void {
         for (let x = 0; x < size; x++) {
             const v = smoothstep(0.25, 0.75, n(x / size, y / size));
             put(image, size, x, y, v, v, v, 1);
+        }
+    }
+}
+
+/** Billowing tileable noise in red, cores bright and gaps clear: the energy that rises through a flame. */
+function energyNoise(image: ImageData, size: number): void {
+    const n = fractalNoise(81, 3, 5);
+    for (let y = 0; y < size; y++) {
+        for (let x = 0; x < size; x++) {
+            const v = smoothstep(0.38, 0.72, n(x / size, y / size));
+            put(image, size, x, y, v, v, v, v);
+        }
+    }
+}
+
+/** A flame's silhouette in red: full at its broad foot and along its middle, falling off to its sides and tip. */
+function flameMask(image: ImageData, size: number): void {
+    for (let y = 0; y < size; y++) {
+        const v = 1 - (y + 0.5) / size;
+        for (let x = 0; x < size; x++) {
+            const u = (x + 0.5) / size;
+            const half = 0.5 * Math.pow(1 - v, 0.6);
+            const across = half > 0 ? Math.abs(u - 0.5) / half : 1;
+            const m = Math.max(0, 1 - across * across) * Math.pow(1 - v, 0.5) * smoothstep(0, 0.2, v);
+            put(image, size, x, y, m, m, m, 1);
         }
     }
 }
@@ -238,8 +216,8 @@ function tealRamp(image: ImageData, size: number): void {
     const stops: [number, number, number, number, number][] = [
         [0, 0.0, 0.25, 0.22, 0],
         [0.25, 0.0, 0.5, 0.38, 0.8],
-        [0.55, 0.0, 0.92, 0.66, 1],
-        [0.8, 0.28, 1, 0.82, 1],
+        [0.55, 0.0, 0.85, 0.6, 1],
+        [0.8, 0.2, 1, 0.78, 1],
         [1, 0.82, 1, 0.96, 1],
     ];
     for (let x = 0; x < size; x++) {
@@ -353,104 +331,55 @@ export function init({scene, camera, batchRenderer, systems}: DemoContext) {
     body.material = skin;
     shadows.addShadowCaster(body);
 
-    const flames = canvasTexture(scene, 'flameFlipbook', 512, false, flameFlipbook);
     const distortion = canvasTexture(scene, 'distortionNoise', 128, true, distortionNoise);
     const erosion = canvasTexture(scene, 'erosionNoise', 128, true, erosionNoise);
     const ramp = canvasTexture(scene, 'tealRamp', 64, false, tealRamp);
     const glow = canvasTexture(scene, 'softGlow', 256, false, softGlow);
 
-    // The flame material every tongue shares: a flipbook frame recoloured by the
-    // teal ramp, licking upward as noise pushes its UV, dissolving through a
-    // noise mask as its alpha falls. Shared settings batch into one draw.
-    const flameMaterial: Partial<ParticleSystemParameters> = {
-        texture: flames,
-        uTileCount: FLIPBOOK_SIDE,
-        vTileCount: FLIPBOOK_SIDE,
-        blendTiles: true,
+    // Flame sheets standing round the body: billowing noise (the map) rises
+    // through a flame silhouette (the mask), and the ramp colours their
+    // product, so the fire reads as masses of energy rather than sparks. The
+    // particle's alpha is the erosion level that trims their faint edges.
+    const energy = canvasTexture(scene, 'energyNoise', 256, true, energyNoise);
+    const silhouette = canvasTexture(scene, 'flameMask', 128, false, flameMask);
+    const sheetMaterial: Partial<ParticleSystemParameters> = {
+        texture: energy,
+        mapUV: {channel: 1, tiling: [1.2, 0.55], scroll: [0, -0.6]},
         blendMode: Constants.ALPHA_ADD,
-        gradientMap: {ramp},
-        uvDistortion: {map: distortion, strength: 0.03, mapUV: {tiling: [1.2, 0.8], scroll: [0.05, -0.9]}},
-        erosion: {
-            mask: erosion,
-            maskUV: {channel: 1, tiling: [0.8, 0.6], scroll: [0, -0.7]},
-            softness: 0.3,
-        },
+        mask: {map: silhouette, mapUV: {channel: 1}},
+        gradientMap: {ramp, channel: 'a'},
+        uvDistortion: {map: distortion, strength: 0.08, mapUV: {channel: 1, tiling: [0.8, 0.5], scroll: [0, -0.3]}},
+        erosion: {softness: 0.3},
     };
-    // Each tongue plays the flipbook from its own frame, so no two lick alike.
-    const flipbook = () =>
-        new FrameOverLife(new ConstantValue(0), {
-            fps: 18,
-            frameCount: FLIPBOOK_SIDE * FLIPBOOK_SIDE,
-            startFrame: new IntervalValue(0, FLIPBOOK_SIDE * FLIPBOOK_SIDE),
-        });
-    // Grow in, hold, then dissolve: alpha is how much of the tongue is left.
-    const flameLife = overLife(
-        [
-            [1, 1, 1],
-            [0.8, 0.95, 0.95],
-        ],
-        [0.55, 1, 0.85, 0]
-    );
-
-    // Flames licking off the whole body, rising and swaying as they go.
     const surface = new MeshSurfaceEmitter();
     surface.mesh = body;
-    const bodyFlames = new ParticleSystem({
+    const sheets = new ParticleSystem({
         scene,
         duration: 1,
         looping: true,
         prewarm: true,
         worldSpace: true,
-        startLife: new IntervalValue(0.45, 0.8),
-        startSpeed: new IntervalValue(0, 0.12),
-        startSize: new Vector3Function(
-            new IntervalValue(0.3, 0.45),
-            new IntervalValue(0.5, 0.85),
-            new ConstantValue(1)
-        ),
-        startRotation: new IntervalValue(-0.25, 0.25),
-        startColor: new RandomColor(new Color4(0.35, 0.55, 0.55, 1), new Color4(0.6, 0.8, 0.8, 1)),
-        emissionOverTime: new ConstantValue(120),
+        startLife: new IntervalValue(0.9, 1.4),
+        startSpeed: new ConstantValue(0.05),
+        startSize: new Vector3Function(new IntervalValue(0.3, 0.48), new IntervalValue(0.8, 1.2), new ConstantValue(1)),
+        startRotation: new IntervalValue(-0.12, 0.12),
+        startColor: new ConstantColor(new Color4(0.5, 0.72, 0.6, 1)),
+        emissionOverTime: new ConstantValue(44),
         shape: surface,
         renderMode: RenderMode.VerticalBillBoard,
-        // The tongue's foot sits on the body; it grows upward from there.
-        pivot: new BVector3(0, 0.35, 0),
-        ...flameMaterial,
+        pivot: new BVector3(0, 0.25, 0),
+        ...sheetMaterial,
     });
-    bodyFlames.addBehavior(new ForceOverLife(new ConstantValue(0), new ConstantValue(2), new ConstantValue(0)));
-    bodyFlames.addBehavior(new Noise(new ConstantValue(1.5), new ConstantValue(0.25)));
-    bodyFlames.addBehavior(new SizeOverLife(new PiecewiseBezier([[new Bezier(0.6, 1, 1.1, 0.7), 0]])));
-    bodyFlames.addBehavior(flameLife.clone());
-    bodyFlames.addBehavior(flipbook());
-
-    // Tongues round the head, rising faster: the bright foot of the plume.
-    const crownFlames = new ParticleSystem({
-        scene,
-        duration: 1,
-        looping: true,
-        prewarm: true,
-        worldSpace: true,
-        startLife: new IntervalValue(0.45, 0.75),
-        startSpeed: new IntervalValue(0.1, 0.3),
-        startSize: new Vector3Function(
-            new IntervalValue(0.25, 0.4),
-            new IntervalValue(0.55, 0.9),
-            new ConstantValue(1)
-        ),
-        startRotation: new IntervalValue(-0.15, 0.15),
-        startColor: new ConstantColor(new Color4(1, 1, 1, 1)),
-        emissionOverTime: new ConstantValue(14),
-        shape: new SphereEmitter({radius: 0.12, thickness: 1}),
-        renderMode: RenderMode.VerticalBillBoard,
-        pivot: new BVector3(0, 0.35, 0),
-        ...flameMaterial,
-    });
-    crownFlames.emitter.position = new BVector3(0, 1.62, 0);
-    crownFlames.addBehavior(new ForceOverLife(new ConstantValue(0), new ConstantValue(4.5), new ConstantValue(0)));
-    crownFlames.addBehavior(new Noise(new ConstantValue(1.2), new ConstantValue(0.2)));
-    crownFlames.addBehavior(new SizeOverLife(new PiecewiseBezier([[new Bezier(0.7, 1, 1, 0.6), 0]])));
-    crownFlames.addBehavior(flameLife.clone());
-    crownFlames.addBehavior(flipbook());
+    sheets.addBehavior(new ForceOverLife(new ConstantValue(0), new ConstantValue(0.6), new ConstantValue(0)));
+    sheets.addBehavior(
+        overLife(
+            [
+                [1, 1, 1],
+                [1, 1, 1],
+            ],
+            [0, 0.7, 0.6, 0]
+        )
+    );
 
     // The plume: thin wisps shooting up off the head, cooling from teal into
     // dark smoke over the scene, alpha blended so they darken what they cross.
@@ -480,7 +409,7 @@ export function init({scene, camera, batchRenderer, systems}: DemoContext) {
                 [0.1, 0.3, 0.3],
                 [0.14, 0.2, 0.22],
             ],
-            [0, 0.3, 0.2, 0]
+            [0, 0.18, 0.12, 0]
         )
     );
     plume.addBehavior(new SizeOverLife(new PiecewiseBezier([[new Bezier(0.8, 1, 1.2, 1.4), 0]])));
@@ -568,7 +497,7 @@ export function init({scene, camera, batchRenderer, systems}: DemoContext) {
         )
     );
 
-    for (const system of [pool, splash, halo, plume, bodyFlames, crownFlames]) {
+    for (const system of [pool, splash, halo, plume, sheets]) {
         batchRenderer.addSystem(system);
         systems.push(system);
     }

@@ -226,6 +226,7 @@ export function particleSystemParametersFromJSON(
     const erosionMeta = materialMeta?.erosion;
     const gradientMeta = materialMeta?.gradientMap;
     const distortionMeta = materialMeta?.uvDistortion;
+    const maskMeta = materialMeta?.mask;
     const resolvedGeometryEntry =
         typeof json.instancingGeometry === 'string'
             ? meta.geometries?.[json.instancingGeometry]
@@ -267,6 +268,7 @@ export function particleSystemParametersFromJSON(
             distortionMeta && typeof distortionMeta === 'object'
                 ? {...distortionMeta, map: resolveTexture(distortionMeta.map)}
                 : undefined,
+        mask: maskMeta && typeof maskMeta === 'object' ? {...maskMeta, map: resolveTexture(maskMeta.map)} : undefined,
     };
 }
 
@@ -364,6 +366,7 @@ function materialMeta(system: ParticleSystem, meta: BabylonMetaData): string {
     const erosion = system.erosion;
     const distortion = system.uvDistortion;
     const gradientMap = system.gradientMap;
+    const mask = system.mask;
     const optional = <T>(key: string, value: T | undefined) => (value !== undefined ? {[key]: value} : {});
 
     const materialUUID = nextSerializationId(meta, 'quarks_material');
@@ -410,6 +413,15 @@ function materialMeta(system: ParticleSystem, meta: BabylonMetaData): string {
                       ...(distortion.strength !== UV_DISTORTION_DEFAULT_STRENGTH
                           ? {strength: distortion.strength}
                           : {}),
+                  },
+              }
+            : {}),
+        ...(mask
+            ? {
+                  mask: {
+                      map: textureRef(mask.map, false, 'mask.map'),
+                      ...(mask.channel !== 'r' ? {channel: mask.channel} : {}),
+                      ...optional('mapUV', textureUVToJSON(mask.mapUV)),
                   },
               }
             : {}),

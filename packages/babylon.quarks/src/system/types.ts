@@ -28,6 +28,7 @@ import type {
     MeshRim,
     ParticleErosionOptions,
     ParticleGradientMap,
+    ParticleMaskOptions,
     ParticleUVDistortionOptions,
     RenderFace,
     RenderMode,
@@ -311,6 +312,8 @@ export interface ParticleSystemParameters {
     erosion?: ParticleErosionOptions;
     /** Map UV distortion, see {@link ParticleSystem.uvDistortion}. Default none. */
     uvDistortion?: ParticleUVDistortionOptions;
+    /** Mask multiplied into the map, see {@link ParticleSystem.mask}. Default none. */
+    mask?: ParticleMaskOptions;
     /** Multiplier on the time the system is advanced by, see {@link ParticleSystem.playbackSpeed}. Default 1. */
     playbackSpeed?: number;
     /** What the system does while off screen, see {@link CullingMode}. Default `'always'`. */

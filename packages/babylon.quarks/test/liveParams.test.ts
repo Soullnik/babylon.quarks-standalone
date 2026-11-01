@@ -106,6 +106,7 @@ describe('live parameters written in place', () => {
         ps.mapUV = {tiling: [2, 2]};
         ps.uvDistortion = {map: textures.noise, mapUV: uv(), strength: 0.1};
         ps.gradientMap = {ramp: textures.ramp, channel: 'r'};
+        ps.mask = {map: textures.mask, mapUV: uv()};
         ps.erosion = {mask: textures.mask, maskUV: uv(), softness: 0.1, edgeWidth: 0.1, edgeColor: [1, 0.5, 0]};
         return ps;
     }
@@ -136,6 +137,8 @@ describe('live parameters written in place', () => {
             (s) => (s.uvDistortion = {...s.uvDistortion!, mapUV: {...uv(), offset: [0.5, 0]}}),
         ],
         ['gradientMap.channel', 'sprite', (s) => (s.gradientMap = {...s.gradientMap!, channel: 'a'})],
+        ['mask.channel', 'sprite', (s) => (s.mask = {...s.mask!, channel: 'g'})],
+        ['mask.mapUV', 'sprite', (s) => (s.mask = {...s.mask!, mapUV: {...uv(), tiling: [2, 1]}})],
         ['erosion.softness', 'sprite', (s) => (s.erosion = {...s.erosion!, softness: 0.3})],
         ['erosion.edgeWidth', 'sprite', (s) => (s.erosion = {...s.erosion!, edgeWidth: 0.2})],
         ['erosion.edgeColor', 'sprite', (s) => (s.erosion = {...s.erosion!, edgeColor: [0, 0, 1]})],
