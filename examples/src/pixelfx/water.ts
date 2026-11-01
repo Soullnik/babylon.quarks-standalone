@@ -571,10 +571,19 @@ export const water: FxDef[] = [
                     bead.position.y = -5;
                 }
             });
-            star(fx, {at: [0.04, tip - 0.2, 0.1], size: 0.4, life: 0.25, time: PINCH - 0.15, order: 8});
+            star(fx, {at: [0.04, tip - 0.2, 0.1], size: 0.4, life: 0.25, time: PINCH - 0.15, order: 8, loop: true});
             // The landing: a white fleck and a flash, a crown of beads, a rebound bead, rings.
-            star(fx, {at: [0, 0.12, 0], size: 0.6, life: 0.2, time: LAND, tex: 'burst', ramp: WATER});
-            light(fx, {at: [0, 0.045, 0], size: 1.6, color: '#8fd8ff', alpha: 0.7, life: 0.3, time: LAND, floor: true});
+            star(fx, {at: [0, 0.12, 0], size: 0.6, life: 0.2, time: LAND, tex: 'burst', ramp: WATER, loop: true});
+            light(fx, {
+                at: [0, 0.045, 0],
+                size: 1.6,
+                color: '#8fd8ff',
+                alpha: 0.7,
+                life: 0.3,
+                time: LAND,
+                floor: true,
+                loop: true,
+            });
             beads(fx, {
                 at: [0, 0.05, 0],
                 burst: [[LAND, 12]],
@@ -1058,7 +1067,7 @@ export const water: FxDef[] = [
                     at: [x, 0.85, z],
                     order: 5,
                 });
-                star(fx, {at: [x, 0.1, z], size: 0.45, life: 0.16, time: t, tex: 'burst', ramp: WATER});
+                star(fx, {at: [x, 0.1, z], size: 0.45, life: 0.16, time: t, tex: 'burst', ramp: WATER, loop: true});
                 beads(fx, {
                     at: [x, 0.05, z],
                     burst: [[t + 0.02, 1]],

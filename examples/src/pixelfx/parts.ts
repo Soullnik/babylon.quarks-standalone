@@ -213,11 +213,13 @@ export function star(
         color?: string;
         alpha?: number;
         parent?: SysOptions['parent'];
+        /** Replays every cycle of a looping effect; once by default. */
+        loop?: boolean;
     }
 ) {
     return fx.sys({
         tex: o.tex ?? 'glint',
-        loop: false,
+        loop: o.loop ?? false,
         life: o.life,
         size: o.size,
         rot: o.rot,
@@ -234,12 +236,22 @@ export function star(
 /** A soft pool of light: on the air at `at`, or laid on the floor with `floor`. */
 export function light(
     fx: FxBuilder,
-    o: {at?: At; size: number; color: string; alpha?: number; life?: number; time?: number; floor?: boolean}
+    o: {
+        at?: At;
+        size: number;
+        color: string;
+        alpha?: number;
+        life?: number;
+        time?: number;
+        floor?: boolean;
+        /** Replays every cycle of a looping effect; once by default. */
+        loop?: boolean;
+    }
 ) {
     return fx.sys({
         tex: 'glow',
         mode: o.floor ? RenderMode.HorizontalBillBoard : undefined,
-        loop: false,
+        loop: o.loop ?? false,
         life: o.life ?? 0.35,
         size: o.size,
         burst: [[o.time ?? 0, 1]],

@@ -184,17 +184,12 @@ function held(
     });
 }
 
-/** A hero that appears only above (`keep: 'above'`) or below a moving height, by a clip plane set round its draw. */
-function clipped(fx: FxBuilder, mesh: Mesh, keep: 'above' | 'below'): (y: number) => void {
+/** A hero that appears only above (`keep: 'above'`) or below a moving height, by a clip plane on its own material. */
+function clipped(material: StandardMaterial, keep: 'above' | 'below'): (y: number) => void {
+    // The material's own clip plane, so nothing else in the scene is cut. Babylon discards where
+    // dot(normal, p) + d > 0.
     const plane = new Plane(0, keep === 'above' ? -1 : 1, 0, 0);
-    const scene = fx.scene;
-    mesh.onBeforeRenderObservable.add(() => {
-        scene.clipPlane = plane;
-    });
-    mesh.onAfterRenderObservable.add(() => {
-        scene.clipPlane = null;
-    });
-    // Babylon discards where dot(normal, p) + d > 0.
+    material.clipPlane = plane;
     return (y) => {
         plane.d = keep === 'above' ? y : -y;
     };
@@ -1013,7 +1008,7 @@ export const scifi: FxDef[] = [
                 order: 6,
                 b: [tint([['#ffffff', 0]], flicker())],
             });
-            const glow = light(fx, {at: [0, 1, 0.2], size: 3, color: '#ff2e63', alpha: 0.3, life: 0.25});
+            const glow = light(fx, {at: [0, 1, 0.2], size: 3, color: '#ff2e63', alpha: 0.3, life: 0.25, loop: true});
             glow.emissionBursts.length = 0;
             windows(glow, 2.4, BURSTS, 12);
             pool(fx, {color: '#2ef2ff', size: 2.2, alpha: 0.12});
@@ -1304,6 +1299,7 @@ export const scifi: FxDef[] = [
                 alpha: 0.6,
                 life: 0.1,
                 floor: true,
+                loop: true,
             });
             glow.emissionBursts.length = 0;
             glow.emissionOverTime = curve([0, 40], [1, 40]);
@@ -1814,7 +1810,7 @@ export const scifi: FxDef[] = [
             const SLAM = 0.6;
             const hero = fx.character();
             const heroMat = own(hero, 'warp-in-hero');
-            const cut = clipped(fx, hero, 'above');
+            const cut = clipped(heroMat, 'above');
             const beam = fx.node('beam');
             const tube: Array<[number, number]> = [
                 [0.6, 0],
@@ -1968,7 +1964,7 @@ export const scifi: FxDef[] = [
             // shut at 1.75 s, leaving sparkles.
             const hero = fx.character();
             const heroMat = own(hero, 'warp-out-hero');
-            const cut = clipped(fx, hero, 'below');
+            const cut = clipped(heroMat, 'below');
             const white = c3('#e8fcff');
             const black = new Color3(0, 0, 0);
             const outline = fx.prop(shapes.cylinder(fx.scene, 2, 0.34, 0.34, 20), {

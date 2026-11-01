@@ -19,10 +19,12 @@ and the package's version moves in lockstep with `quarks.core`.
 - `ROADMAP.md` and `docs/SHURIKEN_PARITY.md` describe where 1.0 stands.
 - **Pixel FX demos:** eight gallery demos (fire, explosions, ice, lightning, impacts, projectiles,
   water, sci-fi) with 93 effects rebuilt in 3D from the pixel-art effects of
-  [pixelfx](https://github.com/patch-gg/pixelfx) (MIT): sub-emitter fireworks and rain splashes,
-  beam lightning and lasers, trails and emission over distance on projectiles, lit mesh shards and
-  soft smoke, on procedural textures. A click on an
-  effect zooms in and replays it; `?fx=<category>/<name>` shows one effect alone.
+  [pixelfx](https://github.com/patch-gg/pixelfx) (MIT), each mapped beat by beat against its
+  source: sub-emitter fireworks and rain splashes, beam lightning and lasers, trails and emission
+  over distance on projectiles, lit mesh shards and soft smoke, flipbooks traced from the originals,
+  and mesh particles on lathe shells (domes, funnels, columns, a fountain's bell, a waterfall's
+  sheet) with scrolled, distorted, eroded and rim-lit maps. A click on an effect zooms in and
+  replays it; `?fx=<category>/<name>` shows one effect alone.
 
 ### Changed
 
