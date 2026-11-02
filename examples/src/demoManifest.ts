@@ -436,4 +436,14 @@ export const demoManifest: DemoManifestEntry[] = [
         tags: ['pixelfx', 'nature', 'mesh'],
         preview: {icon: 'NA', gradient: 'linear-gradient(135deg, #b4dc5a 0%, #1d3a1a 100%)'},
     },
+    {
+        key: 'PixelFxWeatherDemo',
+        name: 'Pixel FX: Weather',
+        module: 'pixelfxWeather',
+        sourcePath: 'examples/src/pixelfx/weather.ts',
+        description:
+            'An aurora, a blizzard, cherry blossoms, clouds, falling leaves, fireflies, fog, god rays, rain, shooting stars, snow and a storm: pixelfx weather filling a 3D volume.',
+        tags: ['pixelfx', 'weather', 'mesh'],
+        preview: {icon: 'WE', gradient: 'linear-gradient(135deg, #a6ecff 0%, #1a2448 100%)'},
+    },
 ];

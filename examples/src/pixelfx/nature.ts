@@ -1296,7 +1296,6 @@ export const nature: FxDef[] = [
                 color: ACID[5],
                 at: [0, 0.08, 0],
                 order: 5,
-                b: [tint([['#ffffff', 0]], flicker())],
             });
             const rim = fx.node('rim', [0, 0.02, 0]);
             rim.scaling.set(1, 1, 1.1 / 1.5);
