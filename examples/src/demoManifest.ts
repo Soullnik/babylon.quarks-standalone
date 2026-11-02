@@ -456,4 +456,14 @@ export const demoManifest: DemoManifestEntry[] = [
         tags: ['pixelfx', 'ui', 'mesh'],
         preview: {icon: 'UI', gradient: 'linear-gradient(135deg, #ffde5e 0%, #3d0a33 100%)'},
     },
+    {
+        key: 'PixelFxPickupsDemo',
+        name: 'Pixel FX: Pickups',
+        module: 'pixelfxPickups',
+        sourcePath: 'examples/src/pixelfx/pickups.ts',
+        description:
+            'A chest bursting open, a spinning coin, a collect burst, a broken crystal, a cut ruby, a beating heart, a key, a loot beam, a potion, a power star and an XP orb: pixelfx pickups as lit, faceted 3D props.',
+        tags: ['pixelfx', 'pickups', 'mesh'],
+        preview: {icon: 'PU', gradient: 'linear-gradient(135deg, #ffe066 0%, #2c1250 100%)'},
+    },
 ];
