@@ -9,11 +9,13 @@ import {
     gravity,
     grow,
     type Hex,
+    lathe,
     lifeFrames,
     type Num,
     popOut,
     spin,
     tint,
+    turn,
     wobble,
 } from './kit';
 import type {FxBuilder} from './stage';
@@ -488,3 +490,66 @@ export function arcs(
 }
 
 export {drag, gravity, grow, spin, tint};
+
+/**
+ * Wind bands round a funnel: one-pixel streaks wrapped part way round at `radius`, a solid head
+ * fading along the tail, spinning `turns` times a second about the parent's up axis, a few at a
+ * time. Mesh arcs rather than trails, so their length holds at any frame rate. They write depth, so
+ * a translucent body drawn after them covers the far ones and not the near ones. For tornadoes,
+ * blizzards, whirlwinds.
+ */
+export function windBand(
+    fx: FxBuilder,
+    o: Placed & {
+        radius: number;
+        /** Turns a second; negative spins the other way. */
+        turns: number;
+        colors: [Hex, Hex];
+        rate?: number;
+        width?: number;
+        /** How far round each band reaches, radians. */
+        span?: number;
+        life?: [number, number];
+        order?: number;
+    }
+): ParticleSystem {
+    const w = (o.width ?? 0.05) / 2;
+    const spin = o.turns * Math.PI * 2;
+    return fx.sys({
+        geo: lathe(
+            [
+                [o.radius, -w],
+                [o.radius, w],
+            ],
+            24,
+            o.span ?? 1.5
+        ),
+        tex: 'comet',
+        blend: 'alpha',
+        life: o.life ?? [0.7, 1.1],
+        size: [1, 1.08],
+        rate: o.rate ?? 6,
+        upright: true,
+        color: o.colors,
+        at: o.at,
+        parent: o.parent,
+        delay: o.delay,
+        duration: o.duration,
+        loop: o.loop,
+        world: o.world,
+        order: o.order ?? 3,
+        look: {renderFace: 'both'},
+        b: [
+            turn([spin * 0.85, spin * 1.15]),
+            tint(
+                [['#ffffff', 0]],
+                [
+                    [0, 0],
+                    [1, 0.15],
+                    [1, 0.7],
+                    [0, 1],
+                ]
+            ),
+        ],
+    });
+}

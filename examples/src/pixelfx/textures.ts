@@ -23,6 +23,7 @@ export type TextureName =
     | 'swirl'
     | 'rune'
     | 'streak'
+    | 'comet'
     | 'white'
     | 'burst'
     | 'pow'
@@ -587,6 +588,17 @@ const SPECS: Record<TextureName, TextureSpec> = {
             }),
     },
     // A soft horizontal streak, bright in the middle: wind lines, speed lines, motion blur.
+    // A comet along U: a solid head at U 1 thinning to nothing at U 0, soft across V. For wind bands
+    // and swept streaks wrapped round a lathe arc.
+    comet: {
+        size: 64,
+        paint: (img, s) =>
+            fillAlpha(
+                img,
+                s,
+                (u, v) => Math.pow(u, 1.6) * smoothstep(1, 0.9, u) * (1 - smoothstep(0.35, 0.5, Math.abs(v - 0.5)))
+            ),
+    },
     streak: {
         size: 64,
         paint: (img, s) =>

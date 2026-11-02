@@ -1,6 +1,19 @@
 import type {TransformNode} from '@babylonjs/core/Meshes/transformNode';
 import {CircleEmitter, ConeEmitter, RenderMode, SphereEmitter} from 'babylon.quarks';
-import {airDrag, extrude, fadeOut, floorBounce, gravity, grow, lathe, popOut, tint, wobble, type Geometry} from './kit';
+import {
+    airDrag,
+    extrude,
+    fadeOut,
+    floorBounce,
+    gravity,
+    grow,
+    lathe,
+    pillow,
+    popOut,
+    tint,
+    wobble,
+    type Geometry,
+} from './kit';
 import {type At} from './parts';
 import {decal, flames} from './recipes';
 import {skull} from './shadow';
@@ -267,11 +280,12 @@ const FISH_BODY: Array<[number, number]> = Array.from({length: 24}, (_, i) => {
     const y = Math.sin(a) * (0.2 - 0.06 * Math.cos(a)) * (1 + 0.15 * Math.cos(a));
     return [x, y];
 });
+/** A forked tail fin, as tall as the body, so the fish reads as a fish and not a pill. */
 const FISH_TAIL: Array<[number, number]> = [
-    [0, 0],
-    [-0.3, 0.2],
-    [-0.22, 0],
-    [-0.3, -0.2],
+    [0.06, 0],
+    [-0.32, 0.27],
+    [-0.2, 0],
+    [-0.32, -0.27],
 ];
 
 export const critters: FxDef[] = [
@@ -616,8 +630,8 @@ export const critters: FxDef[] = [
         build(fx) {
             const P = 4.8;
             const L = P + 0.02;
-            const BODY = extrude(FISH_BODY, 0.22);
-            const TAIL = extrude(FISH_TAIL, 0.04);
+            const BODY = pillow(FISH_BODY, 0.26);
+            const TAIL = extrude(FISH_TAIL, 0.05);
             const fish = Array.from({length: 10}, (_, i) => {
                 const row = i % 2;
                 const at: At = [
@@ -629,10 +643,10 @@ export const critters: FxDef[] = [
                 const s = 0.5 + (i % 3) * 0.08;
                 node.scaling.setAll(s);
                 solid(fx, node, BODY, row ? SEA[3] : SEA[4], {life: L, rim: [0.6, 1, 1]});
-                const eye = part(fx, node, [0.3, 0.04, 0.115], [0.06, 0.06, 1]);
+                const eye = part(fx, node, [0.3, 0.04, 0.09], [0.06, 0.06, 1]);
                 solid(fx, eye, DISC, '#05080c', {life: L, lit: false, order: 6});
-                const tail = fx.node('tail', [-0.45, 0, 0], node);
-                solid(fx, tail, TAIL, row ? SEA[2] : SEA[3], {life: L, rim: [0.6, 1, 1]});
+                const tail = fx.node('tail', [-0.44, 0, 0], node);
+                solid(fx, tail, TAIL, row ? SEA[3] : SEA[4], {life: L, rim: [0.6, 1, 1]});
                 return {node, tail, at, i, dart: (i * 1.7) % P};
             });
             // Bubbles rising.
@@ -704,6 +718,8 @@ export const critters: FxDef[] = [
             const P = 2.4;
             const L = P + 0.02;
             const head = fx.node('skull', [0, 1.5, 0]);
+            // Tipped back so its face meets a camera above it, not the floor.
+            head.rotation.x = -0.35;
             const bone = skull(fx, head, {
                 scale: 0.55,
                 color: BONE[3],
@@ -714,8 +730,9 @@ export const critters: FxDef[] = [
             });
             // Fire roaring off the crown.
             const crown = fx.node('crown', [0, 0.5, 0], head);
-            flames(fx, {parent: crown, radius: 0.15, height: 0.8, size: [0.24, 0.4], rate: 24, loop: true, order: 6});
-            flames(fx, {parent: crown, radius: 0.1, height: 0.45, size: [0.16, 0.24], rate: 18, loop: true, order: 7});
+            // One blaze, not scattered tongues: big overlapping flames over a hot core.
+            flames(fx, {parent: crown, radius: 0.2, height: 0.9, size: [0.45, 0.7], rate: 30, loop: true, order: 6});
+            flames(fx, {parent: crown, radius: 0.1, height: 0.5, size: [0.3, 0.45], rate: 22, loop: true, order: 7});
             fx.sys({
                 tex: 'flame',
                 blend: 'add',
@@ -1223,12 +1240,14 @@ export const critters: FxDef[] = [
         build(fx) {
             const P = 2.4;
             const L = P + 0.02;
-            const N = 18;
+            // Twice as many, half as far apart, so the body reads as one smooth tube, not a string of beads.
+            const N = 36;
             const segs = Array.from({length: N}, (_, i) => {
                 const node = fx.node('seg', [0, 0, 0]);
                 const r = 0.15 * (1 - (i / N) * 0.75);
                 node.scaling.setAll(r * 2);
-                solid(fx, node, SPHERE, i % 3 === 0 ? '#c8a030' : i % 2 ? FROG[3] : FROG[4], {
+                const band = Math.floor(i / 2);
+                solid(fx, node, SPHERE, band % 3 === 0 ? '#c8a030' : band % 2 ? FROG[3] : FROG[4], {
                     life: L,
                     rim: [0.7, 1, 0.5],
                 });
@@ -1265,12 +1284,12 @@ export const critters: FxDef[] = [
             fx.every((t) => {
                 // Humps rise and roll back down the body; the head stays raised, tongue flicking.
                 const w = (t / P) * TAU;
-                const spacing = 0.14;
+                const spacing = 0.07;
                 let touchX = 0;
                 for (const s of segs) {
                     const x = 0.9 - s.i * spacing;
-                    const hump = Math.max(0, Math.sin(s.i * 0.7 + w * 2));
-                    s.node.position.set(x, s.r + hump * 0.16, Math.sin(s.i * 0.45 - w) * 0.12);
+                    const hump = Math.max(0, Math.sin(s.i * 0.35 + w * 2));
+                    s.node.position.set(x, s.r + hump * 0.16, Math.sin(s.i * 0.225 - w) * 0.12);
                     if (hump < 0.02) touchX = x;
                 }
                 dust.emitter.position.set(touchX, 0.05, 0);

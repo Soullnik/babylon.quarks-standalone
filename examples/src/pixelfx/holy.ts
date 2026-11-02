@@ -526,7 +526,7 @@ export const holy: FxDef[] = [
                 rotate: [-Math.PI / 2, 0, 0],
                 at: [0, 1, 0],
                 order: 6,
-                b: [tint(SHINE, fadeOut(0.8, 0.1)), orbit(4)],
+                b: [tint(SHINE, fadeOut(0.8, 0.1)), orbit(4, [0, 0, 1])],
             });
             window(motes, P, RISE1 - 0.1, RISE1 + 0.4, 16);
             const hearts = fx.sys({

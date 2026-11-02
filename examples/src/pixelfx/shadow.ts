@@ -10,7 +10,9 @@ import {
     gravity,
     grow,
     lathe,
+    lens,
     orbit,
+    outlineBand,
     popOut,
     spin,
     tint,
@@ -18,7 +20,7 @@ import {
     type Geometry,
 } from './kit';
 import {clods, dust, hotSparks, light, star, type At} from './parts';
-import {decal, shockwave, type Ramp} from './recipes';
+import {shockwave, type Ramp} from './recipes';
 import {between, hero} from './spawn';
 import {type FxBuilder, type FxDef} from './stage';
 import {image, rampTexture} from './textures';
@@ -48,15 +50,16 @@ const SPHERE = lathe(ballProfile(20), 40);
 /** A skull as a lathe: a narrow jaw under a round cranium, about one unit tall. */
 const SKULL = lathe(
     [
+        // A wide jaw (about 0.6 of the cranium), as pixel skulls are drawn, so it never reads as a cap.
         [0.001, -0.62],
-        [0.3, -0.6],
-        [0.38, -0.42],
-        [0.5, -0.22],
-        [0.72, -0.05],
-        [0.82, 0.2],
-        [0.78, 0.45],
-        [0.6, 0.68],
-        [0.32, 0.8],
+        [0.44, -0.6],
+        [0.52, -0.42],
+        [0.56, -0.24],
+        [0.7, -0.1],
+        [0.8, 0.15],
+        [0.8, 0.42],
+        [0.64, 0.66],
+        [0.36, 0.8],
         [0.001, 0.82],
     ],
     20
@@ -222,7 +225,12 @@ export function skull(
     return bone;
 }
 
+/** An ink pool's outline: a radius near 1 that wanders round it. */
+const INK_EDGE = (a: number) =>
+    1 + 0.08 * Math.sin(3 * a + 1.9) + 0.06 * Math.sin(5 * a + 0.4) + 0.035 * Math.sin(8 * a + 3.1);
+
 /** A dark pool on the floor that opens and closes, with a lit violet lip. */
+
 function darkPool(fx: FxBuilder, o: {size: number; open: number; close: number; period: number; at?: At}) {
     const {open, close, period} = o;
     const keys: Array<[number, number]> = [
@@ -237,20 +245,42 @@ function darkPool(fx: FxBuilder, o: {size: number; open: number; close: number; 
         const k = ease(between(t, open, open + 0.3)) * (1 - ease(between(t, close, close + 0.3)));
         lip.scaling.setAll(Math.max(0.001, k));
     });
-    decal(fx, {at: [0, 0.02, 0], parent: lip, size: o.size, color: '#000000', alpha: 0.95, life: period, alphas: keys});
+    // An ink puddle with a wandering edge: a low lens of void, a slow violet swirl over it, and a thin
+    // glowing lip that follows the edge, not a perfect ring.
+    const r = o.size * 0.42;
+    const pool = {loop: false, life: period, size: 1, burst: [[0, 1]] as Array<[number, number]>, parent: lip};
     fx.sys({
-        geo: flatRing(o.size * 0.36, o.size * 0.42),
+        ...pool,
+        geo: lens(INK_EDGE, 0.05, {sx: r, sz: r * 0.9, power: 0.3}),
+        tex: 'white',
+        blend: 'alpha',
+        color: VOID[1],
+        at: [0, 0.01, 0],
+        order: 1,
+        look: {scalingMode: 'hierarchy', rim: {color: [0.5, 0.25, 0.9], power: 3, strength: 1, mode: 'add'}},
+        b: [tint([['#ffffff', 0]], keys)],
+    });
+    fx.sys({
+        ...pool,
+        geo: lens(INK_EDGE, 0.052, {sx: r * 0.97, sz: r * 0.87, power: 0.3}),
+        image: 'noise',
+        blend: 'add',
+        color: VOID[3],
+        alpha: 0.7,
+        at: [0, 0.012, 0],
+        order: 2,
+        look: {scalingMode: 'hierarchy', mapUV: {tiling: [1.5, 1.5], scroll: [0.12, -0.18]}},
+        b: [tint([['#ffffff', 0]], keys)],
+    });
+    fx.sys({
+        ...pool,
+        geo: outlineBand(INK_EDGE, 0.95, 1.02, {sx: r, sz: r * 0.9}),
         tex: 'white',
         blend: 'add',
-        loop: false,
-        life: period,
-        size: 1,
-        burst: [[0, 1]],
         color: VOID[5],
-        alpha: 0.8,
-        at: [0, 0.025, 0],
-        parent: lip,
-        order: 1,
+        alpha: 0.75,
+        at: [0, 0.014, 0],
+        order: 3,
         look: {renderFace: 'both', scalingMode: 'hierarchy'},
         b: [tint([['#ffffff', 0]], keys)],
     });
@@ -712,7 +742,8 @@ export const shadow: FxDef[] = [
                     size: 1,
                     burst: [[0, 1]],
                     rot: (i / 14) * Math.PI + ((i * 3) % 4) * 0.05,
-                    color: i % 3 ? PEARL[2] : PEARL[3],
+                    // Violet streamers, a white one now and then, as in the sprite.
+                    color: i % 3 ? VOID[5] : PEARL[2],
                     alpha: 0.55,
                     parent: sky,
                     order: 3,
@@ -784,9 +815,9 @@ export const shadow: FxDef[] = [
             const SEG = 22;
             arms.forEach(([x, z, lean, phase], a) => {
                 const t0 = 0.3 + a * 0.08;
-                const segs = chain(fx, SEG, {color: VOID[1], rim: [0.7, 0.35, 1.2], life: P});
+                const segs = chain(fx, SEG, {color: VOID[2], rim: [1.1, 0.6, 1.9], life: P});
                 const hand = fx.node('hand', [0, 0, 0]);
-                const palm = chain(fx, 1, {color: VOID[1], rim: [0.8, 0.4, 1.3], life: P, parent: hand});
+                const palm = chain(fx, 1, {color: VOID[2], rim: [1.1, 0.6, 1.9], life: P, parent: hand});
                 palm[0].position.set(0, 0.05, 0);
                 // Four claws and a thumb, each three joints that curl.
                 const fingers: TransformNode[][] = [];
@@ -797,7 +828,7 @@ export const shadow: FxDef[] = [
                     base.rotation.z = spread;
                     base.position.set(Math.sin(-spread) * 0.08, 0.1, f === 4 ? 0.05 : 0);
                     bases.push(base);
-                    fingers.push(chain(fx, 3, {color: VOID[2], rim: [0.9, 0.5, 1.4], life: P, parent: base}));
+                    fingers.push(chain(fx, 3, {color: VOID[3], rim: [1.2, 0.7, 2], life: P, parent: base}));
                 }
                 fx.every((t) => {
                     const up = outCubic(between(t, t0, t0 + 0.35));
@@ -1180,17 +1211,18 @@ export const shadow: FxDef[] = [
             fx.every((t) => {
                 turn.rotation.y = (t / 3) * Math.PI * 2;
             });
-            for (let i = 0; i < 3; i++) {
-                const a = (i / 3) * Math.PI * 2;
-                const head = fx.node('skull', [Math.cos(a) * 1.35, 0, Math.sin(a) * 1.35], turn);
+            // Six small skulls, as in the sprite: each about a quarter the flame's width.
+            for (let i = 0; i < 6; i++) {
+                const a = (i / 6) * Math.PI * 2;
+                const head = fx.node('skull', [Math.cos(a) * 1.45, 0, Math.sin(a) * 1.45], turn);
                 fx.every((t) => {
                     // Each faces the camera as it goes round.
                     head.rotation.y = -(t / 3) * Math.PI * 2;
                     head.rotation.x = -0.45;
-                    head.position.y = Math.sin(t * 4 + i * 2) * 0.12;
+                    head.position.y = Math.sin(t * 4 + i * 2) * 0.08;
                 });
                 skull(fx, head, {
-                    scale: 0.34,
+                    scale: 0.2,
                     color: NECRO[5],
                     rim: [0.3, 1, 0.7],
                     eye: NECRO[6],
@@ -1201,9 +1233,9 @@ export const shadow: FxDef[] = [
                     tex: 'smoke',
                     world: true,
                     life: [0.6, 0.9],
-                    size: [0.25, 0.4],
+                    size: [0.16, 0.26],
                     rot: true,
-                    rate: 20,
+                    rate: 14,
                     color: [NECRO[4], NECRO[5]],
                     alpha: 0.35,
                     parent: head,
@@ -1338,7 +1370,7 @@ export const shadow: FxDef[] = [
                 [0.05, -0.6, 5.6],
             ];
             roots.forEach(([x, z, phase], r) => {
-                const segs = chain(fx, SEG, {color: VOID[1], rim: [0.8, 0.4, 1.4], life: P});
+                const segs = chain(fx, SEG, {color: VOID[2], rim: [1.1, 0.6, 1.9], life: P});
                 const height = 1.6 + (r % 2) * 0.4;
                 const t0 = 0.3 + r * 0.05;
                 const dir = x < 0 ? -1 : 1;

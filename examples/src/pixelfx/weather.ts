@@ -850,7 +850,8 @@ export const weather: FxDef[] = [
                 [1.8, 0.4, 1],
             ];
             beams.forEach(([x, z, width], i) => {
-                const foot = fx.node('beam', [x, 0, z]);
+                // Sunk below the floor so the shaft's cut end is hidden and it simply meets the ground.
+                const foot = fx.node('beam', [x, -0.35, z]);
                 fx.every((t) => {
                     foot.rotation.z = 0.55 + Math.sin(t * 0.8 + i) * 0.03;
                 });

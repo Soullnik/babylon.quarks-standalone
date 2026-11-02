@@ -566,9 +566,12 @@ export const lightning: FxDef[] = [
                 fx.prop(shapes.cylinder(fx.scene, 3.2, 0.05), {
                     at: [side * 0.6, 1.6, 0],
                     rotate: [0, 0, -side * 0.22],
-                    color: '#8a6a4a',
+                    color: '#a8b0c4',
                 });
+                // Each rod stands in a ribbed insulator, as in the original.
+                fx.prop(shapes.cylinder(fx.scene, 0.24, 0.16), {at: [side * 0.26, 0.2, 0], color: '#d8dce8'});
             }
+            fx.prop(shapes.box(fx.scene, 1.3, 0.1, 0.5), {at: [0, 0.05, 0], color: '#3a3a48'});
             const left = fx.node('left', [-0.25, 0.2, 0]);
             const right = fx.node('right', [0.25, 0.2, 0]);
             fx.every((t) => {

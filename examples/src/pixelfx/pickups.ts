@@ -9,6 +9,7 @@ import {
     grow,
     lathe,
     orbit,
+    pillow,
     popOut,
     spin,
     tint,
@@ -152,7 +153,8 @@ const BRILLIANT = faceted(
         10
     )
 );
-const HEART = extrude(heartOutline(), 0.42);
+/** A plump heart, round at its middle and thin at its edge, as a pixel heart is shaded. */
+const HEART = pillow(heartOutline(), 0.5, {center: [0, 0.12]});
 
 /** A solid, lit, glossy shape riding `parent`, born again every `life` seconds. */
 function solid(
@@ -740,7 +742,7 @@ export const pickups: FxDef[] = [
                 parent: float,
                 order: 6,
                 look: {lighting: 'fixed', rim: {color: [1, 0.6, 0.2], power: 2, strength: 0.8, mode: 'add'}},
-                b: [orbit(1.6)],
+                b: [orbit(1.6, [0, 0, 1])],
             });
             twinkles(fx, {at: [0, 0, 0], radius: 0.6, rate: 3, color: AMBER[6], parent: float});
             const sh = shadow(fx, {size: 0.9, life: L});
@@ -846,10 +848,11 @@ export const pickups: FxDef[] = [
             const plump = fx.node('plump', [0, 0, 0], heart);
             plump.scaling.set(1, 1, 1.4);
             solid(fx, plump, HEART, HEARTS[4], {life: L, size: 0.9, rim: [1, 0.6, 0.6]});
-            solid(fx, plump, extrude(heartOutline(), 0.44), HEARTS[6], {
+            solid(fx, plump, pillow(heartOutline(), 0.5, {center: [0, 0.12]}), HEARTS[6], {
                 life: L,
-                size: 0.32,
-                at: [-0.16, 0.14, 0.01],
+                size: 0.26,
+                // On the swell of the upper-left lobe, where a pixel heart has its shine.
+                at: [-0.17, 0.17, 0.19],
                 alpha: 0.9,
                 lit: false,
             });
@@ -1082,13 +1085,37 @@ export const pickups: FxDef[] = [
                 {life: L, rim: [0.6, 0.4, 0.3]}
             );
             solid(fx, grip, SPHERE, EPIC[5], {life: L, size: 0.16, at: [0, 0.4, 0], rim: [1, 0.8, 1]});
-            // The pillar: a white core thinning to the sky in a wide purple glow.
+            // The pillar: a round column of purple light, as wide as the sprite's (about half a metre
+            // across) and a white core down its middle.
+            const column = lathe(
+                [
+                    [0.42, 0],
+                    [0.36, 12],
+                ],
+                32
+            );
+            for (const [face, alpha, order] of [
+                ['back', 0.45, 2],
+                ['front', 0.8, 5],
+            ] as const) {
+                fx.sys({
+                    geo: column,
+                    image: 'light-column',
+                    blend: 'add',
+                    life: L,
+                    size: 1,
+                    burst: [[0, 1]],
+                    color: EPIC[5],
+                    alpha,
+                    order,
+                    look: {renderFace: face, mapUV: {scroll: [0.15, 0]}},
+                });
+            }
             for (const [w, h, c, a] of [
-                [12, 1.6, EPIC[4], 0.5],
-                [12, 0.7, EPIC[5], 0.8],
-                [11, 0.22, '#ffffff', 1],
+                [12, 0.5, EPIC[6], 0.6],
+                [11, 0.2, '#ffffff', 1],
             ] as Array<[number, number, string, number]>) {
-                bar(fx, {w, h, rot: Math.PI / 2, color: c, life: L, alpha: a, at: [0, w / 2 - 0.2, 0], order: 4});
+                bar(fx, {w, h, rot: Math.PI / 2, color: c, life: L, alpha: a, at: [0, w / 2 + 0.02, 0], order: 4});
             }
             fx.sys({
                 tex: 'glow',
@@ -1292,10 +1319,13 @@ export const pickups: FxDef[] = [
             const float = hover(fx, 1.2, 0.05, P);
             const star = fx.node('star', [0, 0, 0], float);
             // A fat bevelled star: a deep body and a smaller, brighter face standing off it.
-            solid(fx, star, extrude(starOutline(5, 0.62, 0.3), 0.3), STAR[4], {life: L, rim: [1, 0.85, 0.4]});
-            solid(fx, star, extrude(starOutline(5, 0.46, 0.22), 0.4), STAR[5], {life: L, rim: [1, 1, 0.7]});
+            // One plump star, thick at its heart and thinning to each point, rather than two stacked slabs.
+            solid(fx, star, pillow(starOutline(5, 0.62, 0.3), 0.5, {rings: 10}), STAR[4], {
+                life: L,
+                rim: [1, 0.9, 0.5],
+            });
             for (const x of [-0.09, 0.09]) {
-                solid(fx, star, extrude(disk(0.045, 12), 0.44), STAR[0], {life: L, at: [x, 0.05, 0], lit: false});
+                solid(fx, star, extrude(disk(0.045, 12), 0.52), STAR[0], {life: L, at: [x, 0.05, 0], lit: false});
             }
             // Rays turning slowly behind it.
             for (let i = 0; i < 8; i++) {

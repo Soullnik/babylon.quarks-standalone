@@ -3,26 +3,29 @@ import {CircleEmitter, ConeEmitter, RenderMode, SphereEmitter} from 'babylon.qua
 import {held, window} from './arcane';
 import {
     airDrag,
-    domeProfile,
     extrude,
     fadeOut,
     flicker,
     floorBounce,
     gravity,
     grow,
+    horn,
     lathe,
+    lens,
     orbit,
+    outlineBand,
     popOut,
     spike,
+    subEmit,
     tint,
+    turn,
     wobble,
 } from './kit';
 import {clods, dust, hotSparks, light, star, type At} from './parts';
-import {decal, shockwave, type Ramp} from './recipes';
+import {decal, shockwave, windBand, type Ramp} from './recipes';
 import {chain} from './shadow';
 import {between, hero} from './spawn';
 import {shapes, type FxBuilder, type FxDef} from './stage';
-import {image} from './textures';
 
 const ACID = ['#0e1d14', '#173320', '#23552e', '#318232', '#55b92f', '#8eea3f', '#cfff63', '#f6ffc2'];
 const EARTH = ['#1c1410', '#3a2a1e', '#5e4430', '#8a6844', '#b08e62', '#d4b88a', '#f0e0bc'];
@@ -63,6 +66,28 @@ const BALL = lathe(
     }),
     16
 );
+/** pixelfx's toadstool, traced off its spore-burst sprite: `[radius, height]` in metres. */
+const TOADSTOOL_STEM: Array<[number, number]> = [
+    [0.151, 0],
+    [0.12, 0.09],
+    [0.12, 0.27],
+    [0.09, 0.33],
+    [0.135, 0.36],
+    [0.09, 0.4],
+    [0.09, 0.5],
+];
+const TOADSTOOL_CAP: Array<[number, number]> = [
+    [0.09, 0.49],
+    [0.571, 0.5],
+    [0.571, 0.63],
+    [0.541, 0.69],
+    [0.511, 0.75],
+    [0.481, 0.81],
+    [0.419, 0.87],
+    [0.271, 0.93],
+    [0.181, 0.96],
+    [0.001, 0.965],
+];
 const STEM = lathe(
     [
         [1, 0],
@@ -150,11 +175,79 @@ function leaves(
         order: 5,
         look: {lighting: 'fixed', renderFace: 'both'},
         b: [
-            ...(o.whirl ? [orbit(o.whirl, [0, 1, 0])] : []),
+            ...(o.whirl ? [orbit(o.whirl, o.aim === 'up' ? [0, 0, 1] : [0, 1, 0])] : []),
             gravity(o.weight ?? 2),
             airDrag(1.5),
             wobble(1.5, 0.6),
             grow([0, 1], [0.85, 1], [1, 0]),
+        ],
+    });
+}
+
+/** `a` to `b` by `k`, as hex. */
+function mixHex(a: string, b: string, k: number): string {
+    const ch = (h: string, i: number) => parseInt(h.slice(1 + i * 2, 3 + i * 2), 16);
+    return (
+        '#' +
+        [0, 1, 2]
+            .map((i) =>
+                Math.round(ch(a, i) + (ch(b, i) - ch(a, i)) * k)
+                    .toString(16)
+                    .padStart(2, '0')
+            )
+            .join('')
+    );
+}
+
+/** A tar or acid puddle's outline: a radius near 1 that wanders round it. */
+const PUDDLE = (a: number) =>
+    1 + 0.09 * Math.sin(3 * a + 0.7) + 0.06 * Math.sin(5 * a + 2.1) + 0.04 * Math.sin(7 * a + 4.2);
+
+/**
+ * Vapour off a pool: thin ribbons that curl up, lit green from below and greying as they climb, then
+ * fade. Trails, so they leave the curl behind them as they rise.
+ */
+function vapour(
+    fx: FxBuilder,
+    o: {
+        rate: number;
+        burst?: number;
+        life: [number, number];
+        /** The radius of the pool they rise from; a point when left out. */
+        radius?: number;
+        at?: At;
+        world?: boolean;
+        colors?: [string, string];
+    }
+) {
+    return fx.sys({
+        tex: 'glow',
+        mode: RenderMode.Trail,
+        trail: 40,
+        blend: 'alpha',
+        loop: o.burst ? false : undefined,
+        life: o.life,
+        speed: [0.28, 0.42],
+        size: [0.06, 0.1],
+        rate: o.rate,
+        burst: o.burst ? [[0, o.burst]] : undefined,
+        color: o.colors ?? ['#a6d46a', '#c8e0a4'],
+        alpha: 0.55,
+        shape: new ConeEmitter({radius: o.radius ?? 0.02, angle: 0.15}),
+        aim: 'up',
+        at: o.at,
+        world: o.world ?? true,
+        order: 6,
+        b: [
+            gravity(0.35, [0, 1, 0]),
+            wobble(1.1, 0.5),
+            tint(
+                [
+                    ['#ffffff', 0],
+                    ['#e4e8e0', 1],
+                ],
+                fadeOut(0.45, 0.12)
+            ),
         ],
     });
 }
@@ -220,26 +313,63 @@ export const nature: FxDef[] = [
                 order: 0,
                 look: {scalingMode: 'hierarchy'},
             });
+            // The acid pooled in it, boiling: a shallow lens with a wandering edge, its surface
+            // churning, a bright lip where it bites the floor.
+            const bath = {
+                loop: false,
+                life: P - HIT,
+                size: 0.62,
+                burst: [[HIT, 1]] as Array<[number, number]>,
+                parent: pit,
+            };
+            fx.sys({
+                ...bath,
+                geo: lens(PUDDLE, 0.05, {power: 0.3}),
+                image: 'noise',
+                blend: 'add',
+                color: ACID[4],
+                at: [0, 0.01, 0],
+                order: 1,
+                look: {scalingMode: 'hierarchy', mapUV: {tiling: [2, 2], scroll: [0.25, -0.4]}},
+            });
+            fx.sys({
+                ...bath,
+                geo: outlineBand(PUDDLE, 0.92, 1.06),
+                tex: 'white',
+                blend: 'add',
+                color: ACID[6],
+                alpha: 0.8,
+                at: [0, 0.012, 0],
+                order: 2,
+                look: {renderFace: 'both', scalingMode: 'hierarchy'},
+                b: [tint([['#ffffff', 0]], flicker())],
+            });
+            // The crown the gob bursts into: a flared wall of acid that leaps up and slumps back.
             fx.sys({
                 geo: lathe(
                     [
-                        [0.55, 0],
-                        [0.75, 0],
+                        [0.12, 0],
+                        [0.16, 0.1],
+                        [0.26, 0.22],
+                        [0.34, 0.28],
                     ],
-                    48
+                    32
                 ),
-                image: 'noise',
-                blend: 'add',
+                tex: 'white',
+                blend: 'alpha',
                 loop: false,
-                life: P - HIT,
+                life: 0.4,
                 size: 1,
                 burst: [[HIT, 1]],
                 color: ACID[5],
-                at: [0, 0.02, 0],
-                parent: pit,
-                order: 1,
-                look: {renderFace: 'both', scalingMode: 'hierarchy', mapUV: {tiling: [4, 1], scroll: [0.3, 0]}},
-                b: [tint([['#ffffff', 0]], flicker())],
+                at: [0, 0.01, 0],
+                order: 5,
+                look: {
+                    renderFace: 'both',
+                    lighting: 'fixed',
+                    rim: {color: [0.6, 1, 0.3], power: 2, strength: 1, mode: 'add'},
+                },
+                b: [grow([0, 0.4], [0.35, 1.1], [1, 1.4]), tint(ACIDRAMP, popOut(0.35))],
             });
             fx.sys({
                 tex: 'glow',
@@ -271,22 +401,14 @@ export const nature: FxDef[] = [
                 b: [gravity(9), tint(ACIDRAMP, popOut(0.5))],
             });
             window(spit, P, HIT + 0.2, 2.3, 22);
-            const steam = fx.sys({
-                tex: 'smoke',
-                life: [0.9, 1.3],
-                speed: [0.4, 0.7],
-                size: [0.3, 0.45],
-                rot: true,
-                color: ['#c8e0c0', '#e8f4dc'],
-                alpha: 0.35,
-                blend: 'alpha',
-                shape: new ConeEmitter({radius: 0.5, angle: 0.2, thickness: 1}),
-                aim: 'up',
-                at: [0, 0.1, 0],
-                order: 5,
-                b: [tint([['#ffffff', 0]], fadeOut(0.4, 0.2)), grow([0, 0.5], [1, 1.5]), wobble(1, 0.6)],
+            const steam = vapour(fx, {
+                rate: 0,
+                life: [0.6, 1.1],
+                radius: 0.45,
+                at: [0, 0.05, 0],
+                colors: ['#dcecd0', '#f4fae8'],
             });
-            window(steam, P, HIT + 0.3, 2.4, 10);
+            window(steam, P, HIT + 0.3, 2.4, 24);
             light(fx, {at: [0, 0.05, 0], size: 3, color: ACID[4], floor: true, life: 2, alpha: 0.5, time: HIT});
         },
     },
@@ -664,7 +786,7 @@ export const nature: FxDef[] = [
                 rotate: [Math.PI / 2, 0, 0],
                 at: [0, 0.08, 0],
                 order: 6,
-                b: [orbit(4, [0, 1, 0]), tint([['#ffffff', 0]], popOut(0.6))],
+                b: [orbit(4, [0, 0, 1]), tint([['#ffffff', 0]], popOut(0.6))],
             });
             dust(fx, {
                 at: [0, 0.1, 0],
@@ -857,17 +979,18 @@ export const nature: FxDef[] = [
                 light(fx, {at: [x, 0.05, 0], size: 2, color: '#ff8a2a', floor: true, life: 0.8, alpha: 0.5, time: at});
             });
             // Slabs of floor heave up on each jolt and drop back askew.
+            // They lie along the rift, flush with the floor until their jolt, and settle proud of it.
             const slabs: Array<[number, number, number, number]> = [
-                [-1.6, 0.4, 0.6, 0],
-                [-0.6, -0.5, 0.7, 1],
-                [0.5, 0.5, 0.6, 1],
-                [1.5, -0.3, 0.7, 2],
-                [-0.1, 0.9, 0.5, 0],
+                [-1.5, 0.38, 0.6, 0],
+                [-0.6, -0.4, 0.7, 0],
+                [0.5, 0.4, 0.6, 1],
+                [1.5, -0.36, 0.7, 2],
+                [-0.05, -0.42, 0.5, 1],
             ];
             slabs.forEach(([x, z, w, j], i) => {
-                const slab = fx.prop(shapes.box(fx.scene, w, 0.14, w * 0.8), {at: [x, -0.06, z], color: EARTH[2]});
+                const slab = fx.prop(shapes.box(fx.scene, w, 0.14, w * 0.8), {at: [x, -0.09, z], color: EARTH[2]});
                 fx.every((t) => {
-                    let y = -0.06;
+                    let y = t > JOLTS[j] ? -0.035 : -0.09;
                     let tilt = 0;
                     JOLTS.forEach((at, k) => {
                         if (k < j) return;
@@ -878,7 +1001,7 @@ export const nature: FxDef[] = [
                             tilt += Math.min(1, d / 0.35) * (i % 2 ? 0.08 : -0.1);
                         }
                     });
-                    slab.position.y = Math.max(-0.06, y);
+                    slab.position.y = Math.max(-0.09, y);
                     slab.rotation.set(tilt, 0, tilt * 0.7);
                 });
             });
@@ -985,12 +1108,11 @@ export const nature: FxDef[] = [
                 );
                 shroom.position.x = shake;
             });
-            const stalk = fx.node('stalk', [0, 0, 0], shroom);
-            stalk.scaling.set(0.16, 0.7, 0.16);
-            solid(fx, stalk, {geo: STEM, color: '#e8dccc', life: P});
-            const cap = fx.node('cap', [0, 0.62, 0], shroom);
-            cap.scaling.set(0.62, 0.45, 0.62);
-            solid(fx, cap, {geo: lathe(domeProfile(), 32), color: '#c0304a', rim: [1, 0.5, 0.6], life: P});
+            // The toadstool turned from pixelfx's own silhouette (traced off its sprite, 3 cm a pixel):
+            // a stem with a frilled ring, under a domed cap with a flat, gilled underside.
+            solid(fx, shroom, {geo: lathe(TOADSTOOL_STEM, 20), color: '#d8ccd0', life: P});
+            const cap = fx.node('cap', [0, 0, 0], shroom);
+            solid(fx, cap, {geo: lathe(TOADSTOOL_CAP, 32), color: '#8e3462', rim: [1, 0.55, 0.6], life: P});
             fx.sys({
                 tex: 'glow',
                 mode: RenderMode.HorizontalBillBoard,
@@ -998,7 +1120,7 @@ export const nature: FxDef[] = [
                 size: 1.1,
                 burst: [[0, 1]],
                 color: SPORE[4],
-                at: [0, 0.6, 0],
+                at: [0, 0.48, 0],
                 parent: shroom,
                 order: 3,
                 look: {scalingMode: 'hierarchy'},
@@ -1017,24 +1139,27 @@ export const nature: FxDef[] = [
             });
             for (let i = 0; i < 7; i++) {
                 const a = (i / 7) * Math.PI * 2;
-                const spot = fx.node('spot', [Math.cos(a) * 0.7, 0.55 + (i % 2) * 0.25, Math.sin(a) * 0.7], cap);
-                spot.scaling.setAll(0.12);
+                // Pale spots sitting on the dome, high and low round it.
+                const [r, h] = TOADSTOOL_CAP[i % 2 ? 4 : 6];
+                const spot = fx.node('spot', [Math.cos(a) * r * 0.97, h, Math.sin(a) * r * 0.97], cap);
+                spot.scaling.setAll(0.05 + (i % 3) * 0.012);
                 solid(fx, spot, {geo: BALL, color: '#fff4e8', life: P});
             }
             // It squashes and puffs a lumpy cloud of glowing spores that billows up.
             fx.sys({
                 tex: 'smoke',
+                blend: 'alpha',
                 loop: false,
                 life: [1.4, 1.9],
-                speed: [0.8, 1.8],
-                size: [0.6, 1],
+                speed: [1, 2.2],
+                size: [0.8, 1.3],
                 rot: true,
-                burst: [[POP + 0.05, 18]],
+                burst: [[POP + 0.05, 24]],
                 color: [SPORE[3], SPORE[4]],
                 alpha: 0.7,
                 shape: new ConeEmitter({radius: 0.4, angle: 0.7, thickness: 1}),
                 aim: 'up',
-                at: [0, 0.85, 0],
+                at: [0, 0.75, 0],
                 order: 5,
                 b: [
                     tint([['#ffffff', 0]], fadeOut(0.5, 0.05)),
@@ -1065,7 +1190,7 @@ export const nature: FxDef[] = [
                 color: [SPORE[5], '#ffffff'],
                 shape: new ConeEmitter({radius: 0.4, angle: 0.8, thickness: 1}),
                 aim: 'up',
-                at: [0, 0.9, 0],
+                at: [0, 0.75, 0],
                 order: 7,
                 b: [tint([['#ffffff', 0]], flicker()), airDrag(2), gravity(0.25), wobble(0.8, 0.4)],
             });
@@ -1100,14 +1225,16 @@ export const nature: FxDef[] = [
             });
             window(seam, P, 0, 0.6, 120);
             const N = 6;
-            const geo = spike(0.35, 5);
+            // Hooked like pixelfx's thorns: thick at the foot, the tip curling over toward the way the
+            // seam ran.
+            const geo = horn(0.45, 6, 0.16);
             for (let i = 0; i < N; i++) {
                 const k = i / (N - 1);
                 const x = X0 + 0.4 + k * (X1 - X0 - 0.6);
                 const t0 = 0.12 + k * 0.42;
                 const h = 0.5 + k * 1.1;
                 const node = fx.node('thorn', [x, 0, i % 2 ? 0.2 : -0.15]);
-                node.rotation.y = Math.PI;
+                node.rotation.y = i % 2 ? 0.25 : -0.25;
                 fx.every((t) => {
                     const up = outBack(between(t, t0, t0 + 0.14));
                     const sink = ease(between(t, 1.6 + k * 0.1, 2.0 + k * 0.1));
@@ -1160,91 +1287,187 @@ export const nature: FxDef[] = [
         period: 2,
         view: {height: 1.7},
         build(fx) {
-            // A snaking funnel of spinning wind bands, flared at the top.
-            const HT = 3.4;
-            const profile: Array<[number, number]> = [];
-            for (let i = 0; i <= 24; i++) {
-                const v = (i / 24) * 1.2;
-                profile.push([
-                    ((3.5 + 15 * Math.pow(Math.min(v, 1), 1.35) + 6 * Math.max(0, v - 1)) / 80) * HT,
-                    v * HT,
-                ]);
+            // pixelfx's funnel at 3 cm a pixel: its axis snakes, a wave running up it (here round both
+            // floor axes), and its radius flares at the top. It is cut into rings, each carried along
+            // the wave, and is built of wind rather than a skin: thin bands wrapped round it, each
+            // ring spinning at its own speed, over a faint translucent column.
+            const D = 2;
+            const PX = 0.03;
+            const FH = 112 * PX;
+            const N = 14;
+            const C = ['#141221', '#231f33', '#36314a', '#4d4762', '#68617d', '#8a839e', '#b3adc4', '#e2def0'];
+            const DUST = ['#2a2018', '#4e3e2e', '#76624a', '#a08a6a', '#cbb894'];
+            const smooth = (a: number, b: number, x: number) => ease(Math.min(1, Math.max(0, (x - a) / (b - a))));
+            const rad = (u: number) => (3 + 20 * Math.pow(u, 1.5) + 17 * smooth(0.78, 1, u) ** 2) * PX;
+            const sway = (u: number, t: number): [number, number] => {
+                const ph = (Math.PI * 2 * t) / D;
+                return [
+                    (8.5 * Math.sin(ph - 2.6 * u) * (0.2 + 0.8 * u) + 3 * Math.sin(2 * ph + 1.3 - 4.5 * u) * u) * PX,
+                    6 * Math.cos(ph - 2.6 * u) * (0.2 + 0.8 * u) * PX,
+                ];
+            };
+            const rings: Array<[TransformNode, number]> = [];
+            for (let i = 0; i < N; i++) {
+                const u0 = i / N;
+                const u1 = (i + 1) / N;
+                const um = (u0 + u1) / 2;
+                const ring = fx.node('ring', [0, u0 * FH, 0]);
+                rings.push([ring, u0]);
+                const fade = Math.min(1, um * 8 + 0.25) * (1 - smooth(0.9, 1.02, um));
+                // Rows spin two or three turns a loop; the faster ones shear past their neighbours.
+                const turns = i % 3 === 1 ? 3 : 2;
+                const dir = -1;
+                const low = Math.max(0, 1 - um / 0.3) * 0.7;
+                const column = lathe(
+                    [u0, um, u1].map((u) => [rad(u), (u - u0) * FH] as [number, number]),
+                    40
+                );
+                const body = {
+                    geo: column,
+                    image: 'noise' as const,
+                    blend: 'alpha' as const,
+                    loop: false,
+                    life: 1e4,
+                    size: 1,
+                    burst: 1,
+                    parent: ring,
+                };
+                const streaks = {
+                    tiling: [3, 0.45] as [number, number],
+                    offset: [i * 0.37, i * 0.45] as [number, number],
+                    scroll: [dir * turns * 0.5 * 3, 0] as [number, number],
+                };
+                // The far wall, dim, seen through the near one.
+                fx.sys({
+                    ...body,
+                    color: mixHex(C[2], DUST[1], low),
+                    alpha: 0.3 * fade,
+                    order: 1,
+                    look: {renderFace: 'back', mapUV: streaks},
+                });
+                // The near wall, lit from the left like the original.
+                fx.sys({
+                    ...body,
+                    color: mixHex(C[6], DUST[4], low),
+                    alpha: 0.42 * fade,
+                    order: 5,
+                    look: {renderFace: 'front', lighting: 'fixed', mapUV: streaks},
+                });
+                // Wind bands: one pixel wide, bright at the head and fading along the tail.
+                windBand(fx, {
+                    radius: rad(um) * 1.04,
+                    turns: (dir * turns) / D,
+                    width: PX * 1.6,
+                    rate: 8 * fade,
+                    colors: i % 4 === 0 ? [C[3], C[6]] : [C[5], C[7]],
+                    at: [0, (u1 - u0) * FH * 0.5, 0],
+                    parent: ring,
+                });
             }
-            const funnel = fx.node('funnel');
-            fx.every((t) => {
-                const a = (t / 2) * Math.PI * 2;
-                funnel.rotation.z = 0.08 * Math.sin(a * 2) + 0.05 * Math.sin(a);
-                funnel.rotation.x = 0.05 * Math.cos(a * 2);
-            });
-            const base = {
-                image: 'blizzard-band' as const,
-                geo: lathe(profile, 48),
-                blend: 'alpha' as const,
-                life: 1e4,
-                size: 1,
-                burst: 1,
-                parent: funnel,
-            };
-            const surface = {
-                mapUV: {tiling: [2, 1] as [number, number], scroll: [1.6, 0] as [number, number]},
-                uvDistortion: {
-                    map: image(fx.scene, 'noise').texture,
-                    strength: 0.04,
-                    mapUV: {tiling: [3, 2] as [number, number], scroll: [0.4, -1.2] as [number, number]},
-                },
-            };
-            fx.sys({...base, color: '#6a6488', alpha: 0.7, order: 2, look: {...surface, renderFace: 'back'}});
-            fx.sys({
-                ...base,
-                color: '#c8c2dc',
-                alpha: 0.85,
-                order: 4,
-                look: {
-                    ...surface,
-                    renderFace: 'front',
-                    rim: {color: [0.2, 0.18, 0.3], power: 2, strength: 0.6, mode: 'mix'},
-                },
-            });
-            // Its churning top, flickering with lightning.
+            // The flared top: a lid of cloud sheared into flat bands riding round with the funnel, lit
+            // along their upper rims, over a dark mass at its core; once a loop it lights up inside.
+            const crown = fx.node('crown', [0, FH + 3 * PX, 0]);
+            const R = rad(1);
             fx.sys({
                 tex: 'smoke',
                 blend: 'alpha',
-                life: [0.8, 1.2],
-                speed: [0.2, 0.5],
-                size: [1, 1.5],
+                life: [0.9, 1.3],
+                speed: [0.1, 0.3],
+                size: [0.8, 1.3],
                 rot: true,
-                rate: 10,
-                color: ['#4a4460', '#6a6488'],
-                alpha: 0.7,
-                shape: new CircleEmitter({radius: 1.3, thickness: 0.5}),
+                rate: 9,
+                color: [C[1], C[3]],
+                alpha: 0.6,
+                shape: new CircleEmitter({radius: R * 0.7, thickness: 0.8}),
                 rotate: [Math.PI / 2, 0, 0],
-                at: [0, HT * 1.12, 0],
-                parent: funnel,
-                order: 5,
-                b: [orbit(2.5, [0, 1, 0]), tint([['#ffffff', 0]], fadeOut(0.4, 0.2)), grow([0, 0.6], [1, 1.2])],
+                parent: crown,
+                order: 2,
+                b: [orbit(2.5, [0, 0, 1]), tint([['#ffffff', 0]], fadeOut(0.5, 0.25)), grow([0, 0.7], [1, 1.2])],
             });
             fx.sys({
+                geo: lathe(
+                    [
+                        [1, -0.05],
+                        [1, 0.05],
+                    ],
+                    24,
+                    2.4
+                ),
+                tex: 'comet',
+                blend: 'alpha',
+                life: [1.2, 1.8],
+                size: [R * 0.4, R * 1.15],
+                rate: 9,
+                upright: true,
+                color: [C[3], C[6]],
+                shape: new SphereEmitter({radius: 0.12, thickness: 1}),
+                parent: crown,
+                order: 4,
+                look: {renderFace: 'both', lighting: 'fixed'},
+                b: [
+                    turn([-Math.PI, -Math.PI * 2]),
+                    tint(
+                        [['#ffffff', 0]],
+                        [
+                            [0, 0],
+                            [0.9, 0.2],
+                            [0.9, 0.7],
+                            [0, 1],
+                        ]
+                    ),
+                ],
+            });
+            const FLASH = 1.24;
+            fx.sys({
                 tex: 'bolt',
-                life: 0.08,
-                size: [0.8, 1.4],
+                life: [0.06, 0.1],
+                size: [0.9, 1.4],
                 rot: true,
-                rate: 5,
-                color: '#e0e8ff',
-                shape: new CircleEmitter({radius: 1.1, thickness: 0.5}),
+                burst: [
+                    [FLASH, 2],
+                    [FLASH + 0.14, 1],
+                ],
+                color: C[7],
+                shape: new CircleEmitter({radius: R * 0.6, thickness: 0.6}),
                 rotate: [Math.PI / 2, 0, 0],
-                at: [0, HT * 1.1, 0],
-                parent: funnel,
+                parent: crown,
                 order: 6,
             });
-            // Leaves and debris whirling round it, front and back.
+            fx.sys({
+                tex: 'glow',
+                life: 0.12,
+                size: R * 4,
+                burst: [
+                    [FLASH, 1],
+                    [FLASH + 0.14, 1],
+                ],
+                color: C[7],
+                alpha: 0.45,
+                parent: crown,
+                order: 6,
+                b: [tint([['#ffffff', 0]], popOut(0.1))],
+            });
+            fx.every((t) => {
+                for (const [ring, u] of rings) {
+                    const [x, z] = sway(u, t);
+                    ring.position.x = x;
+                    ring.position.z = z;
+                }
+                const [x, z] = sway(1, t);
+                crown.position.x = x;
+                crown.position.z = z;
+            });
+            // Leaves, twigs and pebbles spiral up round it and are flung off the top.
             leaves(fx, {
-                at: [0, 0.2, 0],
-                rate: 14,
-                speed: [1.2, 1.8],
-                life: [1.4, 1.8],
-                emitter: new ConeEmitter({radius: 0.6, angle: 0.15, thickness: 0.3}),
+                at: [0, 0.1, 0],
+                rate: 9,
+                speed: [1.6, 2.1],
+                life: [1.3, 1.9],
+                size: [0.16, 0.24],
+                colors: [LEAF[2], LEAF[6]],
+                emitter: new ConeEmitter({radius: 0.35, angle: 0.3, thickness: 0.4}),
                 aim: 'up',
-                whirl: 4,
+                whirl: 6,
                 weight: 0,
                 loop: true,
                 world: false,
@@ -1252,29 +1475,82 @@ export const nature: FxDef[] = [
             fx.sys({
                 mesh: 'rock',
                 life: [1.2, 1.6],
-                speed: [1, 1.6],
-                size: [0.06, 0.12],
-                rate: 6,
+                speed: [1.6, 2.1],
+                size: [0.06, 0.1],
+                rate: 5,
                 tumble: 6,
-                color: [EARTH[2], EARTH[4]],
-                shape: new ConeEmitter({radius: 0.7, angle: 0.15, thickness: 0.3}),
+                color: [DUST[1], DUST[3]],
+                shape: new ConeEmitter({radius: 0.35, angle: 0.3, thickness: 0.4}),
                 aim: 'up',
                 order: 5,
-                b: [orbit(4, [0, 1, 0]), grow([0, 1], [0.85, 1], [1, 0])],
+                b: [orbit(6, [0, 0, 1]), grow([0, 1], [0.85, 1], [1, 0])],
             });
-            // Dust boiling at its foot.
+            // At its foot: dust boiling round and out, grit hopping, scuffs swept round the floor.
             dust(fx, {
-                at: [0, 0.15, 0],
-                size: [0.6, 0.9],
-                life: [0.7, 1],
-                rate: 16,
-                speed: [1, 1.6],
-                shape: new CircleEmitter({radius: 0.3, thickness: 1}),
+                at: [0, 0.12, 0],
+                size: [0.5, 0.9],
+                life: [0.7, 1.3],
+                rate: 26,
+                speed: [0.6, 1.2],
+                shape: new CircleEmitter({radius: 0.15, thickness: 1}),
                 rotate: [Math.PI / 2, 0, 0],
-                color: [EARTH[4], EARTH[5]],
-                alpha: 0.5,
+                color: [DUST[2], DUST[3]],
+                alpha: 0.7,
                 loop: true,
             });
+            fx.sys({
+                tex: 'dot',
+                world: true,
+                life: [0.35, 0.6],
+                speed: [1.2, 2],
+                size: [0.03, 0.05],
+                rate: 12,
+                color: [DUST[3], DUST[4]],
+                shape: new ConeEmitter({radius: 0.15, angle: 1.1}),
+                aim: 'up',
+                at: [0, 0.03, 0],
+                order: 5,
+                b: [gravity(9), floorBounce(0.2), tint([['#ffffff', 0]], popOut(0.6))],
+            });
+            fx.sys({
+                geo: lathe(
+                    [
+                        [0.92, 0],
+                        [1, 0],
+                    ],
+                    20,
+                    1.1
+                ),
+                tex: 'comet',
+                blend: 'alpha',
+                life: [0.5, 0.8],
+                size: [0.36, 0.84],
+                rate: 5,
+                upright: true,
+                color: [DUST[2], DUST[3]],
+                at: [0, 0.015, 0],
+                order: 2,
+                look: {renderFace: 'both'},
+                b: [turn(-3 * Math.PI), tint([['#ffffff', 0]], fadeOut(0.4, 0.1))],
+            });
+            // A soft pale column of light and a cold pool at its foot.
+            for (const [at, size, color, alpha, mode] of [
+                [[0, FH * 0.5, 0], 3.2, C[5], 0.08, undefined],
+                [[0, 0.02, 0], 2.4, DUST[3], 0.18, RenderMode.HorizontalBillBoard],
+            ] as const) {
+                fx.sys({
+                    tex: 'glow',
+                    mode,
+                    loop: false,
+                    life: 1e4,
+                    size,
+                    burst: 1,
+                    color,
+                    alpha,
+                    at: [...at],
+                    order: 1,
+                });
+            }
         },
     },
     {
@@ -1283,94 +1559,142 @@ export const nature: FxDef[] = [
         loop: true,
         period: 4,
         build(fx) {
-            // Black tar, lit from inside by chartreuse veins and a glowing rim.
-            const tar = fx.node('tar', [0, 0.01, 0]);
-            tar.scaling.set(1.5, 0.06, 1.1);
-            solid(fx, tar, {geo: lathe(domeProfile(), 40), color: '#0a0c08', rim: [0.3, 0.6, 0.1], loop: true});
+            const D = 4;
+            const C = ['#06070a', '#0c100c', '#141a10', '#1e2814', '#2e3c18', '#5a7a1c', '#a6d42a', '#ecff86'];
+            const SHEEN = ['#2a1648', '#5a2e8e', '#1e7a86', '#6adccc'];
+            // A heavy lens of black tar with a wandering outline, not a disc: its lip glows chartreuse
+            // where it meets the floor and the glow bleeds out over the floor round it.
+            const tar = fx.node('tar', [0, 0.004, 0]);
+            const pool = {geo: lens(PUDDLE, 0.12, {sx: 1.35}), loop: false, life: 1e4, size: 1, burst: 1, parent: tar};
             fx.sys({
-                tex: 'crack',
-                mode: RenderMode.HorizontalBillBoard,
-                life: 1e4,
-                size: 2.2,
-                burst: [[0, 1]],
-                color: ACID[5],
-                at: [0, 0.08, 0],
-                order: 5,
+                ...pool,
+                tex: 'white',
+                blend: 'alpha',
+                color: C[1],
+                order: 3,
+                look: {lighting: 'fixed', rim: {color: [0.25, 0.42, 0.06], power: 3, strength: 1, mode: 'add'}},
             });
-            const rim = fx.node('rim', [0, 0.02, 0]);
-            rim.scaling.set(1, 1, 1.1 / 1.5);
+            // Veins of light under the crust, swelling brighter and dimmer in a slow pulse.
             fx.sys({
-                geo: lathe(
-                    [
-                        [1.42, 0],
-                        [1.55, 0],
-                    ],
-                    64
-                ),
+                ...pool,
+                loop: true,
+                life: D,
+                tex: 'crack',
+                blend: 'add',
+                size: 1.004,
+                color: C[6],
+                order: 4,
+                b: [
+                    tint(
+                        [['#ffffff', 0]],
+                        [
+                            [0.45, 0],
+                            [1, 0.5],
+                            [0.45, 1],
+                        ]
+                    ),
+                ],
+            });
+            // An oily violet and teal sheen sliding over its skin.
+            for (const [color, scroll] of [
+                [SHEEN[1], [0.03, 0.012]],
+                [SHEEN[2], [-0.02, 0.025]],
+            ] as const) {
+                fx.sys({
+                    ...pool,
+                    image: 'noise',
+                    blend: 'add',
+                    size: 1.008,
+                    color,
+                    alpha: 0.25,
+                    order: 5,
+                    look: {mapUV: {tiling: [1.5, 1.5], scroll: [...scroll]}},
+                });
+            }
+            fx.sys({
+                ...pool,
+                geo: outlineBand(PUDDLE, 0.98, 1.03, {sx: 1.35}),
                 tex: 'white',
                 blend: 'add',
-                life: 1e4,
-                size: 1,
-                burst: [[0, 1]],
-                color: ACID[5],
-                alpha: 0.8,
-                parent: rim,
+                color: C[6],
+                alpha: 0.75,
+                at: [0, 0.006, 0],
                 order: 2,
-                look: {renderFace: 'both', scalingMode: 'hierarchy'},
+                look: {renderFace: 'both'},
             });
-            // An oily sheen drifting on it.
             fx.sys({
-                geo: lathe(domeProfile(), 40),
-                image: 'noise',
+                ...pool,
+                geo: outlineBand(PUDDLE, 1, 1.45, {sx: 1.35}),
+                image: 'light-column',
                 blend: 'add',
-                life: 1e4,
-                size: 1,
-                burst: [[0, 1]],
-                color: '#6a4aa0',
-                alpha: 0.35,
-                parent: tar,
-                order: 6,
-                look: {scalingMode: 'hierarchy', mapUV: {tiling: [2, 1], scroll: [0.05, 0.02]}},
+                color: C[6],
+                alpha: 0.4,
+                at: [0, 0.003, 0],
+                order: 1,
+                look: {renderFace: 'both'},
             });
-            // Glossy bubbles that dome, stretch and pop.
-            fx.sys({
+            light(fx, {at: [0, 0.02, 0], size: 4.2, color: C[5], floor: true, life: D, alpha: 0.35, loop: true});
+            // Fat bubbles dome up dark and glossy with light glowing through them, then pop in a ripple
+            // and a spatter of tar, loosing a ribbon of vapour.
+            const bubbles = fx.sys({
                 geo: BALL,
                 tex: 'white',
                 blend: 'alpha',
-                life: [0.8, 1.2],
-                size: [0.1, 0.2],
-                rate: 4,
+                world: true,
+                life: [1, 1.6],
+                size: [0.17, 0.28],
+                rate: 2,
                 upright: true,
-                color: '#141a10',
-                shape: new CircleEmitter({radius: 1.1, thickness: 1}),
+                color: C[2],
+                shape: new CircleEmitter({radius: 0.75, thickness: 1}),
                 rotate: [Math.PI / 2, 0, 0],
-                at: [0, 0.06, 0],
+                at: [0, 0.08, 0],
                 order: 4,
-                look: {lighting: 'fixed', rim: {color: [0.6, 1.2, 0.3], power: 2, strength: 1, mode: 'add'}},
-                b: [grow([0, 0.1], [0.8, 1], [0.95, 1.3], [1, 0])],
+                look: {lighting: 'fixed', rim: {color: [0.65, 0.95, 0.2], power: 1.3, strength: 1.5, mode: 'add'}},
+                b: [grow([0, 0.05], [0.7, 0.9], [1, 1.08])],
             });
-            // Vapour curling up in fraying ribbons.
-            fx.sys({
-                tex: 'smoke',
-                life: [1.4, 1.8],
-                speed: [0.4, 0.6],
-                size: [0.3, 0.45],
-                rot: true,
-                rate: 7,
-                color: [ACID[4], ACID[5]],
-                alpha: 0.3,
-                shape: new CircleEmitter({radius: 1, thickness: 1}),
-                rotate: [Math.PI / 2, 0, 0],
-                at: [0, 0.1, 0],
-                order: 5,
-                b: [
-                    tint([['#ffffff', 0]], fadeOut(0.4, 0.2)),
-                    grow([0, 0.5], [1, 1.6]),
-                    wobble(1.2, 1),
-                    gravity(0.4, [0, 1, 0]),
-                ],
+            const ripple = fx.sys({
+                tex: 'ring',
+                mode: RenderMode.HorizontalBillBoard,
+                loop: false,
+                life: 0.3,
+                size: 0.9,
+                burst: [[0, 1]],
+                color: C[7],
+                world: true,
+                order: 6,
+                b: [tint([['#ffffff', 0]], popOut(0.1)), grow([0, 0.15], [1, 1])],
             });
-            light(fx, {at: [0, 0.03, 0], size: 4, color: ACID[4], floor: true, life: 4, alpha: 0.4, loop: true});
+            const flash = fx.sys({
+                tex: 'glow',
+                loop: false,
+                life: 0.12,
+                size: 0.8,
+                burst: [[0, 1]],
+                color: C[6],
+                alpha: 0.8,
+                world: true,
+                order: 6,
+                b: [tint([['#ffffff', 0]], popOut(0.1))],
+            });
+            const spatter = fx.sys({
+                tex: 'dot',
+                loop: false,
+                life: [0.35, 0.55],
+                speed: [1.2, 2.2],
+                size: [0.035, 0.05],
+                burst: [[0, 7]],
+                color: [C[2], C[6]],
+                shape: new ConeEmitter({radius: 0.03, angle: 0.6}),
+                aim: 'up',
+                world: true,
+                order: 6,
+                b: [gravity(12), floorBounce(0, 0.05)],
+            });
+            const puff = vapour(fx, {rate: 0, burst: 1, life: [1.4, 2], world: true});
+            for (const s of [ripple, flash, spatter, puff]) subEmit(bubbles, s);
+            // A steady breath of vapour ribbons off the whole pool.
+            vapour(fx, {rate: 2.4, life: [2.4, 3.2], radius: 0.95, at: [0, 0.07, 0]});
         },
     },
     {

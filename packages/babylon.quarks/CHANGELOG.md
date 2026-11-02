@@ -29,6 +29,9 @@ and the package's version moves in lockstep with `quarks.core`.
   replays it; `?fx=<category>/<name>` shows one effect alone. The newer categories add extruded
   3D props and lettering (`extrude`, `label()` text sheets), DynamicTexture erosion masks for
   transitions, node-rigged critters with chained limbs, and caster-and-target staging for moves.
+  Puddles are swollen lenses with a wandering edge, props such as hearts, stars and fish are
+  inflated from their pixel outlines (`pillow()`), and the wind tornado is built from
+  comet-textured wind bands instead of reusing the fire tornado.
 
 ### Changed
 

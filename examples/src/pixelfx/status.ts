@@ -507,7 +507,6 @@ export const status: FxDef[] = [
                 loop: true,
                 color: HEX[1],
                 order: 4,
-                from: 'feet',
                 cut: [
                     [0, 0],
                     [0.75, 0.75],
@@ -536,7 +535,8 @@ export const status: FxDef[] = [
             eyes(fx, {color: HEX[5], size: 0.2});
             // A skull glitching in overhead.
             const head = fx.node('skull', [0, 2.35, 0]);
-            head.rotation.x = 0.25;
+            // Tipped back a little so its face, not its crown, meets a camera above it.
+            head.rotation.x = -0.3;
             const bone = skull(fx, head, {
                 scale: 0.36,
                 color: HEX[4],
@@ -755,7 +755,6 @@ export const status: FxDef[] = [
                 life: BURST,
                 color: STONE[5],
                 order: 4,
-                from: 'feet',
                 cut: [
                     [0.02, 0],
                     [0.02, 0.1 / BURST],
@@ -860,7 +859,6 @@ export const status: FxDef[] = [
                 color: TOXIC[3],
                 lighting: 'unlit',
                 order: 4,
-                from: 'feet',
                 cut: [
                     [0, 0],
                     [0.55, 0.45],

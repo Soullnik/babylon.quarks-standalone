@@ -646,8 +646,8 @@ export const arcane: FxDef[] = [
                 column.scaling.set(thin, Math.max(0.001, 8 * k), thin);
             });
             for (const [face, alpha] of [
-                ['back', 0.4],
-                ['front', 0.7],
+                ['back', 0.6],
+                ['front', 1],
             ] as const) {
                 fx.sys({
                     image: 'light-column',

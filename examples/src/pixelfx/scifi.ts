@@ -232,7 +232,7 @@ export const scifi: FxDef[] = [
             // rolling scanlines swells out over it with arcs crawling its skin, strobes, tears and shorts
             // out at 1.4 s into dead pixels raining down, with a last few sparks of lightning.
             const POP = 0.4;
-            const R = 2.6;
+            const R = 1.25;
             fx.prop(shapes.cylinder(fx.scene, 0.12, 0.42, 0.48, 24), {at: [0, 0.06, 0], color: METAL});
             fx.prop(shapes.torus(fx.scene, 0.4, 0.05), {at: [0, 0.12, 0], color: '#1c2a6a', glow: '#3f55e8'});
             const lamp = fx.prop(shapes.sphere(fx.scene, 0.1), {at: [0, 0.16, 0], color: '#1c1658', glow: '#5a8eff'});
@@ -261,9 +261,9 @@ export const scifi: FxDef[] = [
                 geo: dome,
                 image: 'scanlines',
                 parent: bubble,
-                color: '#7aa0ff',
-                rim: [0.75, 0.88, 1],
-                alpha: [0.35, 0.85],
+                color: '#c4d8ff',
+                rim: [0.75, 0.9, 1],
+                alpha: [0.55, 1],
                 tiling: [1, 11],
                 scroll: [0, 0.7],
                 life: 3.2,
@@ -273,11 +273,11 @@ export const scifi: FxDef[] = [
                 geo: dome,
                 blend: 'add',
                 life: 3.2,
-                size: 1.03,
+                size: 1.02,
                 burst: 1,
                 loop: false,
                 color: '#ff5ad8',
-                alpha: 0.35,
+                alpha: 0.12,
                 parent: bubble,
                 order: 5,
                 look: {mapUV: {tiling: [1, 11], scroll: [0, 0.7]}, renderFace: 'front', scalingMode: 'hierarchy'},
@@ -298,7 +298,7 @@ export const scifi: FxDef[] = [
                 tex: 'ring',
                 mode: RenderMode.HorizontalBillBoard,
                 life: 1.05,
-                size: R * 2.1,
+                size: R * 3,
                 burst: [[POP, 1]],
                 color: '#9cc4ff',
                 at: [0, 0.04, 0],
@@ -1029,9 +1029,9 @@ export const scifi: FxDef[] = [
             shell(fx, {
                 geo: lathe(cone, 40),
                 image: 'light-column',
-                color: '#2e98e8',
-                rim: [0.45, 0.85, 1],
-                alpha: [0.3, 0.55],
+                color: '#6cd0ff',
+                rim: [0.3, 0.7, 1],
+                alpha: [0.6, 0.85],
                 scroll: [0.1, 0],
             });
             // The model: a diamond in scanlines and a wireframe over it, turning and bobbing.
@@ -1046,7 +1046,7 @@ export const scifi: FxDef[] = [
                 image: 'scanlines',
                 color: '#6cd0ff',
                 rim: [0.7, 0.95, 1],
-                alpha: [0.35, 0.8],
+                alpha: [0.15, 0.7],
                 tiling: [1, 9],
                 scroll: [0, -0.4],
                 parent: model,
@@ -1593,14 +1593,14 @@ export const scifi: FxDef[] = [
         view: {height: 1.4, distance: 7},
         build(fx) {
             // teleporter-pad.js in 3D: a steel pad glows on the floor with rings rippling out over it; a
-            // soft column of light rises off it, rings of light lift away up it, and sparkles drift up.
-            fx.prop(shapes.cylinder(fx.scene, 0.18, 1.25, 1.35, 40), {at: [0, 0.09, 0], color: METAL});
+            // soft column of light rises off it, rings of light come down it, and sparkles drift up.
+            fx.prop(shapes.cylinder(fx.scene, 0.18, 1.08, 1.16, 40), {at: [0, 0.09, 0], color: METAL});
             fx.prop(shapes.cylinder(fx.scene, 0.02, 1.05, 1.05, 40), {
                 at: [0, 0.19, 0],
                 color: '#2a1a5a',
                 glow: '#5a3ad2',
             });
-            for (const r of [1.15, 0.72, 0.36]) {
+            for (const r of [1.0, 0.66, 0.34]) {
                 fx.prop(shapes.torus(fx.scene, r, 0.04), {at: [0, 0.2, 0], color: '#b4a2ff', glow: '#7a5aff'});
             }
             star(fx, {at: [0, 0.25, 0], size: 2.4, life: 1e4, tex: 'glow', color: '#b4a2ff', alpha: 0.55});
@@ -1624,21 +1624,22 @@ export const scifi: FxDef[] = [
                 image: 'light-column',
                 color: '#8a6aff',
                 rim: [0.75, 0.65, 1],
-                alpha: [0.35, 0.6],
+                alpha: [0.5, 0.75],
                 scroll: [0.06, 0],
             });
+            // Rings of light come down the column from its top and settle on the pad.
             fx.sys({
                 tex: 'ring',
                 mode: RenderMode.HorizontalBillBoard,
                 life: 1.8,
-                speed: 1.4,
+                speed: -1.5,
                 size: 1.96,
                 rate: 1.25,
                 color: '#c8b4ff',
                 aim: 'up',
-                at: [0, 0.25, 0],
+                at: [0, 2.95, 0],
                 order: 7,
-                b: [tint(VIOLET, fadeOut(0.45, 0.05)), grow([0, 1], [1, 0.9])],
+                b: [tint(VIOLET, fadeOut(0.45, 0.05)), grow([0, 0.9], [1, 1.05])],
             });
             fx.sys({
                 tex: 'glint',
@@ -1676,12 +1677,14 @@ export const scifi: FxDef[] = [
         name: 'Tractor beam',
         loop: true,
         period: 3,
-        view: {height: 1.9, distance: 9},
+        view: {height: 2.1, distance: 9.5},
         build(fx) {
             // tractor-beam.js in 3D: a hovering pod projects a cone of light to the floor; rocks tear loose
             // in puffs of dust and spiral up spinning into the lens while rings of light climb the beam.
-            const TOP = 3.5;
+            const TOP = 4;
             const pod = fx.node('pod', [0, TOP, 0]);
+            // The saucer is small against its beam, as in the sprite (about a third of the beam's foot).
+            pod.scaling.setAll(0.6);
             fx.prop(shapes.cylinder(fx.scene, 0.2, 1.25, 0.55, 32), {parent: pod, at: [0, 0.05, 0], color: '#5a5868'});
             fx.prop(shapes.cylinder(fx.scene, 0.12, 0.8, 1.25, 32), {parent: pod, at: [0, 0.21, 0], color: '#6a6878'});
             const dome = fx.prop(shapes.sphere(fx.scene, 0.5, 16), {
@@ -1703,11 +1706,10 @@ export const scifi: FxDef[] = [
             fx.every((t) => {
                 pod.position.y = TOP + 0.07 * Math.sin((t / 3) * Math.PI * 2);
             });
-            star(fx, {at: [0, TOP - 0.1, 0], size: 1.6, life: 1e4, tex: 'glow', color: '#dffffa', alpha: 0.9});
+            star(fx, {at: [0, TOP - 0.1, 0], size: 1.1, life: 1e4, tex: 'glow', color: '#dffffa', alpha: 0.9});
             const cone: Array<[number, number]> = [
-                [1.55, 0.02],
-                [0.95, 1.6],
-                [0.4, TOP - 0.1],
+                [1.6, 0.02],
+                [0.24, TOP - 0.12],
             ];
             shell(fx, {
                 geo: lathe(cone, 48),
@@ -1740,7 +1742,7 @@ export const scifi: FxDef[] = [
                 aim: 'up',
                 at: [0, 0.1, 0],
                 order: 7,
-                b: [tint(CYAN, fadeOut(0.7, 0.1)), grow([0, 1], [1, 0.26])],
+                b: [tint(CYAN, fadeOut(0.7, 0.1)), grow([0, 1], [1, 0.16])],
             });
             // Rocks torn loose, spiralling up into the lens.
             fx.sys({

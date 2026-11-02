@@ -65,7 +65,8 @@ export function ramp(period: number, t0: number, a: number, t1: number, b: numbe
  * The hero as one mesh particle, lit and solid, living the whole `period`: unlike a prop, it can
  * be eroded away (or written back in) by a gradient up its height, a hot band on the cut. `cut`
  * gives its alpha over time as `[alpha, t]` keys, which the erosion reads as how much of it is
- * left: from the feet up with `from: 'feet'`, from the crown down by default.
+ * left. By default what is left is the lower part, so a rising `cut` grows the body up from the
+ * feet; with `from: 'feet'` what is left is the upper part, so a falling `cut` eats it from the feet up.
  */
 export function hero(
     fx: FxBuilder,
@@ -641,10 +642,10 @@ export const spawn: FxDef[] = [
             // A ring of soft round smoke balls bursting out between speed lines.
             puffs(fx, {
                 at,
-                count: 14,
+                count: 20,
                 time: 0.08,
                 speed: [1.6, 2.6],
-                size: [0.45, 0.8],
+                size: [0.7, 1.1],
                 life: [0.9, 1.3],
                 color: [PUFF[4], PUFF[5]],
                 shape: new CircleEmitter({radius: 0.2, thickness: 1}),
@@ -652,10 +653,10 @@ export const spawn: FxDef[] = [
             });
             puffs(fx, {
                 at,
-                count: 6,
+                count: 10,
                 time: 0.1,
                 speed: [0.3, 0.8],
-                size: [0.6, 0.9],
+                size: [0.9, 1.25],
                 life: [1, 1.4],
                 color: [PUFF[3], PUFF[4]],
                 lift: 0.9,
@@ -907,7 +908,7 @@ export const spawn: FxDef[] = [
                 count: 26,
                 color: [FROST[5], FROST[4]],
                 mesh: 'shard',
-                size: [0.08, 0.16],
+                size: [0.12, 0.24],
                 life: [1.3, 1.8],
                 delay: BURST,
                 speed: [1.5, 4],

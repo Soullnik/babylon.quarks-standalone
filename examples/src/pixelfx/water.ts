@@ -8,7 +8,7 @@ import type {TransformNode} from '@babylonjs/core/Meshes/transformNode';
 import type {ParticleSystem} from 'babylon.quarks';
 import {BoxEmitter, CircleEmitter, ConeEmitter, HemisphereEmitter, RenderMode, SphereEmitter} from 'babylon.quarks';
 import type {Geometry, SysOptions} from './kit';
-import {airDrag, fadeOut, gravity, grow, lathe, orbit, popOut, spin, subEmit, tint, wobble} from './kit';
+import {airDrag, fadeOut, gravity, grow, lathe, lens, orbit, popOut, spin, subEmit, tint, wobble} from './kit';
 import {FLAT, dust, gate, light, star, type At} from './parts';
 import type {Ramp} from './recipes';
 import {shapes, type FxBuilder, type FxDef} from './stage';
@@ -24,14 +24,24 @@ const FOAM = '#eef8ff';
 
 /** A still dark pool lying on the floor (or at `at`), the stage for splashes and rings. */
 function pool(fx: FxBuilder, radius: number, at: At = [0, 0, 0], squash = 1) {
-    const disc = fx.prop(shapes.cylinder(fx.scene, 0.02, radius, radius, 48), {
-        at,
+    // A shallow lens of water with a wandering edge, as a puddle lies, rather than a cut disc.
+    return fx.sys({
+        geo: lens(PUDDLE_EDGE, 0.02, {sx: radius, sz: radius * squash, power: 0.15}),
+        tex: 'white',
+        blend: 'alpha',
+        loop: false,
+        life: 1e4,
+        size: 1,
+        burst: 1,
         color: '#071a30',
-        glow: '#04101e',
+        at,
+        order: 1,
     });
-    disc.scaling.z = squash;
-    return disc;
 }
+
+/** A puddle's edge: a radius near 1 that wanders gently round it. */
+const PUDDLE_EDGE = (a: number) =>
+    1 + 0.05 * Math.sin(3 * a + 1) + 0.04 * Math.sin(5 * a + 2.5) + 0.025 * Math.sin(8 * a);
 
 /** Rings spreading over the water from where drops land. */
 function rings(
@@ -935,11 +945,11 @@ export const water: FxDef[] = [
                 tex: 'streak',
                 mode: RenderMode.HorizontalBillBoard,
                 life: [0.12, 0.22],
-                size: [0.9, 1.6],
-                rate: 60,
+                size: [0.45, 0.8],
+                rate: 90,
                 rot: Math.PI / 2 - 0.35,
                 color: '#ffe8b8',
-                alpha: 0.55,
+                alpha: 0.35,
                 shape: new BoxEmitter({width: 0.25, height: 0.01, depth: 3.4}),
                 at: [1.9, 0.045, -0.4],
                 rotate: [0, -0.35, 0],

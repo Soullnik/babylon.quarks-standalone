@@ -21,7 +21,7 @@ import {
     tint,
     wobble,
 } from './kit';
-import {PALETTE, decal, flash, pool, shockwave, smoke} from './recipes';
+import {PALETTE, decal, flash, pool, shockwave, smoke, windBand} from './recipes';
 import {type FxBuilder, type FxDef, shapes} from './stage';
 import {image} from './textures';
 
@@ -238,9 +238,11 @@ export const ice: FxDef[] = [
                     mapUV: {tiling: [3, 2] as [number, number], scroll: [0.5, -1] as [number, number]},
                 },
             };
-            fx.sys({...body, color: '#8fb8dc', alpha: 0.7, order: 2, look: {...surface, renderFace: 'back'}});
+            // Snow-filled air, faint: the wind bands carry the shape.
+            fx.sys({...body, color: '#8fb8dc', alpha: 0.3, order: 2, look: {...surface, renderFace: 'back'}});
             fx.sys({
                 ...body,
+                alpha: 0.4,
                 order: 5,
                 look: {
                     ...surface,
@@ -248,6 +250,20 @@ export const ice: FxDef[] = [
                     rim: {color: [0.86, 0.98, 1], power: 2.5, strength: 0.7, mode: 'add'},
                 },
             });
+            // Wind bands spinning up it, faster low down where it is narrow.
+            for (let i = 0; i < 10; i++) {
+                const u = (i + 0.5) / 10;
+                windBand(fx, {
+                    radius: radius(u * HT) * 1.06,
+                    turns: 1.6 * (1.45 - u),
+                    width: 0.06,
+                    rate: 7,
+                    life: [0.5, 0.9],
+                    colors: i % 3 === 0 ? ['#62c8f4', '#dcfbff'] : ['#a6ecff', '#ffffff'],
+                    at: [0, u * HT, 0],
+                    parent: funnel,
+                });
+            }
             // Cold light in its throat.
             for (const [h, size, color, alpha] of [
                 [0.45, 3.2, '#3a8bd8', 0.35],
@@ -837,8 +853,9 @@ export const ice: FxDef[] = [
             [1.4, 2.3, 3.2].forEach((radius, i) => {
                 blades(fx, {
                     life: 2.2 - i * 0.2,
-                    size: [0.7 + i * 0.15, 1.3 + i * 0.2],
-                    burst: [[0.8 + i * 0.12, 12 + i * 8]],
+                    // Knee high at most, as in the original (8 to 20 px), the inner ring tallest.
+                    size: [0.45 - i * 0.1, 0.8 - i * 0.17],
+                    burst: [[0.8 + i * 0.12, 16 + i * 10]],
                     shape: new CircleEmitter({radius, thickness: 0.25}),
                     aim: 'up',
                     grow: [
@@ -870,13 +887,35 @@ export const ice: FxDef[] = [
         loop: true,
         period: 3,
         build(fx) {
-            const crystal = fx.prop(shapes.poly(fx.scene, 1, 0.55), {
-                at: [0, 1.7, 0],
+            // The crystal turned from pixelfx's own sprite (traced: 31 px tall, a short point below, a
+            // long one above, 19 px across), a six-sided prism, half as big again.
+            const crystal = fx.node('crystal', [0, 1.7, 0]);
+            fx.sys({
+                geo: lathe(
+                    [
+                        [0.001, -0.47],
+                        [0.29, -0.1],
+                        [0.27, 0.1],
+                        [0.001, 0.46],
+                    ],
+                    6
+                ),
+                tex: 'white',
+                blend: 'alpha',
+                loop: false,
+                life: 1e4,
+                size: 1.5,
+                burst: 1,
                 color: '#9ad8ff',
-                glow: '#3a7aa8',
-                alpha: 0.85,
+                alpha: 0.9,
+                parent: crystal,
+                order: 3,
+                look: {
+                    lighting: 'fixed',
+                    scalingMode: 'hierarchy',
+                    rim: {color: [0.5, 0.85, 1], power: 1.5, strength: 1, mode: 'add'},
+                },
             });
-            crystal.scaling.y = 1.8;
             fx.every((t, dt) => {
                 crystal.rotation.y += dt * 0.8;
                 crystal.position.y = 1.7 + 0.12 * Math.sin((t / 3) * Math.PI * 2);

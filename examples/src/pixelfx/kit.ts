@@ -189,6 +189,14 @@ export function orbit(speed: Num, axis: [number, number, number] = [0, 1, 0]): O
     return new OrbitOverLife(num(speed), new BVector3(...axis));
 }
 
+/**
+ * Turn a mesh particle about its own `axis` (up by default), radians per second: a ring or band
+ * that spins in place. Use `upright` for a random start angle about y.
+ */
+export function turn(speed: Num, axis: [number, number, number] = [0, 1, 0]): Rotation3DOverLife {
+    return new Rotation3DOverLife(new AxisAngleGenerator(new BVector3(...axis).normalize(), num(speed)));
+}
+
 /** Flip through the texture's tiles `frames` times a second, starting on a random one. */
 export function frames(fps: number, count: number): FrameOverLife {
     return new FrameOverLife(new ConstantValue(0), {fps, frameCount: count, random: true});
@@ -426,6 +434,96 @@ export function domeProfile(rows = 16): Array<[number, number]> {
     return out;
 }
 
+/**
+ * A pool or mound lying on y = 0: a lens `height` tall in the middle whose outline wanders as
+ * `edge(angle)` (a radius near 1, angle from +x toward +z), stretched `sx` along x and `sz` along z.
+ * `power` shapes its crown: 0.5 a round lens, lower a flatter top with a steeper lip. UVs lie flat,
+ * x and z across 0 to 1, so a map or decal sits on it from above.
+ */
+export function lens(
+    edge: (angle: number) => number,
+    height: number,
+    o: {sx?: number; sz?: number; power?: number; rings?: number; segments?: number} = {}
+): Geometry {
+    const {sx = 1, sz = 1, power = 0.4, rings = 10, segments = 64} = o;
+    const positions: number[] = [];
+    const normals: number[] = [];
+    const uvs: number[] = [];
+    const indices: number[] = [];
+    let reach = 0;
+    for (let i = 0; i < segments; i++) reach = Math.max(reach, edge((i / segments) * Math.PI * 2));
+    for (let j = 0; j <= rings; j++) {
+        const s = j / rings;
+        const lift = height * Math.pow(Math.max(0, 1 - s * s), power);
+        // The slope outward, d(height)/d(s), clamped where the lip turns vertical.
+        const slope = (height * power * 2 * Math.min(s, 0.97)) / Math.pow(1 - Math.min(s, 0.97) ** 2, 1 - power);
+        for (let i = 0; i <= segments; i++) {
+            const a = (i / segments) * Math.PI * 2;
+            const r = edge(a);
+            const x = Math.cos(a) * r * s * sx;
+            const z = Math.sin(a) * r * s * sz;
+            positions.push(x, lift, z);
+            const nx = (Math.cos(a) * slope) / (r * sx);
+            const nz = (Math.sin(a) * slope) / (r * sz);
+            const len = Math.hypot(nx, 1, nz);
+            normals.push(nx / len, 1 / len, nz / len);
+            uvs.push(0.5 + x / (2 * reach * sx), 0.5 + z / (2 * reach * sz));
+        }
+    }
+    const ring = segments + 1;
+    for (let j = 0; j < rings; j++) {
+        for (let i = 0; i < segments; i++) {
+            const a = j * ring + i;
+            const b = a + ring;
+            indices.push(a, b, a + 1, a + 1, b, b + 1);
+        }
+    }
+    return {
+        positions: new Float32Array(positions),
+        normals: new Float32Array(normals),
+        uvs: new Float32Array(uvs),
+        indices: new Uint32Array(indices),
+    };
+}
+
+/**
+ * A flat strip lying on y = 0 that follows the outline `edge(angle)` (as for {@link lens}) from
+ * `inner` to `outer` times it: a glowing lip, a stain or a glow spilling round a pool. U runs round
+ * it, V from the inner edge (0) to the outer (1).
+ */
+export function outlineBand(
+    edge: (angle: number) => number,
+    inner: number,
+    outer: number,
+    o: {sx?: number; sz?: number; segments?: number} = {}
+): Geometry {
+    const {sx = 1, sz = 1, segments = 96} = o;
+    const positions: number[] = [];
+    const normals: number[] = [];
+    const uvs: number[] = [];
+    const indices: number[] = [];
+    for (const [k, v] of [
+        [inner, 0],
+        [outer, 1],
+    ]) {
+        for (let i = 0; i <= segments; i++) {
+            const a = (i / segments) * Math.PI * 2;
+            const r = edge(a) * k;
+            positions.push(Math.cos(a) * r * sx, 0, Math.sin(a) * r * sz);
+            normals.push(0, 1, 0);
+            uvs.push(i / segments, v);
+        }
+    }
+    const ring = segments + 1;
+    for (let i = 0; i < segments; i++) indices.push(i, i + ring, i + 1, i + 1, i + ring, i + ring + 1);
+    return {
+        positions: new Float32Array(positions),
+        normals: new Float32Array(normals),
+        uvs: new Float32Array(uvs),
+        indices: new Uint32Array(indices),
+    };
+}
+
 /** A chunk of crystal: an octahedron one unit across on the origin, for `geo`. */
 export function gem(): Geometry {
     return lathe(
@@ -451,6 +549,53 @@ export function spike(lean = 0, sides = 4): Geometry {
     // Sheared over by `lean` (x per unit of height), so a random turn about y tips it any way.
     for (let i = 0; i < geo.positions.length; i += 3) geo.positions[i] += lean * geo.positions[i + 1];
     return geo;
+}
+
+/**
+ * A horn, thorn or claw: a tapering tube one unit tall on the origin whose tip curls `curl` units
+ * over toward +x (the bend grows with the square of the height), `base` in radius at the foot,
+ * `sides` round. For hooked thorns, tusks, talons.
+ */
+export function horn(curl = 0.4, sides = 6, base = 0.14, rows = 12): Geometry {
+    const positions: number[] = [];
+    const normals: number[] = [];
+    const uvs: number[] = [];
+    const indices: number[] = [];
+    for (let j = 0; j <= rows; j++) {
+        const t = j / rows;
+        const cx = curl * t * t;
+        // The centre line's tangent, and the side axis in the bend's plane square to it.
+        const len = Math.hypot(2 * curl * t, 1);
+        const tx = (2 * curl * t) / len;
+        const ty = 1 / len;
+        const r = Math.max(0.0005, base * Math.pow(1 - t, 0.9));
+        for (let i = 0; i <= sides; i++) {
+            const a = (i / sides) * Math.PI * 2;
+            const c = Math.cos(a);
+            const sn = Math.sin(a);
+            // Side axis (ty, -tx, 0) and depth axis (0, 0, 1).
+            const nx = c * ty;
+            const ny = -c * tx;
+            const nz = sn;
+            positions.push(cx + r * nx, t + r * ny, r * nz);
+            normals.push(nx, ny, nz);
+            uvs.push(i / sides, t);
+        }
+    }
+    const ring = sides + 1;
+    for (let j = 0; j < rows; j++) {
+        for (let i = 0; i < sides; i++) {
+            const a = j * ring + i;
+            const b = a + ring;
+            indices.push(a, a + 1, b, a + 1, b + 1, b);
+        }
+    }
+    return {
+        positions: new Float32Array(positions),
+        normals: new Float32Array(normals),
+        uvs: new Float32Array(uvs),
+        indices: new Uint32Array(indices),
+    };
 }
 
 /**
@@ -530,6 +675,123 @@ export function extrude(outline: Array<[number, number]>, depth: number): Geomet
     return {
         positions: new Float32Array(positions),
         normals: new Float32Array(normals),
+        uvs: new Float32Array(uvs),
+        indices: new Uint32Array(indices),
+    };
+}
+
+/**
+ * A flat shape puffed up like a pillow: `outline` (x, y points round a point `center` they all see,
+ * such as a heart, a star or a cloud) swells to `depth` thick at `center` and thins to an edge at the
+ * outline, front (+z) and back. Smooth normals, so it shades round. UVs map the outline's bounds to
+ * 0 to 1 on both faces. Where {@link extrude} gives a slab, this gives a plump, toy-like solid.
+ */
+export function pillow(
+    outline: Array<[number, number]>,
+    depth: number,
+    o: {center?: [number, number]; rings?: number; power?: number} = {}
+): Geometry {
+    const {center = [0, 0], rings = 8, power = 0.5} = o;
+    let area = 0;
+    for (let i = 0; i < outline.length; i++) {
+        const [x0, y0] = outline[i];
+        const [x1, y1] = outline[(i + 1) % outline.length];
+        area += x0 * y1 - x1 * y0;
+    }
+    const pts = area < 0 ? [...outline].reverse() : outline;
+    const n = pts.length;
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+    for (const [x, y] of pts) {
+        minX = Math.min(minX, x);
+        minY = Math.min(minY, y);
+        maxX = Math.max(maxX, x);
+        maxY = Math.max(maxY, y);
+    }
+    const positions: number[] = [];
+    const uvs: number[] = [];
+    const indices: number[] = [];
+    const [cx, cy] = center;
+    // How far a point lies inside the outline: its distance to the nearest edge.
+    const inset = (x: number, y: number) => {
+        let best = Infinity;
+        for (let i = 0; i < n; i++) {
+            const [ax, ay] = pts[i];
+            const [bx, by] = pts[(i + 1) % n];
+            const ex = bx - ax;
+            const ey = by - ay;
+            const k = Math.max(0, Math.min(1, ((x - ax) * ex + (y - ay) * ey) / (ex * ex + ey * ey || 1)));
+            best = Math.min(best, Math.hypot(x - ax - ex * k, y - ay - ey * k));
+        }
+        return best;
+    };
+    // The grid: ring 0 is the outline, ring `rings` collapses to the centre.
+    const grid: Array<[number, number, number]> = [];
+    for (let j = 0; j <= rings; j++) {
+        const k = 1 - j / rings;
+        for (const [px, py] of pts) {
+            const x = cx + (px - cx) * k;
+            const y = cy + (py - cy) * k;
+            grid.push([x, y, inset(x, y)]);
+        }
+    }
+    // Swell with the distance from the edge, not the ring, so a deep notch (a heart's cleft) dips
+    // only where it is, and the thickest part sits where the shape is widest.
+    const deepest = Math.max(...grid.map((g) => g[2])) || 1;
+    for (const side of [1, -1]) {
+        const base = positions.length / 3;
+        for (let j = 0; j <= rings; j++) {
+            for (let i = 0; i < n; i++) {
+                const [x, y, d] = grid[j * n + i];
+                const k = 1 - d / deepest;
+                const z = side * (depth / 2) * Math.pow(Math.max(0, 1 - k * k), power);
+                positions.push(x, y, z);
+                uvs.push((x - minX) / (maxX - minX || 1), (y - minY) / (maxY - minY || 1));
+            }
+        }
+        for (let j = 0; j < rings; j++) {
+            for (let i = 0; i < n; i++) {
+                const a = base + j * n + i;
+                const b = base + j * n + ((i + 1) % n);
+                const c = a + n;
+                const d = b + n;
+                // Clockwise seen from outside, as Babylon's front faces (and extrude's caps) are.
+                if (side > 0) indices.push(a, d, b, a, c, d);
+                else indices.push(a, b, d, a, d, c);
+            }
+        }
+    }
+    // Smooth normals: the area-weighted sum of the faces round each vertex (taken counter-clockwise,
+    // so they point out of the clockwise faces).
+    const normals = new Float32Array(positions.length);
+    for (let t = 0; t < indices.length; t += 3) {
+        const [a, c, b] = [indices[t] * 3, indices[t + 1] * 3, indices[t + 2] * 3];
+        const ux = positions[b] - positions[a];
+        const uy = positions[b + 1] - positions[a + 1];
+        const uz = positions[b + 2] - positions[a + 2];
+        const vx = positions[c] - positions[a];
+        const vy = positions[c + 1] - positions[a + 1];
+        const vz = positions[c + 2] - positions[a + 2];
+        const nx = uy * vz - uz * vy;
+        const ny = uz * vx - ux * vz;
+        const nz = ux * vy - uy * vx;
+        for (const v of [a, b, c]) {
+            normals[v] += nx;
+            normals[v + 1] += ny;
+            normals[v + 2] += nz;
+        }
+    }
+    for (let v = 0; v < normals.length; v += 3) {
+        const len = Math.hypot(normals[v], normals[v + 1], normals[v + 2]) || 1;
+        normals[v] /= len;
+        normals[v + 1] /= len;
+        normals[v + 2] /= len;
+    }
+    return {
+        positions: new Float32Array(positions),
+        normals,
         uvs: new Float32Array(uvs),
         indices: new Uint32Array(indices),
     };
