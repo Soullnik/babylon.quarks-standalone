@@ -366,4 +366,24 @@ export const demoManifest: DemoManifestEntry[] = [
         tags: ['pixelfx', 'sci-fi', 'beam'],
         preview: {icon: 'SF', gradient: 'linear-gradient(135deg, #9cc4ff 0%, #3c2296 100%)'},
     },
+    {
+        key: 'PixelFxMeleeDemo',
+        name: 'Pixel FX: Melee',
+        module: 'pixelfxMelee',
+        sourcePath: 'examples/src/pixelfx/melee.ts',
+        description:
+            'Sword, scythe and spear swings, cleaves, claws, thrusts and whips drawn as weapon trails swept along the blade: pixelfx melee effects rebuilt in 3D.',
+        tags: ['pixelfx', 'melee', 'trail'],
+        preview: {icon: 'ME', gradient: 'linear-gradient(135deg, #e8f1ff 0%, #2c58aa 100%)'},
+    },
+    {
+        key: 'PixelFxSpawnDemo',
+        name: 'Pixel FX: Spawn',
+        module: 'pixelfxSpawn',
+        sourcePath: 'examples/src/pixelfx/spawn.ts',
+        description:
+            'Poofs, coin drops, disintegration, burning away, shattering, souls rising, respawn beams, portals and summonings, the hero a mesh particle eroded up its height: pixelfx spawn effects rebuilt in 3D.',
+        tags: ['pixelfx', 'spawn', 'erosion', 'mesh'],
+        preview: {icon: 'SP', gradient: 'linear-gradient(135deg, #a8f5d8 0%, #481b8c 100%)'},
+    },
 ];

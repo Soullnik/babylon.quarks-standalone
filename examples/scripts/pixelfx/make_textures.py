@@ -371,6 +371,20 @@ def gradient(size=128):
     save('gradient.png', np.stack([g, g, g, np.ones_like(g)], -1))
 
 
+def sweep(size=128):
+    """Red from 0 at U 0 to 1 at U 1: an erosion mask whose cut runs along a surface, round a ring."""
+    u = (np.arange(size) + 0.5) / size
+    g = np.repeat(u[None, :], 4, 0)
+    save('sweep.png', np.stack([g, g, g, np.ones_like(g)], -1))
+
+
+def tent(size=128):
+    """Red 0 at both ends of U to 1 in the middle: an erosion cut that closes a mark from both ends."""
+    u = (np.arange(size) + 0.5) / size
+    g = np.repeat((1 - np.abs(2 * u - 1))[None, :], 4, 0)
+    save('tent.png', np.stack([g, g, g, np.ones_like(g)], -1))
+
+
 def disc_layer(img, cx, cy, r, rgb, a, aa=1.2, wob=0.0, seed=0):
     """Composites an antialiased disc over `img` (premultiplied RGBA), `aa` pixels of soft edge. `wob`
     ruffles its rim by that fraction of the radius, so a ball of flame or smoke reads as billowing."""
@@ -473,5 +487,7 @@ if __name__ == '__main__':
     light_column()
     radial()
     gradient()
+    sweep()
+    tent()
     puff_sheet('fire-puff-heat', lambda *a: fire_puff_frame(*a, heat=True))
     puff_sheet('smoke-puff', smoke_puff_frame)

@@ -6,7 +6,7 @@ import type {Mesh} from '@babylonjs/core/Meshes/mesh';
 import {MeshBuilder} from '@babylonjs/core/Meshes/meshBuilder';
 import type {TransformNode} from '@babylonjs/core/Meshes/transformNode';
 import type {Scene} from '@babylonjs/core/scene';
-import type {Behavior, ParticleSystemParameters, ValueGenerator} from 'babylon.quarks';
+import type {Behavior, ParticleSystemParameters, TrailSettings, ValueGenerator} from 'babylon.quarks';
 import {
     ApplyCollision,
     ApplyForce,
@@ -251,6 +251,11 @@ export interface SysOptions {
     mode?: RenderMode;
     /** Trail length in samples, for `RenderMode.Trail`. */
     trail?: number;
+    /**
+     * More trail settings, passed through: `sideAxis` and `followLocalOrigin` for a weapon trail
+     * swept along a blade, `tessellation`, `uvFromHead`, `colorFromParticle` and the like.
+     */
+    trailOpts?: Partial<Omit<TrailSettings, 'startLength'>>;
     /** Stretched billboard factors. */
     stretch?: {speed?: number; length?: number};
     /** Simulate in world space, so particles stay behind a moving emitter. */
@@ -395,6 +400,16 @@ export function lathe(profile: Array<[number, number]>, segments = 48, arc = Mat
     };
 }
 
+/** A hemisphere of radius 1 standing on y = 0, as a lathe profile. */
+export function domeProfile(rows = 16): Array<[number, number]> {
+    const out: Array<[number, number]> = [];
+    for (let i = 0; i <= rows; i++) {
+        const a = (i / rows) * (Math.PI / 2);
+        out.push([Math.max(0.001, Math.cos(a)), Math.sin(a)]);
+    }
+    return out;
+}
+
 /** A chunk of crystal: an octahedron one unit across on the origin, for `geo`. */
 export function gem(): Geometry {
     return lathe(
@@ -475,7 +490,7 @@ export function makeSystem(scene: Scene, o: SysOptions, defaults: {loop: boolean
     const mode = geo ? RenderMode.Mesh : o.beam ? RenderMode.Beam : (o.mode ?? RenderMode.BillBoard);
     const rendererEmitterSettings =
         mode === RenderMode.Trail
-            ? {startLength: new ConstantValue(o.trail ?? 20), followLocalOrigin: false}
+            ? {startLength: new ConstantValue(o.trail ?? 20), followLocalOrigin: false, ...o.trailOpts}
             : mode === RenderMode.StretchedBillBoard
               ? {speedFactor: o.stretch?.speed ?? 0.12, lengthFactor: o.stretch?.length ?? 1}
               : undefined;

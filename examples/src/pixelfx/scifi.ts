@@ -11,6 +11,7 @@ import {
     airDrag,
     c3,
     curve,
+    domeProfile,
     drag,
     fadeOut,
     flicker,
@@ -89,16 +90,6 @@ function windows(system: ParticleSystem, period: number, spans: Array<[number, n
     }
     keys.push([1, 0]);
     system.emissionOverTime = curve(...keys);
-}
-
-/** A hemisphere of radius 1 standing on y = 0, as a lathe profile. */
-function domeProfile(rows = 16): Array<[number, number]> {
-    const out: Array<[number, number]> = [];
-    for (let i = 0; i <= rows; i++) {
-        const a = (i / rows) * (Math.PI / 2);
-        out.push([Math.max(0.001, Math.cos(a)), Math.sin(a)]);
-    }
-    return out;
 }
 
 /** A see-through shell of light: `geo` drawn twice, its far side dimmer, its near side lit at the rim. */

@@ -25,7 +25,9 @@ export type TextureName =
     | 'streak'
     | 'white'
     | 'burst'
-    | 'pow';
+    | 'pow'
+    | 'smear'
+    | 'lens';
 
 /** How a texture is split into tiles, for `uTileCount` / `vTileCount` and random tile picks. */
 export interface TextureSheet {
@@ -417,6 +419,35 @@ const SPECS: Record<TextureName, TextureSpec> = {
             },
         },
     },
+    // A blade's smear for a swept trail (U from the head, 0, back to the tail, 1; V across the blade,
+    // its edge at V 1): a crescent thickest two thirds of the way to the head, tapering to a hair at
+    // both ends, brightest along the edge. Its alpha is also the erosion order, so as a trail's
+    // alpha falls the tail and the inner side go first and the smear thins back toward the edge.
+    smear: {
+        size: 128,
+        paint: (img, s) =>
+            fillAlpha(img, s, (u, v) => {
+                const fromTail = 1 - u;
+                const w = Math.pow(Math.sin(Math.PI * Math.pow(fromTail, 2.2)), 0.6);
+                if (w < 0.02) return 0;
+                const q = (1 - v) / w;
+                if (q > 1) return 0;
+                return (1 - 0.7 * q) * smoothstep(1, 0.85, q) * Math.min(1, fromTail / 0.4);
+            }),
+    },
+    // A cut that tears open: a lens along U, sharp at both ends and thickest in the middle, across V
+    // brightest on its centre line. Its alpha orders an erosion the same way as the smear's.
+    lens: {
+        size: 128,
+        paint: (img, s) =>
+            fillAlpha(img, s, (u, v) => {
+                const w = Math.pow(Math.sin(Math.PI * u), 1.15);
+                if (w < 0.03) return 0;
+                const off = (Math.abs(v - 0.5) * 2) / w;
+                if (off > 1) return 0;
+                return (1 - 0.6 * off) * smoothstep(1, 0.8, off);
+            }),
+    },
     // A soft horizontal streak, bright in the middle: wind lines, speed lines, motion blur.
     streak: {
         size: 64,
@@ -486,6 +517,8 @@ export type ImageName =
     | 'scanlines'
     | 'light-column'
     | 'radial'
+    | 'sweep'
+    | 'tent'
     | 'gradient'
     | 'noise';
 
@@ -523,6 +556,10 @@ const IMAGES: Record<ImageName, {u: number; v: number; wrap: boolean; wrapV?: bo
     'light-column': {u: 1, v: 1, wrap: true},
     // Red 1 at the bottom to 0 at the top: an erosion mask whose cut climbs a surface.
     gradient: {u: 1, v: 1, wrap: false, mask: 'linear'},
+    // Red 0 at U 0 to 1 at U 1: an erosion mask whose cut runs along a ring or a ribbon.
+    sweep: {u: 1, v: 1, wrap: false, mask: 'linear'},
+    // Red 0 at both ends of U to 1 in the middle: an erosion cut that closes a mark from both ends.
+    tent: {u: 1, v: 1, wrap: false, mask: 'linear'},
     // A cone in red, 1 at the centre to 0 at the rim: an erosion mask that spreads a cut from a point.
     radial: {u: 1, v: 1, wrap: false, mask: 'linear'},
     // Two wrapping noises in red and green, for UV distortion.
