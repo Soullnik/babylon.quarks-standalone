@@ -336,19 +336,70 @@ function windowed(period: number, t0: number, t1: number, fade = 0.05): Array<[n
     return keys;
 }
 
-/** A nested pair of frames round a hole of `points`, scaled together so the hole can shut to a dot. */
-function iris(fx: FxBuilder, node: TransformNode, points: Array<[number, number]>, period: number, color = COVER) {
-    solid(fx, node, holeFrame(points, 24), color, {life: period, lit: false, order: 6});
-    solid(
-        fx,
-        node,
-        holeFrame(
-            points.map(([x, y]) => [x * 23.5, y * 23.5] as [number, number]),
-            30
-        ),
-        color,
-        {life: period, lit: false, order: 6}
-    );
+/** Distance from the origin to (x, y) in units of the closed outline `points` along that ray: 1 on the outline. */
+function shapeDistance(points: Array<[number, number]>): (x: number, y: number) => number {
+    return (x, y) => {
+        const rho = Math.hypot(x, y);
+        if (rho < 1e-9) return 0;
+        const dx = x / rho;
+        const dy = y / rho;
+        let reach = Infinity;
+        for (let i = 0; i < points.length; i++) {
+            const [ax, ay] = points[i];
+            const [bx, by] = points[(i + 1) % points.length];
+            const ex = bx - ax;
+            const ey = by - ay;
+            const den = dx * ey - dy * ex;
+            if (Math.abs(den) < 1e-12) continue;
+            const along = (ax * ey - ay * ex) / den;
+            const k = (ax * dy - ay * dx) / den;
+            if (along > 0 && k >= 0 && k <= 1) reach = Math.min(reach, along);
+        }
+        return reach === Infinity ? 0 : rho / reach;
+    };
+}
+
+/**
+ * The screen as one quad with a hole of `points` round `center`, `radius(t)` across, eroded out of
+ * a distance mask. Unlike a frame scaled with its hole, it never reaches past the screen.
+ */
+function irisCover(
+    fx: FxBuilder,
+    key: string,
+    center: At,
+    points: Array<[number, number]>,
+    period: number,
+    radius: (t: number) => number,
+    edge: [number, number, number]
+) {
+    const dist = shapeDistance(points);
+    const dx = center[0] - S[0];
+    const dy = center[1] - S[1];
+    let far = 0;
+    for (let i = 0; i <= 64; i++) {
+        const k = i / 64;
+        for (const [u, v] of [
+            [k, 0],
+            [k, 1],
+            [0, k],
+            [1, k],
+        ]) {
+            far = Math.max(far, dist((u - 0.5) * W - dx, (0.5 - v) * H - dy));
+        }
+    }
+    const alphas: Array<[number, number]> = [];
+    for (let i = 0; i <= 80; i++) {
+        const u = i / 80;
+        alphas.push([clamp01(1 - radius(u * period) / far), u]);
+    }
+    erodingCover(fx, {
+        period,
+        mask: mask(fx.scene, key, (u, v) => dist((u - 0.5) * W - dx, (0.5 - v) * H - dy) / far),
+        alphas,
+        edge,
+        edgeWidth: 0.015,
+        softness: 0.004,
+    });
 }
 
 export const transitions: FxDef[] = [
@@ -693,8 +744,8 @@ export const transitions: FxDef[] = [
                 });
                 return {node, i, lag: hash(i) * 0.35, freeze: hash(i + 9)};
             });
-            // Data slivers spat off the torn edges.
-            fx.sys({
+            // Data slivers spat off the torn edges, while there are edges on screen.
+            const slivers = fx.sys({
                 tex: 'white',
                 mode: RenderMode.StretchedBillBoard,
                 stretch: {speed: 0.06, length: 3},
@@ -709,6 +760,7 @@ export const transitions: FxDef[] = [
                 order: 9,
                 b: [tint([['#ffffff', 0]], popOut(0.4))],
             });
+            gate(slivers, P, 0.05, 1.75, 80);
             fx.every((t) => {
                 for (const b of bands) {
                     // In from the left in stutters, freezing and jerking back; then on through.
@@ -736,8 +788,18 @@ export const transitions: FxDef[] = [
             const P = 2.2;
             backdrop(fx, P);
             const C: At = [0, 1.6, S[2]];
+            const SHUT = 1.25;
+            const OPEN = 1.45;
+            // Closes onto the hero's head, holds as a spotlight, snaps shut, pops open.
+            const radius = (t: number) => {
+                if (t < 0.45) return 6 - 5.4 * easeOut(span(t, 0, 0.45));
+                if (t < 1.05) return 0.6 - 0.05 * Math.sin((t - 0.45) * 8);
+                if (t < SHUT) return 0.6 * (1 - easeIn(span(t, 1.05, SHUT)));
+                if (t < OPEN) return 0;
+                return 6 * easeOut(span(t, OPEN, P));
+            };
+            irisCover(fx, 'iris-circle', C, circle(1), P, radius, [1.6, 1.4, 1]);
             const ap = fx.node('iris', C);
-            iris(fx, ap, circle(1), P);
             const rim = fx.node('rim', [0, 0, 0.02], ap);
             solid(fx, rim, holeFrame(circle(0.98), 1.05), SPOT[6], {life: P, blend: 'add', lit: false});
             // The spotlight's dust.
@@ -766,8 +828,6 @@ export const transitions: FxDef[] = [
                 b: [tint([['#ffffff', 0]], popOut(0.5))],
             });
             gate(tw, P, 0.5, 1.1, 12);
-            const SHUT = 1.25;
-            const OPEN = 1.45;
             flash(fx, {at: [C[0], C[1], C[2] + 0.2], size: 1, time: SHUT, color: '#ffffff', life: 0.2});
             flash(fx, {at: [C[0], C[1], C[2] + 0.2], size: 3, time: OPEN, color: SPOT[6]});
             fx.sys({
@@ -785,15 +845,9 @@ export const transitions: FxDef[] = [
                 b: [gravity(4), tint([['#ffffff', 0]], popOut(0.4))],
             });
             fx.every((t) => {
-                // Closes onto the hero's head, holds as a spotlight, snaps shut, pops open.
-                let r: number;
-                if (t < 0.45) r = 6 - 5.4 * easeOut(span(t, 0, 0.45));
-                else if (t < 1.05) r = 0.6 - 0.05 * Math.sin((t - 0.45) * 8);
-                else if (t < SHUT) r = 0.6 * (1 - easeIn(span(t, 1.05, SHUT)));
-                else if (t < OPEN) r = 0;
-                else r = 6 * easeOut(span(t, OPEN, P));
-                ap.scaling.setAll(Math.max(0.004, r));
-                ap.rotation.z = t * 0.3;
+                // The rim rides the hole while it is on screen.
+                const r = radius(t);
+                ap.scaling.setAll(r > 1.2 ? HIDE : Math.max(0.004, r));
             });
         },
     },
@@ -1088,9 +1142,18 @@ export const transitions: FxDef[] = [
             const P = 2.2;
             backdrop(fx, P);
             const C: At = [0, 1.45, S[2]];
-            const ap = fx.node('star', C);
             const STAR = starPoints(1, 0.42);
-            iris(fx, ap, STAR, P);
+            const SHUT = 1.3;
+            const OPEN = 1.5;
+            const radius = (t: number) => {
+                if (t < 0.5) return 7 - 6.2 * easeOut(span(t, 0, 0.5));
+                if (t < 1.1) return 0.8 - 0.06 * Math.sin((t - 0.5) * 8);
+                if (t < SHUT) return 0.8 * (1 - easeIn(span(t, 1.1, SHUT)));
+                if (t < OPEN) return 0;
+                return 7 * easeOut(span(t, OPEN, P));
+            };
+            irisCover(fx, 'iris-star', C, STAR, P, radius, [1.8, 1.4, 0.6]);
+            const ap = fx.node('star', C);
             const rim = fx.node('rim', [0, 0, 0.02], ap);
             solid(fx, rim, holeFrame(STAR, 1.07), GOLD[5], {life: P, blend: 'add', lit: false});
             // Tips twinkling and shedding motes.
@@ -1124,8 +1187,6 @@ export const transitions: FxDef[] = [
                 });
                 gate(m, P, 0.2, 1.3, 14);
             }
-            const SHUT = 1.3;
-            const OPEN = 1.5;
             flash(fx, {at: [C[0], C[1], C[2] + 0.2], size: 1, time: SHUT, color: '#ffffff', life: 0.2});
             flash(fx, {at: [C[0], C[1], C[2] + 0.2], size: 3.4, time: OPEN, color: GOLD[6]});
             shockwave(fx, {
@@ -1138,15 +1199,9 @@ export const transitions: FxDef[] = [
                 delay: OPEN,
             });
             fx.every((t) => {
-                let r: number;
-                if (t < 0.5) r = 7 - 6.2 * easeOut(span(t, 0, 0.5));
-                else if (t < 1.1) r = 0.8 - 0.06 * Math.sin((t - 0.5) * 8);
-                else if (t < SHUT) r = 0.8 * (1 - easeIn(span(t, 1.1, SHUT)));
-                else if (t < OPEN) r = 0;
-                else r = 7 * easeOut(span(t, OPEN, P));
-                ap.scaling.setAll(Math.max(0.004, r));
-                ap.rotation.z = t < OPEN ? t * 2.2 : OPEN * 2.2 - (t - OPEN) * 3;
-                tips.scaling.setAll(1);
+                // The gold rim and its tips ride the hole while it is on screen.
+                const r = radius(t);
+                ap.scaling.setAll(r > 1.2 ? HIDE : Math.max(0.004, r));
             });
         },
     },

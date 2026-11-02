@@ -132,9 +132,11 @@ function shadow(fx: FxBuilder, follow: TransformNode, size: number, life: number
         look: {scalingMode: 'hierarchy'},
     });
     fx.every(() => {
+        // The shadow node lives under the cell's root, so take the root's own offset back out.
         const p = follow.getAbsolutePosition();
-        node.position.set(p.x, 0.012, p.z);
-        const k = Math.max(0.3, 1 - (p.y - base) * 0.25);
+        const o = fx.root.getAbsolutePosition();
+        node.position.set(p.x - o.x, 0.012, p.z - o.z);
+        const k = Math.max(0.3, 1 - (p.y - o.y - base) * 0.25);
         node.scaling.set(k, 1, k);
     });
     return node;
@@ -642,7 +644,7 @@ export const critters: FxDef[] = [
                 rate: 6,
                 color: SEA[6],
                 alpha: 0.7,
-                shape: new CircleEmitter({radius: 1.6, thickness: 1}),
+                shape: new ConeEmitter({radius: 1.6, angle: 0.1, thickness: 1}),
                 aim: 'up',
                 at: [0, 0.3, 0],
                 order: 7,
@@ -828,6 +830,7 @@ export const critters: FxDef[] = [
             fx.sys({
                 tex: 'glint',
                 life: L,
+                look: {scalingMode: 'hierarchy'},
                 size: 0.12,
                 burst: [[0, 1]],
                 color: '#c8e0ff',
@@ -849,7 +852,6 @@ export const critters: FxDef[] = [
                 color: '#6a5a50',
                 alpha: 0.6,
                 shape: new CircleEmitter({radius: 0.3, thickness: 1}),
-                aim: 'up',
                 rotate: [Math.PI / 2, 0, 0],
                 at: [0.9, 0.05, 0],
                 order: 4,
@@ -1164,6 +1166,7 @@ export const critters: FxDef[] = [
                 speed: [1.5, 2.5],
                 size: [0.06, 0.1],
                 burst: [[1.22, 10]],
+                world: true,
                 color: SLIME[4],
                 shape: new ConeEmitter({radius: 0.3, angle: 1.2, thickness: 1}),
                 aim: 'up',
@@ -1180,6 +1183,7 @@ export const critters: FxDef[] = [
                 life: 0.6,
                 delay: 1.22,
                 blend: 'add',
+                loop: true,
             });
             fx.every((t) => {
                 // Wind-up squash, stretch into the jump, round in the air, splat, wobble.

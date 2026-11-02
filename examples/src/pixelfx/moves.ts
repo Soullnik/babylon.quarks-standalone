@@ -11,6 +11,7 @@ import {
     popOut,
     spike,
     spin,
+    teleported,
     tint,
     type Geometry,
 } from './kit';
@@ -207,9 +208,13 @@ function arcPoint(a: At, b: At, k: number, lift: number): At {
 /** A node flying from `a` to `b` between `t0` and `t1`, hidden before and after. */
 function flier(fx: FxBuilder, a: At, b: At, t0: number, t1: number, lift = 0, ease = (k: number) => k): TransformNode {
     const node = fx.node('flier', a);
+    let last = 0;
     fx.every((t) => {
         const k = ease(span(t, t0, t1));
         node.position.set(...arcPoint(a, b, k, lift));
+        // Back from the target to the start on a new loop: a jump, not a flight to fill with particles.
+        if (t < last) teleported(node);
+        last = t;
         node.scaling.setAll(t >= t0 && t <= t1 ? 1 : HIDE);
     });
     return node;
@@ -500,7 +505,6 @@ export const moves: FxDef[] = [
                 speed: [1, 2.5],
                 color: '#8a7a68',
                 shape: new CircleEmitter({radius: 0.3, thickness: 1}),
-                aim: 'up',
                 rotate: [Math.PI / 2, 0, 0],
             });
             shockwave(fx, {at: [LEFT + 0.2, 0.04, 0], size: 2.4, life: 0.4, color: '#c8b090', delay: STOMP});
@@ -549,7 +553,6 @@ export const moves: FxDef[] = [
                 speed: [1.5, 3],
                 color: '#8a7a68',
                 shape: new CircleEmitter({radius: 0.4, thickness: 1}),
-                aim: 'up',
                 rotate: [Math.PI / 2, 0, 0],
             });
             hitFlash(fx, foe, P, [RISE], '#ffe0a0', 0.6);
@@ -747,7 +750,6 @@ export const moves: FxDef[] = [
                 speed: [2, 4],
                 color: '#8a7a68',
                 shape: new CircleEmitter({radius: 0.5, thickness: 1}),
-                aim: 'up',
                 rotate: [Math.PI / 2, 0, 0],
             });
             hotSparks(fx, {
@@ -774,7 +776,7 @@ export const moves: FxDef[] = [
                     1 - coil * 0.25 - land * 0.3 + (t > JUMP && t < LAND ? 0.15 : 0),
                     1
                 );
-                me.body.rotation.z = t > JUMP && t < 1.05 ? -(t - JUMP) * 4 : 0;
+                me.body.rotation.z = -Math.PI * 2 * span(t, JUMP, 1.05); // One full flip over the top.
                 // Thrown about as the shock wave passes.
                 const air = span(t, passes, passes + 0.6);
                 foe.root.position.set(RIGHT + air * 0.6, Math.sin(air * Math.PI) * 0.9 * (air < 1 ? 1 : 0), 0);
@@ -884,7 +886,7 @@ export const moves: FxDef[] = [
                 size: [0.12, 0.22],
                 rate: 14,
                 color: GOLD[6],
-                shape: new CircleEmitter({radius: 0.6, thickness: 1}),
+                shape: new ConeEmitter({radius: 0.6, angle: 0.1, thickness: 1}),
                 aim: 'up',
                 at: [RIGHT, 0.2, 0],
                 order: 8,
@@ -1209,7 +1211,7 @@ export const moves: FxDef[] = [
                 size: [0.06, 0.12],
                 rate: 30,
                 color: [ARC[5], ARC[7]],
-                shape: new CircleEmitter({radius: 1.1, thickness: 0.1}),
+                shape: new ConeEmitter({radius: 1.1, angle: 0.1, thickness: 0.1}),
                 aim: 'up',
                 at: [LEFT, 0.05, 0],
                 order: 6,
@@ -1260,7 +1262,7 @@ export const moves: FxDef[] = [
                 order: 5,
                 b: [tint(PALETTE.fire, fadeOut(0.2, 0)), grow([0, 1], [1, 0.3])],
             });
-            smoke(fx, {
+            const trail = smoke(fx, {
                 at: [0, 0, 0],
                 parent: rock,
                 rate: 20,
@@ -1270,6 +1272,7 @@ export const moves: FxDef[] = [
                 alpha: 0.6,
                 life: [0.8, 1.2],
             });
+            gate(trail, P, POINT, HIT, 20);
             // The impact flattens the scene.
             flash(fx, {at: [RIGHT, 1, 0.5], size: 9, time: HIT, color: '#fff3a6'});
             shockwave(fx, {at: [RIGHT, 0.05, 0], size: 9, life: 0.7, color: '#ffc23d', delay: HIT});
@@ -1602,7 +1605,7 @@ export const moves: FxDef[] = [
                 // Thrown up and back.
                 const air = span(t, HIT, HIT + 1);
                 foe.root.position.set(RIGHT + 0.6 + air * 1.4, Math.sin(air * Math.PI) * 1.6 * (air < 1 ? 1 : 0), 0);
-                foe.body.rotation.z = -air * Math.PI * 1.5 * (air < 1 ? 1 : 0);
+                foe.body.rotation.z = -air * Math.PI * 2;
             });
         },
     },
@@ -1698,7 +1701,6 @@ export const moves: FxDef[] = [
                 speed: [1.5, 3],
                 color: '#8a7a68',
                 shape: new CircleEmitter({radius: 0.3, thickness: 1}),
-                aim: 'up',
                 rotate: [Math.PI / 2, 0, 0],
             });
             clods(fx, {

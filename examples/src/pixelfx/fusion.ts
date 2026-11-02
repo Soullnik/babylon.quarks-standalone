@@ -435,11 +435,11 @@ export const fusion: FxDef[] = [
             fx.every((t) => {
                 const bob = Math.sin((t / P) * Math.PI * 2) * 0.06;
                 orb.position.y = 1.7 + bob;
-                const pulse = 1 + 0.04 * Math.sin(t * 13) + (t > ZAP && t < ZAP + 0.25 ? 0.12 : 0);
+                const pulse = 1 + 0.04 * Math.sin(((Math.PI * 2 * 6) / P) * t) + (t > ZAP && t < ZAP + 0.25 ? 0.12 : 0);
                 orb.scaling.setAll(pulse);
                 tips.forEach((tip, i) => {
-                    const a = t * (1.7 + i * 0.6) + i * 2.1;
-                    const b = Math.sin(t * (1.1 + i * 0.4) + i) * 1.2;
+                    const a = ((Math.PI * 2 * (1 + i)) / P) * t + i * 2.1;
+                    const b = Math.sin(((Math.PI * 2 * (2 - (i % 2))) / P) * t + i) * 1.2;
                     tip.position.set(
                         Math.cos(a) * Math.cos(b) * 0.38,
                         Math.sin(b) * 0.38,
