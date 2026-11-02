@@ -640,3 +640,10 @@ export function init({scene, camera, batchRenderer, systems}: DemoContext) {
         systems.push(system);
     }
 }
+
+/** One turn of the camera round the figure every 4.6 seconds, as the reference's turntable. */
+const ORBIT_SPEED = (Math.PI * 2) / 4.6;
+
+export function update({camera}: DemoContext, delta: number) {
+    camera.alpha += ORBIT_SPEED * delta;
+}
