@@ -15,7 +15,6 @@ import {Mesh} from '@babylonjs/core/Meshes/mesh';
 import {Scene} from '@babylonjs/core/scene';
 import {
     Bezier,
-    CircleEmitter,
     ColorOverLife,
     ConeEmitter,
     ConstantColor,
@@ -26,7 +25,6 @@ import {
     MeshSurfaceEmitter,
     Noise,
     ParticleSystem,
-    type ParticleSystemParameters,
     PiecewiseBezier,
     PointEmitter,
     RenderMode,
@@ -37,17 +35,19 @@ import {
 import type {DemoContext} from '../types';
 
 /*
- * A teal flame aura around a standing figure: masses of fire standing off the
- * body's surface, a thin plume rising off the head into dark smoke, a soft
- * halo and a glow pooled on the ground with flames splashing round the feet.
- * Every texture is painted below, so the effect needs no asset files.
+ * A teal flame aura around a standing figure: a teardrop of smoky energy
+ * behind the body, widest at the hips and drawn up to a point over the head,
+ * a thin plume rising into dark smoke, a soft halo, and energy pooling on the
+ * ground round the feet. Every texture is painted below, so the effect needs
+ * no asset files.
  *
- * The fire is the masked panner of Unity's and Unreal's flame materials:
- * tongues of flame painted as noise scroll up and waver (`mapUV` scroll, UV
- * distortion) through a still flame silhouette (`mask`); the gradient map
+ * The aura is the masked panner of Unity's and Unreal's VFX materials, drawn
+ * on a few large billboards: smoky noise scrolls up and wavers (`mapUV`
+ * scroll, UV distortion) through a still teardrop (`mask`); the gradient map
  * colours the product and the particle's alpha wears it away from its faint
- * edges (`erosion`). A random start tile gives every sheet its own stretch of
- * the noise, as a random UV offset per particle does in those engines.
+ * parts (`erosion`). Two layers scroll at their own speed and scale, and a
+ * random start tile gives every billboard its own stretch of the noise, as a
+ * random UV offset per particle does in those engines.
  */
 
 /** A square canvas texture painted by `paint`, wrapping or clamped. */
@@ -63,7 +63,8 @@ function canvasTexture(
     const image = ctx.createImageData(size, size);
     paint(image, size);
     ctx.putImageData(image, 0, 0);
-    texture.update(false);
+    // Row 0 of the canvas is the top of the picture (V = 1).
+    texture.update(true);
     const mode = wrap ? Texture.WRAP_ADDRESSMODE : Texture.CLAMP_ADDRESSMODE;
     texture.wrapU = mode;
     texture.wrapV = mode;
@@ -133,17 +134,6 @@ function distortionNoise(image: ImageData, size: number): void {
     }
 }
 
-/** High-contrast tileable noise in red, the order an erosion eats a flame away in. */
-function erosionNoise(image: ImageData, size: number): void {
-    const n = fractalNoise(33, 4, 4);
-    for (let y = 0; y < size; y++) {
-        for (let x = 0; x < size; x++) {
-            const v = smoothstep(0.25, 0.75, n(x / size, y / size));
-            put(image, size, x, y, v, v, v, 1);
-        }
-    }
-}
-
 /**
  * Tileable fractal value noise stretched along V: `cellsX` by `cellsY` cells
  * in its first octave, so its features run upward like licks of flame.
@@ -179,34 +169,52 @@ function streakNoise(seed: number, cellsX: number, cellsY: number, octaves: numb
 }
 
 /**
- * Tongues of flame as tileable noise in every channel: streaks stretched
- * upward and bent sideways by a second noise, bright where they gather and
- * clear between them.
+ * Smoky energy as tileable noise in every channel: fractal noise whose domain
+ * is warped by a second noise, so it curls like smoke, cut into bright
+ * blotches with clear gaps, and laced with the thin ridges where it crosses
+ * its middle value.
  */
-function tongueNoise(image: ImageData, size: number): void {
-    const n = streakNoise(81, 5, 2, 4);
-    const warp = streakNoise(23, 3, 2, 3);
+function smokeNoise(image: ImageData, size: number): void {
+    const n = streakNoise(81, 4, 4, 5);
+    const wx = streakNoise(23, 3, 3, 3);
+    const wy = streakNoise(57, 3, 3, 3);
     for (let y = 0; y < size; y++) {
         for (let x = 0; x < size; x++) {
             const u = x / size;
             const v = y / size;
-            const bent = u + (warp(u, v) - 0.5) * 0.5;
-            const ridge = 1 - Math.abs(n(bent, v) * 2 - 1);
-            const a = smoothstep(0.35, 0.9, ridge) * smoothstep(0.15, 0.55, n(bent + 0.5, v + 0.5));
+            const value = n(u + (wx(u, v) - 0.5) * 0.45, v + (wy(u, v) - 0.5) * 0.45);
+            const blotch = smoothstep(0.5, 0.76, value);
+            const ridge = Math.pow(1 - Math.abs(value * 2 - 1), 8) * 0.5;
+            const a = Math.min(1, blotch + ridge);
             put(image, size, x, y, a, a, a, a);
         }
     }
 }
 
-/** A flame's silhouette in red: full at its broad foot and along its middle, falling off to its sides and tip. */
-function flameMask(image: ImageData, size: number): void {
+/**
+ * The aura's outline in every channel: a teardrop, round and widest a third
+ * of the way up, drawn to a point at the top, every edge soft.
+ */
+function auraMask(image: ImageData, size: number): void {
     for (let y = 0; y < size; y++) {
         const v = 1 - (y + 0.5) / size;
+        // Half-width at height v: rises fast from the foot, then tapers to the tip.
+        const half = 0.5 * Math.pow(Math.sin(Math.PI * Math.pow(v, 0.62)), 1.3) * Math.pow(1 - v, 0.7);
         for (let x = 0; x < size; x++) {
             const u = (x + 0.5) / size;
-            const half = 0.5 * Math.pow(1 - v, 0.6);
-            const across = half > 0 ? Math.abs(u - 0.5) / half : 1;
-            const m = Math.max(0, 1 - across * across) * Math.pow(1 - v, 0.5) * smoothstep(0, 0.2, v);
+            const across = half > 0.001 ? Math.abs(u - 0.5) / half : 2;
+            const m = smoothstep(1.1, 0.2, across) * smoothstep(0, 0.12, v);
+            put(image, size, x, y, m, m, m, 1);
+        }
+    }
+}
+
+/** In every channel: full in the middle, fading to nothing at the edge of the disc. */
+function discMask(image: ImageData, size: number): void {
+    for (let y = 0; y < size; y++) {
+        for (let x = 0; x < size; x++) {
+            const r = Math.hypot((x + 0.5) / size - 0.5, (y + 0.5) / size - 0.5) * 2;
+            const m = smoothstep(1, 0.3, r);
             put(image, size, x, y, m, m, m, 1);
         }
     }
@@ -237,20 +245,6 @@ function wisp(image: ImageData, size: number): void {
             const ends = smoothstep(0, 0.25, v) * smoothstep(1, 0.6, v);
             const a = Math.pow(Math.max(0, 1 - across - (n(u, v) - 0.5) * 0.5), 1.5) * ends;
             put(image, size, x, y, a, a, a, smoothstep(0, 0.6, a));
-        }
-    }
-}
-
-/** A blotchy patch of fire seen from above: noise inside a soft disc, red as heat. */
-function groundSplash(image: ImageData, size: number): void {
-    const n = fractalNoise(71, 3, 4);
-    for (let y = 0; y < size; y++) {
-        for (let x = 0; x < size; x++) {
-            const dx = (x + 0.5) / size - 0.5;
-            const dy = (y + 0.5) / size - 0.5;
-            const r = Math.hypot(dx, dy) * 2;
-            const heat = smoothstep(0.35, 0.8, n(x / size, y / size) * (1.25 - r));
-            put(image, size, x, y, heat, heat, heat, smoothstep(0, 0.4, heat));
         }
     }
 }
@@ -376,97 +370,83 @@ export function init({scene, camera, batchRenderer, systems}: DemoContext) {
     shadows.addShadowCaster(body);
 
     const distortion = canvasTexture(scene, 'distortionNoise', 128, true, distortionNoise);
-    const erosion = canvasTexture(scene, 'erosionNoise', 128, true, erosionNoise);
     const ramp = canvasTexture(scene, 'tealRamp', 64, false, tealRamp);
     const glow = canvasTexture(scene, 'softGlow', 256, false, softGlow);
 
-    // Flame sheets standing round the body: tongues of flame (the map) lick
-    // upward through a flame silhouette (the mask), and the ramp colours their
-    // product. The particle's alpha is the erosion level that trims their
-    // faint edges. The map is laid out as a 4 by 4 flipbook of the same
-    // tiling noise and each sheet starts on a random tile, so every sheet
-    // shows its own stretch of the noise rather than all moving in step.
-    const tongues = canvasTexture(scene, 'tongueNoise', 256, true, tongueNoise);
-    const silhouette = canvasTexture(scene, 'flameMask', 128, false, flameMask);
-    const sheetMaterial: Partial<ParticleSystemParameters> = {
-        texture: tongues,
-        uTileCount: 4,
-        vTileCount: 4,
-        startTileIndex: new IntervalValue(0, 16),
-        mapUV: {tiling: [4 * 0.9, 4 * 0.6], scroll: [0, -0.9]},
-        blendMode: Constants.ALPHA_ADD,
-        mask: {map: silhouette, mapUV: {channel: 1}},
-        gradientMap: {ramp, channel: 'a'},
-        uvDistortion: {map: distortion, strength: 0.12, mapUV: {channel: 1, tiling: [0.7, 0.5], scroll: [0, -0.5]}},
-        erosion: {softness: 0.35},
+    // The aura: a few large billboards standing behind the figure, each a
+    // teardrop (the mask) through which veins of energy (the map) stream
+    // upward and waver (scroll, UV distortion). Two layers scroll at their own
+    // speed and scale. Each sheet lives a moment and starts on a random tile
+    // of the noise, laid out as a 4 by 4 flipbook of the same tiling picture,
+    // so the overlapping sheets never move in step and the outline breathes
+    // as they fade in and out.
+    const veins = canvasTexture(scene, 'smokeNoise', 256, true, smokeNoise);
+    const outline = canvasTexture(scene, 'auraMask', 128, false, auraMask);
+    const auraLayer = (
+        name: string,
+        tiling: [number, number],
+        scroll: number,
+        width: [number, number],
+        height: [number, number],
+        color: Color4,
+        rate: number
+    ) => {
+        const layer = new ParticleSystem({
+            scene,
+            duration: 1,
+            looping: true,
+            prewarm: true,
+            startLife: new IntervalValue(1.2, 1.6),
+            startSpeed: new ConstantValue(0),
+            startSize: new Vector3Function(
+                new IntervalValue(width[0], width[1]),
+                new IntervalValue(height[0], height[1]),
+                new ConstantValue(1)
+            ),
+            startRotation: new IntervalValue(-0.06, 0.06),
+            startColor: new ConstantColor(color),
+            emissionOverTime: new ConstantValue(rate),
+            shape: new PointEmitter(),
+            texture: veins,
+            uTileCount: 4,
+            vTileCount: 4,
+            startTileIndex: new IntervalValue(0, 16),
+            mapUV: {tiling: [4 * tiling[0], 4 * tiling[1]], scroll: [0, scroll]},
+            blendMode: Constants.ALPHA_ADD,
+            mask: {map: outline, mapUV: {channel: 1}},
+            gradientMap: {ramp, channel: 'a'},
+            uvDistortion: {
+                map: distortion,
+                strength: 0.07,
+                mapUV: {channel: 1, tiling: [1.2, 0.8], scroll: [0, -0.35]},
+            },
+            erosion: {softness: 0.25},
+            // Its foot at the emitter, its middle a little behind the figure.
+            pivot: new BVector3(0, 0.5, -0.12),
+        });
+        layer.emitter.name = name;
+        layer.emitter.position = new BVector3(0, -0.1, 0);
+        layer.addBehavior(
+            overLife(
+                [
+                    [1, 1, 1],
+                    [1, 1, 1],
+                ],
+                [0, 0.6, 0.5, 0]
+            )
+        );
+        return layer;
     };
-    const surface = new MeshSurfaceEmitter();
-    surface.mesh = body;
-    const sheets = new ParticleSystem({
-        scene,
-        duration: 1,
-        looping: true,
-        prewarm: true,
-        worldSpace: true,
-        startLife: new IntervalValue(0.7, 1.1),
-        startSpeed: new ConstantValue(0.04),
-        startSize: new Vector3Function(
-            new IntervalValue(0.22, 0.34),
-            new IntervalValue(0.45, 0.8),
-            new ConstantValue(1)
-        ),
-        startRotation: new IntervalValue(-0.15, 0.15),
-        startColor: new ConstantColor(new Color4(0.4, 0.62, 0.52, 1)),
-        emissionOverTime: new ConstantValue(70),
-        shape: surface,
-        renderMode: RenderMode.VerticalBillBoard,
-        pivot: new BVector3(0, 0.15, 0),
-        ...sheetMaterial,
-    });
-    sheets.addBehavior(new ForceOverLife(new ConstantValue(0), new ConstantValue(0.6), new ConstantValue(0)));
-    sheets.addBehavior(
-        overLife(
-            [
-                [1, 1, 1],
-                [1, 1, 1],
-            ],
-            [0, 0.75, 0.6, 0]
-        )
+    const coarse = auraLayer(
+        'auraCoarse',
+        [0.9, 0.7],
+        -0.45,
+        [1.5, 1.8],
+        [2.5, 2.8],
+        new Color4(0.4, 0.75, 0.62, 1),
+        2
     );
-
-    // A tall thin tongue of flame licking up off the crown of the head.
-    const crest = new ParticleSystem({
-        scene,
-        duration: 1,
-        looping: true,
-        prewarm: true,
-        worldSpace: true,
-        startLife: new IntervalValue(0.5, 0.8),
-        startSpeed: new IntervalValue(0.6, 0.9),
-        startSize: new Vector3Function(
-            new IntervalValue(0.14, 0.22),
-            new IntervalValue(0.6, 0.9),
-            new ConstantValue(1)
-        ),
-        startRotation: new IntervalValue(-0.08, 0.08),
-        startColor: new ConstantColor(new Color4(0.4, 0.62, 0.52, 1)),
-        emissionOverTime: new ConstantValue(10),
-        shape: new ConeEmitter({radius: 0.05, angle: 0.05}),
-        renderMode: RenderMode.VerticalBillBoard,
-        pivot: new BVector3(0, 0.3, 0),
-        ...sheetMaterial,
-    });
-    crest.emitter.position = new BVector3(0, 1.75, 0);
-    crest.emitter.rotation.x = -Math.PI / 2;
-    crest.addBehavior(
-        overLife(
-            [
-                [1, 1, 1],
-                [1, 1, 1],
-            ],
-            [0, 0.75, 0.55, 0]
-        )
-    );
+    const fine = auraLayer('auraFine', [1.6, 1.2], -0.8, [1.2, 1.4], [2.3, 2.7], new Color4(0.35, 0.7, 0.58, 1), 2);
 
     // The plume: thin wisps shooting up off the head, cooling from teal into
     // dark smoke over the scene, alpha blended so they darken what they cross.
@@ -503,6 +483,8 @@ export function init({scene, camera, batchRenderer, systems}: DemoContext) {
     plume.addBehavior(new Noise(new ConstantValue(0.8), new ConstantValue(0.25)));
 
     // A soft teal halo hugging the figure, the glow the flames give off.
+    const surface = new MeshSurfaceEmitter();
+    surface.mesh = body;
     const halo = new ParticleSystem({
         scene,
         duration: 1,
@@ -525,7 +507,7 @@ export function init({scene, camera, batchRenderer, systems}: DemoContext) {
                 [1, 1, 1],
                 [1, 1, 1],
             ],
-            [0, 0.5, 0]
+            [0, 0.2, 0]
         )
     );
 
@@ -549,42 +531,44 @@ export function init({scene, camera, batchRenderer, systems}: DemoContext) {
     });
     pool.emitter.position = new BVector3(0, 0.01, 0.1);
 
-    // Fire splashing on the floor round the feet, turning as it dissolves.
+    // Energy pooling on the floor round the feet: the same veins in a soft
+    // disc, laid flat and turning as they fade.
     const splash = new ParticleSystem({
         scene,
         duration: 1,
         looping: true,
         prewarm: true,
-        worldSpace: true,
-        startLife: new IntervalValue(0.5, 0.9),
+        startLife: new IntervalValue(1, 1.4),
         startSpeed: new ConstantValue(0),
-        startSize: new IntervalValue(0.5, 0.9),
+        startSize: new IntervalValue(0.8, 1.05),
         startRotation: new IntervalValue(0, Math.PI * 2),
-        startColor: new ConstantColor(new Color4(1, 1, 1, 1)),
-        emissionOverTime: new ConstantValue(18),
-        shape: new CircleEmitter({radius: 0.3}),
+        startColor: new ConstantColor(new Color4(0.35, 0.7, 0.58, 1)),
+        emissionOverTime: new ConstantValue(2.5),
+        shape: new PointEmitter(),
         renderMode: RenderMode.HorizontalBillBoard,
-        texture: canvasTexture(scene, 'groundSplash', 128, false, groundSplash),
+        texture: veins,
+        uTileCount: 4,
+        vTileCount: 4,
+        startTileIndex: new IntervalValue(0, 16),
+        mapUV: {tiling: [4 * 1.2, 4 * 1.2], scroll: [0.05, -0.15]},
         blendMode: Constants.ALPHA_ADD,
-        gradientMap: {ramp},
-        uvDistortion: {map: distortion, strength: 0.04, mapUV: {scroll: [0.2, -0.3]}},
-        erosion: {mask: erosion, maskUV: {channel: 1, tiling: [1.5, 1.5]}, softness: 0.12},
+        mask: {map: canvasTexture(scene, 'discMask', 128, false, discMask), mapUV: {channel: 1}},
+        gradientMap: {ramp, channel: 'a'},
+        uvDistortion: {map: distortion, strength: 0.05, mapUV: {channel: 1, scroll: [0.1, -0.2]}},
     });
-    splash.emitter.position = new BVector3(0, 0.02, 0.05);
-    splash.emitter.rotation.x = -Math.PI / 2;
-    splash.addBehavior(new RotationOverLife(new IntervalValue(-0.6, 0.6)));
-    splash.addBehavior(new SizeOverLife(new PiecewiseBezier([[new Bezier(0.7, 1, 1.1, 1.2), 0]])));
+    splash.emitter.position = new BVector3(0, 0.015, 0.05);
+    splash.addBehavior(new RotationOverLife(new IntervalValue(-0.3, 0.3)));
     splash.addBehavior(
         overLife(
             [
                 [1, 1, 1],
                 [1, 1, 1],
             ],
-            [0.5, 1, 0]
+            [0, 1, 1, 0]
         )
     );
 
-    for (const system of [pool, splash, halo, plume, sheets, crest]) {
+    for (const system of [pool, splash, halo, coarse, fine, plume]) {
         batchRenderer.addSystem(system);
         systems.push(system);
     }

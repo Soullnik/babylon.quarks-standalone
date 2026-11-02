@@ -232,7 +232,7 @@ export const demoManifest: DemoManifestEntry[] = [
         module: 'flameAura',
         sourcePath: 'examples/src/demos/flameAura.ts',
         description:
-            'A teal flame aura around a standing figure: tongues of flame scroll up through flame silhouettes (mask), each sheet on a random flipbook tile, shed from the body by a MeshSurfaceEmitter, coloured by a gradient map and trimmed by erosion; a plume of smoke off the head and light pooled on the floor.',
+            'A teal flame aura around a standing figure: smoky noise scrolls up through a teardrop mask on a few large billboards behind the body, two layers at their own speed, coloured by a gradient map and worn away by erosion; a plume of smoke off the head and energy pooled on the floor.',
         tags: ['loop', 'material', 'mesh'],
         preview: {icon: 'FA', gradient: 'linear-gradient(135deg, #3ef2d0 0%, #1d3a40 100%)'},
     },
