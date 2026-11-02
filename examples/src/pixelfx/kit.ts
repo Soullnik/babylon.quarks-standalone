@@ -437,6 +437,88 @@ export function spike(lean = 0, sides = 4): Geometry {
     return geo;
 }
 
+/**
+ * A flat shape given thickness: `outline` (x, y points, either winding, no holes) cut into
+ * triangles by ear clipping, capped front (+z) and back and walled round, `depth` thick and centred
+ * on z = 0. UVs map the outline's bounds to 0 to 1 on the caps. For hearts, stars, birds, glyphs.
+ */
+export function extrude(outline: Array<[number, number]>, depth: number): Geometry {
+    // Counter-clockwise, so the front cap faces +z.
+    let area = 0;
+    for (let i = 0; i < outline.length; i++) {
+        const [x0, y0] = outline[i];
+        const [x1, y1] = outline[(i + 1) % outline.length];
+        area += x0 * y1 - x1 * y0;
+    }
+    const pts = area < 0 ? [...outline].reverse() : outline;
+    const n = pts.length;
+    const tris: number[] = [];
+    const left = pts.map((_, i) => i);
+    const cross = (a: number, b: number, c: number) =>
+        (pts[b][0] - pts[a][0]) * (pts[c][1] - pts[a][1]) - (pts[b][1] - pts[a][1]) * (pts[c][0] - pts[a][0]);
+    const inside = (p: number, a: number, b: number, c: number) =>
+        cross(a, b, p) >= 0 && cross(b, c, p) >= 0 && cross(c, a, p) >= 0;
+    let guard = n * n;
+    while (left.length > 3 && guard-- > 0) {
+        for (let i = 0; i < left.length; i++) {
+            const a = left[(i + left.length - 1) % left.length];
+            const b = left[i];
+            const c = left[(i + 1) % left.length];
+            if (cross(a, b, c) <= 0) continue;
+            if (left.some((p) => p !== a && p !== b && p !== c && inside(p, a, b, c))) continue;
+            tris.push(a, b, c);
+            left.splice(i, 1);
+            break;
+        }
+    }
+    if (left.length === 3) tris.push(left[0], left[1], left[2]);
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+    for (const [x, y] of pts) {
+        minX = Math.min(minX, x);
+        minY = Math.min(minY, y);
+        maxX = Math.max(maxX, x);
+        maxY = Math.max(maxY, y);
+    }
+    const positions: number[] = [];
+    const normals: number[] = [];
+    const uvs: number[] = [];
+    const indices: number[] = [];
+    const h = depth / 2;
+    for (const side of [1, -1]) {
+        const base = positions.length / 3;
+        for (const [x, y] of pts) {
+            positions.push(x, y, side * h);
+            normals.push(0, 0, side);
+            uvs.push((x - minX) / (maxX - minX || 1), (y - minY) / (maxY - minY || 1));
+        }
+        for (let t = 0; t < tris.length; t += 3) {
+            if (side > 0) indices.push(base + tris[t], base + tris[t + 2], base + tris[t + 1]);
+            else indices.push(base + tris[t], base + tris[t + 1], base + tris[t + 2]);
+        }
+    }
+    for (let i = 0; i < n; i++) {
+        const [x0, y0] = pts[i];
+        const [x1, y1] = pts[(i + 1) % n];
+        const len = Math.hypot(x1 - x0, y1 - y0) || 1;
+        const nx = (y1 - y0) / len;
+        const ny = -(x1 - x0) / len;
+        const base = positions.length / 3;
+        positions.push(x0, y0, h, x1, y1, h, x1, y1, -h, x0, y0, -h);
+        for (let k = 0; k < 4; k++) normals.push(nx, ny, 0);
+        uvs.push(0, 1, 1, 1, 1, 0, 0, 0);
+        indices.push(base, base + 1, base + 2, base, base + 2, base + 3);
+    }
+    return {
+        positions: new Float32Array(positions),
+        normals: new Float32Array(normals),
+        uvs: new Float32Array(uvs),
+        indices: new Uint32Array(indices),
+    };
+}
+
 /** A unit square in the x-y plane facing +z, UV 0 to 1: a decal to lay on a surface. */
 export function quad(): Geometry {
     return {

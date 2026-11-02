@@ -30,7 +30,11 @@ export type TextureName =
     | 'lens'
     | 'plus'
     | 'heart'
-    | 'skull';
+    | 'skull'
+    | 'question'
+    | 'zee'
+    | 'dial'
+    | 'anger';
 
 /** How a texture is split into tiles, for `uTileCount` / `vTileCount` and random tile picks. */
 export interface TextureSheet {
@@ -185,6 +189,90 @@ const SPECS: Record<TextureName, TextureSpec> = {
                 ctx.fill();
                 ctx.fillRect(0.2 * s, (1 - 0.24) * s, 0.1 * s, s * 0.012);
                 for (let i = 0; i <= 5; i++) ctx.fillRect((0.205 + i * 0.018) * s, (1 - 0.26) * s, s * 0.005, s * 0.06);
+            },
+        },
+    },
+    // A fat question mark with a dark outline: confusion.
+    question: {
+        size: 128,
+        paint: {
+            canvas: (ctx, s) => {
+                ctx.font = `900 ${Math.round(s * 0.8)}px 'Arial Black', Impact, sans-serif`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.lineJoin = 'round';
+                ctx.lineWidth = s * 0.08;
+                ctx.strokeStyle = '#3a2a10';
+                ctx.strokeText('?', s / 2, s * 0.54);
+                ctx.fillStyle = '#fff';
+                ctx.fillText('?', s / 2, s * 0.54);
+            },
+        },
+    },
+    // A soft outlined Z: sleep.
+    zee: {
+        size: 128,
+        paint: {
+            canvas: (ctx, s) => {
+                ctx.font = `900 ${Math.round(s * 0.8)}px 'Arial Black', Impact, sans-serif`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.lineJoin = 'round';
+                ctx.lineWidth = s * 0.1;
+                ctx.strokeStyle = 'rgba(120,130,200,0.9)';
+                ctx.strokeText('Z', s / 2, s * 0.54);
+                ctx.fillStyle = '#fff';
+                ctx.fillText('Z', s / 2, s * 0.54);
+            },
+        },
+    },
+    // A clock face: a rim, twelve ticks (the quarters longer) and a faint glassy fill.
+    dial: {
+        size: 256,
+        paint: {
+            canvas: (ctx, s) => {
+                const c = s / 2;
+                ctx.fillStyle = 'rgba(255,255,255,0.12)';
+                ctx.beginPath();
+                ctx.arc(c, c, s * 0.46, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.strokeStyle = '#fff';
+                ctx.lineWidth = s * 0.03;
+                ctx.beginPath();
+                ctx.arc(c, c, s * 0.45, 0, Math.PI * 2);
+                ctx.stroke();
+                ctx.lineCap = 'round';
+                for (let i = 0; i < 12; i++) {
+                    const a = (i / 12) * Math.PI * 2;
+                    const r0 = s * (i % 3 === 0 ? 0.3 : 0.36);
+                    ctx.lineWidth = s * (i % 3 === 0 ? 0.03 : 0.018);
+                    ctx.beginPath();
+                    ctx.moveTo(c + Math.cos(a) * r0, c + Math.sin(a) * r0);
+                    ctx.lineTo(c + Math.cos(a) * s * 0.41, c + Math.sin(a) * s * 0.41);
+                    ctx.stroke();
+                }
+            },
+        },
+    },
+    // A comic anger mark: four bulging brackets round a centre, like a throbbing vein.
+    anger: {
+        size: 128,
+        paint: {
+            canvas: (ctx, s) => {
+                ctx.strokeStyle = '#fff';
+                ctx.lineWidth = s * 0.09;
+                ctx.lineCap = 'round';
+                const c = s / 2;
+                for (let i = 0; i < 4; i++) {
+                    ctx.save();
+                    ctx.translate(c, c);
+                    ctx.rotate((i * Math.PI) / 2);
+                    ctx.beginPath();
+                    ctx.moveTo(s * 0.08, -s * 0.36);
+                    ctx.quadraticCurveTo(s * 0.1, -s * 0.1, s * 0.36, -s * 0.08);
+                    ctx.stroke();
+                    ctx.restore();
+                }
             },
         },
     },

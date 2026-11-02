@@ -416,4 +416,14 @@ export const demoManifest: DemoManifestEntry[] = [
         tags: ['pixelfx', 'shadow', 'mesh'],
         preview: {icon: 'SH', gradient: 'linear-gradient(135deg, #d4b4ff 0%, #0a0612 100%)'},
     },
+    {
+        key: 'PixelFxStatusDemo',
+        name: 'Pixel FX: Status',
+        module: 'pixelfxStatus',
+        sourcePath: 'examples/src/pixelfx/status.ts',
+        description:
+            'Bleeding, burning, charmed, confused, cursed, frozen, haste, petrified, poisoned, rage, sleep, slowed and stunned: pixelfx status effects on a 3D hero, with solid hearts, stars and birds.',
+        tags: ['pixelfx', 'status', 'mesh'],
+        preview: {icon: 'ST', gradient: 'linear-gradient(135deg, #ffe36e 0%, #4b2070 100%)'},
+    },
 ];

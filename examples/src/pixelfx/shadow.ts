@@ -170,7 +170,7 @@ function chain(
  * A skull riding `parent`, `scale` metres to a unit, facing +z: bone with its face painted on, and
  * two eyes that can burn in the sockets.
  */
-function skull(
+export function skull(
     fx: FxBuilder,
     parent: TransformNode,
     o: {

@@ -47,7 +47,8 @@ export function bodyProfile(height = 1.8, radius = 0.36, rows = 24): Array<[numb
     return out;
 }
 
-const BODY = lathe(bodyProfile(), 32);
+/** The stand-in hero's body, 1.8 m tall: V runs 0 at the feet to 1 at the crown. */
+export const BODY = lathe(bodyProfile(), 32);
 const SHELL = lathe(bodyProfile(1.9, 0.42), 32);
 
 /** Keys `[t, alpha]` straight from `a` at `t0` to `b` at `t1`, held either side; `t` in seconds over `period`. */
@@ -88,6 +89,8 @@ export function hero(
         life?: number;
         /** Plain alpha keys `[alpha, t]` (a fade, not a cut) when there is no `cut`. */
         fade?: Array<[number, number]>;
+        /** Respawns every `period`, for a looping effect; once by default. */
+        loop?: boolean;
     }
 ): ParticleSystem {
     // Red 1 at the feet: the crown goes first as alpha falls. Flipped, the feet go first.
@@ -97,7 +100,7 @@ export function hero(
         geo: o.geo ?? BODY,
         tex: 'white',
         blend: o.blend ?? 'alpha',
-        loop: false,
+        loop: o.loop ?? false,
         life: o.life ?? o.period,
         size: 1,
         burst: [[o.time ?? 0, 1]],
