@@ -1029,8 +1029,9 @@ export const pickups: FxDef[] = [
             const P = 2.4;
             const L = P + 0.02;
             // The sword, stuck in the ground at a slant.
-            const sword = fx.node('sword', [0, 0.5, 0]);
+            const sword = fx.node('sword', [0, 0.85, 0]);
             sword.rotation.z = 0.18;
+            sword.scaling.setAll(1.6);
             solid(
                 fx,
                 sword,
@@ -1178,8 +1179,8 @@ export const pickups: FxDef[] = [
                     ],
                     24
                 ),
-                MAGENTA[6],
-                {life: L, at: [0, 0.12, 0], lit: false}
+                MAGENTA[5],
+                {life: L, at: [0, 0.12, 0], lit: false, alpha: 0.7}
             );
             // The glass: see-through, its edges catching the light.
             const glass = lathe(

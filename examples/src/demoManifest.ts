@@ -466,4 +466,14 @@ export const demoManifest: DemoManifestEntry[] = [
         tags: ['pixelfx', 'pickups', 'mesh'],
         preview: {icon: 'PU', gradient: 'linear-gradient(135deg, #ffe066 0%, #2c1250 100%)'},
     },
+    {
+        key: 'PixelFxTransitionsDemo',
+        name: 'Pixel FX: Transitions',
+        module: 'pixelfxTransitions',
+        sourcePath: 'examples/src/pixelfx/transitions.ts',
+        description:
+            'Blinds, a burn-away, a CRT switching off, diamond, glitch, pixel, shatter and slash wipes and two irises: pixelfx screen transitions as a 3D panel in front of the scene, with slats, erosion masks and glass shards.',
+        tags: ['pixelfx', 'transitions', 'erosion'],
+        preview: {icon: 'TR', gradient: 'linear-gradient(135deg, #c890ff 0%, #0b0a12 100%)'},
+    },
 ];
