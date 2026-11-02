@@ -275,6 +275,20 @@ export interface SysOptions {
     b?: Behavior[];
     /** Soft particles fading where they meet the floor. */
     soft?: boolean;
+    /**
+     * Draw a `geo` mesh in the opaque pass, writing depth, so it hides what is behind it pixel by
+     * pixel instead of sorting as one see-through mesh. Alpha below 1% still cuts it (an erosion
+     * mask still eats it), but alpha no longer fades it. By default a `geo` mesh blended `alpha`
+     * at full alpha that no behaviour fades is drawn opaque.
+     */
+    opaque?: boolean;
+    /**
+     * Whether a see-through system writes depth. By default a `geo` mesh blended `alpha` at full
+     * alpha does, so particles drawn after it are hidden behind it, while its clear texels (alpha
+     * below 1%, discarded) let them through: a funnel of flame strands hides the embers circling
+     * behind it.
+     */
+    depthWrite?: boolean;
     /** Render each particle as a small lit, opaque mesh instead of a sprite. */
     mesh?: MeshKind;
     /** Mesh particles tumble at up to this many radians per second. */
@@ -553,11 +567,16 @@ export function makeSystem(scene: Scene, o: SysOptions, defaults: {loop: boolean
           ? image(scene, o.image)
           : sheet(scene, o.mesh ? 'white' : (o.tex ?? (o.beam ? 'bolt' : 'glow')));
     const geo = o.mesh ? geometry(scene, o.mesh) : o.geo;
-    // `mesh` particles are solid, lit rocks; `geo` particles are see-through, like sprites.
-    const solid = !!o.mesh;
     const tiles = tex.u * tex.v;
     const color = o.color ?? '#ffffff';
     const alpha = o.alpha ?? 1;
+    // `mesh` particles are solid, lit rocks. A `geo` mesh blended `alpha` at full alpha is a solid
+    // body too (opaque, writing depth) unless a behaviour fades it or a mask erodes it; then it
+    // stays see-through but still writes depth, so what is drawn after it hides behind it.
+    const fullAlpha = !!o.geo && o.blend === 'alpha' && alpha >= 1;
+    const fades = (o.b ?? []).some((b) => b instanceof ColorOverLife) || !!o.look?.erosion;
+    const solid = !!o.mesh || (o.opaque ?? (fullAlpha && !fades));
+    const depthWrite = solid ? true : (o.depthWrite ?? (fullAlpha ? true : undefined));
     const startColor = Array.isArray(color)
         ? new RandomColor(c4(color[0], alpha), c4(color[1], alpha))
         : new ConstantColor(c4(color, alpha));
@@ -616,7 +635,10 @@ export function makeSystem(scene: Scene, o: SysOptions, defaults: {loop: boolean
             tiles > 1 && o.randomTile !== false ? new IntervalValue(0, tiles - 0.001) : new ConstantValue(0),
         blendMode: solid ? Constants.ALPHA_DISABLE : BLENDS[o.blend ?? 'add'],
         transparent: !solid,
-        depthWrite: solid ? true : undefined,
+        depthWrite,
+        // Alpha-blended sprites overlap in the right order only drawn back to front; additive ones
+        // add up the same in any order, so they skip the sort.
+        sortMode: !solid && !geo && o.blend === 'alpha' ? 'distance' : undefined,
         instancingGeometry: geo?.positions,
         instancingNormals: geo?.normals,
         instancingUVs: geo?.uvs,

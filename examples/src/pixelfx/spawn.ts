@@ -109,6 +109,8 @@ export function hero(
         at: o.at ?? [0, 0, 0],
         parent: o.parent,
         order: o.order ?? 3,
+        // A plain body with no cut and no fade is solid: drawn opaque, so it hides what is behind it.
+        opaque: !o.cut && !o.fade && (o.blend ?? 'alpha') === 'alpha' && (o.alpha ?? 1) >= 1,
         look: {
             lighting: o.lighting ?? 'fixed',
             scalingMode: 'hierarchy',
