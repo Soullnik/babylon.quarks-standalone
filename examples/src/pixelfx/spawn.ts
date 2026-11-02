@@ -26,7 +26,7 @@ function clamp01(k: number): number {
 }
 
 /** A ramp from a palette's top `k` entries, hot first. */
-function hot(c: string[], k = 4): Ramp {
+export function hot(c: string[], k = 4): Ramp {
     const top = c.slice(-k).reverse();
     return top.map((h, i) => [h, i / (top.length - 1)]);
 }
@@ -36,7 +36,7 @@ function hot(c: string[], k = 4): Ramp {
  * spaced in height so the lathe's V is the height up it, 0 at the feet and 1 at the crown. A
  * gradient erosion mask laid on V then cuts it at a height.
  */
-function bodyProfile(height = 1.8, radius = 0.36, rows = 24): Array<[number, number]> {
+export function bodyProfile(height = 1.8, radius = 0.36, rows = 24): Array<[number, number]> {
     const out: Array<[number, number]> = [];
     for (let i = 0; i <= rows; i++) {
         const y = (height * i) / rows;
@@ -51,7 +51,7 @@ const BODY = lathe(bodyProfile(), 32);
 const SHELL = lathe(bodyProfile(1.9, 0.42), 32);
 
 /** Keys `[t, alpha]` straight from `a` at `t0` to `b` at `t1`, held either side; `t` in seconds over `period`. */
-function ramp(period: number, t0: number, a: number, t1: number, b: number): Array<[number, number]> {
+export function ramp(period: number, t0: number, a: number, t1: number, b: number): Array<[number, number]> {
     return [
         [a, 0],
         [a, t0 / period],
@@ -66,7 +66,7 @@ function ramp(period: number, t0: number, a: number, t1: number, b: number): Arr
  * gives its alpha over time as `[alpha, t]` keys, which the erosion reads as how much of it is
  * left: from the feet up with `from: 'feet'`, from the crown down by default.
  */
-function hero(
+export function hero(
     fx: FxBuilder,
     o: {
         period: number;
@@ -86,6 +86,8 @@ function hero(
         rim?: [number, number, number];
         time?: number;
         life?: number;
+        /** Plain alpha keys `[alpha, t]` (a fade, not a cut) when there is no `cut`. */
+        fade?: Array<[number, number]>;
     }
 ): ParticleSystem {
     // Red 1 at the feet: the crown goes first as alpha falls. Flipped, the feet go first.
@@ -118,12 +120,12 @@ function hero(
                   }
                 : undefined,
         },
-        b: [tint(o.colors ?? [['#ffffff', 0]], o.cut ?? [[1, 0]])],
+        b: [tint(o.colors ?? [['#ffffff', 0]], o.cut ?? o.fade ?? [[1, 0]])],
     });
 }
 
 /** A node that rides the cut of {@link hero}: at height `height * level(t)`. */
-function cutNode(fx: FxBuilder, level: (t: number) => number, height = 1.8): TransformNode {
+export function cutNode(fx: FxBuilder, level: (t: number) => number, height = 1.8): TransformNode {
     const node = fx.node('cut', [0, 0, 0]);
     fx.every((t) => {
         node.position.y = height * level(t);
@@ -132,7 +134,7 @@ function cutNode(fx: FxBuilder, level: (t: number) => number, height = 1.8): Tra
 }
 
 /** Straight from 0 at `t0` to 1 at `t1`. */
-function between(t: number, t0: number, t1: number): number {
+export function between(t: number, t0: number, t1: number): number {
     return clamp01((t - t0) / (t1 - t0));
 }
 
@@ -160,7 +162,7 @@ const COIN = lathe(
 );
 
 /** Soft round cartoon smoke balls. */
-function puffs(
+export function puffs(
     fx: FxBuilder,
     o: {
         at: At;
@@ -290,8 +292,7 @@ export const spawn: FxDef[] = [
                 color: ARC[6],
                 time: 0.7,
                 life: 0.25,
-                cut: popOut(0.2),
-                edgeWidth: 0,
+                fade: popOut(0.2),
                 order: 4,
             });
             // Crackle: small sparks crawling over the body.

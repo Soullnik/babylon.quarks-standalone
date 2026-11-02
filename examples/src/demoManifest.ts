@@ -386,4 +386,14 @@ export const demoManifest: DemoManifestEntry[] = [
         tags: ['pixelfx', 'spawn', 'erosion', 'mesh'],
         preview: {icon: 'SP', gradient: 'linear-gradient(135deg, #a8f5d8 0%, #481b8c 100%)'},
     },
+    {
+        key: 'PixelFxArcaneDemo',
+        name: 'Pixel FX: Arcane',
+        module: 'pixelfxArcane',
+        sourcePath: 'examples/src/pixelfx/arcane.ts',
+        description:
+            'Beams, homing missiles, an orb of glass, blinks, magic circles, mana bursts, a portal, rune circles, a charge, falling stars and a clock that stops time: pixelfx arcane effects rebuilt in 3D.',
+        tags: ['pixelfx', 'arcane', 'trail', 'erosion'],
+        preview: {icon: 'AR', gradient: 'linear-gradient(135deg, #ecc8ff 0%, #2b1252 100%)'},
+    },
 ];
