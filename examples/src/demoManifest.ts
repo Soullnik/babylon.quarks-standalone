@@ -496,4 +496,14 @@ export const demoManifest: DemoManifestEntry[] = [
         tags: ['pixelfx', 'moves', 'combat'],
         preview: {icon: 'MV', gradient: 'linear-gradient(135deg, #ff7a2a 0%, #1a0b2b 100%)'},
     },
+    {
+        key: 'PixelFxFusionDemo',
+        name: 'Pixel FX: Sprite Fusion extras',
+        module: 'pixelfxFusion',
+        sourcePath: 'examples/src/pixelfx/fusion.ts',
+        description:
+            'A blood hit, drifting embers, a plasma orb, a speed power-up, a dash and a glint: the Sprite Fusion pixel VFX that pixelfx has no counterpart for, staged in 3D with mesh droplets that stain the floor where they land, a glassy orb and a turning gem.',
+        tags: ['pixelfx', 'spritefusion', 'mesh'],
+        preview: {icon: 'SF', gradient: 'linear-gradient(135deg, #ff86e6 0%, #172a68 100%)'},
+    },
 ];

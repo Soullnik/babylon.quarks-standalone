@@ -41,7 +41,7 @@ const LEFT = -GAP / 2;
 const RIGHT = GAP / 2;
 const VIEW = {height: 1.2, distance: 8};
 
-const SPHERE = lathe(
+export const SPHERE = lathe(
     Array.from({length: 11}, (_, i) => {
         const a = -Math.PI / 2 + (i / 10) * Math.PI;
         return [Math.max(0.001, Math.cos(a) * 0.5), Math.sin(a) * 0.5] as [number, number];
@@ -67,7 +67,7 @@ const CONE = lathe(
 );
 
 /** A solid, lit shape riding `parent`, for the length of the move. */
-function solid(
+export function solid(
     fx: FxBuilder,
     parent: TransformNode,
     geo: Geometry,
@@ -105,7 +105,7 @@ function solid(
 }
 
 /** A node at `at` under `parent`, scaled per axis and turned, for a limb or a prop. */
-function part(
+export function part(
     fx: FxBuilder,
     parent: TransformNode,
     at: At,
@@ -118,7 +118,7 @@ function part(
     return node;
 }
 
-interface Actor {
+export interface Actor {
     /** Where the actor stands; move it to step, dash or fly. */
     root: TransformNode;
     /** The body, under the root: lean it, squash it. */
@@ -130,7 +130,7 @@ interface Actor {
 }
 
 /** A stand-in character: the lit capsule, a hand that can hold a prop, facing `face` along x. */
-function actor(fx: FxBuilder, period: number, x: number, face: 1 | -1, color = '#8a8fa8'): Actor {
+export function actor(fx: FxBuilder, period: number, x: number, face: 1 | -1, color = '#8a8fa8'): Actor {
     const root = fx.node('actor', [x, 0, 0]);
     const body = fx.node('body', [0, 0, 0], root);
     hero(fx, {period, parent: body, color});
@@ -140,7 +140,7 @@ function actor(fx: FxBuilder, period: number, x: number, face: 1 | -1, color = '
 }
 
 /** A flash of `color` over a body, peaking at each of `times` (seconds). */
-function hitFlash(
+export function hitFlash(
     fx: FxBuilder,
     a: Actor,
     period: number,
@@ -181,7 +181,7 @@ function stain(fx: FxBuilder, a: Actor, period: number, time: number, color: str
 }
 
 /** Knockback: each hit at `time` shoves the actor `push` along x and tips it, settling back. */
-function reel(a: Actor, t: number, hits: Array<[number, number]>, base: number) {
+export function reel(a: Actor, t: number, hits: Array<[number, number]>, base: number) {
     let dx = 0;
     let tilt = 0;
     for (const [time, push] of hits) {
