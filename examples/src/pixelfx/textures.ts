@@ -29,7 +29,8 @@ export type TextureName =
     | 'smear'
     | 'lens'
     | 'plus'
-    | 'heart';
+    | 'heart'
+    | 'skull';
 
 /** How a texture is split into tiles, for `uTileCount` / `vTileCount` and random tile picks. */
 export interface TextureSheet {
@@ -158,6 +159,32 @@ const SPECS: Record<TextureName, TextureSpec> = {
                 ctx.strokeText('POW!', 0, 0);
                 ctx.fillStyle = '#fff';
                 ctx.fillText('POW!', 0, 0);
+            },
+        },
+    },
+    // A skull's face wrapped round a lathe (U round from +x toward +z, so the face is at U 0.25; V up
+    // it): two sockets, a nose and a row of teeth in dark on white bone.
+    skull: {
+        size: 128,
+        paint: {
+            canvas: (ctx, s) => {
+                ctx.fillStyle = '#fff';
+                ctx.fillRect(0, 0, s, s);
+                ctx.fillStyle = '#141018';
+                // Canvas y runs down, V up: row y = (1 - v) * s.
+                for (const u of [0.205, 0.295]) {
+                    ctx.beginPath();
+                    ctx.ellipse(u * s, (1 - 0.5) * s, s * 0.04, s * 0.085, 0, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+                ctx.beginPath();
+                ctx.moveTo(0.25 * s, (1 - 0.4) * s);
+                ctx.lineTo(0.235 * s, (1 - 0.32) * s);
+                ctx.lineTo(0.265 * s, (1 - 0.32) * s);
+                ctx.closePath();
+                ctx.fill();
+                ctx.fillRect(0.2 * s, (1 - 0.24) * s, 0.1 * s, s * 0.012);
+                for (let i = 0; i <= 5; i++) ctx.fillRect((0.205 + i * 0.018) * s, (1 - 0.26) * s, s * 0.005, s * 0.06);
             },
         },
     },

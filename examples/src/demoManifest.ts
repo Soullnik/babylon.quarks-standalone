@@ -406,4 +406,14 @@ export const demoManifest: DemoManifestEntry[] = [
         tags: ['pixelfx', 'holy', 'mesh'],
         preview: {icon: 'HO', gradient: 'linear-gradient(135deg, #fffbe0 0%, #c4652e 100%)'},
     },
+    {
+        key: 'PixelFxShadowDemo',
+        name: 'Pixel FX: Shadow',
+        module: 'pixelfxShadow',
+        sourcePath: 'examples/src/pixelfx/shadow.ts',
+        description:
+            'A black hole, a curse, a dark explosion, an eclipse, grasping hands, a hex sigil, life steal, necro skulls, shadow flames, tendrils, soul drain and a void orb: pixelfx shadow effects rebuilt in 3D.',
+        tags: ['pixelfx', 'shadow', 'mesh'],
+        preview: {icon: 'SH', gradient: 'linear-gradient(135deg, #d4b4ff 0%, #0a0612 100%)'},
+    },
 ];
