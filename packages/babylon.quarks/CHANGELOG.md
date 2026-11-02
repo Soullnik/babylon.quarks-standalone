@@ -19,8 +19,8 @@ and the package's version moves in lockstep with `quarks.core`.
   in every render mode, in GLSL and WGSL, without a map too (the mask then shapes white), and is
   saved with the material as `mask: {map, channel, mapUV}`, only the fields that are not default.
   The effect file schema's material gains the optional `mask`. The editor has no panel for it yet.
-- **Flame aura demo** (`#FlameAuraDemo`): a teal aura around a standing figure, smoky noise
-  rising through a teardrop mask on a few large billboards behind the body.
+- **Flame aura demo** (`#FlameAuraDemo`): a teal aura around a standing figure, spinning wisps of
+  flame wrapped round the body, with smoky noise scrolling through a disc `mask` on the floor.
 - **`STABILITY.md`:** what 1.x promises and what it does not, for the API, the effect files, the
   look of an effect and the platforms, with the deprecation policy.
 - **`docs/AUTHORING.md`:** a step-by-step guide from a new project in the effect editor to the

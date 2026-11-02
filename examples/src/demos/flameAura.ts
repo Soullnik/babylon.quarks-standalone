@@ -35,19 +35,18 @@ import {
 import type {DemoContext} from '../types';
 
 /*
- * A teal flame aura around a standing figure: a teardrop of smoky energy
- * behind the body, widest at the hips and drawn up to a point over the head,
- * a thin plume rising into dark smoke, a soft halo, and energy pooling on the
- * ground round the feet. Every texture is painted below, so the effect needs
- * no asset files.
+ * A teal flame aura around a standing figure: wisps of flame wrapped round
+ * the body, spinning as they grow and climb off it, gathering into a thin
+ * column over the head that cools into dark smoke, with sparks, a soft halo
+ * and energy pooling on the ground round the feet. Every texture is painted
+ * below, so the effect needs no asset files.
  *
- * The aura is the masked panner of Unity's and Unreal's VFX materials, drawn
- * on a few large billboards: smoky noise scrolls up and wavers (`mapUV`
- * scroll, UV distortion) through a still teardrop (`mask`); the gradient map
- * colours the product and the particle's alpha wears it away from its faint
- * parts (`erosion`). Two layers scroll at their own speed and scale, and a
- * random start tile gives every billboard its own stretch of the noise, as a
- * random UV offset per particle does in those engines.
+ * The wisps are plain Shuriken work: sprites born on the body's surface
+ * (`MeshSurfaceEmitter`) at a random angle, turning at a constant rate
+ * (`RotationOverLife`), growing from nothing (`SizeOverLife`) and fading as
+ * they rise, each showing one of four drawn wisps (a random flipbook tile).
+ * The floor's energy is the masked panner: smoky noise scrolling through a
+ * soft disc (`mask`), coloured by a gradient map.
  */
 
 /** A square canvas texture painted by `paint`, wrapping or clamped. */
@@ -69,6 +68,87 @@ function canvasTexture(
     texture.wrapU = mode;
     texture.wrapV = mode;
     return texture;
+}
+
+/** A square canvas texture drawn with the 2D canvas API by `draw`, clamped. */
+function drawnTexture(
+    scene: Scene,
+    name: string,
+    size: number,
+    draw: (ctx: CanvasRenderingContext2D, size: number) => void
+): DynamicTexture {
+    const texture = new DynamicTexture(name, {width: size, height: size}, scene, true);
+    draw(texture.getContext() as unknown as CanvasRenderingContext2D, size);
+    texture.update(true);
+    texture.wrapU = Texture.CLAMP_ADDRESSMODE;
+    texture.wrapV = Texture.CLAMP_ADDRESSMODE;
+    return texture;
+}
+
+/**
+ * A wisp of flame drawn into the `cell`-sized square at (`left`, `top`): a few
+ * translucent sheets rising and swaying, each brighter along its folded edges,
+ * softened and faded towards the square's rim so a spinning sprite shows no
+ * corners.
+ */
+function drawWisp(ctx: CanvasRenderingContext2D, left: number, top: number, cell: number, seed: number): void {
+    const random = seeded(seed);
+    const layer = document.createElement('canvas');
+    layer.width = layer.height = cell;
+    const g = layer.getContext('2d')!;
+    g.globalCompositeOperation = 'lighter';
+    g.lineCap = 'round';
+    for (let i = 0; i < 7; i++) {
+        const x0 = 0.3 + random() * 0.4;
+        const sway = 0.05 + random() * 0.1;
+        const turns = 0.5 + random() * 0.8;
+        const phase = random() * Math.PI * 2;
+        const curl = (random() - 0.5) * 0.6;
+        const width = 0.05 + random() * 0.09;
+        const foot = 0.82 + random() * 0.1;
+        const tip = 0.08 + random() * 0.2;
+        const points: [number, number, number][] = [];
+        for (let k = 0; k <= 40; k++) {
+            const t = k / 40;
+            const x = x0 + Math.sin(turns * t * Math.PI * 2 + phase) * sway * (0.4 + t) + curl * t * t;
+            const w = width * Math.sin(Math.PI * Math.min(1, t * 1.1)) * (1.2 - t * 0.6);
+            points.push([x, foot + (tip - foot) * t, w]);
+        }
+        // The sheet: a faint fill between its two edges.
+        g.beginPath();
+        points.forEach(([x, y, w], k) => (k ? g.lineTo : g.moveTo).call(g, (x - w) * cell, y * cell));
+        for (let k = points.length - 1; k >= 0; k--)
+            g.lineTo((points[k][0] + points[k][2]) * cell, points[k][1] * cell);
+        g.closePath();
+        g.fillStyle = `rgba(255,255,255,${0.1 + random() * 0.12})`;
+        g.fill();
+        // Its folds: the two edges, brighter.
+        for (const side of [-1, 1]) {
+            g.beginPath();
+            points.forEach(([x, y, w], k) => (k ? g.lineTo : g.moveTo).call(g, (x + side * w) * cell, y * cell));
+            g.strokeStyle = `rgba(255,255,255,${0.3 + random() * 0.4})`;
+            g.lineWidth = cell * (0.004 + random() * 0.006);
+            g.stroke();
+        }
+    }
+    g.globalCompositeOperation = 'destination-in';
+    const rim = g.createRadialGradient(cell / 2, cell / 2, 0, cell / 2, cell / 2, cell / 2);
+    rim.addColorStop(0, 'rgba(0,0,0,1)');
+    rim.addColorStop(0.6, 'rgba(0,0,0,1)');
+    rim.addColorStop(1, 'rgba(0,0,0,0)');
+    g.fillStyle = rim;
+    g.fillRect(0, 0, cell, cell);
+    ctx.save();
+    ctx.filter = `blur(${cell / 160}px)`;
+    ctx.drawImage(layer, left, top);
+    ctx.restore();
+}
+
+/** Four different wisps of flame, white, as a 2 by 2 flipbook. */
+function drawWisps(ctx: CanvasRenderingContext2D, size: number): void {
+    ctx.clearRect(0, 0, size, size);
+    const cell = size / 2;
+    [7, 20, 33, 46].forEach((seed, i) => drawWisp(ctx, (i % 2) * cell, Math.floor(i / 2) * cell, cell, seed));
 }
 
 /** A tiny seeded generator, so the pictures are the same every run. */
@@ -187,24 +267,6 @@ function smokeNoise(image: ImageData, size: number): void {
             const ridge = Math.pow(1 - Math.abs(value * 2 - 1), 8) * 0.5;
             const a = Math.min(1, blotch + ridge);
             put(image, size, x, y, a, a, a, a);
-        }
-    }
-}
-
-/**
- * The aura's outline in every channel: a teardrop, round and widest a third
- * of the way up, drawn to a point at the top, every edge soft.
- */
-function auraMask(image: ImageData, size: number): void {
-    for (let y = 0; y < size; y++) {
-        const v = 1 - (y + 0.5) / size;
-        // Half-width at height v: rises fast from the foot, then tapers to the tip.
-        const half = 0.5 * Math.pow(Math.sin(Math.PI * Math.pow(v, 0.62)), 1.3) * Math.pow(1 - v, 0.7);
-        for (let x = 0; x < size; x++) {
-            const u = (x + 0.5) / size;
-            const across = half > 0.001 ? Math.abs(u - 0.5) / half : 2;
-            const m = smoothstep(1.1, 0.2, across) * smoothstep(0, 0.12, v);
-            put(image, size, x, y, m, m, m, 1);
         }
     }
 }
@@ -373,80 +435,87 @@ export function init({scene, camera, batchRenderer, systems}: DemoContext) {
     const ramp = canvasTexture(scene, 'tealRamp', 64, false, tealRamp);
     const glow = canvasTexture(scene, 'softGlow', 256, false, softGlow);
 
-    // The aura: a few large billboards standing behind the figure, each a
-    // teardrop (the mask) through which veins of energy (the map) stream
-    // upward and waver (scroll, UV distortion). Two layers scroll at their own
-    // speed and scale. Each sheet lives a moment and starts on a random tile
-    // of the noise, laid out as a 4 by 4 flipbook of the same tiling picture,
-    // so the overlapping sheets never move in step and the outline breathes
-    // as they fade in and out.
-    const veins = canvasTexture(scene, 'smokeNoise', 256, true, smokeNoise);
-    const outline = canvasTexture(scene, 'auraMask', 128, false, auraMask);
-    const auraLayer = (
-        name: string,
-        tiling: [number, number],
-        scroll: number,
-        width: [number, number],
-        height: [number, number],
-        color: Color4,
-        rate: number
-    ) => {
-        const layer = new ParticleSystem({
-            scene,
-            duration: 1,
-            looping: true,
-            prewarm: true,
-            startLife: new IntervalValue(1.2, 1.6),
-            startSpeed: new ConstantValue(0),
-            startSize: new Vector3Function(
-                new IntervalValue(width[0], width[1]),
-                new IntervalValue(height[0], height[1]),
-                new ConstantValue(1)
-            ),
-            startRotation: new IntervalValue(-0.06, 0.06),
-            startColor: new ConstantColor(color),
-            emissionOverTime: new ConstantValue(rate),
-            shape: new PointEmitter(),
-            texture: veins,
-            uTileCount: 4,
-            vTileCount: 4,
-            startTileIndex: new IntervalValue(0, 16),
-            mapUV: {tiling: [4 * tiling[0], 4 * tiling[1]], scroll: [0, scroll]},
-            blendMode: Constants.ALPHA_ADD,
-            mask: {map: outline, mapUV: {channel: 1}},
-            gradientMap: {ramp, channel: 'a'},
-            uvDistortion: {
-                map: distortion,
-                strength: 0.07,
-                mapUV: {channel: 1, tiling: [1.2, 0.8], scroll: [0, -0.35]},
-            },
-            erosion: {softness: 0.25},
-            // Its foot at the emitter, its middle a little behind the figure.
-            pivot: new BVector3(0, 0.5, -0.12),
-        });
-        layer.emitter.name = name;
-        layer.emitter.position = new BVector3(0, -0.1, 0);
-        layer.addBehavior(
-            overLife(
+    // The aura: wisps of flame wrapped round the body. Each is drawn on a
+    // camera-facing sprite born on the body's surface at a random angle,
+    // spinning as it grows from nothing to full size and rising slowly, so
+    // the overlapping wisps swirl round the figure and climb off it. A
+    // random tile of the flipbook gives every sprite one of four wisps.
+    const surface = new MeshSurfaceEmitter();
+    surface.mesh = body;
+    const wisps = new ParticleSystem({
+        scene,
+        duration: 1,
+        looping: true,
+        prewarm: true,
+        worldSpace: true,
+        startLife: new IntervalValue(0.8, 1.2),
+        startSpeed: new IntervalValue(0.05, 0.15),
+        startSize: new IntervalValue(0.55, 0.8),
+        startRotation: new IntervalValue(0, Math.PI * 2),
+        startColor: new ConstantColor(new Color4(0.02, 1.8, 1.05, 1)),
+        emissionOverTime: new ConstantValue(90),
+        shape: surface,
+        texture: drawnTexture(scene, 'flameWisps', 512, drawWisps),
+        uTileCount: 2,
+        vTileCount: 2,
+        startTileIndex: new IntervalValue(0, 4),
+        blendMode: Constants.ALPHA_ADD,
+    });
+    wisps.addBehavior(new ForceOverLife(new ConstantValue(0), new ConstantValue(0.35), new ConstantValue(0)));
+    wisps.addBehavior(new RotationOverLife(new ConstantValue(Math.PI / 4)));
+    wisps.addBehavior(new SizeOverLife(new PiecewiseBezier([[new Bezier(0, 1 / 3, 2 / 3, 1), 0]])));
+    wisps.addBehavior(
+        new ColorOverLife(
+            new Gradient(
                 [
-                    [1, 1, 1],
-                    [1, 1, 1],
+                    [new Color3(1, 1, 1), 0],
+                    [new Color3(1, 1, 1), 1],
                 ],
-                [0, 0.6, 0.5, 0]
+                [
+                    [0.8, 0],
+                    [0.95, 0.38],
+                    [0.08, 1],
+                ]
             )
-        );
-        return layer;
-    };
-    const coarse = auraLayer(
-        'auraCoarse',
-        [0.9, 0.7],
-        -0.45,
-        [1.5, 1.8],
-        [2.5, 2.8],
-        new Color4(0.4, 0.75, 0.62, 1),
-        2
+        )
     );
-    const fine = auraLayer('auraFine', [1.6, 1.2], -0.8, [1.2, 1.4], [2.3, 2.7], new Color4(0.35, 0.7, 0.58, 1), 2);
+
+    // Above the head the wisps gather into a thin column licking upward.
+    const crown = wisps.clone();
+    crown.emitterShape = new ConeEmitter({radius: 0.08, angle: 0.12});
+    crown.emitter.rotation.x = -Math.PI / 2;
+    crown.emitter.position = new BVector3(0, 1.78, 0);
+    crown.startSpeed = new IntervalValue(0.5, 0.8);
+    crown.startSize = new IntervalValue(0.3, 0.45);
+    crown.emissionOverTime = new ConstantValue(20);
+
+    // Sparks: points of light drifting up off the body.
+    const sparks = new ParticleSystem({
+        scene,
+        duration: 1,
+        looping: true,
+        prewarm: true,
+        worldSpace: true,
+        startLife: new IntervalValue(0.8, 1.4),
+        startSpeed: new IntervalValue(0.1, 0.3),
+        startSize: new IntervalValue(0.03, 0.07),
+        startColor: new ConstantColor(new Color4(0.4, 1, 0.85, 1)),
+        emissionOverTime: new ConstantValue(14),
+        shape: surface,
+        texture: glow,
+        blendMode: Constants.ALPHA_ADD,
+    });
+    sparks.addBehavior(new ForceOverLife(new ConstantValue(0), new ConstantValue(1.2), new ConstantValue(0)));
+    sparks.addBehavior(new Noise(new ConstantValue(1.5), new ConstantValue(0.4)));
+    sparks.addBehavior(
+        overLife(
+            [
+                [1, 1, 1],
+                [1, 1, 1],
+            ],
+            [0, 1, 0]
+        )
+    );
 
     // The plume: thin wisps shooting up off the head, cooling from teal into
     // dark smoke over the scene, alpha blended so they darken what they cross.
@@ -483,8 +552,6 @@ export function init({scene, camera, batchRenderer, systems}: DemoContext) {
     plume.addBehavior(new Noise(new ConstantValue(0.8), new ConstantValue(0.25)));
 
     // A soft teal halo hugging the figure, the glow the flames give off.
-    const surface = new MeshSurfaceEmitter();
-    surface.mesh = body;
     const halo = new ParticleSystem({
         scene,
         duration: 1,
@@ -531,7 +598,7 @@ export function init({scene, camera, batchRenderer, systems}: DemoContext) {
     });
     pool.emitter.position = new BVector3(0, 0.01, 0.1);
 
-    // Energy pooling on the floor round the feet: the same veins in a soft
+    // Energy pooling on the floor round the feet: smoky noise in a soft
     // disc, laid flat and turning as they fade.
     const splash = new ParticleSystem({
         scene,
@@ -546,7 +613,7 @@ export function init({scene, camera, batchRenderer, systems}: DemoContext) {
         emissionOverTime: new ConstantValue(2.5),
         shape: new PointEmitter(),
         renderMode: RenderMode.HorizontalBillBoard,
-        texture: veins,
+        texture: canvasTexture(scene, 'smokeNoise', 256, true, smokeNoise),
         uTileCount: 4,
         vTileCount: 4,
         startTileIndex: new IntervalValue(0, 16),
@@ -568,7 +635,7 @@ export function init({scene, camera, batchRenderer, systems}: DemoContext) {
         )
     );
 
-    for (const system of [pool, splash, halo, coarse, fine, plume]) {
+    for (const system of [pool, splash, halo, wisps, crown, sparks, plume]) {
         batchRenderer.addSystem(system);
         systems.push(system);
     }
