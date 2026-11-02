@@ -37,7 +37,7 @@ import {
     SpeedOverLife,
     SubParticleEmitMode,
 } from 'babylon.quarks';
-import {image, type ImageName, sheet, type TextureName} from './textures';
+import {image, type ImageName, sheet, type TextureName, type TextureSheet} from './textures';
 
 /** A number, a `[min, max]` range rolled per particle, or any quarks value generator. */
 export type Num = number | [number, number] | ValueGenerator;
@@ -226,6 +226,8 @@ export interface SysOptions {
     tex?: TextureName;
     /** A loaded image texture instead of a painted one: a flipbook or a mesh's map. */
     image?: ImageName;
+    /** Any other texture sheet, such as a {@link label}: wins over `tex` and `image`. */
+    sheet?: TextureSheet;
     /** Pick a random tile of a sheet texture at birth (true by default for sheets). */
     randomTile?: boolean;
     life: Num;
@@ -545,9 +547,11 @@ const BLENDS: Record<Blend, number> = {
 
 /** Builds one quarks ParticleSystem from the short options above. */
 export function makeSystem(scene: Scene, o: SysOptions, defaults: {loop: boolean; duration: number}): ParticleSystem {
-    const tex = o.image
-        ? image(scene, o.image)
-        : sheet(scene, o.mesh ? 'white' : (o.tex ?? (o.beam ? 'bolt' : 'glow')));
+    const tex = o.sheet
+        ? o.sheet
+        : o.image
+          ? image(scene, o.image)
+          : sheet(scene, o.mesh ? 'white' : (o.tex ?? (o.beam ? 'bolt' : 'glow')));
     const geo = o.mesh ? geometry(scene, o.mesh) : o.geo;
     // `mesh` particles are solid, lit rocks; `geo` particles are see-through, like sprites.
     const solid = !!o.mesh;

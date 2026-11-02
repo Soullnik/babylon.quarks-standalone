@@ -446,4 +446,14 @@ export const demoManifest: DemoManifestEntry[] = [
         tags: ['pixelfx', 'weather', 'mesh'],
         preview: {icon: 'WE', gradient: 'linear-gradient(135deg, #a6ecff 0%, #1a2448 100%)'},
     },
+    {
+        key: 'PixelFxUiDemo',
+        name: 'Pixel FX: UI',
+        module: 'pixelfxUi',
+        sourcePath: 'examples/src/pixelfx/ui.ts',
+        description:
+            'An achievement toast, coin collect, a combo counter, confetti, a countdown, crit and damage numbers, an exclamation, a health bar hit, a lost heart, level up and quest complete: pixelfx UI as chunky 3D signs and lit props.',
+        tags: ['pixelfx', 'ui', 'mesh'],
+        preview: {icon: 'UI', gradient: 'linear-gradient(135deg, #ffde5e 0%, #3d0a33 100%)'},
+    },
 ];

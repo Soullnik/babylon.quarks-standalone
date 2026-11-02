@@ -598,6 +598,67 @@ const SPECS: Record<TextureName, TextureSpec> = {
     },
 };
 
+/** Options for {@link label}. */
+export interface LabelStyle {
+    /** Fill at the top and bottom of the letters, a vertical gradient; white by default. */
+    top?: string;
+    bottom?: string;
+    /** A dark outline round the letters, `outline` wide in pixels of a 128-pixel line. */
+    stroke?: string;
+    outline?: number;
+    /** A CSS font weight and family; a heavy sans by default. */
+    font?: string;
+}
+
+const labels = new WeakMap<Scene, Map<string, TextureSheet & {aspect: number}>>();
+
+/**
+ * A line of text painted once per scene and style, for UI pop-ups in the world: damage numbers,
+ * banners, counters. `aspect` is its width per unit of height, for a billboard's size.
+ */
+export function label(scene: Scene, text: string, style: LabelStyle = {}): TextureSheet & {aspect: number} {
+    let map = labels.get(scene);
+    if (!map) {
+        map = new Map();
+        labels.set(scene, map);
+    }
+    const key = JSON.stringify([text, style]);
+    const found = map.get(key);
+    if (found) return found;
+    const h = 128;
+    const font = `${style.font ?? "900 96px 'Arial Black', Impact, sans-serif"}`;
+    const outline = style.outline ?? 14;
+    const probe = new DynamicTexture('pixelfx-label-probe', {width: 8, height: 8}, scene, false);
+    const pctx = probe.getContext() as unknown as CanvasRenderingContext2D;
+    pctx.font = font;
+    const w = Math.ceil(pctx.measureText(text).width + outline * 2 + 16);
+    probe.dispose();
+    const texture = new DynamicTexture(`pixelfx-label-${text}`, {width: w, height: h}, scene, true);
+    const ctx = texture.getContext() as unknown as CanvasRenderingContext2D;
+    ctx.clearRect(0, 0, w, h);
+    ctx.font = font;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.lineJoin = 'round';
+    if (outline > 0) {
+        ctx.lineWidth = outline;
+        ctx.strokeStyle = style.stroke ?? '#1a1020';
+        ctx.strokeText(text, w / 2, h * 0.54);
+    }
+    const fill = ctx.createLinearGradient(0, h * 0.2, 0, h * 0.85);
+    fill.addColorStop(0, style.top ?? '#ffffff');
+    fill.addColorStop(1, style.bottom ?? style.top ?? '#ffffff');
+    ctx.fillStyle = fill;
+    ctx.fillText(text, w / 2, h * 0.54);
+    texture.update(true);
+    texture.hasAlpha = true;
+    texture.wrapU = Texture.CLAMP_ADDRESSMODE;
+    texture.wrapV = Texture.CLAMP_ADDRESSMODE;
+    const result = {texture, u: 1, v: 1, aspect: w / h};
+    map.set(key, result);
+    return result;
+}
+
 const cache = new WeakMap<Scene, Map<TextureName, TextureSheet>>();
 
 /** The named texture for this scene, painted once and shared by every system that uses it. */
