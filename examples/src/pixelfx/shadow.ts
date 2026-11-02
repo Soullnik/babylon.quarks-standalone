@@ -127,7 +127,7 @@ function along(points: Array<[number, number]>, u: number): [number, number] {
  * A chain of lit balls, one per node: a tentacle, an arm, a finger. Move and scale the nodes each
  * frame; a node scaled to 0 hides its ball.
  */
-function chain(
+export function chain(
     fx: FxBuilder,
     count: number,
     o: {
@@ -266,7 +266,7 @@ function darkPool(fx: FxBuilder, o: {size: number; open: number; close: number; 
 }
 
 /** Inky droplets thrown up out of a pool, falling back. */
-function splash(fx: FxBuilder, o: {at: At; time: number; count: number; radius?: number}) {
+export function splash(fx: FxBuilder, o: {at: At; time: number; count: number; radius?: number}) {
     return fx.sys({
         tex: 'dot',
         mode: RenderMode.StretchedBillBoard,

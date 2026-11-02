@@ -426,4 +426,14 @@ export const demoManifest: DemoManifestEntry[] = [
         tags: ['pixelfx', 'status', 'mesh'],
         preview: {icon: 'ST', gradient: 'linear-gradient(135deg, #ffe36e 0%, #4b2070 100%)'},
     },
+    {
+        key: 'PixelFxNatureDemo',
+        name: 'Pixel FX: Nature',
+        module: 'pixelfxNature',
+        sourcePath: 'examples/src/pixelfx/nature.ts',
+        description:
+            'An acid splash, a boulder, an earth spike, a healing bloom, a leaf storm, a poison cloud, a quake, a root snare, a spore burst, thorns, a tornado, a toxic puddle and a vine whip: pixelfx nature effects rebuilt in 3D.',
+        tags: ['pixelfx', 'nature', 'mesh'],
+        preview: {icon: 'NA', gradient: 'linear-gradient(135deg, #b4dc5a 0%, #1d3a1a 100%)'},
+    },
 ];
