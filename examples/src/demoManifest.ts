@@ -396,4 +396,14 @@ export const demoManifest: DemoManifestEntry[] = [
         tags: ['pixelfx', 'arcane', 'trail', 'erosion'],
         preview: {icon: 'AR', gradient: 'linear-gradient(135deg, #ecc8ff 0%, #2b1252 100%)'},
     },
+    {
+        key: 'PixelFxHolyDemo',
+        name: 'Pixel FX: Holy',
+        module: 'pixelfxHoly',
+        sourcePath: 'examples/src/pixelfx/holy.ts',
+        description:
+            'Blessings, a divine shield, feathers, a halo, heals, a holy pillar, a resurrection with wings, a smite and a sunburst: pixelfx holy effects rebuilt in 3D.',
+        tags: ['pixelfx', 'holy', 'mesh'],
+        preview: {icon: 'HO', gradient: 'linear-gradient(135deg, #fffbe0 0%, #c4652e 100%)'},
+    },
 ];

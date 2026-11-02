@@ -27,7 +27,9 @@ export type TextureName =
     | 'burst'
     | 'pow'
     | 'smear'
-    | 'lens';
+    | 'lens'
+    | 'plus'
+    | 'heart';
 
 /** How a texture is split into tiles, for `uTileCount` / `vTileCount` and random tile picks. */
 export interface TextureSheet {
@@ -446,6 +448,27 @@ const SPECS: Record<TextureName, TextureSpec> = {
                 const off = (Math.abs(v - 0.5) * 2) / w;
                 if (off > 1) return 0;
                 return (1 - 0.6 * off) * smoothstep(1, 0.8, off);
+            }),
+    },
+    // A plus sign with soft edges: healing.
+    plus: {
+        size: 64,
+        paint: (img, s) =>
+            fillAlpha(img, s, (u, v) => {
+                const bar = (a: number, b: number) =>
+                    smoothstep(0.15, 0.1, Math.abs(a - 0.5)) * smoothstep(0.42, 0.36, Math.abs(b - 0.5));
+                return Math.max(bar(u, v), bar(v, u));
+            }),
+    },
+    // A heart, its point down.
+    heart: {
+        size: 64,
+        paint: (img, s) =>
+            fillAlpha(img, s, (u, v) => {
+                const x = (u - 0.5) * 2.6;
+                const y = (0.5 - v) * 2.6 + 0.25;
+                const f = Math.pow(x * x + y * y - 1, 3) - x * x * y * y * y;
+                return smoothstep(0.04, -0.04, f);
             }),
     },
     // A soft horizontal streak, bright in the middle: wind lines, speed lines, motion blur.

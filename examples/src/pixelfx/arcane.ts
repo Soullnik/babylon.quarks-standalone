@@ -32,7 +32,7 @@ const COOL: Ramp = [
 ];
 
 /** A full sphere of radius 1 as a lathe profile. */
-function ballProfile(rows = 16): Array<[number, number]> {
+export function ballProfile(rows = 16): Array<[number, number]> {
     const out: Array<[number, number]> = [];
     for (let i = 0; i <= rows; i++) {
         const a = -Math.PI / 2 + (i / rows) * Math.PI;
@@ -42,7 +42,7 @@ function ballProfile(rows = 16): Array<[number, number]> {
 }
 
 /** A flat ring between `inner` and `outer` on the lathe's x-z plane, its U round it. */
-function flatRing(inner: number, outer: number, segments = 64) {
+export function flatRing(inner: number, outer: number, segments = 64) {
     return lathe(
         [
             [inner, 0],
@@ -53,14 +53,14 @@ function flatRing(inner: number, outer: number, segments = 64) {
 }
 
 /** Emits only between `from` and `to` seconds of a `period`, at `rate`, as a curve. */
-function window(system: {emissionOverTime: unknown}, period: number, from: number, to: number, rate: number) {
+export function window(system: {emissionOverTime: unknown}, period: number, from: number, to: number, rate: number) {
     const a = Math.max(0.0005, from / period);
     const b = Math.min(0.998, to / period);
     system.emissionOverTime = curve([0, 0], [a - 0.0005, 0], [a, rate], [b, rate], [b + 0.001, 0], [1, 0]);
 }
 
 /** A held glow riding a node: a fresh short-lived sprite every frame. */
-function held(
+export function held(
     fx: FxBuilder,
     parent: TransformNode,
     o: {tex?: 'glow' | 'glint' | 'dot'; size: number; color: string; alpha?: number; order?: number}
@@ -689,7 +689,7 @@ export const arcane: FxDef[] = [
                 size: [0.12, 0.25],
                 rate: 0,
                 color: [ARC[6], '#ffffff'],
-                shape: new CircleEmitter({radius: 0.6, thickness: 1}),
+                shape: new ConeEmitter({radius: 0.6, angle: 0.05, thickness: 1}),
                 rotate: [-Math.PI / 2, 0, 0],
                 at: [0, 0.3, 0],
                 order: 7,
@@ -1014,7 +1014,7 @@ export const arcane: FxDef[] = [
                 size: [0.04, 0.07],
                 rate: 22,
                 color: [ARC[6], ARC[5]],
-                shape: new CircleEmitter({radius: 1.8, thickness: 0.6}),
+                shape: new ConeEmitter({radius: 1.8, angle: 0.05, thickness: 0.6}),
                 rotate: [-Math.PI / 2, 0, 0],
                 order: 6,
                 b: [tint(COOL, fadeOut(0.5, 0.2)), wobble(1, 0.3)],
