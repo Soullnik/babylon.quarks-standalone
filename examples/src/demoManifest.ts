@@ -476,4 +476,14 @@ export const demoManifest: DemoManifestEntry[] = [
         tags: ['pixelfx', 'transitions', 'erosion'],
         preview: {icon: 'TR', gradient: 'linear-gradient(135deg, #c890ff 0%, #0b0a12 100%)'},
     },
+    {
+        key: 'PixelFxCrittersDemo',
+        name: 'Pixel FX: Critters',
+        module: 'pixelfxCritters',
+        sourcePath: 'examples/src/pixelfx/critters.ts',
+        description:
+            'A bat, a bird, a butterfly, an eyeball, a school of fish, a flaming skull, a frog, a ghost, a jellyfish, a slime, a snake and a wisp: pixelfx critters as lit 3D bodies animated through node rigs, with wings, chains and trails.',
+        tags: ['pixelfx', 'critters', 'mesh'],
+        preview: {icon: 'CR', gradient: 'linear-gradient(135deg, #62b440 0%, #140b2b 100%)'},
+    },
 ];
