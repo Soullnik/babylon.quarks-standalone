@@ -1613,6 +1613,14 @@ export function loadPlugin(plugin: Plugin_2): void;
 export function mapUVEqual(a: TextureUV | undefined, b: TextureUV | undefined): boolean;
 
 // @public
+export function maskEqual(a: ParticleMask | undefined, b: ParticleMask | undefined): boolean;
+
+// @public
+export type MaskJSON = Omit<ParticleMaskOptions, 'map'> & {
+    map?: MaterialTextureRef;
+};
+
+// @public
 export type MaterialTextureRef = string | BaseTexture | null;
 
 // @public
@@ -1731,6 +1739,9 @@ export function normalizeGradientMap(gradientMap: Partial<ParticleGradientMap> |
 
 // @public
 export function normalizeMapUV(uv: Partial<TextureUV> | null | undefined): TextureUV | undefined;
+
+// @public
+export function normalizeMask(mask: ParticleMaskOptions | null | undefined): ParticleMask | undefined;
 
 // @public
 export function normalizeMeshRim(rim: Partial<MeshRim> | null | undefined): MeshRim | undefined;
@@ -1860,6 +1871,18 @@ export interface ParticleGradientMap {
     channel: GradientMapChannel;
     ramp: BaseTexture | null;
 }
+
+// @public
+export interface ParticleMask {
+    channel: GradientMapChannel;
+    map: BaseTexture | null;
+    mapUV: TextureUV;
+}
+
+// @public
+export type ParticleMaskOptions = Partial<Omit<ParticleMask, 'mapUV'>> & {
+    mapUV?: Partial<TextureUV>;
+};
 
 // @public
 export interface ParticleMaterialSource {
@@ -2001,6 +2024,8 @@ export class ParticleSystem implements IParticleSystem {
     looping: boolean;
     get mapUV(): TextureUV | undefined;
     set mapUV(uv: Partial<TextureUV> | undefined);
+    get mask(): ParticleMask | undefined;
+    set mask(mask: ParticleMaskOptions | undefined);
     get material(): ParticleMaterialSource | null;
     set material(material: ParticleMaterialSource | null);
     maxParticles?: number;
@@ -2195,6 +2220,7 @@ export interface ParticleSystemParameters {
     lighting?: MeshLighting;
     looping?: boolean;
     mapUV?: Partial<TextureUV>;
+    mask?: ParticleMaskOptions;
     material?: ParticleMaterialSource | null;
     maxParticles?: number;
     maxParticleSize?: number;
@@ -2457,6 +2483,7 @@ export interface QuarksMaterialJSON {
     lighting?: MeshLighting;
     map?: string;
     mapUV?: Partial<TextureUV>;
+    mask?: MaskJSON;
     reflectionAtlas?: MaterialTextureRef;
     reflectionLevel?: number;
     rim?: Partial<MeshRim>;
@@ -2703,6 +2730,7 @@ export function readFormatPart<T>(segment: string, read: () => T): T;
 export function readsUV1(settings: {
     mapUV?: TextureUV;
     uvDistortion?: ParticleUVDistortion;
+    mask?: ParticleMask;
     erosion?: ParticleErosion;
 }): boolean;
 
@@ -2948,7 +2976,7 @@ export interface ShaderProgram {
 export function shaderProgram(settings: ShaderSettings, context: ShaderContext): ShaderProgram;
 
 // @public
-export type ShaderSettings = Pick<StoredBatchSettings, 'renderMode' | 'texture' | 'reflectionAtlas' | 'uTileCount' | 'vTileCount' | 'blendTiles' | 'softParticles' | 'materialAlphaTest' | 'materialTransparent' | 'materialBlendMode' | 'applyFog' | 'applyImageProcessing' | 'pivot' | 'minParticleSize' | 'maxParticleSize' | 'lighting' | 'rim' | 'mapUV' | 'uvDistortion' | 'gradientMap' | 'erosion'>;
+export type ShaderSettings = Pick<StoredBatchSettings, 'renderMode' | 'texture' | 'reflectionAtlas' | 'uTileCount' | 'vTileCount' | 'blendTiles' | 'softParticles' | 'materialAlphaTest' | 'materialTransparent' | 'materialBlendMode' | 'applyFog' | 'applyImageProcessing' | 'pivot' | 'minParticleSize' | 'maxParticleSize' | 'lighting' | 'rim' | 'mapUV' | 'uvDistortion' | 'gradientMap' | 'mask' | 'erosion'>;
 
 // @public
 export interface ShaderSources {
@@ -3221,6 +3249,7 @@ export interface StoredBatchSettings {
     layerMask: number;
     lighting?: MeshLighting;
     mapUV?: TextureUV;
+    mask?: ParticleMask;
     materialAlphaTest: number;
     materialBlendMode: number;
     materialDepthTest: boolean;
@@ -3745,6 +3774,7 @@ export interface VFXBatchSettings {
     layerMask: number;
     lighting?: MeshLighting;
     mapUV?: TextureUV;
+    mask?: ParticleMask;
     materialAlphaTest: number;
     materialBlendMode: number;
     materialDepthTest: boolean;

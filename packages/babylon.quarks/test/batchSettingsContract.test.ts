@@ -59,6 +59,7 @@ function full(renderMode: RenderMode = RenderMode.Mesh): VFXBatchSettings {
         mapUV: {channel: 1, tiling: [1, 1], offset: [0, 0], scroll: [0, 0]},
         uvDistortion: {map: texture('noise'), mapUV: uv(), strength: 0.1},
         gradientMap: {ramp: texture('ramp'), channel: 'r'},
+        mask: {map: texture('shape'), channel: 'r', mapUV: uv()},
         erosion: {mask: texture('mask'), maskUV: uv(), softness: 0.1, edgeWidth: 0.1, edgeColor: [1, 0.5, 0]},
     };
 }
@@ -101,6 +102,7 @@ const changes: Record<keyof StoredBatchSettings, {mode?: RenderMode; change: (s:
     mapUV: {change: (s) => (s.mapUV = {channel: 1, tiling: [2, 1], offset: [0, 0], scroll: [0, 0]})},
     uvDistortion: {change: (s) => (s.uvDistortion = {map: texture('noise'), mapUV: uv(), strength: 0.3})},
     gradientMap: {change: (s) => (s.gradientMap = {ramp: texture('ramp'), channel: 'g'})},
+    mask: {change: (s) => (s.mask = {map: texture('shape'), channel: 'a', mapUV: uv()})},
     erosion: {
         change: (s) =>
             (s.erosion = {mask: texture('mask'), maskUV: uv(), softness: 0.3, edgeWidth: 0.1, edgeColor: [1, 0.5, 0]}),
@@ -139,6 +141,7 @@ function shared(base: VFXBatchSettings): Partial<VFXBatchSettings> {
         reflectionAtlas: base.reflectionAtlas,
         uvDistortion: base.uvDistortion,
         gradientMap: base.gradientMap,
+        mask: base.mask,
         erosion: base.erosion,
     };
 }

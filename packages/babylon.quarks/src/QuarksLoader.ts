@@ -1321,6 +1321,13 @@ export class QuarksLoader {
                     map: texture(matDef.uvDistortion.map),
                 };
             }
+            // mask {map (texture uuid), channel, mapUV {channel, tiling, offset, scroll}}.
+            if (matDef.mask && typeof matDef.mask === 'object') {
+                matInfo.mask = {
+                    ...matDef.mask,
+                    map: texture(matDef.mask.map),
+                };
+            }
 
             // QuarksMaterial (what `materialMeta` in system/serialization.ts writes) writes `alphaMode`
             // directly as a Babylon alpha-mode constant; three.js materials (MeshBasicMaterial

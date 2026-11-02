@@ -100,11 +100,14 @@ import {
     normalizeErosion,
     normalizeGradientMap,
     normalizeMapUV,
+    normalizeMask,
     normalizeMeshRim,
     normalizeUVDistortion,
     ParticleErosion,
     ParticleErosionOptions,
     ParticleGradientMap,
+    ParticleMask,
+    ParticleMaskOptions,
     ParticleUVDistortion,
     ParticleUVDistortionOptions,
     RenderFace,
@@ -704,6 +707,23 @@ export class ParticleSystem implements IParticleSystem {
         this.neededToUpdateRender = true;
     }
 
+    /**
+     * A mask multiplied into the map, see {@link ParticleMask}: one channel of
+     * a second texture, on its own layout, scales the map's alpha before the
+     * gradient map and erosion read it, so a scrolling noise map billows up
+     * through a still flame silhouette. Undefined (the default), or without a map: none.
+     * Fields left out take their defaults; assign a new object to change it.
+     * Saved with the material in the effect JSON.
+     */
+    get mask(): ParticleMask | undefined {
+        return this.rendererSettings.mask;
+    }
+
+    set mask(mask: ParticleMaskOptions | undefined) {
+        this.rendererSettings.mask = normalizeMask(mask);
+        this.neededToUpdateRender = true;
+    }
+
     /** The mean scale of the emitter's matrix for a world-space system, else 1. */
     private measureMotionScale(emitterMatrix: Matrix4): number {
         if (!this.worldSpace) {
@@ -1265,6 +1285,7 @@ export class ParticleSystem implements IParticleSystem {
             gradientMap: normalizeGradientMap(parameters.gradientMap),
             erosion: normalizeErosion(parameters.erosion),
             uvDistortion: normalizeUVDistortion(parameters.uvDistortion),
+            mask: normalizeMask(parameters.mask),
         };
         this.flip = parameters.flip;
         this.playbackSpeed = parameters.playbackSpeed ?? 1;
@@ -2212,6 +2233,7 @@ export class ParticleSystem implements IParticleSystem {
             gradientMap: this.gradientMap,
             erosion: this.erosion,
             uvDistortion: this.uvDistortion,
+            mask: this.mask,
             scene: this.emitter.getScene(),
         });
         // A sub emitter behavior transforms by its parent system's emitter;

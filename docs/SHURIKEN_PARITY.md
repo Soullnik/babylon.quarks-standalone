@@ -72,6 +72,7 @@ Three tiers: ✅ shipped · 🟡 runtime supports it, editor UI missing · 🔴 
 - ✅ texture thumbnail + mesh wireframe previews in the inspector
 - ✅ soft particles (+near/far fade), alpha test, depth write/test, layer mask (`layerMask`)
 - ✅ texture layout (UV channel, Tiling / Offset, scroll as Unreal's Panner), flip, gradient map, alpha erosion, UV distortion, rim on mesh particles
+- 🟡 mask (`mask`): a second texture multiplied into the map on its own layout, as Unreal's masked panner and a Shader Graph `_Mask`; no editor panel yet
 - ✅ render face (`renderFace`: both / front / back, mesh particles)
 - ✅ the scene's image processing (`applyImageProcessing`, on by default as on Babylon's own materials)
 - ✅ sort mode (`sortMode`: distance / oldest in front / youngest in front), min/max particle size (`minParticleSize` / `maxParticleSize`, billboards and stretched), pivot (`pivot`)

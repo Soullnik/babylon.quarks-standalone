@@ -49,6 +49,7 @@ export type ShaderSettings = Pick<
     | 'mapUV'
     | 'uvDistortion'
     | 'gradientMap'
+    | 'mask'
     | 'erosion'
 >;
 
@@ -489,9 +490,9 @@ function softDefines(
     }
 }
 
-/** The texture effects of `chunks/surface.ts`: the map's layout, distortion, gradient map and erosion. */
+/** The texture effects of `chunks/surface.ts`: the map's layout, distortion, mask, gradient map and erosion. */
 function surfaceDefines(settings: ShaderSettings, defines: string[], uniforms: string[], samplers: string[]): void {
-    const {mapUV, uvDistortion, gradientMap, erosion} = settings;
+    const {mapUV, uvDistortion, gradientMap, mask, erosion} = settings;
     if (readsUV1(settings)) {
         defines.push('UV1');
     }
@@ -509,6 +510,14 @@ function surfaceDefines(settings: ShaderSettings, defines: string[], uniforms: s
         }
         samplers.push('distortionMap');
         uniforms.push('distortionTransform', 'distortionStrength');
+    }
+    if (mask) {
+        defines.push('MASK');
+        if (mask.mapUV.channel === 1) {
+            defines.push('MASK_UV1');
+        }
+        samplers.push('maskMap');
+        uniforms.push('maskTransform', 'maskChannel');
     }
     if (gradientMap) {
         defines.push('GRADIENT_MAP');

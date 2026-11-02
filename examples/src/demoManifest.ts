@@ -227,6 +227,16 @@ export const demoManifest: DemoManifestEntry[] = [
         preview: {icon: 'AT', gradient: 'linear-gradient(135deg, #ffd27a 0%, #1c2a5c 100%)'},
     },
     {
+        key: 'FlameAuraDemo',
+        name: 'Flame Aura',
+        module: 'flameAura',
+        sourcePath: 'examples/src/demos/flameAura.ts',
+        description:
+            'A teal flame aura around a standing figure: wisps of flame born on the body by a MeshSurfaceEmitter spin, grow and climb off it into a column over the head; sparks, a plume of smoke, and smoky noise scrolling through a disc mask on the floor.',
+        tags: ['loop', 'material', 'mesh'],
+        preview: {icon: 'FA', gradient: 'linear-gradient(135deg, #3ef2d0 0%, #1d3a40 100%)'},
+    },
+    {
         key: 'PooledHitsDemo',
         name: 'Pooled One-Shot Hits',
         module: 'pooledHits',

@@ -6,6 +6,7 @@ import {
     normalizeErosion,
     normalizeGradientMap,
     normalizeMapUV,
+    normalizeMask,
     normalizeMeshRim,
     normalizeUVDistortion,
     RenderMode,
@@ -51,6 +52,7 @@ function bare(renderMode: RenderMode): ShaderSettings {
         mapUV: undefined,
         uvDistortion: undefined,
         gradientMap: undefined,
+        mask: undefined,
         erosion: undefined,
     };
 }
@@ -152,6 +154,8 @@ const SURFACE: Axis[] = (() => {
     const erosion = normalizeErosion({});
     const erosionMask0 = normalizeErosion({mask: TEXTURE});
     const erosionMask1 = normalizeErosion({mask: TEXTURE, maskUV: {channel: 1}});
+    const mask0 = normalizeMask({map: TEXTURE});
+    const mask1 = normalizeMask({map: TEXTURE, mapUV: {channel: 1}});
     return [
         {name: 'map transform', settings: {mapUV: uv0}},
         {name: 'map transform uv1', settings: {mapUV: uv1}},
@@ -161,6 +165,9 @@ const SURFACE: Axis[] = (() => {
         {name: 'erosion mask uv1', settings: {erosion: erosionMask1}},
         {name: 'distortion', settings: {uvDistortion: distortion0}},
         {name: 'distortion uv1', settings: {uvDistortion: distortion1}},
+        {name: 'mask', settings: {mask: mask0}},
+        {name: 'mask uv1', settings: {mask: mask1}},
+        {name: 'mask gradient erosion', settings: {mask: mask0, gradientMap: gradient, erosion}},
         {
             name: 'map transform distortion gradient erosion mask',
             settings: {mapUV: uv0, uvDistortion: distortion0, gradientMap: gradient, erosion: erosionMask0},
@@ -171,7 +178,13 @@ const SURFACE: Axis[] = (() => {
         },
         {
             name: 'every effect on uv1',
-            settings: {mapUV: uv1, uvDistortion: distortion1, gradientMap: gradient, erosion: erosionMask1},
+            settings: {
+                mapUV: uv1,
+                uvDistortion: distortion1,
+                mask: mask1,
+                gradientMap: gradient,
+                erosion: erosionMask1,
+            },
         },
     ];
 })();

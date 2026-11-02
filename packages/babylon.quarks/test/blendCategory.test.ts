@@ -134,6 +134,7 @@ describe('blend defines', () => {
         mapUV: undefined,
         uvDistortion: undefined,
         gradientMap: undefined,
+        mask: undefined,
         erosion: undefined,
     });
     const context = {depth: null, envAtlasReady: false, meshUV2: false, imageProcessing: null};

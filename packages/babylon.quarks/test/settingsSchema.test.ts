@@ -77,6 +77,7 @@ const HANDLED_BY: Record<keyof ParticleSystemParameters, 'table' | 'elsewhere'> 
     gradientMap: 'elsewhere',
     erosion: 'elsewhere',
     uvDistortion: 'elsewhere',
+    mask: 'elsewhere',
     playbackSpeed: 'table',
     cullingMode: 'table',
     scalingMode: 'table',

@@ -29,6 +29,7 @@ import {
     normalizeErosion,
     normalizeGradientMap,
     normalizeMapUV,
+    normalizeMask,
     normalizeTextureUV,
     normalizeUVDistortion,
     RenderMode,
@@ -685,6 +686,137 @@ describe('texture effects', () => {
             expect(((root as ParticleEmitter).system as ParticleSystem).uvDistortion).toBeUndefined();
             const plain = emptyMeta();
             expect('uvDistortion' in plain.materials[none.toJSON(plain).material!]).toBe(false);
+        });
+    });
+
+    describe('mask', () => {
+        it('needs a map, and fills in defaults', () => {
+            const shape = new Texture(null, scene);
+            expect(normalizeMask(undefined)).toBeUndefined();
+            expect(normalizeMask({channel: 'g'})).toBeUndefined();
+            expect(normalizeMask({map: shape})).toEqual({
+                map: shape,
+                channel: 'r',
+                mapUV: {channel: 0, tiling: [1, 1], offset: [0, 0], scroll: [0, 0]},
+            });
+            expect(normalizeMask({map: shape, channel: 'x' as GradientMapChannel})?.channel).toBe('r');
+            expect(normalizeMask({map: shape, channel: 'luminance'})?.channel).toBe('luminance');
+            expect(system().mask).toBeUndefined();
+        });
+
+        it('compiles in on sprites, meshes and trails, its channel and scrolling layout as uniforms', () => {
+            const shape = new Texture(null, scene);
+            const renderer = new BatchedRenderer('mask', scene);
+            const modes = [RenderMode.BillBoard, RenderMode.StretchedBillBoard, RenderMode.Mesh, RenderMode.Trail];
+            const systems = modes.map((renderMode) =>
+                system({
+                    renderMode,
+                    mask: {map: shape, channel: 'a', mapUV: {tiling: [2, 2], scroll: [0.25, 0.5]}},
+                })
+            );
+            systems.forEach((s) => renderer.addSystem(s));
+            renderer.update(3);
+            for (const s of systems) {
+                const mat = materialOf(renderer, s);
+                expect(defines(mat)).toContain('MASK');
+                expect(defines(mat)).not.toContain('MASK_UV1');
+                expect(samplers(mat)).toContain('maskMap');
+                expect(uniforms(mat)).toEqual(expect.arrayContaining(['maskTransform', 'maskChannel']));
+                notifyBind(mat);
+                const c = mat['_vectors4'].maskChannel;
+                expect([c.x, c.y, c.z, c.w]).toEqual([0, 0, 0, 1]);
+                const t = mat['_vectors4'].maskTransform;
+                expect([t.x, t.y]).toEqual([2, 2]);
+                expect(t.z).toBeCloseTo(0.75, 6);
+                expect(t.w).toBeCloseTo(1.5, 6);
+            }
+            for (const source of [
+                particleFragGLSL,
+                particleFragWGSL,
+                physicsFragGLSL,
+                physicsFragWGSL,
+                trailFragGLSL,
+                trailFragWGSL,
+            ]) {
+                expect(source).toContain('#ifdef MASK');
+                expect(source).toContain('defined(MASK)');
+            }
+        });
+
+        it('reads UV channel 1 when laid on it, without a map of its own', () => {
+            const shape = new Texture(null, scene);
+            const renderer = new BatchedRenderer('maskUV1', scene);
+            const s = system({texture: null, mask: {map: shape, mapUV: {channel: 1}}});
+            renderer.addSystem(s);
+            const mat = materialOf(renderer, s);
+            expect(defines(mat)).toEqual(expect.arrayContaining(['MASK', 'MASK_UV1', 'UV1']));
+        });
+
+        it('updates its channel and layout live, and batches a different mask texture apart', () => {
+            const shape = new Texture(null, scene);
+            const other = new Texture(null, scene);
+            const renderer = new BatchedRenderer('maskBatch', scene);
+            const a = system({mask: {map: shape}});
+            const b = system({mask: {map: shape}});
+            const c = system({mask: {map: other}});
+            const d = system({mask: {map: shape, channel: 'g'}});
+            const none = system();
+            [a, b, c, d, none].forEach((s) => renderer.addSystem(s));
+            const index = (s: ParticleSystem) => renderer.systemToBatchIndex.get(s);
+            expect(index(a)).toBe(index(b));
+            expect(new Set([a, c, d, none].map(index)).size).toBe(4);
+            a.mask = {map: shape, channel: 'b'};
+            renderer.update(0.016);
+            expect(a.mask?.channel).toBe('b');
+        });
+
+        it('round-trips through JSON, clone and the loader, writing only what is not default', () => {
+            const shape = new Texture(null, scene);
+            const a = system({mask: {map: shape, channel: 'luminance', mapUV: {channel: 1, scroll: [0, -0.5]}}});
+            const meta = emptyMeta();
+            const json = a.toJSON(meta);
+            const material = meta.materials[json.material!];
+            expect(textureOf(meta, material.mask?.map)).toBe(shape);
+            expect(material.mask?.channel).toBe('luminance');
+            expect(material.mask?.mapUV).toEqual({channel: 1, scroll: [0, -0.5]});
+            for (const copy of [ParticleSystem.fromJSON(json, meta, scene), a.clone()]) {
+                expect(copy.mask).toEqual({
+                    map: shape,
+                    channel: 'luminance',
+                    mapUV: {channel: 1, tiling: [1, 1], offset: [0, 0], scroll: [0, -0.5]},
+                });
+            }
+            {
+                const plain = emptyMeta();
+                const plainMask = plain.materials[system({mask: {map: shape}}).toJSON(plain).material!].mask;
+                expect(Object.keys(plainMask!)).toEqual(['map']);
+            }
+            const loader = new QuarksLoader(scene);
+            const root = loader.parse({
+                textures: [],
+                materials: [{uuid: 'm', type: 'QuarksMaterial', mask: {map: 'missing', channel: 'g'}}],
+                object: {uuid: 'e', type: 'ParticleEmitter', ps: {...system().toJSON(), material: 'm'}},
+            });
+            // A mask texture the file does not carry leaves no mask.
+            expect(((root as ParticleEmitter).system as ParticleSystem).mask).toBeUndefined();
+            const withTexture = loader.parse({
+                images: [{uuid: 'img', url: 'textures/mask.png'}],
+                textures: [{uuid: 'tex', image: 'img'}],
+                materials: [
+                    {
+                        uuid: 'm',
+                        type: 'QuarksMaterial',
+                        mask: {map: 'tex', channel: 'g', mapUV: {channel: 1, tiling: [2, 1]}},
+                    },
+                ],
+                object: {uuid: 'e', type: 'ParticleEmitter', ps: {...system().toJSON(), material: 'm'}},
+            });
+            const loadedMask = ((withTexture as ParticleEmitter).system as ParticleSystem).mask;
+            expect(loadedMask?.map).toBeInstanceOf(Texture);
+            expect(loadedMask?.channel).toBe('g');
+            expect(loadedMask?.mapUV).toEqual({channel: 1, tiling: [2, 1], offset: [0, 0], scroll: [0, 0]});
+            const none = emptyMeta();
+            expect('mask' in none.materials[system().toJSON(none).material!]).toBe(false);
         });
     });
 });

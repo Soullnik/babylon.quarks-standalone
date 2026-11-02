@@ -432,6 +432,58 @@ export function uvDistortionEqual(a: ParticleUVDistortion | undefined, b: Partic
 }
 
 /**
+ * A mask multiplied into the map: one channel of a second texture, laid by
+ * its own {@link TextureUV}, scales the map's alpha (1 without a map) before
+ * the gradient map and erosion read it. A scrolling noise map then runs
+ * through a still shape (the masked panner of Unreal's particle materials
+ * and the `_Mask` slot of Unity's Shader Graph VFX). Only alpha changes, as
+ * with every fade, so the colour keeps its brightness up to the edge; a
+ * gradient map looked up by `'a'` and an erosion without a mask of its own
+ * read the product: energy and fire that billow up inside a flame's
+ * silhouette. On a sprite sheet, a mask on UV channel 0 follows the current
+ * tile and is not blended into the next one. See
+ * {@link VFXBatchSettings.mask}.
+ */
+export interface ParticleMask {
+    /** The mask texture. Required: without one there is no mask. */
+    map: BaseTexture | null;
+    /** The mask texel value that scales the map's alpha: one channel, or luminance. Default `'r'`. */
+    channel: GradientMapChannel;
+    /** How the mask is laid over the particle, see {@link TextureUV}. Default channel 0, untiled, still. */
+    mapUV: TextureUV;
+}
+
+/** {@link ParticleMask} as given: any field may be left out, the mask's layout too. */
+export type ParticleMaskOptions = Partial<Omit<ParticleMask, 'mapUV'>> & {
+    /** See {@link ParticleMask.mapUV}; fields left out take their defaults. */
+    mapUV?: Partial<TextureUV>;
+};
+
+/** A complete mask from a partial one, or undefined when unset or without a map. */
+export function normalizeMask(mask: ParticleMaskOptions | null | undefined): ParticleMask | undefined {
+    if (!mask || typeof mask !== 'object' || !mask.map) {
+        return undefined;
+    }
+    const channel = mask.channel;
+    return {
+        map: mask.map,
+        channel: channel !== undefined && channel in GRADIENT_MAP_WEIGHTS ? channel : 'r',
+        mapUV: normalizeTextureUV(mask.mapUV),
+    };
+}
+
+/** True when both mask the same way (or both not at all). */
+export function maskEqual(a: ParticleMask | undefined, b: ParticleMask | undefined): boolean {
+    if (a === b) {
+        return true;
+    }
+    if (!a || !b) {
+        return false;
+    }
+    return a.map === b.map && a.channel === b.channel && textureUVEqual(a.mapUV, b.mapUV);
+}
+
+/**
  * The main map's layout, or undefined when it is the identity (channel 0,
  * untiled, unmoved, still), which costs nothing in the shader.
  */
@@ -450,17 +502,21 @@ export function mapUVEqual(a: TextureUV | undefined, b: TextureUV | undefined): 
 
 /**
  * True when a texture effect of `settings` samples UV channel 1, see
- * {@link UVChannel}: the map, the distortion noise or an erosion mask laid
+ * {@link UVChannel}: the map, the distortion noise, the mask or an erosion mask laid
  * on it.
  */
 export function readsUV1(settings: {
     mapUV?: TextureUV;
     uvDistortion?: ParticleUVDistortion;
+    mask?: ParticleMask;
     erosion?: ParticleErosion;
 }): boolean {
-    const {mapUV, uvDistortion, erosion} = settings;
+    const {mapUV, uvDistortion, mask, erosion} = settings;
     return (
-        mapUV?.channel === 1 || uvDistortion?.mapUV.channel === 1 || (!!erosion?.mask && erosion.maskUV.channel === 1)
+        mapUV?.channel === 1 ||
+        uvDistortion?.mapUV.channel === 1 ||
+        mask?.mapUV.channel === 1 ||
+        (!!erosion?.mask && erosion.maskUV.channel === 1)
     );
 }
 
@@ -541,6 +597,8 @@ export interface StoredBatchSettings {
     mapUV?: TextureUV;
     /** Map UV distortion, see {@link VFXBatchSettings.uvDistortion}. */
     uvDistortion?: ParticleUVDistortion;
+    /** Mask multiplied into the map, see {@link VFXBatchSettings.mask}. */
+    mask?: ParticleMask;
     /** Colour ramp for the map, see {@link VFXBatchSettings.gradientMap}. */
     gradientMap?: ParticleGradientMap;
     /** Alpha erosion, see {@link VFXBatchSettings.erosion}. */

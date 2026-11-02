@@ -1,7 +1,7 @@
 /**
  * Texture effects shared by the sprite, mesh and trail fragment shaders, in
- * both shader languages: UV scrolling, UV distortion, a gradient map and
- * alpha erosion.
+ * both shader languages: UV scrolling, UV distortion, a mask, a gradient map
+ * and alpha erosion.
  *
  * - `UV1`: the vertex shader passes `vUV1`, the particle's own UV that the
  *   sprite sheet never moves (see `UVChannel`). The distortion noise and the
@@ -20,6 +20,14 @@
  *   by up to `distortionStrength` UV units: the heat shimmer, licking and
  *   breathing of fire and auras. On a sprite sheet the pushed UV can reach
  *   the neighbouring tile.
+ * - `MASK`: the map's alpha (1 without a map) is scaled by one channel of
+ *   `maskMap` (`maskChannel`, as `gradientMapChannel`), laid by
+ *   `maskTransform` on `vUV` or, under `MASK_UV1`, on `vUV1`; undistorted,
+ *   so a noise map scrolls and distorts through a still shape. Only alpha
+ *   changes, as with every fade (`blend.ts`): a gradient map looked up by
+ *   alpha, and an erosion by the map's alpha, then read the product. On a
+ *   sprite sheet, a mask on channel 0 follows the current tile and is not
+ *   blended into the next one.
  * - `GRADIENT_MAP`: the map's texel dotted with `gradientMapChannel` (one
  *   channel, or luminance weights) picks a colour along U of `gradientMap`.
  *   The ramp's alpha multiplies the map's, or replaces it when the lookup is
@@ -48,6 +56,11 @@ uniform vec4 mapTransform;
 uniform sampler2D distortionMap;
 uniform vec4 distortionTransform;
 uniform float distortionStrength;
+#endif
+#ifdef MASK
+uniform sampler2D maskMap;
+uniform vec4 maskTransform;
+uniform vec4 maskChannel;
 #endif
 #ifdef GRADIENT_MAP
 uniform sampler2D gradientMap;
@@ -108,7 +121,7 @@ export function surfaceColorGLSL(tileBlend: boolean): string {
     baseColor.a = 1.0;
     float erosionMaskValue = 1.0;
 #endif
-#if defined(USE_MAP) || defined(GRADIENT_MAP)
+#if defined(USE_MAP) || defined(GRADIENT_MAP) || defined(MASK)
 #ifdef USE_MAP
     vec4 texColor = texture2D(map, mapUV);
     ${
@@ -135,6 +148,14 @@ export function surfaceColorGLSL(tileBlend: boolean): string {
     // No map: the ramp is looked up at white, its far end.
     vec4 texColor = vec4(1.0);
 #endif
+    #ifdef MASK
+        #ifdef MASK_UV1
+            vec2 maskUV = vUV1;
+        #else
+            vec2 maskUV = vUV;
+        #endif
+        texColor.a *= clamp(dot(texture2D(maskMap, maskUV * maskTransform.xy + maskTransform.zw), maskChannel), 0.0, 1.0);
+    #endif
     #ifdef GRADIENT_MAP
         float rampAt = clamp(dot(texColor, gradientMapChannel), 0.0, 1.0);
         vec4 ramp = texture2D(gradientMap, vec2(mix(gradientMapRange.x, gradientMapRange.y, rampAt), 0.5));
@@ -169,6 +190,12 @@ var distortionMapSampler: sampler;
 var distortionMap: texture_2d<f32>;
 uniform distortionTransform: vec4f;
 uniform distortionStrength: f32;
+#endif
+#ifdef MASK
+var maskMapSampler: sampler;
+var maskMap: texture_2d<f32>;
+uniform maskTransform: vec4f;
+uniform maskChannel: vec4f;
 #endif
 #ifdef GRADIENT_MAP
 var gradientMapSampler: sampler;
@@ -226,7 +253,7 @@ export function surfaceColorWGSL(tileBlend: boolean): string {
     baseColor.a = 1.0;
     var erosionMaskValue = 1.0;
 #endif
-#if defined(USE_MAP) || defined(GRADIENT_MAP)
+#if defined(USE_MAP) || defined(GRADIENT_MAP) || defined(MASK)
 #ifdef USE_MAP
     var texColor = textureSample(map, mapSampler, mapUV);
     ${
@@ -253,6 +280,14 @@ export function surfaceColorWGSL(tileBlend: boolean): string {
     // No map: the ramp is looked up at white, its far end.
     var texColor = vec4f(1.0);
 #endif
+    #ifdef MASK
+        #ifdef MASK_UV1
+            let maskUV = fragmentInputs.vUV1;
+        #else
+            let maskUV = fragmentInputs.vUV;
+        #endif
+        texColor.a *= clamp(dot(textureSample(maskMap, maskMapSampler, maskUV * uniforms.maskTransform.xy + uniforms.maskTransform.zw), uniforms.maskChannel), 0.0, 1.0);
+    #endif
     #ifdef GRADIENT_MAP
         let rampAt = clamp(dot(texColor, uniforms.gradientMapChannel), 0.0, 1.0);
         let ramp = textureSample(gradientMap, gradientMapSampler, vec2f(mix(uniforms.gradientMapRange.x, uniforms.gradientMapRange.y, rampAt), 0.5));

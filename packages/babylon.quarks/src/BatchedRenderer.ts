@@ -20,6 +20,7 @@ import {
     MeshRim,
     ParticleErosion,
     ParticleGradientMap,
+    ParticleMask,
     ParticleUVDistortion,
     RenderFace,
     RenderMode,
@@ -171,6 +172,8 @@ export interface VFXBatchSettings {
     gradientMap?: ParticleGradientMap;
     /** Map UV distortion by a noise texture, see {@link ParticleUVDistortion}. Unset: none. Systems that differ are batched apart. */
     uvDistortion?: ParticleUVDistortion;
+    /** Mask multiplied into the map, see {@link ParticleMask}. Unset: none. Systems that differ are batched apart. */
+    mask?: ParticleMask;
     /** Alpha erosion (dissolve / wipe), see {@link ParticleErosion}. Unset: none. Systems that differ are batched apart. */
     erosion?: ParticleErosion;
 }

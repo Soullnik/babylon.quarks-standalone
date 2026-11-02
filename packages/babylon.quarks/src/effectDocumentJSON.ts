@@ -4,6 +4,7 @@ import type {
     MeshRim,
     ParticleErosionOptions,
     ParticleGradientMap,
+    ParticleMaskOptions,
     ParticleUVDistortionOptions,
     TextureUV,
 } from './batchSettings';
@@ -188,6 +189,12 @@ export type UVDistortionJSON = Omit<ParticleUVDistortionOptions, 'map'> & {
     map?: MaterialTextureRef;
 };
 
+/** The mask of a {@link QuarksMaterialJSON}; see `ParticleSystem.mask`. */
+export type MaskJSON = Omit<ParticleMaskOptions, 'map'> & {
+    /** The mask texture. */
+    map?: MaterialTextureRef;
+};
+
 /**
  * A material entry of an effect document: what a particle system's material writes (`type`
  * `'QuarksMaterial'`), or a three.js material, whose `map` and `blending` the loader reads too.
@@ -231,6 +238,8 @@ export interface QuarksMaterialJSON {
     erosion?: ErosionJSON;
     /** UV distortion. */
     uvDistortion?: UVDistortionJSON;
+    /** Mask multiplied into the map. */
+    mask?: MaskJSON;
     /** While writing: the material the system read its settings from. Never written to a file. */
     sourceMaterial?: ParticleMaterialSource;
 }
