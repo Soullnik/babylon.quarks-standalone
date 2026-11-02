@@ -486,4 +486,14 @@ export const demoManifest: DemoManifestEntry[] = [
         tags: ['pixelfx', 'critters', 'mesh'],
         preview: {icon: 'CR', gradient: 'linear-gradient(135deg, #62b440 0%, #140b2b 100%)'},
     },
+    {
+        key: 'PixelFxMovesDemo',
+        name: 'Pixel FX: Moves',
+        module: 'pixelfxMoves',
+        sourcePath: 'examples/src/pixelfx/moves.ts',
+        description:
+            'Arrow shot, dash strike, earth stomp, fireball throw, ground pound, holy smite, ice lance, lightning call, meteor call, pistol shots, rocket launcher and sword combo: pixelfx character moves staged as a caster and a target, with projectiles, impacts and hit reactions.',
+        tags: ['pixelfx', 'moves', 'combat'],
+        preview: {icon: 'MV', gradient: 'linear-gradient(135deg, #ff7a2a 0%, #1a0b2b 100%)'},
+    },
 ];
