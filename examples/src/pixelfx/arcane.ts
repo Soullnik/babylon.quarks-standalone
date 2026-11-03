@@ -12,13 +12,14 @@ import {
     orbit,
     popOut,
     quad,
+    turn as roll,
     spin,
     subEmit,
     tint,
     wobble,
 } from './kit';
 import {FLAT, clods, hotSparks, light, star, type At} from './parts';
-import {shockwave, type Ramp} from './recipes';
+import {shockwave, sticker, type Ramp} from './recipes';
 import {between, hero} from './spawn';
 import {shapes, type FxBuilder, type FxDef} from './stage';
 import {image} from './textures';
@@ -820,7 +821,9 @@ export const arcane: FxDef[] = [
             const rift = fx.node('rift', [0, 1.6, 0]);
             rift.scaling.set(0.62, 1, 1);
             // An upright rift: fibrous spiral arms winding down into the dark.
-            fx.sys({
+            // The rift lies in its own plane, so the dark and the swirl are stickers on it, not sprites
+            // turned to the eye: from the side it narrows to a slit.
+            sticker(fx, {
                 tex: 'glow',
                 life: 1e4,
                 size: 3,
@@ -846,7 +849,7 @@ export const arcane: FxDef[] = [
                 order: 3,
                 look: {renderFace: 'both', scalingMode: 'hierarchy', mapUV: {tiling: [2, 1], scroll: [0.25, 0.6]}},
             });
-            fx.sys({
+            sticker(fx, {
                 tex: 'swirl',
                 life: 1e4,
                 size: 2.4,
@@ -856,9 +859,9 @@ export const arcane: FxDef[] = [
                 parent: rift,
                 order: 4,
                 look: {scalingMode: 'hierarchy'},
-                b: [spin(-1.8)],
+                b: [roll(-1.8, [0, 0, 1])],
             });
-            fx.sys({
+            sticker(fx, {
                 tex: 'glow',
                 life: 1e4,
                 size: 0.9,
@@ -1297,7 +1300,7 @@ export const arcane: FxDef[] = [
                 look: {scalingMode: 'hierarchy'},
             });
             // Drained of colour it cracks, then shatters into falling shards.
-            fx.sys({
+            sticker(fx, {
                 tex: 'crack',
                 loop: false,
                 life: SHATTER - CRACK,

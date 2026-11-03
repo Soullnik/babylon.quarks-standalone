@@ -2,6 +2,7 @@ import type {TransformNode} from '@babylonjs/core/Meshes/transformNode';
 import {BoxEmitter, CircleEmitter, ConeEmitter, HemisphereEmitter, RenderMode, SphereEmitter} from 'babylon.quarks';
 import {
     airDrag,
+    crossQuad,
     fadeOut,
     flicker,
     floorBounce,
@@ -12,10 +13,11 @@ import {
     spin,
     teleported,
     tint,
+    turn,
     wobble,
 } from './kit';
 import {GOLD, HOT, SPARK, clods, dust, gate, hotSparks, light, star, wedges, type At} from './parts';
-import {PALETTE, arcs, decal, shockwave, type Ramp} from './recipes';
+import {PALETTE, arcs, decal, shockwave, sticker, type Ramp} from './recipes';
 import {shapes, type FxBuilder, type FxDef} from './stage';
 
 const BRASS: [string, string] = ['#c89a3a', '#e8c060'];
@@ -72,6 +74,9 @@ function gun(fx: FxBuilder, x: number, height: number, length: number, radius: n
     return [x, height, 0];
 }
 
+const STREAK = crossQuad('x');
+const JET = crossQuad('y');
+
 /** A sprite that always sits on `parent`: a burning core, a halo, a band of a bolt. */
 function held(
     fx: FxBuilder,
@@ -91,13 +96,24 @@ function held(
         blend?: 'add' | 'alpha';
     }
 ) {
+    // A streak trailing a shot, or a flame jet turned to point back, has a direction: crossed quads
+    // along it keep it there from every side, where a billboard would swing round with the camera.
+    const along = o.tex === 'streak' ? STREAK : o.tex === 'flame' && typeof o.rot === 'number' ? JET : undefined;
     return fx.sys({
         tex: o.tex,
         blend: o.blend,
         life: o.life ?? 0.06,
         size: o.size,
         rate: o.rate ?? 50,
-        rot: o.rot,
+        ...(along
+            ? {
+                  geo: along,
+                  rotate: [0, 0, typeof o.rot === 'number' ? o.rot : 0] as [number, number, number],
+                  opaque: false,
+                  depthWrite: false,
+                  look: {renderFace: 'both' as const},
+              }
+            : {rot: o.rot}),
         color: o.color,
         alpha: o.alpha,
         parent: o.parent,
@@ -337,8 +353,10 @@ export const projectiles: FxDef[] = [
             // streaks of light left behind.
             const disc = flyer(fx, [-3.8, 1.3, 0], [3.8, 1.3, 0], 1);
             const blade = {parent: disc, life: 1, burst: [[0, 1]] as Array<[number, number]>, order: 6} as const;
-            fx.sys({...blade, tex: 'burst', size: 1.05, color: '#62c8f4', b: [spin(-16)]});
-            fx.sys({...blade, tex: 'swirl', size: 0.85, color: '#a6ecff', order: 7, b: [spin(-11)]});
+            // The blade is a disc in its own plane (the one the sparks fly off), not a sprite turned to
+            // the eye, so it goes edge-on from the side.
+            sticker(fx, {...blade, tex: 'burst', size: 1.05, color: '#62c8f4', b: [turn(-16, [0, 0, 1])]});
+            sticker(fx, {...blade, tex: 'swirl', size: 0.85, color: '#a6ecff', order: 7, b: [turn(-11, [0, 0, 1])]});
             held(fx, {parent: disc, tex: 'glow', size: 0.45, color: '#ffffff', order: 8});
             held(fx, {parent: disc, tex: 'glow', size: 1.8, color: '#3a8bd8', alpha: 0.5, order: 2});
             // Sparks flung off the teeth.

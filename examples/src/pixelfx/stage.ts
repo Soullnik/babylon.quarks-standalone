@@ -256,7 +256,7 @@ export function buildStage(ctx: DemoContext, allDefs: FxDef[]): PixelFxStage {
     });
     // Debug/testing hook, like the viewer's `__quarksViewer`: focus a cell from the console or a script.
     const debug = window as never as {__pixelfx?: unknown};
-    debug.__pixelfx = {focus: focusOn, periods: cells.map((cell) => cell.def.period)};
+    debug.__pixelfx = {focus: focusOn, periods: cells.map((cell) => cell.def.period), camera: ctx.camera};
     return stage;
 }
 

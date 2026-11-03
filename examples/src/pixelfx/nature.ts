@@ -23,7 +23,7 @@ import {
 } from './kit';
 import {clods, dust, hotSparks, light, star, type At} from './parts';
 import {decal, shockwave, windBand, type Ramp} from './recipes';
-import {chain} from './shadow';
+import {chain, tube} from './shadow';
 import {between, hero} from './spawn';
 import {shapes, type FxBuilder, type FxDef} from './stage';
 
@@ -1020,7 +1020,7 @@ export const nature: FxDef[] = [
             const ROOTS = 3;
             const SEG = 40;
             for (let r = 0; r < ROOTS; r++) {
-                const segs = chain(fx, SEG, {color: EARTH[2], rim: [0.6, 0.45, 0.25], life: P});
+                const segs = chain(fx, SEG, {color: EARTH[2], rim: [0.6, 0.45, 0.25], life: P, tube: true});
                 const phase = (r / ROOTS) * Math.PI * 2;
                 fx.every((t) => {
                     const grow = outCubic(between(t, 0.1 + r * 0.05, 0.55 + r * 0.05));
@@ -1036,6 +1036,7 @@ export const nature: FxDef[] = [
                         segs[i].scaling.setAll(reach && crumble < 1 ? 0.09 * (1 - s * 0.6) : 0.001);
                     }
                 });
+                tube(fx, segs);
             }
             // They cinch tight with a snap.
             star(fx, {
@@ -1718,7 +1719,7 @@ export const nature: FxDef[] = [
             });
             // A thorny vine bursting up, rearing back coiled, then lashing out right.
             const SEG = 44;
-            const segs = chain(fx, SEG, {color: LEAF[2], rim: [0.4, 0.9, 0.3], life: P});
+            const segs = chain(fx, SEG, {color: LEAF[2], rim: [0.4, 0.9, 0.3], life: P, tube: true});
             const tip = fx.node('tip', [0, 0, 0]);
             fx.every((t) => {
                 const rise = outCubic(between(t, 0, 0.25));
@@ -1742,6 +1743,7 @@ export const nature: FxDef[] = [
                 }
                 tip.position.set(x, y, 0);
             });
+            tube(fx, segs);
             // The crack: sap sprays and leaves tear off.
             star(fx, {
                 at: [0, 0, 0.2],

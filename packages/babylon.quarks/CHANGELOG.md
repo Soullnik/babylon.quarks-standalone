@@ -32,6 +32,9 @@ and the package's version moves in lockstep with `quarks.core`.
   Puddles are swollen lenses with a wandering edge, props such as hearts, stars and fish are
   inflated from their pixel outlines (`pillow()`), and the wind tornado is built from
   comet-textured wind bands instead of reusing the fire tornado.
+  Things with a place or direction are no longer camera-facing sprites: tentacles, roots and vines
+  are tubes of capsules (`tube()`), cracks, dials and portals lie on their surfaces (`sticker()`),
+  and shot streaks and jets are crossed quads (`crossQuad()`).
 
 ### Changed
 

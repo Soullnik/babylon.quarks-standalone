@@ -13,6 +13,7 @@ import {
     lifeFrames,
     type Num,
     popOut,
+    quad,
     spin,
     tint,
     turn,
@@ -414,6 +415,27 @@ export function debris(
         world: o.world,
         order: o.order ?? 2,
         b: [gravity(o.gravity ?? 12), grow([0, 1], [0.85, 1], [1, 0])],
+    });
+}
+
+const STICKER = quad();
+
+/**
+ * A sprite laid on a surface instead of turned to the camera: a crack on ice, veins on skin, a dial
+ * on a wall. It lies in its emitter's xy plane facing +z (so place it with `at`, `aim` and `rotate`
+ * like any emitter), turned `turn` radians in that plane. It never writes depth and keeps its
+ * clear texels see-through, so it can sit just off the surface it marks. Unlike a billboard it
+ * keeps its place on the surface from every side, as a decal does.
+ */
+export function sticker(fx: FxBuilder, o: Omit<SysOptions, 'geo' | 'mesh' | 'mode'> & {turn?: number}): ParticleSystem {
+    const {turn = 0, rotate = [0, 0, 0], look, ...rest} = o;
+    return fx.sys({
+        ...rest,
+        geo: STICKER,
+        rotate: [rotate[0], rotate[1], rotate[2] + turn],
+        opaque: false,
+        depthWrite: false,
+        look: {renderFace: 'both', ...look},
     });
 }
 

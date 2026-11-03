@@ -11,13 +11,14 @@ import {
     lathe,
     popOut,
     quad,
+    turn as roll,
     spike,
     spin,
     tint,
     wobble,
 } from './kit';
 import {clods, dust, light, wedges, type At} from './parts';
-import {PALETTE, decal, flames} from './recipes';
+import {PALETTE, decal, flames, sticker} from './recipes';
 import {skull} from './shadow';
 import {BODY, between, cutNode, hero} from './spawn';
 import {type FxBuilder, type FxDef} from './stage';
@@ -434,16 +435,17 @@ export const status: FxDef[] = [
         view: {height: 1.3, distance: 6.5},
         build(fx) {
             hero(fx, {period: 2.4, loop: true});
-            // A glowing spiral whirling over the head.
-            fx.sys({
+            // A glowing spiral whirling over the head, lying flat like a halo.
+            sticker(fx, {
                 tex: 'swirl',
                 life: 1e4,
                 size: 0.75,
                 burst: [[0, 1]],
                 color: DAZE[4],
                 at: [0, 2.25, 0],
+                aim: 'up',
                 order: 6,
-                b: [spin(-5)],
+                b: [roll(-5, [0, 0, 1])],
             });
             fx.sys({
                 tex: 'glow',
@@ -786,13 +788,14 @@ export const status: FxDef[] = [
                 [0.6, 0.5, 2.3],
                 [1.65, -0.2, 2.45],
             ].forEach(([y, turn, at]) => {
-                fx.sys({
+                sticker(fx, {
+                    rotate: [0, turn, 0],
                     tex: 'crack',
                     blend: 'alpha',
                     loop: false,
                     life: BURST - at,
                     size: 0.5,
-                    rot: true,
+                    turn: at * 2.7,
                     burst: [[at, 1]],
                     color: STONE[0],
                     at: skin(y, turn, 0.03),
@@ -870,13 +873,14 @@ export const status: FxDef[] = [
                 edgeWidth: 0.1,
             });
             // Dark veins creeping from a wound.
-            fx.sys({
+            sticker(fx, {
+                rotate: [0, 0.25, 0],
                 tex: 'crack',
                 blend: 'alpha',
                 life: 1e4,
                 size: 0.7,
                 burst: [[0, 1]],
-                rot: 0.4,
+                turn: 0.4,
                 color: '#2c1a3a',
                 alpha: 0.85,
                 at: skin(1.15, 0.25, 0.03),
@@ -1117,7 +1121,8 @@ export const status: FxDef[] = [
             hero(fx, {period: P, loop: true});
             // A glassy clock dial behind the head.
             const dial = fx.node('dial', [0, 1.75, -0.45]);
-            fx.sys({
+            // The face is a sticker in the dial's plane, so it turns with the hands drawn on it.
+            sticker(fx, {
                 tex: 'dial',
                 life: 1e4,
                 size: 1.5,

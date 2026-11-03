@@ -17,7 +17,7 @@ import {
     type Geometry,
 } from './kit';
 import {FLAT, clods, dust, light, star, wedges, type At} from './parts';
-import {PALETTE, decal, embers, flames, shockwave, smoke, type Ramp} from './recipes';
+import {PALETTE, decal, embers, flames, shockwave, smoke, sticker, type Ramp} from './recipes';
 import {shapes, type FxBuilder, type FxDef} from './stage';
 import {image} from './textures';
 
@@ -496,13 +496,13 @@ export const spawn: FxDef[] = [
             });
             rocks.forEach((r0, i) => {
                 // Light leaking through the cracks, brighter each time.
-                fx.sys({
+                sticker(fx, {
                     tex: 'crack',
                     loop: false,
                     life: POP - r0 - 0.15,
                     size: 0.5 + i * 0.15,
                     burst: [[r0 + 0.15, 1]],
-                    rot: i * 1.7,
+                    turn: i * 1.7,
                     color: GOLD[5],
                     alpha: 0.5 + i * 0.25,
                     at: [0.04 * i, 0.5 + 0.1 * i, 0.38],
@@ -891,7 +891,7 @@ export const spawn: FxDef[] = [
                 edgeWidth: 0.12,
             });
             // Cracks spread from the chest.
-            fx.sys({
+            sticker(fx, {
                 tex: 'crack',
                 loop: false,
                 life: BURST - 1.15,

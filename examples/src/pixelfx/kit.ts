@@ -807,6 +807,32 @@ export function quad(): Geometry {
     };
 }
 
+/**
+ * Two unit quads crossed along one axis, both mapped like {@link quad}: a sprite with length, such
+ * as a streak behind a shot (`'x'`, the texture's U) or a jet of flame (`'y'`, its V). Side on it
+ * reads as the sprite; end on it shrinks to a point, as a stretched streak should, where a billboard
+ * would keep showing its full length.
+ */
+export function crossQuad(axis: 'x' | 'y'): Geometry {
+    const q = quad();
+    const positions = Array.from(q.positions);
+    const normals = Array.from(q.normals);
+    // The second quad is the first turned a quarter about the shared axis.
+    for (let k = 0; k < 4; k++) {
+        const [x, y] = [q.positions[k * 3], q.positions[k * 3 + 1]];
+        if (axis === 'x') positions.push(x, 0, y);
+        else positions.push(0, y, x);
+        if (axis === 'x') normals.push(0, -1, 0);
+        else normals.push(-1, 0, 0);
+    }
+    return {
+        positions: new Float32Array(positions),
+        normals: new Float32Array(normals),
+        uvs: new Float32Array([...q.uvs, ...q.uvs]),
+        indices: new Uint32Array([...q.indices, ...Array.from(q.indices, (n) => n + 4)]),
+    };
+}
+
 const AIMS: Record<Aim, [number, number, number]> = {
     up: [-Math.PI / 2, 0, 0],
     down: [Math.PI / 2, 0, 0],

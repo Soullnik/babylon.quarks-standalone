@@ -1,3 +1,4 @@
+import {Quaternion, Vector3} from '@babylonjs/core/Maths/math.vector';
 import type {TransformNode} from '@babylonjs/core/Meshes/transformNode';
 import {CircleEmitter, ConeEmitter, ConstantValue, RenderMode, SphereEmitter, Vector3Function} from 'babylon.quarks';
 import {ballProfile, flatRing, held, window} from './arcane';
@@ -47,6 +48,20 @@ const GHOST: Ramp = [
 
 const BALL = lathe(ballProfile(10), 16);
 const SPHERE = lathe(ballProfile(20), 40);
+/** A capsule one unit long on y and one unit in radius, its ends rounded: a segment of a tube. */
+const CAPSULE = lathe(
+    [
+        [0.001, -0.5],
+        [0.55, -0.47],
+        [0.85, -0.4],
+        [1, -0.28],
+        [1, 0.28],
+        [0.85, 0.4],
+        [0.55, 0.47],
+        [0.001, 0.5],
+    ],
+    18
+);
 /** A skull as a lathe: a narrow jaw under a round cranium, about one unit tall. */
 const SKULL = lathe(
     [
@@ -128,7 +143,8 @@ function along(points: Array<[number, number]>, u: number): [number, number] {
 
 /**
  * A chain of lit balls, one per node: a tentacle, an arm, a finger. Move and scale the nodes each
- * frame; a node scaled to 0 hides its ball.
+ * frame; a node scaled to 0 hides its ball. With `tube`, each node is a capsule instead: pose the
+ * nodes as points along the line, then call {@link tube} to join them into one smooth limb.
  */
 export function chain(
     fx: FxBuilder,
@@ -141,6 +157,7 @@ export function chain(
         parent?: TransformNode;
         order?: number;
         loop?: boolean;
+        tube?: boolean;
     }
 ): TransformNode[] {
     const nodes: TransformNode[] = [];
@@ -148,7 +165,7 @@ export function chain(
         const node = fx.node('seg', [0, 0, 0], o.parent);
         node.scaling.setAll(0);
         fx.sys({
-            geo: BALL,
+            geo: o.tube ? CAPSULE : BALL,
             tex: 'white',
             blend: 'alpha',
             loop: o.loop ?? false,
@@ -167,6 +184,46 @@ export function chain(
         nodes.push(node);
     }
     return nodes;
+}
+
+/**
+ * Joins a `tube` chain into one limb. The hook before it poses the chain as points: each node's
+ * position a point on the line and its scale the radius there. This then stretches each capsule
+ * from its point to the next and turns it along the gap, overlapping its neighbours so the joints
+ * stay round, and caps the tip. Register it after the hook that poses the chain.
+ */
+export function tube(fx: FxBuilder, segs: TransformNode[]): void {
+    const points = segs.map(() => new Vector3());
+    const up = Vector3.Up();
+    const dir = new Vector3();
+    const axis = new Vector3();
+    fx.every(() => {
+        segs.forEach((seg, i) => points[i].copyFrom(seg.position));
+        segs.forEach((seg, i) => {
+            const r = seg.scaling.x;
+            const here = points[i];
+            const next = points[i + 1];
+            let len: number;
+            if (next) {
+                next.subtractToRef(here, dir);
+                len = dir.length();
+                seg.position.copyFrom(here).addInPlace(next).scaleInPlace(0.5);
+            } else {
+                if (i > 0) here.subtractToRef(points[i - 1], dir);
+                else dir.copyFrom(up);
+                len = r;
+            }
+            if (dir.lengthSquared() < 1e-12) dir.copyFrom(up);
+            dir.normalize();
+            seg.rotationQuaternion ??= new Quaternion();
+            // Turn +y onto the gap: about up × dir, by the angle between them.
+            Vector3.CrossToRef(up, dir, axis);
+            const sin = axis.length();
+            if (sin < 1e-6) axis.set(1, 0, 0);
+            Quaternion.RotationAxisToRef(axis.normalize(), Math.atan2(sin, dir.y), seg.rotationQuaternion);
+            seg.scaling.set(r, len + r, r);
+        });
+    });
 }
 
 /**
@@ -327,61 +384,52 @@ export const shadow: FxDef[] = [
             const hole = fx.node('hole', [0, 1.7, 0]);
             const tilt = fx.node('tilt', [0, 0, 0], hole);
             tilt.rotation.set(-0.12, 0, -0.18);
-            // The disk: banded rings round the hole, turning, split so its near half passes in
-            // front of the hole and its far half behind.
-            for (const [start, order, alpha] of [
-                [Math.PI, 2, 0.55],
-                [0, 6, 0.8],
-            ] as const) {
-                fx.sys({
-                    geo: lathe(
-                        [
-                            [0.85, 0],
-                            [2.3, 0],
-                        ],
-                        40,
-                        Math.PI,
-                        start
-                    ),
-                    image: 'scanlines',
-                    blend: 'add',
-                    life: 1e4,
-                    size: 1,
-                    burst: [[0, 1]],
-                    color: VOID[5],
-                    alpha,
-                    parent: tilt,
-                    order,
-                    look: {renderFace: 'both', mapUV: {tiling: [1, 3], scroll: [0, -0.15]}},
-                });
-                fx.sys({
-                    geo: lathe(
-                        [
-                            [0.8, 0],
-                            [2.0, 0],
-                        ],
-                        40,
-                        Math.PI,
-                        start
-                    ),
-                    image: 'whirl-band',
-                    blend: 'add',
-                    life: 1e4,
-                    size: 1,
-                    burst: [[0, 1]],
-                    color: VOID[6],
-                    alpha: alpha * 0.6,
-                    parent: tilt,
-                    order,
-                    look: {renderFace: 'both', mapUV: {tiling: [3, 1], scroll: [0.35, 0]}},
-                });
-            }
-            // The far side of the disk, bent up over the top and under the bottom: a ring of light
-            // facing us round the hole.
+            // The disk: banded rings round the hole, turning. It is whole, and the opaque hole hides
+            // whatever part of it is behind, so it reads right from every side.
+            fx.sys({
+                geo: lathe(
+                    [
+                        [0.85, 0],
+                        [2.3, 0],
+                    ],
+                    72
+                ),
+                image: 'scanlines',
+                blend: 'add',
+                life: 1e4,
+                size: 1,
+                burst: [[0, 1]],
+                color: VOID[5],
+                alpha: 0.7,
+                parent: tilt,
+                order: 5,
+                look: {renderFace: 'both', mapUV: {tiling: [2, 3], scroll: [0, -0.15]}},
+            });
+            fx.sys({
+                geo: lathe(
+                    [
+                        [0.8, 0],
+                        [2.0, 0],
+                    ],
+                    72
+                ),
+                image: 'whirl-band',
+                blend: 'add',
+                life: 1e4,
+                size: 1,
+                burst: [[0, 1]],
+                color: VOID[6],
+                alpha: 0.45,
+                parent: tilt,
+                order: 5,
+                look: {renderFace: 'both', mapUV: {tiling: [6, 1], scroll: [0.35, 0]}},
+            });
+            // The photon ring: light bent round the hole, which faces the eye from any side, so it is
+            // the one part drawn as a billboard. It hugs the hole's edge.
             fx.sys({
                 tex: 'ring',
                 life: 1e4,
-                size: 2.4,
+                size: 1.9,
                 burst: [[0, 1]],
                 color: VOID[5],
                 alpha: 0.75,
@@ -815,7 +863,7 @@ export const shadow: FxDef[] = [
             const SEG = 22;
             arms.forEach(([x, z, lean, phase], a) => {
                 const t0 = 0.3 + a * 0.08;
-                const segs = chain(fx, SEG, {color: VOID[2], rim: [1.1, 0.6, 1.9], life: P});
+                const segs = chain(fx, SEG, {color: VOID[2], rim: [1.1, 0.6, 1.9], life: P, tube: true});
                 const hand = fx.node('hand', [0, 0, 0]);
                 const palm = chain(fx, 1, {color: VOID[2], rim: [1.1, 0.6, 1.9], life: P, parent: hand});
                 palm[0].position.set(0, 0.05, 0);
@@ -828,7 +876,7 @@ export const shadow: FxDef[] = [
                     base.rotation.z = spread;
                     base.position.set(Math.sin(-spread) * 0.08, 0.1, f === 4 ? 0.05 : 0);
                     bases.push(base);
-                    fingers.push(chain(fx, 3, {color: VOID[3], rim: [1.2, 0.7, 2], life: P, parent: base}));
+                    fingers.push(chain(fx, 3, {color: VOID[3], rim: [1.2, 0.7, 2], life: P, parent: base, tube: true}));
                 }
                 fx.every((t) => {
                     const up = outCubic(between(t, t0, t0 + 0.35));
@@ -864,6 +912,8 @@ export const shadow: FxDef[] = [
                     palm[0].scaling.setAll(0.15);
                     bases.forEach((b) => b.scaling.setAll(1));
                 });
+                tube(fx, segs);
+                fingers.forEach((joints) => tube(fx, joints));
             });
             // Violet smoke curling off the arms while they strain.
             const curl = fx.sys({
@@ -1370,7 +1420,7 @@ export const shadow: FxDef[] = [
                 [0.05, -0.6, 5.6],
             ];
             roots.forEach(([x, z, phase], r) => {
-                const segs = chain(fx, SEG, {color: VOID[2], rim: [1.1, 0.6, 1.9], life: P});
+                const segs = chain(fx, SEG, {color: VOID[2], rim: [1.1, 0.6, 1.9], life: P, tube: true});
                 const height = 1.6 + (r % 2) * 0.4;
                 const t0 = 0.3 + r * 0.05;
                 const dir = x < 0 ? -1 : 1;
@@ -1392,6 +1442,7 @@ export const shadow: FxDef[] = [
                         segs[i].scaling.setAll(h > 0.05 ? 0.15 * (1 - s * 0.8) : 0.001);
                     }
                 });
+                tube(fx, segs);
             });
             const curl = fx.sys({
                 tex: 'dot',

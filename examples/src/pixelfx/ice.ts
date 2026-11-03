@@ -21,7 +21,7 @@ import {
     tint,
     wobble,
 } from './kit';
-import {PALETTE, decal, flash, pool, shockwave, smoke, windBand} from './recipes';
+import {PALETTE, decal, flash, pool, shockwave, smoke, sticker, windBand} from './recipes';
 import {type FxBuilder, type FxDef, shapes} from './stage';
 import {image} from './textures';
 
@@ -571,12 +571,12 @@ export const ice: FxDef[] = [
             });
             // The cracks: white lines racing over the near face.
             for (const c of CRACK) {
-                fx.sys({
+                sticker(fx, {
                     tex: 'crack',
                     blend: 'add',
                     life: BURST - c,
                     size: 1.4,
-                    rot: true,
+                    turn: c * 2.3,
                     burst: [[0, 1]],
                     delay: c,
                     loop: false,
@@ -1100,12 +1100,12 @@ export const ice: FxDef[] = [
             });
             flash(fx, {at: [-0.75, 0.8, 0.2], size: 1.6, delay: HIT, life: 0.14, color: '#ffffff'});
             for (const c of CRACKS) {
-                fx.sys({
+                sticker(fx, {
                     tex: 'crack',
                     blend: 'add',
                     life: BURST - c,
                     size: 1.2,
-                    rot: true,
+                    turn: c * 2.3,
                     burst: [[0, 1]],
                     delay: c,
                     loop: false,
