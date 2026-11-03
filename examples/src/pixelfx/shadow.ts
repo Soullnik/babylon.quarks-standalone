@@ -6,12 +6,12 @@ import {
     airDrag,
     fadeOut,
     flicker,
-    frames,
     gem,
     gravity,
     grow,
     lathe,
     lens,
+    lifeFrames,
     orbit,
     outlineBand,
     popOut,
@@ -1201,7 +1201,7 @@ export const shadow: FxDef[] = [
             ];
             // A cold green flame.
             fx.sys({
-                image: 'flame-heat',
+                image: 'flame-tongue-heat',
                 blend: 'add',
                 alpha: 0.8,
                 look: {gradientMap: {ramp: rampTexture(fx.scene, flame)}, pivot: {x: 0, y: 0.45, z: 0}},
@@ -1215,7 +1215,7 @@ export const shadow: FxDef[] = [
                 at: [0, 0.6, 0],
                 order: 3,
                 b: [
-                    frames(12, 24),
+                    lifeFrames(24),
                     tint([['#ffffff', 0]], fadeOut(0.45, 0.1)),
                     grow([0, 0.7], [0.3, 1], [1, 0.25]),
                     wobble(2, 0.6),
@@ -1330,7 +1330,7 @@ export const shadow: FxDef[] = [
                 [VOID[3], 1],
             ];
             const base = {
-                image: 'flame-heat' as const,
+                image: 'flame-tongue-heat' as const,
                 rot: [-0.2, 0.2] as [number, number],
                 shape: new ConeEmitter({radius: 0.35, angle: 0.12, thickness: 1}),
                 aim: 'up' as const,
@@ -1348,7 +1348,7 @@ export const shadow: FxDef[] = [
                 rate: 26,
                 order: 2,
                 b: [
-                    frames(12, 24),
+                    lifeFrames(24),
                     tint([['#ffffff', 0]], fadeOut(0.45, 0.1)),
                     grow([0, 0.7], [0.3, 1], [1, 0.3]),
                     wobble(2, 0.6),
@@ -1366,7 +1366,7 @@ export const shadow: FxDef[] = [
                 rate: 34,
                 order: 4,
                 b: [
-                    frames(12, 24),
+                    lifeFrames(24),
                     tint([['#ffffff', 0]], fadeOut(0.5, 0.1)),
                     grow([0, 0.7], [0.3, 1], [1, 0.25]),
                     wobble(2, 0.6),

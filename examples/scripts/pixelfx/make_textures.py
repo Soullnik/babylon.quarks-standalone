@@ -5,16 +5,16 @@
 Needs numpy and Pillow. Two kinds of texture come out of it:
 
 * Flipbooks traced from pixelfx (https://github.com/patch-gg/pixelfx, MIT). Each file in `parts/` is one
-  element of a pixelfx effect with the rest turned off (the torch's flame, the spirit flame's body). Copy
-  it to pixelfx's src/fx/parts/, render it with `node tools/render.mjs parts/<name> --sheet --bg none
-  --no-actor`, and pass the sheet: `--part torch-flame <png> <json> --heat flame-heat <png> <json>
-  --part spirit-flame <png> <json>`. Each frame is de-pixelized: premultiplied, upscaled, blurred by about half a source pixel,
+  element of a pixelfx effect with the rest turned off (the spirit flame's body). Copy it to pixelfx's
+  src/fx/parts/, render it with `node tools/render.mjs parts/<name> --sheet --bg none --no-actor`, and
+  pass the sheet: `--part spirit-flame <png> <json>`. Each frame is de-pixelized: premultiplied, upscaled, blurred by about half a source pixel,
   then its alpha edge tightened so the outlines come out as clean curves in the original colours.
 * Maps drawn here from the same formulas the pixel effects use, at full resolution: the fire tornado's
   spiral band (pixelfx fire/fire-tornado), the force field's hex shell (pixelfx scifi/force-field, after
   Sprite Fusion's shield, https://www.spritefusion.com/pixel-art-vfx/shield, MIT) and a wrapping noise.
 
-Without --part or --heat the flipbooks already in public/ are left alone.
+Without --part or --heat the flipbooks already in public/ are left alone. The fire and smoke sheets
+(flames, tongues, comets, puffs) come from make_fire.py instead.
 """
 import json
 import os
@@ -385,79 +385,6 @@ def tent(size=128):
     save('tent.png', np.stack([g, g, g, np.ones_like(g)], -1))
 
 
-def disc_layer(img, cx, cy, r, rgb, a, aa=1.2, wob=0.0, seed=0):
-    """Composites an antialiased disc over `img` (premultiplied RGBA), `aa` pixels of soft edge. `wob`
-    ruffles its rim by that fraction of the radius, so a ball of flame or smoke reads as billowing."""
-    h, w = img.shape[:2]
-    y, x = np.mgrid[0:h, 0:w]
-    d = np.sqrt((x + 0.5 - cx) ** 2 + (y + 0.5 - cy) ** 2)
-    if wob:
-        th = np.arctan2(y + 0.5 - cy, x + 0.5 - cx)
-        rng = np.random.default_rng(seed)
-        ruffle = sum(np.sin(th * f + rng.uniform(0, TAU)) / f ** 0.7 for f in (3, 5, 7, 11))
-        d = d - r * wob * ruffle / 2.2
-    cov = np.clip((r - d) / aa + 0.5, 0, 1) * a
-    img[..., :3] = img[..., :3] * (1 - cov[..., None]) + np.asarray(rgb)[None, None, :] * cov[..., None]
-    img[..., 3] = img[..., 3] * (1 - cov) + cov
-
-
-def unpremultiply(img):
-    out = img.copy()
-    out[..., :3] = img[..., :3] / np.maximum(img[..., 3:4], 1e-4)
-    return out
-
-
-def puff_sheet(name, draw, frames=16, cols=4, tile=128):
-    """A sheet of `frames` tiles, frame i drawn by draw(img, cx, cy, k) with k the life left (1 to 0)."""
-    rows = (frames + cols - 1) // cols
-    sheet = np.zeros((rows * tile, cols * tile, 4), np.float32)
-    for i in range(frames):
-        img = np.zeros((tile, tile, 4), np.float32)
-        draw(img, tile / 2, tile * 0.56, 1 - i / (frames - 1) * 0.999)
-        r, c = i // cols, i % cols
-        sheet[r * tile:(r + 1) * tile, c * tile:(c + 1) * tile] = unpremultiply(img)
-    save(name + '.png', sheet)
-
-
-def fire_puff_frame(img, x, y, k, size=30, heat=False):
-    """pixelfx fire/_lib.js `firePuff`, drawn at full resolution: a ball of flame cooling down the ramp as it
-    ages, a darker rim, a lit core up and to the left, a tongue on top and a hot heart while young."""
-    H = [np.full(3, h, np.float32) for h in FIRE_HEAT] if heat else [hexrgb(c) for c in FIRE]
-    n = len(H)
-    age = 1 - k
-    heat = min(0.999, age ** 0.62 + 0.03)
-    idx = min(n - 2, int(heat * (n - 1)))
-    r = size * (0.55 + 0.45 * min(1, age * 7)) * (1 - age * 0.55)
-    c = H[idx]
-    if idx >= n - 2:
-        disc_layer(img, x, y, r, c, min(1, k * 3) * 0.85, aa=r * 0.5)
-        return
-    disc_layer(img, x, y, r, H[min(n - 1, idx + 2)], 1, wob=0.14, seed=1)
-    disc_layer(img, x - r * 0.16, y - r * 0.22, r * 0.78, c, 1, wob=0.12, seed=2)
-    disc_layer(img, x, y - r * 0.9, r * 0.42, c, 1, wob=0.1, seed=3)
-    if idx <= 3:
-        disc_layer(img, x - r * 0.28, y - r * 0.34, r * 0.36, H[max(0, idx - 1)], 1, wob=0.1, seed=4)
-
-
-SMOKE = ['#7b6f72', '#5d5660', '#433d48', '#2b2630', '#1a171e']
-
-
-def smoke_puff_frame(img, x, y, k, size=26):
-    """pixelfx fire/_lib.js `smokePuff` (big), drawn at full resolution: a body, a denser core sitting low
-    and a lit cap while young, swelling and thinning. Shaded relative to the ramp's lightest grey, so the
-    particle colour sets the smoke's own."""
-    age = 1 - k
-    r = size * (0.65 + min(1, age * 2.5) * 0.45 + age * 0.5)
-    a = min(1, age * 12) * min(1, k * 2.4) * 0.7
-    top = hexrgb(SMOKE[0])
-    grey = hexrgb(SMOKE[min(4, int(age * 1.05 * 5))]) / top
-    soft = r * 0.35
-    disc_layer(img, x, y, r, grey, a * 0.45, aa=soft, wob=0.12, seed=5)
-    disc_layer(img, x + r * 0.05, y + r * 0.06, r * 0.74, grey, a * 0.62, aa=soft, wob=0.12, seed=6)
-    if age < 0.5:
-        disc_layer(img, x - r * 0.22, y - r * 0.3, r * 0.5, np.minimum(1, grey * 1.15), a * 0.4 * (1 - age * 2), aa=soft)
-
-
 def radial(size=128):
     """Red 1 at the centre falling linearly to 0 at the rim, 0 outside and on the border: an erosion
     mask that, laid over a surface by tiling and offset, spreads a cut outward from one point."""
@@ -489,5 +416,3 @@ if __name__ == '__main__':
     gradient()
     sweep()
     tent()
-    puff_sheet('fire-puff-heat', lambda *a: fire_puff_frame(*a, heat=True))
-    puff_sheet('smoke-puff', smoke_puff_frame)

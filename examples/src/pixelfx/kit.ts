@@ -811,10 +811,16 @@ export function quad(): Geometry {
  * Two unit quads crossed along one axis, both mapped like {@link quad}: a sprite with length, such
  * as a streak behind a shot (`'x'`, the texture's U) or a jet of flame (`'y'`, its V). Side on it
  * reads as the sprite; end on it shrinks to a point, as a stretched streak should, where a billboard
- * would keep showing its full length.
+ * would keep showing its full length. Turn it with the emitter's `rotate`.
  */
-export function crossQuad(axis: 'x' | 'y'): Geometry {
+export function crossQuad(axis: 'x' | 'y', pivot: [number, number] = [0, 0]): Geometry {
     const q = quad();
+    // `pivot` is the point of the sprite (in its own -0.5..0.5 units) set on the particle: a flame's
+    // foot, a comet's head.
+    for (let k = 0; k < 4; k++) {
+        q.positions[k * 3] -= pivot[0];
+        q.positions[k * 3 + 1] -= pivot[1];
+    }
     const positions = Array.from(q.positions);
     const normals = Array.from(q.normals);
     // The second quad is the first turned a quarter about the shared axis.

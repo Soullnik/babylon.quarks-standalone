@@ -109,9 +109,10 @@ export function flames(fx: FxBuilder, o: FlameOptions = {}): ParticleSystem {
     const height = o.height ?? 1.6;
     const life: Num = o.life ?? [0.45, 0.75];
     const meanLife = Array.isArray(life) ? (life[0] + life[1]) / 2 : typeof life === 'number' ? life : 0.6;
-    // pixelfx's own flame tongue (or flame puff) as a heat flipbook, coloured through the ramp.
+    // A tongue of flame (or a flame puff) as a heat flipbook played once over each particle's life, so
+    // every tongue flares, licks up and burns out, coloured through the ramp.
     return fx.sys({
-        image: o.puff ? 'fire-puff-heat' : 'flame-heat',
+        image: o.puff ? 'fire-puff-heat' : 'flame-tongue-heat',
         // Added, so where tongues overlap the heart of the fire burns toward white.
         blend: o.puff ? 'alpha' : 'add',
         alpha: o.puff ? 1 : 0.75,
@@ -141,7 +142,7 @@ export function flames(fx: FxBuilder, o: FlameOptions = {}): ParticleSystem {
         world: o.world,
         order: o.order ?? 3,
         b: [
-            o.puff ? lifeFrames(16) : frames(12, 24),
+            lifeFrames(o.puff ? 16 : 24),
             tint([['#ffffff', 0]], o.puff ? popOut(0.8) : fadeOut(0.45, 0.1)),
             grow(
                 ...((o.puff
@@ -149,15 +150,45 @@ export function flames(fx: FxBuilder, o: FlameOptions = {}): ParticleSystem {
                           [0, 1],
                           [1, 1.3],
                       ]
-                    : [
-                          [0, 0.7],
-                          [0.3, 1],
-                          [1, 0.25],
+                    : // The sheet itself flares and burns out; this only swells it a little as it rises.
+                      [
+                          [0, 0.85],
+                          [0.4, 1],
+                          [1, 0.9],
                       ]) as Array<[number, number]>)
             ),
             wobble(2, 0.6),
             drag([0, 1], [1, 0.6]),
         ],
+    });
+}
+
+/**
+ * The body of a fire burning on the spot: one upright sprite playing a whole flame on a seamless
+ * 64-frame loop (Unity's and Unreal's way of drawing a torch or a campfire), its foot at `at`,
+ * coloured through the ramp. Pair it with {@link flames} for tongues licking off it.
+ */
+export function fireBody(
+    fx: FxBuilder,
+    o: Placed & {size?: number; palette?: Ramp; alpha?: number; order?: number} = {}
+): ParticleSystem {
+    const size = o.size ?? 1.6;
+    const [x, y, z] = o.at ?? [0, 0, 0];
+    return fx.sys({
+        image: 'fire-loop-heat',
+        mode: RenderMode.VerticalBillBoard,
+        blend: 'add',
+        alpha: o.alpha,
+        life: 1e4,
+        size,
+        burst: 1,
+        loop: false,
+        // The sheet's foot sits a twentieth of a tile above its bottom edge.
+        at: [x, y + size * 0.45, z],
+        parent: o.parent,
+        order: o.order ?? 3,
+        look: {gradientMap: {ramp: rampTexture(fx.scene, o.palette ?? PALETTE.fire)}},
+        b: [frames(24, 64)],
     });
 }
 

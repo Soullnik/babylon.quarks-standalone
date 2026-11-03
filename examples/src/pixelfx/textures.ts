@@ -710,8 +710,9 @@ export function sheet(scene: Scene, name: TextureName): TextureSheet {
  * formulas of its effects. Unlike the painted ones above they carry their own colour.
  */
 export type ImageName =
-    | 'torch-flame'
-    | 'flame-heat'
+    | 'fire-loop-heat'
+    | 'flame-tongue-heat'
+    | 'fire-comet-heat'
     | 'spirit-flame'
     | 'fire-puff-heat'
     | 'smoke-puff'
@@ -735,10 +736,15 @@ export type ImageName =
 
 /** `mask`: an erosion mask read by value, so no mipmaps (they would average values that order a cut); `nearest` keeps per-cell values crisp. */
 const IMAGES: Record<ImageName, {u: number; v: number; wrap: boolean; wrapV?: boolean; mask?: 'linear' | 'nearest'}> = {
-    // 24 frames of the torch's flame at 12 fps, 6 × 4, each square with the flame's foot at the bottom.
-    'torch-flame': {u: 6, v: 4, wrap: false},
-    // The same flame as heat, grey 1 white-hot to 0 dark red, for a gradient map to colour in any ramp.
-    'flame-heat': {u: 6, v: 4, wrap: false},
+    // Drawn by scripts/pixelfx/make_fire.py, as heat. A whole flame burning on the spot, 64 frames 8 × 8
+    // that loop: the body of a torch or a campfire, one sprite playing it.
+    'fire-loop-heat': {u: 8, v: 8, wrap: false},
+    // One tongue over its life, 24 frames 6 × 4: it flares, stretches, splits and burns out. Play it once
+    // over each particle's life, so every tongue is born and dies rather than looping the same frames.
+    'flame-tongue-heat': {u: 6, v: 4, wrap: false},
+    // A ball of flame flying toward +U with its fire streaming back, 16 frames 4 × 4 that loop; the head's
+    // centre sits at U 0.74, V 0.5. Lay it along the flight.
+    'fire-comet-heat': {u: 4, v: 4, wrap: false},
     // pixelfx's spirit flame body (rim, hollow heart, side wisps, strands), 36 frames at 12 fps, 8 × 5.
     'spirit-flame': {u: 8, v: 5, wrap: false},
     // A ball of flame over its life, 16 frames 4 × 4, as heat; play it once over a particle's life.

@@ -1,3 +1,4 @@
+import {Vector3} from '@babylonjs/core/Maths/math.vector';
 import {
     CircleEmitter,
     ConeEmitter,
@@ -7,6 +8,7 @@ import {
     SphereEmitter,
 } from 'babylon.quarks';
 import {
+    crossQuad,
     curve,
     drag,
     fadeOut,
@@ -23,7 +25,20 @@ import {
     tint,
     wobble,
 } from './kit';
-import {PALETTE, debris, decal, embers, flames, flash, heart, pool, shockwave, smoke, sparks} from './recipes';
+import {
+    PALETTE,
+    debris,
+    decal,
+    embers,
+    fireBody,
+    flames,
+    flash,
+    heart,
+    pool,
+    shockwave,
+    smoke,
+    sparks,
+} from './recipes';
 import {type FxBuilder, type FxDef, shapes} from './stage';
 import {image, rampTexture} from './textures';
 
@@ -31,7 +46,7 @@ import {image, rampTexture} from './textures';
 function licks(fx: FxBuilder, at: [number, number, number], radius: number, rate: number): void {
     const fireRamp = rampTexture(fx.scene, PALETTE.fire);
     fx.sys({
-        image: 'flame-heat',
+        image: 'flame-tongue-heat',
         blend: 'add',
         mode: RenderMode.VerticalBillBoard,
         life: [0.25, 0.45],
@@ -44,7 +59,7 @@ function licks(fx: FxBuilder, at: [number, number, number], radius: number, rate
         at,
         order: 4,
         look: {gradientMap: {ramp: fireRamp}, pivot: {x: 0, y: 0.45, z: 0}},
-        b: [frames(12, 24), tint([['#ffffff', 0]], fadeOut(0.4, 0.1)), grow([0, 1], [1, 0.3])],
+        b: [lifeFrames(24), tint([['#ffffff', 0]], fadeOut(0.4, 0.1)), grow([0, 1], [1, 0.3])],
     });
     fx.sys({
         image: 'fire-puff-heat',
@@ -65,6 +80,11 @@ function licks(fx: FxBuilder, at: [number, number, number], radius: number, rate
 }
 
 /** pixelfx's fire category, rebuilt as 3D particle effects. */
+/** The comet sheet on crossed quads with its head on the particle, to lay along a flight. */
+const COMET = crossQuad('x', [0.24, 0]);
+/** A flame tongue on crossed quads standing on its foot, to point along a jet. */
+const JET = crossQuad('y', [0, -0.45]);
+
 export const fire: FxDef[] = [
     {
         id: 'fire/brazier',
@@ -141,7 +161,8 @@ export const fire: FxDef[] = [
             fx.prop(shapes.sphere(scene, 0.55, 10), {at: [0, 0.02, 0], color: '#2a0d06', glow: '#902a0a'}).scaling.y =
                 0.22;
             heart(fx, {at: [0, 0.6, 0], size: 1.8});
-            flames(fx, {at: [0, 0.2, 0], radius: 0.45, height: 1.9, rate: 45});
+            fireBody(fx, {at: [0, 0.15, 0], size: 1.9, alpha: 0.85});
+            flames(fx, {at: [0, 0.2, 0], radius: 0.45, height: 1.9, rate: 30});
             licks(fx, [0, 1.3, 0], 0.35, 10);
             embers(fx, {at: [0, 0.5, 0], radius: 0.4, rate: 12});
             sparks(fx, {
@@ -299,7 +320,7 @@ export const fire: FxDef[] = [
             });
             // Past a third of the way, each billow tears into a tongue licking up and back.
             fx.sys({
-                image: 'flame-heat',
+                image: 'flame-tongue-heat',
                 blend: 'add',
                 life: [0.45, 0.7],
                 speed: [8, 12],
@@ -323,7 +344,7 @@ export const fire: FxDef[] = [
                     pivot: {x: 0, y: 0.45, z: 0},
                 },
                 b: [
-                    frames(12, 24),
+                    lifeFrames(24),
                     tint(
                         [['#ffffff', 0]],
                         [
@@ -356,7 +377,7 @@ export const fire: FxDef[] = [
                 const side = i % 2 ? 1 : -1;
                 const d = (18 + (i >> 1) * 16) * 0.04;
                 fx.sys({
-                    image: 'flame-heat',
+                    image: 'fire-loop-heat',
                     blend: 'add',
                     mode: RenderMode.VerticalBillBoard,
                     life: 1e4,
@@ -367,7 +388,7 @@ export const fire: FxDef[] = [
                     at: along(d, side * d * SPREAD * 0.85),
                     order: 4,
                     look: {gradientMap: {ramp: fireRamp}, pivot: {x: 0, y: 0.45, z: 0}},
-                    b: [frames(12, 24)],
+                    b: [frames(24, 64)],
                 });
             }
             // The roar: bright streaks racing out through the heart of the cone.
@@ -396,15 +417,20 @@ export const fire: FxDef[] = [
             });
             // The jet at the lips: white-hot overlapping blades fluttering as the breath roars.
             fx.sys({
-                image: 'flame-heat',
+                image: 'flame-tongue-heat',
+                // A jet pointing along the breath from every side, not a sprite turned to the screen.
+                geo: JET,
+                opaque: false,
+                depthWrite: false,
                 blend: 'add',
                 life: [0.1, 0.18],
                 size: [1, 1.7],
-                rot: [-Math.PI / 2 - 0.08, -Math.PI / 2 + 0.08],
+                rotate: [0, 0, -Math.PI / 2],
                 rate: 45,
                 at: along(0.05),
                 order: 5,
                 look: {
+                    renderFace: 'both',
                     gradientMap: {
                         ramp: rampTexture(fx.scene, [
                             ['#ffffff', 0],
@@ -413,9 +439,8 @@ export const fire: FxDef[] = [
                             ['#ff8a2a', 1],
                         ]),
                     },
-                    pivot: {x: 0, y: 0.45, z: 0},
                 },
-                b: [frames(12, 24), tint([['#ffffff', 0]], popOut(0.6))],
+                b: [lifeFrames(24), tint([['#ffffff', 0]], popOut(0.6))],
             });
             sparks(fx, {
                 at: along(1),
@@ -554,7 +579,7 @@ export const fire: FxDef[] = [
                 const life = 0.3 + 1.0 * q * q;
                 const count = Math.max(5, Math.round((Math.PI * 2 * r) / 0.34));
                 fx.sys({
-                    image: 'flame-heat',
+                    image: 'flame-tongue-heat',
                     blend: 'add',
                     mode: RenderMode.VerticalBillBoard,
                     life: [life * 0.85, life * 1.2],
@@ -566,7 +591,7 @@ export const fire: FxDef[] = [
                     order: 4,
                     look: {gradientMap: {ramp: fireRamp}, pivot: {x: 0, y: 0.45, z: 0}},
                     b: [
-                        frames(12, 24),
+                        lifeFrames(24),
                         tint(
                             [
                                 ['#ffffff', 0],
@@ -712,9 +737,9 @@ export const fire: FxDef[] = [
                 funnel.rotation.z = 0.07 * Math.sin(a * 2) + 0.05 * Math.sin(a);
                 funnel.rotation.x = 0.05 * Math.cos(a * 2);
             });
-            // The ring of flame whirling at its foot: the torch's flipbook, two turns a loop.
+            // The ring of flame whirling at its foot: tongues born and dying round it, two turns a loop.
             fx.sys({
-                image: 'torch-flame',
+                image: 'flame-tongue-heat',
                 mode: RenderMode.VerticalBillBoard,
                 blend: 'alpha',
                 life: [0.5, 0.8],
@@ -722,10 +747,10 @@ export const fire: FxDef[] = [
                 rate: 30,
                 shape: new CircleEmitter({radius: 0.65, thickness: 0.15}),
                 aim: 'up',
-                look: {pivot: {x: 0, y: 0.45, z: 0}},
+                look: {gradientMap: {ramp: rampTexture(fx.scene, PALETTE.fire)}, pivot: {x: 0, y: 0.45, z: 0}},
                 order: 4,
                 b: [
-                    frames(12, 24),
+                    lifeFrames(24),
                     orbit(Math.PI * 2, [0, 0, 1]),
                     tint([['#ffffff', 0]], fadeOut(0.6, 0.15)),
                     grow([0, 0.6], [0.3, 1], [1, 0.7]),
@@ -733,7 +758,7 @@ export const fire: FxDef[] = [
             });
             // Flame flung off the spinning sides, cooling as it flies.
             fx.sys({
-                image: 'torch-flame',
+                image: 'flame-tongue-heat',
                 mode: RenderMode.VerticalBillBoard,
                 blend: 'alpha',
                 life: [0.3, 0.5],
@@ -745,8 +770,9 @@ export const fire: FxDef[] = [
                 at: [0, 0.4, 0],
                 world: true,
                 order: 5,
+                look: {gradientMap: {ramp: rampTexture(fx.scene, PALETTE.fire)}},
                 b: [
-                    frames(12, 24),
+                    lifeFrames(24),
                     orbit(5, [0, 0, 1]),
                     tint(
                         [
@@ -842,44 +868,27 @@ export const fire: FxDef[] = [
                 alpha: 0.55,
                 radius: 0.25,
             });
-            // The body: tongues rooted in the head streaming back, the longest behind.
-            for (const [length, dy] of [
-                [1.2, 0],
-                [0.92, -0.06],
-                [0.88, 0.06],
-                [0.6, 0],
+            // The body: a comet of flame laid along the flight, its head on the ball and its fire streaming
+            // back, on crossed quads so it stays along the path from every side; a hotter, shorter one
+            // inside it.
+            for (const [size, ramp, order] of [
+                [1.4, fireRamp, 4],
+                [0.85, hotRamp, 5],
             ] as const) {
                 fx.sys({
-                    image: 'flame-heat',
+                    image: 'fire-comet-heat',
+                    geo: COMET,
                     blend: 'add',
+                    opaque: false,
+                    depthWrite: false,
                     life: 1e4,
-                    size: length,
+                    size,
                     burst: 1,
                     loop: false,
-                    rot: Math.PI / 2 - dy * 2,
                     parent: ball,
-                    at: [0.06, dy, 0.01],
-                    order: 4,
-                    look: {gradientMap: {ramp: fireRamp}, pivot: {x: 0, y: 0.45, z: 0}},
-                    b: [frames(12, 24)],
-                });
-            }
-            // The corona: thin licks peeling back off the head, three above and three below.
-            for (const a of [-1.3, -1.8, -2.3, 1.3, 1.8, 2.3]) {
-                fx.sys({
-                    image: 'flame-heat',
-                    blend: 'add',
-                    life: 1e4,
-                    size: 0.3 + 0.08 * (2.3 - Math.abs(Math.abs(a) - 1.8) * 2),
-                    burst: 1,
-                    loop: false,
-                    // Pointing back and out: the head's normal at `a` (0 is the nose) swung toward the tail.
-                    rot: -Math.atan2(Math.cos(a) * 0.55 - 1, Math.sin(a) * 0.55) - Math.PI / 2,
-                    parent: ball,
-                    at: [Math.cos(a) * 0.17, Math.sin(a) * 0.17, 0.02],
-                    order: 4,
-                    look: {gradientMap: {ramp: fireRamp}, pivot: {x: 0, y: 0.45, z: 0}},
-                    b: [frames(12, 24)],
+                    order,
+                    look: {gradientMap: {ramp}, renderFace: 'both'},
+                    b: [frames(16, 16)],
                 });
             }
             // The head: hot billows churning on the spot, spinning, swept back by the corona and body.
@@ -1064,7 +1073,7 @@ export const fire: FxDef[] = [
                 const dx = (i - 2) * R0 * 0.4;
                 const k = i === 2 ? 1.2 : i % 4 === 0 ? 0.6 : 0.9;
                 fx.sys({
-                    image: 'flame-heat',
+                    image: 'fire-loop-heat',
                     blend: 'add',
                     mode: RenderMode.VerticalBillBoard,
                     life: 1e4,
@@ -1076,7 +1085,7 @@ export const fire: FxDef[] = [
                     parent: crown,
                     order: 4,
                     look: {gradientMap: {ramp: fireRamp}, pivot: {x: 0, y: 0.45, z: 0}, scalingMode: 'hierarchy'},
-                    b: [frames(12, 24)],
+                    b: [frames(24, 64)],
                 });
             }
             heart(fx, {
@@ -1110,7 +1119,7 @@ export const fire: FxDef[] = [
             // Licks running up the column's sides, raggedening its silhouette.
             gate(
                 fx.sys({
-                    image: 'flame-heat',
+                    image: 'flame-tongue-heat',
                     blend: 'add',
                     mode: RenderMode.VerticalBillBoard,
                     life: [0.7, 1],
@@ -1123,7 +1132,7 @@ export const fire: FxDef[] = [
                     world: true,
                     order: 4,
                     look: {gradientMap: {ramp: fireRamp}, pivot: {x: 0, y: 0.45, z: 0}},
-                    b: [frames(12, 24), tint([['#ffffff', 0]], fadeOut(0.7, 0.1)), grow([0, 1], [1, 0.6])],
+                    b: [lifeFrames(24), tint([['#ffffff', 0]], fadeOut(0.7, 0.1)), grow([0, 1], [1, 0.6])],
                 }),
                 [ERUPT, 45],
                 [FALL, 0]
@@ -1435,7 +1444,7 @@ export const fire: FxDef[] = [
             // Tongues licking up off the burning fuel, riding along it, swept back by the wind of it.
             gate(
                 fx.sys({
-                    image: 'flame-heat',
+                    image: 'flame-tongue-heat',
                     blend: 'add',
                     mode: RenderMode.VerticalBillBoard,
                     life: [RIDE * 0.8, RIDE],
@@ -1450,7 +1459,7 @@ export const fire: FxDef[] = [
                     order: 5,
                     look: {gradientMap: {ramp: fireRamp}, pivot: {x: 0, y: 0.45, z: 0}},
                     b: [
-                        frames(12, 24),
+                        lifeFrames(24),
                         tint(
                             [['#ffffff', 0]],
                             [
@@ -1510,15 +1519,20 @@ export const fire: FxDef[] = [
             });
             // The pilot at the nozzle: a blue cone of gas where it lights, a white point at its heart.
             fx.sys({
-                image: 'flame-heat',
+                image: 'flame-tongue-heat',
+                // A jet pointing along the breath from every side, not a sprite turned to the screen.
+                geo: JET,
+                opaque: false,
+                depthWrite: false,
                 blend: 'add',
                 life: [0.1, 0.16],
                 size: [0.32, 0.4],
-                rot: [-Math.PI / 2 - 0.05, -Math.PI / 2 + 0.05],
+                rotate: [0, 0, -Math.PI / 2],
                 rate: 40,
                 at: along(0.02),
                 order: 6,
                 look: {
+                    renderFace: 'both',
                     gradientMap: {
                         ramp: rampTexture(scene, [
                             ['#a8d4ff', 0],
@@ -1526,9 +1540,8 @@ export const fire: FxDef[] = [
                             ['#1b2a8a', 1],
                         ]),
                     },
-                    pivot: {x: 0, y: 0.45, z: 0},
                 },
-                b: [frames(12, 24), tint([['#ffffff', 0]], popOut(0.5))],
+                b: [lifeFrames(24), tint([['#ffffff', 0]], popOut(0.5))],
             });
             heart(fx, {at: along(0.04), size: 0.25, color: '#ffffff', alpha: 0.9});
             heart(fx, {at: along(0.08), size: 0.6, color: '#a8d4ff', alpha: 0.45});
@@ -1616,8 +1629,6 @@ export const fire: FxDef[] = [
             const {scene} = fx;
             const HIT = 0.62;
             const FROM: [number, number, number] = [-4.5, 5.7, -0.6];
-            // The tongues trail back up the path: a billboard turned to point up-left.
-            const back = Math.atan2(-FROM[0], FROM[1]);
             const rock = fx.node('rock', FROM);
             const stone = fx.prop(shapes.ico(scene, 0.26), {parent: rock, color: '#3a2420', glow: '#c2401a'});
             fx.every((t) => {
@@ -1634,36 +1645,33 @@ export const fire: FxDef[] = [
                 ['#ffc23d', 0.6],
                 ['#f2561d', 1],
             ]);
-            // The comet: blades of flame streaming back off the rock, fluttering, white at the root.
-            fx.sys({
-                image: 'flame-heat',
-                blend: 'add',
-                life: [0.08, 0.14],
-                size: [0.9, 1.7],
-                rot: [back - 0.12, back + 0.12],
-                rate: 60,
-                duration: HIT,
-                loop: false,
-                shape: new SphereEmitter({radius: 0.08}),
-                parent: rock,
-                order: 6,
-                look: {gradientMap: {ramp: fireRamp}, pivot: {x: 0, y: 0.42, z: 0}},
-                b: [frames(14, 24), tint([['#ffffff', 0]], popOut(0.6))],
-            });
-            fx.sys({
-                image: 'flame-heat',
-                blend: 'add',
-                life: [0.08, 0.14],
-                size: [0.6, 0.9],
-                rot: [back - 0.08, back + 0.08],
-                rate: 40,
-                duration: HIT,
-                loop: false,
-                parent: rock,
-                order: 7,
-                look: {gradientMap: {ramp: hot}, pivot: {x: 0, y: 0.42, z: 0}},
-                b: [frames(14, 24), tint([['#ffffff', 0]], popOut(0.6))],
-            });
+            // The comet: flame streaming back off the rock along its path, on crossed quads turned to
+            // the flight (a node that rides the rock without its spin), a hotter one inside.
+            const dir = new Vector3(-FROM[0], 0.15 - FROM[1], -FROM[2]).normalize();
+            const head = fx.node('head', FROM);
+            fx.every(() => head.position.copyFrom(rock.position));
+            for (const [size, ramp, order] of [
+                [2.2, fireRamp, 6],
+                [1.3, hot, 7],
+            ] as const) {
+                fx.sys({
+                    image: 'fire-comet-heat',
+                    geo: COMET,
+                    blend: 'add',
+                    opaque: false,
+                    depthWrite: false,
+                    life: HIT,
+                    size,
+                    burst: 1,
+                    loop: false,
+                    parent: head,
+                    // +x onto the flight: pitch about z, then yaw about y.
+                    rotate: [0, Math.atan2(-dir.z, dir.x), Math.asin(dir.y)],
+                    order,
+                    look: {gradientMap: {ramp}, renderFace: 'both'},
+                    b: [frames(16, 16), tint([['#ffffff', 0]], fadeOut(0.9, 0.1))],
+                });
+            }
             // Fire puffs shed behind it, rolling into smoke, sparks and embers flung off it.
             fx.sys({
                 image: 'fire-puff-heat',
@@ -2034,21 +2042,10 @@ export const fire: FxDef[] = [
                 color: '#3b2216',
             });
             fx.prop(shapes.cylinder(scene, 0.3, 0.11), {at: [0, 2.65, -0.47], rotate: [-0.5, 0, 0], color: '#2a1a12'});
-            // The flame: pixelfx's own torch flame as a 24-frame flipbook, one long-lived upright sprite.
-            const FLAME = 1.9;
-            fx.sys({
-                image: 'torch-flame',
-                randomTile: false,
-                mode: RenderMode.VerticalBillBoard,
-                blend: 'alpha',
-                life: 1e4,
-                size: FLAME,
-                burst: 1,
-                loop: false,
-                at: [0, 2.72 + FLAME / 2, -0.42],
-                order: 4,
-                b: [flipbook(12, 24)],
-            });
+            // The flame: one upright sprite playing a whole burning flame on a 64-frame loop, as a torch is
+            // made in Unity or Unreal, with a few tongues licking off its tip.
+            fireBody(fx, {at: [0, 2.68, -0.42], size: 1.6, order: 4});
+            flames(fx, {at: [0, 3.0, -0.42], radius: 0.1, size: [0.3, 0.5], rate: 9, height: 1.3, order: 5});
             heart(fx, {at: [0, 3.2, -0.42], size: 1.6, alpha: 0.35});
             embers(fx, {at: [0, 3.3, -0.42], rate: 6, radius: 0.12});
             smoke(fx, {at: [0, 3.9, -0.42], rate: 5, alpha: 0.4, size: [0.25, 0.4], color: '#5b5566'});

@@ -35,6 +35,10 @@ and the package's version moves in lockstep with `quarks.core`.
   Things with a place or direction are no longer camera-facing sprites: tentacles, roots and vines
   are tubes of capsules (`tube()`), cracks, dials and portals lie on their surfaces (`sticker()`),
   and shot streaks and jets are crossed quads (`crossQuad()`).
+  Fire is drawn the way Unity and Unreal draw it, from sheets generated for the gallery
+  (`examples/scripts/pixelfx/make_fire.py`): torches and campfires loop one whole flame (`fireBody()`)
+  with tongues that each play their own life once, fireballs and meteors lay a comet of flame
+  along their flight, and fire and smoke puffs billow in lit, lumpy shapes.
 
 ### Changed
 
