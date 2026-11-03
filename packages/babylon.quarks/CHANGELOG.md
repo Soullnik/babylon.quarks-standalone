@@ -17,6 +17,28 @@ and the package's version moves in lockstep with `quarks.core`.
 - **A starter project:** `starters/vite`, a Vite + TypeScript scene with one effect, opened on
   StackBlitz from the READMEs. `npm run typecheck` compiles it against the workspace build.
 - `ROADMAP.md` and `docs/SHURIKEN_PARITY.md` describe where 1.0 stands.
+- **Pixel FX demos:** 22 gallery demos with 250 effects rebuilt in 3D from the pixel-art effects
+  of [pixelfx](https://github.com/patch-gg/pixelfx) (MIT) and
+  [Sprite Fusion](https://www.spritefusion.com/pixel-art-vfx) (MIT): fire, explosions, ice,
+  lightning, impacts, projectiles, water, sci-fi, melee, spawn, arcane, holy, shadow, status,
+  nature, weather, UI, pickups, screen transitions, critters, character moves, and the Sprite
+  Fusion effects pixelfx lacks. Each is mapped beat by beat against its source: sub-emitter fireworks and rain splashes, beam lightning and lasers, trails and emission
+  over distance on projectiles, lit mesh shards and soft smoke, flipbooks traced from the originals,
+  and mesh particles on lathe shells (domes, funnels, columns, a fountain's bell, a waterfall's
+  sheet) with scrolled, distorted, eroded and rim-lit maps. A click on an effect zooms in and
+  replays it; `?fx=<category>/<name>` shows one effect alone. The newer categories add extruded
+  3D props and lettering (`extrude`, `label()` text sheets), DynamicTexture erosion masks for
+  transitions, node-rigged critters with chained limbs, and caster-and-target staging for moves.
+  Puddles are swollen lenses with a wandering edge, props such as hearts, stars and fish are
+  inflated from their pixel outlines (`pillow()`), and the wind tornado is built from
+  comet-textured wind bands instead of reusing the fire tornado.
+  Things with a place or direction are no longer camera-facing sprites: tentacles, roots and vines
+  are tubes of capsules (`tube()`), cracks, dials and portals lie on their surfaces (`sticker()`),
+  and shot streaks and jets are crossed quads (`crossQuad()`).
+  Fire is drawn the way Unity and Unreal draw it, from sheets generated for the gallery
+  (`examples/scripts/pixelfx/make_fire.py`): torches and campfires loop one whole flame (`fireBody()`)
+  with tongues that each play their own life once, fireballs and meteors lay a comet of flame
+  along their flight, and fire and smoke puffs billow in lit, lumpy shapes.
 
 ### Changed
 

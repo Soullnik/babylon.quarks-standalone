@@ -1,0 +1,418 @@
+"""Textures for the Pixel FX gallery's mesh and flipbook effects, written to public/textures/pixelfx/.
+
+    python3 examples/scripts/pixelfx/make_textures.py [--part|--heat <name> <sheet.png> <sheet.json>]...
+
+Needs numpy and Pillow. Two kinds of texture come out of it:
+
+* Flipbooks traced from pixelfx (https://github.com/patch-gg/pixelfx, MIT). Each file in `parts/` is one
+  element of a pixelfx effect with the rest turned off (the spirit flame's body). Copy it to pixelfx's
+  src/fx/parts/, render it with `node tools/render.mjs parts/<name> --sheet --bg none --no-actor`, and
+  pass the sheet: `--part spirit-flame <png> <json>`. Each frame is de-pixelized: premultiplied, upscaled, blurred by about half a source pixel,
+  then its alpha edge tightened so the outlines come out as clean curves in the original colours.
+* Maps drawn here from the same formulas the pixel effects use, at full resolution: the fire tornado's
+  spiral band (pixelfx fire/fire-tornado), the force field's hex shell (pixelfx scifi/force-field, after
+  Sprite Fusion's shield, https://www.spritefusion.com/pixel-art-vfx/shield, MIT) and a wrapping noise.
+
+Without --part or --heat the flipbooks already in public/ are left alone. The fire and smoke sheets
+(flames, tongues, comets, puffs) come from make_fire.py instead.
+"""
+import json
+import os
+import sys
+
+import numpy as np
+from PIL import Image
+
+OUT = os.path.join(os.path.dirname(__file__), '..', '..', 'public', 'textures', 'pixelfx')
+TAU = np.pi * 2
+
+
+def hexrgb(h):
+    v = int(h.lstrip('#'), 16)
+    return np.array([(v >> 16) & 255, (v >> 8) & 255, v & 255], np.float32) / 255
+
+
+def save(name, rgba):
+    os.makedirs(OUT, exist_ok=True)
+    path = os.path.join(OUT, name)
+    Image.fromarray((np.clip(rgba, 0, 1) * 255 + 0.5).astype(np.uint8)).save(path, optimize=True)
+    print(path, rgba.shape[1], 'x', rgba.shape[0])
+
+
+def smoothstep(a, b, x):
+    t = np.clip((x - a) / (b - a), 0, 1)
+    return t * t * (3 - 2 * t)
+
+
+def blur(a, s, wrap=False):
+    """Separable Gaussian, numpy only; `wrap` treats the image as tiling."""
+    r = int(s * 3) + 1
+    x = np.arange(-r, r + 1)
+    g = np.exp(-(x * x) / (2 * s * s))
+    g /= g.sum()
+    for axis in (0, 1):
+        if wrap:
+            a = sum(w * np.roll(a, int(k), axis) for k, w in zip(x, g))
+        else:
+            a = np.apply_along_axis(lambda v: np.convolve(v, g, 'same'), axis, a)
+    return a
+
+
+# ---- flipbooks from pixel art ----
+
+
+def part_atlas(name, png, meta, scale=None, soft=0.25, heat=False):
+    """A pixelfx part's sheet, each frame cropped to what any frame draws, padded to a square with its
+    foot at the bottom, and de-pixelized; with `heat`, its fire colours turned to heat first."""
+    img = np.asarray(Image.open(png).convert('RGBA')).astype(np.float32) / 255
+    if heat:
+        img = to_heat(img)
+    info = json.load(open(meta))['meta']['pixelfx']
+    fw, fh = info['frameSize']
+    cols, n = info['columns'], info['frames']
+    # Crop every frame to the union of what any frame draws, centred on the pivot's column, foot kept.
+    frames = [img[(i // cols) * fh:(i // cols + 1) * fh, (i % cols) * fw:(i % cols + 1) * fw] for i in range(n)]
+    drawn = np.max([f[..., 3] for f in frames], 0) > 0
+    ys, xs = np.nonzero(drawn)
+    px = info['pivot'][0]
+    half = int(max(px - xs.min(), xs.max() + 1 - px))
+    top, foot = int(ys.min()), int(ys.max()) + 1
+    fw, fh = 2 * half, foot - top
+    frames = [np.pad(f, ((0, 0), (half, half), (0, 0)))[top:foot, px:px + 2 * half] for f in frames]
+    side = max(fw, fh) + 2
+    scale = scale or min(8, 256 // side)  # tiles of at most 256 px
+    print(name, 'frame', fw, 'x', fh, '->', side)
+    out_cols = cols
+    rows = (n + out_cols - 1) // out_cols
+    k = scale
+    pad = 2
+    res = np.zeros((rows * side * k, out_cols * side * k, 4), np.float32)
+    for i in range(n):
+        frame = np.zeros((side, side, 4), np.float32)
+        ox = (side - fw) // 2
+        frame[side - fh - 1:side - 1, ox:ox + fw] = frames[i]
+        f = np.pad(frame, ((pad, pad), (pad, pad), (0, 0)))
+        pm = f[..., :3] * f[..., 3:4]
+        big = lambda a: np.kron(a, np.ones((k, k)))
+        sig = k * 0.55
+        A = blur(big(f[..., 3]), sig)
+        C = np.stack([blur(big(pm[..., c]), sig) for c in range(3)], -1)
+        rgb = C / np.maximum(A[..., None], 1e-4)
+        A2 = smoothstep(0.5 - soft, 0.5 + soft, A)
+        o = np.concatenate([np.clip(rgb, 0, 1), A2[..., None]], -1)[pad * k:-pad * k, pad * k:-pad * k]
+        r, c = i // out_cols, i % out_cols
+        res[r * side * k:(r + 1) * side * k, c * side * k:(c + 1) * side * k] = o
+    save(name + '.png', res)
+
+
+def to_heat(img):
+    """Each pixel's fire colour as its heat, grey in RGB: 1 white-hot to 0 the darkest red. Through a
+    gradient map the same flipbook then burns in any ramp: fire, spirit flame, poison."""
+    cols = np.stack([hexrgb(c) for c in FIRE])
+    d = ((img[..., None, :3] - cols[None, None]) ** 2).sum(-1)
+    h = np.asarray(FIRE_HEAT)[d.argmin(-1)]
+    return np.concatenate([np.repeat(h[..., None], 3, -1), img[..., 3:4]], -1).astype(np.float32)
+
+
+# ---- maps drawn from the effects' formulas ----
+
+
+def wrap_noise(w, h, scale, seed):
+    """Smooth noise in [0, 1] that tiles both ways: white noise blurred on a torus."""
+    rng = np.random.default_rng(seed)
+    n = blur(rng.random((h, w)).astype(np.float32), scale, wrap=True)
+    n -= n.min()
+    return n / n.max()
+
+
+def noise_map():
+    """Red and green: two independent wrapping noises around 0.5, for UV distortion."""
+    r = wrap_noise(128, 128, 6, 1)
+    g = wrap_noise(128, 128, 6, 2)
+    save('noise.png', np.stack([r, g, np.full_like(r, 0.5), np.ones_like(r)], -1))
+
+
+# Fire, hottest first, and the heat each colour stands for in fire-tornado.js's thresholds.
+FIRE = ['#ffffff', '#fff3a6', '#ffe26b', '#ffc23d', '#ff8a2a', '#f2561d', '#c9281f', '#8a1f17', '#4a1712']
+FIRE_HEAT = [1.0, 0.885, 0.76, 0.64, 0.52, 0.40, 0.27, 0.15, 0.0]
+
+
+def fire_colour(heat):
+    stops = np.array(FIRE_HEAT[::-1])
+    cols = np.stack([hexrgb(c) for c in FIRE[::-1]])
+    return np.stack([np.interp(heat, stops, cols[:, c]) for c in range(3)], -1)
+
+
+def tornado_band(w=512, h=512):
+    """The funnel's surface: U runs once round it, V up it (0 at the foot, 1 at 1.2× the height).
+
+    As in fire-tornado.js: three spiral bands twisted up the column, a darker body with bright
+    streaks, cooling with height, coming apart into strands near the top. U wraps; scroll U to spin.
+    """
+    u = (np.arange(w) + 0.5) / w
+    v = (np.arange(h)[::-1] + 0.5) / h  # row 0 is the top of the image
+    U, V = np.meshgrid(u, v)
+    hv = V * 1.2  # height in funnel heights
+    vv = np.minimum(1, hv)
+    ns = wrap_noise(w, h, 10, 7) - 0.5
+    tear = 0.5 * ns + 0.25 * np.sin(TAU * (2 * U + 3 * hv))
+    band = 0.5 + 0.5 * np.sin((TAU * U + hv * 5.5 + tear) * 3)
+    streak = band ** 3
+    cut = np.clip((hv - 0.72) / 0.42, 0, 1)
+    heat = 0.56 + 0.5 * streak - 0.22 * vv + 0.1 * (1 - vv) - 0.25 * cut + 0.1 * ns
+    rgb = fire_colour(np.clip(heat, 0, 1))
+    keep = band - (0.35 + cut * 0.6 + 0.2 * (wrap_noise(w, h, 4, 9) - 0.5))
+    strands = smoothstep(0, 0.6, cut)
+    alpha = 1 - strands + strands * smoothstep(-0.03, 0.03, keep)
+    alpha *= smoothstep(0, 0.03, V) * smoothstep(1.2, 1.1, hv)
+    save('tornado-band.png', np.concatenate([rgb, alpha[..., None]], -1))
+
+
+ICE = ['#151a3d', '#212f6b', '#2c58aa', '#3a8bd8', '#62c8f4', '#a6ecff', '#dcfbff', '#ffffff']
+
+
+def ice_colour(level):
+    """pixelfx's ice palette (ice/blizzard-vortex.js), dark to white, at level 0..1."""
+    stops = np.linspace(0, 1, len(ICE))
+    cols = np.stack([hexrgb(c) for c in ICE])
+    return np.stack([np.interp(level, stops, cols[:, c]) for c in range(3)], -1)
+
+
+def blizzard_band(w=512, h=512):
+    """The snow funnel's surface: U once round it, V up it (0 at the foot, 1 at 1.1x the height).
+
+    As in blizzard-vortex.js's body: thin snow-filled air with three swirls twisted up the column and
+    bright wind streaks along them, fading out over the top 30% and at the foot. The mesh's rim adds
+    the denser edges. U wraps; scroll U to spin.
+    """
+    u = (np.arange(w) + 0.5) / w
+    v = (np.arange(h)[::-1] + 0.5) / h
+    U, V = np.meshgrid(u, v)
+    hv = V * 1.1
+    ns = wrap_noise(w, h, 8, 21) - 0.5
+    swirl = 0.5 + 0.5 * np.sin(TAU * (3 * U) + hv * 14 + 1.2 * ns)
+    streak = smoothstep(0.82, 0.97, 0.5 + 0.5 * np.sin(TAU * (5 * U) + hv * 22 + 2.5 * ns))
+    level = 0.55 + 0.25 * swirl + 0.45 * streak
+    rgb = ice_colour(np.clip(level, 0, 1))
+    alpha = 0.16 + 0.22 * swirl + 0.55 * streak
+    alpha *= smoothstep(0, 0.05, hv) * np.clip((1 - hv) / 0.3 + 0.35, 0, 1) * smoothstep(1.1, 0.95, hv)
+    save('blizzard-band.png', np.concatenate([rgb, np.clip(alpha, 0, 1)[..., None]], -1))
+
+
+def pillar_band(w=256, h=256):
+    """The flame pillar's surface: U runs once round the column, V up one pulse of it; wraps both ways.
+
+    As in flame-pillar.js: seven hotter strands running up the column, wavering, and a bright pulse
+    racing up it (scroll V); a white-hot body whose edges the mesh's rim reddens.
+    """
+    u = (np.arange(w) + 0.5) / w
+    v = (np.arange(h)[::-1] + 0.5) / h
+    U, V = np.meshgrid(u, v)
+    rng = np.random.default_rng(5)
+    heat = 0.66 + 0.12 * (wrap_noise(w, h, 8, 11) - 0.5)
+    for k in range(7):
+        o, wd, f = rng.random(), 0.025 + 0.03 * rng.random(), rng.integers(1, 3)
+        d = np.abs(((U - o - 0.03 * np.sin(TAU * (f * V + k / 7))) + 0.5) % 1 - 0.5)
+        heat += 0.22 * smoothstep(wd, wd * 0.3, d)
+    p = np.abs(((V - 0.05) + 0.5) % 1 - 0.5)
+    heat += 0.2 * smoothstep(0.06, 0.02, p)
+    rgb = fire_colour(np.clip(heat, 0, 1))
+    save('pillar-band.png', np.concatenate([rgb, np.ones_like(heat)[..., None]], -1))
+
+
+def hex_cells(gx, gy):
+    """Sprite Fusion shield.ts `cell()`: a hash per hex, and 0 at a hex's centre to 1 at its edge."""
+    s3 = np.sqrt(3)
+    q = (s3 / 3) * gx - gy / 3
+    r = (2 / 3) * gy
+    s = -q - r
+    rq, rr, rs = np.round(q), np.round(r), np.round(s)
+    dq, dr, ds = np.abs(rq - q), np.abs(rr - r), np.abs(rs - s)
+    a = (dq > dr) & (dq > ds)
+    b = ~a & (dr > ds)
+    rq = np.where(a, -rr - rs, rq)
+    rr = np.where(b, -rq - rs, rr)
+    hx = s3 * (rq + rr / 2)
+    hy = 1.5 * rr
+    dx = np.abs(gx - hx)
+    dy = gy - hy
+    e = np.maximum.reduce([dx, np.abs(dx / 2 + dy * s3 / 2), np.abs(dx / 2 - dy * s3 / 2)]) / (s3 / 2)
+    return rq, rr, e, gx - hx, dy
+
+
+def hex_shell(w=1024, h=512, columns=22):
+    """The dome's hex plates over longitude (U, wrapping) and latitude (V, 0 at the ground, 1 at the top).
+
+    `shell`: bright plate edges over faint glass, with a bright foot ring. `plates`: each plate's face
+    at its own brightness, for glints. The grid has a whole number of columns round the dome so U wraps.
+    """
+    u = (np.arange(w) + 0.5) / w
+    v = (np.arange(h)[::-1] + 0.5) / h
+    U, V = np.meshgrid(u, v)
+    grid = np.sqrt(3) * columns / TAU
+    lon, lat = U * TAU, V * np.pi / 2
+    rq, rr, e, ox, oy = hex_cells(lon * grid, lat * grid * 1.15)
+    rq = np.mod(rq + (rr - np.mod(rr, 2)) / 2, columns)  # wrap the axial column round the dome
+    # Near the pole the longitude cells crowd together; the plates fade into plain glass there.
+    keep = smoothstep(0.86, 0.6, V)
+    edge = smoothstep(0.8, 0.9, e) * keep
+    # Each plate's lit top-left edge (force-field.js `bevel`): a thin band inside the seam facing up-left.
+    facing = np.clip((-ox * 0.5 + oy * 0.87) / np.maximum(np.hypot(ox, oy), 1e-4), 0, 1)
+    bevel = smoothstep(0.62, 0.72, e) * (1 - smoothstep(0.74, 0.8, e)) * facing * keep
+    glass = 0.035 + 0.05 * V
+    foot = smoothstep(0.035, 0.0, V)
+    a = np.maximum.reduce([edge, glass, foot, bevel * 0.35])
+    light, deep, lit = hexrgb('#8ae8ff'), hexrgb('#2582d2'), hexrgb('#36b9ee')
+    rgb = deep * (1 - edge[..., None]) + light * edge[..., None]
+    rgb = rgb * (1 - bevel[..., None]) + lit * bevel[..., None]
+    rgb = rgb * (1 - foot[..., None]) + hexrgb('#d4fbff') * foot[..., None]
+    save('hex-shell.png', np.concatenate([rgb, a[..., None]], -1))
+    hashv = np.mod(np.sin(rq * 12.9898 + rr * 78.233) * 43758.5453, 1)
+    inside = 1 - smoothstep(0.66, 0.78, e)
+    face = inside * (0.35 + 0.65 * hashv) * keep
+    save('hex-plates.png', np.stack([np.ones_like(face)] * 3 + [face], -1))
+    # When each plate glints: one plate in five gets a time in 0.2..1 (an erosion level), the rest none.
+    pick = np.mod(np.sin(rq * 39.346 + rr * 11.135) * 24634.6345, 1)
+    when = np.mod(np.sin(rq * 73.156 + rr * 52.235) * 13758.937, 1)
+    glint = np.where(pick < 0.2, 0.2 + 0.8 * when, 0) * (inside > 0.5) * keep
+    save('hex-glint.png', np.stack([glint] * 3 + [np.ones_like(glint)], -1))
+
+
+def diamond_shell(w=512, h=512, columns=12, rows=8):
+    """A diamond lattice over a surface (pixelfx impacts/shield-block): U across, V up, both 0..1.
+
+    `diamond-shell`: bright lattice lines over faint glass, a bright foot. `diamond-cells`: an erosion
+    mask with one random value per cell, so a falling level blinks the cells out one by one.
+    """
+    u = (np.arange(w) + 0.5) / w
+    v = (np.arange(h)[::-1] + 0.5) / h
+    U, V = np.meshgrid(u, v)
+    a = U * columns + V * rows
+    b = U * columns - V * rows
+    fa, fb = a - np.floor(a), b - np.floor(b)
+    e = np.minimum.reduce([fa, 1 - fa, fb, 1 - fb])  # 0 on a line, 0.5 at a cell's middle
+    line = smoothstep(0.07, 0.02, e)
+    glass = 0.06 + 0.06 * V
+    foot = smoothstep(0.04, 0.0, V)
+    alpha = np.maximum.reduce([line, glass, foot])
+    light, deep = hexrgb('#a6ecff'), hexrgb('#2c58aa')
+    rgb = deep * (1 - line[..., None]) + light * line[..., None]
+    rgb = rgb * (1 - foot[..., None]) + hexrgb('#dcfbff') * foot[..., None]
+    save('diamond-shell.png', np.concatenate([rgb, alpha[..., None]], -1))
+    ca, cb = np.floor(a), np.floor(b)
+    cell = np.mod(np.sin(ca * 12.9898 + cb * 78.233) * 43758.5453, 1)
+    mask = 0.04 + 0.92 * cell
+    save('diamond-cells.png', np.stack([mask] * 3 + [np.ones_like(mask)], -1))
+
+
+def streaks(w, h, su, sv, seed):
+    """Wrapping noise drawn out along V: blurred `su` pixels across and `sv` along, so it reads as strands."""
+    rng = np.random.default_rng(seed)
+    n = rng.random((h, w)).astype(np.float32)
+    for axis, s in ((1, su), (0, sv)):
+        r = int(s * 3) + 1
+        x = np.arange(-r, r + 1)
+        g = np.exp(-(x * x) / (2 * s * s))
+        g /= g.sum()
+        n = sum(wt * np.roll(n, int(k), axis) for k, wt in zip(x, g))
+    n -= n.min()
+    return n / n.max()
+
+
+def water_band(name='water-band', w=256, h=512, twist=0):
+    """Running water's surface, tiling both ways: a translucent blue body with pale strands along V and a
+    few white crests, after pixelfx water's glassy jets and sheets. Scroll V to make it flow. `twist`
+    shears the strands round U that many turns over V, so on a funnel scrolled in U and V they spiral.
+    """
+    body = streaks(w, h, 2.5, 40, 21)
+    fine = streaks(w, h, 1.2, 18, 22)
+    crest = streaks(w, h, 3, 6, 23)
+    level = 0.55 * body + 0.45 * fine
+    strand = smoothstep(0.42, 0.68, level)
+    white = smoothstep(0.75, 0.92, crest) * 0.7 + smoothstep(0.74, 0.9, level)
+    gap = smoothstep(0.18, 0.32, body)
+    deep, pale = hexrgb('#2a6fc0'), hexrgb('#bfe6ff')
+    rgb = deep * (1 - strand[..., None]) + pale * strand[..., None]
+    rgb = rgb * (1 - np.clip(white, 0, 1)[..., None]) + np.clip(white, 0, 1)[..., None]
+    alpha = np.clip((0.42 + 0.5 * strand + white) * gap, 0, 1)
+    out = np.concatenate([rgb, alpha[..., None]], -1)
+    if twist:
+        for row in range(h):
+            out[row] = np.roll(out[row], int(round(twist * w * row / h)), 0)
+    save(name + '.png', out)
+
+
+def scanlines(w=64, h=128, rows=16):
+    """White scanlines across V (`rows` of them, tiling both ways) over a faint fill: a hologram's or a
+    pulse's skin. Tint it with the particle colour and scroll V to roll the lines."""
+    v = (np.arange(h) + 0.5) / h
+    f = (v * rows) % 1
+    line = smoothstep(0.32, 0.0, np.abs(f - 0.5) - 0.12)
+    alpha = np.clip(0.12 + 0.88 * line, 0, 1)
+    a = np.repeat(alpha[:, None], w, 1)
+    save('scanlines.png', np.stack([np.ones_like(a)] * 3 + [a], -1))
+
+
+def light_column(w=256, h=256):
+    """A column of light: U round it (tiling), V up it, bright at the foot and fading to nothing at the
+    top, with faint vertical streaks. White, to be tinted."""
+    v = (np.arange(h)[::-1] + 0.5) / h
+    streak = streaks(w, h, 2, 200, 31)
+    fade = (1 - v) ** 1.3
+    foot = smoothstep(0.08, 0.0, v)
+    a = np.clip(fade[:, None] * (0.45 + 0.55 * streak) + 0.6 * foot[:, None], 0, 1)
+    save('light-column.png', np.stack([np.ones_like(a)] * 3 + [a], -1))
+
+
+def gradient(size=128):
+    """Red from 1 at V 0 (the bottom) to 0 at V 1: an erosion mask whose cut climbs a surface."""
+    v = (np.arange(size)[::-1] + 0.5) / size
+    g = np.repeat((1 - v)[:, None], 4, 1)
+    save('gradient.png', np.stack([g, g, g, np.ones_like(g)], -1))
+
+
+def sweep(size=128):
+    """Red from 0 at U 0 to 1 at U 1: an erosion mask whose cut runs along a surface, round a ring."""
+    u = (np.arange(size) + 0.5) / size
+    g = np.repeat(u[None, :], 4, 0)
+    save('sweep.png', np.stack([g, g, g, np.ones_like(g)], -1))
+
+
+def tent(size=128):
+    """Red 0 at both ends of U to 1 in the middle: an erosion cut that closes a mark from both ends."""
+    u = (np.arange(size) + 0.5) / size
+    g = np.repeat((1 - np.abs(2 * u - 1))[None, :], 4, 0)
+    save('tent.png', np.stack([g, g, g, np.ones_like(g)], -1))
+
+
+def radial(size=128):
+    """Red 1 at the centre falling linearly to 0 at the rim, 0 outside and on the border: an erosion
+    mask that, laid over a surface by tiling and offset, spreads a cut outward from one point."""
+    c = (np.arange(size) + 0.5) / size * 2 - 1
+    X, Y = np.meshgrid(c, c)
+    r = np.clip(1 - np.sqrt(X * X + Y * Y) / 0.97, 0, 1)
+    save('radial.png', np.stack([r, r, r, np.ones_like(r)], -1))
+
+
+if __name__ == '__main__':
+    # Flipbooks from pixelfx parts, rendered first with pixelfx's tools (see the module docstring):
+    #   --part <name> <sheet.png> <sheet.json>   colour flipbook public/textures/pixelfx/<name>.png
+    #   --heat <name> <sheet.png> <sheet.json>   the same as heat, for a gradient map
+    args = sys.argv[1:]
+    while args and args[0] in ('--part', '--heat'):
+        part_atlas(args[1], args[2], args[3], heat=args[0] == '--heat')
+        args = args[4:]
+    noise_map()
+    tornado_band()
+    pillar_band()
+    blizzard_band()
+    hex_shell()
+    diamond_shell()
+    water_band()
+    water_band('whirl-band', twist=1)
+    scanlines()
+    light_column()
+    radial()
+    gradient()
+    sweep()
+    tent()

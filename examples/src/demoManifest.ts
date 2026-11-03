@@ -286,4 +286,224 @@ export const demoManifest: DemoManifestEntry[] = [
         tags: ['import', 'rotation'],
         preview: {icon: 'MZ', gradient: 'linear-gradient(135deg, #7ec8ff 0%, #2a3f8e 100%)'},
     },
+    {
+        key: 'PixelFxFireDemo',
+        name: 'Pixel FX: Fire',
+        module: 'pixelfxFire',
+        sourcePath: 'examples/src/pixelfx/fire.ts',
+        description:
+            'Braziers, campfires, breath, rings, tornadoes, fireballs, pillars and meteors: pixelfx fire effects rebuilt in 3D.',
+        tags: ['pixelfx', 'fire'],
+        preview: {icon: 'FI', gradient: 'linear-gradient(135deg, #ffb347 0%, #8a1f17 100%)'},
+    },
+    {
+        key: 'PixelFxExplosionsDemo',
+        name: 'Pixel FX: Explosions',
+        module: 'pixelfxExplosions',
+        sourcePath: 'examples/src/pixelfx/explosions.ts',
+        description:
+            'Barrels, grenades, dirt blasts, fireworks on sub-emitters, an implosion, plasma and a nuke: pixelfx explosions rebuilt in 3D.',
+        tags: ['pixelfx', 'explosion', 'sub-emitter'],
+        preview: {icon: 'EX', gradient: 'linear-gradient(135deg, #ffd27a 0%, #6a1f17 100%)'},
+    },
+    {
+        key: 'PixelFxIceDemo',
+        name: 'Pixel FX: Ice',
+        module: 'pixelfxIce',
+        sourcePath: 'examples/src/pixelfx/ice.ts',
+        description:
+            'Frost novas, freezes, ice lances, spikes, shatters and a blizzard vortex, with lit mesh shards: pixelfx ice effects rebuilt in 3D.',
+        tags: ['pixelfx', 'ice', 'mesh'],
+        preview: {icon: 'IC', gradient: 'linear-gradient(135deg, #e6f8ff 0%, #2a5fa8 100%)'},
+    },
+    {
+        key: 'PixelFxLightningDemo',
+        name: 'Pixel FX: Lightning',
+        module: 'pixelfxLightning',
+        sourcePath: 'examples/src/pixelfx/lightning.ts',
+        description:
+            'Chain lightning, tesla coils, plasma balls, storm clouds and strikes drawn with beam particles: pixelfx lightning effects rebuilt in 3D.',
+        tags: ['pixelfx', 'lightning', 'beam'],
+        preview: {icon: 'LI', gradient: 'linear-gradient(135deg, #c7f1ff 0%, #3a3dd6 100%)'},
+    },
+    {
+        key: 'PixelFxImpactsDemo',
+        name: 'Pixel FX: Impacts',
+        module: 'pixelfxImpacts',
+        sourcePath: 'examples/src/pixelfx/impacts.ts',
+        description:
+            'Hit sparks, crits, bullet impacts, ground slams, heavy landings, parries, ricochets and shield blocks: pixelfx impact effects rebuilt in 3D.',
+        tags: ['pixelfx', 'impact', 'mesh'],
+        preview: {icon: 'IM', gradient: 'linear-gradient(135deg, #fff1b8 0%, #8a4a17 100%)'},
+    },
+    {
+        key: 'PixelFxProjectilesDemo',
+        name: 'Pixel FX: Projectiles',
+        module: 'pixelfxProjectiles',
+        sourcePath: 'examples/src/pixelfx/projectiles.ts',
+        description:
+            'Arrows, tracers, cannonballs, lasers, homing missiles, rockets and muzzle flashes, with trails and hit sub-emitters: pixelfx projectiles rebuilt in 3D.',
+        tags: ['pixelfx', 'projectile', 'trail', 'sub-emitter'],
+        preview: {icon: 'PR', gradient: 'linear-gradient(135deg, #ffe7a8 0%, #5a2a9a 100%)'},
+    },
+    {
+        key: 'PixelFxWaterDemo',
+        name: 'Pixel FX: Water',
+        module: 'pixelfxWater',
+        sourcePath: 'examples/src/pixelfx/water.ts',
+        description:
+            'Bubbles, drips, fountains, geysers, rain, splashes, waterfalls and a whirlpool: pixelfx water effects rebuilt in 3D.',
+        tags: ['pixelfx', 'water', 'sub-emitter'],
+        preview: {icon: 'WA', gradient: 'linear-gradient(135deg, #c8eeff 0%, #123a5a 100%)'},
+    },
+    {
+        key: 'PixelFxScifiDemo',
+        name: 'Pixel FX: Sci-fi',
+        module: 'pixelfxScifi',
+        sourcePath: 'examples/src/pixelfx/scifi.ts',
+        description:
+            'EMP blasts, an energy core, a force field, holograms, a jetpack, laser grids, scanners, teleporters, a tractor beam and warps: pixelfx sci-fi effects rebuilt in 3D.',
+        tags: ['pixelfx', 'sci-fi', 'beam'],
+        preview: {icon: 'SF', gradient: 'linear-gradient(135deg, #9cc4ff 0%, #3c2296 100%)'},
+    },
+    {
+        key: 'PixelFxMeleeDemo',
+        name: 'Pixel FX: Melee',
+        module: 'pixelfxMelee',
+        sourcePath: 'examples/src/pixelfx/melee.ts',
+        description:
+            'Sword, scythe and spear swings, cleaves, claws, thrusts and whips drawn as weapon trails swept along the blade: pixelfx melee effects rebuilt in 3D.',
+        tags: ['pixelfx', 'melee', 'trail'],
+        preview: {icon: 'ME', gradient: 'linear-gradient(135deg, #e8f1ff 0%, #2c58aa 100%)'},
+    },
+    {
+        key: 'PixelFxSpawnDemo',
+        name: 'Pixel FX: Spawn',
+        module: 'pixelfxSpawn',
+        sourcePath: 'examples/src/pixelfx/spawn.ts',
+        description:
+            'Poofs, coin drops, disintegration, burning away, shattering, souls rising, respawn beams, portals and summonings, the hero a mesh particle eroded up its height: pixelfx spawn effects rebuilt in 3D.',
+        tags: ['pixelfx', 'spawn', 'erosion', 'mesh'],
+        preview: {icon: 'SP', gradient: 'linear-gradient(135deg, #a8f5d8 0%, #481b8c 100%)'},
+    },
+    {
+        key: 'PixelFxArcaneDemo',
+        name: 'Pixel FX: Arcane',
+        module: 'pixelfxArcane',
+        sourcePath: 'examples/src/pixelfx/arcane.ts',
+        description:
+            'Beams, homing missiles, an orb of glass, blinks, magic circles, mana bursts, a portal, rune circles, a charge, falling stars and a clock that stops time: pixelfx arcane effects rebuilt in 3D.',
+        tags: ['pixelfx', 'arcane', 'trail', 'erosion'],
+        preview: {icon: 'AR', gradient: 'linear-gradient(135deg, #ecc8ff 0%, #2b1252 100%)'},
+    },
+    {
+        key: 'PixelFxHolyDemo',
+        name: 'Pixel FX: Holy',
+        module: 'pixelfxHoly',
+        sourcePath: 'examples/src/pixelfx/holy.ts',
+        description:
+            'Blessings, a divine shield, feathers, a halo, heals, a holy pillar, a resurrection with wings, a smite and a sunburst: pixelfx holy effects rebuilt in 3D.',
+        tags: ['pixelfx', 'holy', 'mesh'],
+        preview: {icon: 'HO', gradient: 'linear-gradient(135deg, #fffbe0 0%, #c4652e 100%)'},
+    },
+    {
+        key: 'PixelFxShadowDemo',
+        name: 'Pixel FX: Shadow',
+        module: 'pixelfxShadow',
+        sourcePath: 'examples/src/pixelfx/shadow.ts',
+        description:
+            'A black hole, a curse, a dark explosion, an eclipse, grasping hands, a hex sigil, life steal, necro skulls, shadow flames, tendrils, soul drain and a void orb: pixelfx shadow effects rebuilt in 3D.',
+        tags: ['pixelfx', 'shadow', 'mesh'],
+        preview: {icon: 'SH', gradient: 'linear-gradient(135deg, #d4b4ff 0%, #0a0612 100%)'},
+    },
+    {
+        key: 'PixelFxStatusDemo',
+        name: 'Pixel FX: Status',
+        module: 'pixelfxStatus',
+        sourcePath: 'examples/src/pixelfx/status.ts',
+        description:
+            'Bleeding, burning, charmed, confused, cursed, frozen, haste, petrified, poisoned, rage, sleep, slowed and stunned: pixelfx status effects on a 3D hero, with solid hearts, stars and birds.',
+        tags: ['pixelfx', 'status', 'mesh'],
+        preview: {icon: 'ST', gradient: 'linear-gradient(135deg, #ffe36e 0%, #4b2070 100%)'},
+    },
+    {
+        key: 'PixelFxNatureDemo',
+        name: 'Pixel FX: Nature',
+        module: 'pixelfxNature',
+        sourcePath: 'examples/src/pixelfx/nature.ts',
+        description:
+            'An acid splash, a boulder, an earth spike, a healing bloom, a leaf storm, a poison cloud, a quake, a root snare, a spore burst, thorns, a tornado, a toxic puddle and a vine whip: pixelfx nature effects rebuilt in 3D.',
+        tags: ['pixelfx', 'nature', 'mesh'],
+        preview: {icon: 'NA', gradient: 'linear-gradient(135deg, #b4dc5a 0%, #1d3a1a 100%)'},
+    },
+    {
+        key: 'PixelFxWeatherDemo',
+        name: 'Pixel FX: Weather',
+        module: 'pixelfxWeather',
+        sourcePath: 'examples/src/pixelfx/weather.ts',
+        description:
+            'An aurora, a blizzard, cherry blossoms, clouds, falling leaves, fireflies, fog, god rays, rain, shooting stars, snow and a storm: pixelfx weather filling a 3D volume.',
+        tags: ['pixelfx', 'weather', 'mesh'],
+        preview: {icon: 'WE', gradient: 'linear-gradient(135deg, #a6ecff 0%, #1a2448 100%)'},
+    },
+    {
+        key: 'PixelFxUiDemo',
+        name: 'Pixel FX: UI',
+        module: 'pixelfxUi',
+        sourcePath: 'examples/src/pixelfx/ui.ts',
+        description:
+            'An achievement toast, coin collect, a combo counter, confetti, a countdown, crit and damage numbers, an exclamation, a health bar hit, a lost heart, level up and quest complete: pixelfx UI as chunky 3D signs and lit props.',
+        tags: ['pixelfx', 'ui', 'mesh'],
+        preview: {icon: 'UI', gradient: 'linear-gradient(135deg, #ffde5e 0%, #3d0a33 100%)'},
+    },
+    {
+        key: 'PixelFxPickupsDemo',
+        name: 'Pixel FX: Pickups',
+        module: 'pixelfxPickups',
+        sourcePath: 'examples/src/pixelfx/pickups.ts',
+        description:
+            'A chest bursting open, a spinning coin, a collect burst, a broken crystal, a cut ruby, a beating heart, a key, a loot beam, a potion, a power star and an XP orb: pixelfx pickups as lit, faceted 3D props.',
+        tags: ['pixelfx', 'pickups', 'mesh'],
+        preview: {icon: 'PU', gradient: 'linear-gradient(135deg, #ffe066 0%, #2c1250 100%)'},
+    },
+    {
+        key: 'PixelFxTransitionsDemo',
+        name: 'Pixel FX: Transitions',
+        module: 'pixelfxTransitions',
+        sourcePath: 'examples/src/pixelfx/transitions.ts',
+        description:
+            'Blinds, a burn-away, a CRT switching off, diamond, glitch, pixel, shatter and slash wipes and two irises: pixelfx screen transitions as a 3D panel in front of the scene, with slats, erosion masks and glass shards.',
+        tags: ['pixelfx', 'transitions', 'erosion'],
+        preview: {icon: 'TR', gradient: 'linear-gradient(135deg, #c890ff 0%, #0b0a12 100%)'},
+    },
+    {
+        key: 'PixelFxCrittersDemo',
+        name: 'Pixel FX: Critters',
+        module: 'pixelfxCritters',
+        sourcePath: 'examples/src/pixelfx/critters.ts',
+        description:
+            'A bat, a bird, a butterfly, an eyeball, a school of fish, a flaming skull, a frog, a ghost, a jellyfish, a slime, a snake and a wisp: pixelfx critters as lit 3D bodies animated through node rigs, with wings, chains and trails.',
+        tags: ['pixelfx', 'critters', 'mesh'],
+        preview: {icon: 'CR', gradient: 'linear-gradient(135deg, #62b440 0%, #140b2b 100%)'},
+    },
+    {
+        key: 'PixelFxMovesDemo',
+        name: 'Pixel FX: Moves',
+        module: 'pixelfxMoves',
+        sourcePath: 'examples/src/pixelfx/moves.ts',
+        description:
+            'Arrow shot, dash strike, earth stomp, fireball throw, ground pound, holy smite, ice lance, lightning call, meteor call, pistol shots, rocket launcher and sword combo: pixelfx character moves staged as a caster and a target, with projectiles, impacts and hit reactions.',
+        tags: ['pixelfx', 'moves', 'combat'],
+        preview: {icon: 'MV', gradient: 'linear-gradient(135deg, #ff7a2a 0%, #1a0b2b 100%)'},
+    },
+    {
+        key: 'PixelFxFusionDemo',
+        name: 'Pixel FX: Sprite Fusion extras',
+        module: 'pixelfxFusion',
+        sourcePath: 'examples/src/pixelfx/fusion.ts',
+        description:
+            'A blood hit, drifting embers, a plasma orb, a speed power-up, a dash and a glint: the Sprite Fusion pixel VFX that pixelfx has no counterpart for, staged in 3D with mesh droplets that stain the floor where they land, a glassy orb and a turning gem.',
+        tags: ['pixelfx', 'spritefusion', 'mesh'],
+        preview: {icon: 'SF', gradient: 'linear-gradient(135deg, #ff86e6 0%, #172a68 100%)'},
+    },
 ];
