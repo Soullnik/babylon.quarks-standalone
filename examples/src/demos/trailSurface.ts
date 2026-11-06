@@ -21,8 +21,10 @@ import {
     RenderMode,
     SizeOverLife,
 } from 'babylon.quarks';
-import {createSharedTexture} from '../shared/common';
-import type {DemoContext} from '../types';
+import {addLabel} from '../shared/labels';
+import {addGround} from '../shared/stage';
+import {baseTexture} from '../shared/textures';
+import type {DemoContext, DemoRun} from '../types';
 
 /** A square canvas texture painted by `paint`, wrapping or clamped, without mipmaps. */
 function canvasTexture(
@@ -79,9 +81,13 @@ function iceRamp(ctx: CanvasRenderingContext2D, size: number): void {
  * laid on UV channel 1 and scrolled, so the bands flow outward from the centre;
  * a gradient map colours them by the band's red channel.
  */
-export function init({scene, camera, batchRenderer, systems}: DemoContext) {
-    camera.setPosition(new BVector3(0, 7, 20));
-    const sheet = createSharedTexture(scene);
+export function init({scene, camera, add}: DemoContext): DemoRun {
+    camera.setPosition(new BVector3(0, 4, 15));
+    camera.setTarget(new BVector3(0, 0, 0));
+    addGround(scene, -2.2);
+    addLabel(scene, 'MeshSurfaceEmitter trails', new BVector3(-5, 3, 0), {height: 0.42});
+    addLabel(scene, 'Mesh UV2 + gradientMap', new BVector3(5, 1.6, 0), {height: 0.42});
+    const sheet = baseTexture(scene, 'streak');
 
     // Left: the knot and the trails shed from its surface.
     const pivot = new TransformNode('knotPivot', scene);
@@ -112,9 +118,6 @@ export function init({scene, camera, batchRenderer, systems}: DemoContext) {
         texture: sheet,
         transparent: true,
         blendMode: Constants.ALPHA_ADD,
-        startTileIndex: new ConstantValue(0),
-        uTileCount: 10,
-        vTileCount: 10,
         renderMode: RenderMode.Trail,
         rendererEmitterSettings: {
             startLength: new ConstantValue(20),
@@ -129,8 +132,7 @@ export function init({scene, camera, batchRenderer, systems}: DemoContext) {
     });
     trails.addBehavior(new SizeOverLife(new PiecewiseBezier([[new Bezier(1, 0.8, 0.4, 0), 0]])));
     trails.emitter.parent = pivot;
-    batchRenderer.addSystem(trails);
-    systems.push(trails);
+    add(trails);
 
     // Right: a disc whose second UV set is radial (U = distance from the centre, V = angle).
     const disc = MeshBuilder.CreateDisc('ripple', {radius: 1, tessellation: 48}, scene);
@@ -170,14 +172,12 @@ export function init({scene, camera, batchRenderer, systems}: DemoContext) {
     ripples.addBehavior(new SizeOverLife(new PiecewiseBezier([[new Bezier(0.3, 0.8, 1, 1), 0]])));
     ripples.emitter.position = new BVector3(5, -1, 0);
     ripples.emitter.rotation.x = Math.PI / 2; // lay the disc flat
-    batchRenderer.addSystem(ripples);
-    systems.push(ripples);
-}
+    add(ripples);
 
-export function update({scene}: DemoContext, delta: number) {
-    const pivot = scene.getTransformNodeByName('knotPivot');
-    if (pivot) {
-        pivot.rotation.y += delta * 0.6;
-        pivot.rotation.x += delta * 0.2;
-    }
+    return {
+        update(delta) {
+            pivot.rotation.y += delta * 0.6;
+            pivot.rotation.x += delta * 0.2;
+        },
+    };
 }

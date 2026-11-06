@@ -13,8 +13,10 @@ import {
     RandomColor,
     RenderMode,
 } from 'babylon.quarks';
-import {createSharedTexture} from '../shared/common';
-import type {DemoContext} from '../types';
+import {addLabel} from '../shared/labels';
+import {addGround} from '../shared/stage';
+import {baseTexture} from '../shared/textures';
+import type {DemoContext, DemoRun} from '../types';
 
 /**
  * The `space` of a force (Unity's Space on Force over Lifetime). Both systems simulate in
@@ -22,9 +24,13 @@ import type {DemoContext} from '../types';
  * gravity, so its sparks keep falling straight down however the emitter leans; the right one
  * is pushed by a `'local'` thrust along the emitter's own X, so the push turns with it.
  */
-export function init({scene, camera, batchRenderer, systems}: DemoContext) {
-    camera.setPosition(new BVector3(0, 6, 22));
-    const texture = createSharedTexture(scene);
+export function init({scene, camera, add}: DemoContext): DemoRun {
+    camera.setPosition(new BVector3(0, 5, 20));
+    camera.setTarget(new BVector3(0, -1, 0));
+    addGround(scene, -6);
+    addLabel(scene, 'World force: gravity', new BVector3(-5, 3.2, 0));
+    addLabel(scene, 'Local force: thrust', new BVector3(5, 3.2, 0));
+    const texture = baseTexture(scene, 'streak');
 
     const make = (x: number, tint: Color4) => {
         const system = new ParticleSystem({
@@ -33,18 +39,16 @@ export function init({scene, camera, batchRenderer, systems}: DemoContext) {
             looping: true,
             startLife: new ConstantValue(2.5),
             startSpeed: new IntervalValue(4, 6),
-            startSize: new IntervalValue(0.15, 0.3),
+            startSize: new IntervalValue(0.12, 0.22),
             startColor: new RandomColor(tint, new Color4(1, 1, 1, 1)),
             worldSpace: false,
             emissionOverTime: new ConstantValue(200),
             shape: new ConeEmitter({radius: 0.3, angle: 0.25}),
-            renderMode: RenderMode.BillBoard,
+            renderMode: RenderMode.StretchedBillBoard,
+            rendererEmitterSettings: {speedFactor: 0.07, lengthFactor: 1},
             texture,
             transparent: true,
             blendMode: Constants.ALPHA_ADD,
-            startTileIndex: new ConstantValue(0),
-            uTileCount: 10,
-            vTileCount: 10,
         });
         system.addBehavior(
             new ColorOverLife(
@@ -61,8 +65,7 @@ export function init({scene, camera, batchRenderer, systems}: DemoContext) {
             )
         );
         system.emitter.position.set(x, 0, 0);
-        batchRenderer.addSystem(system);
-        systems.push(system);
+        add(system);
         return system;
     };
 
@@ -73,12 +76,15 @@ export function init({scene, camera, batchRenderer, systems}: DemoContext) {
     // A thrust along the emitter's own X: it leans with the emitter.
     const thrust = make(5, new Color4(0.4, 0.8, 1, 1));
     thrust.addBehavior(new ForceOverLife(new ConstantValue(12), new ConstantValue(0), new ConstantValue(0), 'local'));
-}
 
-/** Tips both emitters back and forth. */
-export function update({systems}: DemoContext) {
-    const time = (performance.now() / 1000) % 1000;
-    for (const system of systems) {
-        system.emitter.rotation.z = Math.sin(time * 0.8) * 0.9;
-    }
+    // Tips both emitters back and forth.
+    let time = 0;
+    return {
+        update(delta) {
+            time += delta;
+            for (const system of [gravity, thrust]) {
+                system.emitter.rotation.z = Math.sin(time * 0.8) * 0.9;
+            }
+        },
+    };
 }

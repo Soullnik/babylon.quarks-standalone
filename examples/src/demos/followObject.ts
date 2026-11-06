@@ -20,11 +20,9 @@ import {
     SizeOverLife,
     SphereEmitter,
 } from 'babylon.quarks';
-import {createSharedTexture} from '../shared/common';
-import type {DemoContext} from '../types';
-
-/** 10×10 `texture1.png`, counted from the top left. */
-const TILE = {glow: 1};
+import {addLabel} from '../shared/labels';
+import {baseTexture} from '../shared/textures';
+import type {DemoContext, DemoRun} from '../types';
 
 /** Half-width and half-depth of the figure-eight both orbs fly along. */
 const PATH = {x: 14, z: 7};
@@ -83,9 +81,6 @@ function createOrb(
         texture,
         transparent: true,
         blendMode: Constants.ALPHA_ADD,
-        startTileIndex: new ConstantValue(TILE.glow),
-        uTileCount: 10,
-        vTileCount: 10,
         renderMode: RenderMode.BillBoard,
         renderOrder: 2,
     });
@@ -109,9 +104,6 @@ function createOrb(
         texture,
         transparent: true,
         blendMode: Constants.ALPHA_ADD,
-        startTileIndex: new ConstantValue(TILE.glow),
-        uTileCount: 10,
-        vTileCount: 10,
         renderMode: RenderMode.BillBoard,
         renderOrder: 1,
     });
@@ -130,15 +122,10 @@ function createOrb(
  * - orange emits over distance (`emissionOverDistance`), so its wake stays evenly spaced at any
  *   speed. That is what a rocket exhaust, a footstep trail or a tyre mark wants.
  */
-export function init({scene, camera, batchRenderer, systems, demoState}: DemoContext) {
+export function init({scene, camera, add}: DemoContext): DemoRun {
     camera.setPosition(new BVector3(0, 15, 21));
     camera.setTarget(new BVector3(0, 0, 0));
-    const texture = createSharedTexture(scene);
-    const add = (system: ParticleSystem) => {
-        batchRenderer.addSystem(system);
-        systems.push(system);
-    };
-
+    const texture = baseTexture(scene, 'glow');
     const ground = MeshBuilder.CreateDisc('followGround', {radius: 40, tessellation: 64}, scene);
     ground.rotation.x = Math.PI / 2;
     const groundMat = new StandardMaterial('followGroundMat', scene);
@@ -178,8 +165,22 @@ export function init({scene, camera, batchRenderer, systems, demoState}: DemoCon
         add
     );
 
-    demoState.followObject = {phase: 0, time: 0, orbs: [byTime, byDistance]};
-    place(demoState.followObject.orbs, 0);
+    // Each orb names its emission, its label riding along above it.
+    addLabel(scene, 'Emission over time', new BVector3(0, 1.4, 0), {height: 0.9}).parent = byTime;
+    addLabel(scene, 'Emission over distance', new BVector3(0, 1.4, 0), {height: 0.9}).parent = byDistance;
+
+    const orbs = [byTime, byDistance];
+    let phase = 0;
+    let time = 0;
+    place(orbs, phase);
+    return {
+        update(delta) {
+            time += delta;
+            // Angular speed swings between a crawl and a dash, so the two emission modes diverge.
+            phase += delta * (0.75 + 0.6 * Math.sin(time * 0.8));
+            place(orbs, phase);
+        },
+    };
 }
 
 /** Puts the orbs on the figure-eight, a quarter turn apart so they never meet. */
@@ -189,15 +190,4 @@ function place(orbs: Mesh[], phase: number) {
         orb.position.x = PATH.x * Math.sin(theta);
         orb.position.z = PATH.z * Math.sin(2 * theta);
     });
-}
-
-export function update({demoState}: DemoContext, delta: number) {
-    const state = demoState.followObject;
-    if (!state) {
-        return;
-    }
-    state.time += delta;
-    // Angular speed swings between a crawl and a dash, so the two emission modes diverge.
-    state.phase += delta * (0.75 + 0.6 * Math.sin(state.time * 0.8));
-    place(state.orbs, state.phase);
 }

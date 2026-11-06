@@ -6,13 +6,14 @@ import {MeshBuilder} from '@babylonjs/core/Meshes/meshBuilder';
 import {TransformNode} from '@babylonjs/core/Meshes/transformNode';
 import {
     ApplyForce,
-    Bezier,
+    ColorOverLife,
     ConstantColor,
     ConstantValue,
     EffectPool,
+    FrameOverLife,
     IntervalValue,
     ParticleSystem,
-    PiecewiseBezier,
+    type ParticleSystemParameters,
     PointEmitter,
     QuarksUtil,
     RandomColor,
@@ -20,154 +21,205 @@ import {
     SizeOverLife,
     SphereEmitter,
 } from 'babylon.quarks';
-import {createColorOverLifeGradient, createSharedTexture} from '../shared/common';
-import type {DemoContext} from '../types';
+import {curve, fade} from '../shared/curves';
+import {addGround} from '../shared/stage';
+import {baseTexture, sheetOf} from '../shared/textures';
+import {every} from '../shared/timing';
+import type {DemoContext, DemoRun} from '../types';
 
 /** Targets the hits land on, laid out in a ring. */
 const TARGET_COUNT = 6;
-const TARGET_RADIUS = 7;
+const TARGET_RADIUS = 5;
 
 /**
- * Builds the template of one hit: a flash, an expanding ring and a burst of
- * sparks under a parent node. The pool clones this node; it is never played
- * itself and stays disabled.
+ * Builds the template of one hit, layered and staged as a game's hit is: two stacked star flashes
+ * and a glow that pops, a ring, sparks laid along their flight and embers that fall, and a puff of
+ * smoke left behind. The pool clones this node; it is never played itself and stays disabled.
  */
 function createHitTemplate({scene, batchRenderer}: DemoContext): TransformNode {
-    const texture = createSharedTexture(scene);
     const root = new TransformNode('hit', scene);
-    const burst = (count: number) => [
-        {time: 0, count: new ConstantValue(count), cycle: 1, interval: 0.01, probability: 1},
+    const burst = (count: number, time = 0) => [
+        {time, count: new ConstantValue(count), cycle: 1, interval: 0.01, probability: 1},
     ];
+    const layer = (name: string, parameters: Partial<ParticleSystemParameters>) => {
+        const ps = new ParticleSystem({
+            scene,
+            duration: 0.6,
+            looping: false,
+            startSpeed: new ConstantValue(0),
+            emissionOverTime: new ConstantValue(0),
+            shape: new PointEmitter(),
+            transparent: true,
+            blendMode: Constants.ALPHA_ADD,
+            ...parameters,
+        } as ParticleSystemParameters);
+        ps.emitter.name = name;
+        ps.emitter.parent = root;
+        return ps;
+    };
 
-    const flash = new ParticleSystem({
-        scene,
-        duration: 0.4,
-        looping: false,
-        startLife: new ConstantValue(0.25),
-        startSpeed: new ConstantValue(0),
-        startSize: new ConstantValue(5),
-        startColor: new ConstantColor(new Color4(1, 0.95, 0.7, 1)),
-        emissionOverTime: new ConstantValue(0),
-        emissionBursts: burst(1),
-        shape: new PointEmitter(),
-        texture,
-        transparent: true,
-        blendMode: Constants.ALPHA_ADD,
-        startTileIndex: new ConstantValue(1),
-        uTileCount: 10,
-        vTileCount: 10,
-        renderMode: RenderMode.BillBoard,
-        renderOrder: 2,
-    });
-    flash.addBehavior(new SizeOverLife(new PiecewiseBezier([[new Bezier(1, 0.8, 0.4, 0), 0]])));
-
-    const ring = new ParticleSystem({
-        scene,
-        duration: 0.6,
-        looping: false,
-        startLife: new ConstantValue(0.5),
-        startSpeed: new ConstantValue(0),
-        startSize: new ConstantValue(6),
-        startColor: new ConstantColor(new Color4(1, 0.6, 0.2, 0.8)),
-        emissionOverTime: new ConstantValue(0),
-        emissionBursts: burst(1),
-        shape: new PointEmitter(),
-        texture,
-        transparent: true,
-        blendMode: Constants.ALPHA_ADD,
-        startTileIndex: new ConstantValue(0),
-        uTileCount: 10,
-        vTileCount: 10,
-        renderMode: RenderMode.BillBoard,
-        renderOrder: 1,
-    });
-    ring.addBehavior(new SizeOverLife(new PiecewiseBezier([[new Bezier(0.2, 0.7, 0.9, 1), 0]])));
-    ring.addBehavior(createColorOverLifeGradient(new Color4(1, 0.6, 0.2, 0.8), new Color4(1, 0.2, 0.1, 0)));
-
-    const sparks = new ParticleSystem({
-        scene,
-        duration: 1,
-        looping: false,
-        startLife: new IntervalValue(0.5, 0.9),
-        startSpeed: new IntervalValue(8, 16),
-        startSize: new IntervalValue(0.25, 0.45),
-        startColor: new RandomColor(new Color4(1, 0.9, 0.5, 1), new Color4(1, 0.5, 0.1, 1)),
-        worldSpace: true,
-        emissionOverTime: new ConstantValue(0),
-        emissionBursts: burst(60),
-        shape: new SphereEmitter({radius: 0.3, thickness: 1, arc: Math.PI * 2}),
-        texture,
-        transparent: true,
-        blendMode: Constants.ALPHA_ADD,
-        startTileIndex: new ConstantValue(0),
-        uTileCount: 10,
-        vTileCount: 10,
-        renderMode: RenderMode.StretchedBillBoard,
-        rendererEmitterSettings: {speedFactor: 0.06, lengthFactor: 1},
+    const flash = layer('Flash', {
+        startLife: new IntervalValue(0.18, 0.26),
+        startSize: new IntervalValue(2.6, 3.2),
+        startRotation: new IntervalValue(0, Math.PI * 2),
+        startColor: new RandomColor(new Color4(1, 1, 1, 1), new Color4(1, 0.85, 0.55, 1)),
+        emissionBursts: burst(2),
+        texture: baseTexture(scene, 'flash'),
+        ...sheetOf('flash'),
         renderOrder: 3,
     });
-    sparks.addBehavior(new ApplyForce(new BVector3(0, -1, 0), new ConstantValue(25)));
-    sparks.addBehavior(new SizeOverLife(new PiecewiseBezier([[new Bezier(1, 0.9, 0.5, 0), 0]])));
+    flash.addBehavior(
+        new FrameOverLife(
+            curve([
+                [0, 0],
+                [1, 7.99],
+            ])
+        )
+    );
 
-    for (const system of [flash, ring, sparks]) {
-        system.emitter.parent = root;
-    }
+    const glow = layer('Glow', {
+        startLife: new ConstantValue(0.18),
+        startSize: new ConstantValue(3.2),
+        startColor: new ConstantColor(new Color4(1, 0.45, 0.15, 1)),
+        emissionBursts: burst(1),
+        texture: baseTexture(scene, 'glow'),
+        renderOrder: 2,
+    });
+    glow.addBehavior(
+        new SizeOverLife(
+            curve([
+                [0, 0.3],
+                [0.25, 1],
+                [1, 0.4],
+            ])
+        )
+    );
+    glow.addBehavior(new ColorOverLife(fade(0, 0.3)));
+
+    const ring = layer('Ring', {
+        startLife: new ConstantValue(0.35),
+        startSize: new ConstantValue(3.4),
+        startColor: new ConstantColor(new Color4(1, 0.7, 0.35, 1)),
+        emissionBursts: burst(1, 0.03),
+        texture: baseTexture(scene, 'ring'),
+        renderOrder: 2,
+    });
+    ring.addBehavior(
+        new SizeOverLife(
+            curve([
+                [0, 0.2],
+                [0.4, 0.85],
+                [1, 1],
+            ])
+        )
+    );
+    ring.addBehavior(new ColorOverLife(fade(0, 0.3)));
+
+    const sparks = layer('Sparks', {
+        duration: 1,
+        startLife: new IntervalValue(0.25, 0.5),
+        startSpeed: new IntervalValue(6, 12),
+        startSize: new IntervalValue(0.12, 0.2),
+        startColor: new RandomColor(new Color4(1, 0.95, 0.7, 1), new Color4(1, 0.6, 0.2, 1)),
+        worldSpace: true,
+        emissionBursts: burst(24),
+        shape: new SphereEmitter({radius: 0.2, thickness: 1}),
+        texture: baseTexture(scene, 'streak'),
+        renderMode: RenderMode.StretchedBillBoard,
+        rendererEmitterSettings: {speedFactor: 0.05, lengthFactor: 1},
+        renderOrder: 4,
+    });
+    sparks.addBehavior(new ApplyForce(new BVector3(0, -1, 0), new ConstantValue(18)));
+
+    const embers = layer('Embers', {
+        duration: 1,
+        startLife: new IntervalValue(0.5, 0.8),
+        startSpeed: new IntervalValue(2, 5),
+        startSize: new IntervalValue(0.1, 0.18),
+        startColor: new RandomColor(new Color4(1, 0.7, 0.3, 1), new Color4(1, 0.4, 0.1, 1)),
+        worldSpace: true,
+        emissionBursts: burst(10, 0.03),
+        shape: new SphereEmitter({radius: 0.2, thickness: 1}),
+        texture: baseTexture(scene, 'spark'),
+        renderOrder: 4,
+    });
+    embers.addBehavior(new ApplyForce(new BVector3(0, -1, 0), new ConstantValue(8)));
+    embers.addBehavior(new ColorOverLife(fade(0.05, 0.7)));
+
+    const smoke = layer('Smoke', {
+        duration: 1.2,
+        startLife: new IntervalValue(0.7, 1),
+        startSpeed: new IntervalValue(0.3, 0.7),
+        startSize: new IntervalValue(1.2, 1.6),
+        startRotation: new IntervalValue(0, Math.PI * 2),
+        startColor: new RandomColor(new Color4(0.45, 0.42, 0.4, 0.6), new Color4(0.6, 0.56, 0.52, 0.7)),
+        emissionBursts: burst(3, 0.08),
+        shape: new SphereEmitter({radius: 0.3}),
+        texture: baseTexture(scene, 'smoke_puff'),
+        ...sheetOf('smoke_puff'),
+        blendMode: Constants.ALPHA_COMBINE,
+        renderOrder: 1,
+    });
+    smoke.addBehavior(
+        new FrameOverLife(
+            curve([
+                [0, 0],
+                [1, 15.99],
+            ])
+        )
+    );
+
     QuarksUtil.addToBatchRenderer(root, batchRenderer);
     root.setEnabled(false);
     return root;
 }
 
-export function init(ctx: DemoContext) {
-    const {scene, camera, demoState} = ctx;
-    camera.setPosition(new BVector3(0, 10, 22));
+export function init(ctx: DemoContext): DemoRun {
+    const {scene, camera, systems} = ctx;
+    camera.setPosition(new BVector3(0, 8, 17));
+    camera.setTarget(new BVector3(0, 0.8, 0));
+    addGround(scene);
 
+    // Dummies in a ring; each hit lands on a dummy's chest, on the side toward the camera.
     const targetMaterial = new StandardMaterial('target', scene);
-    targetMaterial.diffuseColor = new Color3(0.25, 0.3, 0.45);
-    targetMaterial.specularColor = Color3.Black();
+    targetMaterial.diffuseColor = new Color3(0.36, 0.36, 0.42);
+    targetMaterial.specularColor = new Color3(0.1, 0.1, 0.1);
     const targets: BVector3[] = [];
     for (let i = 0; i < TARGET_COUNT; i++) {
         const angle = (i / TARGET_COUNT) * Math.PI * 2;
-        const position = new BVector3(Math.cos(angle) * TARGET_RADIUS, 1, Math.sin(angle) * TARGET_RADIUS);
-        const target = MeshBuilder.CreateSphere(`target${i}`, {diameter: 1.4, segments: 12}, scene);
-        target.position.copyFrom(position);
-        target.material = targetMaterial;
-        targets.push(position);
+        const x = Math.cos(angle) * TARGET_RADIUS;
+        const z = Math.sin(angle) * TARGET_RADIUS;
+        const dummy = MeshBuilder.CreateCapsule(`target${i}`, {height: 1.8, radius: 0.32}, scene);
+        dummy.position.set(x, 0.9, z);
+        dummy.material = targetMaterial;
+        targets.push(new BVector3(x, 1.2, z + 0.5));
     }
 
     const template = createHitTemplate(ctx);
     // Four copies made up front, so no hit pays for cloning; eight at most, a cap
     // this cadence stays well under, so `acquire` never comes back empty here.
     const pool = new EffectPool(template, {renderer: ctx.batchRenderer, prewarm: 4, maxSize: 8});
-    // The template's longest system decides how fast hits may follow each other
-    // and still overlap by about half.
-    const period = QuarksUtil.getDuration(template) / 2;
-    demoState.pooledHits = {pool, targets, elapsed: period, period, index: 0};
-}
-
-export function update({demoState, systems}: DemoContext, delta: number) {
-    const st = demoState.pooledHits;
-    if (!st) {
-        return;
-    }
-    st.elapsed += delta;
-    if (st.elapsed < st.period) {
-        return;
-    }
-    st.elapsed = 0;
-    const position = st.targets[st.index % st.targets.length];
-    st.index++;
-    const copy = st.pool.acquire(position);
-    if (!copy) {
-        return; // every copy is busy: the pool is at its size, so this hit is skipped
-    }
-    // A heavier hit every third time: emission counts scale without touching the curves.
-    const strength = st.index % 3 === 0 ? 2 : 1;
-    QuarksUtil.runOnAllParticleEmitters(copy, (emitter) => {
-        const system = emitter.system as ParticleSystem;
-        system.emissionMultiplier = strength;
-        // The copies are what plays, so they are what the viewer counts and exports.
-        if (!systems.includes(system)) {
-            systems.push(system);
+    // The template's longest system decides how fast hits may follow each other: four overlap,
+    // the smoke of one still rising as the next lands.
+    const period = QuarksUtil.getDuration(template) / 4;
+    let index = 0;
+    const hit = () => {
+        const position = targets[index % targets.length];
+        index++;
+        const copy = pool.acquire(position);
+        if (!copy) {
+            return; // every copy is busy: the pool is at its size, so this hit is skipped
         }
-    });
+        // A heavier hit every third time: emission counts scale without touching the curves.
+        const strength = index % 3 === 0 ? 2 : 1;
+        QuarksUtil.runOnAllParticleEmitters(copy, (emitter) => {
+            const system = emitter.system as ParticleSystem;
+            system.emissionMultiplier = strength;
+            // The copies are what plays, so they are what the viewer counts and exports.
+            if (!systems.includes(system)) {
+                systems.push(system);
+            }
+        });
+    };
+    return {update: every(period, hit)};
 }

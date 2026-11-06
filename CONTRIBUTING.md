@@ -68,7 +68,7 @@ npm run typecheck                              # tsc over sources, tests, the ex
 npm run test:coverage                          # the same suites with the coverage gate (what CI runs)
 npm run docs                                   # TypeDoc API docs
 npm run docs:check                             # renders the API docs of quarks.core and babylon.quarks; fails on a missing TSDoc or broken {@link} (CI runs it)
-npm run check:demos                            # every demo in headless Chromium, fails on page/console errors or a missing gallery preview
+npm run check:demos                            # every demo in headless Chromium, fails on errors, an empty canvas or a missing gallery preview
 npm run validate:shaders                       # every shader variant, GLSL and WGSL, through a real compiler (CI runs it)
 npm run check:allocations                      # what a steady frame allocates, per render mode and behavior; nothing per particle (CI runs it)
 npm run check:pack                             # tarball contents, a consumer project importing them, and each bundle's gzipped size budget (scripts/size-budget.json)
@@ -146,16 +146,27 @@ out of `babylon.quarks`' exports.
 
 ## Adding a demo
 
-1. Create a module in `examples/src/demos/` exporting `init` (and optionally `update`) —
-   see any existing demo for the `DemoContext` shape.
-2. Register it in `examples/src/demoManifest.ts` (key, name, description, tags, preview).
+1. Create a module in `examples/src/demos/` whose `init(ctx)` builds the demo and returns its
+   `update(delta)` and, when it needs clean-up, `dispose()` (`DemoRun` in `examples/src/types.ts`).
+   Keep the demo's state in that closure, add systems with `ctx.add` (or a whole effect with
+   `ctx.addEffect`), name what a feature demo compares with `addLabel` (`shared/labels.ts`), and
+   offer switches with `ctx.controls`. Draw with the base texture set (`baseTexture` in
+   `shared/textures.ts`, greyscale sheets and shapes tinted by the particles' colour, made outside
+   this repository) and stand the demo on `addGround` (`shared/stage.ts`), mid-dark so additive
+   light and alpha-blended smoke both read. Time comes only from `update`'s `delta`: it pauses,
+   slows down and steps with the viewer. `shared/timing.ts` replays one-shot effects.
+2. Register it in `examples/src/demoManifest.ts`: its section (`showcase` for a finished effect,
+   `features` for a demo of one part of the library), category, description (the viewer's panel
+   shows it), tags and `captureAt`, the second of the demo's time its preview shows.
 3. Run `npm run dev`, verify it works, then capture the gallery preview:
-   `npm run capture:previews` (requires the dev server running; `CHROMIUM_PATH` as above). The
-   gallery shows `examples/public/previews/<key>.png`, and `npm run check:demos` fails on a demo
-   without one.
-   `npm run capture:previews -- --only=YourDemo` captures just the new one.
-4. Add it to the demo table in the root `README.md` and bump the demo count in
-   `packages/babylon.quarks/README.md`.
+   `npm run capture:previews -- --only=YourDemo` (requires the dev server running; `CHROMIUM_PATH`
+   as above). The gallery shows `examples/public/previews/<key>.png`.
+4. Run `npm run docs:demos`: it writes the demo tables and counts of the READMEs and the landing
+   page from the manifest; CI fails when they are out of date.
+
+`npm run check:demos` opens every demo and fails on a page or console error, a demo whose `init`
+does not finish, one that never has a particle alive or leaves the canvas empty, and one without
+its preview.
 
 ## Landing page
 

@@ -5,13 +5,13 @@ import {Engine} from '@babylonjs/core/Engines/engine';
 import {HemisphericLight} from '@babylonjs/core/Lights/hemisphericLight';
 import {Color4} from '@babylonjs/core/Maths/math.color';
 import {Vector3 as BVector3} from '@babylonjs/core/Maths/math.vector';
-import type {TransformNode} from '@babylonjs/core/Meshes/transformNode';
 import {Scene} from '@babylonjs/core/scene';
 // Side-effect import: registers Scene.createPickingRay, used to project the pointer into the world.
 import '@babylonjs/core/Culling/ray';
 import {BatchedRenderer, BehaviorTypes, EmitterShapes} from 'babylon.quarks';
 import {demoManifest} from '../demoManifest';
-import type {DemoContext, DemoModule, DemoState} from '../types';
+import {createDemoContext, effectRoots, MAX_FRAME, particleCount} from '../shared/host';
+import type {DemoContext, DemoModule, DemoRun} from '../types';
 import {createVortex, type StagePointer} from './vortex';
 
 /** One effect the hero stage can show. */
@@ -39,7 +39,7 @@ interface StageElements {
 interface LoadedEffect {
     id: string;
     ctx: DemoContext;
-    module: DemoModule;
+    run: DemoRun;
 }
 
 const pointer: StagePointer = {x: 0, y: 0, seen: false};
@@ -47,7 +47,7 @@ const pointer: StagePointer = {x: 0, y: 0, seen: false};
 const EFFECTS: Record<string, StageEffect> = {
     vortex: {demoKey: null, load: async () => createVortex(pointer), orbit: false},
     electric: {demoKey: 'ElectricBallDemo', load: () => import('../demos/electricBall'), orbit: true},
-    explosion: {demoKey: 'ExplosionDemo', load: () => import('../demos/explosion'), orbit: true},
+    levelUp: {demoKey: 'LevelUpDemo', load: () => import('../demos/levelUp'), orbit: true},
     weapons: {demoKey: 'AuraTrailDemo', load: () => import('../demos/auraTrail'), orbit: true},
     forces: {demoKey: 'ForceSpaceDemo', load: () => import('../demos/forceSpace'), orbit: true},
 };
@@ -197,10 +197,10 @@ export async function mountHeroStage(root: HTMLElement): Promise<() => void> {
             camera.minZ = 0.1;
             new HemisphericLight('stageLight', new BVector3(0.35, 1, -0.2), scene);
             const batchRenderer = new BatchedRenderer('stageVfx', scene);
-            const demoState: DemoState = {totalTime: 0, refreshIndex: 0};
-            const ctx: DemoContext = {scene, camera, batchRenderer, systems: [], demoState};
-            await module.init(ctx);
+            const ctx = createDemoContext(scene, camera, batchRenderer);
+            const run = (await module.init(ctx)) ?? {};
             if (token !== loadToken) {
+                run.dispose?.();
                 scene.dispose();
                 return false;
             }
@@ -214,7 +214,8 @@ export async function mountHeroStage(root: HTMLElement): Promise<() => void> {
                 }
             }
             const previous = current;
-            current = {id, ctx, module};
+            current = {id, ctx, run};
+            previous?.run.dispose?.();
             previous?.ctx.scene.dispose();
             describe(id);
             return true;
@@ -266,10 +267,10 @@ export async function mountHeroStage(root: HTMLElement): Promise<() => void> {
         if (!current) {
             return;
         }
-        const {ctx, module} = current;
-        const delta = Math.min(engine.getDeltaTime() / 1000, 0.05);
+        const {ctx, run} = current;
+        const delta = Math.min(engine.getDeltaTime() / 1000, MAX_FRAME);
         try {
-            module.update?.(ctx, delta);
+            run.update?.(delta);
             ctx.batchRenderer.update(delta);
             ctx.scene.render();
         } catch (error) {
@@ -278,10 +279,7 @@ export async function mountHeroStage(root: HTMLElement): Promise<() => void> {
         frames++;
         const now = performance.now();
         if (now - lastStat >= 500) {
-            let particles = 0;
-            for (const system of ctx.systems) {
-                particles += system.particleNum;
-            }
+            const particles = particleCount(ctx);
             if (el.particles) {
                 el.particles.textContent = particles.toLocaleString('en-US');
             }
@@ -322,6 +320,7 @@ export async function mountHeroStage(root: HTMLElement): Promise<() => void> {
         el.editorButton?.removeEventListener('click', onEditor);
         setRunning(false);
         loadToken++;
+        current?.run.dispose?.();
         current?.ctx.scene.dispose();
         current = null;
         engine.dispose();
@@ -345,20 +344,12 @@ export async function mountHeroStage(root: HTMLElement): Promise<() => void> {
 async function openInEditor({id, ctx}: LoadedEffect) {
     try {
         const {ensurePortableTextureUrl, serializeEffectForest} = await import('babylon.quarks-editor');
-        const roots = new Set<TransformNode>();
-        for (const system of ctx.systems) {
-            let node: TransformNode = system.emitter;
-            while (node.parent && node.parent !== ctx.batchRenderer) {
-                node = node.parent as TransformNode;
-            }
-            roots.add(node);
-        }
         for (const system of ctx.systems) {
             if (system.texture) {
                 await ensurePortableTextureUrl(system.texture);
             }
         }
-        sessionStorage.setItem('quarks-editor-effect', serializeEffectForest([...roots], effectName(id)));
+        sessionStorage.setItem('quarks-editor-effect', serializeEffectForest(effectRoots(ctx), effectName(id)));
         window.location.href = './editor.html?effect=session';
     } catch (error) {
         // Storage full or blocked: open the editor on its own rather than doing nothing.

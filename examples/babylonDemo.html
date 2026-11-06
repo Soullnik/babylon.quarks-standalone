@@ -132,6 +132,10 @@
                 flex-shrink: 0;
             }
 
+            .ui-title:empty {
+                display: none;
+            }
+
             .ui-title {
                 font-size: 14px;
                 font-weight: 600;
@@ -150,19 +154,88 @@
                 white-space: nowrap;
             }
 
-            .hint {
+            .panel {
                 position: fixed;
                 left: 14px;
                 bottom: 14px;
                 z-index: 20;
+                width: min(380px, calc(100% - 28px));
                 border: 1px solid rgba(151, 172, 255, 0.2);
-                border-radius: 10px;
-                padding: 7px 10px;
-                font-size: 12px;
-                color: #aebfe8;
-                background: rgba(8, 12, 24, 0.6);
+                border-radius: 12px;
+                padding: 12px 14px;
+                background: rgba(8, 12, 24, 0.72);
                 backdrop-filter: blur(8px);
-                line-height: 1.45;
+                display: grid;
+                gap: 8px;
+            }
+
+            .panel-category {
+                font-size: 11px;
+                letter-spacing: 0.08em;
+                text-transform: uppercase;
+                color: #8ea3d8;
+            }
+
+            .panel-description {
+                margin: 0;
+                font-size: 13px;
+                line-height: 1.5;
+                color: #d5def7;
+            }
+
+            .panel-controls {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 8px 14px;
+                align-items: center;
+                font-size: 13px;
+            }
+
+            .panel-controls[hidden] {
+                display: none;
+            }
+
+            .control {
+                display: inline-flex;
+                align-items: center;
+                gap: 6px;
+                cursor: pointer;
+            }
+
+            .panel-foot {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: 10px;
+            }
+
+            .ui-btn-small {
+                height: 28px;
+                padding: 0 10px;
+                font-size: 12px;
+                flex-shrink: 0;
+            }
+
+            .panel-hint {
+                font-size: 11px;
+                color: #8193c2;
+            }
+
+            .panel.is-collapsed .panel-description,
+            .panel.is-collapsed .panel-controls,
+            .panel.is-collapsed .panel-foot {
+                display: none;
+            }
+
+            .panel-toggle {
+                position: absolute;
+                top: 8px;
+                right: 10px;
+                border: 0;
+                background: none;
+                color: #8ea3d8;
+                cursor: pointer;
+                font-size: 12px;
             }
 
             #json-file-input {
@@ -232,11 +305,6 @@
                     flex: 1 1 100%;
                     flex-wrap: wrap;
                 }
-
-                .hint {
-                    right: 14px;
-                    max-width: calc(100% - 28px);
-                }
             }
         </style>
     </head>
@@ -247,7 +315,11 @@
                 <a href="./" class="ui-link">Back</a>
                 <button id="previousBtn" class="ui-btn" type="button">Prev</button>
                 <button id="nextBtn" class="ui-btn" type="button">Next</button>
-                <button id="openJsonBtn" class="ui-btn" type="button">Open JSON</button>
+                <button id="pauseBtn" class="ui-btn" type="button" aria-pressed="false" title="Pause (Space)">
+                    Pause
+                </button>
+                <button id="restartBtn" class="ui-btn" type="button" title="Start the demo over (R)">Restart</button>
+                <select id="speed-select" class="ui-select" aria-label="Playback speed"></select>
                 <button
                     id="openInEditorBtn"
                     class="ui-btn"
@@ -259,7 +331,7 @@
                 <input id="json-file-input" type="file" accept=".json,application/json" />
             </div>
             <div class="hud-center">
-                <span id="demo-name" class="ui-title">Loading...</span>
+                <span id="demo-name" class="ui-title"></span>
                 <select id="demo-select" class="ui-select" aria-label="Choose demo"></select>
             </div>
             <div class="hud-right">
@@ -271,6 +343,7 @@
                     target="_blank"
                     rel="noopener noreferrer"
                     aria-label="Repository on GitHub"
+                    title="Repository on GitHub"
                 >
                     <svg
                         xmlns="http://www.w3.org/2000/svg"
@@ -284,7 +357,6 @@
                             d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"
                         />
                     </svg>
-                    Repo
                 </a>
                 <a
                     class="ui-link"
@@ -292,6 +364,7 @@
                     target="_blank"
                     rel="noopener noreferrer"
                     aria-label="babylon.quarks on npm"
+                    title="babylon.quarks on npm"
                 >
                     <svg
                         xmlns="http://www.w3.org/2000/svg"
@@ -305,7 +378,6 @@
                             d="M1.763 0C.786 0 0 .786 0 1.763v20.474C0 23.214.786 24 1.763 24h20.474c.977 0 1.763-.786 1.763-1.763V1.763C24 .786 23.214 0 22.237 0H1.763zM5.13 5.323l13.837.019-.009 13.818h-3.464l.01-10.382h-3.46L12.04 19.17h-3.47L5.113 5.311z"
                         />
                     </svg>
-                    npm
                 </a>
                 <a
                     id="source-link"
@@ -323,7 +395,18 @@
                 <span>Object3D export with particle emitters (.json)</span>
             </div>
         </div>
-        <div class="hint">Left/Right: switch demo · Drop a .json file or use Open JSON</div>
+        <aside class="panel" id="demo-panel" aria-label="About this demo">
+            <button type="button" class="panel-toggle" id="panelToggle" aria-expanded="true">Hide</button>
+            <span id="demo-category" class="panel-category"></span>
+            <p id="demo-description" class="panel-description"></p>
+            <div id="demo-controls" class="panel-controls" hidden></div>
+            <div class="panel-foot">
+                <span class="panel-hint"
+                    >Left/Right: switch demo · Space: pause · R: restart · drop a .json to open it</span
+                >
+                <button id="openJsonBtn" class="ui-btn ui-btn-small" type="button">Open JSON</button>
+            </div>
+        </aside>
         <script type="module" src="./src/viewer.ts"></script>
     </body>
 </html>

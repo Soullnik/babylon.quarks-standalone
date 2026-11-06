@@ -188,7 +188,10 @@
                             <a class="button primary" href="#get-started">Get started</a>
                             <a class="button" href="./editor.html">Open the editor</a>
                             <a class="button ghost" href="#demos"
-                                ><span><span data-count="demos">27</span> live demos</span></a
+                                ><span
+                                    ><span data-count="demos"><!-- demos:count -->23<!-- /demos:count --></span> live
+                                    demos</span
+                                ></a
                             >
                         </div>
                     </div>
@@ -202,8 +205,8 @@
                             <button type="button" data-effect="weapons" aria-pressed="false" tabindex="-1">
                                 Weapon trails
                             </button>
-                            <button type="button" data-effect="explosion" aria-pressed="false" tabindex="-1">
-                                Unity explosion
+                            <button type="button" data-effect="levelUp" aria-pressed="false" tabindex="-1">
+                                Level-up
                             </button>
                             <button type="button" data-effect="forces" aria-pressed="false" tabindex="-1">
                                 Force space
@@ -615,7 +618,7 @@ const editor = QuarksEffectEditor.Show({
                         </label>
                     </header>
                     <div class="filters">
-                        <div id="demo-filters" class="chips" role="group" aria-label="Filter by tag"></div>
+                        <div id="demo-filters" class="chips" role="group" aria-label="Filter by section"></div>
                         <p id="demo-status" class="demo-status" aria-live="polite"></p>
                     </div>
                     <ul id="demos-grid" class="demo-grid">

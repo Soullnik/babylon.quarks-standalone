@@ -52,6 +52,9 @@ jobs:
             - name: Check API docs
               run: npm run docs:check
 
+            - name: Check the demo lists in the READMEs
+              run: npm run check:demo-docs
+
             # Jest only transpiles TypeScript; type errors in sources and tests fail here.
             - name: Typecheck sources and tests
               run: npm run typecheck

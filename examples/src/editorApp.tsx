@@ -6,6 +6,7 @@ import {QuarksEditorWorkspace, QuarksEffectEditor} from 'babylon.quarks-editor/r
 import {SHARED_ASSETS, createSharedTexture} from './shared/common';
 import {createEngineFromQuery} from './shared/engineFactory';
 import './shared/loaders';
+import {BASE} from './shared/textures';
 
 /**
  * ?effect=session reads a JSON stashed by the demo viewer's "Open in editor" button;
@@ -79,11 +80,15 @@ const editorProps = {
     hostElement: document.getElementById('editor-host')!,
     title: 'Effect editor',
     backLink: {href: './index.html', label: 'gallery'},
+    // The examples' base set first (sheets name their grid), then the older atlases.
     textureOptions: [
+        ...Object.entries(BASE).map(([name, {cols, rows}]) => ({
+            label: cols * rows > 1 ? `${name} (${cols}x${rows} sheet)` : name,
+            url: `textures/base/${name}.png`,
+        })),
         {label: 'Default particle', url: SHARED_ASSETS.defaultParticle},
         {label: 'Texture atlas 1', url: SHARED_ASSETS.atlas},
         {label: 'Texture atlas 2', url: SHARED_ASSETS.atlasSecondary},
-        {label: 'Smoke (4x4 sheet)', url: SHARED_ASSETS.smoke},
     ],
     resolveTexture: (url: string, scene: Scene) => createSharedTexture(scene, url),
     resolveGeometry: loadGeometryFromFile,

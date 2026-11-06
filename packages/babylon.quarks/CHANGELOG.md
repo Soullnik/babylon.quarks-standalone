@@ -243,6 +243,19 @@ and the package's version moves in lockstep with `quarks.core`.
   as gravity, sets `scaleWithEmitter: false`.
 - `ParticleSystem.seed`'s documentation says what STABILITY.md promises: a seeded effect plays the
   same on every machine running the same minor version.
+- **The examples are a gallery in two sections**, a showcase of finished effects and feature demos,
+  each under a category. The viewer shows what a demo is about in a panel, with the switches the
+  demo offers, and pauses (Space), restarts (R) and slows down; Prev and Next follow the
+  categories. A demo's `init` returns its `update` and `dispose`, so all its time comes from the
+  viewer's frames and opening it again starts it fresh. Every demo is redrawn on a base texture set
+  of greyscale sheets and shapes (smoke, dust, fire, flashes, bolts, filaments, glows), labelled
+  in the scene and standing on a floor; the gallery's effects are built as games build theirs, in
+  timed layers. Previews are taken at the moment each demo names, in its own time, and the READMEs'
+  demo tables are written from the gallery's list (`npm run docs:demos`, checked in CI).
+  `check:demos` now also fails on a demo whose `init` never finishes, one without a particle
+  alive, and one whose particles leave the canvas empty. The Explosion, Soft Particle and Alpha
+  Test demos are gone with their third-party textures and mesh, and the Magic Zone, Pick-Up,
+  Turbulence and Custom Blending demos with them; the Sub Emitter demo is built in code.
 
 ### Fixed
 

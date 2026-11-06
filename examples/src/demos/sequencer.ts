@@ -1,5 +1,4 @@
 import {Constants} from '@babylonjs/core/Engines/constants';
-import {Texture} from '@babylonjs/core/Materials/Textures/texture';
 import {Color4} from '@babylonjs/core/Maths/math.color';
 import {Vector3 as BVector3} from '@babylonjs/core/Maths/math.vector';
 import {
@@ -13,6 +12,7 @@ import {
     TextureSequencer,
 } from 'babylon.quarks';
 import {SHARED_ASSETS} from '../shared/common';
+import {baseTexture} from '../shared/textures';
 import type {DemoContext} from '../types';
 
 function loadImage(src: string): Promise<HTMLImageElement> {
@@ -52,13 +52,13 @@ function centerSequencer(
     sequencer.position.y = anchorY - image.height * scaleY * 0.5;
 }
 
-export async function init({scene, camera, batchRenderer, systems}: DemoContext) {
-    camera.setPosition(new BVector3(0, 7, 14));
+export async function init({scene, camera, add}: DemoContext) {
+    camera.setPosition(new BVector3(0, 2, 15));
     const image = await loadImage(SHARED_ASSETS.sequenceText);
     const logo = await loadImage(SHARED_ASSETS.sequenceLogo);
     const textSequencerImage = createSequencerImage(image, 170);
     const logoSequencerImage = createSequencerImage(logo, 150);
-    const texture = new Texture(SHARED_ASSETS.atlas, scene);
+    const texture = baseTexture(scene, 'spark');
     const gridColumn = 100;
     const gridRow = 100;
     const particleCount = gridColumn * gridRow;
@@ -78,10 +78,7 @@ export async function init({scene, camera, batchRenderer, systems}: DemoContext)
         renderMode: RenderMode.BillBoard,
         texture,
         transparent: true,
-        blendMode: Constants.ALPHA_COMBINE,
-        startTileIndex: new ConstantValue(0),
-        uTileCount: 10,
-        vTileCount: 10,
+        blendMode: Constants.ALPHA_ADD,
     });
     const seq = new TextureSequencer(0.08, 0.08, new BVector3());
     seq.fromImage(textSequencerImage, 0.5);
@@ -93,6 +90,5 @@ export async function init({scene, camera, batchRenderer, systems}: DemoContext)
     applySeq.appendSequencer(new IntervalValue(0.8, 6.2), seq);
     applySeq.appendSequencer(new IntervalValue(7.8, 14.8), seq2);
     sequence.addBehavior(applySeq);
-    batchRenderer.addSystem(sequence);
-    systems.push(sequence);
+    add(sequence);
 }

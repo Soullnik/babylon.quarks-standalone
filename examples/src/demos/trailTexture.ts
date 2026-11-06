@@ -1,13 +1,13 @@
 import {Constants} from '@babylonjs/core/Engines/constants';
-import {StandardMaterial} from '@babylonjs/core/Materials/standardMaterial';
 import {DynamicTexture} from '@babylonjs/core/Materials/Textures/dynamicTexture';
 import {Texture} from '@babylonjs/core/Materials/Textures/texture';
-import {Color3, Color4} from '@babylonjs/core/Maths/math.color';
+import {Color4} from '@babylonjs/core/Maths/math.color';
 import {Vector3 as BVector3} from '@babylonjs/core/Maths/math.vector';
-import {MeshBuilder} from '@babylonjs/core/Meshes/meshBuilder';
 import type {Scene} from '@babylonjs/core/scene';
 import {ConstantColor, ConstantValue, ParticleSystem, PointEmitter, RenderMode, TrailSettings} from 'babylon.quarks';
-import type {DemoContext} from '../types';
+import {addLabel} from '../shared/labels';
+import {addGround} from '../shared/stage';
+import type {DemoContext, DemoRun} from '../types';
 
 /**
  * How a trail lays its texture along the ribbon and samples its path: Unity's TrailRenderer
@@ -71,16 +71,14 @@ function figure(lane: number, time: number, out: BVector3): BVector3 {
     return out;
 }
 
-export function init({scene, camera, batchRenderer, systems, demoState}: DemoContext) {
-    camera.setPosition(new BVector3(0, 11, 34));
+export function init({scene, camera, add}: DemoContext): DemoRun {
+    camera.setPosition(new BVector3(0, 5.5, 17));
     camera.setTarget(new BVector3(0, 2, 0));
+    // A striped texture on purpose: the stripes show how each mode lays it along the trail.
     const texture = bandTexture(scene);
-
-    const ground = MeshBuilder.CreateGround('trailTextureGround', {width: 40, height: 20}, scene);
-    const groundMat = new StandardMaterial('trailTextureGroundMat', scene);
-    groundMat.diffuseColor = new Color3(0.07, 0.08, 0.11);
-    groundMat.specularColor = Color3.Black();
-    ground.material = groundMat;
+    addGround(scene);
+    const names = ['stretch', 'distributePerSegment', 'tile', 'repeatPerSegment', 'clearTrails() on a jump'];
+    names.forEach((name, lane) => addLabel(scene, name, new BVector3(laneX(lane), 0.25, 0), {height: 0.46}));
 
     const lanes: Array<Partial<TrailSettings>> = [
         {},
@@ -114,40 +112,36 @@ export function init({scene, camera, batchRenderer, systems, demoState}: DemoCon
             blendMode: Constants.ALPHA_COMBINE,
         });
         figure(lane, 0, system.emitter.position);
-        batchRenderer.addSystem(system);
-        systems.push(system);
+        add(system);
         return system;
     });
 
-    demoState.trailTexture = {elapsed: 0, trails, nextJump: 1.5};
-}
-
-export function update({demoState}: DemoContext, delta: number) {
-    const state = demoState.trailTexture;
-    if (!state) {
-        return;
-    }
-    state.elapsed += delta;
-    const {trails} = state;
-    for (let lane = 0; lane < LANES - 1; lane++) {
-        figure(lane, state.elapsed, trails[lane].emitter.position);
-    }
-    // The last lane teleports: a jump is a placement, not motion to draw a ribbon across.
-    const jumper = trails[LANES - 1];
-    if (state.elapsed >= state.nextJump) {
-        state.nextJump += 1.5;
-        jumper.pause();
-        jumper.emitter.position.set(
-            laneX(LANES - 1) + (Math.random() - 0.5) * 4,
-            2 + Math.random() * 1.5,
-            (Math.random() - 0.5) * 4
-        );
-        jumper.play();
-        jumper.clearTrails();
-    } else {
-        // Between jumps it wanders a little, so each ribbon has a shape of its own.
-        const t = state.elapsed * 3;
-        jumper.emitter.position.x += Math.cos(t) * delta * 1.5;
-        jumper.emitter.position.z += Math.sin(t * 1.3) * delta * 1.5;
-    }
+    let elapsed = 0;
+    let nextJump = 1.5;
+    return {
+        update(delta) {
+            elapsed += delta;
+            for (let lane = 0; lane < LANES - 1; lane++) {
+                figure(lane, elapsed, trails[lane].emitter.position);
+            }
+            // The last lane teleports: a jump is a placement, not motion to draw a ribbon across.
+            const jumper = trails[LANES - 1];
+            if (elapsed >= nextJump) {
+                nextJump += 1.5;
+                jumper.pause();
+                jumper.emitter.position.set(
+                    laneX(LANES - 1) + (Math.random() - 0.5) * 4,
+                    2 + Math.random() * 1.5,
+                    (Math.random() - 0.5) * 4
+                );
+                jumper.play();
+                jumper.clearTrails();
+            } else {
+                // Between jumps it wanders a little, so each ribbon has a shape of its own.
+                const t = elapsed * 3;
+                jumper.emitter.position.x += Math.cos(t) * delta * 1.5;
+                jumper.emitter.position.z += Math.sin(t * 1.3) * delta * 1.5;
+            }
+        },
+    };
 }

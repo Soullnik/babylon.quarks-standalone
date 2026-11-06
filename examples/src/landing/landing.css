@@ -1215,6 +1215,32 @@ h3 {
     gap: 24px 18px;
 }
 
+.demo-group {
+    grid-column: 1 / -1;
+    margin-top: 12px;
+}
+
+.demo-group:first-child {
+    margin-top: 0;
+}
+
+.demo-group h3 {
+    margin: 0;
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    font-size: 1.05rem;
+}
+
+.demo-group h3 span {
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    font-weight: 500;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--muted);
+}
+
 .demo {
     display: grid;
     grid-template-rows: auto 1fr auto;

@@ -1,4 +1,4 @@
-import {demoManifest} from '../demoManifest';
+import {demoManifest, previewFile, SECTIONS} from '../demoManifest';
 import type {DemoManifestEntry} from '../types';
 import {highlightTs} from './highlight';
 
@@ -233,14 +233,6 @@ function setupCode() {
     }
 }
 
-/** `examples/public/previews/<kebab-key>.png`, as `npm run capture:previews` writes it. */
-function previewFile(demoKey: string) {
-    return demoKey
-        .replace(/Demo$/u, '')
-        .replace(/([a-z0-9])([A-Z])/g, '$1-$2')
-        .toLowerCase();
-}
-
 function escapeHtml(text: string) {
     return text.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 }
@@ -249,7 +241,7 @@ function demoCard(demo: DemoManifestEntry) {
     const tags = demo.tags.map((tag) => `<li>${escapeHtml(tag)}</li>`).join('');
     return `<li class="demo">
   <a class="demo-link" href="./babylonDemo.html#${encodeURIComponent(demo.key)}">
-    <img src="./previews/${previewFile(demo.key)}.png" alt="" loading="lazy" decoding="async" width="640" height="360" />
+    <img src="./previews/${previewFile(demo.key)}" alt="" loading="lazy" decoding="async" width="640" height="360" />
     <span class="demo-name">${escapeHtml(demo.name)}</span>
   </a>
   <p>${escapeHtml(demo.description)}</p>
@@ -257,20 +249,10 @@ function demoCard(demo: DemoManifestEntry) {
 </li>`;
 }
 
-/** Tags that appear on at least two demos, most common first: the gallery's filter chips. */
-function filterTags() {
-    const counts = new Map<string, number>();
-    for (const demo of demoManifest) {
-        for (const tag of demo.tags) {
-            counts.set(tag, (counts.get(tag) ?? 0) + 1);
-        }
-    }
-    return [...counts.entries()]
-        .filter(([, count]) => count >= 2)
-        .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
-        .map(([tag]) => tag);
-}
-
+/**
+ * The gallery: the showcase, then the feature demos, each under its category's heading. The chips
+ * pick a section; the search matches names, descriptions, categories and tags.
+ */
 function setupGallery() {
     const grid = document.getElementById('demos-grid');
     const search = document.getElementById('demo-search') as HTMLInputElement | null;
@@ -279,23 +261,21 @@ function setupGallery() {
     if (!grid) {
         return;
     }
-    let activeTag = '';
+    let activeSection = '';
     if (chips) {
-        chips.innerHTML = ['', ...filterTags()]
+        chips.innerHTML = [{id: '', title: 'All'}, ...SECTIONS]
             .map(
-                (tag) =>
-                    `<button type="button" class="chip" data-tag="${escapeHtml(tag)}" aria-pressed="${tag === ''}">${
-                        tag === '' ? 'All' : escapeHtml(tag)
-                    }</button>`
+                ({id, title}) =>
+                    `<button type="button" class="chip" data-section="${id}" aria-pressed="${id === ''}">${escapeHtml(title)}</button>`
             )
             .join('');
         chips.addEventListener('click', (event) => {
-            const chip = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-tag]');
+            const chip = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-section]');
             if (!chip) {
                 return;
             }
-            activeTag = chip.dataset.tag ?? '';
-            for (const other of Array.from(chips.querySelectorAll('[data-tag]'))) {
+            activeSection = chip.dataset.section ?? '';
+            for (const other of Array.from(chips.querySelectorAll('[data-section]'))) {
                 other.setAttribute('aria-pressed', String(other === chip));
             }
             render();
@@ -303,21 +283,35 @@ function setupGallery() {
     }
     const render = () => {
         const query = (search?.value ?? '').trim().toLowerCase();
-        const shown = demoManifest.filter((demo) => {
-            if (activeTag && !demo.tags.includes(activeTag)) {
-                return false;
+        const matches = (demo: DemoManifestEntry) =>
+            (!activeSection || demo.section === activeSection) &&
+            (!query ||
+                `${demo.name} ${demo.description} ${demo.category} ${demo.tags.join(' ')}`
+                    .toLowerCase()
+                    .includes(query));
+        let count = 0;
+        const groups: string[] = [];
+        for (const section of SECTIONS) {
+            for (const category of section.categories) {
+                const cards = demoManifest.filter(
+                    (demo) => demo.section === section.id && demo.category === category && matches(demo)
+                );
+                if (cards.length === 0) {
+                    continue;
+                }
+                count += cards.length;
+                groups.push(
+                    `<li class="demo-group"><h3>${escapeHtml(category)}<span>${escapeHtml(section.title)}</span></h3></li>`,
+                    ...cards.map(demoCard)
+                );
             }
-            if (!query) {
-                return true;
-            }
-            return `${demo.name} ${demo.description} ${demo.tags.join(' ')}`.toLowerCase().includes(query);
-        });
-        grid.innerHTML = shown.map(demoCard).join('');
+        }
+        grid.innerHTML = groups.join('');
         if (status) {
             status.textContent =
-                shown.length === demoManifest.length
+                count === demoManifest.length
                     ? `${demoManifest.length} demos`
-                    : `${shown.length} of ${demoManifest.length} demos`;
+                    : `${count} of ${demoManifest.length} demos`;
         }
     };
     search?.addEventListener('input', render);

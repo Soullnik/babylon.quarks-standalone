@@ -7,7 +7,6 @@ export const SHARED_ASSETS = {
     atlas: 'textures/texture1.png',
     atlasSecondary: 'textures/texture2.png',
     defaultParticle: 'textures/particle_default.png',
-    smoke: 'textures/cfxr smoke cloud x4.png',
     sequenceText: 'textures/text_texture.png',
     sequenceLogo: 'textures/logo_texture.png',
 };
