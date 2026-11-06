@@ -369,8 +369,11 @@ export function collapseTrailNewborns(
 }
 
 /**
- * Moves and ages the trail particles: a trail that follows its local origin is placed by its
- * emitter (or parent) matrix every step, any other along its velocity.
+ * Moves and ages the trail particles: a trail that follows its local origin stays where it was
+ * emitted relative to the emitter every step, any other moves along its velocity. A world-space
+ * system holds it there by the emitter's matrix; a local-space one keeps its local position as it
+ * is, since its positions are in the frame the emitter (or, for a sub emission, the parent
+ * particle) carries: the renderer, or `recordWorldSpace`, brings them to the world once.
  */
 export function moveTrails(
     delta: number,
@@ -378,6 +381,7 @@ export function moveTrails(
     store: ParticleStore,
     particleCount: number,
     followLocalOrigin: boolean,
+    worldSpace: boolean,
     emitterMatrix: Matrix4
 ): void {
     if (followLocalOrigin) {
@@ -385,7 +389,9 @@ export function moveTrails(
             const particle = particles[i];
             if ((particle as TrailParticle).localPosition) {
                 particle.position.copy((particle as TrailParticle).localPosition!);
-                particle.position.applyMatrix4(particle.parentMatrix ?? emitterMatrix);
+                if (worldSpace) {
+                    particle.position.applyMatrix4(emitterMatrix);
+                }
             } else {
                 particle.position.addScaledVector(particle.velocity, delta * particle.speedModifier);
             }

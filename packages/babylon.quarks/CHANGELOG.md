@@ -246,6 +246,14 @@ and the package's version moves in lockstep with `quarks.core`.
 
 ### Fixed
 
+- **A local-space trail that follows its local origin is drawn where its emitter is.** With
+  `followLocalOrigin`, a local-space system put the particle at its local position through the
+  emitter's matrix, in world space, and then the renderer (or `recordWorldSpace`, recording its
+  samples) took it through the matrix again: an emitter at x 3 drew its trail at x 6. The
+  particle now stays at its local position, in the frame the emitter (or a sub emission's parent
+  particle) carries, and is brought to the world once. World-space systems were right and are
+  unchanged.
+
 - **A mesh particle takes the emitter's scale after its rotation, as Unity's does.** Unity
   stretches a mesh particle by the emitter's scale outside its own rotation, along the axes of the
   render alignment: the emitter's world matrix for Local (skew and all), the scale along the

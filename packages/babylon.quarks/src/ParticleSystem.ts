@@ -2110,7 +2110,15 @@ export class ParticleSystem implements IParticleSystem {
             // then removal, each over the particle objects the history lives on.
             const trailSettings = this.rendererEmitterSettings as TrailSettings;
             collapseTrailNewborns(store, particleCount, snapshotSize, snapshotColor);
-            moveTrails(delta, particles, store, particleCount, Boolean(trailSettings.followLocalOrigin), emitterMatrix);
+            moveTrails(
+                delta,
+                particles,
+                store,
+                particleCount,
+                Boolean(trailSettings.followLocalOrigin),
+                this.worldSpace,
+                emitterMatrix
+            );
             recordTrailHistory(particles, particleCount, trailSettings, this.worldSpace, emitterMatrix);
             liveParticleCount = removeDeadTrails(particles, store, liveParticleCount, onDied);
         }
