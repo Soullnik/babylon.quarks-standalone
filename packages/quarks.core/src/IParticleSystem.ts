@@ -63,15 +63,23 @@ export interface JsonMetaData {
 /** The render-mode-specific settings of a system: one of the shapes below, by its render mode. */
 export type RendererEmitterSettings = TrailSettings | MeshSettings | BillBoardSettings | StretchedBillBoardSettings;
 
-/** Settings of a stretched billboard system. */
+/**
+ * Settings of a stretched billboard system, Unity's Stretched Billboard. The quad runs from the
+ * particle back along its velocity, `size × lengthFactor + speed × speedFactor` long, and is as
+ * wide as the size; a negative total stretches it ahead of the particle. A particle that does not
+ * move has no direction and draws nothing, as in Unity.
+ */
 export interface StretchedBillBoardSettings {
     /**
-     * how stretched the particle is in the direction of the camera based on the speed of the particle.
+     * Length per unit of speed, Unity's Speed Scale: a particle moving at 5 with a factor of 0.2
+     * is stretched 1 unit, whatever its size. 0 adds no length but keeps the quad along the
+     * velocity.
      * @type {number}
      */
     speedFactor: number;
     /**
-     * how stretched the particle is in the direction of the camera based on the size of the particle.
+     * Length per unit of size, Unity's Length Scale: a factor of 2 makes a quad of size 0.1
+     * 0.2 long.
      * @type {number}
      */
     lengthFactor: number;
@@ -268,7 +276,7 @@ export interface IParticleSystem {
      */
     simulationStep?: number;
     /**
-     * What world-space forces and speed limits are multiplied by: the mean
+     * What world-space forces are multiplied by: the mean
      * scale of {@link IEmitter.matrixWorld}'s axes for a world-space system,
      * which carries what its scaling mode scales motion by; 1 or undefined
      * otherwise.

@@ -7,11 +7,11 @@ import {quarksNodeId} from './nodeId';
 /**
  * Emits from the surface of a Babylon mesh (Unity's Shape: Mesh, Unreal's Skeletal/Static Mesh
  * Location): a point picked at random over the triangles, weighted by their area, moving along the
- * triangle's normal at the particle's start speed. The mesh's vertices are read once, when it is
- * set, in the mesh's own space, and laid in the emitter's space as they are, moved by
- * {@link transform}; moving the mesh node afterwards does not move the shape. A mesh without an
- * index buffer is read as a plain triangle list. A shape without a mesh emits from the origin
- * along +Z.
+ * triangle's normal out of its front face (the outside of a closed mesh) at the particle's start
+ * speed. The mesh's vertices are read once, when it is set, in the mesh's own space, and laid in
+ * the emitter's space as they are, moved by {@link transform}; moving the mesh node afterwards does
+ * not move the shape. A mesh without an index buffer is read as a plain triangle list. A shape
+ * without a mesh emits from the origin along +Z.
  */
 export class MeshSurfaceEmitter implements EmitterShape {
     /** The shape's type in effect files. */
@@ -91,7 +91,7 @@ export class MeshSurfaceEmitter implements EmitterShape {
         if (mesh) this.mesh = mesh;
     }
 
-    /** Places a new particle on the surface and sets its velocity along the triangle's normal. */
+    /** Places a new particle on the surface and sets its velocity along the triangle's front-face normal. */
     initialize(p: Particle): void {
         if (!this._positions || !this._indices) {
             p.position.set(0, 0, 0);
@@ -137,9 +137,11 @@ export class MeshSurfaceEmitter implements EmitterShape {
 
         p.position.set(ax + bx * u1 + cx * u2, ay + by * u1 + cy * u2, az + bz * u1 + cz * u2);
 
-        const nx = by * cz - bz * cy;
-        const ny = bz * cx - bx * cz;
-        const nz = bx * cy - by * cx;
+        // Out of the triangle's front face, as Babylon winds it (a MeshBuilder box's outside, and
+        // the normal Babylon computes for it): (c - a) x (b - a).
+        const nx = cy * bz - cz * by;
+        const ny = cz * bx - cx * bz;
+        const nz = cx * by - cy * bx;
         const len = Math.sqrt(nx * nx + ny * ny + nz * nz) || 1;
         p.velocity.set(nx / len, ny / len, nz / len).multiplyScalar(p.startSpeed);
         this.transform?.apply(p);

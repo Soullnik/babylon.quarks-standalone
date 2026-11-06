@@ -166,6 +166,9 @@
                 },
                 "rotation": {
                     "type": "number"
+                },
+                "colorSpace": {
+                    "type": "string"
                 }
             }
         },
@@ -210,6 +213,13 @@
                     "items": {
                         "type": "number"
                     }
+                },
+                "colors": {
+                    "type": "array",
+                    "items": {
+                        "type": "number"
+                    },
+                    "description": "Vertex colours, r, g, b, a per vertex, linear, from 0 to 1: a mesh particle's colour is multiplied by them as they are."
                 },
                 "url": {
                     "type": "string",
@@ -394,7 +404,35 @@
                         "type": "number"
                     },
                     "minItems": 16,
-                    "maxItems": 16
+                    "maxItems": 16,
+                    "description": "The node's local transform, column-major, as writers before 1.0 wrote it in place of position, quaternion and scale."
+                },
+                "position": {
+                    "type": "array",
+                    "items": {
+                        "type": "number"
+                    },
+                    "minItems": 3,
+                    "maxItems": 3,
+                    "description": "The node's local position; left out at the origin."
+                },
+                "quaternion": {
+                    "type": "array",
+                    "items": {
+                        "type": "number"
+                    },
+                    "minItems": 4,
+                    "maxItems": 4,
+                    "description": "The node's local rotation as [x, y, z, w]; left out when it does not turn."
+                },
+                "scale": {
+                    "type": "array",
+                    "items": {
+                        "type": "number"
+                    },
+                    "minItems": 3,
+                    "maxItems": 3,
+                    "description": "The node's local scale, negative along a mirrored axis; left out at 1."
                 },
                 "visible": {
                     "const": false
@@ -589,6 +627,12 @@
                 "renderFace": {
                     "enum": ["both", "front", "back"]
                 },
+                "renderAlignment": {
+                    "enum": ["simulation", "view", "world", "local"]
+                },
+                "rotationAxis": {
+                    "enum": ["z", "emission"]
+                },
                 "alignToDirection": {
                     "type": "boolean"
                 },
@@ -614,6 +658,26 @@
                 },
                 "blendTiles": {
                     "type": "boolean"
+                },
+                "premultipliedMap": {
+                    "type": "boolean"
+                },
+                "particleColor": {
+                    "type": "boolean"
+                },
+                "materialColor": {
+                    "type": "array",
+                    "items": {
+                        "type": "number"
+                    },
+                    "minItems": 4,
+                    "maxItems": 4
+                },
+                "materialColorScale": {
+                    "type": "number"
+                },
+                "sortingFudge": {
+                    "type": "number"
                 },
                 "softParticles": {
                     "type": "boolean"

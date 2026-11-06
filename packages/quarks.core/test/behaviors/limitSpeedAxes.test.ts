@@ -23,8 +23,9 @@ const matrixWorld = new Matrix4().compose(
     new Vector3(2, 2, 2)
 );
 const STEP = 1 / 60;
-/** At dampen 1, one 60 Hz step removes a third of the excess. */
-const THIRD = 1 / 3;
+/** Half the excess goes each 1/30 s at this dampen (Unity's law), so a 60 Hz step removes SHARE. */
+const DAMPEN = 0.5;
+const SHARE = 1 - Math.sqrt(0.5);
 
 function makeSystem(worldSpace: boolean, motionScale?: number): IParticleSystem {
     return {worldSpace, emitter: {matrixWorld}, motionScale} as unknown as IParticleSystem;
@@ -56,37 +57,42 @@ const close = (vector: Vector3, x: number, y: number, z: number) => {
 
 describe.each([false, true])('LimitSpeedOverLife separate axes (updateAll: %s)', (bulk) => {
     it('limits each axis on its own and keeps its sign', () => {
-        const v = run(new LimitSpeedOverLife(axes(2, 3, 4), 1), makeSystem(false), new Vector3(5, -6, 1), bulk);
-        close(v, 5 - 3 * THIRD, -6 + 3 * THIRD, 1);
+        const v = run(new LimitSpeedOverLife(axes(2, 3, 4), DAMPEN), makeSystem(false), new Vector3(5, -6, 1), bulk);
+        close(v, 5 - 3 * SHARE, -6 + 3 * SHARE, 1);
     });
 
     it('reads a limit below 0 as 0', () => {
-        const v = run(new LimitSpeedOverLife(axes(-1, 0, 0), 1), makeSystem(false), new Vector3(3, -3, 0), bulk);
-        close(v, 3 - 3 * THIRD, -3 + 3 * THIRD, 0);
+        const v = run(new LimitSpeedOverLife(axes(-1, 0, 0), DAMPEN), makeSystem(false), new Vector3(3, -3, 0), bulk);
+        close(v, 3 - 3 * SHARE, -3 + 3 * SHARE, 0);
     });
 
     it('measures local axes through the emitter in a world-space system', () => {
         // World -Z is local +X at half the length: 10 world is 5 local, 4 over the limit of 1.
-        // A third of that (in local units) comes off, twice as long in world units.
-        const v = run(new LimitSpeedOverLife(axes(1, 100, 100), 1), makeSystem(true), new Vector3(0, 0, -10), bulk);
-        close(v, 0, 0, -10 + 8 * THIRD);
+        // SHARE of that (in local units) comes off, twice as long in world units.
+        const v = run(
+            new LimitSpeedOverLife(axes(1, 100, 100), DAMPEN),
+            makeSystem(true),
+            new Vector3(0, 0, -10),
+            bulk
+        );
+        close(v, 0, 0, -10 + 8 * SHARE);
     });
 
     it('measures world axes through the emitter in a local-space system', () => {
         // Local +X is world -Z at twice the length: 3 local is 6 world, 4 over the limit of 2.
-        const behavior = new LimitSpeedOverLife(axes(100, 100, 2), 1, 'world');
+        const behavior = new LimitSpeedOverLife(axes(100, 100, 2), DAMPEN, 'world');
         const v = run(behavior, makeSystem(false), new Vector3(3, 0, 0), bulk);
-        close(v, 3 - 2 * THIRD, 0, 0);
+        close(v, 3 - 2 * SHARE, 0, 0);
     });
 
-    it('scales world limits by the motion scale of a world-space system', () => {
-        const behavior = new LimitSpeedOverLife(axes(2, 100, 100), 1, 'world');
+    it('leaves world limits of a world-space system unscaled by the emitter, as Unity does', () => {
+        const behavior = new LimitSpeedOverLife(axes(2, 100, 100), DAMPEN, 'world');
         const v = run(behavior, makeSystem(true, 2), new Vector3(7, 0, 0), bulk);
-        close(v, 7 - 3 * THIRD, 0, 0);
+        close(v, 7 - 5 * SHARE, 0, 0);
     });
 
     it('leaves a particle within every limit alone', () => {
-        const v = run(new LimitSpeedOverLife(axes(2, 2, 2), 1), makeSystem(true), new Vector3(0.5, -0.5, 0), bulk);
+        const v = run(new LimitSpeedOverLife(axes(2, 2, 2), DAMPEN), makeSystem(true), new Vector3(0.5, -0.5, 0), bulk);
         close(v, 0.5, -0.5, 0);
     });
 });
@@ -139,8 +145,8 @@ describe('LimitSpeedOverLife separate axes under a flattened emitter', () => {
         );
         const system = {worldSpace: true, emitter: {matrixWorld: flattened}} as unknown as IParticleSystem;
         // Local X is world +Y after the quarter turn about Z; its limit of 1 still applies.
-        const v = run(new LimitSpeedOverLife(axes(1, 1, 100), 1), system, new Vector3(0, 10, 0), false);
+        const v = run(new LimitSpeedOverLife(axes(1, 1, 100), DAMPEN), system, new Vector3(0, 10, 0), false);
         expect(Number.isFinite(v.y)).toBe(true);
-        expect(v.y).toBeCloseTo(10 - 9 * THIRD, 4);
+        expect(v.y).toBeCloseTo(10 - 9 * SHARE, 4);
     });
 });

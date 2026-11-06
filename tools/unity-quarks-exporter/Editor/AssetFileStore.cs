@@ -104,7 +104,7 @@ namespace BabylonQuarks.UnityExporter
             _geometryFiles.TryGetValue(mesh, out path);
 
         /// <summary>
-        /// Writes a geometry file — the same <c>positions / indices / uvs / normals</c> fields an
+        /// Writes a geometry file — the same <c>positions / indices / uvs / normals / colors</c> fields an
         /// inline <c>QuarksGeometry</c> carries, under a <c>QuarksGeometry</c> metadata header.
         /// </summary>
         public string WriteGeometry(Mesh mesh, JObject geometryData)

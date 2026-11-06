@@ -82,11 +82,23 @@ describe.each([false, true])('force space (updateAll: %s)', (bulk) => {
             close(particle.velocity, 3, 0, 0);
         });
 
-        it('turns a world force into the emitter axes in a local-space system', () => {
-            // World +X is local +Z after the inverse quarter turn, at half the length.
+        it('turns a world force into the emitter axes in a local-space system, where the frame scales it', () => {
+            // World +X is local +Z after the inverse quarter turn, at its length: the doubled
+            // frame then doubles it in the world, as Unity scales a force with the emitter.
             const particle = makeParticle();
             step(new ApplyForce(new Vector3(1, 0, 0), new ConstantValue(2)), makeSystem(false), particle, 1, bulk);
-            close(particle.velocity, 0, 0, 1);
+            close(particle.velocity, 0, 0, 2);
+        });
+
+        it('keeps the world strength of a force that does not scale with the emitter', () => {
+            const down = () => new ApplyForce(new Vector3(0, -1, 0), new ConstantValue(2), 'world', false);
+            const world = makeParticle();
+            step(down(), makeSystem(true, 3), world, 1, bulk);
+            close(world.velocity, 0, -2, 0);
+            // Local units of the doubled frame: half of it, which the frame doubles back.
+            const local = makeParticle();
+            step(down(), makeSystem(false), local, 1, bulk);
+            close(local.velocity, 0, -1, 0);
         });
 
         it('applies a local force as is in a local-space system, without motionScale', () => {
@@ -135,10 +147,45 @@ describe.each([false, true])('force space (updateAll: %s)', (bulk) => {
             close(particle.velocity, 3, 0, 0);
         });
 
-        it('turns a world force into the emitter axes in a local-space system', () => {
+        it('turns a world force into the emitter axes in a local-space system, where the frame scales it', () => {
+            // Unity: a world force in a local-space system scaled by s moves the particle s times
+            // as fast in the world.
             const particle = makeParticle();
             step(force(), makeSystem(false), particle, 1, bulk);
-            close(particle.velocity, 0, 0, 0.5);
+            close(particle.velocity, 0, 0, 1);
+        });
+
+        describe('that does not scale with the emitter, as gravity', () => {
+            const gravity = (space?: 'local' | 'world') =>
+                new ForceOverLife(
+                    new ConstantValue(1),
+                    new ConstantValue(0),
+                    new ConstantValue(0),
+                    space,
+                    false,
+                    false
+                );
+
+            it('leaves out motionScale in a world-space system', () => {
+                const particle = makeParticle();
+                step(gravity(), makeSystem(true, 3), particle, 1, bulk);
+                close(particle.velocity, 1, 0, 0);
+            });
+
+            it('divides the frame scale out in a local-space system', () => {
+                const particle = makeParticle();
+                step(gravity(), makeSystem(false), particle, 1, bulk);
+                close(particle.velocity, 0, 0, 0.5);
+            });
+
+            it('turns a local one with the emitter without scaling it', () => {
+                const world = makeParticle();
+                step(gravity('local'), makeSystem(true), world, 1, bulk);
+                close(world.velocity, 0, 0, -1);
+                const local = makeParticle();
+                step(gravity('local'), makeSystem(false), local, 1, bulk);
+                close(local.velocity, 0.5, 0, 0);
+            });
         });
 
         it('applies a local force as is in a local-space system', () => {
@@ -269,6 +316,19 @@ describe('force space JSON', () => {
         const over = new ForceOverLife(new ConstantValue(1), new ConstantValue(0), new ConstantValue(0));
         expect(over.toJSON()).not.toHaveProperty('space');
         expect((ForceOverLife.fromJSON({...over.toJSON(), space: 'local'}) as ForceOverLife).space).toBe('local');
+        expect(over.toJSON()).not.toHaveProperty('scaleWithEmitter');
+        const gravity = new ForceOverLife(new ConstantValue(0), new ConstantValue(-9.81), new ConstantValue(0));
+        gravity.scaleWithEmitter = false;
+        expect(gravity.toJSON().scaleWithEmitter).toBe(false);
+        expect((ForceOverLife.fromJSON(gravity.toJSON()) as ForceOverLife).scaleWithEmitter).toBe(false);
+        expect((gravity.clone() as ForceOverLife).scaleWithEmitter).toBe(false);
+        const apply = new ApplyForce(new Vector3(0, -1, 0), new ConstantValue(9.8), 'world', false);
+        expect(apply.toJSON().scaleWithEmitter).toBe(false);
+        expect((ApplyForce.fromJSON(apply.toJSON()) as ApplyForce).scaleWithEmitter).toBe(false);
+        expect((apply.clone() as ApplyForce).scaleWithEmitter).toBe(false);
+        expect(new ApplyForce(new Vector3(0, -1, 0), new ConstantValue(9.8)).toJSON()).not.toHaveProperty(
+            'scaleWithEmitter'
+        );
         expect(
             (
                 ApplyForce.fromJSON(

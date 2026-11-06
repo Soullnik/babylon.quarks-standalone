@@ -12,6 +12,7 @@ import {ParticleStore} from '../ParticleStore';
 import {randomInt} from '../util/MathUtil';
 import SimplexNoise from '../util/SimplexNoise';
 import {Behavior, BehaviorJSON} from './Behavior';
+import {stepEndAge, stepEndLife} from './stepAge';
 
 const GENERATOR_COUNT = 100;
 const generators: Array<SimplexNoise | undefined> = new Array(GENERATOR_COUNT);
@@ -325,13 +326,13 @@ export class Noise implements Behavior {
         rotation.set(quaternion[0], quaternion[1], quaternion[2], quaternion[3]);
     }
 
-    update(particle: Particle, _: number): void {
+    update(particle: Particle, delta: number): void {
         const state = (particle as NoisyParticle)._noiseState;
         if (state === undefined) {
             return;
         }
         const memory = particle.memory;
-        const t = particle.age / particle.life;
+        const t = stepEndLife(particle, delta);
         const cf = this._frequency;
         const frequency = cf === cf ? cf : this.frequency.genValue(memory, t);
         const cp = this._power;
@@ -340,7 +341,7 @@ export class Noise implements Behavior {
         const positionAmount = cpa === cpa ? cpa : this.positionAmount.genValue(memory, t);
         const cra = this._rotationAmount;
         const rotationAmount = cra === cra ? cra : this.rotationAmount.genValue(memory, t);
-        const noiseTime = particle.age * frequency + this.scrollOffset;
+        const noiseTime = stepEndAge(particle, delta) * frequency + this.scrollOffset;
 
         if (positionAmount > 0) {
             const amount = power * positionAmount;
@@ -409,12 +410,14 @@ export class Noise implements Behavior {
                 continue;
             }
             const memory = particle.memory;
-            const t = age / life;
+            // The age the step ends at, as stepEndAge reads it.
+            const drawn = age + delta < life ? age + delta : life;
+            const t = drawn / life;
             const frequency = cf === cf ? cf : this.frequency.genValue(memory, t);
             const power = cp === cp ? cp : this.power.genValue(memory, t);
             const positionAmount = cpa === cpa ? cpa : this.positionAmount.genValue(memory, t);
             const rotationAmount = cra === cra ? cra : this.rotationAmount.genValue(memory, t);
-            const noiseTime = age * frequency + this.scrollOffset;
+            const noiseTime = drawn * frequency + this.scrollOffset;
 
             if (positionAmount > 0) {
                 const amount = power * positionAmount;

@@ -1,1 +1,2 @@
-
+[Quarks Exporter] 'Flares': Render Alignment Facing is exported as View (facing the camera's plane, not its position).
+[Quarks Exporter] 'Glints': Render Alignment Velocity has no quarks counterpart; the billboards face the camera.

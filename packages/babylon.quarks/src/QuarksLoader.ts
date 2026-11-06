@@ -37,6 +37,7 @@ import {disposeEffect, retainEffectResources} from './effectResources';
 import {upgradeEffectNodes} from './formatMigrations';
 import {ensureTriangleIndices} from './geometryUtil';
 import {fileNodeId, setQuarksNodeId} from './nodeId';
+import {colorAttributeRGBA} from './system/geometry';
 import type {ParticleSystemJSONParameters} from './system/types';
 import {setTextureSourceUrl} from './textureSource';
 
@@ -248,6 +249,7 @@ function geometryKey(geometry: GeometryArrays): string {
         geometry.uvs,
         geometry.uvs2,
         geometry.normals,
+        geometry.colors,
     ];
     let lengths = '';
     for (const part of parts) {
@@ -655,6 +657,9 @@ export class QuarksLoader {
 
     private parseGeometries(geometries: EffectGeometryJSON[], meta: LoadedMeta): void {
         for (const geom of geometries) {
+            // The geometries built here are three.js' (a plane facing +Z, a sphere facing out),
+            // wound as Babylon winds a front face, so the side their normals face is the one
+            // renderFace 'front' draws, a lit mesh lights and a mesh_surface shape emits from.
             if (geom.type === 'PlaneGeometry') {
                 const w = geom.width || 1;
                 const h = geom.height || 1;
@@ -662,7 +667,7 @@ export class QuarksLoader {
                 const hh = h / 2;
                 meta.geometries[geom.uuid] = {
                     positions: new Float32Array([-hw, -hh, 0, hw, -hh, 0, hw, hh, 0, -hw, hh, 0]),
-                    indices: new Uint32Array([0, 1, 2, 0, 2, 3]),
+                    indices: new Uint32Array([0, 2, 1, 0, 3, 2]),
                     uvs: new Float32Array([0, 0, 1, 0, 1, 1, 0, 1]),
                     normals: new Float32Array([0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1]),
                 };
@@ -684,6 +689,7 @@ export class QuarksLoader {
                     uvs: geom.uvs ? new Float32Array(geom.uvs) : undefined,
                     uvs2: geom.uvs2 ? new Float32Array(geom.uvs2) : undefined,
                     normals: geom.normals ? new Float32Array(geom.normals) : undefined,
+                    colors: geom.colors ? new Float32Array(geom.colors) : undefined,
                 });
             }
         }
@@ -723,6 +729,7 @@ export class QuarksLoader {
         return baseUrl + url;
     }
 
+    /** three.js' SphereGeometry, its triangles wound as Babylon winds a front face: outwards. */
     private parseSphereGeometry(geom: SphereGeometryJSON): GeometryArrays {
         const radius = geom.radius ?? 0.5;
         const widthSegments = Math.max(3, Math.floor(geom.widthSegments ?? 16));
@@ -776,10 +783,10 @@ export class QuarksLoader {
                 const d = grid[iy + 1][ix + 1];
 
                 if (iy !== 0 || !isTopFull) {
-                    indices.push(a, b, d);
+                    indices.push(a, d, b);
                 }
                 if (iy !== heightSegments - 1 || !isBottomFull) {
-                    indices.push(b, c, d);
+                    indices.push(b, d, c);
                 }
             }
         }
@@ -799,6 +806,7 @@ export class QuarksLoader {
         let uvs: Float32Array | undefined;
         let uvs2: Float32Array | undefined;
         let normals: Float32Array | undefined;
+        let colors: Float32Array | undefined;
         // three.js names the second UV set `uv1` (r151 on), `uv2` before.
         const uv2Attribute = data.attributes?.uv1 ?? data.attributes?.uv2;
 
@@ -825,6 +833,9 @@ export class QuarksLoader {
             uvs = readInterleaved(data.attributes?.uv);
             uvs2 = readInterleaved(uv2Attribute);
             normals = readInterleaved(data.attributes?.normal);
+            const color = data.attributes?.color;
+            // Read out as floats already, so only the attribute's size counts.
+            colors = colorAttributeRGBA({itemSize: color?.itemSize}, readInterleaved(color));
         } else if (data.attributes) {
             if (data.attributes.position?.array) {
                 positions = new Float32Array(data.attributes.position.array);
@@ -838,6 +849,7 @@ export class QuarksLoader {
             if (data.attributes.normal?.array) {
                 normals = new Float32Array(data.attributes.normal.array);
             }
+            colors = colorAttributeRGBA(data.attributes.color);
         }
 
         if (data.index) {
@@ -850,7 +862,7 @@ export class QuarksLoader {
 
         indices = ensureTriangleIndices(positions, indices);
 
-        return {positions, indices, uvs, uvs2, normals};
+        return {positions, indices, uvs, uvs2, normals, colors};
     }
 
     private extractInterleavedAttribute(
@@ -1091,7 +1103,7 @@ export class QuarksLoader {
                     const data = await loadGeometry(url);
                     // Copy arrays so a shared fetch-cache document is not aliased across
                     // effects — mutating one effect's inlined geometry must not corrupt others.
-                    for (const key of ['positions', 'indices', 'uvs', 'uvs2', 'normals']) {
+                    for (const key of ['positions', 'indices', 'uvs', 'uvs2', 'normals', 'colors']) {
                         const value = isRecord(data) ? data[key] : undefined;
                         if (value === undefined) {
                             continue;
@@ -1157,6 +1169,7 @@ export class QuarksLoader {
             if (imageUrl) {
                 const invertY = texDef.invertY !== undefined ? !!texDef.invertY : true;
                 const noMipmap = !!texDef.noMipmap;
+                const useSRGBBuffer = texDef.colorSpace === 'srgb';
                 // Everything below that ends up on the Texture object is part of the key, so a
                 // shared texture always looks the way each of its effects asked for.
                 const share = this.options.shareResources !== false;
@@ -1169,6 +1182,7 @@ export class QuarksLoader {
                           texDef.repeat,
                           texDef.offset,
                           texDef.rotation,
+                          useSRGBBuffer,
                       ].join('|') +
                       '|' +
                       imageUrl
@@ -1189,6 +1203,8 @@ export class QuarksLoader {
                     noMipmap,
                     invertY,
                     samplingMode: typeof texDef.samplingMode === 'number' ? texDef.samplingMode : undefined,
+                    // Decoded and filtered in linear space by the GPU where it can, see QuarksTextureJSON.
+                    useSRGBBuffer,
                     onLoad: () => settle(),
                     onError: (message, exception) => {
                         failed = true;

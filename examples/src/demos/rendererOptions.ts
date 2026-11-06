@@ -23,7 +23,7 @@ import {createSharedTexture} from '../shared/common';
 import type {DemoContext} from '../types';
 
 /**
- * Five pairs of systems, each pair the same effect with one renderer option
+ * Seven pairs of systems, each pair the same effect with one renderer option
  * off on the left and on on the right. Read left to right:
  *
  * 1. `sortMode`: overlapping alpha-blended discs drawn in emission order, then
@@ -40,11 +40,19 @@ import type {DemoContext} from '../types';
  * 5. `renderFace`: open bowls tumbling as mesh particles. With `'both'` their
  *    inside shows through the opening; with `'front'` the back faces are
  *    culled and the inside disappears, as with Unity's Render Face: Front.
+ * 6. `renderAlignment`: flat quad meshes from an emitter turned a quarter
+ *    about Y. In `'simulation'`, the default, they turn with the emitter and
+ *    are seen edge-on; in `'view'` they are laid along the camera's axes and
+ *    face it, spinning in the screen's plane (Unity's Render Alignment: View).
+ * 7. `renderAlignment` on billboards: rings from an emitter turned to lie on
+ *    the ground. With `'view'`, the default, they face the camera; with
+ *    `'local'` they lie in the emitter's plane, flat on the ground, however
+ *    the camera turns (Unity's Render Alignment: Local, as on a decal).
  */
 export function init({scene, camera, batchRenderer, systems}: DemoContext) {
-    camera.setPosition(new BVector3(1.5, 6, 30));
+    camera.setPosition(new BVector3(3, 6, 36));
     const texture = createSharedTexture(scene);
-    const columnX = (pair: number, side: 0 | 1) => -13.5 + pair * 6 + side * 3;
+    const columnX = (pair: number, side: 0 | 1) => -16.5 + pair * 6 + side * 3;
 
     const add = (parameters: ParticleSystemParameters, x: number, parent?: TransformNode) => {
         const system = new ParticleSystem(parameters);
@@ -201,4 +209,70 @@ export function init({scene, camera, batchRenderer, systems}: DemoContext) {
     });
     add(bowls('both'), columnX(4, 0));
     add(bowls('front'), columnX(4, 1));
+
+    // 6. Render alignment: quads in their mesh's XY plane, from an emitter turned to face sideways.
+    const quad = MeshBuilder.CreatePlane('quad', {size: 1}, scene);
+    quad.isVisible = false;
+    quad.setEnabled(false);
+    const quads = (renderAlignment: ParticleSystemParameters['renderAlignment']): ParticleSystemParameters => ({
+        scene,
+        duration: 2,
+        looping: true,
+        startLife: new ConstantValue(3),
+        startSpeed: new IntervalValue(0.3, 0.6),
+        startSize: new ConstantValue(2.2),
+        // An angle about the mesh's Z: a spin in the quad's own plane.
+        startRotation: new IntervalValue(0, Math.PI * 2),
+        startColor: new RandomColor(new Color4(1, 0.8, 0.3, 1), new Color4(1, 0.4, 0.7, 1)),
+        worldSpace: false,
+        emissionOverTime: new ConstantValue(4),
+        shape: new SphereEmitter({radius: 1, thickness: 1, arc: Math.PI * 2}),
+        texture,
+        transparent: true,
+        blendMode: Constants.ALPHA_COMBINE,
+        startTileIndex: new ConstantValue(1),
+        uTileCount: 10,
+        vTileCount: 10,
+        renderMode: RenderMode.Mesh,
+        renderFace: 'both',
+        lighting: 'unlit',
+        instancingGeometry: new Float32Array(quad.getVerticesData(VertexBuffer.PositionKind)!),
+        instancingNormals: new Float32Array(quad.getVerticesData(VertexBuffer.NormalKind)!),
+        instancingUVs: new Float32Array(quad.getVerticesData(VertexBuffer.UVKind)!),
+        instancingIndices: new Uint32Array(quad.getIndices()!),
+        renderAlignment,
+    });
+    for (const side of [0, 1] as const) {
+        const system = add(quads(side === 1 ? 'view' : 'simulation'), columnX(5, side));
+        system.emitter.rotation.y = Math.PI / 2;
+    }
+
+    // 7. Render alignment on billboards: rings spreading from an emitter whose XY plane is the ground.
+    const rings = (renderAlignment: ParticleSystemParameters['renderAlignment']): ParticleSystemParameters => ({
+        scene,
+        duration: 2,
+        looping: true,
+        startLife: new ConstantValue(2),
+        startSpeed: new ConstantValue(0),
+        startSize: new ConstantValue(1.2),
+        startRotation: new IntervalValue(0, Math.PI * 2),
+        startColor: new RandomColor(new Color4(0.4, 1, 0.8, 1), new Color4(0.3, 0.6, 1, 1)),
+        worldSpace: false,
+        emissionOverTime: new ConstantValue(3),
+        shape: new SphereEmitter({radius: 0.01, thickness: 1, arc: Math.PI * 2}),
+        texture,
+        transparent: true,
+        blendMode: Constants.ALPHA_ADD,
+        startTileIndex: new ConstantValue(1),
+        uTileCount: 10,
+        vTileCount: 10,
+        renderMode: RenderMode.BillBoard,
+        renderAlignment,
+    });
+    for (const side of [0, 1] as const) {
+        const system = add(rings(side === 1 ? 'local' : 'view'), columnX(6, side));
+        system.emitter.rotation.x = Math.PI / 2;
+        system.emitter.position.y = -2;
+        system.addBehavior(new SizeOverLife(new PiecewiseBezier([[new Bezier(1, 2.5, 4, 5), 0]])));
+    }
 }

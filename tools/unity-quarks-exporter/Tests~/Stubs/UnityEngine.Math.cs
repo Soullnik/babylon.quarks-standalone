@@ -26,7 +26,11 @@ namespace UnityEngine
         public static Vector3 one => new Vector3(1, 1, 1);
         public static bool operator ==(Vector3 a, Vector3 b) => a.x == b.x && a.y == b.y && a.z == b.z;
         public static bool operator !=(Vector3 a, Vector3 b) => !(a == b);
+        public static Vector3 up => new Vector3(0, 1, 0);
         public static Vector3 operator *(Vector3 a, float s) => new Vector3(a.x * s, a.y * s, a.z * s);
+        public static Vector3 operator +(Vector3 a, Vector3 b) => new Vector3(a.x + b.x, a.y + b.y, a.z + b.z);
+        public static Vector3 operator -(Vector3 a, Vector3 b) => new Vector3(a.x - b.x, a.y - b.y, a.z - b.z);
+        public static Vector3 Scale(Vector3 a, Vector3 b) => new Vector3(a.x * b.x, a.y * b.y, a.z * b.z);
         public override bool Equals(object o) => o is Vector3 v && v == this;
         public override int GetHashCode() => x.GetHashCode() ^ (y.GetHashCode() << 2) ^ (z.GetHashCode() >> 2);
     }
@@ -48,6 +52,18 @@ namespace UnityEngine
             a.w * b.y + a.y * b.w + a.z * b.x - a.x * b.z,
             a.w * b.z + a.z * b.w + a.x * b.y - a.y * b.x,
             a.w * b.w - a.x * b.x - a.y * b.y - a.z * b.z);
+
+        public static Vector3 operator *(Quaternion q, Vector3 v)
+        {
+            // v + 2w(u × v) + 2u × (u × v), u the vector part.
+            float tx = 2 * (q.y * v.z - q.z * v.y), ty = 2 * (q.z * v.x - q.x * v.z), tz = 2 * (q.x * v.y - q.y * v.x);
+            return new Vector3(
+                v.x + q.w * tx + (q.y * tz - q.z * ty),
+                v.y + q.w * ty + (q.z * tx - q.x * tz),
+                v.z + q.w * tz + (q.x * ty - q.y * tx));
+        }
+
+        public static Quaternion Inverse(Quaternion q) => new Quaternion(-q.x, -q.y, -q.z, q.w);
 
         private static Quaternion Axis(float angleDeg, float ax, float ay, float az)
         {
@@ -116,6 +132,20 @@ namespace UnityEngine
             t = Mathf.Clamp01(t);
             return new Color(a.r + (b.r - a.r) * t, a.g + (b.g - a.g) * t, a.b + (b.b - a.b) * t, a.a + (b.a - a.a) * t);
         }
+    }
+
+    public struct Color32
+    {
+        public byte r, g, b, a;
+        public Color32(byte r, byte g, byte b, byte a) { this.r = r; this.g = g; this.b = b; this.a = a; }
+    }
+
+    public enum ColorSpace { Uninitialized = -1, Gamma = 0, Linear = 1 }
+
+    public static class QualitySettings
+    {
+        /// <summary>Gamma unless a check sets it: the golden files are a Gamma project's.</summary>
+        public static ColorSpace activeColorSpace { get; set; } = ColorSpace.Gamma;
     }
 
     public static class Mathf

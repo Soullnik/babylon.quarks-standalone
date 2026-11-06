@@ -202,6 +202,83 @@ describe('a Death sub emission', () => {
     });
 });
 
+/**
+ * One parent particle, born at 0 and living `parentLife`, with a Birth sub emitter into a child
+ * whose particles live 10 s, so the child's count is what the emission spawned. The numbers are
+ * Unity 6's, from a probe of the same setup stepped at 30 fps.
+ */
+function birthCounts(
+    parentLife: number,
+    child: Partial<ConstructorParameters<typeof ParticleSystem>[0]>,
+    seconds: number,
+    parentSettings: Partial<ConstructorParameters<typeof ParticleSystem>[0]> = {}
+): number[] {
+    const renderer = new BatchedRenderer('birth', scene);
+    const sub = system({onlyUsedByOther: true, looping: false, startLife: new ConstantValue(10), ...child});
+    const parent = system({
+        looping: false,
+        duration: 5,
+        startLife: new ConstantValue(parentLife),
+        startSpeed: new ConstantValue(1),
+        emissionBursts: [{time: 0, count: new ConstantValue(1), cycle: 1, interval: 0, probability: 1}],
+        ...parentSettings,
+    });
+    parent.addBehavior(
+        new EmitSubParticleSystem(parent, false, sub.emitter as ParticleEmitter, SubParticleEmitMode.Birth)
+    );
+    renderer.addSystem(parent);
+    renderer.addSystem(sub);
+    const counts: number[] = [];
+    for (let i = 1; i <= seconds * 60; i++) {
+        renderer.update(STEP);
+        if (i % 30 === 0) counts.push(sub.particleNum);
+    }
+    return counts;
+}
+
+describe('a Birth sub emission', () => {
+    test('ends when its parent dies, before the duration of the target does', () => {
+        // Unity: 4 by the parent's death at 0.5 s, and no more, though the sub system runs 2 s.
+        const counts = birthCounts(0.5, {duration: 2, emissionOverTime: new ConstantValue(10)}, 3);
+        expect(counts[0]).toBeGreaterThanOrEqual(4);
+        expect(counts[0]).toBeLessThanOrEqual(5);
+        expect(counts.every((count) => count === counts[0])).toBe(true);
+    });
+
+    test('ends with the duration of the target while the parent still lives', () => {
+        // Unity: 9 by the end of the sub system's 1 s, and no more through the parent's 3 s.
+        const counts = birthCounts(3, {duration: 1, emissionOverTime: new ConstantValue(10)}, 4);
+        expect(counts[1]).toBeGreaterThanOrEqual(9);
+        expect(counts[1]).toBeLessThanOrEqual(10);
+        expect(counts.slice(1).every((count) => count === counts[1])).toBe(true);
+    });
+
+    test('loops a looping target while the parent lives', () => {
+        // Unity: 29 by the parent's death at 3 s, from a sub system of 1 s that loops.
+        const counts = birthCounts(3, {duration: 1, looping: true, emissionOverTime: new ConstantValue(10)}, 4);
+        expect(counts[5]).toBeGreaterThanOrEqual(29);
+        expect(counts[5]).toBeLessThanOrEqual(30);
+        expect(counts[7]).toBe(counts[5]);
+    });
+
+    test('drops a burst due after the parent died', () => {
+        // Unity: a burst of 5 at 0.5 s never goes off for a parent that lived 0.1 s.
+        const bursts = [{time: 0.5, count: new ConstantValue(5), cycle: 1, interval: 0, probability: 1}];
+        const counts = birthCounts(0.1, {duration: 2, emissionBursts: bursts}, 3);
+        expect(counts).toEqual([0, 0, 0, 0, 0, 0]);
+    });
+
+    test('goes on for a parent a ring buffer holds at the end of its life', () => {
+        // Unity: a held parent is alive, so its emission does not end at 0.5 s; 15 by 1.5 s.
+        const counts = birthCounts(0.5, {duration: 2, emissionOverTime: new ConstantValue(10)}, 2, {
+            maxParticles: 1,
+            ringBufferMode: 'pauseUntilReplaced',
+        });
+        expect(counts[2]).toBeGreaterThanOrEqual(14);
+        expect(counts[2]).toBeLessThanOrEqual(16);
+    });
+});
+
 describe('a Death sub emitter across a restart', () => {
     test('drops the emissions of the last play', () => {
         const renderer = new BatchedRenderer('restart', scene);

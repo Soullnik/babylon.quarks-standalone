@@ -37,10 +37,28 @@
  *   (softness, edge width); the edge band just above the cut glows in
  *   `erosionEdgeColor`. Erosion only changes alpha, which the blend resolve
  *   (`blend.ts`) turns into coverage in every blend mode.
+ *
+ * Every colour comes into the working space (`colorSpace.ts`) on its own: each texel of the map as
+ * it is sampled (`MAP_LINEAR` when the map's `gammaSpace` is false, an sRGB buffer's texels already
+ * linear), the ramp's texel by the ramp's space (`GRADIENT_MAP_LINEAR`), and the erosion edge
+ * colour, given in gamma space like the particle colours, where it is added. Under a gradient map
+ * the map's texel is the ramp's lookup key and is read as it is stored, and a mask or distortion
+ * texel is data, never converted.
  */
 
 /** Fragment-side declarations, GLSL. */
 export const surfaceFragmentDeclarationGLSL = /* glsl */ `
+#ifdef USE_MAP
+vec4 quarksSampleMap(vec2 uv) {
+    vec4 texel = texture2D(map, uv);
+#if !defined(GRADIENT_MAP) && defined(MAP_LINEAR)
+    texel.rgb = quarksFromLinear(texel.rgb);
+#elif !defined(GRADIENT_MAP)
+    texel.rgb = quarksFromGamma(texel.rgb);
+#endif
+    return texel;
+}
+#endif
 #ifdef MAP_TRANSFORM
 uniform vec4 mapTransform;
 #endif
@@ -72,7 +90,7 @@ vec4 quarksErode(vec4 color, float level, float mask) {
     float visible = smoothstep(cut, cut + softness, mask);
     if (edgeWidth > 0.0) {
         float edge = 1.0 - smoothstep(cut + softness, cut + softness + edgeWidth, mask);
-        color.rgb += erosionEdgeColor * edge;
+        color.rgb += quarksFromGamma(erosionEdgeColor) * edge;
     }
     color.a *= visible;
     return color;
@@ -87,6 +105,11 @@ vec4 quarksErode(vec4 color, float level, float mask) {
 export function surfaceColorGLSL(tileBlend: boolean): string {
     return /* glsl */ `
     vec4 baseColor = vColor;
+#ifdef MAP_PREMULTIPLIED
+    // A premultiplied map's alpha does not cover its colour: it only lets the frame through,
+    // and is put on the alpha after the blend resolve (see blend.ts).
+    float quarksMapAlpha = 1.0;
+#endif
 #if defined(MAP_TRANSFORM) && defined(MAP_UV1)
     vec2 mapUV = vUV1 * mapTransform.xy + mapTransform.zw;
 #elif defined(MAP_TRANSFORM)
@@ -110,7 +133,7 @@ export function surfaceColorGLSL(tileBlend: boolean): string {
 #endif
 #if defined(USE_MAP) || defined(GRADIENT_MAP)
 #ifdef USE_MAP
-    vec4 texColor = texture2D(map, mapUV);
+    vec4 texColor = quarksSampleMap(mapUV);
     ${
         tileBlend
             ? `#ifdef TILE_BLEND
@@ -126,7 +149,7 @@ export function surfaceColorGLSL(tileBlend: boolean): string {
             mapUV2 += distortion;
         #endif
     #endif
-        vec4 texColor2 = texture2D(map, mapUV2);
+        vec4 texColor2 = quarksSampleMap(mapUV2);
         texColor = mix(texColor, texColor2, vTileBlend);
     #endif`
             : ''
@@ -138,10 +161,19 @@ export function surfaceColorGLSL(tileBlend: boolean): string {
     #ifdef GRADIENT_MAP
         float rampAt = clamp(dot(texColor, gradientMapChannel), 0.0, 1.0);
         vec4 ramp = texture2D(gradientMap, vec2(mix(gradientMapRange.x, gradientMapRange.y, rampAt), 0.5));
+        #ifdef GRADIENT_MAP_LINEAR
+            ramp.rgb = quarksFromLinear(ramp.rgb);
+        #else
+            ramp.rgb = quarksFromGamma(ramp.rgb);
+        #endif
         texColor = vec4(ramp.rgb, ramp.a * mix(texColor.a, 1.0, gradientMapChannel.a));
     #endif
     #ifdef EROSION
         erosionMaskValue = texColor.a;
+    #endif
+    #ifdef MAP_PREMULTIPLIED
+        quarksMapAlpha = texColor.a;
+        texColor.a = 1.0;
     #endif
     baseColor *= texColor;
 #endif
@@ -161,6 +193,17 @@ export function surfaceColorGLSL(tileBlend: boolean): string {
 
 /** Fragment-side declarations, WGSL. */
 export const surfaceFragmentDeclarationWGSL = /* wgsl */ `
+#ifdef USE_MAP
+fn quarksSampleMap(uv: vec2f) -> vec4f {
+    var texel = textureSample(map, mapSampler, uv);
+#if !defined(GRADIENT_MAP) && defined(MAP_LINEAR)
+    texel = vec4f(quarksFromLinear(texel.rgb), texel.a);
+#elif !defined(GRADIENT_MAP)
+    texel = vec4f(quarksFromGamma(texel.rgb), texel.a);
+#endif
+    return texel;
+}
+#endif
 #ifdef MAP_TRANSFORM
 uniform mapTransform: vec4f;
 #endif
@@ -193,7 +236,7 @@ fn quarksErode(colorIn: vec4f, level: f32, mask: f32) -> vec4f {
     let visible = smoothstep(cut, cut + softness, mask);
     if (edgeWidth > 0.0) {
         let edge = 1.0 - smoothstep(cut + softness, cut + softness + edgeWidth, mask);
-        color = vec4f(color.rgb + uniforms.erosionEdgeColor * edge, color.a);
+        color = vec4f(color.rgb + quarksFromGamma(uniforms.erosionEdgeColor) * edge, color.a);
     }
     color.a *= visible;
     return color;
@@ -205,6 +248,11 @@ fn quarksErode(colorIn: vec4f, level: f32, mask: f32) -> vec4f {
 export function surfaceColorWGSL(tileBlend: boolean): string {
     return /* wgsl */ `
     var baseColor = fragmentInputs.vColor;
+#ifdef MAP_PREMULTIPLIED
+    // A premultiplied map's alpha does not cover its colour: it only lets the frame through,
+    // and is put on the alpha after the blend resolve (see blend.ts).
+    var quarksMapAlpha = 1.0;
+#endif
 #if defined(MAP_TRANSFORM) && defined(MAP_UV1)
     var mapUV = fragmentInputs.vUV1 * uniforms.mapTransform.xy + uniforms.mapTransform.zw;
 #elif defined(MAP_TRANSFORM)
@@ -228,7 +276,7 @@ export function surfaceColorWGSL(tileBlend: boolean): string {
 #endif
 #if defined(USE_MAP) || defined(GRADIENT_MAP)
 #ifdef USE_MAP
-    var texColor = textureSample(map, mapSampler, mapUV);
+    var texColor = quarksSampleMap(mapUV);
     ${
         tileBlend
             ? `#ifdef TILE_BLEND
@@ -244,7 +292,7 @@ export function surfaceColorWGSL(tileBlend: boolean): string {
             mapUV2 += distortion;
         #endif
     #endif
-        let texColor2 = textureSample(map, mapSampler, mapUV2);
+        let texColor2 = quarksSampleMap(mapUV2);
         texColor = mix(texColor, texColor2, fragmentInputs.vTileBlend);
     #endif`
             : ''
@@ -255,11 +303,20 @@ export function surfaceColorWGSL(tileBlend: boolean): string {
 #endif
     #ifdef GRADIENT_MAP
         let rampAt = clamp(dot(texColor, uniforms.gradientMapChannel), 0.0, 1.0);
-        let ramp = textureSample(gradientMap, gradientMapSampler, vec2f(mix(uniforms.gradientMapRange.x, uniforms.gradientMapRange.y, rampAt), 0.5));
+        var ramp = textureSample(gradientMap, gradientMapSampler, vec2f(mix(uniforms.gradientMapRange.x, uniforms.gradientMapRange.y, rampAt), 0.5));
+        #ifdef GRADIENT_MAP_LINEAR
+            ramp = vec4f(quarksFromLinear(ramp.rgb), ramp.a);
+        #else
+            ramp = vec4f(quarksFromGamma(ramp.rgb), ramp.a);
+        #endif
         texColor = vec4f(ramp.rgb, ramp.a * mix(texColor.a, 1.0, uniforms.gradientMapChannel.a));
     #endif
     #ifdef EROSION
         erosionMaskValue = texColor.a;
+    #endif
+    #ifdef MAP_PREMULTIPLIED
+        quarksMapAlpha = texColor.a;
+        texColor.a = 1.0;
     #endif
     baseColor *= texColor;
 #endif

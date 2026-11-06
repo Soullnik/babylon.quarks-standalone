@@ -1,4 +1,4 @@
-import type {BufferGeometryDataJSON, GeometryArrays, GeometryEntry} from '../effectDocumentJSON';
+import type {BufferAttributeJSON, BufferGeometryDataJSON, GeometryArrays, GeometryEntry} from '../effectDocumentJSON';
 import {ensureTriangleIndices} from '../geometryUtil';
 
 /** Positions of the unit quad billboards are drawn with, and the default mesh. */
@@ -53,9 +53,51 @@ function floats(values: number[] | Float32Array | undefined): Float32Array | und
     return values ? (values instanceof Float32Array ? values : new Float32Array(values)) : undefined;
 }
 
+/** The largest value of each integer array type, which a normalized attribute's 1 stands for. */
+const NORMALIZED_MAX: {[type: string]: number} = {
+    Uint8Array: 255,
+    Uint8ClampedArray: 255,
+    Int8Array: 127,
+    Uint16Array: 65535,
+    Int16Array: 32767,
+    Uint32Array: 4294967295,
+    Int32Array: 2147483647,
+};
+
+/**
+ * A three.js colour attribute as {@link GeometryArrays.colors}: `r, g, b, a` per vertex from 0
+ * to 1, alpha 1 where it holds `r, g, b` only, and normalized integers scaled as WebGL reads them.
+ * `values` are the attribute's own (`array`) or read out of an interleaved buffer. Undefined for an
+ * attribute of another size, or one that does not hold a whole number of vertices.
+ * @internal
+ */
+export function colorAttributeRGBA(
+    attribute: BufferAttributeJSON | undefined,
+    values: ArrayLike<number> | undefined = attribute?.array
+): Float32Array | undefined {
+    const size = attribute?.itemSize ?? 4;
+    if (!values || (size !== 3 && size !== 4) || values.length % size !== 0) {
+        return undefined;
+    }
+    const max = attribute?.normalized ? NORMALIZED_MAX[attribute.type ?? ''] : undefined;
+    const signed = attribute?.type?.startsWith('Int') ?? false;
+    const count = values.length / size;
+    const rgba = new Float32Array(count * 4);
+    for (let v = 0; v < count; v++) {
+        for (let c = 0; c < 4; c++) {
+            let value = c < size ? values[v * size + c] : 1;
+            if (max !== undefined && c < size) {
+                value = signed ? Math.max(value / max, -1) : value / max;
+            }
+            rgba[v * 4 + c] = value;
+        }
+    }
+    return rgba;
+}
+
 /**
  * Typed arrays from a geometry entry of an effect document: quarks' own `{positions, indices, uvs,
- * uvs2, normals}`, or a three.js `BufferGeometry` JSON or its `data`. Anything else gives the
+ * uvs2, normals, colors}`, or a three.js `BufferGeometry` JSON or its `data`. Anything else gives the
  * default quad.
  */
 export function resolveGeometryData(entry: GeometryEntry | BufferGeometryDataJSON | undefined): GeometryArrays {
@@ -73,6 +115,7 @@ export function resolveGeometryData(entry: GeometryEntry | BufferGeometryDataJSO
             uvs: floats(entry.uvs),
             uvs2: floats(entry.uvs2),
             normals: floats(entry.normals),
+            colors: floats(entry.colors),
         };
     }
 
@@ -93,6 +136,7 @@ export function resolveGeometryData(entry: GeometryEntry | BufferGeometryDataJSO
             // three.js names the second set `uv1` (r151 on), `uv2` before.
             uvs2: floats((attributes.uv1 ?? attributes.uv2)?.array),
             normals: floats(attributes.normal?.array),
+            colors: colorAttributeRGBA(attributes.color),
         };
     }
 

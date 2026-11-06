@@ -283,6 +283,7 @@ export type GeometryData = Omit<GeometryOption, 'label'>;
 
 // @public
 export interface GeometryOption {
+    colors?: Float32Array | number[];
     indices?: Uint32Array | number[];
     label: string;
     normals?: Float32Array | number[];

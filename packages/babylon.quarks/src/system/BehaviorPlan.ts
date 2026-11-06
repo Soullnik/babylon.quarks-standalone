@@ -18,7 +18,9 @@ const INERT_FOR_SIZE_AND_COLOR = new Set([
     'InheritVelocity',
     'OrbitOverLife',
     'WidthOverLength',
+    'ColorOverLength',
     'ChangeEmitDirection',
+    'RandomizeDirection',
     'EmitSubParticleSystem',
     'LimitSpeedOverLife',
     'ApplyCollision',
@@ -39,6 +41,11 @@ export class BehaviorPlan {
      */
     changesSize = true;
     changesColor = true;
+    /**
+     * Whether any behavior in the plan can move a particle's position directly and so add to its
+     * `animatedVelocity`: a VelocityOverLife or an OrbitOverLife, or a custom behavior, which may.
+     */
+    animatesVelocity = true;
 
     /**
      * Execution plan for this system's behaviors, rebuilt when the list changes.
@@ -66,10 +73,14 @@ export class BehaviorPlan {
         this.fusionSteps = planBehaviorFusion(behaviors);
         let changesSize = false;
         let changesColor = false;
+        let animatesVelocity = false;
         for (let i = 0; i < behaviors.length; i++) {
             // Only a built-in running its own update is known to write what its type says; a
             // custom behavior, whatever its type string, may write anything.
             const type = stockBehaviorType(behaviors[i]);
+            if (type === undefined || type === 'VelocityOverLife' || type === 'OrbitOverLife') {
+                animatesVelocity = true;
+            }
             if (type === undefined) {
                 changesSize = true;
                 changesColor = true;
@@ -85,6 +96,7 @@ export class BehaviorPlan {
         }
         this.changesSize = changesSize;
         this.changesColor = changesColor;
+        this.animatesVelocity = animatesVelocity;
         return this.fusionSteps;
     }
 }

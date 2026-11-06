@@ -79,6 +79,15 @@ export interface Particle extends IParticle {
      */
     previousVelocity?: Vector3;
     /**
+     * The velocity of the motion a behavior gave the particle this step by moving its position
+     * directly (Unity's `animatedVelocity`, which Velocity over Lifetime writes), when the
+     * implementation keeps it: only while a renderer draws from it. A behavior that moves the
+     * position adds the velocity of that move here; a stretched billboard is drawn along the
+     * velocity plus this.
+     * @type {Vector3 | undefined}
+     */
+    animatedVelocity?: Vector3;
+    /**
      * How fast the particle is turning, as the behavior that turns it last left
      * it: a rate in radians per second for a particle that rotates by an angle,
      * or one simulation step's turn for one that rotates by quaternion.
@@ -88,6 +97,12 @@ export interface Particle extends IParticle {
      * @type {number | Quaternion}
      */
     angularVelocity?: number | Quaternion;
+    /**
+     * The axis, in the particle's own axes, that a number rotation turns a mesh particle about:
+     * its start rotation and `RotationOverLife`'s turn (Unity's `axisOfRotation`). Unset or
+     * null is +Z. A unit vector; the spawner sets it per particle when the system asks for it.
+     */
+    rotationAxis?: Vector3 | null;
     /**
      * Speed modifier of the particle.
      * @type {number}
@@ -264,6 +279,11 @@ export class SpriteParticle implements Particle {
      */
     previousVelocity: Vector3;
     /**
+     * The velocity of this step's direct moves; see {@link Particle.animatedVelocity}. A view of
+     * the store's column while the store keeps it, undefined otherwise.
+     */
+    animatedVelocity: Vector3 | undefined = undefined;
+    /**
      * Velocity of the particle.
      * @type {Vector3}
      */
@@ -384,6 +404,9 @@ export class SpriteParticle implements Particle {
         }
     }
 
+    /** See {@link Particle.rotationAxis}. Kept on the particle object, which follows its store row. */
+    rotationAxis: Vector3 | null = null;
+
     /**
      * Color of the particle.
      * @type {Vector4}
@@ -430,6 +453,7 @@ export class SpriteParticle implements Particle {
         this.previousPosition = new Vector3View(store.previousPosition, offset3);
         this.previousVelocity = new Vector3View(store.previousVelocity, offset3);
         this.velocity = new Vector3View(store.velocity, offset3);
+        this.bindAnimatedVelocity(offset3);
         this.size = new Vector3View(store.size, offset3);
         this.startSize = new Vector3View(store.startSize, offset3);
         this.color = new Vector4View(store.color, offset4);
@@ -451,6 +475,18 @@ export class SpriteParticle implements Particle {
         this.rebind();
     }
 
+    /** Views the store's {@link ParticleStore.animatedVelocity} while it keeps one. */
+    private bindAnimatedVelocity(offset3: number): void {
+        const column = this.store.animatedVelocity;
+        if (column.length === 0) {
+            this.animatedVelocity = undefined;
+        } else if (this.animatedVelocity instanceof Vector3View) {
+            this.animatedVelocity.bind(column, offset3);
+        } else {
+            this.animatedVelocity = new Vector3View(column, offset3);
+        }
+    }
+
     /** Re-points the vector views after the store grew its arrays. */
     rebind(): void {
         const store = this.store;
@@ -460,6 +496,7 @@ export class SpriteParticle implements Particle {
         (this.previousPosition as Vector3View).bind(store.previousPosition, offset3);
         (this.previousVelocity as Vector3View).bind(store.previousVelocity, offset3);
         (this.velocity as Vector3View).bind(store.velocity, offset3);
+        this.bindAnimatedVelocity(offset3);
         (this.size as Vector3View).bind(store.size, offset3);
         (this.startSize as Vector3View).bind(store.startSize, offset3);
         (this.color as Vector4View).bind(store.color, offset4);
@@ -637,8 +674,21 @@ export class TrailParticle implements Particle {
      * behaviors have run. 1 unless such a behavior sets it.
      */
     headWidthScale = 1;
-    /** Ring buffer of recorded colors, 4 floats per sample. */
+    /** Ring buffer of the colors the renderer draws, 4 floats per sample. */
     historyColors: Float32Array = EMPTY_HISTORY;
+    /**
+     * Ring buffer of the particle's color at each sample, before any behavior rescaled it, 4
+     * floats per sample: what color behaviors scale, as width behaviors scale
+     * {@link historyBaseSizes}. Empty unless such a behavior asked for it, see
+     * {@link ensureBaseColorHistory}.
+     */
+    historyBaseColors: Float32Array = EMPTY_HISTORY;
+    /**
+     * Factors the next recorded sample's color is drawn with, red, green, blue and alpha: what a
+     * color behavior gives the head of the trail, which is recorded after the behaviors have run.
+     * All 1 unless such a behavior sets them.
+     */
+    readonly headColorScale = new Float32Array([1, 1, 1, 1]);
     /**
      * Ring buffer of recorded side vectors, 3 floats per sample, in the space
      * the positions are recorded in. Empty unless the trail is swept along an
@@ -733,6 +783,9 @@ export class TrailParticle implements Particle {
             if (this.historySides.length > 0) {
                 this.historySides = new Float32Array(capacity * 3);
             }
+            if (this.historyBaseColors.length > 0) {
+                this.historyBaseColors = new Float32Array(capacity * 4);
+            }
         }
         this.historyHead = 0;
         this.historyCount = 0;
@@ -742,6 +795,17 @@ export class TrailParticle implements Particle {
     ensureSideHistory(): void {
         if (this.historySides.length < this.historyCapacity * 3) {
             this.historySides = new Float32Array(this.historyCapacity * 3);
+        }
+    }
+
+    /**
+     * Allocates {@link historyBaseColors} for the current capacity, once a color behavior scales
+     * the trail, starting it from the colors recorded so far.
+     */
+    ensureBaseColorHistory(): void {
+        if (this.historyBaseColors.length < this.historyCapacity * 4) {
+            this.historyBaseColors = new Float32Array(this.historyCapacity * 4);
+            this.historyBaseColors.set(this.historyColors.subarray(0, this.historyCapacity * 4));
         }
     }
 
@@ -803,10 +867,18 @@ export class TrailParticle implements Particle {
         const colors = this.historyColors;
         const storeColors = store.color;
         const o4 = row * 4;
-        colors[colorIndex] = storeColors[o4];
-        colors[colorIndex + 1] = storeColors[o4 + 1];
-        colors[colorIndex + 2] = storeColors[o4 + 2];
-        colors[colorIndex + 3] = storeColors[o4 + 3];
+        const scale = this.headColorScale;
+        colors[colorIndex] = storeColors[o4] * scale[0];
+        colors[colorIndex + 1] = storeColors[o4 + 1] * scale[1];
+        colors[colorIndex + 2] = storeColors[o4 + 2] * scale[2];
+        colors[colorIndex + 3] = storeColors[o4 + 3] * scale[3];
+        const baseColors = this.historyBaseColors;
+        if (baseColors.length > 0) {
+            baseColors[colorIndex] = storeColors[o4];
+            baseColors[colorIndex + 1] = storeColors[o4 + 1];
+            baseColors[colorIndex + 2] = storeColors[o4 + 2];
+            baseColors[colorIndex + 3] = storeColors[o4 + 3];
+        }
         this.historyAges[head] = age;
 
         if (!replacing) {
@@ -866,6 +938,7 @@ export class TrailParticle implements Particle {
     reset() {
         this.memory.length = 0;
         this.headWidthScale = 1;
+        this.headColorScale.fill(1);
         this.resetHistory();
     }
 

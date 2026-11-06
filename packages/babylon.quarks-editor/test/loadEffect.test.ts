@@ -1,3 +1,4 @@
+import {Texture} from '@babylonjs/core/Materials/Textures/texture';
 import {TransformNode} from '@babylonjs/core/Meshes/transformNode';
 import {BatchedRenderer, ParticleEmitter, serializeEffect} from 'babylon.quarks';
 import {disposeLoadedEffect, loadEffectFromJson, parseEffectFromJson} from '../src/core/loadEffect';
@@ -34,6 +35,22 @@ describe('loading an effect', () => {
         expect(loaded.systems[0].paused).toBe(false);
         expect(renderer.systemToBatchIndex.has(loaded.systems[0])).toBe(true);
         expect(scene.get().getTransformNodeByName('empty')).toBeNull();
+    });
+
+    it('keeps the textures of an effect whose wrapper root gave way to its emitter', () => {
+        const root = new TransformNode('fx', scene.get());
+        const pixel =
+            'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/x8AAwMCAO+ip1sAAAAASUVORK5CYII=';
+        emitterIn(root, 'burst').texture = new Texture(pixel, scene.get());
+        const json = serializeEffect(root, {name: 'fx'});
+        root.dispose(false, true);
+
+        const loaded = parseEffectFromJson(scene.get(), null, json, {registerRenderer: false});
+        expect(loaded.root).toBeInstanceOf(ParticleEmitter);
+        const texture = loaded.systems[0].texture!;
+        expect(texture.getScene()).toBe(scene.get());
+        disposeLoadedEffect(loaded.root, loaded.systems, new BatchedRenderer('r', scene.get()), false);
+        expect(texture.getScene()).toBeNull();
     });
 
     it('keeps groups with several children and emitters that have children of their own', () => {

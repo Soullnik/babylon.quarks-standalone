@@ -93,6 +93,35 @@ describe('visibility culling', () => {
         expect(max.x).toBeCloseTo(5 + 0.3, 5);
     });
 
+    it('pads a stretched quad by its reach either way, a negative length factor too', () => {
+        // A shot's aura: Length Scale -2 stretches the quad ahead of the
+        // particle. The padding came out negative, turning the box inside out, so the system was
+        // culled from cameras that saw it.
+        const min = new Vector3();
+        const max = new Vector3();
+        for (const lengthFactor of [2, -2]) {
+            const system = makeSystem({
+                renderMode: RenderMode.StretchedBillBoard,
+                rendererEmitterSettings: {speedFactor: 0, lengthFactor},
+            });
+            system.update(STEP);
+            system.update(STEP);
+            expect(system.getWorldBounds(min, max)).toBe(true);
+            // The quad reaches its size times (1 + |length factor|) past the point it starts at.
+            expect(min.x).toBeCloseTo(-0.2 * 3, 5);
+            expect(max.x).toBeCloseTo(0.2 * 3, 5);
+        }
+        const renderer = new BatchedRenderer('r', scene);
+        const ahead = makeSystem({
+            renderMode: RenderMode.StretchedBillBoard,
+            rendererEmitterSettings: {speedFactor: 0, lengthFactor: -2},
+            cullingMode: 'pause',
+        });
+        renderer.addSystem(ahead);
+        frames(renderer, 3);
+        expect(ahead.culled).toBe(false);
+    });
+
     it('gives the batch mesh real bounds, so Babylon culls the draw', () => {
         const renderer = new BatchedRenderer('r', scene);
         const system = makeSystem();

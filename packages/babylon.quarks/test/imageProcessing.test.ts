@@ -303,7 +303,7 @@ describe('image processing', () => {
         expect(read.map((s) => s.applyImageProcessing)).toEqual([false]);
     });
 
-    it('runs on the straight colour before the blend resolve, and linearises a multiply factor after it', () => {
+    it('runs on the straight colour before the blend resolve, a multiply factor too', () => {
         const settings = drawn().batch().settings;
         for (const renderMode of [RenderMode.BillBoard, RenderMode.Mesh, RenderMode.Trail]) {
             const program = shaderProgram(
@@ -315,12 +315,13 @@ describe('image processing', () => {
                 const main = source.slice(source.search(/void main\(\)|fn main\(/));
                 const processing = main.indexOf('applyImageProcessing(');
                 const resolve = main.indexOf('#if defined(BLEND_PREMULTIPLY)');
-                const multiplyFactor = main.lastIndexOf(
-                    'defined(IMAGEPROCESSINGPOSTPROCESS) && defined(BLEND_MULTIPLY)'
-                );
                 expect(processing).toBeGreaterThan(main.indexOf('#ifdef FOG'));
                 expect(processing).toBeLessThan(resolve);
-                expect(multiplyFactor).toBeGreaterThan(resolve);
+                // Every colour came into linear space on its own (see colorSpace.test.ts), so under
+                // a post process every blend, multiply included, is resolved in linear space, as
+                // Unity's Linear colour space does, and nothing is linearised as a whole.
+                expect(main).not.toMatch(/toLinearSpace/);
+                expect(main).not.toMatch(/IMAGEPROCESSINGPOSTPROCESS\) && (!)?defined\(BLEND_MULTIPLY\)/);
             }
         }
     });

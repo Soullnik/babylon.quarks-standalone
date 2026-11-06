@@ -274,14 +274,33 @@ namespace BabylonQuarks.UnityExporter
         {
             var node = new JObject()
                 .Set("uuid", ctx.GetTransformUuid(t))
-                .Set("name", t.name)
-                .Set("matrix", LocalMatrix(t));
+                .Set("name", t.name);
+            SetLocalTransform(node, t);
+            // An inactive GameObject plays nothing in Unity, and nothing under it does, until
+            // something activates it: the node loads disabled, as quarks' `visible: false` means.
+            if (!t.gameObject.activeSelf)
+            {
+                node.Set("visible", false);
+            }
 
             var ps = t.GetComponent<ParticleSystem>();
+            if (ps != null && !ParticleConverter.IsExported(ps))
+            {
+                Debug.LogWarning($"[Quarks Exporter] '{ps.name}': Unity draws nothing of it ({ParticleConverter.WhyNothingIsDrawn(ps)}), so it is exported as an empty node.");
+                ps = null;
+            }
+            // A Trail Renderer becomes a trail system of its own: the node itself when it holds no
+            // particle system, otherwise a child at the same place.
+            var trail = t.GetComponent<TrailRenderer>();
+            JObject trailPs = trail != null && trail.enabled ? TrailRendererConverter.BuildPs(trail, ctx) : null;
             if (ps != null)
             {
                 var renderer = t.GetComponent<ParticleSystemRenderer>();
                 node.Set("type", "ParticleEmitter").Set("ps", ParticleConverter.BuildPs(ps, renderer, ctx));
+            }
+            else if (trailPs != null)
+            {
+                node.Set("type", "ParticleEmitter").Set("ps", trailPs);
             }
             else
             {
@@ -289,6 +308,14 @@ namespace BabylonQuarks.UnityExporter
             }
 
             var children = new JArray();
+            if (trailPs != null && ps != null)
+            {
+                children.Add(new JObject()
+                    .Set("uuid", ctx.NewId("node"))
+                    .Set("name", t.name + " trail")
+                    .Set("type", "ParticleEmitter")
+                    .Set("ps", trailPs));
+            }
             foreach (Transform child in t)
             {
                 children.Add(SerializeNode(child, ctx));
@@ -300,19 +327,30 @@ namespace BabylonQuarks.UnityExporter
             return node;
         }
 
-        /// <summary>Local TRS as a three.js/Babylon column-major 16-float matrix.</summary>
-        private static JArray LocalMatrix(Transform t)
+        /// <summary>
+        /// Writes the transform's local position, rotation and scale onto <paramref name="node"/>,
+        /// each only when it is not the default: Unity's own values, in the same left-handed axes.
+        /// Not as a matrix: a mirrored node's matrix splits into a turn and a scale more than one
+        /// way, and what is below it turns by which one Unity has (its transform.rotation), which
+        /// only the scale's signs say.
+        /// </summary>
+        private static void SetLocalTransform(JObject node, Transform t)
         {
-            Matrix4x4 m = Matrix4x4.TRS(t.localPosition, t.localRotation, t.localScale);
-            var arr = new JArray();
-            for (int col = 0; col < 4; col++)
+            Vector3 p = t.localPosition;
+            if (p.x != 0f || p.y != 0f || p.z != 0f)
             {
-                for (int row = 0; row < 4; row++)
-                {
-                    arr.Add(m[row, col]);
-                }
+                node.Set("position", new JArray().Add(p.x).Add(p.y).Add(p.z));
             }
-            return arr;
+            Quaternion q = t.localRotation;
+            if (q.x != 0f || q.y != 0f || q.z != 0f || q.w != 1f)
+            {
+                node.Set("quaternion", new JArray().Add(q.x).Add(q.y).Add(q.z).Add(q.w));
+            }
+            Vector3 s = t.localScale;
+            if (s.x != 1f || s.y != 1f || s.z != 1f)
+            {
+                node.Set("scale", new JArray().Add(s.x).Add(s.y).Add(s.z));
+            }
         }
     }
 }

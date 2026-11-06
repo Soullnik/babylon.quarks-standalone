@@ -100,7 +100,7 @@ ${surfaceColorGLSL(true)}
 #else
     vec3 L = normalize(-lightDirection);
     float NdotL = max(dot(N, L), 0.0);
-    vec3 litColor = ambientColor + lightColor * NdotL;
+    vec3 litColor = quarksFromGamma(ambientColor) + quarksFromGamma(lightColor) * NdotL;
 
     vec3 color = baseColor.rgb * litColor;
 #endif
@@ -108,7 +108,7 @@ ${surfaceColorGLSL(true)}
 #ifdef USE_ENVMAP_ATLAS
     vec3 viewDir = normalize(vWorldPos - eyePosition);
     vec3 reflectionCoords = reflect(viewDir, N);
-    color += sampleEnvAtlas(reflectionCoords) * reflectionLevel;
+    color += quarksFromGamma(sampleEnvAtlas(reflectionCoords)) * reflectionLevel;
 #endif
 
 #ifdef MESH_RIM
@@ -119,9 +119,9 @@ ${surfaceColorGLSL(true)}
     // Faces turned to the camera fade by the strength; edges stay.
     baseColor.a *= clamp(1.0 - rimParams.y * (1.0 - edgeTerm), 0.0, 1.0);
     #elif defined(MESH_RIM_MIX)
-    color = mix(color, rimColor, clamp(edgeTerm * rimParams.y, 0.0, 1.0));
+    color = mix(color, quarksFromGamma(rimColor), clamp(edgeTerm * rimParams.y, 0.0, 1.0));
     #else
-    color += rimColor * edgeTerm * rimParams.y;
+    color += quarksFromGamma(rimColor) * edgeTerm * rimParams.y;
     #endif
 #endif
 
@@ -129,7 +129,9 @@ ${surfaceColorGLSL(true)}
 #ifdef USE_ALPHATEST
     if (baseColor.a < alphaTest) discard;
 #else
-    if (baseColor.a < 0.01) discard;
+    // Only what draws nothing: a faint fringe still shows once a doubled tint or additive
+    // blending lifts it, and Unity cuts none of it.
+    if (baseColor.a <= 0.0) discard;
 #endif
 
 ${fogFragmentGLSL('color')}

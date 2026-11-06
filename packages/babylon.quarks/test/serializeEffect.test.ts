@@ -47,6 +47,7 @@ function sampledTexture(): Texture {
         noMipmap: true,
         invertY: false,
         samplingMode: Constants.TEXTURE_NEAREST_SAMPLINGMODE,
+        useSRGBBuffer: true,
     });
     texture.wrapU = Texture.CLAMP_ADDRESSMODE;
     texture.wrapV = Texture.MIRROR_ADDRESSMODE;
@@ -97,6 +98,27 @@ describe('serializeEffect', () => {
         expect(warn).not.toHaveBeenCalled();
     });
 
+    test("writes a node's position, rotation and scale, and keeps which axis a mirror is on", () => {
+        // (-1, 1, 1) unturned and (1, -1, 1) turned half round Z are the same matrix; what is
+        // below the node turns by which one it is, as Unity's transform.rotation does.
+        const mirrored = new TransformNode('mirrored', scene);
+        mirrored.position.set(1, 2, 3);
+        mirrored.scaling.set(-2, 1, 1);
+        const plainNode = new TransformNode('plain', scene);
+        const json = plain(serializeEffect([mirrored, plainNode]));
+        const [mirroredJSON, plainJSON] = json.object.children!;
+        expect(mirroredJSON).toMatchObject({position: [1, 2, 3], scale: [-2, 1, 1]});
+        expect(mirroredJSON).not.toHaveProperty('quaternion');
+        expect(mirroredJSON).not.toHaveProperty('matrix');
+        // Nothing for a node at the origin, unturned and unscaled.
+        expect(Object.keys(plainJSON).sort()).toEqual(['name', 'type', 'uuid']);
+        const loaded = new QuarksLoader(scene).parse(json);
+        const back = loaded.getChildren((node) => node.name === 'mirrored')[0] as TransformNode;
+        expect(back.scaling.asArray()).toEqual([-2, 1, 1]);
+        expect(back.rotationQuaternion).toBeNull();
+        expect(back.rotation.asArray()).toEqual([0, 0, 0]);
+    });
+
     test('loads back to the same effect, and saves again to the same file', () => {
         const {root} = effect();
         const first = plain(serializeEffect(root));
@@ -142,6 +164,7 @@ describe('serializeEffect', () => {
                 repeat: [2, 3],
                 offset: [0.25, 0.5],
                 rotation: 0.75,
+                colorSpace: 'srgb',
             },
         ]);
         const loaded = new QuarksLoader(scene, {shareResources: false}).parse(plain(json));
@@ -154,6 +177,25 @@ describe('serializeEffect', () => {
         expect([texture.uScale, texture.vScale, texture.uOffset, texture.vOffset, texture.wAng]).toEqual([
             2, 3, 0.25, 0.5, 0.75,
         ]);
+        expect(texture._useSRGBBuffer).toBe(true);
+    });
+
+    test('loads an sRGB texture into its own texture, apart from the same image read as stored', () => {
+        const json = plain(
+            serializeEffect(system('plain', {texture: new Texture('https://example.com/a.png', scene)}).emitter)
+        );
+        const srgb = plain(json);
+        srgb.textures![0].colorSpace = 'srgb';
+        const textureOf = (node: unknown) => ((node as ParticleEmitter).system as ParticleSystem).texture as Texture;
+        const asStored = textureOf(new QuarksLoader(scene).parse(plain(json)));
+        const decoded = textureOf(new QuarksLoader(scene).parse(srgb));
+        expect(asStored._useSRGBBuffer).toBeFalsy();
+        expect(decoded._useSRGBBuffer).toBe(true);
+        expect(decoded).not.toBe(asStored);
+        // three.js writes '' for no colour space; it is read as stored.
+        const none = plain(json);
+        none.textures![0].colorSpace = '';
+        expect(textureOf(new QuarksLoader(scene).parse(none))).toBe(asStored);
     });
 
     test('writes a default texture with no sampler fields', () => {

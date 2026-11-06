@@ -241,8 +241,11 @@ describe('render-time smoothness', () => {
             // Rows are recycled constantly at this lifetime; only compare a row
             // that still holds the same particle, and only once that particle
             // has a whole step behind it — one born this frame has nothing to
-            // continue yet, correctly.
-            if (who === previous.who && who.age > 1 / 60) changes.push(Math.abs(size - previous.size));
+            // continue yet, correctly — and is not yet drawn at its curve's end,
+            // size 0, where there is nothing left to continue either.
+            if (who === previous.who && who.age > 1 / 60 && previous.size > 1e-6) {
+                changes.push(Math.abs(size - previous.size));
+            }
             previous = {size, who};
         }
 

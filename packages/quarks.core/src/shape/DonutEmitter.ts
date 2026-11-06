@@ -6,9 +6,8 @@ import {
     ValueGeneratorFromJSON,
 } from '../functions';
 import {EmissionState, IParticleSystem} from '../IParticleSystem';
-import {Matrix4, Quaternion} from '../math';
 import {Particle} from '../Particle';
-import {shellRadius, UP_VEC3, ZERO_VEC3} from '../util/MathUtil';
+import {shellRadius} from '../util/MathUtil';
 import {random} from '../util/random';
 import {EmitterMode, EmitterShape, getValueFromEmitterMode, ShapeJSON} from './EmitterUtil';
 import {ShapeTransform} from './ShapeTransform';
@@ -94,12 +93,6 @@ export class DonutEmitter implements EmitterShape {
     memory: GeneratorMemory;
     transform?: ShapeTransform;
 
-    /**
-     * Scratch matrix.
-     * @internal
-     */
-    _m1: Matrix4;
-
     constructor(parameters: DonutEmitterParameters = {}) {
         this.radius = parameters.radius ?? 10;
         this.arc = parameters.arc ?? 2.0 * Math.PI;
@@ -110,7 +103,6 @@ export class DonutEmitter implements EmitterShape {
         this.speed = parameters.speed ?? new ConstantValue(1);
         this.memory = [];
         this.transform = parameters.transform;
-        this._m1 = new Matrix4();
     }
 
     private currentValue = 0;
@@ -128,8 +120,7 @@ export class DonutEmitter implements EmitterShape {
     }
 
     /**
-     * Starts `p` in the tube, heading out from the tube's centre line at its start speed and, when
-     * it has no start rotation, facing that way.
+     * Starts `p` in the tube, heading out from the tube's centre line at its start speed.
      */
     initialize(p: Particle, emissionState: EmissionState) {
         const u = getValueFromEmitterMode(this.mode, this.currentValue, this.spread, emissionState);
@@ -148,14 +139,6 @@ export class DonutEmitter implements EmitterShape {
         p.position.set(radius * cosTheta, radius * sinTheta, 0).addScaledVector(p.velocity, tube);
         p.velocity.multiplyScalar(p.startSpeed);
 
-        // Default facing-velocity orientation, but defer to startRotation if set.
-        if (p.rotation instanceof Quaternion) {
-            const r = p.rotation;
-            if (r.x === 0 && r.y === 0 && r.z === 0 && r.w === 1) {
-                this._m1.lookAt(ZERO_VEC3, p.velocity, UP_VEC3);
-                p.rotation.setFromRotationMatrix(this._m1);
-            }
-        }
         this.transform?.apply(p);
     }
 

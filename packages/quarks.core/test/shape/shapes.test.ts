@@ -16,6 +16,7 @@ import {
     GridSampling,
     HemisphereEmitter,
     PointEmitter,
+    Quaternion,
     RectangleEmitter,
     ShapeJSON,
     ShapeTransform,
@@ -180,6 +181,32 @@ describe('velocity', () => {
             // The direction is in the plane through z and the point on the centre line.
             expect(p.x * v.y - p.y * v.x).toBeCloseTo(0, 5);
         }
+    });
+});
+
+describe('start rotation', () => {
+    it('leaves a mesh particle in its start rotation on every shape, as Unity does', () => {
+        const shapes: EmitterShape[] = [
+            new SphereEmitter({radius: 2}),
+            new HemisphereEmitter({radius: 2}),
+            new DonutEmitter({radius: 2, donutRadius: 0.5}),
+            new RectangleEmitter({width: 2, height: 2}),
+            new PointEmitter(),
+            new ConeEmitter({radius: 1, angle: 0.4}),
+            new BoxEmitter(),
+        ];
+        withRandomSource(createSeededRandom(3), () => {
+            for (const shape of shapes) {
+                for (let i = 0; i < 20; i++) {
+                    const particle = new SpriteParticle();
+                    particle.startSpeed = SPEED;
+                    particle.rotation = new Quaternion();
+                    shape.initialize(particle, emissionState());
+                    const r = particle.rotation as Quaternion;
+                    expect([r.x, r.y, r.z, r.w]).toEqual([0, 0, 0, 1]);
+                }
+            }
+        });
     });
 });
 

@@ -36,7 +36,7 @@ describe('EmitSubParticleSystem', () => {
     });
 
     test('stops following when the parent object is reused for a newborn', () => {
-        const {behavior, particle, translations} = setup(SubParticleEmitMode.Birth);
+        const {behavior, particle, translations} = setup(SubParticleEmitMode.Frame);
         behavior.update(particle, 1 / 60);
         // The parent died; the system reused its object for a new particle at the origin.
         particle.serial = 2;
@@ -44,6 +44,17 @@ describe('EmitSubParticleSystem', () => {
         particle.position.set(0, 0, 0);
         behavior.frameUpdate(1 / 60);
         expect(translations[translations.length - 1]).toEqual([5, 0, 0]);
+    });
+
+    test('a Birth emission ends when the parent object is reused for a newborn', () => {
+        const {behavior, particle, translations} = setup(SubParticleEmitMode.Birth);
+        behavior.update(particle, 1 / 60);
+        particle.serial = 2;
+        particle.age = 0;
+        particle.position.set(0, 0, 0);
+        behavior.frameUpdate(1 / 60);
+        expect(translations).toEqual([]);
+        expect(behavior.hasPendingEmission()).toBe(false);
     });
 
     test('a Death emission stays where the parent died', () => {

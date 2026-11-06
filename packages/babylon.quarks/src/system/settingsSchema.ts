@@ -1,5 +1,6 @@
 import {Constants} from '@babylonjs/core/Engines/constants';
 import type {
+    Color4Like,
     ColorGeneratorJSON,
     RotationGeneratorJSON,
     ValueGeneratorJSON,
@@ -28,12 +29,18 @@ import {
     normalizeBursts,
     validCullingMode,
     validLoopRange,
+    validMaterialColor,
+    validMaterialColorScale,
+    validRenderAlignment,
     validRenderFace,
     validRingBufferMode,
+    validRotationAxis,
     validScalingMode,
+    validSortingFudge,
     validSortMode,
     validStopAction,
     validTileCount,
+    WHITE_MATERIAL_COLOR,
 } from './normalize';
 import type {
     BurstParameters,
@@ -256,9 +263,11 @@ export const SETTINGS: ReadonlyArray<SettingDescriptor> = [
     plain('playbackSpeed', (s) => s.playbackSpeed, 1, number),
     plain('cullingMode', (s) => s.cullingMode, 'always', validCullingMode),
     plain('scalingMode', (s) => s.scalingMode, 'local', validScalingMode),
+    plain('rotationAxis', (s) => s.rotationAxis, 'z', validRotationAxis),
     plain('seed', (s) => s.seed, undefined, number),
     plain('sortMode', (s) => s.sortMode, 'none', validSortMode),
     plain('renderFace', (s) => s.renderFace, 'both', validRenderFace),
+    plain('renderAlignment', (s) => s.renderAlignment, 'simulation', validRenderAlignment),
     plain(
         'alignToDirection',
         (s) => s.alignToDirection,
@@ -278,6 +287,37 @@ export const SETTINGS: ReadonlyArray<SettingDescriptor> = [
     plain('vTileCount', (s) => s.vTileCount, 1, tileCount),
     plain('blendTiles', (s) => s.blendTiles, false, boolean),
     plain('softParticles', (s) => s.softParticles, false, boolean),
+    plain(
+        'premultipliedMap',
+        (s) => s.premultipliedMap,
+        false,
+        (json) => json === true
+    ),
+    plain('particleColor', (s) => s.particleColor, true, boolean),
+    {
+        param: 'materialColor',
+        get: (s) => s.materialColor,
+        isDefault: (value) => validMaterialColor(value) === WHITE_MATERIAL_COLOR,
+        toJSON: (value) => [...validMaterialColor(value)],
+        fromJSON: (json) => {
+            if (!Array.isArray(json)) return undefined;
+            const [r, g, b, a] = validMaterialColor(json);
+            return {r, g, b, a};
+        },
+        clone: (value) => ({...(value as Color4Like)}),
+    },
+    plain(
+        'materialColorScale',
+        (s) => s.materialColorScale,
+        1,
+        (json) => (typeof json === 'number' ? validMaterialColorScale(json) : undefined)
+    ),
+    plain(
+        'sortingFudge',
+        (s) => s.sortingFudge,
+        0,
+        (json) => (typeof json === 'number' ? validSortingFudge(json) : undefined)
+    ),
     plain('softFarFade', (s) => s.softFarFade, DEFAULT_SOFT_FAR_FADE, softFade),
     plain('softNearFade', (s) => s.softNearFade, 0, softFade),
     plain('blendMode', (s) => s.blending, Constants.ALPHA_ADD, number, {json: 'blending'}),

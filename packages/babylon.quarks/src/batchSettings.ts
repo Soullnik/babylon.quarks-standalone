@@ -7,17 +7,19 @@ import type {Vector3Like} from 'quarks.core';
 // apart from VFXBatch so the batch key (batchKey.ts) can read them without importing the batch.
 
 /**
- * The order the particles of a batch are drawn in (Unity's Sort Mode). Alpha
+ * The order a system's particles are drawn in (Unity's Sort Mode). Alpha
  * blended particles cover what was drawn before them, so the order shows.
  *
- * - `'none'`: as they are, system by system. Right for additive blending.
+ * - `'none'`: as they are. Right for additive blending.
  * - `'distance'`: farthest from the camera first, so nearer particles cover
  *   farther ones. The order is computed once a frame, from the first of the
  *   scene's active cameras (`scene.activeCameras[0]`, else `activeCamera`);
  *   other cameras, a second viewport or a render target, draw the same order.
  * - `'oldestInFront'` / `'youngestInFront'`: by age.
  *
- * Sorting runs over the whole batch after each fill. Trails are not sorted.
+ * As in Unity, each system's particles are sorted among themselves, after each
+ * fill; the transparent systems are drawn back to front by the centre of their
+ * bounds (see {@link VFXBatchSettings.sortingFudge}). Trails are not sorted.
  */
 export type SortMode = 'none' | 'distance' | 'oldestInFront' | 'youngestInFront';
 
@@ -34,6 +36,48 @@ export type SortMode = 'none' | 'distance' | 'oldestInFront' | 'youngestInFront'
  * `'back'` its outside.
  */
 export type RenderFace = 'both' | 'front' | 'back';
+
+/**
+ * Which axes a mesh particle's rotation is measured in, and which a billboard's quad is laid
+ * along (Unity's renderer Render Alignment). A mesh is first laid along these axes, then turned
+ * by the particle's own 3D rotation inside them.
+ *
+ * - `'simulation'` (the default): the axes of the space the system simulates in, as quarks has
+ *   always drawn meshes. A local-space system's meshes turn with the emitter, as Unity's Local
+ *   alignment does. A world-space system's meshes are measured in the world axes with the
+ *   emitter's rotation at their birth applied, so each keeps the turn it was born with.
+ *   Billboards face the camera, as for `'view'`.
+ * - `'view'`: the camera's axes (Unity's View, its default): the mesh's x runs to the right of
+ *   the screen, its y up and its z along the view direction, away from the camera (towards it in
+ *   a right-handed scene, whose cameras look down −z). A flat quad in the mesh's XY plane then
+ *   faces the camera however the camera turns. Computed in the vertex shader from the view matrix
+ *   the batch is drawn with, so each camera, viewport or render target sees the meshes turned
+ *   towards itself. Billboards face the camera, as they always have.
+ * - `'world'`: the world axes (Unity's World), whatever the emitter's rotation and space.
+ * - `'local'`: the emitter's axes of the moment (Unity's Local), so the meshes turn with the
+ *   emitter even when the system simulates in world space.
+ *
+ * Only the rotation follows the alignment: positions and sizes stay in the simulation space. The
+ * start rotation and the rotation behaviors are measured in the alignment's axes, and
+ * {@link ParticleSystem.alignToDirection} points the mesh's +Z along the particle's travel in
+ * them; for `'view'` the travel is taken in the emitter's axes, since the camera is not known at
+ * birth.
+ *
+ * A `'world'` or `'local'` billboard no longer faces the camera: its quad lies in the XY plane of
+ * the alignment's axes, its x along their X and its y along their Y, so that seen from their −Z
+ * it reads as a camera-facing billboard reads on screen (measured in Unity 6 with
+ * `ParticleSystemRenderer.BakeMesh`). The particle's rotation spins it about their Z, its size
+ * (with the emitter's scale, as for any billboard) stretches it along x and y, and the
+ * {@link ParticleSystem.pivot} moves it along their X, Y and Z. Seen from behind, the quad is
+ * mirrored, as in Unity. Unity scales a `'local'` quad by the emitter's scale along the world
+ * axes rather than its own, which differs only for an emitter scaled unevenly and turned.
+ *
+ * It applies to the Mesh and BillBoard render modes. Stretched, horizontal and vertical
+ * billboards ignore it, as in Unity, and beams and trails follow the particle's path. Unity's
+ * Facing (towards the camera's position rather than its plane) and Velocity (along the particle's
+ * velocity) are not supported yet; `'view'` is the nearest to Facing.
+ */
+export type RenderAlignment = 'simulation' | 'view' | 'world' | 'local';
 
 /** How a system draws its particles (Unity's Render Mode), see {@link ParticleSystem.renderMode}. */
 export enum RenderMode {
@@ -104,7 +148,7 @@ export function defaultMeshLighting(): MeshLightingSettings {
  * Only mesh particles draw it.
  */
 export interface MeshRim {
-    /** Edge colour, linear RGB. Default `[1, 1, 1]`. */
+    /** Edge colour, in gamma space like the particle colours (see `shaders/chunks/colorSpace.ts`). Default `[1, 1, 1]`. */
     color: [number, number, number];
     /** Falloff exponent; higher keeps the rim to a thinner edge. Default 2. */
     power: number;
@@ -318,7 +362,7 @@ export interface ParticleErosion {
     softness: number;
     /** Width of the glowing band above the cut, in mask units; 0 (default) draws none. */
     edgeWidth: number;
-    /** Colour added in the edge band, linear RGB, may exceed 1. Default `[1, 1, 1]`. */
+    /** Colour added in the edge band, in gamma space like the particle colours, may exceed 1. Default `[1, 1, 1]`. */
     edgeColor: [number, number, number];
 }
 // Limits worth knowing: with neither a mask nor a map there is
@@ -481,6 +525,8 @@ export interface StoredBatchSettings {
     instancingUVs2?: Float32Array;
     /** See {@link VFXBatchSettings.instancingNormals}. */
     instancingNormals?: Float32Array;
+    /** See {@link VFXBatchSettings.instancingColors}. */
+    instancingColors?: Float32Array;
     /** See {@link VFXBatchSettings.renderMode}. */
     renderMode: RenderMode;
     /** See {@link VFXBatchSettings.renderOrder}. */
@@ -493,6 +539,16 @@ export interface StoredBatchSettings {
     blendTiles: boolean;
     /** See {@link VFXBatchSettings.softParticles}. */
     softParticles: boolean;
+    /** See {@link VFXBatchSettings.premultipliedMap}; false without a texture. */
+    premultipliedMap: boolean;
+    /** See {@link VFXBatchSettings.particleColor}. */
+    particleColor: boolean;
+    /** See {@link VFXBatchSettings.materialColor}. */
+    materialColor: readonly [number, number, number, number];
+    /** See {@link VFXBatchSettings.materialColorScale}. */
+    materialColorScale: number;
+    /** See {@link VFXBatchSettings.sortingFudge}. */
+    sortingFudge: number;
     /** See {@link VFXBatchSettings.softNearFade}. */
     softNearFade: number;
     /** See {@link VFXBatchSettings.softFarFade}. */
@@ -529,6 +585,12 @@ export interface StoredBatchSettings {
     sortMode: SortMode;
     /** Which faces a mesh particle draws, see {@link RenderFace}; `'both'` outside the Mesh render mode. */
     renderFace: RenderFace;
+    /**
+     * The axes a mesh particle's rotation is measured in and a billboard's quad is laid along, see
+     * {@link RenderAlignment}. `'simulation'` outside the Mesh render mode and for camera-facing
+     * billboards (`'view'` included).
+     */
+    renderAlignment: RenderAlignment;
     /** Smallest size a particle may have on screen, see {@link VFXBatchSettings.minParticleSize}. */
     minParticleSize: number;
     /** Largest size a particle may have on screen, see {@link VFXBatchSettings.maxParticleSize}. */

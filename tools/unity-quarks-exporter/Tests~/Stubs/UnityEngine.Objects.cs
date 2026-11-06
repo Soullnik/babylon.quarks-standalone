@@ -22,6 +22,14 @@ namespace UnityEngine
             gameObject.GetComponentsInChildren<T>(includeInactive);
     }
 
+    public class MeshRenderer : Component { }
+
+    public class SkinnedMeshRenderer : Component { }
+
+    public class SpriteRenderer : Component { }
+
+    public class Sprite : Object { }
+
     public class Transform : Component, IEnumerable
     {
         private readonly List<Transform> _children = new List<Transform>();
@@ -40,6 +48,27 @@ namespace UnityEngine
         }
 
         public IEnumerator GetEnumerator() => _children.ToList().GetEnumerator();
+
+        // World placement, composed down the parents as Unity does (lossyScale ignores skew).
+        public Quaternion rotation => parent == null ? localRotation : parent.rotation * localRotation;
+        public Vector3 lossyScale => parent == null ? localScale : Vector3.Scale(parent.lossyScale, localScale);
+        public Vector3 position => parent == null ? localPosition : parent.TransformPoint(localPosition);
+        public Vector3 up => rotation * Vector3.up;
+
+        public Vector3 TransformPoint(Vector3 point)
+        {
+            Vector3 p = localRotation * Vector3.Scale(point, localScale) + localPosition;
+            return parent == null ? p : parent.TransformPoint(p);
+        }
+
+        public Vector3 InverseTransformPoint(Vector3 point)
+        {
+            Vector3 p = parent == null ? point : parent.InverseTransformPoint(point);
+            p = Quaternion.Inverse(localRotation) * (p - localPosition);
+            return new Vector3(p.x / localScale.x, p.y / localScale.y, p.z / localScale.z);
+        }
+
+        public Vector3 InverseTransformDirection(Vector3 direction) => Quaternion.Inverse(rotation) * direction;
     }
 
     public sealed class GameObject : Object
@@ -52,6 +81,10 @@ namespace UnityEngine
             this.name = name;
             transform = AddComponent<Transform>();
         }
+
+        public bool activeSelf { get; private set; } = true;
+
+        public void SetActive(bool value) => activeSelf = value;
 
         public T AddComponent<T>() where T : Component, new()
         {
@@ -79,7 +112,27 @@ namespace UnityEngine
 
     public class Shader : Object
     {
-        public static Shader Find(string name) => new Shader { name = name };
+        /// <summary>
+        /// The RenderType tag of the shaders the fixtures use, as Unity 6's declare it; the others
+        /// have none.
+        /// </summary>
+        private static readonly Dictionary<string, string> RenderTypes = new Dictionary<string, string>
+        {
+            ["Legacy Shaders/Diffuse"] = "Opaque",
+            ["Legacy Shaders/Transparent/Cutout/Diffuse"] = "TransparentCutout",
+            ["Legacy Shaders/Particles/Additive"] = "Transparent",
+            ["Legacy Shaders/Particles/Additive (Soft)"] = "Transparent",
+            ["Legacy Shaders/Particles/Alpha Blended Premultiply"] = "Transparent",
+            ["Legacy Shaders/Particles/Multiply"] = "Transparent",
+            ["Standard"] = "Opaque",
+            ["Unlit/Transparent"] = "Transparent",
+        };
+
+        public static Shader Find(string name) =>
+            new Shader { name = name, renderType = RenderTypes.TryGetValue(name, out var tag) ? tag : "" };
+
+        /// <summary>Test hook: the shader's RenderType tag, "" for none.</summary>
+        public string renderType { get; set; } = "";
     }
 
     public enum TextureWrapMode { Repeat = 0, Clamp = 1, Mirror = 2, MirrorOnce = 3 }
@@ -162,8 +215,18 @@ namespace UnityEngine
         private readonly Dictionary<string, Vector2> _scales = new Dictionary<string, Vector2>();
         private readonly Dictionary<string, Vector2> _offsets = new Dictionary<string, Vector2>();
         private readonly HashSet<string> _keywords = new HashSet<string>();
+        private readonly Dictionary<string, string> _tags = new Dictionary<string, string>();
 
         public Material(Shader shader) { this.shader = shader; }
+
+        /// <summary>The tag the material overrides, else its shader's (only RenderType is modelled).</summary>
+        public string GetTag(string tag, bool searchFallbacks, string defaultValue = "")
+        {
+            if (_tags.TryGetValue(tag, out var value)) return value;
+            return tag == "RenderType" && shader != null && shader.renderType.Length > 0 ? shader.renderType : defaultValue;
+        }
+
+        public void SetOverrideTag(string tag, string value) => _tags[tag] = value;
 
         public Shader shader { get; set; }
 
@@ -212,6 +275,7 @@ namespace UnityEngine
         public Vector2[] uv { get; set; } = new Vector2[0];
         public Vector2[] uv2 { get; set; } = new Vector2[0];
         public Vector3[] normals { get; set; } = new Vector3[0];
+        public Color32[] colors32 { get; set; } = new Color32[0];
 
         public void RecalculateNormals()
         {

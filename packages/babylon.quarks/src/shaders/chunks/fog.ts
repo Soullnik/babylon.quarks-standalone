@@ -13,6 +13,10 @@
  * the whole screen), so under `FOG_ADDITIVE` they fade toward black instead,
  * and multiplying particles (`FOG_MULTIPLY`) toward white, which leaves the
  * frame as it is: what Unity does for additive and multiply materials.
+ *
+ * The fog colour, given in gamma space as the scene's `fogColor` is, is brought into the working
+ * space (`colorSpace.ts`) before the particle is mixed toward it, so under image processing the
+ * fog mixes in linear space, as Unity's Linear colour space fogs.
  */
 
 /** Vertex-side declaration, GLSL. */
@@ -68,7 +72,7 @@ export function fogFragmentGLSL(rgb: string): string {
 #elif defined(FOG_MULTIPLY)
         ${rgb} = mix(vec3(1.0), ${rgb}, fogFactor);
 #else
-        ${rgb} = mix(vFogColor, ${rgb}, fogFactor);
+        ${rgb} = mix(quarksFromGamma(vFogColor), ${rgb}, fogFactor);
 #endif
     }
 #endif
@@ -118,7 +122,7 @@ fn quarksFog(rgb: vec3f, fogDistanceVector: vec3f) -> vec3f {
 #elif defined(FOG_MULTIPLY)
     return mix(vec3f(1.0), rgb, fogFactor);
 #else
-    return mix(uniforms.vFogColor, rgb, fogFactor);
+    return mix(quarksFromGamma(uniforms.vFogColor), rgb, fogFactor);
 #endif
 }
 #endif

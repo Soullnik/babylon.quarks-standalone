@@ -4,7 +4,9 @@
 
 ```ts
 
+import { AbstractMesh } from '@babylonjs/core/Meshes/abstractMesh.js';
 import { BaseTexture } from '@babylonjs/core/Materials/Textures/baseTexture.js';
+import { BoundingInfo } from '@babylonjs/core/Culling/boundingInfo.js';
 import { Camera } from '@babylonjs/core/Cameras/camera.js';
 import { Color3 } from '@babylonjs/core/Maths/math.color.js';
 import { DepthRenderer } from '@babylonjs/core/Rendering/depthRenderer.js';
@@ -15,6 +17,7 @@ import { Node as Node_2 } from '@babylonjs/core/node.js';
 import { Quaternion as Quaternion_2 } from '@babylonjs/core/Maths/math.vector.js';
 import { Scene } from '@babylonjs/core/scene.js';
 import { ShaderMaterial } from '@babylonjs/core/Materials/shaderMaterial.js';
+import { SubMesh } from '@babylonjs/core/Meshes/subMesh.js';
 import { Texture } from '@babylonjs/core/Materials/Textures/texture.js';
 import { TransformNode } from '@babylonjs/core/Meshes/transformNode.js';
 import { Vector3 as Vector3_2 } from '@babylonjs/core/Maths/math.vector.js';
@@ -57,20 +60,31 @@ export interface AnimationJSON {
 
 // @public
 export class ApplyCollision implements Behavior {
+    // Warning: (ae-forgotten-export) The symbol "ApplyCollisionOptions" needs to be exported by the entry point index.d.ts
     constructor(
     resolver: PhysicsResolver | undefined,
-    bounce: number);
+    bounce: number, options?: ApplyCollisionOptions);
     bounce: number;
     // (undocumented)
     clone(): Behavior;
+    dampen: number;
+    readonly _frame: EmitterFrame;
     // (undocumented)
     frameUpdate(delta: number): void;
     static fromJSON(json: ApplyCollisionJSON): Behavior;
     // (undocumented)
-    initialize(particle: Particle): void;
+    initialize(particle: Particle, particleSystem: IParticleSystem): void;
+    lifetimeLoss: number;
+    // Warning: (ae-forgotten-export) The symbol "CollisionPlane" needs to be exported by the entry point index.d.ts
+    planes: CollisionPlane[];
+    ps?: IParticleSystem;
+    radiusScale: number;
     // (undocumented)
     reset(): void;
     resolver: PhysicsResolver | undefined;
+    _simPlanes: Vector3[];
+    // @internal
+    _tempNext: Vector3;
     // Warning: (ae-forgotten-export) The symbol "Vector3" needs to be exported by the entry point index.d.ts
     //
     // @internal
@@ -86,6 +100,11 @@ export class ApplyCollision implements Behavior {
 // @public
 export interface ApplyCollisionJSON extends BehaviorJSON {
     bounce?: number;
+    dampen?: number;
+    lifetimeLoss?: number;
+    // Warning: (ae-forgotten-export) The symbol "CollisionPlaneJSON" needs to be exported by the entry point index.d.ts
+    planes?: CollisionPlaneJSON[];
+    radiusScale?: number;
 }
 
 // @public
@@ -93,7 +112,8 @@ export class ApplyForce implements Behavior {
     constructor(
     direction: Vector3Like,
     magnitude: ValueGenerator,
-    space?: BehaviorSpace);
+    space?: BehaviorSpace,
+    scaleWithEmitter?: boolean);
     // (undocumented)
     clone(): Behavior;
     get direction(): Vector3;
@@ -109,6 +129,7 @@ export class ApplyForce implements Behavior {
     ps?: IParticleSystem;
     // (undocumented)
     reset(): void;
+    scaleWithEmitter: boolean;
     space: BehaviorSpace;
     _step(delta: number): number;
     // (undocumented)
@@ -126,6 +147,7 @@ export interface ApplyForceJSON extends BehaviorJSON {
     direction?: Vector3ArrayJSON;
     force?: ValueGeneratorJSON;
     magnitude?: ValueGeneratorJSON;
+    scaleWithEmitter?: boolean;
     space?: BehaviorSpace;
 }
 
@@ -393,12 +415,14 @@ export interface BufferAttributeJSON {
     data?: string;
     isInterleavedBufferAttribute?: boolean;
     itemSize?: number;
+    normalized?: boolean;
     offset?: number;
     type?: string;
 }
 
 // @public
 export interface BufferGeometryAttributesJSON {
+    color?: BufferAttributeJSON;
     normal?: BufferAttributeJSON;
     position?: BufferAttributeJSON;
     uv?: BufferAttributeJSON;
@@ -584,6 +608,35 @@ export interface ColorJSON {
     b: number;
     g: number;
     r: number;
+}
+
+// @public
+export class ColorOverLength implements Behavior {
+    constructor(color: FunctionColorGenerator);
+    // (undocumented)
+    clone(): Behavior;
+    // (undocumented)
+    color: FunctionColorGenerator;
+    // (undocumented)
+    frameUpdate(delta: number): void;
+    static fromJSON(json: ColorOverLengthJSON): Behavior;
+    // (undocumented)
+    initialize(particle: Particle): void;
+    // (undocumented)
+    reset(): void;
+    // @internal
+    _temp: Vector4;
+    // (undocumented)
+    toJSON(): ColorOverLengthJSON;
+    // (undocumented)
+    type: string;
+    // (undocumented)
+    update(particle: Particle): void;
+}
+
+// @public
+export interface ColorOverLengthJSON extends BehaviorJSON {
+    color: ColorGeneratorJSON;
 }
 
 // @public
@@ -814,10 +867,6 @@ export class DonutEmitter implements EmitterShape {
     donutRadius: number;
     static fromJSON(json: ShapeJSON): DonutEmitter;
     initialize(p: Particle, emissionState: EmissionState): void;
-    // Warning: (ae-forgotten-export) The symbol "Matrix4" needs to be exported by the entry point index.d.ts
-    //
-    // @internal
-    _m1: Matrix4;
     memory: GeneratorMemory;
     mode: EmitterMode;
     radius: number;
@@ -981,6 +1030,8 @@ export interface EmitSubParticleSystemJSON extends BehaviorJSON {
 
 // @public
 export class EmitterFrame {
+    static forceReadsFrame(space: BehaviorSpace, worldSpace: boolean, scaled: boolean): boolean;
+    forceToSimulation(vector: Vector3, space: BehaviorSpace, worldSpace: boolean, scaled: boolean): Vector3;
     fromSimulation(vector: Vector3, space: BehaviorSpace, worldSpace: boolean): Vector3;
     pointToSimulation(point: Vector3, space: BehaviorSpace, worldSpace: boolean): Vector3;
     readonly position: Vector3;
@@ -1076,7 +1127,7 @@ export interface EulerJSON {
 export type EulerOrder = 'XYZ' | 'YXZ' | 'ZXY' | 'ZYX' | 'YZX' | 'XZY' | 'XYX' | 'YZY' | 'ZXZ' | 'XZX' | 'YXY' | 'ZYZ';
 
 // @public
-export type FieldType = 'vec3' | 'value' | 'number' | 'range' | 'colorFunc' | 'valueFunc' | 'rotationFunc' | 'radian' | 'mesh' | 'particleSystem' | 'boolean' | 'string' | 'geometry' | 'emitterMode' | 'boxEmitFrom' | 'coneEmitFrom' | 'gridSampling' | 'subEmitterInherit' | 'shapeTransform' | 'vec3Func';
+export type FieldType = 'vec3' | 'value' | 'number' | 'range' | 'colorFunc' | 'valueFunc' | 'rotationFunc' | 'radian' | 'mesh' | 'particleSystem' | 'boolean' | 'string' | 'geometry' | 'emitterMode' | 'boxEmitFrom' | 'coneEmitFrom' | 'gridSampling' | 'subEmitterInherit' | 'shapeTransform' | 'collisionPlanes' | 'vec3Func';
 
 // @public
 export type FogTarget = 'color' | 'black' | 'white';
@@ -1087,7 +1138,11 @@ export class ForceOverLife implements Behavior {
     x: FunctionValueGenerator | ValueGenerator,
     y: FunctionValueGenerator | ValueGenerator,
     z: FunctionValueGenerator | ValueGenerator,
-    space?: BehaviorSpace);
+    space?: BehaviorSpace,
+    randomized?: boolean,
+    scaleWithEmitter?: boolean);
+    // @internal
+    _apply(particle: Particle, t: number, step: number): void;
     // (undocumented)
     clone(): Behavior;
     readonly _frame: EmitterFrame;
@@ -1097,8 +1152,12 @@ export class ForceOverLife implements Behavior {
     // (undocumented)
     initialize(particle: Particle, particleSystem: IParticleSystem): void;
     ps?: IParticleSystem;
+    randomized: boolean;
+    // @internal
+    _reroll(memory: GeneratorMemory): void;
     // (undocumented)
     reset(): void;
+    scaleWithEmitter: boolean;
     space: BehaviorSpace;
     _step(delta: number): number;
     // @internal
@@ -1118,6 +1177,8 @@ export class ForceOverLife implements Behavior {
 
 // @public
 export interface ForceOverLifeJSON extends BehaviorJSON {
+    randomized?: boolean;
+    scaleWithEmitter?: boolean;
     space?: BehaviorSpace;
     x: ValueGeneratorJSON;
     y: ValueGeneratorJSON;
@@ -1149,8 +1210,12 @@ export class FrameOverLife implements Behavior {
     isPlain(): boolean;
     loop: boolean;
     random: boolean;
+    randomRow: boolean;
     // (undocumented)
     reset(): void;
+    row: number;
+    rowCount: number;
+    rowLength: number;
     startFrame?: ValueGenerator;
     // (undocumented)
     toJSON(): FrameOverLifeJSON;
@@ -1170,6 +1235,10 @@ export interface FrameOverLifeJSON extends BehaviorJSON {
     frameCount?: number;
     loop?: boolean;
     random?: boolean;
+    randomRow?: boolean;
+    row?: number;
+    rowCount?: number;
+    rowLength?: number;
     startFrame?: ValueGeneratorJSON;
 }
 
@@ -1180,6 +1249,10 @@ export interface FrameOverLifeOptions {
     frameCount?: number;
     loop?: boolean;
     random?: boolean;
+    randomRow?: boolean;
+    row?: number;
+    rowCount?: number;
+    rowLength?: number;
     startFrame?: ValueGenerator;
 }
 
@@ -1201,6 +1274,7 @@ export interface FunctionValueGenerator {
     clone(): FunctionValueGenerator;
     genValue(memory: GeneratorMemory, t: number): number;
     refreshTable?(): void;
+    reroll?(memory: GeneratorMemory): void;
     startGen(memory: GeneratorMemory): void;
     toJSON(): ValueGeneratorJSON;
     type: 'function';
@@ -1225,6 +1299,7 @@ export type GeneratorMemory = number[];
 
 // @public
 export interface GeometryArrays {
+    colors?: Float32Array;
     indices: Uint32Array | Uint16Array;
     normals?: Float32Array;
     positions: Float32Array;
@@ -1377,8 +1452,6 @@ export class HemisphereEmitter implements EmitterShape {
     clone(): EmitterShape;
     static fromJSON(json: ShapeJSON): HemisphereEmitter;
     initialize(p: Particle, emissionState: EmissionState): void;
-    // @internal
-    _m1: Matrix4;
     memory: GeneratorMemory;
     mode: EmitterMode;
     radius: number;
@@ -1414,6 +1487,7 @@ export interface IAnimationData {
 
 // @public
 export interface IEmitter {
+    // Warning: (ae-forgotten-export) The symbol "Matrix4" needs to be exported by the entry point index.d.ts
     matrixWorld: Matrix4;
     system: IParticleSystem;
     uuid: string;
@@ -1480,6 +1554,7 @@ export class IntervalValue implements ValueGenerator {
     genValue(memory: GeneratorMemory): number;
     // @internal
     indexCount: number;
+    reroll(memory: GeneratorMemory): void;
     startGen(memory: GeneratorMemory): void;
     toJSON(): IntervalValueJSON;
     type: 'value';
@@ -1580,8 +1655,7 @@ export class LimitSpeedOverLife implements Behavior {
     // @internal
     _limit: Vector3;
     // @internal
-    _limitAxes(particle: Particle, t: number, step: number, motionScale: number, convert: boolean): void;
-    motionScale(): number;
+    _limitAxes(particle: Particle, t: number, step: number, convert: boolean): void;
     ps?: IParticleSystem;
     // (undocumented)
     reset(): void;
@@ -1708,7 +1782,7 @@ export class Noise implements Behavior {
     // (undocumented)
     type: string;
     // (undocumented)
-    update(particle: Particle, _: number): void;
+    update(particle: Particle, delta: number): void;
     // (undocumented)
     updateAll(particles: Array<Particle>, count: number, delta: number): void;
 }
@@ -1801,11 +1875,13 @@ export type ParameterType = FieldType | 'self';
 // @public
 export interface Particle extends IParticle {
     angularVelocity?: number | Quaternion;
+    animatedVelocity?: Vector3;
     emissionState?: EmissionState;
     parentMatrix?: Matrix4;
     previousPosition?: Vector3;
     previousVelocity?: Vector3;
     reset(): void;
+    rotationAxis?: Vector3 | null;
     serial?: number;
     speedModifier: number;
     startColor: Vector4;
@@ -1816,10 +1892,12 @@ export interface Particle extends IParticle {
 // @public
 export class ParticleEmitter extends TransformNode {
     constructor(system: IParticleSystem, scene?: Scene);
+    get alignedScale(): Vector3;
     // (undocumented)
     clone(name?: string): ParticleEmitter;
     dispose(doNotRecurse?: boolean, disposeMaterialAndTextures?: boolean): void;
     get matrixWorld(): Matrix4;
+    get mirrored(): boolean;
     get shapeScale(): Vector3;
     system: IParticleSystem;
     toJSON(meta?: BabylonMetaData): ParticleEmitterJSON;
@@ -1889,16 +1967,19 @@ export class ParticleStore {
     static readonly AGE = 0;
     angularVelocity: Float32Array;
     angularVelocityQuaternion: Float32Array;
+    animatedVelocity: Float32Array;
     capacity: number;
     color: Float32Array;
     ensureCapacity(count: number): boolean;
     ensureQuaternionColumns(): boolean;
     flip: Uint8Array;
+    keepAnimatedVelocity(): boolean;
     keepPreviousVelocity(): boolean;
     static readonly LIFE = 1;
     memory: Float64Array;
     memoryStride: number;
     position: Float32Array;
+    previousAnimatedVelocity: Float32Array;
     previousColor: Float32Array;
     previousPosition: Float32Array;
     previousSize: Float32Array;
@@ -1979,6 +2060,8 @@ export class ParticleSystem implements IParticleSystem {
     set gradientMap(gradientMap: Partial<ParticleGradientMap> | undefined);
     hasPendingEmission(state?: EmissionState): boolean;
     ignoreStopAction: boolean;
+    get instancingColors(): Float32Array | undefined;
+    set instancingColors(colors: Float32Array | undefined);
     get instancingGeometry(): Float32Array;
     set instancingGeometry(geometry: Float32Array);
     get instancingIndices(): Uint32Array | Uint16Array;
@@ -2003,6 +2086,10 @@ export class ParticleSystem implements IParticleSystem {
     set mapUV(uv: Partial<TextureUV> | undefined);
     get material(): ParticleMaterialSource | null;
     set material(material: ParticleMaterialSource | null);
+    get materialColor(): Color4Like;
+    set materialColor(color: Color4Like);
+    get materialColorScale(): number;
+    set materialColorScale(scale: number);
     maxParticles?: number;
     get maxParticleSize(): number;
     set maxParticleSize(size: number);
@@ -2012,6 +2099,8 @@ export class ParticleSystem implements IParticleSystem {
     motionScale: number;
     neededToUpdateRender: boolean;
     onlyUsedByOther: boolean;
+    get particleColor(): boolean;
+    set particleColor(particleColor: boolean);
     get particleNum(): number;
     readonly particles: Array<Particle>;
     pause(): void;
@@ -2021,11 +2110,15 @@ export class ParticleSystem implements IParticleSystem {
     play(): void;
     get playbackSpeed(): number;
     set playbackSpeed(speed: number);
+    get premultipliedMap(): boolean;
+    set premultipliedMap(premultiplied: boolean);
     prewarm: boolean;
     get prewarmTime(): number;
     set prewarmTime(seconds: number);
     removeAllEventListeners(event?: ParticleSystemEventType): void;
     removeEventListener(event: ParticleSystemEventType, callback: (event: ParticleSystemEvent) => void): void;
+    get renderAlignment(): RenderAlignment;
+    set renderAlignment(alignment: RenderAlignment);
     // @internal (undocumented)
     _renderer?: BatchedRenderer;
     rendererEmitterSettings: RendererEmitterSettings;
@@ -2047,6 +2140,7 @@ export class ParticleSystem implements IParticleSystem {
     get ringBufferLoopRange(): Vector2Like;
     set ringBufferLoopRange(value: Vector2Like);
     ringBufferMode: RingBufferMode;
+    rotationAxis: RotationAxis;
     scalingMode: ScalingMode;
     get seed(): number | undefined;
     set seed(seed: number | undefined);
@@ -2061,6 +2155,8 @@ export class ParticleSystem implements IParticleSystem {
     set softNearFade(v: number);
     get softParticles(): boolean;
     set softParticles(v: boolean);
+    get sortingFudge(): number;
+    set sortingFudge(fudge: number);
     get sortMode(): SortMode;
     set sortMode(mode: SortMode);
     startColor: ColorGenerator | FunctionColorGenerator;
@@ -2128,14 +2224,19 @@ export interface ParticleSystemJSONParameters {
     layers?: number;
     looping?: boolean;
     material?: string;
+    materialColor?: [number, number, number, number];
+    materialColorScale?: number;
     maxParticles?: number;
     maxParticleSize?: number;
     minParticleSize?: number;
     onlyUsedByOther?: boolean;
+    particleColor?: boolean;
     pivot?: number[];
     playbackSpeed?: number;
+    premultipliedMap?: boolean;
     prewarm?: boolean;
     prewarmTime?: number;
+    renderAlignment?: RenderAlignment;
     rendererEmitterSettings?: RendererEmitterSettingsJSON;
     renderFace?: RenderFace;
     renderingGroupId?: number;
@@ -2143,12 +2244,14 @@ export interface ParticleSystemJSONParameters {
     renderOrder?: number;
     ringBufferLoopRange?: [number, number];
     ringBufferMode?: RingBufferMode;
+    rotationAxis?: RotationAxis;
     scalingMode?: ScalingMode;
     seed?: number;
     shape?: ShapeJSON;
     softFarFade?: number;
     softNearFade?: number;
     softParticles?: boolean;
+    sortingFudge?: number;
     sortMode?: SortMode;
     speedFactor?: number;
     startColor?: ColorGeneratorJSON;
@@ -2186,6 +2289,7 @@ export interface ParticleSystemParameters {
     erosion?: ParticleErosionOptions;
     flip?: Vector2Like;
     gradientMap?: Partial<ParticleGradientMap>;
+    instancingColors?: Float32Array;
     instancingGeometry?: Float32Array;
     instancingIndices?: Uint32Array | Uint16Array;
     instancingNormals?: Float32Array;
@@ -2196,14 +2300,19 @@ export interface ParticleSystemParameters {
     looping?: boolean;
     mapUV?: Partial<TextureUV>;
     material?: ParticleMaterialSource | null;
+    materialColor?: Color4Like;
+    materialColorScale?: number;
     maxParticles?: number;
     maxParticleSize?: number;
     minParticleSize?: number;
     onlyUsedByOther?: boolean;
+    particleColor?: boolean;
     pivot?: Vector3Like;
     playbackSpeed?: number;
+    premultipliedMap?: boolean;
     prewarm?: boolean;
     prewarmTime?: number;
+    renderAlignment?: RenderAlignment;
     rendererEmitterSettings?: RendererEmitterSettings;
     renderFace?: RenderFace;
     renderingGroupId?: number;
@@ -2212,6 +2321,7 @@ export interface ParticleSystemParameters {
     rim?: Partial<MeshRim>;
     ringBufferLoopRange?: Vector2Like;
     ringBufferMode?: RingBufferMode;
+    rotationAxis?: RotationAxis;
     scalingMode?: ScalingMode;
     scene?: Scene;
     seed?: number;
@@ -2219,6 +2329,7 @@ export interface ParticleSystemParameters {
     softFarFade?: number;
     softNearFade?: number;
     softParticles?: boolean;
+    sortingFudge?: number;
     sortMode?: SortMode;
     startColor?: ColorGenerator | FunctionColorGenerator;
     startDelay?: ValueGenerator | FunctionValueGenerator;
@@ -2327,8 +2438,6 @@ export class PointEmitter implements EmitterShape {
     clone(): EmitterShape;
     static fromJSON(json: ShapeJSON): PointEmitter;
     initialize(p: Particle): void;
-    // @internal
-    _m1: Matrix4;
     toJSON(): ShapeJSON;
     transform?: ShapeTransform;
     type: string;
@@ -2368,6 +2477,7 @@ export class QuarksFormatError extends Error {
 
 // @public
 export interface QuarksGeometryEntryJSON {
+    colors?: number[];
     indices?: number[];
     normals?: number[];
     positions?: number[];
@@ -2380,6 +2490,7 @@ export interface QuarksGeometryEntryJSON {
 
 // @public
 export interface QuarksGeometryJSON {
+    colors?: number[];
     indices: number[];
     normals?: number[];
     positions: number[];
@@ -2548,7 +2659,11 @@ export interface QuarksResourceResolver {
 }
 
 // @public
+export function quarksSortDistance(subMesh: SubMesh): number;
+
+// @public
 export interface QuarksTextureJSON {
+    colorSpace?: string;
     image?: string;
     invertY?: boolean;
     noMipmap?: boolean;
@@ -2571,6 +2686,9 @@ export interface QuarksTimelineClip {
 }
 
 // @public
+export function quarksTransparentSortCompare(a: SubMesh, b: SubMesh): number;
+
+// @public
 export class QuarksUtil {
     static addToBatchRenderer(root: Node_2, batchRenderer: BatchedRenderer): void;
     static endEmit(root: Node_2): void;
@@ -2583,6 +2701,7 @@ export class QuarksUtil {
     static resume(root: Node_2): void;
     static runOnAllParticleEmitters(root: Node_2, callback: (emitter: ParticleEmitter) => void): void;
     static setStopAction(root: Node_2, stopAction: StopAction): void;
+    static shareResources(source: TransformNode, target: TransformNode): void;
     static stop(root: Node_2): void;
 }
 
@@ -2610,6 +2729,7 @@ export class RandomBetweenCurves implements FunctionValueGenerator {
     // @internal
     indexCount: number;
     refreshTable(): void;
+    reroll(memory: GeneratorMemory): void;
     startGen(memory: GeneratorMemory): void;
     toJSON(): RandomBetweenCurvesJSON;
     readonly type: "function";
@@ -2667,6 +2787,35 @@ export interface RandomColorJSON {
     a: ColorJSON;
     b: ColorJSON;
     type: 'RandomColor';
+}
+
+// @public
+export class RandomizeDirection implements Behavior {
+    constructor(amount: number);
+    // (undocumented)
+    amount: number;
+    // (undocumented)
+    clone(): Behavior;
+    // (undocumented)
+    frameUpdate(delta: number): void;
+    static fromJSON(json: RandomizeDirectionJSON): Behavior;
+    // (undocumented)
+    initialize(particle: Particle): void;
+    // (undocumented)
+    reset(): void;
+    // @internal
+    _temp: Vector3;
+    // (undocumented)
+    toJSON(): RandomizeDirectionJSON;
+    // (undocumented)
+    type: string;
+    // (undocumented)
+    update(particle: Particle, delta: number): void;
+}
+
+// @public
+export interface RandomizeDirectionJSON extends BehaviorJSON {
+    amount: number;
 }
 
 // @public
@@ -2740,6 +2889,9 @@ export interface RectangleEmitterParameters {
 }
 
 // @public
+export type RenderAlignment = 'simulation' | 'view' | 'world' | 'local';
+
+// @public
 export type RendererEmitterSettings = TrailSettings | MeshSettings | BillBoardSettings | StretchedBillBoardSettings;
 
 // @public
@@ -2775,9 +2927,15 @@ export type RingBufferMode = 'disabled' | 'pauseUntilReplaced' | 'loopUntilRepla
 
 // @public
 export class Rotation3DOverLife implements Behavior {
-    constructor(angularVelocity: RotationGenerator);
+    constructor(angularVelocity: RotationGenerator, options?: Rotation3DOverLifeOptions);
+    // @internal
+    _addAngles(particle: Particle, t: number, delta: number): void;
+    // @internal
+    _angleSlot: number;
     // (undocumented)
     angularVelocity: RotationGenerator;
+    // @internal
+    _applyAngles(memory: ArrayLike<number>, rotations: Float32Array | Float64Array, r: number, turns: Float32Array | Float64Array, a: number): void;
     // (undocumented)
     clone(): Behavior;
     // (undocumented)
@@ -2785,11 +2943,16 @@ export class Rotation3DOverLife implements Behavior {
     static fromJSON(json: Rotation3DOverLifeJSON): Behavior;
     // (undocumented)
     initialize(particle: Particle): void;
+    // @internal
+    _integratesAngles(): boolean;
+    integration: RotationIntegration;
     // (undocumented)
     reset(): void;
     tempQuat: Quaternion;
     // (undocumented)
     toJSON(): Rotation3DOverLifeJSON;
+    // @internal
+    _turn(particle: Particle, t: number, delta: number): void;
     // (undocumented)
     type: string;
     // (undocumented)
@@ -2799,7 +2962,16 @@ export class Rotation3DOverLife implements Behavior {
 // @public
 export interface Rotation3DOverLifeJSON extends BehaviorJSON {
     angularVelocity: RotationGeneratorJSON;
+    integration?: RotationIntegration;
 }
+
+// @public
+export interface Rotation3DOverLifeOptions {
+    integration?: RotationIntegration;
+}
+
+// @public
+export type RotationAxis = 'z' | 'emission';
 
 // @public
 export class RotationBySpeed implements Behavior {
@@ -2847,6 +3019,9 @@ export function RotationGeneratorFromJSON(json: RotationGeneratorJSON | undefine
 export type RotationGeneratorJSON = AxisAngleJSON | EulerJSON | RandomQuatJSON;
 
 // @public
+export type RotationIntegration = 'turn' | 'angles';
+
+// @public
 export class RotationOverLife implements Behavior {
     constructor(angularVelocity: ValueGenerator | FunctionValueGenerator);
     // (undocumented)
@@ -2863,6 +3038,8 @@ export class RotationOverLife implements Behavior {
     tempQuat: Quaternion;
     // (undocumented)
     toJSON(): RotationOverLifeJSON;
+    turn(particle: Particle, rotation: Quaternion, angle: number): void;
+    // @deprecated (undocumented)
     turnAboutZ(particle: Particle, rotation: Quaternion, angle: number): void;
     // (undocumented)
     type: string;
@@ -2922,6 +3099,7 @@ export interface ShaderContext {
     depth: ShaderDepth | null;
     envAtlasReady: boolean;
     imageProcessing?: ShaderImageProcessing | null;
+    meshColors?: boolean;
     meshUV2: boolean;
 }
 
@@ -2948,7 +3126,7 @@ export interface ShaderProgram {
 export function shaderProgram(settings: ShaderSettings, context: ShaderContext): ShaderProgram;
 
 // @public
-export type ShaderSettings = Pick<StoredBatchSettings, 'renderMode' | 'texture' | 'reflectionAtlas' | 'uTileCount' | 'vTileCount' | 'blendTiles' | 'softParticles' | 'materialAlphaTest' | 'materialTransparent' | 'materialBlendMode' | 'applyFog' | 'applyImageProcessing' | 'pivot' | 'minParticleSize' | 'maxParticleSize' | 'lighting' | 'rim' | 'mapUV' | 'uvDistortion' | 'gradientMap' | 'erosion'>;
+export type ShaderSettings = Partial<Pick<StoredBatchSettings, 'renderAlignment' | 'premultipliedMap' | 'particleColor'>> & Pick<StoredBatchSettings, 'renderMode' | 'texture' | 'reflectionAtlas' | 'uTileCount' | 'vTileCount' | 'blendTiles' | 'softParticles' | 'materialAlphaTest' | 'materialTransparent' | 'materialBlendMode' | 'applyFog' | 'applyImageProcessing' | 'pivot' | 'minParticleSize' | 'maxParticleSize' | 'lighting' | 'rim' | 'mapUV' | 'uvDistortion' | 'gradientMap' | 'erosion'>;
 
 // @public
 export interface ShaderSources {
@@ -3063,7 +3241,7 @@ export class SizeOverLife implements Behavior {
     // (undocumented)
     type: string;
     // (undocumented)
-    update(particle: Particle): void;
+    update(particle: Particle, delta: number): void;
     // (undocumented)
     updateAll(particles: Array<Particle>, count: number, delta: number): void;
 }
@@ -3104,7 +3282,7 @@ export class SpeedOverLife implements Behavior {
     // (undocumented)
     type: string;
     // (undocumented)
-    update(particle: Particle): void;
+    update(particle: Particle, delta: number): void;
     // (undocumented)
     updateAll(particles: Array<Particle>, count: number, delta: number): void;
 }
@@ -3121,8 +3299,6 @@ export class SphereEmitter implements EmitterShape {
     clone(): EmitterShape;
     static fromJSON(json: ShapeJSON): SphereEmitter;
     initialize(p: Particle, emissionState: EmissionState): void;
-    // @internal
-    _m1: Matrix4;
     memory: GeneratorMemory;
     mode: EmitterMode;
     radius: number;
@@ -3169,6 +3345,7 @@ export class SpriteParticle implements Particle {
     set age(value: number);
     get angularVelocity(): number | Quaternion;
     set angularVelocity(value: number | Quaternion | undefined);
+    animatedVelocity: Vector3 | undefined;
     color: Vector4;
     get died(): boolean;
     get flip(): number;
@@ -3185,6 +3362,7 @@ export class SpriteParticle implements Particle {
     reset(): void;
     get rotation(): number | Quaternion;
     set rotation(value: number | Quaternion);
+    rotationAxis: Vector3 | null;
     protected scalarOffset: number;
     protected scalars: Float64Array;
     serial?: number;
@@ -3204,6 +3382,12 @@ export class SpriteParticle implements Particle {
 }
 
 // @public
+export function stepEndAge(particle: Particle, delta: number): number;
+
+// @public
+export function stepEndLife(particle: Particle, delta: number): number;
+
+// @public
 export type StopAction = 'none' | 'disable' | 'destroy';
 
 // @public
@@ -3213,6 +3397,7 @@ export interface StoredBatchSettings {
     blendTiles: boolean;
     erosion?: ParticleErosion;
     gradientMap?: ParticleGradientMap;
+    instancingColors?: Float32Array;
     instancingGeometry: Float32Array;
     instancingIndices: Uint32Array | Uint16Array;
     instancingNormals?: Float32Array;
@@ -3223,15 +3408,20 @@ export interface StoredBatchSettings {
     mapUV?: TextureUV;
     materialAlphaTest: number;
     materialBlendMode: number;
+    materialColor: readonly [number, number, number, number];
+    materialColorScale: number;
     materialDepthTest: boolean;
     materialDepthWrite: boolean;
     materialTransparent: boolean;
     maxParticleSize: number;
     minParticleSize: number;
+    particleColor: boolean;
     pivot?: Vector3Like;
+    premultipliedMap: boolean;
     reflectionAtlas: BaseTexture | null;
     reflectionLevel: number;
     reflectionTexture: BaseTexture | null;
+    renderAlignment: RenderAlignment;
     renderFace: RenderFace;
     renderingGroupId: number;
     renderMode: RenderMode;
@@ -3240,6 +3430,7 @@ export interface StoredBatchSettings {
     softFarFade: number;
     softNearFade: number;
     softParticles: boolean;
+    sortingFudge: number;
     sortMode: SortMode;
     texture: BaseTexture | null;
     uTileCount: number;
@@ -3338,11 +3529,14 @@ export class TrailParticle implements Particle {
     color: Vector4;
     get died(): boolean;
     dropOldest(): void;
+    ensureBaseColorHistory(): void;
     ensureHistoryCapacity(capacity: number): void;
     ensureSideHistory(): void;
     getHistoryIndex(i: number): number;
+    readonly headColorScale: Float32Array<ArrayBuffer>;
     headWidthScale: number;
     historyAges: Float32Array;
+    historyBaseColors: Float32Array;
     historyBaseSizes: Float32Array;
     historyCapacity: number;
     historyColors: Float32Array;
@@ -3498,6 +3692,7 @@ export interface ValueGenerator {
     clone(): ValueGenerator;
     genValue(memory: GeneratorMemory): number;
     refreshTable?(): void;
+    reroll?(memory: GeneratorMemory): void;
     startGen(memory: GeneratorMemory): void;
     toJSON(): ValueGeneratorJSON;
     type: 'value';
@@ -3667,8 +3862,12 @@ export type VelocityOverLifeSpace = BehaviorSpace;
 export abstract class VFXBatch {
     // @internal
     protected constructor(settings: VFXBatchSettings, scene: Scene, depth?: DepthBinding | null);
+    // @internal
+    addIdle(system: IParticleSystem): void;
     // @internal (undocumented)
     addSystem(system: IParticleSystem): void;
+    // @internal
+    addToRun(system: IParticleSystem): void;
     // @internal
     applyDepthTexture(depth: DepthBinding | BaseTexture | null): void;
     // @internal
@@ -3678,11 +3877,19 @@ export abstract class VFXBatch {
     // @internal
     attachTo(node: Node_2 | null): void;
     // @internal
+    beginDrawOrder(): void;
+    // @internal
     protected bindFog(material: ShaderMaterial): void;
     // @internal
     protected bindImageProcessing(material: ShaderMaterial, compiled: ShaderImageProcessing | null): void;
     protected bindSoft(material: ShaderMaterial): void;
     protected bindSurface(material: ShaderMaterial): void;
+    // @internal
+    protected readonly boundsMax_: Vector3;
+    // @internal
+    protected readonly boundsMin_: Vector3;
+    // @internal
+    protected configureDrawMesh(mesh: Mesh): void;
     protected configureMesh(): void;
     // Warning: (ae-forgotten-export) The symbol "DepthBinding" needs to be exported by the entry point index.d.ts
     //
@@ -3690,6 +3897,10 @@ export abstract class VFXBatch {
     protected depth: DepthBinding | null;
     // @internal (undocumented)
     dispose(): void;
+    // @internal
+    drawKey(system: IParticleSystem, eye: Vector3_2): number;
+    // @internal
+    drawnInstances(): number;
     protected drawsSoft(): boolean;
     // @internal (undocumented)
     abstract expandBuffers(target: number): void;
@@ -3702,23 +3913,41 @@ export abstract class VFXBatch {
     protected abstract readonly initialCapacity: number;
     // @internal (undocumented)
     protected maxParticles: number;
+    // @internal
+    protected measureSystems(from: number, to: number): 'measured' | 'empty' | 'unmeasured';
     mesh: Mesh;
     // @internal (undocumented)
     abstract rebuildMaterial(): void;
-    protected refreshBoundingInfo(): void;
+    protected refreshBoundingInfo(mesh?: AbstractMesh, from?: number, to?: number): void;
     // @internal
     protected releaseImageProcessing(): void;
     // @internal (undocumented)
     removeSystem(system: IParticleSystem): void;
     // @internal
     protected abstract resizeBuffers(): void;
+    // @internal
+    protected runCount: number;
+    // @internal
+    protected readonly runEnds: number[];
+    // @internal
+    protected readonly runKeys: number[];
+    // @internal
+    protected readonly runSequences: number[];
     // @internal (undocumented)
     protected scene: Scene;
     settings: StoredBatchSettings;
     // @internal (undocumented)
     abstract setupBuffers(): void;
     static readonly SHRINK_AFTER_FILLS = 300;
+    // @internal
+    protected sortCentre(system: ParticleSystem, out: Vector3): Vector3;
+    // @internal
+    startRun(key: number, sequence: number): void;
+    // @internal
+    protected syncDrawMesh(mesh: Mesh): void;
     systems: Set<IParticleSystem>;
+    // @internal
+    protected systemsToFill(): IParticleSystem[];
     time: number;
     // @internal (undocumented)
     abstract update(): void;
@@ -3726,6 +3955,8 @@ export abstract class VFXBatch {
     // @internal (undocumented)
     protected readonly visibleSystems: IParticleSystem[];
     protected static writeBound(material: ShaderMaterial, write: (target: ShaderMaterial | Effect) => void): void;
+    // @internal
+    protected writeBounds(info: BoundingInfo): void;
     // @internal
     protected writeLiveUniforms(material: ShaderMaterial): void;
 }
@@ -3737,6 +3968,7 @@ export interface VFXBatchSettings {
     blendTiles: boolean;
     erosion?: ParticleErosion;
     gradientMap?: ParticleGradientMap;
+    instancingColors?: Float32Array;
     instancingGeometry: Float32Array;
     instancingIndices: Uint32Array | Uint16Array;
     instancingNormals?: Float32Array;
@@ -3747,15 +3979,20 @@ export interface VFXBatchSettings {
     mapUV?: TextureUV;
     materialAlphaTest: number;
     materialBlendMode: number;
+    materialColor?: readonly [number, number, number, number];
+    materialColorScale?: number;
     materialDepthTest: boolean;
     materialDepthWrite: boolean;
     materialTransparent: boolean;
     maxParticleSize?: number;
     minParticleSize?: number;
+    particleColor?: boolean;
     pivot?: Vector3Like;
+    premultipliedMap?: boolean;
     reflectionAtlas: BaseTexture | null;
     reflectionLevel: number;
     reflectionTexture: BaseTexture | null;
+    renderAlignment?: RenderAlignment;
     renderFace?: RenderFace;
     renderingGroupId: number;
     renderMode: RenderMode;
@@ -3764,6 +4001,7 @@ export interface VFXBatchSettings {
     softFarFade: number;
     softNearFade: number;
     softParticles: boolean;
+    sortingFudge?: number;
     sortMode?: SortMode;
     texture: Texture | null;
     uTileCount: number;
@@ -3809,7 +4047,7 @@ export function withRandomSource<T>(generator: RandomSource, fn: () => T): T;
 
 // Warnings were encountered during analysis:
 //
-// dist/types/index.d.ts:15:1 - (ae-misplaced-package-tag) The @packageDocumentation comment must appear at the top of entry point *.d.ts file
+// dist/types/index.d.ts:1202:1 - (ae-misplaced-package-tag) The @packageDocumentation comment must appear at the top of entry point *.d.ts file
 
 // (No @packageDocumentation comment for this package)
 

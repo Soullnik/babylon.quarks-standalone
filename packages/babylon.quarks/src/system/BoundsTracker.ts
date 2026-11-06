@@ -98,7 +98,11 @@ export class BoundsTracker {
             padding += maxSize * this.meshGeometryRadius(settings.instancingGeometry);
         } else if (renderMode === RenderMode.StretchedBillBoard) {
             const stretch = emitterSettings as StretchedBillBoardSettings;
-            padding += maxSize * (1 + (stretch.lengthFactor ?? 0) + maxSpeed * (stretch.speedFactor ?? 0));
+            // As Unity draws it: the size times the length factor plus the speed times the speed
+            // factor long. A negative factor (Unity's negative Length or Speed Scale) stretches the
+            // quad ahead of the particle instead of behind it: as far, the other way.
+            padding +=
+                maxSize * (1 + Math.abs(stretch.lengthFactor ?? 0)) + maxSpeed * Math.abs(stretch.speedFactor ?? 0);
         } else {
             const pivot = settings.pivot;
             const pivotReach = pivot === undefined ? 0 : Math.abs(pivot.x) + Math.abs(pivot.y) + Math.abs(pivot.z);

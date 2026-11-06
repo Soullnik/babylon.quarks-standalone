@@ -1,7 +1,5 @@
 import {IParticleSystem} from '../IParticleSystem';
-import {Matrix4, Quaternion} from '../math';
 import {Particle} from '../Particle';
-import {UP_VEC3, ZERO_VEC3} from '../util/MathUtil';
 import {random} from '../util/random';
 import {EmitterShape, ShapeJSON} from './EmitterUtil';
 import {ShapeTransform} from './ShapeTransform';
@@ -14,18 +12,12 @@ export class PointEmitter implements EmitterShape {
     type = 'point';
 
     /**
-     * Scratch matrix.
-     * @internal
-     */
-    _m1: Matrix4;
-    /**
      * Offset, rotation and scale of the point within the particle system.
      * {@link ShapeTransform}
      */
     transform?: ShapeTransform;
 
     constructor(transform?: ShapeTransform) {
-        this._m1 = new Matrix4();
         this.transform = transform;
     }
 
@@ -48,17 +40,6 @@ export class PointEmitter implements EmitterShape {
 
         p.position.setScalar(0);
 
-        // Only set a default facing-along-velocity orientation if the user's
-        // startRotation didn't already write a non-identity rotation.
-        // (lookAt(ZERO, p.position, UP) would be degenerate here since
-        // p.position is zero — use velocity instead.)
-        if (p.rotation instanceof Quaternion) {
-            const r = p.rotation;
-            if (r.x === 0 && r.y === 0 && r.z === 0 && r.w === 1) {
-                this._m1.lookAt(ZERO_VEC3, p.velocity, UP_VEC3);
-                p.rotation.setFromRotationMatrix(this._m1);
-            }
-        }
         this.transform?.apply(p);
     }
 

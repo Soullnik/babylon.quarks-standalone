@@ -101,6 +101,57 @@ describe('FrameOverLife', () => {
         });
     });
 
+    describe('single row', () => {
+        // A 4 x 3 sheet; the curve runs over one row's 4 frames.
+        const rowRamp = () => new PiecewiseBezier([[new Bezier(0, 4 / 3, 8 / 3, 3.999), 0]]);
+
+        it('plays the curve within a fixed row', () => {
+            const behavior = new FrameOverLife(rowRamp(), {rowLength: 4, rowCount: 3, row: 2});
+            const frames = framesOf(behavior, [0, 1, 1.9999]);
+            expect(frames.map((f) => Math.floor(f))).toEqual([8, 9, 11]);
+        });
+
+        it('picks a row per particle and keeps each one in it', () => {
+            const behavior = new FrameOverLife(rowRamp(), {rowLength: 4, rowCount: 3, randomRow: true});
+            const ages = new Array(48).fill(0).map((_, i) => (i % 2) * 1.9999);
+            const frames = framesOf(behavior, ages);
+            const rows = frames.map((f) => Math.floor(Math.floor(f) / 4));
+            expect(new Set(rows)).toEqual(new Set([0, 1, 2]));
+            for (let i = 0; i < frames.length; i++) {
+                // Young particles start their row, old ones end it; none leaves it.
+                expect(Math.floor(frames[i]) % 4).toBe(i % 2 === 0 ? 0 : 3);
+            }
+        });
+
+        it('wraps a start frame within the row, not into the next', () => {
+            const behavior = new FrameOverLife(new ConstantValue(3), {
+                frameCount: 4,
+                startFrame: new ConstantValue(2),
+                rowLength: 4,
+                rowCount: 2,
+                row: 1,
+            });
+            expect(framesOf(behavior, [0, 1]).map((f) => Math.floor(f))).toEqual([5, 5]);
+        });
+
+        it('is not plain, so the fused pass goes through frameAt', () => {
+            expect(new FrameOverLife(rowRamp(), {rowLength: 4, rowCount: 3}).isPlain()).toBe(false);
+        });
+
+        it('normalises the row and round-trips through JSON and clone', () => {
+            const behavior = new FrameOverLife(rowRamp(), {rowLength: 4.7, rowCount: 0, row: -2});
+            expect([behavior.rowLength, behavior.rowCount, behavior.row]).toEqual([4, 1, 0]);
+            const random = new FrameOverLife(rowRamp(), {rowLength: 4, rowCount: 3, row: 1, randomRow: true});
+            for (const copy of [
+                FrameOverLife.fromJSON(random.toJSON()) as FrameOverLife,
+                random.clone() as FrameOverLife,
+            ]) {
+                expect([copy.rowLength, copy.rowCount, copy.row, copy.randomRow]).toEqual([4, 3, 1, true]);
+            }
+            expect(new FrameOverLife(rowRamp()).toJSON()).toEqual({type: 'FrameOverLife', frame: rowRamp().toJSON()});
+        });
+    });
+
     describe('random frames', () => {
         const flicker = () => new FrameOverLife(new ConstantValue(4), {fps: 10, frameCount: 6, random: true});
 

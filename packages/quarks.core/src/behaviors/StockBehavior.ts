@@ -5,6 +5,7 @@ import {ApplySequences} from './ApplySequences';
 import type {Behavior} from './Behavior';
 import {ChangeEmitDirection} from './ChangeEmitDirection';
 import {ColorBySpeed} from './ColorBySpeed';
+import {ColorOverLength} from './ColorOverLength';
 import {ColorOverLife} from './ColorOverLife';
 import {EmitSubParticleSystem} from './EmitSubParticleSystem';
 import {ForceOverLife} from './ForceOverLife';
@@ -14,6 +15,7 @@ import {InheritVelocity} from './InheritVelocity';
 import {LimitSpeedOverLife} from './LimitSpeedOverLife';
 import {Noise} from './Noise';
 import {OrbitOverLife} from './OrbitOverLife';
+import {RandomizeDirection} from './RandomizeDirection';
 import {Rotation3DOverLife} from './Rotation3DOverLife';
 import {RotationBySpeed} from './RotationBySpeed';
 import {RotationOverLife} from './RotationOverLife';
@@ -34,6 +36,7 @@ const STOCK_BEHAVIORS: {readonly [type: string]: Constructable<Behavior>} = {
     ApplySequences,
     ChangeEmitDirection,
     ColorBySpeed,
+    ColorOverLength,
     ColorOverLife,
     EmitSubParticleSystem,
     ForceOverLife,
@@ -43,6 +46,7 @@ const STOCK_BEHAVIORS: {readonly [type: string]: Constructable<Behavior>} = {
     LimitSpeedOverLife,
     Noise,
     OrbitOverLife,
+    RandomizeDirection,
     Rotation3DOverLife,
     RotationBySpeed,
     RotationOverLife,

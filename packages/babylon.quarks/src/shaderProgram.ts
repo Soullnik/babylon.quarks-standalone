@@ -4,7 +4,7 @@ import {
     PrepareSamplersForImageProcessing,
     PrepareUniformsForImageProcessing,
 } from '@babylonjs/core/Materials/imageProcessingConfiguration.functions';
-import {hasSizeLimits, takesPivotAndSizeLimits, tilesSheet} from './batchKey';
+import {alignsBillboards, hasSizeLimits, takesPivotAndSizeLimits, tilesSheet} from './batchKey';
 import {readsUV1, RenderMode, StoredBatchSettings} from './batchSettings';
 import local_particle_physics_vert from './shaders/local_particle_physics_vert.glsl';
 import local_particle_physics_vert_wgsl from './shaders/local_particle_physics_vert.wgsl';
@@ -26,31 +26,36 @@ import trail_vert_wgsl from './shaders/trail_vert.wgsl';
  * The part of a batch's settings that decides its shader: the render mode, which textures and
  * effects are compiled in, and the blend state the fog and the fade read. Everything else a
  * batch holds (geometry, draw order, the effects' parameters) is a buffer or a uniform value.
+ * `renderAlignment` may be left out, which is `'simulation'`, `premultipliedMap`, which is false,
+ * and `particleColor`, which is true.
  */
-export type ShaderSettings = Pick<
-    StoredBatchSettings,
-    | 'renderMode'
-    | 'texture'
-    | 'reflectionAtlas'
-    | 'uTileCount'
-    | 'vTileCount'
-    | 'blendTiles'
-    | 'softParticles'
-    | 'materialAlphaTest'
-    | 'materialTransparent'
-    | 'materialBlendMode'
-    | 'applyFog'
-    | 'applyImageProcessing'
-    | 'pivot'
-    | 'minParticleSize'
-    | 'maxParticleSize'
-    | 'lighting'
-    | 'rim'
-    | 'mapUV'
-    | 'uvDistortion'
-    | 'gradientMap'
-    | 'erosion'
->;
+export type ShaderSettings = Partial<
+    Pick<StoredBatchSettings, 'renderAlignment' | 'premultipliedMap' | 'particleColor'>
+> &
+    Pick<
+        StoredBatchSettings,
+        | 'renderMode'
+        | 'texture'
+        | 'reflectionAtlas'
+        | 'uTileCount'
+        | 'vTileCount'
+        | 'blendTiles'
+        | 'softParticles'
+        | 'materialAlphaTest'
+        | 'materialTransparent'
+        | 'materialBlendMode'
+        | 'applyFog'
+        | 'applyImageProcessing'
+        | 'pivot'
+        | 'minParticleSize'
+        | 'maxParticleSize'
+        | 'lighting'
+        | 'rim'
+        | 'mapUV'
+        | 'uvDistortion'
+        | 'gradientMap'
+        | 'erosion'
+    >;
 
 /** What the material needs to know about the depth texture soft particles read. */
 export interface ShaderDepth {
@@ -72,6 +77,11 @@ export interface ShaderContext {
     envAtlasReady: boolean;
     /** Whether the mesh batch has a second UV set to read for {@link UVChannel} 1. */
     meshUV2: boolean;
+    /**
+     * Whether the mesh batch has vertex colours, which the particle colour is multiplied by (see
+     * {@link ParticleSystem.instancingColors}). Left out, it has none.
+     */
+    meshColors?: boolean;
     /**
      * The scene's image processing as `ImageProcessingConfiguration.prepareDefines` writes it;
      * null or left out for none. Compiled in only when the settings apply it, see
@@ -135,6 +145,11 @@ export interface ShaderProgram {
  * after another.
  */
 const SPRITE_INSTANCE_ATTRIBUTES = ['offset', 'color', 'size', 'rotation', 'uvTile'];
+
+/** The per-instance attributes only the mesh shader reads: the stretch's three columns. */
+const MESH_INSTANCE_ATTRIBUTES = ['stretchX', 'stretchY', 'stretchZ'];
+/** The material colour's uniforms, which every vertex shader reads, see `chunks/colorSpace.ts`. */
+const MATERIAL_COLOR_UNIFORMS = ['materialColor', 'materialColorScale'];
 /** The vertex attributes the trail shader reads. */
 const TRAIL_ATTRIBUTES = ['position', 'previous', 'next', 'side', 'width', 'uv', 'color'];
 /** The fog uniforms, declared on every material so a scene can turn its fog on without a recompile. */
@@ -152,6 +167,16 @@ export function drawsAlongVelocity(renderMode: RenderMode): boolean {
  */
 export function samplesMap(settings: {renderMode: RenderMode; texture: unknown}): boolean {
     return settings.texture !== null || settings.renderMode === RenderMode.Mesh;
+}
+
+/**
+ * Whether a colour texture's texels are read in linear space: its `gammaSpace` is false, as Babylon
+ * reports for a texture in an sRGB GPU buffer (`useSRGBBuffer`), which the hardware decodes and
+ * filters in linear space, or for one marked as holding linear colours. Every other colour texture
+ * is in gamma space and converted in the shader. See `shaders/chunks/colorSpace.ts`.
+ */
+export function linearTexture(texture: {gammaSpace?: boolean} | null | undefined): boolean {
+    return texture?.gammaSpace === false;
 }
 
 /**
@@ -271,7 +296,7 @@ function spriteShaderProgram(settings: ShaderSettings, context: ShaderContext): 
         fragment = {glsl: particle_frag, wgsl: particle_frag_wgsl};
     }
 
-    const defines = blendDefines(settings);
+    const defines = [...colorDefines(settings), ...blendDefines(settings)];
     // The geometry's attributes first, in the order of its interleaved buffer.
     const attributes = ['position', 'uv'];
     if (isMesh) {
@@ -279,14 +304,23 @@ function spriteShaderProgram(settings: ShaderSettings, context: ShaderContext): 
         if (readsUV1(settings) && context.meshUV2) {
             attributes.push('uv2');
         }
+        if (context.meshColors) {
+            attributes.push('meshColor');
+        }
     }
     attributes.push(...SPRITE_INSTANCE_ATTRIBUTES);
-    const uniforms = ['world', 'view', 'projection', ...FOG_UNIFORMS];
+    if (isMesh) {
+        attributes.push(...MESH_INSTANCE_ATTRIBUTES);
+    }
+    const uniforms = ['world', 'view', 'projection', ...MATERIAL_COLOR_UNIFORMS, ...FOG_UNIFORMS];
     const samplers: string[] = [];
 
     if (samplesMap(settings)) {
         defines.push('USE_MAP');
         samplers.push('map');
+        if (linearTexture(settings.texture)) {
+            defines.push('MAP_LINEAR');
+        }
     }
     const envAtlas = isMesh && settings.reflectionAtlas !== null && context.envAtlasReady;
     if (envAtlas) {
@@ -347,6 +381,18 @@ function spriteShaderProgram(settings: ShaderSettings, context: ShaderContext): 
     if (isMesh && readsUV1(settings) && context.meshUV2) {
         defines.push('MESH_UV2');
     }
+    if (isMesh && context.meshColors) {
+        defines.push('MESH_COLOR');
+    }
+    // The other alignments are written on the CPU; only the camera's axes need the view matrix.
+    if (isMesh && settings.renderAlignment === 'view') {
+        defines.push('MESH_VIEW_ALIGNED');
+    }
+    // A billboard laid along the world's or the emitter's axes turns by a quaternion written on
+    // the CPU, which holds those axes and the particle's spin about their Z.
+    if (alignsBillboards(settings)) {
+        defines.push('BILLBOARD_ALIGNED');
+    }
     if (drawsAlongVelocity(renderMode)) {
         attributes.push('velocity');
     }
@@ -355,13 +401,16 @@ function spriteShaderProgram(settings: ShaderSettings, context: ShaderContext): 
 
 /** The program of a trail batch. */
 function trailShaderProgram(settings: ShaderSettings, context: ShaderContext): ShaderProgram {
-    const defines = blendDefines(settings);
+    const defines = [...colorDefines(settings), ...blendDefines(settings)];
     const attributes = [...TRAIL_ATTRIBUTES];
-    const uniforms = ['view', 'projection', ...FOG_UNIFORMS];
+    const uniforms = ['view', 'projection', ...MATERIAL_COLOR_UNIFORMS, ...FOG_UNIFORMS];
     const samplers: string[] = [];
     if (settings.texture !== null) {
         defines.push('USE_MAP');
         samplers.push('map');
+        if (linearTexture(settings.texture)) {
+            defines.push('MAP_LINEAR');
+        }
     }
     surfaceDefines(settings, defines, uniforms, samplers);
     softDefines(settings, context, defines, uniforms, samplers);
@@ -381,6 +430,11 @@ function trailShaderProgram(settings: ShaderSettings, context: ShaderContext): S
     };
 }
 
+/** `NO_PARTICLE_COLOR` when the particle's colour is left out of what is drawn (`particleColor` off). */
+function colorDefines(settings: ShaderSettings): string[] {
+    return settings.particleColor === false ? ['NO_PARTICLE_COLOR'] : [];
+}
+
 /**
  * The blend defines: `BLEND_PREMULTIPLY` or `BLEND_MULTIPLY` for how the colour leaves the shader,
  * and with `FOG` (when the settings apply the scene's fog) `FOG_ADDITIVE` or `FOG_MULTIPLY` for a
@@ -391,6 +445,10 @@ function blendDefines(settings: ShaderSettings): string[] {
     const defines: string[] = [];
     if (output === 'premultiply') {
         defines.push('BLEND_PREMULTIPLY');
+        // A map whose colour is already premultiplied; only premultiplied blending can draw it.
+        if (settings.premultipliedMap === true && settings.texture !== null) {
+            defines.push('MAP_PREMULTIPLIED');
+        }
     } else if (output === 'multiply') {
         defines.push('BLEND_MULTIPLY');
     }
@@ -512,6 +570,9 @@ function surfaceDefines(settings: ShaderSettings, defines: string[], uniforms: s
     }
     if (gradientMap) {
         defines.push('GRADIENT_MAP');
+        if (linearTexture(gradientMap.ramp)) {
+            defines.push('GRADIENT_MAP_LINEAR');
+        }
         samplers.push('gradientMap');
         uniforms.push('gradientMapRange', 'gradientMapChannel');
     }

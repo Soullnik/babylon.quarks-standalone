@@ -66,6 +66,28 @@ describe('MeshSurfaceEmitter', () => {
         expect('transform' in new MeshSurfaceEmitter(box).toJSON()).toBe(false);
     });
 
+    it('moves out of the front face of each triangle: a box outwards', () => {
+        const box = MeshBuilder.CreateBox('outward-box', {size: 2}, scene);
+        const emitter = new MeshSurfaceEmitter(box);
+        const particle = new SpriteParticle();
+        particle.startSpeed = 1;
+        for (let i = 0; i < 60; i++) {
+            emitter.initialize(particle);
+            // On a face of the box, the outward normal points along the position's largest axis.
+            const {x, y, z} = particle.position;
+            const ax = Math.abs(x),
+                ay = Math.abs(y),
+                az = Math.abs(z);
+            const along =
+                ax >= ay && ax >= az
+                    ? x * particle.velocity.x
+                    : ay >= az
+                      ? y * particle.velocity.y
+                      : z * particle.velocity.z;
+            expect(along).toBeGreaterThan(0.9);
+        }
+    });
+
     it('falls back when mesh has no position or index data', () => {
         const emptyMesh = new Mesh('empty-surface', scene);
         const emitter = new MeshSurfaceEmitter(emptyMesh);

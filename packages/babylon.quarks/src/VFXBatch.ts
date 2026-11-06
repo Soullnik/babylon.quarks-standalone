@@ -4,6 +4,7 @@ import type {Effect} from '@babylonjs/core/Materials/effect';
 import type {ImageProcessingConfiguration} from '@babylonjs/core/Materials/imageProcessingConfiguration';
 import {ShaderMaterial} from '@babylonjs/core/Materials/shaderMaterial';
 import {Vector2 as BVector2, Vector3 as BVector3, Vector4 as BVector4, Matrix} from '@babylonjs/core/Maths/math.vector';
+import type {AbstractMesh} from '@babylonjs/core/Meshes/abstractMesh';
 import {Mesh} from '@babylonjs/core/Meshes/mesh';
 import type {Observer} from '@babylonjs/core/Misc/observable';
 import type {Node} from '@babylonjs/core/node';
@@ -15,6 +16,7 @@ import {storedBatchSettings} from './batchKey';
 import {GRADIENT_MAP_WEIGHTS, MeshLightingSettings, readsUV1, StoredBatchSettings, TextureUV} from './batchSettings';
 import {imageProcessingParts, ShaderImageProcessing} from './shaderProgram';
 import {DepthBinding, softDepthParams} from './softDepth';
+import {installTransparentSort, setSortingFudge} from './transparentSort';
 
 export * from './batchSettings';
 
@@ -72,14 +74,22 @@ export abstract class VFXBatch {
      * Applies the batch-level scene settings to {@link mesh}. Called on every
      * mesh the batch creates, since the buffers rebuild it.
      *
-     * The bounds of a batch mesh are not kept, so Babylon cannot sort it among
-     * the scene's transparent meshes by distance; `alphaIndex` from the
-     * system's render order puts it where the author said, and the rendering
+     * `alphaIndex` from the system's render order puts the batch where the
+     * author said among the scene's transparent meshes, and the rendering
      * group and layer mask reach the mesh at all (they used to stop at the
      * settings).
      */
     protected configureMesh(): void {
-        const mesh = this.mesh;
+        this.configureDrawMesh(this.mesh);
+        this.applySortingFudge();
+    }
+
+    /**
+     * Sets up `mesh`, the batch mesh or a mesh drawing a later run of the batch's systems (see
+     * {@link runCount}), as a draw of world-space instance data.
+     * @internal
+     */
+    protected configureDrawMesh(mesh: Mesh): void {
         // Until the first fill measures the particles, the batch has no bounds
         // to cull by and is drawn regardless. The instance data is already in
         // world space, so the bounds never need the mesh's own matrix.
@@ -106,16 +116,73 @@ export abstract class VFXBatch {
         mesh.doNotSerialize = true;
     }
 
-    private readonly boundsMin_ = new Vector3();
-    private readonly boundsMax_ = new Vector3();
+    /**
+     * Gives `mesh`, a mesh drawing a later run of the batch's systems, the batch mesh's place in
+     * the scene and its material, which the batch mesh may have changed since. Called each frame
+     * the run is drawn.
+     * @internal
+     */
+    protected syncDrawMesh(mesh: Mesh): void {
+        const batchMesh = this.mesh;
+        if (mesh.parent !== batchMesh.parent) {
+            mesh.parent = batchMesh.parent;
+        }
+        mesh.layerMask = batchMesh.layerMask;
+        mesh.renderingGroupId = batchMesh.renderingGroupId;
+        mesh.alphaIndex = batchMesh.alphaIndex;
+        if (mesh.material !== batchMesh.material) {
+            mesh.material = batchMesh.material;
+        }
+    }
 
     /**
-     * Sets the batch mesh's bounds to the union of its filled systems' world
-     * bounds, so Babylon skips the draw when none of them is in view. Called
-     * after each fill, over the systems {@link getVisibleSystems} last returned.
-     * A batch whose systems have no measured bounds stays always drawn.
+     * Sorts the batch mesh with its systems' sorting fudge (see `ParticleSystem.sortingFudge`)
+     * until the renderer orders it, and sets the renderer's transparent compare on the rendering
+     * group of a transparent batch, which is drawn in the order of its systems.
      */
-    protected refreshBoundingInfo(): void {
+    private applySortingFudge(): void {
+        setSortingFudge(this.mesh, this.settings.sortingFudge);
+        if (this.settings.materialTransparent) {
+            installTransparentSort(this.mesh.getScene(), this.settings.renderingGroupId);
+        }
+    }
+
+    /** Scratch bounds, and what {@link measureSystems} measured. @internal */
+    protected readonly boundsMin_ = new Vector3();
+    /** See {@link boundsMin_}. @internal */
+    protected readonly boundsMax_ = new Vector3();
+
+    /**
+     * Sets `mesh`'s bounds to the union of the world bounds of the systems from `from` to `to` among
+     * those the batch draws this frame, so Babylon skips the draw when none of them is in view: the
+     * batch mesh over the systems it draws, a run's mesh over its own. Called after each fill. A
+     * draw whose systems have no measured bounds stays always drawn.
+     */
+    protected refreshBoundingInfo(
+        mesh: AbstractMesh = this.mesh,
+        from = 0,
+        to: number = this.visibleSystems.length
+    ): void {
+        const measured = this.measureSystems(from, to);
+        if (measured === 'unmeasured') {
+            // Drawn but not measured: the mesh cannot be culled this frame.
+            mesh.alwaysSelectAsActiveMesh = true;
+            return;
+        }
+        if (measured === 'empty') {
+            return;
+        }
+        this.writeBounds(mesh.getBoundingInfo());
+        mesh.alwaysSelectAsActiveMesh = false;
+    }
+
+    /**
+     * Measures the union of the world bounds of the drawing systems from `from` to `to` in
+     * {@link visibleSystems} into {@link boundsMin_} and {@link boundsMax_}: `'empty'` when none
+     * draws, `'unmeasured'` when one has no bounds yet.
+     * @internal
+     */
+    protected measureSystems(from: number, to: number): 'measured' | 'empty' | 'unmeasured' {
         const min = this.boundsMin_;
         const max = this.boundsMax_;
         let minX = Infinity;
@@ -126,15 +193,13 @@ export abstract class VFXBatch {
         let maxZ = -Infinity;
         let any = false;
         const systems = this.visibleSystems;
-        for (let i = 0; i < systems.length; i++) {
+        for (let i = from; i < to; i++) {
             const system = systems[i] as ParticleSystem;
             if (system.particleNum === 0 || typeof system.getWorldBounds !== 'function') {
                 continue;
             }
             if (!system.getWorldBounds(min, max)) {
-                // Drawn but not measured: the batch cannot be culled this frame.
-                this.mesh.alwaysSelectAsActiveMesh = true;
-                return;
+                return 'unmeasured';
             }
             any = true;
             if (min.x < minX) minX = min.x;
@@ -145,24 +210,31 @@ export abstract class VFXBatch {
             if (max.z > maxZ) maxZ = max.z;
         }
         if (!any) {
-            return;
+            return 'empty';
         }
-        const info = this.mesh.getBoundingInfo();
+        min.set(minX, minY, minZ);
+        max.set(maxX, maxY, maxZ);
+        return 'measured';
+    }
+
+    /** Writes the bounds {@link measureSystems} measured into `info`, when they changed. @internal */
+    protected writeBounds(info: BoundingInfo): void {
+        const min = this.boundsMin_;
+        const max = this.boundsMax_;
         const bmin = info.minimum;
         const bmax = info.maximum;
         if (
-            bmin.x !== minX ||
-            bmin.y !== minY ||
-            bmin.z !== minZ ||
-            bmax.x !== maxX ||
-            bmax.y !== maxY ||
-            bmax.z !== maxZ
+            bmin.x !== min.x ||
+            bmin.y !== min.y ||
+            bmin.z !== min.z ||
+            bmax.x !== max.x ||
+            bmax.y !== max.y ||
+            bmax.z !== max.z
         ) {
-            bmin.set(minX, minY, minZ);
-            bmax.set(maxX, maxY, maxZ);
+            bmin.set(min.x, min.y, min.z);
+            bmax.set(max.x, max.y, max.z);
             info.reConstruct(bmin, bmax);
         }
-        this.mesh.alwaysSelectAsActiveMesh = false;
     }
 
     /**
@@ -307,8 +379,12 @@ export abstract class VFXBatch {
         return readsUV1(this.settings);
     }
 
-    /** Sets the texture effects' textures and constants, and advances their scrolling on every bind. */
+    /**
+     * Sets the material colour, the texture effects' textures and constants, and advances their
+     * scrolling on every bind.
+     */
     protected bindSurface(material: ShaderMaterial): void {
+        this.writeMaterialColor(material);
         const {mapUV, uvDistortion, gradientMap, erosion} = this.settings;
         if (uvDistortion?.map) {
             material.setTexture('distortionMap', uvDistortion.map);
@@ -377,6 +453,13 @@ export abstract class VFXBatch {
         material.onBindObservable.add(write);
     }
 
+    /** Writes the material colour and its scale, see {@link VFXBatchSettings.materialColor}. */
+    private writeMaterialColor(material: ShaderMaterial): void {
+        const [r, g, b, a] = this.settings.materialColor;
+        material.setVector4('materialColor', new BVector4(r, g, b, a));
+        material.setFloat('materialColorScale', this.settings.materialColorScale);
+    }
+
     /** Writes the texture effects' constants (the uniforms their live parameters set). */
     private writeSurfaceParams(material: ShaderMaterial): void {
         const {uvDistortion, gradientMap, erosion} = this.settings;
@@ -404,6 +487,7 @@ export abstract class VFXBatch {
      */
     applyLiveSettings(settings: StoredBatchSettings): void {
         Object.assign(this.settings, settings);
+        this.applySortingFudge();
         const material = this.mesh.material;
         if (material instanceof ShaderMaterial) {
             this.writeLiveUniforms(material);
@@ -416,6 +500,7 @@ export abstract class VFXBatch {
      * @internal
      */
     protected writeLiveUniforms(material: ShaderMaterial): void {
+        this.writeMaterialColor(material);
         this.writeSoftParams(material);
         this.writeSurfaceParams(material);
     }
@@ -447,6 +532,104 @@ export abstract class VFXBatch {
         }
         visibleSystems.length = count;
         return visibleSystems;
+    }
+
+    /**
+     * How many draws the coming fill makes: the runs of {@link visibleSystems} that the renderer's
+     * back-to-front order of all its transparent systems puts one after another. Unity draws each
+     * particle system as a renderer of its own, sorted back to front by the distance from the
+     * camera to the centre of its bounds plus its sorting fudge, and draws consecutive renderers
+     * of one material together. When a system of another batch comes between two of this batch's,
+     * the batch draws twice: once under the other batch's system and once over it. A batch the
+     * renderer has not ordered (it is not transparent, or there is no camera) is one run.
+     * @internal
+     */
+    protected runCount = 0;
+    /** For each run, the index into {@link visibleSystems} past its last system. @internal */
+    protected readonly runEnds: number[] = [];
+    /**
+     * For each run, the sort key of its first system (see {@link drawKey}); NaN when the renderer
+     * did not order the batch. @internal
+     */
+    protected readonly runKeys: number[] = [];
+    /** For each run, its place in the renderer's order of draws this frame. @internal */
+    protected readonly runSequences: number[] = [];
+    /** Whether the renderer has set this frame's order, for the coming fill. */
+    private ordered = false;
+
+    /** Starts the renderer's order for the coming fill: no systems, no runs. @internal */
+    beginDrawOrder(): void {
+        this.visibleSystems.length = 0;
+        this.runCount = 0;
+        this.ordered = true;
+    }
+
+    /** Starts a run that comes `sequence`th in the renderer's order, its first system at `key`. @internal */
+    startRun(key: number, sequence: number): void {
+        const run = this.runCount++;
+        this.runKeys[run] = key;
+        this.runSequences[run] = sequence;
+        this.runEnds[run] = this.visibleSystems.length;
+    }
+
+    /** Adds `system` to the run last started. @internal */
+    addToRun(system: IParticleSystem): void {
+        this.visibleSystems.push(system);
+        this.runEnds[this.runCount - 1] = this.visibleSystems.length;
+    }
+
+    /** Adds a visible system with no particles, which draws nothing, after the runs. @internal */
+    addIdle(system: IParticleSystem): void {
+        this.visibleSystems.push(system);
+    }
+
+    /**
+     * The systems to fill, in {@link visibleSystems}, with the runs they are drawn in: the
+     * renderer's order when it set one for this fill, else every visible system as one run.
+     * @internal
+     */
+    protected systemsToFill(): IParticleSystem[] {
+        if (!this.ordered) {
+            this.getVisibleSystems();
+            this.runCount = 0;
+        }
+        this.ordered = false;
+        const systems = this.visibleSystems;
+        if (this.runCount === 0) {
+            this.runCount = 1;
+            this.runKeys[0] = NaN;
+            this.runSequences[0] = 0;
+        }
+        // Systems without particles come after the last run's and draw nothing.
+        this.runEnds[this.runCount - 1] = systems.length;
+        return systems;
+    }
+
+    /**
+     * The key `system` is sorted by among the renderer's transparent systems, back to front: the
+     * distance from `eye` to the centre of its world bounds (where its emitter is until it has
+     * any) plus the batch's sorting fudge.
+     * @internal
+     */
+    drawKey(system: IParticleSystem, eye: BVector3): number {
+        const centre = this.sortCentre(system as ParticleSystem, this.sortCentre_);
+        const dx = centre.x - eye.x;
+        const dy = centre.y - eye.y;
+        const dz = centre.z - eye.z;
+        return Math.sqrt(dx * dx + dy * dy + dz * dz) + this.settings.sortingFudge;
+    }
+
+    private readonly sortCentre_ = new Vector3();
+
+    /** The point `system` is sorted by, into `out`: the centre of its world bounds. @internal */
+    protected sortCentre(system: ParticleSystem, out: Vector3): Vector3 {
+        const min = this.boundsMin_;
+        const max = this.boundsMax_;
+        if (typeof system.getWorldBounds === 'function' && system.getWorldBounds(min, max)) {
+            return out.set((min.x + max.x) / 2, (min.y + max.y) / 2, (min.z + max.z) / 2);
+        }
+        const e = system.emitter.matrixWorld.elements;
+        return out.set(e[12], e[13], e[14]);
     }
 
     /**
@@ -565,6 +748,11 @@ export abstract class VFXBatch {
             return;
         }
         this.underusedFills = 0;
+    }
+
+    /** Instances the last fill drew, over all its draws; 0 for a batch that draws no instances. @internal */
+    drawnInstances(): number {
+        return this.mesh.forcedInstanceCount ?? 0;
     }
 
     /** @internal */

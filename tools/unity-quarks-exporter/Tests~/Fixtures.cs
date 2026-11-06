@@ -16,6 +16,7 @@ namespace BabylonQuarks.UnityExporter.Tests
             ["mesh"] = MeshParticles,
             ["trails"] = TrailsAndSubEmitters,
             ["blending"] = Blending,
+            ["surfaces"] = Surfaces,
         };
 
         // ---- builders ------------------------------------------------------------------------
@@ -60,16 +61,24 @@ namespace BabylonQuarks.UnityExporter.Tests
             return mat;
         }
 
-        private static Mesh Quad(bool secondUV)
+        private static Mesh Quad(bool secondUV, Color32[] colors = null, string name = "Quad")
         {
             return new Mesh
             {
-                name = "Quad",
+                name = name,
                 vertices = new[] { new Vector3(-0.5f, -0.5f, 0), new Vector3(0.5f, -0.5f, 0), new Vector3(0.5f, 0.5f, 0), new Vector3(-0.5f, 0.5f, 0) },
                 triangles = new[] { 0, 2, 1, 0, 3, 2 },
                 uv = new[] { new Vector2(0, 0), new Vector2(1, 0), new Vector2(1, 1), new Vector2(0, 1) },
                 uv2 = secondUV ? new[] { new Vector2(0, 0), new Vector2(0.5f, 0), new Vector2(0.5f, 0.5f), new Vector2(0, 0.5f) } : new Vector2[0],
+                colors32 = colors ?? new Color32[0],
             };
+        }
+
+        private static Color32[] VertexColors(params byte[] grey)
+        {
+            var colors = new Color32[grey.Length];
+            for (int i = 0; i < grey.Length; i++) colors[i] = new Color32(grey[i], grey[i], grey[i], 255);
+            return colors;
         }
 
         // ---- fixtures ------------------------------------------------------------------------
@@ -77,7 +86,9 @@ namespace BabylonQuarks.UnityExporter.Tests
         /// <summary>
         /// Billboards: a cone with a looping arc, random and curved Main values, bursts, a 2×2
         /// flipbook, color and size over life, spin, noise, and an additive URP material with a
-        /// tiled, scrolling-free map and soft particles.
+        /// tiled, scrolling-free map and soft particles. Children cover Render Alignment: Local and
+        /// World billboards, a stretched billboard aligned Local, which Unity draws as View, and
+        /// Facing and Velocity, which are left out with a warning.
         /// </summary>
         private static GameObject Billboard()
         {
@@ -132,6 +143,12 @@ namespace BabylonQuarks.UnityExporter.Tests
             noise.frequency = 0.8f;
             noise.scrollSpeed = 0.2f;
 
+            // In World space Unity gives each new particle a share of the emitter's velocity.
+            var inherit = ps.inheritVelocity;
+            inherit.enabled = true;
+            inherit.mode = ParticleSystemInheritVelocityMode.Initial;
+            inherit.curve = 0.25f;
+
             var sheet = ps.textureSheetAnimation;
             sheet.enabled = true;
             sheet.numTilesX = 2;
@@ -149,6 +166,63 @@ namespace BabylonQuarks.UnityExporter.Tests
             renderer.sortMode = ParticleSystemSortMode.Distance;
             renderer.minParticleSize = 0.01f;
             renderer.maxParticleSize = 0.25f;
+            // A burst the game switches on later: inactive, so it loads disabled.
+            var (later, _, _) = MakeSystem("SparksLater", go.transform);
+            later.SetActive(false);
+
+            // A scorch mark lying in its node's XY plane, turned 30° in it, as a decal on the ground.
+            var (scorchGo, scorch, scorchRenderer) = MakeSystem("Scorch", go.transform);
+            scorchGo.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
+            var scorchMain = scorch.main;
+            scorchMain.startSpeed = 0f;
+            scorchMain.startRotation = Mathf.PI / 6f;
+            scorchRenderer.alignment = ParticleSystemRenderSpace.Local;
+            scorchRenderer.sharedMaterial = mat;
+            var (_, _, ripplesRenderer) = MakeSystem("Ripples", go.transform);
+            ripplesRenderer.alignment = ParticleSystemRenderSpace.World;
+            ripplesRenderer.sharedMaterial = mat;
+            var (_, _, streaksRenderer) = MakeSystem("Streaks", go.transform);
+            streaksRenderer.renderMode = ParticleSystemRenderMode.Stretch;
+            streaksRenderer.alignment = ParticleSystemRenderSpace.Local;
+            streaksRenderer.sharedMaterial = mat;
+            var (_, _, flaresRenderer) = MakeSystem("Flares", go.transform);
+            flaresRenderer.alignment = ParticleSystemRenderSpace.Facing;
+            flaresRenderer.sharedMaterial = mat;
+            var (_, _, glintsRenderer) = MakeSystem("Glints", go.transform);
+            glintsRenderer.alignment = ParticleSystemRenderSpace.Velocity;
+            glintsRenderer.sharedMaterial = mat;
+
+            // A Local system two nodes below a root mirrored along X, as the mirrored copy of an
+            // effect's other half, which Unity does not mirror: scalingMode.test.ts's rootX
+            // hierarchy, its rotations as Unity measured them, one particle sent from (0.7, 0.3,
+            // 0.2) along the shape's +Z turned (30, 40, 0).
+            var mirrored = new GameObject("MirroredRoot").transform;
+            mirrored.SetParent(go.transform);
+            mirrored.localPosition = new Vector3(0.5f, 0f, 0f);
+            mirrored.localRotation = new Quaternion(0.00621f, 0.23172f, -0.35037f, 0.90748f);
+            mirrored.localScale = new Vector3(-1.2f, 0.8f, 1.1f);
+            var arm = new GameObject("Arm").transform;
+            arm.SetParent(mirrored);
+            arm.localPosition = new Vector3(-0.3f, 0.2f, 0.1f);
+            arm.localRotation = new Quaternion(-0.19595f, 0.50677f, 0.25687f, 0.79925f);
+            var (handGo, hand, handRenderer) = MakeSystem("Hand", arm);
+            handGo.transform.localPosition = new Vector3(0.2f, -0.4f, 0.3f);
+            handGo.transform.localRotation = new Quaternion(0.50880f, -0.28359f, 0.30500f, 0.75344f);
+            handGo.transform.localScale = new Vector3(1.3f, 1f, 0.9f);
+            var handMain = hand.main;
+            handMain.startSpeed = 1f;
+            handMain.startLifetime = 10f;
+            handMain.scalingMode = ParticleSystemScalingMode.Local;
+            handMain.simulationSpace = ParticleSystemSimulationSpace.World;
+            hand.emission.rateOverTime = 0f;
+            hand.emission.SetBursts(new[] { new ParticleSystem.Burst(0f, 1f) });
+            var handShape = hand.shape;
+            handShape.shapeType = ParticleSystemShapeType.Cone;
+            handShape.angle = 0f;
+            handShape.radius = 0.0001f;
+            handShape.position = new Vector3(0.7f, 0.3f, 0.2f);
+            handShape.rotation = new Vector3(30f, 40f, 0f);
+            handRenderer.sharedMaterial = mat;
             return go;
         }
 
@@ -157,7 +231,8 @@ namespace BabylonQuarks.UnityExporter.Tests
         /// Hierarchy scaling, a mesh with a second UV set and no normals, and an opaque URP material
         /// with Alpha Clipping and back-face culling. A second system covers Cone Volume, Random
         /// Between Two Curves and Local scaling under a scaled parent, and warns about
-        /// separate-axes limits, which the runtime lacks.
+        /// separate-axes limits, which the runtime lacks. The chunks keep Unity's default Render
+        /// Alignment, View; a third system's Facing is exported as View with a warning.
         /// </summary>
         private static GameObject MeshParticles()
         {
@@ -199,7 +274,8 @@ namespace BabylonQuarks.UnityExporter.Tests
             limit.dampen = 0.2f;
 
             renderer.renderMode = ParticleSystemRenderMode.Mesh;
-            renderer.mesh = Quad(secondUV: true);
+            // White vertex colours, which multiply by 1 and are left out of the export.
+            renderer.mesh = Quad(secondUV: true, VertexColors(255, 255, 255, 255));
             var mat = Urp("ChunkCutout", 0, 1, 0, Spark());
             mat.SetFloat("_AlphaClip", 1);
             mat.SetFloat("_Cutoff", 0.3f);
@@ -213,6 +289,7 @@ namespace BabylonQuarks.UnityExporter.Tests
             var dustShape = dust.shape;
             dustShape.shapeType = ParticleSystemShapeType.ConeVolume;
             dustShape.length = 2f;
+            dustShape.randomDirectionAmount = 0.5f;
             var dustLimit = dust.limitVelocityOverLifetime;
             dustLimit.enabled = true;
             dustLimit.separateAxes = true;
@@ -220,19 +297,123 @@ namespace BabylonQuarks.UnityExporter.Tests
             dustLimit.limitY = 0.5f;
             dustLimit.limitZ = 3f;
             dustLimit.space = ParticleSystemSimulationSpace.World;
+            // A floor below the dust, turned and offset so the plane has to be moved into its space.
+            var floor = new GameObject("Floor").transform;
+            floor.SetParent(root.transform);
+            floor.localPosition = new Vector3(0f, -0.5f, 1f);
+            floor.localRotation = Quaternion.Euler(10f, 0f, 0f);
+            dust.transform.localScale = new Vector3(2f, 2f, 2f);
+            var dustCollision = dust.collision;
+            dustCollision.enabled = true;
+            dustCollision.AddPlane(floor);
+            dustCollision.bounce = 0.5f;
+            dustCollision.dampen = 0.2f;
+            dustCollision.lifetimeLoss = 0.1f;
+            dustCollision.radiusScale = 0.01f;
             dustRenderer.sharedMaterial = Urp("DustAlpha", 1, 5, 10, Spark());
+
+            var (_, _, shardsRenderer) = MakeSystem("Shards", root.transform);
+            shardsRenderer.renderMode = ParticleSystemRenderMode.Mesh;
+            shardsRenderer.mesh = renderer.mesh;
+            shardsRenderer.alignment = ParticleSystemRenderSpace.Facing;
+            shardsRenderer.sharedMaterial = mat;
+
+            // A flat ring on a narrow cone with a 2D rotation, as a ground aura: Unity turns it about
+            // its axisOfRotation, here Y, so it spins level.
+            var (_, ring, ringRenderer) = MakeSystem("Ring", root.transform);
+            var ringMain = ring.main;
+            ringMain.startSpeed = 0f;
+            ringMain.startRotation = new ParticleSystem.MinMaxCurve(0f, Mathf.PI * 2f);
+            var ringShape = ring.shape;
+            ringShape.shapeType = ParticleSystemShapeType.Cone;
+            ringShape.radius = 0.01f;
+            ringShape.angle = 0f;
+            // Unity leaves a cone emitting from its base unrandomized, whatever this says.
+            ringShape.randomDirectionAmount = 1f;
+            var ringSpin = ring.rotationOverLifetime;
+            ringSpin.enabled = true;
+            ringSpin.z = 2f;
+            // Separate Axes on a module that is off leaves the rotation 2D, about axisOfRotation.
+            var ringBySpeed = ring.rotationBySpeed;
+            ringBySpeed.separateAxes = true;
+            ringRenderer.renderMode = ParticleSystemRenderMode.Mesh;
+            // Faded out at one side by its vertex colours, as a stream fades at its ends.
+            ringRenderer.mesh = Quad(secondUV: false, VertexColors(0, 51, 255, 255), "FadedQuad");
+            ringRenderer.sharedMaterial = mat;
+
+            // A Mesh shape without its mesh, which Unity emits from as from no shape: at the origin,
+            // along +Z, turning about Z, its Randomize Direction, Align to Direction and shape
+            // position unused.
+            var (_, spokes, spokesRenderer) = MakeSystem("Spokes", root.transform);
+            var spokesMain = spokes.main;
+            spokesMain.startRotation = new ParticleSystem.MinMaxCurve(0f, Mathf.PI / 2);
+            var spokesShape = spokes.shape;
+            spokesShape.shapeType = ParticleSystemShapeType.Mesh;
+            spokesShape.randomDirectionAmount = 1f;
+            spokesShape.alignToDirection = true;
+            spokesShape.position = new Vector3(1f, 0f, 0f);
+            spokesRenderer.renderMode = ParticleSystemRenderMode.Mesh;
+            spokesRenderer.mesh = renderer.mesh;
+            spokesRenderer.sharedMaterial = mat;
+
+            // Systems Unity draws nothing of: Mesh mode without a mesh (its child still plays) and
+            // a disabled renderer. Both become empty nodes.
+            var (hollow, _, hollowRenderer) = MakeSystem("Hollow", root.transform);
+            hollowRenderer.renderMode = ParticleSystemRenderMode.Mesh;
+            hollowRenderer.sharedMaterial = mat;
+            var (_, _, innerRenderer) = MakeSystem("Inner", hollow.transform);
+            innerRenderer.sharedMaterial = mat;
+            var (_, _, mutedRenderer) = MakeSystem("Muted", root.transform);
+            mutedRenderer.enabled = false;
+            mutedRenderer.sharedMaterial = mat;
+
+            // Flat petals on a wide cone with a 2D rotation, spun by Rotation over Lifetime with
+            // Separate Axes (X and Y still): Unity rotates them in 3D, by their Euler angles, so they
+            // all lie in the emitter's XY plane, however the cone tilts them, and spin about its Z.
+            var (_, petals, petalsRenderer) = MakeSystem("Petals", root.transform);
+            var petalsMain = petals.main;
+            petalsMain.startSpeed = 0f;
+            petalsMain.startRotation = new ParticleSystem.MinMaxCurve(0f, Mathf.PI * 2f);
+            var petalsShape = petals.shape;
+            petalsShape.shapeType = ParticleSystemShapeType.Cone;
+            petalsShape.radius = 0.28f;
+            petalsShape.angle = 25f;
+            var petalsSpin = petals.rotationOverLifetime;
+            petalsSpin.enabled = true;
+            petalsSpin.separateAxes = true;
+            petalsSpin.z = -0.5f;
+            petalsRenderer.renderMode = ParticleSystemRenderMode.Mesh;
+            petalsRenderer.mesh = renderer.mesh;
+            petalsRenderer.alignment = ParticleSystemRenderSpace.Local;
+            petalsRenderer.sharedMaterial = mat;
+
+            // The same with Rotation by Speed on with Separate Axes, which rotates them in 3D too.
+            var (_, vanes, vanesRenderer) = MakeSystem("Vanes", root.transform);
+            var vanesMain = vanes.main;
+            vanesMain.startRotation = new ParticleSystem.MinMaxCurve(0f, Mathf.PI * 2f);
+            var vanesShape = vanes.shape;
+            vanesShape.shapeType = ParticleSystemShapeType.Cone;
+            vanesShape.angle = 25f;
+            var vanesBySpeed = vanes.rotationBySpeed;
+            vanesBySpeed.enabled = true;
+            vanesBySpeed.separateAxes = true;
+            vanesBySpeed.z = 1f;
+            vanesRenderer.renderMode = ParticleSystemRenderMode.Mesh;
+            vanesRenderer.mesh = renderer.mesh;
+            vanesRenderer.sharedMaterial = mat;
             return root.transform.gameObject;
         }
 
         /// <summary>
         /// A rocket: a stretched billboard with a pivot and flip, emitting from a mesh surface,
-        /// moved by velocity, force, inherited velocity and collision, with a death sub-emitter that
+        /// moved by velocity, force and collision, with a death sub-emitter that
         /// leaves trails and a birth sub-emitter of sparks. The trail uses the Standard Particles
         /// shader in Subtractive mode; the rocket a legacy premultiplied shader.
         /// </summary>
         private static GameObject TrailsAndSubEmitters()
         {
             var (go, rocket, renderer) = MakeSystem("Rocket");
+            renderer.sortingFudge = -2.5f;
             var main = rocket.main;
             main.stopAction = ParticleSystemStopAction.Disable;
             main.startLifetime = 2f;
@@ -245,15 +426,24 @@ namespace BabylonQuarks.UnityExporter.Tests
 
             var velocity = rocket.velocityOverLifetime;
             velocity.enabled = true;
-            velocity.y = 1f;
+            // Curves, as Unity has all three axes in one mode, whose keys stop short of the life's
+            // ends: Unity holds the end keys' values, so x kicks for the first 3% of the life only
+            // (bullet holes), y stays 1, and z rises from the middle on.
+            velocity.x = new ParticleSystem.MinMaxCurve(2f, new AnimationCurve(new Keyframe(0, 1), new Keyframe(0.033f, 0)));
+            velocity.y = new ParticleSystem.MinMaxCurve(1f, AnimationCurve.Constant(0, 1, 1));
+            velocity.z = new ParticleSystem.MinMaxCurve(1f, AnimationCurve.Linear(0.5f, 0, 1, 1));
             velocity.orbitalZ = 0.5f;
             velocity.radial = -0.25f;
             velocity.space = ParticleSystemSimulationSpace.World;
 
             var force = rocket.forceOverLifetime;
             force.enabled = true;
+            force.x = new ParticleSystem.MinMaxCurve(-1f, 1f);
             force.y = -2f;
+            // Randomize: a new random x every frame.
+            force.randomized = true;
 
+            // Left out: the rocket simulates in Local space, where Unity inherits nothing.
             var inherit = rocket.inheritVelocity;
             inherit.enabled = true;
             inherit.mode = ParticleSystemInheritVelocityMode.Current;
@@ -261,6 +451,7 @@ namespace BabylonQuarks.UnityExporter.Tests
 
             var collision = rocket.collision;
             collision.enabled = true;
+            collision.type = ParticleSystemCollisionType.World;
             collision.bounce = 0.4f;
 
             var colorBySpeed = rocket.colorBySpeed;
@@ -300,9 +491,32 @@ namespace BabylonQuarks.UnityExporter.Tests
             subtractive.SetColor("_Color", new Color(0.2f, 0.2f, 0.2f, 1f));
             smokeRenderer.trailMaterial = subtractive;
 
+            // Trails carried on particles that never show, as some effects carry
+            // their streaks: Unity draws only the trails, so the system is a trail system. The same set-up
+            // on particles that show keeps its particles.
+            foreach (var (name, alpha) in new[] { ("Wisp", 0f), ("WispShown", 1f) })
+            {
+                var (_, wisp, wispRenderer) = MakeSystem(name, go.transform);
+                var wispMain = wisp.main;
+                wispMain.startLifetime = 0.7f;
+                wispMain.startColor = new ParticleSystem.MinMaxGradient(new Color(1f, 1f, 1f, alpha));
+                var wispTrails = wisp.trails;
+                wispTrails.enabled = true;
+                wispTrails.lifetime = 1f;
+                // Their own colour, not the particle's.
+                wispTrails.inheritParticleColor = false;
+                wispRenderer.sharedMaterial = legacy;
+                wispRenderer.trailMaterial = legacy;
+            }
+
             var (_, sparks, sparksRenderer) = MakeSystem("TrailSparks", go.transform);
             var sparksMain = sparks.main;
             sparksMain.startLifetime = 0.3f;
+            // Left out too: in Custom space Unity inherits nothing in Current mode.
+            sparksMain.simulationSpace = ParticleSystemSimulationSpace.Custom;
+            var sparksInherit = sparks.inheritVelocity;
+            sparksInherit.enabled = true;
+            sparksInherit.mode = ParticleSystemInheritVelocityMode.Current;
             sparks.emission.rateOverTime = 30f;
             var sizeBySpeed = sparks.sizeBySpeed;
             sizeBySpeed.enabled = true;
@@ -321,6 +535,28 @@ namespace BabylonQuarks.UnityExporter.Tests
             subs.AddSubEmitter(smoke, ParticleSystemSubEmitterType.Death, ParticleSystemSubEmitterProperties.InheritColor | ParticleSystemSubEmitterProperties.InheritSize, 1f);
             subs.AddSubEmitter(sparks, ParticleSystemSubEmitterType.Birth, ParticleSystemSubEmitterProperties.InheritNothing, 0.5f);
             subs.AddSubEmitter(sparks, ParticleSystemSubEmitterType.Collision, ParticleSystemSubEmitterProperties.InheritNothing, 1f);
+
+            // A Trail Renderer on its own node, and one beside a particle system: trail systems
+            // that record the node's path, tapering and fading toward the tail. The tracer's node
+            // is scaled to 0, which a Trail Renderer ignores.
+            var tracer = new GameObject("Tracer");
+            tracer.transform.SetParent(go.transform);
+            tracer.transform.localScale = Vector3.zero;
+            var tracerTrail = tracer.AddComponent<TrailRenderer>();
+            tracerTrail.time = 0.4f;
+            tracerTrail.minVertexDistance = 0.05f;
+            tracerTrail.widthCurve = AnimationCurve.Linear(0, 1, 1, 0);
+            tracerTrail.widthMultiplier = 0.3f;
+            var fade = new Gradient();
+            fade.SetKeys(
+                new[] { new GradientColorKey(Color.white, 0f), new GradientColorKey(new Color(1f, 0.5f, 0f), 1f) },
+                new[] { new GradientAlphaKey(1f, 0f), new GradientAlphaKey(0f, 1f) });
+            tracerTrail.colorGradient = fade;
+            tracerTrail.textureMode = LineTextureMode.Tile;
+            tracerTrail.sharedMaterial = Urp("TracerAdd", 1, 1, 1, Spark());
+            var rocketTrail = go.AddComponent<TrailRenderer>();
+            rocketTrail.alignment = LineAlignment.TransformZ;
+            rocketTrail.sharedMaterial = legacy;
             return go;
         }
 
@@ -370,6 +606,54 @@ namespace BabylonQuarks.UnityExporter.Tests
             var reflective = Urp("Reflective", 1, 5, 10, new Texture2D(1, 1) { name = "mirrorOnce", assetPath = "fixtures/spark.png", wrapMode = TextureWrapMode.MirrorOnce });
             reflective.SetTexture("_Cube", new Cubemap { name = "sky", width = 2, height = 2 });
             Add("Reflective", reflective);
+            return root;
+        }
+
+        /// <summary>
+        /// Mesh particles drawn with Unity's mesh shaders, which keep their surface in the shader:
+        /// a cutout (spikes), an opaque one, and Standard's Cutout and Opaque
+        /// modes as its inspector sets them. Each is an opaque, lit surface that culls its back
+        /// faces; the cutout ones clip at their _Cutoff.
+        /// </summary>
+        private static GameObject Surfaces()
+        {
+            var root = new GameObject("Surfaces");
+            var quad = Quad(secondUV: false);
+            void Add(string name, Material mat)
+            {
+                var (_, _, renderer) = MakeSystem(name, root.transform);
+                renderer.renderMode = ParticleSystemRenderMode.Mesh;
+                renderer.mesh = quad;
+                renderer.sharedMaterial = mat;
+            }
+            var spike = new Material(Shader.Find("Legacy Shaders/Transparent/Cutout/Diffuse")) { name = "SpikeCutout" };
+            spike.SetColor("_Color", new Color(0.7f, 0.06f, 0.15f, 1f));
+            spike.SetFloat("_Cutoff", 0.458f);
+            spike.SetTexture("_MainTex", Spark());
+            Add("SpikeCutout", spike);
+            var rock = new Material(Shader.Find("Legacy Shaders/Diffuse")) { name = "RockOpaque" };
+            rock.SetColor("_Color", Color.white);
+            Add("RockOpaque", rock);
+
+            // Standard, with what StandardShaderGUI sets per mode (read in Unity 6).
+            Material Standard(string name, bool cutout)
+            {
+                var mat = new Material(Shader.Find("Standard")) { name = name };
+                mat.SetFloat("_Mode", cutout ? 1 : 0);
+                mat.SetFloat("_SrcBlend", 1);
+                mat.SetFloat("_DstBlend", 0);
+                mat.SetFloat("_ZWrite", 1);
+                mat.SetFloat("_Cutoff", 0.7f);
+                mat.SetColor("_Color", Color.white);
+                if (cutout)
+                {
+                    mat.SetOverrideTag("RenderType", "TransparentCutout");
+                    mat.EnableKeyword("_ALPHATEST_ON");
+                }
+                return mat;
+            }
+            Add("StdCutout", Standard("StdCutout", true));
+            Add("StdOpaque", Standard("StdOpaque", false));
             return root;
         }
     }

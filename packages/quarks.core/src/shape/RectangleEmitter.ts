@@ -6,9 +6,8 @@ import {
     ValueGeneratorFromJSON,
 } from '../functions';
 import {EmissionState, IParticleSystem} from '../IParticleSystem';
-import {Matrix4, Quaternion} from '../math';
 import {Particle} from '../Particle';
-import {shellRadius, UP_VEC3, ZERO_VEC3} from '../util/MathUtil';
+import {shellRadius} from '../util/MathUtil';
 import {random} from '../util/random';
 import {EmitterMode, EmitterShape, getValueFromEmitterMode, ShapeJSON} from './EmitterUtil';
 import {ShapeTransform} from './ShapeTransform';
@@ -99,12 +98,6 @@ export class RectangleEmitter implements EmitterShape {
         this.memory.length = 0;
     }
 
-    /**
-     * Scratch matrix.
-     * @internal
-     */
-    private _m1: Matrix4;
-
     constructor(parameters: RectangleEmitterParameters = {}) {
         this.width = parameters.width ?? 10;
         this.height = parameters.height ?? 10;
@@ -114,8 +107,6 @@ export class RectangleEmitter implements EmitterShape {
         this.speed = parameters.speed ?? new ConstantValue(1);
         this.memory = [];
         this.transform = parameters.transform;
-
-        this._m1 = new Matrix4();
     }
 
     /** Advances the arc sweep by `delta` seconds in the `Loop` and `PingPong` modes. */
@@ -125,8 +116,7 @@ export class RectangleEmitter implements EmitterShape {
     }
 
     /**
-     * Starts `p` on the rectangle's edge, heading away from the centre at its start speed and, when
-     * it has no start rotation, facing that way.
+     * Starts `p` on the rectangle's edge, heading away from the centre at its start speed.
      */
     initialize(p: Particle, emissionState: EmissionState) {
         const u = getValueFromEmitterMode(this.mode, this.currentValue, this.spread, emissionState);
@@ -171,14 +161,6 @@ export class RectangleEmitter implements EmitterShape {
         else p.velocity.set(x, y, 0).normalize();
         p.velocity.multiplyScalar(p.startSpeed);
 
-        // Default facing-velocity orientation, but defer to startRotation if set.
-        if (p.rotation instanceof Quaternion) {
-            const r = p.rotation;
-            if (r.x === 0 && r.y === 0 && r.z === 0 && r.w === 1) {
-                this._m1.lookAt(ZERO_VEC3, p.velocity, UP_VEC3);
-                p.rotation.setFromRotationMatrix(this._m1);
-            }
-        }
         this.transform?.apply(p);
     }
 

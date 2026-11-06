@@ -2,6 +2,7 @@ import {ColorGeneratorFromJSON, FunctionColorGenerator} from '../functions';
 import type {ColorGeneratorJSON} from '../functions/FunctionJSON';
 import {Particle} from '../Particle';
 import {Behavior, BehaviorJSON} from './Behavior';
+import {stepEndLife} from './stepAge';
 
 /** The JSON of a colour over life: a {@link ColorOverLife}. */
 export interface ColorOverLifeJSON extends BehaviorJSON {
@@ -25,7 +26,7 @@ export class ColorOverLife implements Behavior {
     update(particle: Particle, delta: number): void {
         const color = particle.color;
         const startColor = particle.startColor;
-        this.color.genColor(particle.memory, color, particle.age / particle.life);
+        this.color.genColor(particle.memory, color, stepEndLife(particle, delta));
         color.x *= startColor.x;
         color.y *= startColor.y;
         color.z *= startColor.z;
@@ -43,7 +44,7 @@ export class ColorOverLife implements Behavior {
             }
             const color = particle.color;
             const startColor = particle.startColor;
-            generator.genColor(particle.memory, color, particle.age / particle.life);
+            generator.genColor(particle.memory, color, stepEndLife(particle, delta));
             color.x *= startColor.x;
             color.y *= startColor.y;
             color.z *= startColor.z;

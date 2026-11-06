@@ -2,6 +2,7 @@ import type {ValueGeneratorJSON} from '../functions/FunctionJSON';
 import {FunctionValueGenerator, ValueGeneratorFromJSON} from '../functions/ValueGenerator';
 import {Particle} from '../Particle';
 import {Behavior, BehaviorJSON} from './Behavior';
+import {stepEndLife} from './stepAge';
 
 /** The JSON of a speed over life: a {@link SpeedOverLife}. */
 export interface SpeedOverLifeJSON extends BehaviorJSON {
@@ -22,8 +23,8 @@ export class SpeedOverLife implements Behavior {
     /** @param speed - The speed multiplier over the particle's life. */
     constructor(public speed: FunctionValueGenerator) {}
 
-    update(particle: Particle): void {
-        particle.speedModifier = this.speed.genValue(particle.memory, particle.age / particle.life);
+    update(particle: Particle, delta: number): void {
+        particle.speedModifier = this.speed.genValue(particle.memory, stepEndLife(particle, delta));
     }
 
     updateAll(particles: Array<Particle>, count: number, delta: number): void {
@@ -33,7 +34,7 @@ export class SpeedOverLife implements Behavior {
             if (particle.age >= particle.life) {
                 continue;
             }
-            particle.speedModifier = generator.genValue(particle.memory, particle.age / particle.life);
+            particle.speedModifier = generator.genValue(particle.memory, stepEndLife(particle, delta));
         }
     }
     toJSON(): SpeedOverLifeJSON {

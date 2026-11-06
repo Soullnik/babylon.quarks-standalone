@@ -4,6 +4,7 @@ import type {Scene} from '@babylonjs/core/scene';
 import type {
     Behavior,
     BehaviorJSON,
+    Color4Like,
     ColorGenerator,
     ColorGeneratorJSON,
     EmitterShape,
@@ -29,6 +30,7 @@ import type {
     ParticleErosionOptions,
     ParticleGradientMap,
     ParticleUVDistortionOptions,
+    RenderAlignment,
     RenderFace,
     RenderMode,
     SortMode,
@@ -142,8 +144,10 @@ export type RingBufferMode = 'disabled' | 'pauseUntilReplaced' | 'loopUntilRepla
 
 /**
  * What the emitter's scale does to the system, as Unity's Scaling Mode, in world and local space
- * alike. The scale reaches the emission shape, the particles' size, their start speed and, in world
- * space, `ForceOverLife`, `ApplyForce` and `LimitSpeedOverLife` (by the mean of the axes), so a
+ * alike. The scale reaches the emission shape, the particles' size, their start velocity (along
+ * each axis, in world space too, as Unity's: an emitter at half scale starts them at half speed,
+ * measured in Unity 6), their speed limits in local space (where the emitter's whole frame scales
+ * them) and, in world space, `ForceOverLife` and `ApplyForce` (by the mean of the axes), so a
  * scaled effect looks and moves like a scaled model, except where a mode leaves it out:
  *
  * - `'local'` (default, as in Unity): only the emitter's own `scaling`; its parents' scale is left
@@ -152,17 +156,34 @@ export type RingBufferMode = 'disabled' | 'pauseUntilReplaced' | 'loopUntilRepla
  * - `'shape'`: the world scale sizes the emission shape alone; the particles keep their size and
  *   speed, so a bigger emitter spreads the same particles over a larger area.
  *
- * Under every mode the emitter's position, rotation and any mirroring come from the whole
- * hierarchy; only the length of each axis changes. A sub emission starts in its parent particle's
- * frame and takes its size and speed from that, not from the sub emitter's scale; `'shape'` still
- * scales its shape by the sub emitter's world scale. With a non-uniform scale `'shape'` stretches
- * where particles start, not the directions the shape sends them.
+ * Under every mode the emitter's position comes from the whole hierarchy, and its turn is Unity's
+ * `transform.rotation`, which stays a rotation under a mirrored parent: `'hierarchy'` mirrors the
+ * system as its world matrix does, `'local'` by the node's own scale alone, and `'shape'` only its
+ * shape (see `ParticleEmitter.matrixWorld`). A sub emission starts in its parent particle's frame
+ * and takes its size and speed from that, not from the sub emitter's scale; `'shape'` still scales
+ * its shape by the sub emitter's world scale. With a non-uniform scale `'shape'` stretches where
+ * particles start and turns the way it sends them, keeping their speed.
  *
  * Known differences from Unity: a world force (`ForceOverLife`, `ApplyForce`, and so the gravity
  * the Unity exporter writes) is scaled with the motion in `'local'` and `'hierarchy'`, where
  * Unity's gravity is not.
  */
 export type ScalingMode = 'local' | 'hierarchy' | 'shape';
+
+/**
+ * The axis a number rotation turns a mesh particle about: its start rotation and
+ * `RotationOverLife`'s turn. Billboards turn in their own plane whatever it says.
+ *
+ * - `'z'` (the default): the mesh's own Z.
+ * - `'emission'`: an axis picked per particle at birth, as Unity picks a mesh particle's
+ *   `axisOfRotation` when its Shape module is on: square to the Z axis and to the direction the
+ *   shape sends the particle; for a particle sent along Z (a box, a cone with no angle), square to
+ *   Z and to where it starts; for one that starts near the Z axis too, Y. A mesh laid in the XZ
+ *   plane, such as a ring on a box or a narrow cone, then spins about its own normal and stays
+ *   level. Taken in the emitter's axes, from the particle's start velocity, or where it starts
+ *   when it has none.
+ */
+export type RotationAxis = 'z' | 'emission';
 
 /**
  * Where a {@link RenderMode.Beam} system's quads end: a point in world space,
@@ -249,6 +270,8 @@ export interface ParticleSystemParameters {
     instancingUVs2?: Float32Array;
     /** Mesh particles' vertex normals, three values per vertex. Default +Z for every vertex. */
     instancingNormals?: Float32Array;
+    /** See {@link ParticleSystem.instancingColors}. Default none. */
+    instancingColors?: Float32Array;
     /** See {@link ParticleSystem.renderMode}. Default `RenderMode.BillBoard`. */
     renderMode?: RenderMode;
     /** See {@link ParticleSystem.rendererEmitterSettings}. Default the render mode's own. */
@@ -272,6 +295,16 @@ export interface ParticleSystemParameters {
      * every render mode: billboard, stretched, mesh, beam and trail.
      */
     softParticles?: boolean;
+    /** Whether the texture's colour is already premultiplied, see {@link ParticleSystem.premultipliedMap}. Default false. */
+    premultipliedMap?: boolean;
+    /** Whether the particle's colour is drawn, see {@link ParticleSystem.particleColor}. Default true. */
+    particleColor?: boolean;
+    /** The material's colour, see {@link ParticleSystem.materialColor}. Default white. */
+    materialColor?: Color4Like;
+    /** What the material's colour is multiplied by in linear space, see {@link ParticleSystem.materialColorScale}. Default 1. */
+    materialColorScale?: number;
+    /** How far the system sorts behind or in front of others, see {@link ParticleSystem.sortingFudge}. Default 0. */
+    sortingFudge?: number;
     /** See {@link ParticleSystem.softFarFade}. Default 1. */
     softFarFade?: number;
     /** See {@link ParticleSystem.softNearFade}. Default 0. */
@@ -317,12 +350,16 @@ export interface ParticleSystemParameters {
     cullingMode?: CullingMode;
     /** What the emitter's scale does to the system, see {@link ScalingMode}. Default `'local'`. */
     scalingMode?: ScalingMode;
+    /** The axis a number rotation turns a mesh about, see {@link RotationAxis}. Default `'z'`. */
+    rotationAxis?: RotationAxis;
     /** Seed for this system's own random generator, see {@link ParticleSystem.seed}. Default none. */
     seed?: number;
     /** Draw order within the batch, see {@link ParticleSystem.sortMode}. Default `'none'`. */
     sortMode?: SortMode;
     /** Which faces a mesh particle draws, see {@link ParticleSystem.renderFace}. Default `'both'`. */
     renderFace?: RenderFace;
+    /** The axes a mesh particle's rotation is measured in and a billboard is laid along, see {@link ParticleSystem.renderAlignment}. Default `'simulation'`. */
+    renderAlignment?: RenderAlignment;
     /** Whether particles start turned along their direction of travel, see {@link ParticleSystem.alignToDirection}. Default false. */
     alignToDirection?: boolean;
     /** Smallest on-screen size, as a fraction of the viewport height, see {@link ParticleSystem.minParticleSize}. Default 0. */
@@ -430,12 +467,16 @@ export interface ParticleSystemJSONParameters {
     cullingMode?: CullingMode;
     /** Written only when not `'local'`. */
     scalingMode?: ScalingMode;
+    /** Written only when not `'z'`. */
+    rotationAxis?: RotationAxis;
     /** Written only when set. */
     seed?: number;
     /** Written only when not `'none'`. */
     sortMode?: SortMode;
     /** Written only when not `'both'`. */
     renderFace?: RenderFace;
+    /** Written only when not `'simulation'`. */
+    renderAlignment?: RenderAlignment;
     /** Written only when true. */
     alignToDirection?: boolean;
     /** Written only when not 0. */
@@ -460,6 +501,16 @@ export interface ParticleSystemJSONParameters {
     blendTiles?: boolean;
     /** See {@link ParticleSystem.softParticles}. */
     softParticles?: boolean;
+    /** Written only when true. */
+    premultipliedMap?: boolean;
+    /** Written only when false. */
+    particleColor?: boolean;
+    /** `[r, g, b, a]`, written only when not white. */
+    materialColor?: [number, number, number, number];
+    /** Written only when not 1. */
+    materialColorScale?: number;
+    /** Written only when not 0. */
+    sortingFudge?: number;
     /** See {@link ParticleSystem.softFarFade}. */
     softFarFade?: number;
     /** See {@link ParticleSystem.softNearFade}. */

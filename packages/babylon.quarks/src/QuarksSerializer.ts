@@ -3,7 +3,7 @@ import {Constants} from '@babylonjs/core/Engines/constants';
 import {StandardMaterial} from '@babylonjs/core/Materials/standardMaterial';
 import {BaseTexture} from '@babylonjs/core/Materials/Textures/baseTexture';
 import {Texture} from '@babylonjs/core/Materials/Textures/texture';
-import {Matrix, Quaternion} from '@babylonjs/core/Maths/math.vector';
+import {Quaternion} from '@babylonjs/core/Maths/math.vector';
 import {Geometry} from '@babylonjs/core/Meshes/geometry';
 import {InstancedMesh} from '@babylonjs/core/Meshes/instancedMesh';
 import {Mesh} from '@babylonjs/core/Meshes/mesh';
@@ -57,6 +57,14 @@ export interface QuarksTextureJSON {
     offset?: [number, number];
     /** `wAng`, in radians. Default 0. */
     rotation?: number;
+    /**
+     * The colour space the image's colours are stored in, as three.js names them. `'srgb'`: a
+     * colour texture, loaded into an sRGB GPU buffer (`useSRGBBuffer`) that decodes and filters it
+     * in linear space, as Unity's sRGB (Color Texture) import setting does; where the GPU cannot
+     * (WebGL 1 with mipmaps) Babylon loads it as before and the shaders convert it. Anything else,
+     * or absent (the default): read as stored, which the shaders take as gamma space for a colour.
+     */
+    colorSpace?: string;
 }
 
 /** Mesh data, inline. */
@@ -75,6 +83,11 @@ export interface QuarksGeometryJSON {
     uvs2?: number[];
     /** `x, y, z` per vertex. */
     normals?: number[];
+    /**
+     * Vertex colours, `r, g, b, a` per vertex, linear, from 0 to 1, which a mesh particle's colour
+     * is multiplied by. A `Mesh` node is drawn without them.
+     */
+    colors?: number[];
 }
 
 /** A node of an effect: a group, an emitter, a mesh or a prefab, with its children. */
@@ -86,8 +99,9 @@ export interface QuarksNodeJSON {
     /** The node's name. */
     name?: string;
     /**
-     * Local transform, column-major, as Babylon's `Matrix.asArray()`. Always written; a three.js
-     * file without it places the node by `position`, `quaternion` or `rotation`, and `scale`.
+     * Local transform, column-major, as Babylon's `Matrix.asArray()`, as writers before 1.0 and
+     * three.js files write it; read in place of `position`, `quaternion` and `scale`. A mirrored
+     * node in it loads with the mirror on the axis Babylon's `decompose` picks.
      */
     matrix?: number[];
     /** Written only when the node is disabled (false); loads it disabled, with everything under it. */
@@ -106,11 +120,11 @@ export interface QuarksNodeJSON {
     timeScale?: number;
     /** `QuarksPrefab`: the timeline's tracks. */
     animationData?: AnimationJSON[];
-    /** three.js files without `matrix`: the position as `[x, y, z]`. */
+    /** The node's local position as `[x, y, z]`, written only when not 0. */
     position?: number[];
-    /** three.js files without `matrix`: the scale as `[x, y, z]`. */
+    /** The node's local scale as `[x, y, z]`, negative along a mirrored axis, written only when not 1. */
     scale?: number[];
-    /** three.js files without `matrix`: the rotation as a quaternion `[x, y, z, w]`. */
+    /** The node's local rotation as a quaternion `[x, y, z, w]`, written only when it turns. */
     quaternion?: number[];
     /** three.js files without `matrix` or `quaternion`: Euler angles `[x, y, z]` in radians. */
     rotation?: number[];
@@ -189,9 +203,24 @@ function isPortableUrl(url: string | null | undefined): url is string {
     return !/^data:/i.test(url) || url.includes(',');
 }
 
-function localMatrix(node: TransformNode): number[] {
+/**
+ * Writes the node's own transform into `json` as its position, rotation and scale, each only when
+ * it is not the default. Not as a matrix: a matrix with a mirror in it can be split into a turn and
+ * a scale more than one way ((-1, 1, 1) unturned, or (1, -1, 1) turned half round Z), and what is
+ * below a mirrored node turns by which of them it is, as Unity's `transform.rotation` does.
+ */
+function writeTransform(node: TransformNode, json: QuarksNodeJSON): void {
+    const {position, scaling} = node;
+    if (position.x !== 0 || position.y !== 0 || position.z !== 0) {
+        json.position = [position.x, position.y, position.z];
+    }
     const rotation = node.rotationQuaternion ?? Quaternion.FromEulerVector(node.rotation);
-    return Array.from(Matrix.Compose(node.scaling, rotation, node.position).asArray());
+    if (rotation.x !== 0 || rotation.y !== 0 || rotation.z !== 0 || rotation.w !== 1) {
+        json.quaternion = [rotation.x, rotation.y, rotation.z, rotation.w];
+    }
+    if (scaling.x !== 1 || scaling.y !== 1 || scaling.z !== 1) {
+        json.scale = [scaling.x, scaling.y, scaling.z];
+    }
 }
 
 class EffectWriter {
@@ -240,8 +269,8 @@ class EffectWriter {
             uuid: quarksNodeId(node),
             type: 'Group',
             name: node.name,
-            matrix: localMatrix(node),
         };
+        writeTransform(node, json);
         if (!node.isEnabled(false)) {
             json.visible = false;
         }
@@ -476,6 +505,7 @@ function samplerJSON(texture: Texture): Partial<QuarksTextureJSON> {
     if (texture.uScale !== 1 || texture.vScale !== 1) json.repeat = [texture.uScale, texture.vScale];
     if (texture.uOffset !== 0 || texture.vOffset !== 0) json.offset = [texture.uOffset, texture.vOffset];
     if (texture.wAng !== 0) json.rotation = texture.wAng;
+    if (texture._useSRGBBuffer === true) json.colorSpace = 'srgb';
     return json;
 }
 
@@ -502,7 +532,6 @@ export function serializeEffect(
             uuid: `${name}-root`,
             type: 'Group',
             name,
-            matrix: Array.from(Matrix.Identity().asArray()),
             children: root.map((node) => writer.node(node)),
         };
     } else {

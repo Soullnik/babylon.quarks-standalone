@@ -73,15 +73,36 @@ describe('emission over distance', () => {
         xs.forEach((x, i) => expect(x).toBeCloseTo((i + 1) * 0.25, 5));
     });
 
-    it('still spawns time-driven particles at the emitter', () => {
-        const system = distanceSystem({perMeter: 0, perSecond: 60});
+    it('spreads the rate over time along the step too, each particle where the emitter was when it was owed', () => {
+        const system = distanceSystem({perMeter: 0, perSecond: 600});
+        system.play();
+        system.update(1 / 60);
+        const first = system.particleNum;
+        expect(spawnedX(system).every((x) => x === 0)).toBe(true);
+        moveTo(system, 1);
+        system.update(1 / 60);
+        const xs = spawnedX(system).slice(first);
+        expect(xs).toHaveLength(10);
+        xs.forEach((x, i) => expect(x).toBeCloseTo((i + 1) / 10, 5));
+    });
+
+    it('spawns the rate over time of a still emitter at the emitter', () => {
+        const system = distanceSystem({perMeter: 0, perSecond: 600});
+        system.play();
+        moveTo(system, 1);
+        system.update(1 / 60);
+        system.update(1 / 60);
+        expect(system.particleNum).toBe(20);
+        spawnedX(system).forEach((x) => expect(x).toBeCloseTo(1, 5));
+    });
+
+    it('leaves the rate over time of a local-space system at the emitter', () => {
+        const system = distanceSystem({worldSpace: false, perMeter: 0, perSecond: 600});
         system.play();
         system.update(1 / 60);
         moveTo(system, 1);
         system.update(1 / 60);
-        const xs = spawnedX(system);
-        expect(xs[xs.length - 1]).toBeCloseTo(1, 5);
-        expect(xs.filter((x) => x > 0 && x < 1)).toHaveLength(0);
+        spawnedX(system).forEach((x) => expect(x).toBeCloseTo(0, 5));
     });
 
     it('leaves a local-space system spawning at the emitter, which its particles follow', () => {

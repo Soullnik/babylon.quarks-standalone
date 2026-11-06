@@ -49,6 +49,7 @@ const quad = new Float32Array([-0.5, -0.5, 0, 0.5, -0.5, 0, 0.5, 0.5, 0, -0.5, 0
 const quadUVs = new Float32Array([0, 0, 1, 0, 1, 1, 0, 1]);
 const quadUVs2 = new Float32Array([0, 0, 2, 0, 2, 2, 0, 2]);
 const quadNormals = new Float32Array([0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1]);
+const quadColors = new Float32Array([1, 0, 0, 1, 0, 1, 0, 1, 0, 0, 1, 1, 1, 1, 1, 0.5]);
 
 /** The bindings a batch's material takes on WebGPU, and the attributes each one carries. */
 function bindingsOf(renderer: BatchedRenderer, s: ParticleSystem): string[][] {
@@ -82,13 +83,14 @@ describe('vertex buffer bindings', () => {
         ['horizontal billboard', () => ({renderMode: RenderMode.HorizontalBillBoard})],
         ['beam', () => ({renderMode: RenderMode.Beam})],
         [
-            'mesh with normals and a second UV set',
+            'mesh with normals, a second UV set and vertex colours',
             () => ({
                 renderMode: RenderMode.Mesh,
                 instancingGeometry: quad,
                 instancingUVs: quadUVs,
                 instancingNormals: quadNormals,
                 instancingUVs2: quadUVs2,
+                instancingColors: quadColors,
                 erosion: erosion(),
             }),
         ],
@@ -117,13 +119,16 @@ describe('vertex buffer bindings', () => {
         const s = system(cases[4][1]());
         renderer.addSystem(s);
         const runs = bindingsOf(renderer, s);
-        expect(runs[0]).toEqual(['position', 'uv', 'normal', 'uv2']);
-        expect(runs.length).toBe(6);
+        expect(runs[0]).toEqual(['position', 'uv', 'normal', 'uv2', 'meshColor']);
+        // The five instance attributes, then the stretch's three columns, one buffer.
+        expect(runs[runs.length - 1]).toEqual(['stretchX', 'stretchY', 'stretchZ']);
+        expect(runs.length).toBe(7);
         const mesh = renderer.batches[renderer.systemToBatchIndex.get(s)!].mesh;
         expect(Array.from(mesh.getVerticesData('position')!)).toEqual(Array.from(quad));
         expect(Array.from(mesh.getVerticesData('uv')!)).toEqual(Array.from(quadUVs));
         expect(Array.from(mesh.getVerticesData('normal')!)).toEqual(Array.from(quadNormals));
         expect(Array.from(mesh.getVerticesData('uv2')!)).toEqual(Array.from(quadUVs2));
+        expect(Array.from(mesh.getVerticesData('meshColor')!)).toEqual(Array.from(quadColors));
         expect(mesh.getTotalVertices()).toBe(4);
     });
 

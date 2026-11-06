@@ -4,6 +4,7 @@ import {Quaternion} from '../math';
 import {Particle} from '../Particle';
 import {Z_VEC3} from '../util/MathUtil';
 import {Behavior, BehaviorJSON} from './Behavior';
+import {stepEndLife} from './stepAge';
 
 /** The JSON of a rotation over life: a {@link RotationOverLife}. */
 export interface RotationOverLifeJSON extends BehaviorJSON {
@@ -15,10 +16,11 @@ export interface RotationOverLifeJSON extends BehaviorJSON {
  * Apply rotation to particles over their life.
  *
  * A billboard (rotation is an angle) turns in its own plane. A mesh particle
- * (rotation is a quaternion) turns about its local Z axis — the axis a
- * number `startRotation` turns a mesh about, and what Unity's Rotation over
- * Lifetime without separate axes does to mesh particles. For any other axis,
- * or a turn about all three, use {@link Rotation3DOverLife}.
+ * (rotation is a quaternion) turns about its {@link Particle.rotationAxis},
+ * its local Z unless the system gave it another — the axis a number
+ * `startRotation` turns a mesh about, and what Unity's Rotation over Lifetime
+ * without separate axes does to mesh particles. For a turn about all three
+ * axes, use {@link Rotation3DOverLife}.
  */
 export class RotationOverLife implements Behavior {
     type = 'RotationOverLife';
@@ -43,7 +45,7 @@ export class RotationOverLife implements Behavior {
         if (typeof particle.rotation === 'number') {
             const rate = (this.angularVelocity as FunctionValueGenerator).genValue(
                 particle.memory,
-                particle.age / particle.life
+                stepEndLife(particle, delta)
             );
             (particle.rotation as number) += delta * rate;
             // Kept for the renderer, which draws between steps and has no other
@@ -52,9 +54,9 @@ export class RotationOverLife implements Behavior {
         } else if (particle.rotation instanceof Quaternion) {
             const rate = (this.angularVelocity as FunctionValueGenerator).genValue(
                 particle.memory,
-                particle.age / particle.life
+                stepEndLife(particle, delta)
             );
-            this.turnAboutZ(particle, particle.rotation, rate * delta);
+            this.turn(particle, particle.rotation, rate * delta);
         }
     }
 
@@ -67,27 +69,35 @@ export class RotationOverLife implements Behavior {
             }
             const rotation = particle.rotation;
             if (typeof rotation === 'number') {
-                const rate = generator.genValue(particle.memory, particle.age / particle.life);
+                const rate = generator.genValue(particle.memory, stepEndLife(particle, delta));
                 particle.rotation = rotation + delta * rate;
                 particle.angularVelocity = rate;
             } else if (rotation instanceof Quaternion) {
-                const rate = generator.genValue(particle.memory, particle.age / particle.life);
-                this.turnAboutZ(particle, rotation, rate * delta);
+                const rate = generator.genValue(particle.memory, stepEndLife(particle, delta));
+                this.turn(particle, rotation, rate * delta);
             }
         }
     }
 
     /**
-     * Turns a mesh particle by `angle` about its own Z axis, keeping the step
-     * for the renderer to draw a fraction of between simulation steps.
+     * Turns a mesh particle by `angle` about its {@link Particle.rotationAxis} (its own Z when it
+     * has none), keeping the step for the renderer to draw a fraction of between simulation steps.
      */
-    turnAboutZ(particle: Particle, rotation: Quaternion, angle: number): void {
-        const step = this.tempQuat.setFromAxisAngle(Z_VEC3, angle);
+    turn(particle: Particle, rotation: Quaternion, angle: number): void {
+        const step = this.tempQuat.setFromAxisAngle(particle.rotationAxis ?? Z_VEC3, angle);
         rotation.multiply(step);
         const kept = particle.angularVelocity;
         if (kept instanceof Quaternion) {
             kept.copy(step);
         }
+    }
+
+    /**
+     * @deprecated Use {@link RotationOverLife.turn}, which turns about the particle's
+     * {@link Particle.rotationAxis}; this is the same call.
+     */
+    turnAboutZ(particle: Particle, rotation: Quaternion, angle: number): void {
+        this.turn(particle, rotation, angle);
     }
 
     toJSON(): RotationOverLifeJSON {

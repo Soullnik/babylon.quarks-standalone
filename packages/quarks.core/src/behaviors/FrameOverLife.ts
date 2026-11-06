@@ -2,6 +2,7 @@ import {FunctionValueGenerator, IntervalValue, ValueGenerator, ValueGeneratorFro
 import type {ValueGeneratorJSON} from '../functions/FunctionJSON';
 import {Particle} from '../Particle';
 import {Behavior, BehaviorJSON} from './Behavior';
+import {stepEndAge, stepEndLife} from './stepAge';
 
 /**
  * How {@link FrameOverLife} plays the sheet, beyond sampling `frame` over the
@@ -43,6 +44,24 @@ export interface FrameOverLifeOptions {
      * starts each particle on a random frame (Unity's "Start Frame"). Default none.
      */
     startFrame?: ValueGenerator;
+    /**
+     * Play one row of a grid sheet instead of the whole sheet (Unity's Texture Sheet Animation
+     * with Animation "Single Row"): the frames in a row, the sheet's columns. `frame`, the
+     * cycles, {@link frameCount} and {@link startFrame} then count frames within the row, and the
+     * first frame of the row ({@link row}, or a random one with {@link randomRow}) is added.
+     * 0, the default, plays the whole sheet.
+     */
+    rowLength?: number;
+    /** Rows on the sheet, the rows {@link randomRow} picks from. Default 1. */
+    rowCount?: number;
+    /** With {@link rowLength}: the row played, from 0 at the top (Unity's Row Index). Default 0. */
+    row?: number;
+    /**
+     * With {@link rowLength}: each particle plays a row picked at birth from the
+     * {@link rowCount} rows instead of {@link row} (Unity's Row Mode "Random"): a sheet of
+     * several takes of one animation, one per row. Default false.
+     */
+    randomRow?: boolean;
 }
 
 /** The JSON of a flipbook frame over life: a {@link FrameOverLife}. */
@@ -61,6 +80,14 @@ export interface FrameOverLifeJSON extends BehaviorJSON {
     random?: boolean;
     /** The frame each particle starts on. */
     startFrame?: ValueGeneratorJSON;
+    /** Frames in the one row played; absent, the whole sheet plays. */
+    rowLength?: number;
+    /** Rows on the sheet. */
+    rowCount?: number;
+    /** The row played. */
+    row?: number;
+    /** Whether each particle plays a random row. */
+    randomRow?: boolean;
 }
 
 /**
@@ -89,6 +116,14 @@ export class FrameOverLife implements Behavior {
     random: boolean;
     /** See {@link FrameOverLifeOptions.startFrame}. */
     startFrame?: ValueGenerator;
+    /** See {@link FrameOverLifeOptions.rowLength}. */
+    rowLength: number;
+    /** See {@link FrameOverLifeOptions.rowCount}. */
+    rowCount: number;
+    /** See {@link FrameOverLifeOptions.row}. */
+    row: number;
+    /** See {@link FrameOverLifeOptions.randomRow}. */
+    randomRow: boolean;
 
     /** A per-particle sample that sets each particle's random sequence apart. */
     private readonly salt = new IntervalValue(0, 1);
@@ -101,6 +136,10 @@ export class FrameOverLife implements Behavior {
         this.loop = options.loop ?? true;
         this.random = options.random ?? false;
         this.startFrame = options.startFrame;
+        this.rowLength = wholeAtLeast(options.rowLength, 0);
+        this.rowCount = wholeAtLeast(options.rowCount, 1);
+        this.row = wholeAtLeast(options.row, 0);
+        this.randomRow = options.randomRow === true;
     }
 
     /**
@@ -121,7 +160,7 @@ export class FrameOverLife implements Behavior {
 
     /** True when no option is in play and the frame is just `frame` at the life fraction. */
     isPlain(): boolean {
-        return !(this.fps > 0) && this.cycles === 1 && this.startFrame === undefined;
+        return !(this.fps > 0) && this.cycles === 1 && this.startFrame === undefined && !(this.rowLength > 0);
     }
 
     initialize(particle: Particle): void {
@@ -133,7 +172,7 @@ export class FrameOverLife implements Behavior {
     }
 
     update(particle: Particle, delta: number): void {
-        particle.uvTile = this.frameAt(particle, particle.age, particle.age / particle.life);
+        particle.uvTile = this.frameAt(particle, stepEndAge(particle, delta), stepEndLife(particle, delta));
     }
 
     updateAll(particles: Array<Particle>, count: number, delta: number): void {
@@ -142,12 +181,31 @@ export class FrameOverLife implements Behavior {
             if (particle.age >= particle.life) {
                 continue;
             }
-            particle.uvTile = this.frameAt(particle, particle.age, particle.age / particle.life);
+            particle.uvTile = this.frameAt(particle, stepEndAge(particle, delta), stepEndLife(particle, delta));
         }
     }
 
     /** The tile for `particle` at `age` seconds, `t` being that age over its life. */
     frameAt(particle: Particle, age: number, t: number): number {
+        const length = this.rowLength;
+        if (!(length > 0)) {
+            return this.frameInSegment(particle, age, t);
+        }
+        // Within the row, the frame never runs into the next one.
+        const within = Math.min(Math.max(this.frameInSegment(particle, age, t), 0), length - 0.001);
+        return this.rowOf(particle) * length + within;
+    }
+
+    /** The row a particle plays: the set one, or its own pick from its salt. */
+    private rowOf(particle: Particle): number {
+        if (!this.randomRow) {
+            return this.row;
+        }
+        return Math.min(Math.floor(this.saltOf(particle) * this.rowCount), this.rowCount - 1);
+    }
+
+    /** The frame, counted from the first of the sheet or of the row. */
+    private frameInSegment(particle: Particle, age: number, t: number): number {
         if (this.fps > 0) {
             const first = this.sampleFrame(particle, t);
             const n = this.frameCount;
@@ -217,6 +275,10 @@ export class FrameOverLife implements Behavior {
             ...(this.loop ? {} : {loop: false}),
             ...(this.random ? {random: true} : {}),
             ...(this.startFrame !== undefined ? {startFrame: this.startFrame.toJSON()} : {}),
+            ...(this.rowLength > 0 ? {rowLength: this.rowLength} : {}),
+            ...(this.rowCount !== 1 ? {rowCount: this.rowCount} : {}),
+            ...(this.row !== 0 ? {row: this.row} : {}),
+            ...(this.randomRow ? {randomRow: true} : {}),
         };
     }
 
@@ -230,6 +292,10 @@ export class FrameOverLife implements Behavior {
             random: json.random === true,
             startFrame:
                 json.startFrame !== undefined ? (ValueGeneratorFromJSON(json.startFrame) as ValueGenerator) : undefined,
+            rowLength: typeof json.rowLength === 'number' ? json.rowLength : undefined,
+            rowCount: typeof json.rowCount === 'number' ? json.rowCount : undefined,
+            row: typeof json.row === 'number' ? json.row : undefined,
+            randomRow: json.randomRow === true,
         });
     }
 
@@ -241,7 +307,16 @@ export class FrameOverLife implements Behavior {
             loop: this.loop,
             random: this.random,
             startFrame: this.startFrame?.clone() as ValueGenerator | undefined,
+            rowLength: this.rowLength,
+            rowCount: this.rowCount,
+            row: this.row,
+            randomRow: this.randomRow,
         });
     }
     reset(): void {}
+}
+
+/** `value` floored, when it is a finite number of at least `min`; else `min`. */
+function wholeAtLeast(value: number | undefined, min: number): number {
+    return typeof value === 'number' && Number.isFinite(value) ? Math.max(min, Math.floor(value)) : min;
 }

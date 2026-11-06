@@ -7,18 +7,20 @@
  * from `ImageProcessingConfiguration.prepareDefines`, see `imageProcessingDefines` in
  * `shaderProgram.ts`:
  *
- * - `IMAGEPROCESSING`: the material applies the configuration. The colour, authored in gamma
- *   space, is brought to linear space and `applyImageProcessing` returns it to gamma space with
- *   the configuration's effects on the way.
- * - `IMAGEPROCESSINGPOSTPROCESS`: a post process applies it later, to the frame; the material only
+ * - `IMAGEPROCESSING`: the material applies the configuration. The colour, worked out in linear
+ *   space (see `colorSpace.ts`), is returned to gamma space by `applyImageProcessing` with the
+ *   configuration's effects on the way.
+ * - `IMAGEPROCESSINGPOSTPROCESS`: a post process applies it later, to the frame; the material
  *   leaves its colour in the linear space that post process expects.
  *
  * The step runs on the straight colour, after the fog and the soft fade and before the blend
  * resolve (`blend.ts`), so the resolve's meaning of alpha survives it: a premultiplied colour is
  * the processed colour times its coverage. Particles that multiply the frame (`BLEND_MULTIPLY`)
- * are a factor, not light, so `shaderProgram` compiles no in-material processing for them, and
- * under a post process their resolved factor is brought to linear space after the resolve: white,
- * which leaves the frame as it is, stays white.
+ * are a factor, not light, so `shaderProgram` compiles no in-material processing for them; under
+ * a post process their colour is in linear space when the resolve moves it toward white by its
+ * coverage, as Unity's Linear colour space does (white, which leaves the frame as it is, stays
+ * white). Mixing in gamma space first darkened a part-covered factor's weak channels more than its
+ * strong ones, tinting a multiplied smoke toward its strongest colour.
  */
 
 import {ShaderStore} from '@babylonjs/core/Engines/shaderStore';
@@ -28,6 +30,7 @@ import '@babylonjs/core/Shaders/ShadersInclude/imageProcessingFunctions';
 import '@babylonjs/core/ShadersWGSL/ShadersInclude/helperFunctions';
 import '@babylonjs/core/ShadersWGSL/ShadersInclude/imageProcessingDeclaration';
 import '@babylonjs/core/ShadersWGSL/ShadersInclude/imageProcessingFunctions';
+import {colorSpaceDeclarationGLSL, colorSpaceDeclarationWGSL} from './colorSpace';
 
 /**
  * Babylon's WGSL `imageProcessingFunctions` samples a 2D colour grading texture (a LUT laid out as
@@ -83,61 +86,44 @@ ShaderStore.IncludesShadersStoreWGSL['quarksImageProcessingFunctions'] = PATCHES
       )
     : babylonFunctionsWGSL;
 
-/** Fragment-side declaration, GLSL. */
+/** Fragment-side declaration, with the colour space's (`colorSpace.ts`), GLSL. */
 export const imageProcessingDeclarationGLSL = /* glsl */ `
+${colorSpaceDeclarationGLSL}
 #if defined(IMAGEPROCESSING) || defined(IMAGEPROCESSINGPOSTPROCESS)
 #include<imageProcessingDeclaration>
-#include<helperFunctions>
 #include<imageProcessingFunctions>
 #endif
 `;
 
-/** Processes the straight vec4 lvalue `color`, before the blend resolve, GLSL. */
+/**
+ * Processes the straight vec4 lvalue `color`, already in linear space, before the blend resolve,
+ * GLSL. Under a post process it is left as it is.
+ */
 export function imageProcessingFragmentGLSL(color: string): string {
     return /* glsl */ `
-#if defined(IMAGEPROCESSINGPOSTPROCESS) && !defined(BLEND_MULTIPLY)
-    ${color}.rgb = toLinearSpace(${color}.rgb);
-#elif defined(IMAGEPROCESSING)
-    ${color}.rgb = toLinearSpace(${color}.rgb);
+#if defined(IMAGEPROCESSING) && !defined(IMAGEPROCESSINGPOSTPROCESS)
     ${color} = applyImageProcessing(${color});
 #endif
 `;
 }
 
-/** Brings a resolved multiply factor in `color` to linear space for a post process, GLSL. */
-export function imageProcessingResolvedGLSL(color: string): string {
-    return /* glsl */ `
-#if defined(IMAGEPROCESSINGPOSTPROCESS) && defined(BLEND_MULTIPLY)
-    ${color}.rgb = toLinearSpace(${color}.rgb);
-#endif
-`;
-}
-
-/** Fragment-side declaration, WGSL. */
+/** Fragment-side declaration, with the colour space's (`colorSpace.ts`), WGSL. */
 export const imageProcessingDeclarationWGSL = /* wgsl */ `
+${colorSpaceDeclarationWGSL}
 #if defined(IMAGEPROCESSING) || defined(IMAGEPROCESSINGPOSTPROCESS)
 #include<imageProcessingDeclaration>
-#include<helperFunctions>
 #include<quarksImageProcessingFunctions>
 #endif
 `;
 
-/** Processes the straight `var` vec4 `color`, before the blend resolve, WGSL. */
+/**
+ * Processes the straight `var` vec4 `color`, already in linear space, before the blend resolve,
+ * WGSL. Under a post process it is left as it is.
+ */
 export function imageProcessingFragmentWGSL(color: string): string {
     return /* wgsl */ `
-#if defined(IMAGEPROCESSINGPOSTPROCESS) && !defined(BLEND_MULTIPLY)
-    ${color} = vec4f(toLinearSpaceVec3(${color}.rgb), ${color}.a);
-#elif defined(IMAGEPROCESSING)
-    ${color} = applyImageProcessing(vec4f(toLinearSpaceVec3(${color}.rgb), ${color}.a));
-#endif
-`;
-}
-
-/** Brings a resolved multiply factor in `color` to linear space for a post process, WGSL. */
-export function imageProcessingResolvedWGSL(color: string): string {
-    return /* wgsl */ `
-#if defined(IMAGEPROCESSINGPOSTPROCESS) && defined(BLEND_MULTIPLY)
-    ${color} = vec4f(toLinearSpaceVec3(${color}.rgb), ${color}.a);
+#if defined(IMAGEPROCESSING) && !defined(IMAGEPROCESSINGPOSTPROCESS)
+    ${color} = applyImageProcessing(${color});
 #endif
 `;
 }

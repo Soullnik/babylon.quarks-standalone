@@ -199,6 +199,17 @@ export class QuarksUtil {
     }
 
     /**
+     * Gives `target` a hold on the textures and materials of the loaded effect `source` belongs
+     * to (the nearest loaded root at or above `source`), so they stay while `target` does. For a
+     * node kept after its effect's root goes: taken out of the effect, or made the root in place
+     * of a wrapper that is then disposed. Each hold is let go when its node is disposed; a node
+     * outside any loaded effect gives nothing.
+     */
+    static shareResources(source: TransformNode, target: TransformNode): void {
+        shareEffectResources(source, target);
+    }
+
+    /**
      * Seconds until the effect under `root` is over when it plays from the
      * start: for each system its start delay, its duration and its longest
      * particle life, divided by its playback speed; a sub emitter target goes

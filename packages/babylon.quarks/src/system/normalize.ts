@@ -1,7 +1,7 @@
 import type {Vector2Like, Vector3Like} from 'quarks.core';
 import {ConstantValue, FunctionValueGenerator, ValueGenerator} from 'quarks.core';
-import type {MeshLighting, RenderFace, SortMode} from '../batchSettings';
-import type {BurstParameters, CullingMode, RingBufferMode, ScalingMode, StopAction} from './types';
+import type {MeshLighting, RenderAlignment, RenderFace, SortMode} from '../batchSettings';
+import type {BurstParameters, CullingMode, RingBufferMode, RotationAxis, ScalingMode, StopAction} from './types';
 
 // Normalisers shared by the ParticleSystem constructor, its setters and its JSON reader, so a
 // value read from a file and one set in code end up the same.
@@ -19,6 +19,11 @@ export function validSortMode(mode: unknown): SortMode {
 /** `face` if it is one of the render faces, else `'both'`. */
 export function validRenderFace(face: unknown): RenderFace {
     return face === 'front' || face === 'back' ? face : 'both';
+}
+
+/** `alignment` if it is one of the render alignments, else `'simulation'`. */
+export function validRenderAlignment(alignment: unknown): RenderAlignment {
+    return alignment === 'view' || alignment === 'world' || alignment === 'local' ? alignment : 'simulation';
 }
 
 /** `mode` if it is one of the culling modes, else `'always'`. */
@@ -53,6 +58,11 @@ export function validScalingMode(mode: unknown): ScalingMode {
     return mode === 'hierarchy' || mode === 'shape' ? mode : 'local';
 }
 
+/** `axis` if it is `'emission'`, else `'z'`. */
+export function validRotationAxis(axis: unknown): RotationAxis {
+    return axis === 'emission' ? axis : 'z';
+}
+
 /** `count` as a whole number of particles, or undefined (no limit) when it is unset, NaN or negative. */
 export function validMaxParticles(count: unknown): number | undefined {
     return typeof count === 'number' && count >= 0 && count < Infinity ? Math.floor(count) : undefined;
@@ -84,6 +94,35 @@ export const DEFAULT_SOFT_FAR_FADE = 1;
 /** A soft-particle fade distance: finite and at least 0, else `fallback`. */
 export function validSoftFade(distance: unknown, fallback: number): number {
     return typeof distance === 'number' && Number.isFinite(distance) && distance >= 0 ? distance : fallback;
+}
+
+/** The material colour that leaves the particles as they are, see {@link validMaterialColor}. */
+export const WHITE_MATERIAL_COLOR: readonly [number, number, number, number] = Object.freeze([1, 1, 1, 1]);
+
+/**
+ * A material colour as `[r, g, b, a]`, from an array or a `Color4Like`, with each channel a finite
+ * number of at least 0 (a bad or missing one is 1); anything else is white,
+ * {@link WHITE_MATERIAL_COLOR}.
+ */
+export function validMaterialColor(color: unknown): readonly [number, number, number, number] {
+    if (color === null || typeof color !== 'object') {
+        return WHITE_MATERIAL_COLOR;
+    }
+    const like = color as Record<string | number, unknown>;
+    const values = Array.isArray(color) ? [like[0], like[1], like[2], like[3]] : [like.r, like.g, like.b, like.a];
+    const channel = (value: unknown) => (typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : 1);
+    const [r, g, b, a] = values.map(channel);
+    return r === 1 && g === 1 && b === 1 && a === 1 ? WHITE_MATERIAL_COLOR : [r, g, b, a];
+}
+
+/** A sorting fudge: a finite number, else 0. */
+export function validSortingFudge(fudge: unknown): number {
+    return typeof fudge === 'number' && Number.isFinite(fudge) ? fudge : 0;
+}
+
+/** A material colour scale: a finite number of at least 0, else 1. */
+export function validMaterialColorScale(scale: unknown): number {
+    return typeof scale === 'number' && Number.isFinite(scale) && scale >= 0 ? scale : 1;
 }
 
 /** Seconds between a burst's waves when a burst leaves `interval` out, in code and in a file. */

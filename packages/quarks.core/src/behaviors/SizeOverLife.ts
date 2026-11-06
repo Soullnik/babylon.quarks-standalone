@@ -2,6 +2,7 @@ import {FunctionValueGenerator, GeneratorFromJSON, Vector3Function, Vector3Gener
 import type {ValueGeneratorJSON, Vector3GeneratorJSON} from '../functions/FunctionJSON';
 import {Particle} from '../Particle';
 import {Behavior, BehaviorJSON} from './Behavior';
+import {stepEndLife} from './stepAge';
 
 /** The JSON of a size over life: a {@link SizeOverLife}. */
 export interface SizeOverLifeJSON extends BehaviorJSON {
@@ -44,8 +45,8 @@ export class SizeOverLife implements Behavior {
         this._size.startGen(particle.memory);
     }
 
-    update(particle: Particle): void {
-        const t = particle.age / particle.life;
+    update(particle: Particle, delta: number): void {
+        const t = stepEndLife(particle, delta);
         if (this._sizeIsVector3) {
             (this._size as Vector3Function).genValue(particle.memory, particle.size, t).multiply(particle.startSize);
         } else {
@@ -69,7 +70,7 @@ export class SizeOverLife implements Behavior {
                     continue;
                 }
                 generator
-                    .genValue(particle.memory, particle.size, particle.age / particle.life)
+                    .genValue(particle.memory, particle.size, stepEndLife(particle, delta))
                     .multiply(particle.startSize);
             }
             return;
@@ -80,7 +81,7 @@ export class SizeOverLife implements Behavior {
             if (particle.age >= particle.life) {
                 continue;
             }
-            const scale = generator.genValue(particle.memory, particle.age / particle.life);
+            const scale = generator.genValue(particle.memory, stepEndLife(particle, delta));
             const size = particle.size;
             const startSize = particle.startSize;
             size.x = startSize.x * scale;

@@ -9,6 +9,7 @@ import {Scene} from '@babylonjs/core/scene';
 import type {Vector3Like} from 'quarks.core';
 import {EmitSubParticleSystem, IParticleSystem, Vector3} from 'quarks.core';
 import {batchSettingsEqual, shaderKeyEqual, storedBatchSettings} from './batchKey';
+import {DrawOrder} from './drawOrder';
 import {ParticleSystem} from './ParticleSystem';
 import {depthBinding, DepthBinding, DepthTextureOptions, SoftDepthEncoding} from './softDepth';
 import {SpriteBatch} from './SpriteBatch';
@@ -21,6 +22,7 @@ import {
     ParticleErosion,
     ParticleGradientMap,
     ParticleUVDistortion,
+    RenderAlignment,
     RenderFace,
     RenderMode,
     SortMode,
@@ -57,6 +59,8 @@ export interface VFXBatchSettings {
     instancingUVs2?: Float32Array;
     /** The mesh's vertex normals; mesh particles fall back to +Z. */
     instancingNormals?: Float32Array;
+    /** The mesh's vertex colours, see {@link ParticleSystem.instancingColors}. */
+    instancingColors?: Float32Array;
     /** See {@link ParticleSystem.renderMode}. */
     renderMode: RenderMode;
     /** See {@link ParticleSystem.renderOrder}. */
@@ -69,6 +73,16 @@ export interface VFXBatchSettings {
     blendTiles: boolean;
     /** See {@link ParticleSystem.softParticles}. */
     softParticles: boolean;
+    /** See {@link ParticleSystem.premultipliedMap}. Unset is false. */
+    premultipliedMap?: boolean;
+    /** See {@link ParticleSystem.particleColor}. Unset is true. */
+    particleColor?: boolean;
+    /** See {@link ParticleSystem.materialColor}, `[r, g, b, a]`. Unset is white. */
+    materialColor?: readonly [number, number, number, number];
+    /** See {@link ParticleSystem.materialColorScale}. Unset is 1. */
+    materialColorScale?: number;
+    /** See {@link ParticleSystem.sortingFudge}. Unset is 0. */
+    sortingFudge?: number;
     /** See {@link ParticleSystem.softNearFade}. */
     softNearFade: number;
     /** See {@link ParticleSystem.softFarFade}. */
@@ -146,6 +160,12 @@ export interface VFXBatchSettings {
      * that differ are batched apart; other render modes ignore it.
      */
     renderFace?: RenderFace;
+    /**
+     * The axes a mesh particle's rotation is measured in and a billboard's quad is laid along, see
+     * {@link RenderAlignment}. Unset is `'simulation'`. Mesh systems that differ are batched apart,
+     * and billboards laid along other axes than the camera's; other render modes ignore it.
+     */
+    renderAlignment?: RenderAlignment;
     /**
      * Smallest size a billboard or stretched particle may have on screen, as a
      * fraction of the viewport height (Unity's Min Particle Size); 0 by default.
@@ -744,8 +764,16 @@ export class BatchedRenderer extends TransformNode {
         }
     }
 
+    private readonly drawOrder = new DrawOrder();
+
     /** Rebuild instance buffers from current particle state without advancing simulation. */
     refreshBatches(): void {
+        // Unity's order of transparent systems, from the camera the scene draws first; see DrawOrder.
+        const scene = this.getScene();
+        const camera = scene.activeCameras?.[0] ?? scene.activeCamera;
+        if (camera) {
+            this.drawOrder.order(this.batchList, camera.globalPosition);
+        }
         const emptyFrames = this.batchEmptyFrames;
         for (let i = 0; i < this.batchList.length; i++) {
             const batch = this.batchList[i];
@@ -806,7 +834,7 @@ export class BatchedRenderer extends TransformNode {
             return {
                 batchIndex,
                 renderMode: batch.settings.renderMode,
-                instanceCount: batch.mesh.forcedInstanceCount ?? 0,
+                instanceCount: batch.drawnInstances(),
                 particleCount,
                 systemNames,
             };

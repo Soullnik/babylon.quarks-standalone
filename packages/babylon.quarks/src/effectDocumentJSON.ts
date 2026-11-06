@@ -26,6 +26,11 @@ export interface GeometryArrays {
     uvs2?: Float32Array;
     /** `x, y, z` per vertex. */
     normals?: Float32Array;
+    /**
+     * Vertex colours, `r, g, b, a` per vertex, linear, from 0 to 1. See
+     * `ParticleSystem.instancingColors`.
+     */
+    colors?: Float32Array;
 }
 
 /** A three.js `BufferAttribute`, inline or as a view into an interleaved buffer. */
@@ -36,6 +41,8 @@ export interface BufferAttributeJSON {
     itemSize?: number;
     /** The typed array type, e.g. `'Float32Array'` or `'Uint16Array'`. */
     type?: string;
+    /** Whether integer values stand for 0 to 1 (-1 to 1 when signed) over their type's range. */
+    normalized?: boolean;
     /** Set when the attribute reads an interleaved buffer. */
     isInterleavedBufferAttribute?: boolean;
     /** The interleaved buffer's uuid. */
@@ -64,6 +71,8 @@ export interface BufferGeometryAttributesJSON {
     uv2?: BufferAttributeJSON;
     /** Normals, `x, y, z` per vertex. */
     normal?: BufferAttributeJSON;
+    /** Vertex colours, `r, g, b` or `r, g, b, a` per vertex, linear as three.js keeps them. */
+    color?: BufferAttributeJSON;
 }
 
 /** The index of a three.js `BufferGeometry`. */
@@ -151,6 +160,8 @@ export interface QuarksGeometryEntryJSON {
     uvs2?: number[];
     /** `x, y, z` per vertex. */
     normals?: number[];
+    /** Vertex colours, `r, g, b, a` per vertex, linear, from 0 to 1. */
+    colors?: number[];
 }
 
 /** A geometry entry of an effect document. */

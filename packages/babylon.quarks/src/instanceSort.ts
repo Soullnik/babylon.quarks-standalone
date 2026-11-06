@@ -82,28 +82,33 @@ export function sortByKey(scratch: SortScratch, count: number): Uint32Array {
     return from;
 }
 
-/** Copies `count` instances of `stride` floats from `source` into `target` in `order`. */
+/**
+ * Copies `count` instances of `stride` floats from `source` into `target` in `order`, both from
+ * instance `first`: instance `first + i` of `target` is instance `first + order[i]` of `source`.
+ */
 export function gather(
     source: Float32Array,
     target: Float32Array,
     order: Uint32Array,
     count: number,
-    stride: number
+    stride: number,
+    first = 0
 ): void {
+    const base = first * stride;
     if (stride === 1) {
         for (let i = 0; i < count; i++) {
-            target[i] = source[order[i]];
+            target[base + i] = source[base + order[i]];
         }
     } else if (stride === 3) {
-        for (let i = 0, o = 0; i < count; i++, o += 3) {
-            const s = order[i] * 3;
+        for (let i = 0, o = base; i < count; i++, o += 3) {
+            const s = base + order[i] * 3;
             target[o] = source[s];
             target[o + 1] = source[s + 1];
             target[o + 2] = source[s + 2];
         }
     } else if (stride === 4) {
-        for (let i = 0, o = 0; i < count; i++, o += 4) {
-            const s = order[i] * 4;
+        for (let i = 0, o = base; i < count; i++, o += 4) {
+            const s = base + order[i] * 4;
             target[o] = source[s];
             target[o + 1] = source[s + 1];
             target[o + 2] = source[s + 2];
@@ -111,8 +116,8 @@ export function gather(
         }
     } else {
         for (let i = 0; i < count; i++) {
-            const s = order[i] * stride;
-            const o = i * stride;
+            const s = base + order[i] * stride;
+            const o = base + i * stride;
             for (let k = 0; k < stride; k++) {
                 target[o + k] = source[s + k];
             }

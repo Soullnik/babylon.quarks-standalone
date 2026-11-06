@@ -198,6 +198,8 @@ export class EmissionController {
         let pathCarried = 0;
         let pathLength = 0;
         const previousWorldPos = emissionState.previousWorldPos;
+        // What the rate had owed before this step, to place its particles along the step.
+        const waitBefore = emissionState.waitEmiting;
         if (!system.isEmitEnded) {
             const timeRatio = emissionState.time / duration;
             emissionState.waitEmiting +=
@@ -235,7 +237,23 @@ export class EmissionController {
         // frame an old one dies (rate * lifetime ≈ 1 would otherwise flicker).
         const totalSpawn = Math.floor(emissionState.waitEmiting);
         if (totalSpawn > 0) {
-            this.spawner.spawn(totalSpawn, emissionState, emitterMatrix);
+            // A world-space particle stays where it is born, so the rate's particles are born
+            // along the path the emitter took this step, each where it was when the rate came
+            // to owe it, as Unity spreads them: a fast emitter leaves a line, not one clump per
+            // step. Distance emission adds nothing to the rate in world space, so all of
+            // `waitEmiting` is the rate's.
+            if (system.worldSpace && pathLength > 0) {
+                this.spawnOverStep(
+                    totalSpawn,
+                    emissionState,
+                    emitterMatrix,
+                    previousWorldPos!,
+                    waitBefore,
+                    emissionState.waitEmiting
+                );
+            } else {
+                this.spawner.spawn(totalSpawn, emissionState, emitterMatrix);
+            }
             emissionState.waitEmiting -= totalSpawn;
         }
         if (pathSpawn > 0) {
@@ -345,19 +363,44 @@ export class EmissionController {
         spacing: number,
         length: number
     ): void {
-        const matrix = this.pathMatrix.copy(emitterMatrix);
-        const target = emitterMatrix.elements;
-        const elements = matrix.elements;
-        const tx = target[12];
-        const ty = target[13];
-        const tz = target[14];
+        this.pathMatrix.copy(emitterMatrix);
         for (let k = 1; k <= count; k++) {
             const travelled = k * spacing - carried;
             const f = travelled <= 0 ? 0 : travelled >= length ? 1 : travelled / length;
-            elements[12] = from.x + (tx - from.x) * f;
-            elements[13] = from.y + (ty - from.y) * f;
-            elements[14] = from.z + (tz - from.z) * f;
-            this.spawner.spawn(1, emissionState, matrix);
+            this.spawnOnPath(f, emissionState, emitterMatrix, from);
         }
+    }
+
+    /**
+     * Spawns `count` particles owed to the rate over time, each where the emitter was when the
+     * rate's running total crossed its whole number on the way from `waitBefore` to `waitAfter`
+     * over this step, along the straight path from `from` to where `emitterMatrix` has it now.
+     * Only the position is interpolated, as in {@link spawnAlongPath}.
+     */
+    private spawnOverStep(
+        count: number,
+        emissionState: EmissionState,
+        emitterMatrix: Matrix4,
+        from: Vector3,
+        waitBefore: number,
+        waitAfter: number
+    ): void {
+        this.pathMatrix.copy(emitterMatrix);
+        const owed = waitAfter - waitBefore;
+        const first = Math.floor(waitBefore) + 1;
+        for (let k = 0; k < count; k++) {
+            const f = owed > 0 ? Math.min(1, Math.max(0, (first + k - waitBefore) / owed)) : 1;
+            this.spawnOnPath(f, emissionState, emitterMatrix, from);
+        }
+    }
+
+    /** Spawns one particle with {@link pathMatrix} moved `f` of the way from `from` to `emitterMatrix`'s position. */
+    private spawnOnPath(f: number, emissionState: EmissionState, emitterMatrix: Matrix4, from: Vector3): void {
+        const target = emitterMatrix.elements;
+        const elements = this.pathMatrix.elements;
+        elements[12] = from.x + (target[12] - from.x) * f;
+        elements[13] = from.y + (target[13] - from.y) * f;
+        elements[14] = from.z + (target[14] - from.z) * f;
+        this.spawner.spawn(1, emissionState, this.pathMatrix);
     }
 }

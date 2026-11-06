@@ -6,6 +6,8 @@ using System;
 namespace UnityEngine
 {
     public enum ParticleSystemCurveMode { Constant = 0, Curve = 1, TwoCurves = 2, TwoConstants = 3 }
+    public enum ParticleSystemAnimationType { WholeSheet = 0, SingleRow = 1 }
+    public enum ParticleSystemAnimationRowMode { Custom = 0, Random = 1, MeshIndex = 2 }
     public enum ParticleSystemGradientMode { Color = 0, Gradient = 1, TwoColors = 2, TwoGradients = 3, RandomColor = 4 }
     public enum ParticleSystemSimulationSpace { Local = 0, World = 1, Custom = 2 }
     public enum ParticleSystemScalingMode { Hierarchy = 0, Local = 1, Shape = 2 }
@@ -29,6 +31,7 @@ namespace UnityEngine
     public enum ParticleSystemTrailMode { PerParticle = 0, Ribbon = 1 }
     public enum ParticleSystemTrailTextureMode { Stretch = 0, Tile = 1, DistributePerSegment = 2, RepeatPerSegment = 3, Static = 4 }
     public enum ParticleSystemInheritVelocityMode { Initial = 0, Current = 1 }
+    public enum ParticleSystemCollisionType { Planes = 0, World = 1 }
     public enum ParticleSystemSubEmitterType { Birth = 0, Collision = 1, Death = 2, Trigger = 3, Manual = 4 }
 
     [Flags]
@@ -38,13 +41,33 @@ namespace UnityEngine
         InheritDuration = 16, InheritEverything = 31,
     }
 
+    public enum LineTextureMode { Stretch = 0, Tile = 1, DistributePerSegment = 2, RepeatPerSegment = 3, Static = 4 }
+    public enum LineAlignment { View = 0, TransformZ = 1 }
+
+    public class TrailRenderer : Component
+    {
+        public bool enabled { get; set; } = true;
+        public bool emitting { get; set; } = true;
+        public float time { get; set; } = 5f;
+        public float minVertexDistance { get; set; } = 0.1f;
+        public AnimationCurve widthCurve { get; set; } = AnimationCurve.Linear(0, 1, 1, 1);
+        public float widthMultiplier { get; set; } = 1f;
+        public Gradient colorGradient { get; set; } = new Gradient();
+        public LineTextureMode textureMode { get; set; }
+        public LineAlignment alignment { get; set; }
+        public Material sharedMaterial { get; set; }
+        public int sortingOrder { get; set; }
+    }
+
     public class ParticleSystemRenderer : Component
     {
+        public bool enabled { get; set; } = true;
         public ParticleSystemRenderMode renderMode { get; set; } = ParticleSystemRenderMode.Billboard;
         public Material sharedMaterial { get; set; }
         public Material trailMaterial { get; set; }
         public Mesh mesh { get; set; }
         public int sortingOrder { get; set; }
+        public float sortingFudge { get; set; }
         public ParticleSystemSortMode sortMode { get; set; }
         public float velocityScale { get; set; }
         public float lengthScale { get; set; } = 2f;
@@ -253,6 +276,10 @@ namespace UnityEngine
             public float donutRadius { get; set; } = 0.2f;
             public Vector3 boxThickness { get; set; }
             public Mesh mesh { get; set; }
+            public MeshRenderer meshRenderer { get; set; }
+            public SkinnedMeshRenderer skinnedMeshRenderer { get; set; }
+            public Sprite sprite { get; set; }
+            public SpriteRenderer spriteRenderer { get; set; }
             public ParticleSystemMeshShapeType meshShapeType { get; set; } = ParticleSystemMeshShapeType.Triangle;
             public Vector3 position { get; set; }
             public Vector3 rotation { get; set; }
@@ -327,6 +354,8 @@ namespace UnityEngine
             public MinMaxCurve x { get; set; } = 0f;
             public MinMaxCurve y { get; set; } = 0f;
             public MinMaxCurve z { get; set; } = 0f;
+            public ParticleSystemSimulationSpace space { get; set; }
+            public bool randomized { get; set; }
         }
 
         public class ColorBySpeedModule
@@ -369,8 +398,19 @@ namespace UnityEngine
 
         public class CollisionModule
         {
+            private readonly System.Collections.Generic.List<Transform> _planes = new System.Collections.Generic.List<Transform>();
+
             public bool enabled { get; set; }
+            public ParticleSystemCollisionType type { get; set; } = ParticleSystemCollisionType.Planes;
             public MinMaxCurve bounce { get; set; } = 1f;
+            public MinMaxCurve dampen { get; set; } = 0f;
+            public MinMaxCurve lifetimeLoss { get; set; } = 0f;
+            public float radiusScale { get; set; } = 1f;
+            public float minKillSpeed { get; set; }
+            public float maxKillSpeed { get; set; } = 10000f;
+            public int planeCount => _planes.Count;
+            public Transform GetPlane(int index) => _planes[index];
+            public void AddPlane(Transform transform) => _planes.Add(transform);
         }
 
         public class SubEmittersModule
@@ -398,6 +438,9 @@ namespace UnityEngine
             public MinMaxCurve startFrame { get; set; } = 0f;
             public MinMaxCurve frameOverTime { get; set; } = new MinMaxCurve(1f, AnimationCurve.Linear(0, 0, 1, 1));
             public int cycleCount { get; set; } = 1;
+            public ParticleSystemAnimationType animation { get; set; }
+            public ParticleSystemAnimationRowMode rowMode { get; set; }
+            public int rowIndex { get; set; }
         }
 
         public class TrailModule

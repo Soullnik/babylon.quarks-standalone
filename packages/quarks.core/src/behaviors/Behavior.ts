@@ -7,6 +7,7 @@ import {ApplyForce} from './ApplyForce';
 import {ApplySequences} from './ApplySequences';
 import {ChangeEmitDirection} from './ChangeEmitDirection';
 import {ColorBySpeed} from './ColorBySpeed';
+import {ColorOverLength} from './ColorOverLength';
 import {ColorOverLife} from './ColorOverLife';
 import {EmitSubParticleSystem} from './EmitSubParticleSystem';
 import {ForceOverLife} from './ForceOverLife';
@@ -16,6 +17,7 @@ import {InheritVelocity} from './InheritVelocity';
 import {LimitSpeedOverLife} from './LimitSpeedOverLife';
 import {Noise} from './Noise';
 import {OrbitOverLife} from './OrbitOverLife';
+import {RandomizeDirection} from './RandomizeDirection';
 import {Rotation3DOverLife} from './Rotation3DOverLife';
 import {RotationBySpeed} from './RotationBySpeed';
 import {RotationOverLife} from './RotationOverLife';
@@ -51,7 +53,9 @@ export interface BehaviorJSON {
  * 3. {@link update} once per live particle, or {@link updateAll} once for the
  *    whole pool when it is implemented. The particle's `age` is the age at the
  *    start of the step; the host adds `delta` and integrates the velocity
- *    after every behavior has run.
+ *    after every behavior has run. Over-life curves are read at the age the
+ *    step ends at, `stepEndAge` (or `stepEndLife` as a fraction of
+ *    the life), the age the particle is drawn at, as Unity reads them.
  * 4. {@link reset} when the system restarts, before it emits again: state
  *    accumulated across steps goes back to how it was before the first one.
  *
@@ -130,6 +134,7 @@ export const BehaviorTypes: {[key: string]: BehaviorPlugin} = {
             ['direction', ['vec3']],
             ['magnitude', ['value']],
             ['space', ['string']],
+            ['scaleWithEmitter', ['boolean']],
         ],
         loadJSON: ApplyForce.fromJSON,
     },
@@ -182,7 +187,10 @@ export const BehaviorTypes: {[key: string]: BehaviorPlugin} = {
     Rotation3DOverLife: {
         type: 'Rotation3DOverLife',
         constructor: Rotation3DOverLife,
-        params: [['angularVelocity', ['rotationFunc']]],
+        params: [
+            ['angularVelocity', ['rotationFunc']],
+            ['integration', ['string']],
+        ],
         loadJSON: Rotation3DOverLife.fromJSON,
     },
     SizeOverLife: {
@@ -235,6 +243,10 @@ export const BehaviorTypes: {[key: string]: BehaviorPlugin} = {
             ['loop', ['boolean']],
             ['random', ['boolean']],
             ['startFrame', ['value']],
+            ['rowLength', ['number']],
+            ['rowCount', ['number']],
+            ['row', ['number']],
+            ['randomRow', ['boolean']],
         ],
         loadJSON: FrameOverLife.fromJSON,
     },
@@ -246,6 +258,8 @@ export const BehaviorTypes: {[key: string]: BehaviorPlugin} = {
             ['y', ['value', 'valueFunc']],
             ['z', ['value', 'valueFunc']],
             ['space', ['string']],
+            ['randomized', ['boolean']],
+            ['scaleWithEmitter', ['boolean']],
         ],
         loadJSON: ForceOverLife.fromJSON,
     },
@@ -293,11 +307,23 @@ export const BehaviorTypes: {[key: string]: BehaviorPlugin} = {
         ],
         loadJSON: WidthOverLength.fromJSON,
     },
+    ColorOverLength: {
+        type: 'ColorOverLength',
+        constructor: ColorOverLength,
+        params: [['color', ['colorFunc']]],
+        loadJSON: ColorOverLength.fromJSON,
+    },
     ChangeEmitDirection: {
         type: 'ChangeEmitDirection',
         constructor: ChangeEmitDirection,
         params: [['angle', ['value']]],
         loadJSON: ChangeEmitDirection.fromJSON,
+    },
+    RandomizeDirection: {
+        type: 'RandomizeDirection',
+        constructor: RandomizeDirection,
+        params: [['amount', ['number']]],
+        loadJSON: RandomizeDirection.fromJSON,
     },
     ApplySequences: {
         type: 'ApplySequences',
@@ -332,8 +358,14 @@ export const BehaviorTypes: {[key: string]: BehaviorPlugin} = {
     ApplyCollision: {
         type: 'ApplyCollision',
         constructor: ApplyCollision,
-        // The resolver is host-provided (getPhysicsResolver), not serialized; only bounce round-trips.
-        params: [['bounce', ['number']]],
+        // The resolver is host-provided (getPhysicsResolver), not serialized.
+        params: [
+            ['bounce', ['number']],
+            ['planes', ['collisionPlanes']],
+            ['dampen', ['number']],
+            ['lifetimeLoss', ['number']],
+            ['radiusScale', ['number']],
+        ],
         loadJSON: ApplyCollision.fromJSON,
     },
 };

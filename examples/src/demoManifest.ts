@@ -252,7 +252,7 @@ export const demoManifest: DemoManifestEntry[] = [
         module: 'rendererOptions',
         sourcePath: 'examples/src/demos/rendererOptions.ts',
         description:
-            'Five pairs, option off on the left and on on the right: sort mode, align to direction on mesh darts, min/max on-screen particle size, shape vs hierarchy scaling under a scaled parent, and render face on open mesh bowls.',
+            'Seven pairs, option off on the left and on on the right: sort mode, align to direction on mesh darts, min/max on-screen particle size, shape vs hierarchy scaling under a scaled parent, render face on open mesh bowls, render alignment on flat mesh quads, and billboard rings laid on the ground by render alignment.',
         tags: ['renderer', 'comparison'],
         preview: {icon: 'RO', gradient: 'linear-gradient(135deg, #7ee8a2 0%, #1f3b5c 100%)'},
     },

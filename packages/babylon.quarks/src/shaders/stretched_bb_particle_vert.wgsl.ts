@@ -1,3 +1,4 @@
+import {colorSpaceDeclarationWGSL, particleColorVertexDeclarationWGSL} from './chunks/colorSpace';
 import {fogVertexDeclarationWGSL, fogVertexWGSL} from './chunks/fog';
 import {sheetVertexDeclarationWGSL, sheetVertexWGSL} from './chunks/sheet';
 
@@ -43,6 +44,8 @@ uniform sizeLimits: vec2f;
 #endif
 
 ${fogVertexDeclarationWGSL}
+${colorSpaceDeclarationWGSL}
+${particleColorVertexDeclarationWGSL}
 @vertex
 fn main(input: VertexInputs) -> FragmentInputs {
     let lengthFactor = vertexInputs.velocity.w;
@@ -54,19 +57,17 @@ fn main(input: VertexInputs) -> FragmentInputs {
     let viewWorld3 = mat3x3f(viewWorld[0].xyz, viewWorld[1].xyz, viewWorld[2].xyz);
     let viewVelocity = viewWorld3 * vertexInputs.velocity.xyz;
     let vlength = length(viewVelocity);
-    // Stretch direction is the velocity direction; only a genuinely motionless particle has none.
-    // Deriving it via normalize keeps the stretch aligned even when the speed contribution is ~0
-    // (e.g. a speed factor of 0), instead of collapsing the whole burst onto a fixed screen axis.
+    // Stretch direction is the velocity direction, kept by a speed factor of 0 too (the batch writes
+    // a tiny one). A motionless particle has none, and Unity draws nothing of it: no size either.
     var vdir = vec3f(0.0, 0.0, 1.0);
-    if (vlength > 0.000001) {
+    if (vlength > 1e-9) {
         vdir = viewVelocity / vlength;
     }
-    // Seen straight along its length a streak has no side to face; any will do.
-    let sideRaw = cross(mvPosition.xyz, vdir);
-    var side = vec3f(1.0, 0.0, 0.0);
-    if (dot(sideRaw, sideRaw) > 1e-12) {
-        side = normalize(sideRaw);
+#ifndef BEAM
+    if (vlength <= 1e-9) {
+        avgSize = 0.0;
     }
+#endif
 #ifdef SIZE_LIMITS
     // The streak's width on screen as a fraction of the viewport height, held
     // between the limits; a perspective projection divides by the view depth.
@@ -76,20 +77,37 @@ fn main(input: VertexInputs) -> FragmentInputs {
         avgSize *= clamp(screenSize, uniforms.sizeLimits.x, uniforms.sizeLimits.y) / screenSize;
     }
 #endif
-    let widthOffset = vertexInputs.position.y * side * avgSize;
-    // Equivalent to viewVelocity * (1.0 + lengthFactor / vlength) for moving particles, but the
-    // size-based term (vdir * lengthFactor) survives when the velocity contribution vanishes.
 #ifdef BEAM
     // The vector runs from the particle to the beam's end: the quad spans it
     // exactly, U from the particle (0) to the end (1), as wide as the size.
-    var stretched = mvPosition.xyz + widthOffset + (vertexInputs.position.x + 0.5) * viewVelocity;
+    let axis = vdir;
+    let streak = -viewVelocity;
 #else
-    let lengthOffset = (vertexInputs.position.x + 0.5) * (viewVelocity + vdir * lengthFactor) * avgSize;
-    var stretched = mvPosition.xyz + widthOffset - lengthOffset;
+    // Unity's streak, from the particle to its tail end: back along the velocity by the speed
+    // times the speed factor plus the size times the length factor, the two added as they come,
+    // so negative factors reach ahead of the particle (measured in Unity 6). The velocity comes
+    // already scaled by the speed factor, and the length factor times that factor's sign, so the
+    // length runs along the particle's own way whatever the speed factor's sign. The quad lies
+    // along the streak, U from the particle to the tail end, and turns round with it when it
+    // reaches ahead, as Unity turns its texture.
+    let streak = viewVelocity + vdir * lengthFactor * avgSize;
+    let streakLength = length(streak);
+    var axis = vdir;
+    if (streakLength > 1e-9) {
+        axis = streak / streakLength;
+    }
 #endif
+    // Seen straight along its length a streak has no side to face; any will do.
+    let sideRaw = cross(mvPosition.xyz, axis);
+    var side = vec3f(1.0, 0.0, 0.0);
+    if (dot(sideRaw, sideRaw) > 1e-12) {
+        side = normalize(sideRaw);
+    }
+    let widthOffset = vertexInputs.position.y * side * avgSize;
+    var stretched = mvPosition.xyz + widthOffset - (vertexInputs.position.x + 0.5) * streak;
 #ifdef PIVOT
     // In particle-size units along the quad's own axes: x from head to tail, y across.
-    stretched += (uniforms.pivot.y * side - uniforms.pivot.x * vdir) * avgSize;
+    stretched += (uniforms.pivot.y * side - uniforms.pivot.x * axis) * avgSize;
 #endif
     mvPosition.x = stretched.x;
     mvPosition.y = stretched.y;
@@ -110,6 +128,8 @@ ${sheetVertexWGSL('quadUV')}
 #ifdef UV1
     vertexOutputs.vUV1 = quadUV;
 #endif
-    vertexOutputs.vColor = vertexInputs.color;
+    // The particle colour, times the material's, comes into the working space here, so it is
+    // interpolated there too.
+    vertexOutputs.vColor = quarksParticleColor(vertexInputs.color);
 }
 `;

@@ -10,6 +10,7 @@ import {
 import {Quaternion, Vector4View} from '../math';
 import {Particle} from '../Particle';
 import {ParticleStore} from '../ParticleStore';
+import {getRandomSource} from '../util/random';
 import {Behavior} from './Behavior';
 import {runsUpdateAll, stockBehaviorType} from './StockBehavior';
 
@@ -77,13 +78,15 @@ const DEPS = {
     AxisAngleGenerator,
     IntervalValue,
     ColorRange,
+    getRandomSource,
 };
 
 interface Fragment {
     /** Hoisted out of the loop; runs once per pass. */
     setup: string;
     /**
-     * Body applied to row `i`, with `t` (age over life), `o3` / `o4` (row
+     * Body applied to row `i`, with `drawn` (the age the step ends at, see
+     * stepEndAge), `t` (that age over life), `o3` / `o4` (row
      * offsets into the three- and four-component columns), `s` (offset into
      * the scalars) and `p` (the particle object) already bound.
      */
@@ -133,11 +136,48 @@ function scalarValue(n: string, out: string, t: string): string {
             }
         } else if (${n}_const) ${out} = ${n}_cv;
         else if (${n}_iv) {
-            // The particle's own sample, from the memory column when it holds it.
-            let r = ${n}_col ? mem[row * ms + ${n}_slot] : NaN;
-            if (r !== r) r = p.memory[${n}_slot];
+            // The particle's own sample, from the memory column when it holds it. A roll is in
+            // [0, 1), so -1 marks a slot the column lacks, and a NaN in it (a row it never saw)
+            // fails the test too. Not NaN as the mark: that boxes every sample read.
+            let r = ${n}_col ? mem[row * ms + ${n}_slot] : -1;
+            if (!(r >= 0)) r = p.memory[${n}_slot];
             ${out} = (1 - r) * ${n}_a + r * ${n}_b;
         } else ${out} = ${n}.genValue(p.memory, ${t});`;
+}
+
+/**
+ * Statements rolling the generator set up by {@link scalarSetup} again for particle memory `pm`:
+ * a random range inline, into both the particle's memory and the memory column, so the reads
+ * after it see the new roll; any other generator through its own `reroll`, if it has one.
+ *
+ * `k` names the pass's random state (see {@link rollSetup}). A random source set with
+ * `setRandomSource` is called for each roll, so a seeded run replays as the behavior's own update
+ * does. Without one, the rolls come from mulberry32 seeded by one `Math.random()` per pass:
+ * `Math.random()` per roll boxes its result here, a heap number per particle per axis.
+ */
+function reroll(n: string, k: number): string {
+    const store = (roll: string) => `{
+                    ${roll}
+                    pm[${n}_slot] = r;
+                    if (${n}_col) mem[row * ms + ${n}_slot] = r;
+                }`;
+    return `if (${n}_iv) {
+            if (${n}_slot >= 0 && ${n}_slot < pm.length) {
+                if (native${k}) ${store(`seed${k} = (seed${k} + 0x6d2b79f5) | 0;
+                    let z = seed${k};
+                    z = Math.imul(z ^ (z >>> 15), z | 1);
+                    z ^= z + Math.imul(z ^ (z >>> 7), z | 61);
+                    const r = ((z ^ (z >>> 14)) >>> 0) / 4294967296;`)}
+                else ${store(`const r = src${k}();`)}
+            }
+        } else if (${n}.reroll !== undefined) ${n}.reroll(pm);`;
+}
+
+/** Setup for the random state {@link reroll} reads: the source, and the seed when it is `Math.random`. */
+function rollSetup(k: number): string {
+    return `const src${k} = deps.getRandomSource();
+        const native${k} = src${k} === Math.random;
+        let seed${k} = native${k} ? (Math.random() * 4294967296) | 0 : 0;`;
 }
 
 /** Setup for a colour generator read from `expr`, bound to names prefixed `n`. */
@@ -302,7 +342,7 @@ function fragmentFor(behavior: Behavior, k: number): Fragment | null {
                     const quat_${k} = !angle_${k} && rq${k}.length > 0 && rotation_${k} instanceof deps.Quaternion;`,
                 // The rate (or the step's turn) is kept for the renderer, which
                 // draws between simulation steps. A mesh particle turns about its
-                // own Z, as RotationOverLife.turnAboutZ does.
+                // rotation axis, or its own Z without one, as RotationOverLife.turn does.
                 body: `if (angle_${k}) {
                         ${scalarValue(`g${k}`, 'rate', 't')}
                         rot[row] += delta * rate;
@@ -310,13 +350,23 @@ function fragmentFor(behavior: Behavior, k: number): Fragment | null {
                     } else if (quat_${k}) {
                         ${scalarValue(`g${k}`, 'rate', 't')}
                         const half = (rate * delta) / 2;
-                        const qz = Math.sin(half), qw = Math.cos(half);
+                        const s = Math.sin(half), qw = Math.cos(half);
                         const ax = rq${k}[o4], ay = rq${k}[o4 + 1], az = rq${k}[o4 + 2], aw = rq${k}[o4 + 3];
-                        rq${k}[o4] = ax * qw + ay * qz;
-                        rq${k}[o4 + 1] = ay * qw - ax * qz;
-                        rq${k}[o4 + 2] = az * qw + aw * qz;
-                        rq${k}[o4 + 3] = aw * qw - az * qz;
-                        aq${k}[o4] = 0; aq${k}[o4 + 1] = 0; aq${k}[o4 + 2] = qz; aq${k}[o4 + 3] = qw;
+                        const axis = p.rotationAxis;
+                        if (axis) {
+                            const qx = s * axis.x, qy = s * axis.y, qz = s * axis.z;
+                            rq${k}[o4] = aw * qx + ax * qw + ay * qz - az * qy;
+                            rq${k}[o4 + 1] = aw * qy - ax * qz + ay * qw + az * qx;
+                            rq${k}[o4 + 2] = aw * qz + ax * qy - ay * qx + az * qw;
+                            rq${k}[o4 + 3] = aw * qw - ax * qx - ay * qy - az * qz;
+                            aq${k}[o4] = qx; aq${k}[o4 + 1] = qy; aq${k}[o4 + 2] = qz; aq${k}[o4 + 3] = qw;
+                        } else {
+                            rq${k}[o4] = ax * qw + ay * s;
+                            rq${k}[o4 + 1] = ay * qw - ax * s;
+                            rq${k}[o4 + 2] = az * qw + aw * s;
+                            rq${k}[o4 + 3] = aw * qw - az * s;
+                            aq${k}[o4] = 0; aq${k}[o4 + 1] = 0; aq${k}[o4 + 2] = s; aq${k}[o4 + 3] = qw;
+                        }
                     }`,
             };
         case 'FrameOverLife':
@@ -327,7 +377,7 @@ function fragmentFor(behavior: Behavior, k: number): Fragment | null {
                     const b${k} = behaviors[${k}];
                     const plain${k} = typeof b${k}.isPlain !== 'function' || b${k}.isPlain();`,
                 body: `if (plain${k}) {${scalarValue(`g${k}`, 'v', 't')} uvTile[row] = v;}
-                    else uvTile[row] = b${k}.frameAt(p, age, t);`,
+                    else uvTile[row] = b${k}.frameAt(p, drawn, t);`,
             };
         case 'SpeedOverLife':
             return {
@@ -338,27 +388,44 @@ function fragmentFor(behavior: Behavior, k: number): Fragment | null {
             return {
                 // The force is authored in b.space and converted into the simulation
                 // space with the emitter frame b.frameUpdate decomposed, exactly as
-                // EmitterFrame.toSimulation does; the step carries motionScale.
+                // EmitterFrame.forceToSimulation does; the step carries motionScale.
                 setup: `const b${k} = behaviors[${k}];
                     ${scalarSetup(`gx${k}`, `b${k}.x`)}
                     ${scalarSetup(`gy${k}`, `b${k}.y`)}
                     ${scalarSetup(`gz${k}`, `b${k}.z`)}
                     const world${k} = b${k}.ps === undefined || b${k}.ps.worldSpace;
-                    const toWorld${k} = world${k} && b${k}.space === 'local';
-                    const toLocal${k} = !world${k} && b${k}.space === 'world';
+                    const scaled${k} = b${k}.scaleWithEmitter !== false;
+                    // Turned into the other space's axes; scaled before turning into world
+                    // space (a local force that scales), after turning into local space (a
+                    // force that keeps its world strength).
+                    const turn${k} = world${k} ? b${k}.space === 'local' : b${k}.space === 'world';
+                    const scaleFirst${k} = world${k} && b${k}.space === 'local' && scaled${k};
+                    const scaleAfter${k} = !world${k} && !scaled${k};
                     const step${k} = b${k}._step(delta);
+                    // A randomized force picks new values every step, rolled in the particle's
+                    // memory (and the memory column) before they are read.
+                    const rand${k} = b${k}.randomized === true;
+                    ${rollSetup(k)}
                     const fr${k} = b${k}._frame;
-                    ${vectorSetup(`sc${k}`, `toWorld${k} ? fr${k}.scale : fr${k}.scaleInverse`)}
-                    ${quaternionSetup(`q${k}`, `toWorld${k} ? fr${k}.quaternion : fr${k}.quaternionInverse`)}`,
+                    ${vectorSetup(`sc${k}`, `world${k} ? fr${k}.scale : fr${k}.scaleInverse`)}
+                    ${quaternionSetup(`q${k}`, `world${k} ? fr${k}.quaternion : fr${k}.quaternionInverse`)}`,
                 body: `{
+                    if (rand${k}) {
+                        const pm = p.memory;
+                        ${reroll(`gx${k}`, k)}
+                        ${reroll(`gy${k}`, k)}
+                        ${reroll(`gz${k}`, k)}
+                    }
                     ${scalarValue(`gx${k}`, 'fx', 't')}
                     ${scalarValue(`gy${k}`, 'fy', 't')}
                     ${scalarValue(`gz${k}`, 'fz', 't')}
-                    if (toWorld${k}) {
+                    if (scaleFirst${k}) {
                         fx *= sc${k}x; fy *= sc${k}y; fz *= sc${k}z;
+                    }
+                    if (turn${k}) {
                         ${rotateInPlace('fx', 'fy', 'fz', `q${k}x`, `q${k}y`, `q${k}z`, `q${k}w`)}
-                    } else if (toLocal${k}) {
-                        ${rotateInPlace('fx', 'fy', 'fz', `q${k}x`, `q${k}y`, `q${k}z`, `q${k}w`)}
+                    }
+                    if (scaleAfter${k}) {
                         fx *= sc${k}x; fy *= sc${k}y; fz *= sc${k}z;
                     }
                     vel[o3] += fx * step${k}; vel[o3 + 1] += fy * step${k}; vel[o3 + 2] += fz * step${k};}`,
@@ -371,13 +438,11 @@ function fragmentFor(behavior: Behavior, k: number): Fragment | null {
                     const vec3_${k} = b${k}.speed instanceof deps.Vector3Function;
                     ${scalarSetup(`g${k}`, `b${k}.speed`)}
                     const dampen${k} = b${k}.dampenStep(delta);
-                    const ms${k} = typeof b${k}.motionScale === 'function' ? b${k}.motionScale() : 1;
                     const conv${k} = vec3_${k} && b${k}._convertsSpace();`,
-                body: `if (vec3_${k}) b${k}._limitAxes(p, t, dampen${k}, ms${k}, conv${k});
+                body: `if (vec3_${k}) b${k}._limitAxes(p, t, dampen${k}, conv${k});
                     else {const vx = vel[o3], vy = vel[o3 + 1], vz = vel[o3 + 2];
                     const speed = Math.sqrt(vx * vx + vy * vy + vz * vz);
-                    ${scalarValue(`g${k}`, 'limitBase', 't')}
-                    const limit = limitBase * ms${k};
+                    ${scalarValue(`g${k}`, 'limit', 't')}
                     if (speed > limit) {
                         const f = 1 - ((speed - limit) / speed) * dampen${k};
                         vel[o3] = vx * f; vel[o3 + 1] = vy * f; vel[o3 + 2] = vz * f;
@@ -485,6 +550,13 @@ function fragmentFor(behavior: Behavior, k: number): Fragment | null {
                     const rq${k} = store.rotationQuaternion, aq${k} = store.angularVelocityQuaternion;
                     const quat_${k} = rq${k}.length > 0 && count > 0 && particles[0].rotation instanceof deps.Quaternion;
                     const fixed_${k} = g${k} instanceof deps.AxisAngleGenerator && g${k}.angle instanceof deps.ConstantValue;
+                    // Euler angles that add up ('angles' integration): the rates are read inline
+                    // and added to the angles in the particle's memory, and the behavior rebuilds
+                    // the rotation and the turn from them straight into the columns.
+                    const angles_${k} = b${k}._integratesAngles();
+                    ${scalarSetup(`ex${k}`, `angles_${k} ? g${k}.angleX : null`)}
+                    ${scalarSetup(`ey${k}`, `angles_${k} ? g${k}.angleY : null`)}
+                    ${scalarSetup(`ez${k}`, `angles_${k} ? g${k}.angleZ : null`)}
                     let cqx${k} = 0, cqy${k} = 0, cqz${k} = 0, cqw${k} = 1;
                     if (fixed_${k}) {
                         g${k}.genValue(undefined, q${k}, delta, 0);
@@ -492,7 +564,17 @@ function fragmentFor(behavior: Behavior, k: number): Fragment | null {
                     }`,
                 // The step's turn is kept for the renderer, which draws a fraction
                 // of it when the frame falls between steps.
-                body: `if (quat_${k}) {
+                body: `if (quat_${k} && angles_${k}) {
+                        const pm = p.memory, as = b${k}._angleSlot;
+                        if (as < 0 || pm.length < as + 3) b${k}._turn(p, t, delta);
+                        else {
+                            ${scalarValue(`ex${k}`, 'rx', 't')}
+                            ${scalarValue(`ey${k}`, 'ry', 't')}
+                            ${scalarValue(`ez${k}`, 'rz', 't')}
+                            pm[as] += rx * delta; pm[as + 1] += ry * delta; pm[as + 2] += rz * delta;
+                            b${k}._applyAngles(pm, rq${k}, o4, aq${k}, o4);
+                        }
+                    } else if (quat_${k}) {
                         let qx, qy, qz, qw;
                         if (fixed_${k}) {
                             qx = cqx${k}; qy = cqy${k}; qz = cqz${k}; qw = cqw${k};
@@ -523,6 +605,9 @@ function fragmentFor(behavior: Behavior, k: number): Fragment | null {
                     ${scalarSetup(`rd${k}`, `b${k}.radial`)}
                     ${vectorSetup(`ce${k}`, `b${k}._center`)}
                     const world${k} = b${k}.ps !== undefined && b${k}.ps.worldSpace;
+                    // The velocity of the move, for a renderer drawing along it (animatedVelocity).
+                    const av${k} = store.animatedVelocity;
+                    const keepAv${k} = av${k}.length > 0 && delta > 0;
                     const toWorld${k} = world${k} && b${k}.space === 'local';
                     const convert${k} = toWorld${k} || (!world${k} && b${k}.space === 'world');
                     ${vectorSetup(`sc${k}`, `toWorld${k} ? b${k}._tempScale : b${k}._tempScaleInv`)}
@@ -558,6 +643,11 @@ function fragmentFor(behavior: Behavior, k: number): Fragment | null {
                         if (ry !== 0) ${orbitInPlace('ry', `aY${k}x`, `aY${k}y`, `aY${k}z`)}
                         if (rz !== 0) ${orbitInPlace('rz', `aZ${k}x`, `aZ${k}y`, `aZ${k}z`)}
                         px = Math.fround(px + ce${k}x); py = Math.fround(py + ce${k}y); pz = Math.fround(pz + ce${k}z);
+                    }
+                    if (keepAv${k}) {
+                        av${k}[o3] += (px - pos[o3]) / delta;
+                        av${k}[o3 + 1] += (py - pos[o3 + 1]) / delta;
+                        av${k}[o3 + 2] += (pz - pos[o3 + 2]) / delta;
                     }
                     pos[o3] = px; pos[o3 + 1] = py; pos[o3 + 2] = pz;}`,
             };
@@ -650,7 +740,9 @@ function generate(fragments: Array<Fragment>, indices: Array<number>): FusedPass
             const s = row * 3;
             const age = scalars[s], life = scalars[s + 1];
             if (age >= life) continue;
-            const t = age / life;
+            // Curves are read at the age the step ends at, as stepEndAge does.
+            const drawn = age + delta < life ? age + delta : life;
+            const t = drawn / life;
             const o3 = row * 3, o4 = row * 4;
             ${fragments.map((f) => f.body).join('\n')}
         }`;

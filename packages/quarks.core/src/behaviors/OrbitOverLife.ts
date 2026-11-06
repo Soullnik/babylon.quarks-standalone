@@ -5,8 +5,10 @@ import type {Vector3Like} from '../Like';
 import {Quaternion, Vector3} from '../math';
 import {vector3From} from '../math/fromLike';
 import {Particle} from '../Particle';
+import {addAnimatedVelocity} from './animatedVelocity';
 import {Behavior, BehaviorJSON} from './Behavior';
 import {BehaviorSpace, EmitterFrame, readBehaviorSpace} from './EmitterFrame';
+import {stepEndLife} from './stepAge';
 
 /** The JSON of an orbit over life: a {@link OrbitOverLife}. */
 export interface OrbitOverLifeJSON extends BehaviorJSON {
@@ -30,7 +32,9 @@ export interface OrbitOverLifeJSON extends BehaviorJSON {
  * `'world'` orbits the world origin about a world axis wherever the emitter
  * goes (Niagara's Vortex Force with a fixed origin). The axis need not be a
  * unit vector; only its direction matters, and a zero axis orbits nothing.
- * Applies in every render mode.
+ * Applies in every render mode. The velocity of the turn is added to the particle's
+ * `animatedVelocity` when it keeps one, as Unity's orbital velocity is part of its animated
+ * velocity, so a stretched billboard is drawn along it.
  *
  * For an orbit around three axes at once, with a radial speed or an offset
  * pivot, see `VelocityOverLife`.
@@ -116,16 +120,20 @@ export class OrbitOverLife implements Behavior {
             return;
         }
         const position = particle.position;
+        const startX = position.x;
+        const startY = position.y;
+        const startZ = position.z;
         position.sub(this._center);
         this.temp.copy(position).projectOnVector(axis);
         this.rotation.setFromAxisAngle(
             axis,
-            this.orbitSpeed.genValue(particle.memory, particle.age / particle.life) * delta
+            this.orbitSpeed.genValue(particle.memory, stepEndLife(particle, delta)) * delta
         );
         position.sub(this.temp);
         position.applyQuaternion(this.rotation);
         position.add(this.temp);
         position.add(this._center);
+        addAnimatedVelocity(particle, startX, startY, startZ, delta);
     }
 
     updateAll(particles: Array<Particle>, count: number, delta: number): void {
@@ -143,13 +151,17 @@ export class OrbitOverLife implements Behavior {
                 continue;
             }
             const position = particle.position;
+            const startX = position.x;
+            const startY = position.y;
+            const startZ = position.z;
             position.sub(center);
             temp.copy(position).projectOnVector(axis);
-            rotation.setFromAxisAngle(axis, generator.genValue(particle.memory, particle.age / particle.life) * delta);
+            rotation.setFromAxisAngle(axis, generator.genValue(particle.memory, stepEndLife(particle, delta)) * delta);
             position.sub(temp);
             position.applyQuaternion(rotation);
             position.add(temp);
             position.add(center);
+            addAnimatedVelocity(particle, startX, startY, startZ, delta);
         }
     }
 

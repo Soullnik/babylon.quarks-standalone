@@ -1,1 +1,3 @@
-[Quarks Exporter] 'Chunks': Rotation over Lifetime turns about the particle's own X and Y axes in babylon.quarks, not Unity's Euler angles.
+[Quarks Exporter] 'Shards': Render Alignment Facing is exported as View (facing the camera's plane, not its position).
+[Quarks Exporter] 'Hollow': Unity draws nothing of it (it draws meshes but has no mesh), so it is exported as an empty node.
+[Quarks Exporter] 'Muted': Unity draws nothing of it (its renderer is disabled), so it is exported as an empty node.

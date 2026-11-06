@@ -114,6 +114,44 @@ export class EmitterFrame {
     }
 
     /**
+     * Converts the force `vector`, authored in `space`, into the simulation space, as Unity
+     * converts forces. A force that scales with the emitter (`scaled`, the default of the force
+     * behaviors) is converted as {@link toSimulation} converts a direction, except a world force
+     * in a local-space system: that one is only turned into the emitter's axes, and the local
+     * frame then scales it with everything else, as Unity does. (In a world-space system the
+     * force behaviors multiply a world force by the system's `motionScale` for the same reason.)
+     * A force that does not scale with the emitter keeps its strength in world units however the
+     * emitter is scaled, as Unity's gravity does: a local one is turned but not scaled, and in a
+     * local-space system the frame's scale is divided out.
+     */
+    forceToSimulation(vector: Vector3, space: BehaviorSpace, worldSpace: boolean, scaled: boolean): Vector3 {
+        if (worldSpace) {
+            if (space === 'local') {
+                if (scaled) {
+                    vector.multiply(this.scale);
+                }
+                vector.applyQuaternion(this.quaternion);
+            }
+        } else {
+            if (space === 'world') {
+                vector.applyQuaternion(this.quaternionInverse);
+            }
+            if (!scaled) {
+                vector.multiply(this.scaleInverse);
+            }
+        }
+        return vector;
+    }
+
+    /**
+     * Whether {@link forceToSimulation} reads the frame for these settings, so a behavior
+     * refreshes it only then.
+     */
+    static forceReadsFrame(space: BehaviorSpace, worldSpace: boolean, scaled: boolean): boolean {
+        return worldSpace ? space === 'local' : space === 'world' || !scaled;
+    }
+
+    /**
      * The inverse of {@link toSimulation}: converts the direction `vector`, in the simulation
      * space, into `space`. A vector already in `space` is left as it is.
      */

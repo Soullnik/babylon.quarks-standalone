@@ -7,45 +7,184 @@
   },
   "geometries": [
     {
-      "uuid": "quarks_geometry-6",
+      "uuid": "quarks_geometry-15",
+      "type": "QuarksGeometry",
+      "url": "shared/geometries/Quad.json"
+    },
+    {
+      "uuid": "quarks_geometry-20",
+      "type": "QuarksGeometry",
+      "url": "shared/geometries/Quad.json"
+    },
+    {
+      "uuid": "quarks_geometry-23",
+      "type": "QuarksGeometry",
+      "url": "shared/geometries/FadedQuad.json"
+    },
+    {
+      "uuid": "quarks_geometry-26",
+      "type": "QuarksGeometry",
+      "url": "shared/geometries/Quad.json"
+    },
+    {
+      "uuid": "quarks_geometry-31",
+      "type": "QuarksGeometry",
+      "url": "shared/geometries/Quad.json"
+    },
+    {
+      "uuid": "quarks_geometry-34",
       "type": "QuarksGeometry",
       "url": "shared/geometries/Quad.json"
     }
   ],
   "materials": [
     {
-      "uuid": "quarks_material-5",
+      "uuid": "quarks_material-14",
       "type": "QuarksMaterial",
       "transparent": false,
       "alphaMode": 0,
       "depthTest": true,
       "depthWrite": true,
       "alphaTest": 0.3,
-      "texture": "quarks_texture-4"
+      "lighting": "unlit",
+      "texture": "quarks_texture-13"
     },
     {
-      "uuid": "quarks_material-8",
+      "uuid": "quarks_material-17",
       "type": "QuarksMaterial",
       "transparent": true,
       "alphaMode": 2,
       "depthTest": true,
       "depthWrite": false,
       "alphaTest": 0,
-      "texture": "quarks_texture-7"
+      "texture": "quarks_texture-16"
+    },
+    {
+      "uuid": "quarks_material-19",
+      "type": "QuarksMaterial",
+      "transparent": false,
+      "alphaMode": 0,
+      "depthTest": true,
+      "depthWrite": true,
+      "alphaTest": 0.3,
+      "lighting": "unlit",
+      "texture": "quarks_texture-18"
+    },
+    {
+      "uuid": "quarks_material-22",
+      "type": "QuarksMaterial",
+      "transparent": false,
+      "alphaMode": 0,
+      "depthTest": true,
+      "depthWrite": true,
+      "alphaTest": 0.3,
+      "lighting": "unlit",
+      "texture": "quarks_texture-21"
+    },
+    {
+      "uuid": "quarks_material-25",
+      "type": "QuarksMaterial",
+      "transparent": false,
+      "alphaMode": 0,
+      "depthTest": true,
+      "depthWrite": true,
+      "alphaTest": 0.3,
+      "lighting": "unlit",
+      "texture": "quarks_texture-24"
+    },
+    {
+      "uuid": "quarks_material-28",
+      "type": "QuarksMaterial",
+      "transparent": false,
+      "alphaMode": 0,
+      "depthTest": true,
+      "depthWrite": true,
+      "alphaTest": 0.3,
+      "texture": "quarks_texture-27"
+    },
+    {
+      "uuid": "quarks_material-30",
+      "type": "QuarksMaterial",
+      "transparent": false,
+      "alphaMode": 0,
+      "depthTest": true,
+      "depthWrite": true,
+      "alphaTest": 0.3,
+      "lighting": "unlit",
+      "texture": "quarks_texture-29"
+    },
+    {
+      "uuid": "quarks_material-33",
+      "type": "QuarksMaterial",
+      "transparent": false,
+      "alphaMode": 0,
+      "depthTest": true,
+      "depthWrite": true,
+      "alphaTest": 0.3,
+      "lighting": "unlit",
+      "texture": "quarks_texture-32"
     }
   ],
   "textures": [
     {
-      "uuid": "quarks_texture-4",
-      "image": "quarks_image-3",
+      "uuid": "quarks_texture-13",
+      "image": "quarks_image-12",
       "wrap": [
         1000,
         1000
       ]
     },
     {
-      "uuid": "quarks_texture-7",
-      "image": "quarks_image-3",
+      "uuid": "quarks_texture-16",
+      "image": "quarks_image-12",
+      "wrap": [
+        1000,
+        1000
+      ]
+    },
+    {
+      "uuid": "quarks_texture-18",
+      "image": "quarks_image-12",
+      "wrap": [
+        1000,
+        1000
+      ]
+    },
+    {
+      "uuid": "quarks_texture-21",
+      "image": "quarks_image-12",
+      "wrap": [
+        1000,
+        1000
+      ]
+    },
+    {
+      "uuid": "quarks_texture-24",
+      "image": "quarks_image-12",
+      "wrap": [
+        1000,
+        1000
+      ]
+    },
+    {
+      "uuid": "quarks_texture-27",
+      "image": "quarks_image-12",
+      "wrap": [
+        1000,
+        1000
+      ]
+    },
+    {
+      "uuid": "quarks_texture-29",
+      "image": "quarks_image-12",
+      "wrap": [
+        1000,
+        1000
+      ]
+    },
+    {
+      "uuid": "quarks_texture-32",
+      "image": "quarks_image-12",
       "wrap": [
         1000,
         1000
@@ -54,53 +193,33 @@
   ],
   "images": [
     {
-      "uuid": "quarks_image-3",
+      "uuid": "quarks_image-12",
       "url": "shared/textures/spark.png"
     }
   ],
   "object": {
     "uuid": "node-0",
     "name": "Debris",
-    "matrix": [
+    "scale": [
       2,
-      0,
-      0,
-      0,
-      0,
       2,
-      0,
-      0,
-      0,
-      0,
-      2,
-      0,
-      0,
-      0,
-      0,
-      1
+      2
     ],
     "type": "Group",
     "children": [
       {
         "uuid": "node-1",
         "name": "Chunks",
-        "matrix": [
-          5.9604645E-08,
-          0,
-          -0.99999994,
-          0,
+        "position": [
           0,
           1,
+          0
+        ],
+        "quaternion": [
           0,
+          0.70710677,
           0,
-          0.99999994,
-          0,
-          5.9604645E-08,
-          0,
-          0,
-          1,
-          0,
-          1
+          0.70710677
         ],
         "type": "ParticleEmitter",
         "ps": {
@@ -183,10 +302,10 @@
           "renderMode": 2,
           "renderOrder": 0,
           "rendererEmitterSettings": {},
-          "material": "quarks_material-5",
+          "material": "quarks_material-14",
           "layers": 1,
           "playbackSpeed": 1.5,
-          "instancingGeometry": "quarks_geometry-6",
+          "instancingGeometry": "quarks_geometry-15",
           "startTileIndex": {
             "type": "ConstantValue",
             "value": 0
@@ -196,6 +315,7 @@
           "blendTiles": false,
           "worldSpace": true,
           "renderFace": "front",
+          "renderAlignment": "view",
           "scalingMode": "hierarchy",
           "behaviors": [
             {
@@ -216,7 +336,8 @@
                   "value": 0.5
                 },
                 "eulerOrder": "YXZ"
-              }
+              },
+              "integration": "angles"
             },
             {
               "type": "LimitSpeedOverLife",
@@ -232,23 +353,10 @@
       {
         "uuid": "node-2",
         "name": "Dust",
-        "matrix": [
-          1,
-          0,
-          0,
-          0,
-          0,
-          1,
-          0,
-          0,
-          0,
-          0,
-          1,
-          0,
-          0,
-          0,
-          0,
-          1
+        "scale": [
+          2,
+          2,
+          2
         ],
         "type": "ParticleEmitter",
         "ps": {
@@ -340,7 +448,7 @@
           "renderMode": 0,
           "renderOrder": 0,
           "rendererEmitterSettings": {},
-          "material": "quarks_material-8",
+          "material": "quarks_material-17",
           "layers": 1,
           "maxParticleSize": 0.5,
           "startTileIndex": {
@@ -352,6 +460,10 @@
           "blendTiles": false,
           "worldSpace": false,
           "behaviors": [
+            {
+              "type": "RandomizeDirection",
+              "amount": 0.5
+            },
             {
               "type": "LimitSpeedOverLife",
               "speed": {
@@ -371,6 +483,573 @@
               },
               "dampen": 1,
               "space": "world"
+            },
+            {
+              "type": "ApplyCollision",
+              "bounce": 0.5,
+              "planes": [
+                {
+                  "position": [
+                    0,
+                    -0.25,
+                    0.5
+                  ],
+                  "normal": [
+                    0,
+                    3.939231,
+                    0.6945927
+                  ]
+                }
+              ],
+              "radiusScale": 0.01,
+              "dampen": 0.2,
+              "lifetimeLoss": 0.1
+            }
+          ]
+        }
+      },
+      {
+        "uuid": "node-3",
+        "name": "Floor",
+        "position": [
+          0,
+          -0.5,
+          1
+        ],
+        "quaternion": [
+          0.087155744,
+          0,
+          0,
+          0.9961947
+        ],
+        "type": "Group"
+      },
+      {
+        "uuid": "node-4",
+        "name": "Shards",
+        "type": "ParticleEmitter",
+        "ps": {
+          "looping": true,
+          "prewarm": false,
+          "duration": 5,
+          "startDelay": {
+            "type": "ConstantValue",
+            "value": 0
+          },
+          "shape": {
+            "type": "cone",
+            "radius": 1,
+            "thickness": 1,
+            "arc": 6.2831855,
+            "mode": 0,
+            "spread": 0,
+            "speed": {
+              "type": "ConstantValue",
+              "value": 1
+            },
+            "angle": 0.43633232
+          },
+          "startLife": {
+            "type": "ConstantValue",
+            "value": 5.016667
+          },
+          "startSpeed": {
+            "type": "ConstantValue",
+            "value": 5
+          },
+          "startRotation": {
+            "type": "ConstantValue",
+            "value": 0
+          },
+          "startSize": {
+            "type": "ConstantValue",
+            "value": 1
+          },
+          "startColor": {
+            "type": "ConstantColor",
+            "color": {
+              "r": 1,
+              "g": 1,
+              "b": 1,
+              "a": 1
+            }
+          },
+          "emissionOverTime": {
+            "type": "ConstantValue",
+            "value": 10
+          },
+          "emissionOverDistance": {
+            "type": "ConstantValue",
+            "value": 0
+          },
+          "emissionBursts": [],
+          "maxParticles": 1000,
+          "onlyUsedByOther": false,
+          "renderMode": 2,
+          "renderOrder": 0,
+          "rendererEmitterSettings": {},
+          "material": "quarks_material-19",
+          "layers": 1,
+          "instancingGeometry": "quarks_geometry-20",
+          "startTileIndex": {
+            "type": "ConstantValue",
+            "value": 0
+          },
+          "uTileCount": 1,
+          "vTileCount": 1,
+          "blendTiles": false,
+          "worldSpace": false,
+          "renderFace": "front",
+          "renderAlignment": "view",
+          "rotationAxis": "emission",
+          "behaviors": []
+        }
+      },
+      {
+        "uuid": "node-5",
+        "name": "Ring",
+        "type": "ParticleEmitter",
+        "ps": {
+          "looping": true,
+          "prewarm": false,
+          "duration": 5,
+          "startDelay": {
+            "type": "ConstantValue",
+            "value": 0
+          },
+          "shape": {
+            "type": "cone",
+            "radius": 0.01,
+            "thickness": 1,
+            "arc": 6.2831855,
+            "mode": 0,
+            "spread": 0,
+            "speed": {
+              "type": "ConstantValue",
+              "value": 1
+            },
+            "angle": 0
+          },
+          "startLife": {
+            "type": "ConstantValue",
+            "value": 5.016667
+          },
+          "startSpeed": {
+            "type": "ConstantValue",
+            "value": 0
+          },
+          "startRotation": {
+            "type": "IntervalValue",
+            "a": 0,
+            "b": 6.2831855
+          },
+          "startSize": {
+            "type": "ConstantValue",
+            "value": 1
+          },
+          "startColor": {
+            "type": "ConstantColor",
+            "color": {
+              "r": 1,
+              "g": 1,
+              "b": 1,
+              "a": 1
+            }
+          },
+          "emissionOverTime": {
+            "type": "ConstantValue",
+            "value": 10
+          },
+          "emissionOverDistance": {
+            "type": "ConstantValue",
+            "value": 0
+          },
+          "emissionBursts": [],
+          "maxParticles": 1000,
+          "onlyUsedByOther": false,
+          "renderMode": 2,
+          "renderOrder": 0,
+          "rendererEmitterSettings": {},
+          "material": "quarks_material-22",
+          "layers": 1,
+          "instancingGeometry": "quarks_geometry-23",
+          "startTileIndex": {
+            "type": "ConstantValue",
+            "value": 0
+          },
+          "uTileCount": 1,
+          "vTileCount": 1,
+          "blendTiles": false,
+          "worldSpace": false,
+          "renderFace": "front",
+          "renderAlignment": "view",
+          "rotationAxis": "emission",
+          "behaviors": [
+            {
+              "type": "RotationOverLife",
+              "angularVelocity": {
+                "type": "ConstantValue",
+                "value": 2
+              }
+            }
+          ]
+        }
+      },
+      {
+        "uuid": "node-6",
+        "name": "Spokes",
+        "type": "ParticleEmitter",
+        "ps": {
+          "looping": true,
+          "prewarm": false,
+          "duration": 5,
+          "startDelay": {
+            "type": "ConstantValue",
+            "value": 0
+          },
+          "shape": {
+            "type": "cone",
+            "radius": 0,
+            "angle": 0
+          },
+          "startLife": {
+            "type": "ConstantValue",
+            "value": 5.016667
+          },
+          "startSpeed": {
+            "type": "ConstantValue",
+            "value": 5
+          },
+          "startRotation": {
+            "type": "IntervalValue",
+            "a": 0,
+            "b": 1.5707964
+          },
+          "startSize": {
+            "type": "ConstantValue",
+            "value": 1
+          },
+          "startColor": {
+            "type": "ConstantColor",
+            "color": {
+              "r": 1,
+              "g": 1,
+              "b": 1,
+              "a": 1
+            }
+          },
+          "emissionOverTime": {
+            "type": "ConstantValue",
+            "value": 10
+          },
+          "emissionOverDistance": {
+            "type": "ConstantValue",
+            "value": 0
+          },
+          "emissionBursts": [],
+          "maxParticles": 1000,
+          "onlyUsedByOther": false,
+          "renderMode": 2,
+          "renderOrder": 0,
+          "rendererEmitterSettings": {},
+          "material": "quarks_material-25",
+          "layers": 1,
+          "instancingGeometry": "quarks_geometry-26",
+          "startTileIndex": {
+            "type": "ConstantValue",
+            "value": 0
+          },
+          "uTileCount": 1,
+          "vTileCount": 1,
+          "blendTiles": false,
+          "worldSpace": false,
+          "renderFace": "front",
+          "renderAlignment": "view",
+          "behaviors": []
+        }
+      },
+      {
+        "uuid": "node-7",
+        "name": "Hollow",
+        "type": "Group",
+        "children": [
+          {
+            "uuid": "node-8",
+            "name": "Inner",
+            "type": "ParticleEmitter",
+            "ps": {
+              "looping": true,
+              "prewarm": false,
+              "duration": 5,
+              "startDelay": {
+                "type": "ConstantValue",
+                "value": 0
+              },
+              "shape": {
+                "type": "cone",
+                "radius": 1,
+                "thickness": 1,
+                "arc": 6.2831855,
+                "mode": 0,
+                "spread": 0,
+                "speed": {
+                  "type": "ConstantValue",
+                  "value": 1
+                },
+                "angle": 0.43633232
+              },
+              "startLife": {
+                "type": "ConstantValue",
+                "value": 5.016667
+              },
+              "startSpeed": {
+                "type": "ConstantValue",
+                "value": 5
+              },
+              "startRotation": {
+                "type": "ConstantValue",
+                "value": 0
+              },
+              "startSize": {
+                "type": "ConstantValue",
+                "value": 1
+              },
+              "startColor": {
+                "type": "ConstantColor",
+                "color": {
+                  "r": 1,
+                  "g": 1,
+                  "b": 1,
+                  "a": 1
+                }
+              },
+              "emissionOverTime": {
+                "type": "ConstantValue",
+                "value": 10
+              },
+              "emissionOverDistance": {
+                "type": "ConstantValue",
+                "value": 0
+              },
+              "emissionBursts": [],
+              "maxParticles": 1000,
+              "onlyUsedByOther": false,
+              "renderMode": 0,
+              "renderOrder": 0,
+              "rendererEmitterSettings": {},
+              "material": "quarks_material-28",
+              "layers": 1,
+              "maxParticleSize": 0.5,
+              "startTileIndex": {
+                "type": "ConstantValue",
+                "value": 0
+              },
+              "uTileCount": 1,
+              "vTileCount": 1,
+              "blendTiles": false,
+              "worldSpace": false,
+              "behaviors": []
+            }
+          }
+        ]
+      },
+      {
+        "uuid": "node-9",
+        "name": "Muted",
+        "type": "Group"
+      },
+      {
+        "uuid": "node-10",
+        "name": "Petals",
+        "type": "ParticleEmitter",
+        "ps": {
+          "looping": true,
+          "prewarm": false,
+          "duration": 5,
+          "startDelay": {
+            "type": "ConstantValue",
+            "value": 0
+          },
+          "shape": {
+            "type": "cone",
+            "radius": 0.28,
+            "thickness": 1,
+            "arc": 6.2831855,
+            "mode": 0,
+            "spread": 0,
+            "speed": {
+              "type": "ConstantValue",
+              "value": 1
+            },
+            "angle": 0.43633232
+          },
+          "startLife": {
+            "type": "ConstantValue",
+            "value": 5.016667
+          },
+          "startSpeed": {
+            "type": "ConstantValue",
+            "value": 0
+          },
+          "startRotation": {
+            "type": "IntervalValue",
+            "a": 0,
+            "b": 6.2831855
+          },
+          "startSize": {
+            "type": "ConstantValue",
+            "value": 1
+          },
+          "startColor": {
+            "type": "ConstantColor",
+            "color": {
+              "r": 1,
+              "g": 1,
+              "b": 1,
+              "a": 1
+            }
+          },
+          "emissionOverTime": {
+            "type": "ConstantValue",
+            "value": 10
+          },
+          "emissionOverDistance": {
+            "type": "ConstantValue",
+            "value": 0
+          },
+          "emissionBursts": [],
+          "maxParticles": 1000,
+          "onlyUsedByOther": false,
+          "renderMode": 2,
+          "renderOrder": 0,
+          "rendererEmitterSettings": {},
+          "material": "quarks_material-30",
+          "layers": 1,
+          "instancingGeometry": "quarks_geometry-31",
+          "startTileIndex": {
+            "type": "ConstantValue",
+            "value": 0
+          },
+          "uTileCount": 1,
+          "vTileCount": 1,
+          "blendTiles": false,
+          "worldSpace": false,
+          "renderFace": "front",
+          "renderAlignment": "local",
+          "behaviors": [
+            {
+              "type": "Rotation3DOverLife",
+              "angularVelocity": {
+                "type": "Euler",
+                "angleX": {
+                  "type": "ConstantValue",
+                  "value": 0
+                },
+                "angleY": {
+                  "type": "ConstantValue",
+                  "value": 0
+                },
+                "angleZ": {
+                  "type": "ConstantValue",
+                  "value": -0.5
+                },
+                "eulerOrder": "YXZ"
+              },
+              "integration": "angles"
+            }
+          ]
+        }
+      },
+      {
+        "uuid": "node-11",
+        "name": "Vanes",
+        "type": "ParticleEmitter",
+        "ps": {
+          "looping": true,
+          "prewarm": false,
+          "duration": 5,
+          "startDelay": {
+            "type": "ConstantValue",
+            "value": 0
+          },
+          "shape": {
+            "type": "cone",
+            "radius": 1,
+            "thickness": 1,
+            "arc": 6.2831855,
+            "mode": 0,
+            "spread": 0,
+            "speed": {
+              "type": "ConstantValue",
+              "value": 1
+            },
+            "angle": 0.43633232
+          },
+          "startLife": {
+            "type": "ConstantValue",
+            "value": 5.016667
+          },
+          "startSpeed": {
+            "type": "ConstantValue",
+            "value": 5
+          },
+          "startRotation": {
+            "type": "IntervalValue",
+            "a": 0,
+            "b": 6.2831855
+          },
+          "startSize": {
+            "type": "ConstantValue",
+            "value": 1
+          },
+          "startColor": {
+            "type": "ConstantColor",
+            "color": {
+              "r": 1,
+              "g": 1,
+              "b": 1,
+              "a": 1
+            }
+          },
+          "emissionOverTime": {
+            "type": "ConstantValue",
+            "value": 10
+          },
+          "emissionOverDistance": {
+            "type": "ConstantValue",
+            "value": 0
+          },
+          "emissionBursts": [],
+          "maxParticles": 1000,
+          "onlyUsedByOther": false,
+          "renderMode": 2,
+          "renderOrder": 0,
+          "rendererEmitterSettings": {},
+          "material": "quarks_material-33",
+          "layers": 1,
+          "instancingGeometry": "quarks_geometry-34",
+          "startTileIndex": {
+            "type": "ConstantValue",
+            "value": 0
+          },
+          "uTileCount": 1,
+          "vTileCount": 1,
+          "blendTiles": false,
+          "worldSpace": false,
+          "renderFace": "front",
+          "renderAlignment": "view",
+          "behaviors": [
+            {
+              "type": "RotationBySpeed",
+              "angularVelocity": {
+                "type": "ConstantValue",
+                "value": 1
+              },
+              "speedRange": {
+                "type": "IntervalValue",
+                "a": 0,
+                "b": 1
+              }
             }
           ]
         }

@@ -8,6 +8,156 @@ and the package's version moves in lockstep with `quarks.core`.
 
 ### Added
 
+- **`particleColor` on a system**: off, its particles are drawn without their colour (start
+  colour, Color over Life and the like, alpha included, and a mesh's vertex colours), in the
+  texture times the material colour alone, which the alpha test and the blend then read. Unity's
+  mesh shaders draw a particle so: Legacy Diffuse, Specular, Bumped Diffuse, VertexLit, their
+  Transparent and Cutout variants, Mobile/Diffuse, Unlit/* and Standard draw a particle tinted
+  (1, 0.5, 0.25) or faded to alpha 0.4 exactly as a white one, and the cutout ones clip it at the
+  texture's alpha times the material's (measured in Unity 6), where the particle and sprite
+  shaders take the vertex colour, as Unreal's Particle Color node does. On by default; saved only
+  when off (`particleColor: false`). Every render mode, GLSL and WGSL (`NO_PARTICLE_COLOR`);
+  systems that differ draw from different batches, and a mesh's vertex colours are left out of
+  the batch with it.
+
+- **Mesh vertex colours, `instancingColors`**: a mesh particle's colour is multiplied by the vertex
+  colours of its mesh, `r, g, b, a` per vertex, as Unity draws a particle mesh. Unity takes them as
+  they are while it converts the particle colour into a Linear project's space (measured in Unity
+  6), so they are linear here too, as glTF stores `COLOR_0`, and multiply the particle colour once
+  it is in the working space. A mesh can fade out toward its ends (a stream drawn on a spiral whose
+  vertex colours go black at both ends ended in a hard edge without them). Saved in the geometry entry as `colors`, and read from a three.js geometry's
+  `color` attribute (`r, g, b` or `r, g, b, a`, normalized integers too). They go up in the batch's
+  one interleaved geometry buffer, so no vertex buffer binding is added, and only a mesh with them
+  compiles the shader that reads them (`MESH_COLOR`). Systems with different colour arrays draw
+  from different batches; a geometry of another vertex count drops them, and a set that does not
+  hold four values per vertex is left out with a warning. Meshes without vertex colours draw as
+  before.
+
+- **`sortingFudge` on a system**, Unity's renderer Sorting Fudge: how far behind other transparent
+  objects it is sorted, in world units. Transparent meshes are drawn back to front by the distance
+  from the camera to the centre of their bounds plus the fudge (measured in Unity 6), so a positive
+  fudge keeps a system under others and a negative one over them whichever way the camera turns.
+  It counts in the renderer's order of its transparent systems (see Fixed, "Transparent systems
+  are drawn in Unity's order"). Systems with different fudges draw from different batches. Saved in
+  the effect JSON when not 0.
+- **`quarksTransparentSortCompare` and `quarksSortDistance(subMesh)`**: the transparent compare
+  the renderer sets on the rendering groups its transparent batches draw in, Babylon's default with
+  the renderer's order of its draws for their distance, and that key for one sub mesh. A group's
+  opaque and alpha test compares are kept. A group with a transparent compare of the application's
+  own keeps it, with a warning once; that compare can call `quarksSortDistance` for the distance to
+  keep the order.
+- **`Particle.animatedVelocity`** and the store's `animatedVelocity` / `previousAnimatedVelocity`
+  columns (`ParticleStore.keepAnimatedVelocity`): the velocity of the motion a behavior gives a
+  particle in a step by moving its position directly, Unity's animated velocity. `VelocityOverLife`
+  (linear, radial and orbital) and `OrbitOverLife` add to it, on the fused path too. A system keeps
+  it only while it draws stretched billboards and has such a behavior (or a custom one, which may
+  write it); it starts each step at zero.
+- **`colorSpace: 'srgb'` on a texture in the effect file** (`QuarksTextureJSON.colorSpace`, as
+  three.js names it): the loader loads the texture into an sRGB GPU buffer (`useSRGBBuffer`), so
+  the GPU decodes and filters it in linear space as Unity's sRGB (Color Texture) textures are,
+  and the shaders read it as linear (see Changed). A soft glow's falloff is then blended between
+  texels in linear space too. `serializeEffect` writes it for a texture made with
+  `useSRGBBuffer`. Any other value, three.js's `''` included, reads the image as stored, as before.
+- **`materialColor` and `materialColorScale` on a system**: the material's colour, Unity's
+  material Color and Tint Color, which multiplies every particle's colour, alpha included, as it
+  is drawn. Given in gamma space like the particle colours, it comes into the shader's working
+  space on its own, and the scale multiplies after: under the scene's image processing a scale of
+  2 doubles the colour in linear space, as Unity's legacy particle shaders double their tint,
+  where a colour of 2 in gamma space would grow by its power curve. Unlike `tint` it belongs to the
+  effect: saved in the effect JSON when not white and 1, and a live parameter of the batch, so
+  systems with different material colours draw from different batches with one shader.
+- **`premultipliedMap` on a system**: the texture's colour is already multiplied by its alpha and
+  may carry light where its alpha is 0, such as a soft glow, as Unity's legacy Alpha Blended
+  Premultiply takes its texture. With premultiplied blending the colour is drawn times the vertex
+  colour and alpha only, and the texture's alpha only lets the frame through (`MAP_PREMULTIPLIED`,
+  GLSL and WGSL); other blend modes ignore it.
+- **`rotationAxis` on a system** (the new `RotationAxis` type) and **`Particle.rotationAxis`**:
+  the axis a number rotation turns a mesh particle about, its start rotation and
+  `RotationOverLife`'s turn, as Unity turns a mesh particle about its `axisOfRotation`. `'z'` (the
+  default) keeps the mesh's own Z; `'emission'` picks the axis per particle at birth as Unity's
+  Shape module does: square to Z and to the direction the shape sends the particle, whatever its
+  start speed (at 0 too), or to where it starts when it is sent along Z, or Y when it also starts
+  on the Z axis. A flat ring on a narrow cone then
+  spins about its own normal and stays level. `RotationOverLife.turn` turns about the particle's
+  axis, in the fused pass too; `turnAboutZ` is kept as a deprecated alias.
+- **`QuarksUtil.shareResources(source, target)`**: gives a node a hold on the textures and
+  materials of the loaded effect `source` belongs to, so they stay while it does. For a node kept
+  after its effect's root goes, such as an emitter made the root in place of a wrapper group that
+  is then disposed; before, disposing the wrapper freed the textures the emitter still drew with.
+- **`ColorOverLength`** behavior (and `ColorOverLengthJSON`), Unity's Trail Renderer Color and the
+  Trails module's Color over Trail: a gradient from the head (0) to the tail (1) of a trail that
+  multiplies the color each sample was recorded with, as `WidthOverLength` shapes the width, so a
+  trail fades or shifts hue toward its tail. `TrailParticle` gains `historyBaseColors`, allocated
+  only once such a behavior runs, and `headColorScale`. A trail drawn in its particle's current
+  color (`colorFromParticle`) is unchanged by it.
+- **`stepEndAge` and `stepEndLife`**, the age (and life fraction) a particle reaches at the end
+  of a step: the age it is drawn at, where behaviors read their over-life curves (see Changed).
+  A custom behavior with a curve over life reads it there too to stay in step with the stock ones.
+- **`RandomizeDirection`** behavior (and `RandomizeDirectionJSON`), Unity's Shape module
+  Randomize Direction: each new particle's direction blends toward a uniformly random one by
+  `amount` (0 to 1) and keeps its speed. At 1 particles leave in every direction evenly. Before,
+  the only option was `ChangeEmitDirection`, which turns by a set angle and so cannot express
+  the blend: a constant angle of π sends every particle straight back.
+- **Single-row flipbooks:** `FrameOverLife` options `rowLength`, `rowCount`, `row` and
+  `randomRow`, Unity's Texture Sheet Animation with Animation "Single Row" and Row Mode
+  Custom / Random. The frame curve, cycles, frame count and start frame then count frames within
+  one row of the sheet, and each particle plays the set row or one picked at birth: a sheet of
+  several takes of one animation, one per row. The Unity exporter writes them; before, a Single
+  Row sheet played across every row at that many times the speed.
+- **Collision planes:** `ApplyCollision` takes options (the new `ApplyCollisionOptions`,
+  `CollisionPlane` and `CollisionPlaneJSON`) for Unity's Collision module in Planes mode:
+  `planes` the effect carries in its emitter's local space, which follow the emitter in either
+  simulation space; `dampen`, the share of speed lost on a hit; `lifetimeLoss`, the share of its
+  lifetime a particle loses on a hit; and `radiusScale`, the particle's collision radius as a share
+  of half its size. A particle collides when its next step would take it behind a plane, so it
+  never passes through, and rests on the plane when it has no speed left to bounce. With planes
+  the host's resolver is not asked. Each is written to the effect JSON only when set, and the
+  editor field type `'collisionPlanes'` names the plane list.
+- **`scaleWithEmitter`** on `ForceOverLife` and `ApplyForce`: false keeps the force's strength in
+  world units however the emitter or its parents are scaled, in either simulation space, as
+  Unity's gravity (the Gravity Modifier) does, unlike its forces: a half-size copy of an effect
+  falls as fast as the full-size one. True by default, the forces as they scale now (see Changed).
+  Written to JSON only when false; the Unity exporter writes it on gravity. Backed by
+  `EmitterFrame.forceToSimulation`, which converts a force as Unity does.
+- **`ForceOverLife` `randomized`**, Unity's Randomize of Force over Lifetime: a random component
+  (`IntervalValue`, `RandomBetweenCurves`) picks a new value every step instead of once per
+  particle, so the force jitters and averages out over its range. False by default; written to
+  JSON only when true; the Unity exporter writes it. Backed by a new optional `reroll(memory)` on
+  value generators, which `IntervalValue` and `RandomBetweenCurves` implement. With a random
+  source set (`setRandomSource`, a system's `seed`) every roll comes from it, so a seeded run
+  replays; without one, the compiled pass rolls with mulberry32 seeded by one `Math.random()` per
+  step, which unlike `Math.random()` per roll allocates nothing.
+- **`Rotation3DOverLife` `integration`** (the new `RotationIntegration` type and
+  `Rotation3DOverLifeOptions`), how the angular velocity adds up: `'turn'`, the default and the
+  behavior until now, turns each step about the particle's own current axes; `'angles'` is
+  Unity's Rotation over Lifetime with Separate Axes on 3D-rotated mesh particles: the particle
+  keeps Euler angles in the `EulerGenerator`'s order, starting from its birth rotation, each step
+  adds each axis's rate to its angle, and the rotation is rebuilt from the sums. Measured against
+  Unity 6 (start rotation (30, 40, 50)°, rates (10, 90, 20)°/s, 0.5 s → (35, 85, 60)°). It
+  needs an `EulerGenerator` in a Tait–Bryan order and quaternion rotations (mesh mode); with
+  another generator it turns as `'turn'` does. The angles live in three memory slots per
+  particle. Written to JSON only when not `'turn'`; the Unity exporter writes `'angles'`.
+- **`renderAlignment`** on a system (the new `RenderAlignment` type), Unity's renderer Render
+  Alignment for mesh particles: the axes a mesh's rotation is measured in. `'view'` lays each mesh
+  along the camera's axes, so a quad mesh faces the camera however it turns (Unity's View, its
+  default); `'world'` uses the world axes and `'local'` the emitter's, also in a world-space
+  system. The default, `'simulation'`, is the system's simulation space, as meshes were always
+  drawn, so existing effects and files are unchanged. `'view'` is computed in the mesh vertex
+  shader (GLSL and WGSL) from the view matrix it is drawn with; the others on the CPU. Mesh
+  systems that differ are batched apart; other render modes ignore it. Unity's Facing and
+  Velocity alignments are not supported yet. Written to the effect JSON only when not
+  `'simulation'`, and part of the effect schema.
+  It applies to billboards too, as Unity's does (measured in Unity 6 with `BakeMesh`): a
+  `'world'` or `'local'` billboard no longer faces the camera but lies in the XY plane of the
+  world's or the emitter's axes, its x along their X and its y along their Y, so that from their
+  −Z it reads as a camera-facing billboard does. Its rotation spins it in that plane, its size and
+  flip stretch and mirror it there, and its pivot moves it along those axes; `'local'` follows the
+  emitter of the moment, also in a world-space system. A decal lying on the ground or a ring on a
+  wall stays put however the camera turns (bullet holes on a wall, which turned to face
+  every camera). The quad's turn is a quaternion per particle, written on the CPU, and the
+  billboard vertex shader (GLSL and WGSL) lays the quad along it (`BILLBOARD_ALIGNED`). Camera-facing
+  billboards, `'simulation'` and `'view'`, draw and batch as before; stretched, horizontal and
+  vertical billboards ignore the alignment, as Unity's do.
 - **`STABILITY.md`:** what 1.x promises and what it does not, for the API, the effect files, the
   look of an effect and the platforms, with the deprecation policy.
 - **`docs/AUTHORING.md`:** a step-by-step guide from a new project in the effect editor to the
@@ -20,11 +170,244 @@ and the package's version moves in lockstep with `quarks.core`.
 
 ### Changed
 
+- **Behaviour change: geometries are wound as Babylon winds a front face, and `MeshSurfaceEmitter`
+  emits out of it.** A triangle's front face, the one `renderFace: 'front'` draws and a lit mesh
+  lights, is the side `(c - a) × (b - a)` points to, as on Babylon's own meshes (see
+  docs/FORMAT.md).
+  - `MeshSurfaceEmitter` moved each particle along the normal three.js gives a front face, which
+    for a Babylon mesh, wound the other way, points inside: a box emitted inwards. It now emits
+    out of the face Babylon draws as the front, the outside of a closed mesh.
+  - The geometries QuarksLoader builds itself, three.js' `PlaneGeometry` and `SphereGeometry`, are
+    wound so: their front faces are the side their normals face (the plane's +Z, the sphere's
+    outside), where `renderFace: 'front'` culled that side and drew the other and a lit mesh was
+    lit from behind. A `mesh_surface` shape on them emits out of them as before.
+  - The Unity exporter writes its meshes wound so (see its changelog).
+  - A geometry a file gives with its own indices is read as it is, so a file whose mesh is wound
+    the other way now emits from a `mesh_surface` shape into the mesh: a mesh written by an
+    earlier Unity exporter (Unity's winding), or an earlier save of a three.js plane or sphere.
+    Re-export such a Unity effect, or save the three.js original again. Files without a `mesh_surface` shape, a `renderFace` or a
+    lit mesh draw as before; the format version stays.
+
+- **Under the scene's image processing every colour comes into linear space on its own, as in
+  Unity's Linear colour space.** The shaders converted the finished colour to linear space at the
+  end, after the particle colour and the texture had been multiplied, the fog, the light and the
+  rim mixed in, all in gamma space. Now each comes in on its own: the particle colour in the
+  vertex shader (so it is interpolated in linear space too), each texel as it is sampled, the fog,
+  light, ambient, reflection, rim and erosion edge colours where they are read, and only then are
+  they multiplied, added and mixed. With Babylon's default 2.2 power the particle colour times the
+  texture is unchanged; the fog, the lighting and the colours added on top are now mixed in linear
+  space and come out somewhat brighter in the dark. The conversions are Babylon's, so turning on
+  the engine's `useExactSrgbConversions` makes them the exact sRGB curve Unity uses, both ways:
+  a glow's faint rim, where the power curve is several times too dark, then fades as in Unity. A
+  colour texture whose `gammaSpace` is false, such as one loaded into an sRGB GPU buffer
+  (`useSRGBBuffer`), is read as linear (`MAP_LINEAR`, `GRADIENT_MAP_LINEAR`): the GPU decodes
+  and filters it in linear space as Unity's sRGB textures are, and without image processing it is
+  converted back to gamma space. A gradient map's lookup reads the map's value as it is stored.
+  Without image processing nothing changes.
+- **A moving world-space emitter spreads its rate over time along its path.** Each particle the
+  rate owes in a step is born where the emitter was when it came due, between the step's start
+  and end, as Unity spreads them, instead of all at the step's end: a fast emitter with a high
+  rate now leaves a continuous line rather than one clump per step, as emission over distance
+  already did. Only the position is interpolated. A still emitter, a local-space system and
+  bursts are unchanged.
+- **Mesh particles keep their start rotation on every emitter shape.** The sphere, hemisphere,
+  donut, rectangle and point shapes turned a mesh particle whose start rotation was zero to face
+  out of the shape (or along its velocity); the other shapes did not, and neither does Unity,
+  where a mesh starts in its start rotation unless Align To Direction is on. A mesh particle now
+  starts unturned there too. An effect that relied on the turn sets the system's
+  `alignToDirection`, which faces each particle along its start direction on every shape.
+- **Over-life curves are read at the age the particle is drawn at.** A step runs the behaviors,
+  then ages and moves the particles, and the behaviors read their curves at the age the step
+  started at: every particle was drawn one step on in its motion but one step behind in its
+  frame, size, colour, rotation rate, force and the rest. Unity reads them after ageing. Every
+  stock behavior (and the compiled passes) now reads them at `stepEndAge`, the age the step ends
+  at, at most the life. Each effect's curves play 1/60 s earlier than before; it shows on short
+  lives and fast flipbooks, where a frame no longer lags the motion, and a seeded effect no
+  longer replays the exact numbers of earlier versions. On a deterministic test effect exported
+  from Unity 6, the overlap of what quarks draws with Unity's frames went from 0.64 to 0.84 on
+  average (A/B, same frames), and on its first frame from 0.11 to 0.90.
+- **A collision keeps the speed along the surface.** `bounce` now scales only the speed into the
+  surface, turned back out, as Unity's Bounce does; before, it scaled the whole velocity, so a
+  particle grazing the ground at bounce 0 stopped dead instead of sliding. A particle inside a
+  collider that already moves out of it is no longer turned back in on the next step.
+- **`LimitSpeedOverLife` follows Unity's Dampen and ignores the emitter's scale in world
+  space.** `dampen` of the excess goes in each 1/30 s (it was a third of it per 60 Hz step), so
+  `dampen: 1` now holds the speed at the limit, and a world-space system's limit is no longer
+  multiplied by the emitter's scale. Effects with a dampen below 1 slow down faster than before.
+- **A world force in a local-space system scales with the emitter, as Unity's does.**
+  `ForceOverLife` and `ApplyForce` turned a world force into the emitter's axes and divided out
+  its scale, so the force kept its world strength under a scaled emitter; now it is only turned,
+  and the local frame scales it as it scales everything else (a world-space system already
+  multiplied it by `motionScale`). Under a half-scale emitter such a force now accelerates the
+  particles half as much in the world, as in Unity. A force that should keep its strength, such
+  as gravity, sets `scaleWithEmitter: false`.
 - `ParticleSystem.seed`'s documentation says what STABILITY.md promises: a seeded effect plays the
   same on every machine running the same minor version.
 
 ### Fixed
 
+- **A mesh particle takes the emitter's scale after its rotation, as Unity's does.** Unity
+  stretches a mesh particle by the emitter's scale outside its own rotation, along the axes of the
+  render alignment: the emitter's world matrix for Local (skew and all), the scale along the
+  world's or the camera's axes for World and View (measured in Unity 6 with `BakeMesh`, every
+  scaling mode, both simulation spaces). quarks multiplied the particle's size by the scale, inside
+  its rotation, so a turned mesh under an unevenly scaled emitter was stretched along its own axes:
+  flat rings and arcs spinning under a parent scaled 0.37 by 0.495, which Unity keeps upright
+  ellipses, were spun into a lobed knot. A mesh batch now has a per-instance stretch, three columns
+  in one interleaved buffer (one more vertex buffer binding, seven of WebGPU's eight), that the
+  vertex shader applies after the rotation, its normals by the stretch's cofactor; the size stays
+  the particle's own. A world-space system's meshes keep the scale in their size at birth, as
+  before. `ParticleEmitter.alignedScale` gives the scale along the node's turn, Unity's
+  `lossyScale` under a skewed hierarchy.
+- **A mesh particle under a mirrored emitter is drawn mirrored, as Unity draws it.** A negative
+  scale on the emitter or a parent (an odd number of negative axes) was dropped from mesh
+  particles that turn with the emitter (`renderAlignment` `'local'`, or `'simulation'` in local
+  space): they were drawn by the emitter's turn and the lengths of its axes, the picture Unity
+  draws seen in a mirror, and on the other side of the emitter's origin when the mesh lies off
+  it (a swirl of smoke drawn from two mirrored copies, one
+  scaled (-1.543, 1, 1.543), was drawn twice on the same side). Such a mesh is now laid by the
+  emitter's whole matrix, mirror included, its own turn inside the mirror, so a spin turns the
+  other way, and its faces turn inside out as Unity leaves them (a culled material shows the
+  other faces). Unity mirrors by the scale its scaling mode applies (measured in Unity 6): the
+  world scale in `'hierarchy'`, the node's own in `'local'` (a parent's mirror does not reach the
+  mesh), never in `'shape'`; `ParticleEmitter.mirrored` says which. Billboards, and meshes
+  aligned to the view or the world, are not mirrored yet.
+- **`'local'` and `'shape'` scaling leave a parent's mirror where Unity does.** Under a parent
+  with a negative scale, these modes kept the mirror of the world matrix: `'local'` sent particles
+  the mirrored way and laid its shape mirrored, though Unity leaves a parent's mirror out of
+  `'local'` as it does its scale (the sparks of a Local system
+  under a root scaled (-0.891, 0.891, 1.06) flew the wrong way). Unity turns
+  these modes by `transform.rotation`, which stays a rotation under any mirror: each node's own
+  turn seen through the mirror of the scale above it. `'local'` is now that turn times the node's
+  own scale, its signs included, and `'shape'` that turn alone, its shape scaled by the lossy
+  scale with its signs, so a mirror anywhere above still mirrors the shape (measured in Unity 6:
+  the place and motion of a particle under one, two and three mirrored axes, on the root, a
+  middle node and the system's own). `ParticleEmitter.shapeScale` is negative along a mirrored
+  axis. `'hierarchy'`, and every emitter without a mirror above it, are placed as before.
+- **A stretched billboard with a negative Speed Scale draws Unity's streak.** The shader took the
+  streak's way from the velocity as the speed factor scales it, which a negative factor turns
+  round, and laid the length factor along that, so the two parts pulled against each other:
+  a glow with Speed Scale -1 and Length Scale -1.6 drew stubs 0.62 behind its particles where
+  Unity draws beams 1.62 ahead of them. Unity adds the two parts
+  along the particle's own way whatever their signs, and lays the quad along the streak, turned
+  round with its texture when it reaches ahead (measured in Unity 6 with `BakeMesh`, every sign of
+  each). The batch now sends the length factor times the speed factor's sign, and the GLSL and WGSL
+  shaders lay the quad, its side and its pivot along the streak. A positive speed factor draws as
+  before.
+- **A node is saved by its position, rotation and scale, so a mirror stays on its axis.**
+  `serializeEffect` wrote each node's local transform as one matrix, and a matrix with a mirror
+  in it splits into a turn and a scale more than one way: (-1, 1, 1) unturned and (1, -1, 1)
+  turned half round Z are the same matrix, and `QuarksLoader` took the one Babylon's `decompose`
+  picks. Systems below the node turn by which one it is (see the entry above), so a mirrored
+  node's children could come out turned round. Nodes are now written as `position`, `quaternion`
+  and `scale`, each only when not its default, which every earlier babylon.quarks reads; a
+  `matrix` is still read, as before. The schema lists the three beside `matrix`. **Re-save** an
+  effect with a mirrored node to keep its mirror on its axis.
+- **A Birth sub emission ends with its parent particle, as Unity's does.** It ran the target's whole
+  `duration` from the parent's birth and went on emitting where the parent died, so a target
+  whose duration outlasts its parents left puffs behind long after them (debris of
+  0.5 to 0.65 s with a smoke trail of 2 s at 10 per second left puffs where each piece fell,
+  until after the effect had ended). It now ends when the parent
+  dies, rate and bursts still due alike, and a looping target runs its cycle again while the
+  parent lives instead of stopping after one; a parent a ring buffer holds at the end of its life
+  is alive and goes on emitting (measured in Unity 6: a parent of 0.5 s emits 4 into a
+  sub system of 2 s at 10 per second, a parent of 3 s emits 29 into a looping one of 1 s, and a
+  burst due after the parent died never goes off). Death emissions and quarks' own Frame mode are
+  unchanged. On screen: Birth trails stop where their particle dies.
+- **`'local'` and `'shape'` scaling keep a system's shape under a skewed hierarchy, as Unity
+  does.** A parent scaled unevenly with a turned node below it skews the world matrix: its axes
+  are no longer square to each other. These modes set the axes' lengths and kept their directions,
+  so a skewed system kept the skew, down to axes that all but coincide, and an emission shape fell
+  flat (streaks under a parent
+  scaled (0.001, 0.011, 19): a heap of them in Unity was a line). They now turn the system by
+  the node's rotation after each of its parents' and take the world scale along those axes, as
+  Unity's `transform.rotation` and `transform.lossyScale` (measured in Unity 6). An emitter whose
+  world matrix is not skewed is placed exactly as before. On screen: systems under a skewed
+  hierarchy keep their shape and turn.
+- **`'local'` and `'shape'` scaling keep a system's turn under a parent scaled to 0, as Unity
+  does.** A world matrix scaled to 0 on two axes or all three has no direction left, and these
+  modes rebuilt those axes as the bare world axes, so the system lost every turn above and of its
+  own: its shape sent particles the wrong way and its `'local'` aligned meshes lay a quarter turn
+  off (an effect whose root is scaled 0 until an animation grows it: its
+  ground swirl and rings stood upright where Unity lays them flat, and the reverse). Unity still
+  turns such a system by `transform.rotation` (measured in Unity 6), so the axes are now rebuilt
+  along the node's rotation after each of its parents', with the sign of its own scale; a parent
+  with an axis scaled to 0 passes its turn on from its own rotation rather than its world matrix.
+  An axis scaled to 0 alone is still rebuilt square to the other two, and every other emitter is
+  placed exactly as before. On screen: systems under a parent scaled to 0 keep their turn.
+- **`'shape'` scaling turns the way the shape sends particles by the emitter's scale, as Unity
+  does.** Only where they start was scaled; Unity also scales the start direction and sets it back
+  to its speed (measured in Unity 6), so an emitter stretched along Z sends a cone's particles
+  closer to Z. A mesh particle's `rotationAxis: 'emission'` is picked from that direction, as
+  Unity picks it. On screen: a cone, sphere or other shape under a non-uniformly scaled emitter in
+  `'shape'` mode sprays narrower along the stretched axis and wider across a squashed one; a
+  uniformly scaled emitter is unchanged.
+- **Transparent systems are drawn in Unity's order.** Unity draws each transparent particle
+  system as a renderer of its own, back to front by the distance from the camera to the centre of
+  its bounds plus its sorting fudge, and draws consecutive renderers of one material together.
+  quarks drew a batch (the systems of one material and settings) as one draw sorted by the centre
+  of all their bounds, its systems in the order they were added: a system behind could cover one
+  in front of it in the same batch (seven ice lances on
+  one material), and a system of another batch could not come between two of them
+  (rear dust puffs, behind the smoke, covered the front ones). The
+  renderer now orders every visible transparent system that way each frame, from the scene's
+  first active camera, and fills each batch in that order; a batch whose systems another batch's
+  system comes between is drawn once per run of its systems that come one after another, from
+  instance buffers of its own past the first run (trails: a sub mesh per run). A system's
+  particles are sorted by its `sortMode` among themselves, as Unity sorts them, no longer across
+  the systems of a batch. Two systems at one point still go by where mesh particles that lie off
+  their pivot draw their meshes, now per system. On screen: overlapping transparent systems are
+  layered by depth instead of by batch and by the order they were added, and a batch with systems
+  in front of and behind another system costs one more draw call per run. Opaque batches stay one
+  draw. Other cameras than the first draw the first one's order.
+- **A stretched billboard is as long as Unity draws it.** The speed's part of the length was
+  multiplied by the particle's size: `(speed × speedFactor + lengthFactor) × size`, where the
+  documented `speedFactor`, Unity's Speed Scale, stretches by the speed alone. Unity draws
+  `size × lengthFactor + speed × speedFactor` (measured with BakeMesh in Unity 6). On screen: a
+  small fast particle with a speed factor is now as long as in Unity instead of a dot (sparks of
+  size 0.017, speed 2, Speed Scale −0.14: 0.28 long, not 0.005); a large one is
+  shorter. An effect tuned to the old length keeps it with `speedFactor × size` as its factor. A
+  particle that does not move now draws nothing, as in Unity, where it drew a quad facing the
+  camera's depth; and with a speed factor of 0 the quad keeps pointing along the velocity with a
+  length of a ten-thousandth of the speed, where it was a thousandth. The culling bounds follow.
+- **A stretched billboard is drawn along its total velocity.** It was drawn along the particle's
+  velocity only, but `VelocityOverLife` and `OrbitOverLife` move the position directly and leave the
+  velocity alone, so a particle moved by them alone (lightning that
+  starts at speed 0 and rises by Velocity over Lifetime) had no direction, stood edge-on to the
+  camera and was not seen, and one with a velocity too was stretched the wrong way. It is now drawn
+  along the velocity plus the animated velocity, as Unity draws along `totalVelocity`, carried on
+  between steps as the velocity is; the culling bounds count that motion too.
+- **A stretched billboard with a negative length or speed factor is no longer culled while seen.**
+  The culling bounds padded a stretched quad by `size × (1 + lengthFactor + speed × speedFactor)`;
+  a negative factor, Unity's negative Length or Speed Scale that stretches the quad ahead of the
+  particle, made the padding negative and turned the box inside out, so a system culled by
+  `cullingMode` paused for cameras that saw it and showed only from some angles or distances. The
+  padding now takes the factors' magnitude.
+- **A glow's faintest fringe is drawn.** Without an alpha test the particle shaders discarded
+  every fragment below an alpha of 0.01, which Unity does not. Under a doubled tint or additive
+  blending that fringe is far from black once encoded (a texel of alpha 2/255 adds about 33/255
+  in Unity's legacy Additive), so a soft halo ended in a hard outline. Only a fragment of alpha 0,
+  which draws nothing, is discarded now.
+- **Mesh systems at the same place are drawn back to front by where their meshes are.**
+  Transparent batches sort by the centre of their bounds, which for mesh particles is where the
+  particles are, as Unity sorts its renderers; two systems emitting at one point tied, and Babylon
+  drew a tie in creation order, so a dark copy laid behind a light one could cover it. A batch of
+  meshes that lie off their pivot moves its sorting centre a thousandth of the way toward where
+  they are drawn: a tie goes to the geometry, the farther first, and no other order changes.
+- **A random range read per particle in a compiled behavior pass no longer allocates.** The
+  fused pass read an `IntervalValue` sample from the memory column with a NaN fallback, which
+  boxed every read: 16 bytes per particle per random component each step (for example a
+  `ForceOverLife` or `ApplyForce` with a random range). It marks a missing sample with -1 now,
+  since rolls are in [0, 1). `npm run check:allocations` measures a randomized force and an
+  `'angles'` rotation, both allocation-free.
+- **A world-space mesh system with `alignToDirection` points its meshes along their travel.**
+  The emitter's rotation, which a world-space system applies to a newborn mesh, was overwritten
+  by the alignment's own turn, so the meshes were turned twice by it and missed the emitter's.
+- **Multiplying particles blend as Unity's Linear colour space does under a post-process image
+  pipeline.** With `applyByPostProcess`, a multiply factor was mixed toward white by its coverage
+  in gamma space and linearised after, which darkened its weak channels more than its strong ones
+  and tinted a part-covered multiplied smoke toward its strongest colour. It is linearised first
+  now, as every other blend already was.
 - **`QuarksLoader.load` and `loadAll` fetch a relative effect url from the right place.**
   `load('effects/campfire.json')` fetched `effects/effects/campfire.json`, because the effect's own
   url was resolved against its own folder; only absolute urls and files at the page's root loaded.
