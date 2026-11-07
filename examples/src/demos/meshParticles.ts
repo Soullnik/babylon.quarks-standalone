@@ -38,8 +38,9 @@ const FLOOR = -2.6;
  * - Vertex colours: shards bursting out, solid; then with the mesh's own vertex colours
  *   (`instancingColors`), bright at the base and fading out to the tip, as a glTF `COLOR_0`
  *   would draw them.
- * - Rotation axis: triangular plates rising and spun by a number rotation, about the mesh's own Z
- *   (`'z'`), or about an axis each picks from the direction it is emitted in (`'emission'`).
+ * - Rotation axis: triangular plates rising in a column and spun by a number rotation. About the
+ *   mesh's own Z (`'z'`) they tumble, edge on now and then; about an axis picked from the direction
+ *   they are emitted in (`'emission'`), here their own normal, they spin flat, facing the camera.
  * - 3D rotation: leaves tilted back at birth and spun about y. `'turn'` spins each about its own
  *   tilted axis; `'angles'` adds to its Euler angles, so it keeps its tilt and pirouettes about the
  *   vertical, as Unity's Rotation over Lifetime with Separate Axes does.
@@ -135,13 +136,15 @@ export function init({scene, camera, add, controls}: DemoContext): DemoRun {
                     looping: true,
                     prewarm: true,
                     startLife: new ConstantValue(3),
-                    startSpeed: new ConstantValue(1.4),
-                    startSize: new IntervalValue(0.7, 0.9),
+                    startSpeed: new IntervalValue(1.2, 1.6),
+                    startSize: new IntervalValue(0.6, 0.75),
                     startRotation: new IntervalValue(0, Math.PI * 2),
                     rotationAxis: axis,
                     startColor: new RandomColor(new Color4(1, 0.7, 0.3, 1), new Color4(0.45, 0.8, 1, 1)),
-                    emissionOverTime: new ConstantValue(5),
-                    shape: new ConeEmitter({radius: 1.2, angle: 0, thickness: 0}),
+                    emissionOverTime: new ConstantValue(3.2),
+                    // Sent straight along the cone's axis from next to it: 'emission' then
+                    // turns every plate about Y, its own normal.
+                    shape: new ConeEmitter({radius: 0.05, angle: 0}),
                     renderMode: RenderMode.Mesh,
                     ...plate,
                     lighting: 'fixed',

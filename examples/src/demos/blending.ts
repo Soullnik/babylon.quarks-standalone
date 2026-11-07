@@ -109,8 +109,11 @@ function flat(scene: Scene, name: string, color: Color3, lit = false): StandardM
  * - Material colour: the same flame with the material's colour (`materialColor`), brightened in
  *   linear space (`materialColorScale`), and with the particle's own colour left out
  *   (`particleColor: false`): a white flame, its fade gone.
- * - Alpha test: tumbling leaves, blended and unsorted on the left (back leaves cover front ones),
- *   cut out by an alpha test and depth tested on the right.
+ * - Alpha test: tumbling leaves blown toward the camera, green when they set off and red by the
+ *   time they are near. Blended and unsorted on the left, they are drawn in the order they were
+ *   born (or nearly, as dead ones' places are reused), so green ones behind are drawn over red
+ *   ones in front; cut out by an alpha test and writing depth (`depthWrite`, off by default even
+ *   for an opaque system) on the right, the red ones stay in front.
  * - Soft particles: mist among pillars, hard where it cuts the floor and the pillars on the left,
  *   fading out before them on the right (`softParticles`, read from the scene's depth).
  * - Sorting fudge: a glow nearer the camera than the smoke round it. By distance the glow draws
@@ -303,9 +306,10 @@ export function init({scene, camera, batchRenderer, add, controls}: DemoContext)
                     options: {transparent: true, blendMode: Constants.ALPHA_COMBINE},
                 },
                 {
-                    title: 'Cut out: depth tested',
-                    code: 'transparent: false, alphaTest: 0.5',
-                    options: {transparent: false, alphaTest: 0.5},
+                    title: 'Cut out: depth written',
+                    code: 'transparent: false, alphaTest: 0.5, depthWrite: true',
+                    // Depth is written only when asked, opaque or not.
+                    options: {transparent: false, alphaTest: 0.5, depthWrite: true},
                 },
             ];
             sides.forEach((side, index) => {
@@ -315,19 +319,22 @@ export function init({scene, camera, batchRenderer, add, controls}: DemoContext)
                     looping: true,
                     prewarm: true,
                     startLife: new IntervalValue(3.6, 4.4),
-                    startSpeed: new ConstantValue(0),
+                    // The box emits along +z, here at the camera: the older a leaf, the nearer.
+                    startSpeed: new IntervalValue(1.8, 2.1),
                     startSize: new IntervalValue(0.8, 1.1),
                     startRotation: new RandomQuatGenerator(),
-                    // Autumn: red-orange to a yellowing green, the leaf's veins shading it.
-                    startColor: new RandomColor(new Color4(0.95, 0.38, 0.1, 1), new Color4(0.8, 0.78, 0.22, 1)),
+                    startColor: new RandomColor(new Color4(1, 1, 1, 1), new Color4(0.85, 0.85, 0.85, 1)),
                     emissionOverTime: new ConstantValue(18),
-                    shape: new BoxEmitter({width: 3.2, height: 0.3, depth: 4.5}),
+                    shape: new BoxEmitter({width: 2.6, height: 1.8, depth: 0.2}),
                     texture: leaf,
                     renderMode: RenderMode.Mesh,
                     ...quad,
                     ...side.options,
                 });
-                leaves.emitter.position.set(x, 2.4, 0);
+                // A wall of leaves behind the stage, blowing straight at the camera: near and far
+                // leaves lie over each other on screen, so the order they are drawn in shows.
+                leaves.emitter.position.set(x * 1.28, 0.3, -3.5);
+                leaves.emitter.lookAt(camera.position);
                 leaves.addBehavior(
                     new Rotation3DOverLife(
                         new EulerGenerator(
@@ -337,7 +344,23 @@ export function init({scene, camera, batchRenderer, add, controls}: DemoContext)
                         )
                     )
                 );
-                leaves.addBehavior(new ApplyForce(new BVector3(0, -1, 0), new ConstantValue(0.55)));
+                // Green far off, turning red halfway, so near over far reads at a glance; opaque
+                // throughout, as a cutout cannot fade.
+                leaves.addBehavior(
+                    new ColorOverLife(
+                        new Gradient(
+                            [
+                                [new Color3(0.4, 0.85, 0.25), 0],
+                                [new Color3(0.4, 0.85, 0.25), 0.35],
+                                [new Color3(1, 0.3, 0.08), 0.5],
+                            ],
+                            [
+                                [1, 0],
+                                [1, 1],
+                            ]
+                        )
+                    )
+                );
                 // Leaves shrink away at the end: a cutout cannot fade.
                 leaves.addBehavior(
                     new SizeOverLife(
