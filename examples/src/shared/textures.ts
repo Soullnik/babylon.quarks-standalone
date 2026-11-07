@@ -7,8 +7,8 @@ import type {Scene} from '@babylonjs/core/scene';
  * The examples' base texture set, `public/textures/base/`: greyscale (value in RGB, coverage in
  * alpha), so a particle's colour or a gradient map tints them. Made outside this repository: the
  * smoke and dust puffs, fire, flash, bolts, streak, glint, ring, swirl, fibers and aura strip from
- * Kenney's CC0 particle packs (kenney.nl), the plain shapes (glow, spark, disc, leaf, glyphs) drawn
- * with numpy; each sheet's grid is listed here.
+ * Kenney's CC0 particle packs (kenney.nl), the plain shapes (glow, spark, disc, leaf, glyphs, boot
+ * footprints) drawn with numpy; each sheet's grid is listed here.
  */
 export const BASE = {
     glow: {cols: 1, rows: 1},
@@ -27,6 +27,7 @@ export const BASE = {
     flash: {cols: 4, rows: 2},
     fire: {cols: 4, rows: 4},
     glyphs: {cols: 4, rows: 4},
+    footprints: {cols: 2, rows: 1},
 } as const;
 
 export type BaseTexture = keyof typeof BASE;

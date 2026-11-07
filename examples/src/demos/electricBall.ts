@@ -177,6 +177,26 @@ export function init({scene, camera, add}: DemoContext): DemoRun {
     pool.addBehavior(new ColorOverLife(fade(0.3, 0.6)));
     add(pool);
 
+    // The charge it throws on the ground under it: webs lying flat, each lit for a moment, a
+    // random one of the sheet turned at random, so the light crackles rather than glows evenly.
+    const crackle = new ParticleSystem({
+        ...common,
+        startLife: new IntervalValue(0.06, 0.14),
+        startSpeed: new ConstantValue(0),
+        startSize: new IntervalValue(2, 3.2),
+        startRotation: new IntervalValue(0, Math.PI * 2),
+        startColor: new RandomColor(new Color4(0.25, 0.45, 1, 0.35), new Color4(0.5, 0.72, 1, 0.55)),
+        emissionOverTime: new ConstantValue(16),
+        shape: new PointEmitter(),
+        texture: webs,
+        ...kenneySheet('webs'),
+        startTileIndex: new IntervalValue(0, 4),
+        renderMode: RenderMode.HorizontalBillBoard,
+        renderOrder: 0,
+    });
+    crackle.emitter.name = 'Crackle on the ground';
+    add(crackle);
+
     // Now and then it strikes the ground: a bolt from the ball down (a card hanging from its top
     // end, turned to point down), and a flash where it lands. Each is one burst, replayed (restart)
     // at the strike, placed under the ball.
@@ -233,6 +253,7 @@ export function init({scene, camera, add}: DemoContext): DemoRun {
             time += delta;
             ball.position.set(Math.sin(time * 0.6) * 2.6, 2.4 + Math.sin(time * 1.7) * 0.3, Math.sin(time * 1.2) * 1.2);
             pool.emitter.position.set(ball.position.x, 0.02, ball.position.z);
+            crackle.emitter.position.set(ball.position.x, 0.025, ball.position.z);
             if (time >= nextStrike) {
                 // The hanging card's top end on the ball's underside, its length to the ground.
                 strike.emitter.position.set(ball.position.x, ball.position.y - 0.2, ball.position.z);

@@ -95,9 +95,9 @@ export const demoManifest: DemoManifestEntry[] = [
         section: 'features',
         category: 'Emission and shapes',
         description:
-            'Ring Buffer Mode: a full system replaces its oldest particles, which wait paused (footprints) or looping (pulsing dots) until then.',
+            'Ring Buffer Mode: a full system replaces its oldest particles, which wait paused (boot prints) or looping (pulsing wards) until then.',
         tags: ['ringBufferMode', 'maxParticles'],
-        captureAt: 4,
+        captureAt: 8,
     },
     {
         key: 'VelocityDemo',
@@ -136,7 +136,7 @@ export const demoManifest: DemoManifestEntry[] = [
         section: 'features',
         category: 'Motion and forces',
         description:
-            'Two turning emitters: a world-space gravity keeps falling down, a local-space thrust turns with its emitter.',
+            'Two tipping nozzles: a world-space gravity keeps pulling their sparks down, a local-space thrust turns with its nozzle.',
         tags: ['ApplyForce', 'ForceOverLife'],
         captureAt: 3,
     },
@@ -332,7 +332,7 @@ export const demoManifest: DemoManifestEntry[] = [
         description:
             'A charge, a release burst and lingering smoke scheduled on a QuarksPrefab timeline that advances with the scene; the end of the timeline lets particles die out, and every other blast plays in slow motion through timeScale.',
         tags: ['QuarksPrefab', 'timeScale'],
-        captureAt: 1.6,
+        captureAt: 1.4,
     },
     {
         key: 'LoadingEffectsDemo',

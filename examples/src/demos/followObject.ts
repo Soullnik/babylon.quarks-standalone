@@ -7,21 +7,22 @@ import type {Mesh} from '@babylonjs/core/Meshes/mesh';
 import {MeshBuilder} from '@babylonjs/core/Meshes/meshBuilder';
 import type {Scene} from '@babylonjs/core/scene';
 import {
-    Bezier,
     ColorOverLife,
     ConstantColor,
     ConstantValue,
     Gradient,
     IntervalValue,
     ParticleSystem,
-    PiecewiseBezier,
     PointEmitter,
     RenderMode,
+    RotationOverLife,
     SizeOverLife,
     SphereEmitter,
 } from 'babylon.quarks';
+import {curve} from '../shared/curves';
 import {addLabel} from '../shared/labels';
-import {baseTexture} from '../shared/textures';
+import {addGround} from '../shared/stage';
+import {baseTexture, kenneySheet, kenneyTexture} from '../shared/textures';
 import type {DemoContext, DemoRun} from '../types';
 
 /** Half-width and half-depth of the figure-eight both orbs fly along. */
@@ -32,7 +33,7 @@ function cooling(tint: Color3, tail: Color3) {
     return new Gradient(
         [
             [new Color3(1, 1, 1), 0],
-            [tint, 0.15],
+            [tint, 0.08],
             [tail, 1],
         ],
         [
@@ -46,12 +47,14 @@ function cooling(tint: Color3, tail: Color3) {
 /**
  * One glowing orb with two systems parented to it:
  * - a halo in local space, which moves with the orb;
- * - a world-space wake, which stays where it was emitted. It is emitted either at a fixed rate in
- *   time or per unit of distance the orb travels, depending on `byDistance`.
+ * - a world-space wake of coloured smoke, which stays where it was emitted. It is emitted either at
+ *   a fixed rate in time or per unit of distance the orb travels, depending on `byDistance`. The
+ *   puffs are alpha-blended, so where they bunch up the wake grows dense, not white.
  */
 function createOrb(
     scene: Scene,
     texture: Texture,
+    puffs: Texture,
     name: string,
     color: Color3,
     tail: Color3,
@@ -73,7 +76,7 @@ function createOrb(
         startLife: new ConstantValue(1 + 1 / 60),
         startSpeed: new ConstantValue(0),
         startSize: new ConstantValue(3.6),
-        startColor: new ConstantColor(new Color4(color.r, color.g, color.b, 0.55)),
+        startColor: new ConstantColor(new Color4(color.r, color.g, color.b, 0.45)),
         // Local space: the halo is carried along by its parent.
         worldSpace: false,
         emissionOverTime: new ConstantValue(1),
@@ -91,24 +94,36 @@ function createOrb(
         scene,
         duration: 1,
         looping: true,
-        startLife: new IntervalValue(2.6, 3.2),
-        startSpeed: new IntervalValue(0, 0.6),
-        startSize: new IntervalValue(1.4, 2),
-        startColor: new ConstantColor(new Color4(1, 1, 1, 0.75)),
+        startLife: new IntervalValue(1.4, 1.8),
+        startSpeed: new IntervalValue(0, 0.4),
+        startSize: new IntervalValue(0.9, 1.4),
+        startRotation: new IntervalValue(0, Math.PI * 2),
+        startColor: new ConstantColor(new Color4(1, 1, 1, 0.85)),
         // World space: emitted particles stay behind as the orb moves on.
         worldSpace: true,
-        // The same average rate either way: about 80 particles a second at the orb's mean speed.
-        emissionOverTime: new ConstantValue(byDistance ? 0 : 80),
-        emissionOverDistance: new ConstantValue(byDistance ? 8 : 0),
+        // The same average rate either way: about 30 puffs a second at the orb's mean speed.
+        emissionOverTime: new ConstantValue(byDistance ? 0 : 30),
+        emissionOverDistance: new ConstantValue(byDistance ? 3 : 0),
         shape: new SphereEmitter({radius: 0.15, thickness: 1, arc: Math.PI * 2}),
-        texture,
+        texture: puffs,
+        ...kenneySheet('puffs'),
+        startTileIndex: new IntervalValue(0, 25),
         transparent: true,
-        blendMode: Constants.ALPHA_ADD,
+        blendMode: Constants.ALPHA_COMBINE,
         renderMode: RenderMode.BillBoard,
         renderOrder: 1,
     });
     wake.addBehavior(new ColorOverLife(cooling(tint, tail)));
-    wake.addBehavior(new SizeOverLife(new PiecewiseBezier([[new Bezier(1, 0.7, 0.35, 0), 0]])));
+    wake.addBehavior(
+        new SizeOverLife(
+            curve([
+                [0, 0.5],
+                [0.25, 1],
+                [1, 1.5],
+            ])
+        )
+    );
+    wake.addBehavior(new RotationOverLife(new IntervalValue(-0.7, 0.7)));
     wake.emitter.parent = orb;
     add(wake);
     return orb;
@@ -126,12 +141,8 @@ export function init({scene, camera, add}: DemoContext): DemoRun {
     camera.setPosition(new BVector3(0, 15, 21));
     camera.setTarget(new BVector3(0, 0, 0));
     const texture = baseTexture(scene, 'glow');
-    const ground = MeshBuilder.CreateDisc('followGround', {radius: 40, tessellation: 64}, scene);
-    ground.rotation.x = Math.PI / 2;
-    const groundMat = new StandardMaterial('followGroundMat', scene);
-    groundMat.diffuseColor = new Color3(0.05, 0.055, 0.075);
-    groundMat.specularColor = Color3.Black();
-    ground.material = groundMat;
+    const puffs = kenneyTexture(scene, 'puffs');
+    addGround(scene, 0, new Color3(0.13, 0.14, 0.18));
 
     // The route, faintly drawn at the orbs' height.
     const route = MeshBuilder.CreateLines(
@@ -149,6 +160,7 @@ export function init({scene, camera, add}: DemoContext): DemoRun {
     const byTime = createOrb(
         scene,
         texture,
+        puffs,
         'followByTime',
         new Color3(0.35, 0.85, 1),
         new Color3(0.1, 0.25, 0.9),
@@ -158,6 +170,7 @@ export function init({scene, camera, add}: DemoContext): DemoRun {
     const byDistance = createOrb(
         scene,
         texture,
+        puffs,
         'followByDistance',
         new Color3(1, 0.6, 0.2),
         new Color3(0.9, 0.15, 0.05),

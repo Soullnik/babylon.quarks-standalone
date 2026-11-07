@@ -332,6 +332,14 @@ and the package's version moves in lockstep with `quarks.core`.
   Its shadow is a black sphere that writes depth, so whatever passes behind the hole is hidden from
   any side while the near side of the disk passes in front of it; the glow along the disk lies in
   the disk's plane instead of a card facing the camera, and the lensed rings face the camera.
+  Muzzle Flash shows its hundred guns (one mesh drawn as thin instances) blowing dark smoke out of
+  the muzzle; Ring Buffer leaves boot prints round its circle (a new base sheet of a left and a
+  right print) and pulsing wards; Following Moving Objects trails coloured smoke that grows dense
+  rather than white; Force Space tips two nozzles standing on the floor, a fountain under gravity
+  and a jet bent by its thrust; Pooled One-Shot Hits is framed closer and its smoke rises for a
+  couple of seconds; Timeline opens a magic circle under the charge and sends shock rings out at the
+  release; Electric Ball's light on the ground crackles; the Flipbooks smoke plays its sheet fast
+  enough not to step, and the glyph sheet's strokes are thicker.
 
 ### Fixed
 

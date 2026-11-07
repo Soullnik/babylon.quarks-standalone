@@ -22,6 +22,8 @@ import {showTopics, type Topic} from '../shared/topics';
 import type {DemoContext} from '../types';
 
 const FLOOR = -2.6;
+/** The height of the captions over the sheets that play, which stay low. */
+const CAPTION = 2.3;
 
 /** Frames 0 to the last of an `n`-frame sheet over the particle's life. */
 function overLife(n: number) {
@@ -70,12 +72,14 @@ export function init({scene, camera, add, controls}: DemoContext) {
                 duration: 2,
                 looping: true,
                 prewarm: true,
-                startLife: new ConstantValue(2.4),
-                startSpeed: new ConstantValue(0.9),
-                startSize: new IntervalValue(2.2, 2.6),
+                // Sixteen frames over 1.4 seconds, about eleven a second: quick enough that the
+                // puff swells and breaks up rather than stepping.
+                startLife: new ConstantValue(1.4),
+                startSpeed: new ConstantValue(1.5),
+                startSize: new IntervalValue(2, 2.4),
                 startRotation: new IntervalValue(0, Math.PI * 2),
                 startColor: new ConstantColor(new Color4(0.85, 0.82, 0.9, 1)),
-                emissionOverTime: new ConstantValue(1.5),
+                emissionOverTime: new ConstantValue(2.5),
                 shape: new ConeEmitter({radius: 0.2, angle: 0.1}),
                 texture: smoke,
                 ...sheetOf('smoke_puff'),
@@ -85,7 +89,7 @@ export function init({scene, camera, add, controls}: DemoContext) {
             puffs.emitter.position.set(x[0], -1.6, 0);
             puffs.emitter.rotation.x = -Math.PI / 2;
             puffs.addBehavior(new FrameOverLife(overLife(16)));
-            addCaption(scene, group, x[0], 'Once over its life', 'frame: 0 → 15 over life');
+            addCaption(scene, group, x[0], 'Once over its life', 'frame: 0 → 15 over life', CAPTION);
 
             const flame = (at: number, frames: FrameOverLife, title: string, code: string) => {
                 const ps = system(group, {
@@ -94,7 +98,7 @@ export function init({scene, camera, add, controls}: DemoContext) {
                     prewarm: true,
                     startLife: new ConstantValue(2),
                     startSpeed: new ConstantValue(0),
-                    startSize: new ConstantValue(3),
+                    startSize: new ConstantValue(4),
                     startColor: new ConstantColor(new Color4(1, 0.7, 0.35, 1)),
                     emissionOverTime: new ConstantValue(0.5),
                     shape: new PointEmitter(),
@@ -103,10 +107,10 @@ export function init({scene, camera, add, controls}: DemoContext) {
                     transparent: true,
                     blendMode: Constants.ALPHA_ADD,
                 });
-                ps.emitter.position.set(at, -1, 0);
+                ps.emitter.position.set(at, -0.7, 0);
                 ps.addBehavior(frames);
                 ps.addBehavior(new ColorOverLife(fade(0.1, 0.85)));
-                addCaption(scene, group, at, title, code);
+                addCaption(scene, group, at, title, code, CAPTION);
             };
             flame(x[1], new FrameOverLife(overLife(16), {cycles: 3}), 'Three times over its life', 'cycles: 3');
             flame(
@@ -121,7 +125,7 @@ export function init({scene, camera, add, controls}: DemoContext) {
                 looping: true,
                 startLife: new ConstantValue(2.6),
                 startSpeed: new ConstantValue(0),
-                startSize: new ConstantValue(3.4),
+                startSize: new ConstantValue(4.2),
                 startColor: new ConstantColor(new Color4(1, 0.85, 0.5, 1)),
                 emissionOverTime: new ConstantValue(0),
                 emissionBursts: [{time: 0, count: new ConstantValue(1), cycle: 1, interval: 0, probability: 1}],
@@ -135,7 +139,7 @@ export function init({scene, camera, add, controls}: DemoContext) {
             // The sheet's last frames are empty; the segment stops on the star breaking up.
             burst.addBehavior(new FrameOverLife(new ConstantValue(0), {fps: 10, frameCount: 5, loop: false}));
             burst.addBehavior(new ColorOverLife(fade(0.02, 0.8)));
-            addCaption(scene, group, x[3], 'Once, then holds', 'fps: 10, frameCount: 5, loop: false');
+            addCaption(scene, group, x[3], 'Once, then holds', 'fps: 10, frameCount: 5, loop: false', CAPTION);
         },
     });
 

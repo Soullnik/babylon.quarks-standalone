@@ -1,12 +1,14 @@
 import {Constants} from '@babylonjs/core/Engines/constants';
-import {Color4} from '@babylonjs/core/Maths/math.color';
+import {Color3, Color4} from '@babylonjs/core/Maths/math.color';
 import {Vector3 as BVector3} from '@babylonjs/core/Maths/math.vector';
 import {
     ApplyForce,
     Bezier,
+    ColorOverLife,
     ConstantColor,
     ConstantValue,
     FrameOverLife,
+    Gradient,
     IntervalValue,
     ParticleEmitter,
     ParticleSystem,
@@ -15,21 +17,25 @@ import {
     QuarksPrefab,
     RandomColor,
     RenderMode,
+    RotationOverLife,
     SizeOverLife,
     SphereEmitter,
 } from 'babylon.quarks';
 import {createColorOverLifeGradient} from '../shared/common';
-import {curve} from '../shared/curves';
+import {curve, fade} from '../shared/curves';
 import {addGround} from '../shared/stage';
-import {baseTexture, sheetOf} from '../shared/textures';
+import {baseTexture, kenneyTexture, sheetOf} from '../shared/textures';
 import type {DemoContext, DemoRun} from '../types';
 
 /** Seconds of charge before the release. */
 const CHARGE = 1.2;
+/** The floor under the blast, which is at the origin. */
+const FLOOR = -1.6;
 
 /**
  * A charged blast laid out on a QuarksPrefab timeline, as a Unity Timeline or a
- * Niagara emitter schedule would: a looping charge glow, a release burst on a
+ * Niagara emitter schedule would: a magic circle opening on the floor and a
+ * looping charge glow, a release burst with its flash and shock rings on a
  * window shorter than a frame, and smoke that lingers. The prefab advances by
  * the demo's frame time (`update(delta)`; `autoUpdate` would take the scene's
  * instead); at the end of the timeline the systems stop
@@ -37,9 +43,9 @@ const CHARGE = 1.2;
  * motion through the prefab's `timeScale`.
  */
 export function init({scene, camera, batchRenderer, add}: DemoContext): DemoRun {
-    camera.setPosition(new BVector3(0, 2.8, 9));
-    camera.setTarget(new BVector3(0, 1.4, 0));
-    addGround(scene, -1.6);
+    camera.setPosition(new BVector3(0, 2.6, 7.6));
+    camera.setTarget(new BVector3(0, -0.1, 0));
+    addGround(scene, FLOOR);
     const streak = baseTexture(scene, 'streak');
 
     const charge = new ParticleSystem({
@@ -162,19 +168,107 @@ export function init({scene, camera, batchRenderer, add}: DemoContext): DemoRun 
         )
     );
 
+    // A magic circle on the floor under the blast: it opens and turns over the charge, flares at the
+    // release and fades with the smoke.
+    const sigil = new ParticleSystem({
+        scene,
+        duration: CHARGE + 1,
+        looping: false,
+        startLife: new ConstantValue(CHARGE + 1),
+        startSpeed: new ConstantValue(0),
+        startSize: new ConstantValue(4.2),
+        startColor: new ConstantColor(new Color4(0.45, 0.65, 1, 1)),
+        emissionOverTime: new ConstantValue(0),
+        emissionBursts: [{time: 0, count: new ConstantValue(1), cycle: 1, interval: 0, probability: 1}],
+        shape: new PointEmitter(),
+        texture: kenneyTexture(scene, 'sigil'),
+        transparent: true,
+        blendMode: Constants.ALPHA_ADD,
+        renderMode: RenderMode.HorizontalBillBoard,
+    });
+    // The charge is the first `CHARGE / (CHARGE + 1)` of its life.
+    const released = CHARGE / (CHARGE + 1);
+    sigil.addBehavior(
+        new SizeOverLife(
+            curve([
+                [0, 0.3],
+                [released, 1],
+                [released + 0.08, 1.12],
+                [1, 1.05],
+            ])
+        )
+    );
+    sigil.addBehavior(
+        new ColorOverLife(
+            new Gradient(
+                [
+                    [new Color3(1, 1, 1), 0],
+                    [new Color3(1, 1, 1), 1],
+                ],
+                [
+                    [0, 0],
+                    [0.55, released * 0.6],
+                    [0.8, released],
+                    [1, released + 0.04],
+                    [0, 1],
+                ]
+            )
+        )
+    );
+    sigil.addBehavior(new RotationOverLife(new ConstantValue(0.6)));
+    sigil.emitter.position.y = FLOOR + 0.02;
+
+    // The release's shock: a ring racing out over the floor and one facing the camera.
+    const shock = (name: string, renderMode: RenderMode, size: number, y: number, alpha: number) => {
+        const ring = new ParticleSystem({
+            scene,
+            duration: 0.5,
+            looping: false,
+            startLife: new ConstantValue(0.35),
+            startSpeed: new ConstantValue(0),
+            startSize: new ConstantValue(size),
+            startColor: new ConstantColor(new Color4(0.65, 0.82, 1, alpha)),
+            emissionOverTime: new ConstantValue(0),
+            emissionBursts: [{time: 0, count: new ConstantValue(1), cycle: 1, interval: 0, probability: 1}],
+            shape: new PointEmitter(),
+            texture: baseTexture(scene, 'ring'),
+            transparent: true,
+            blendMode: Constants.ALPHA_ADD,
+            renderMode,
+        });
+        ring.addBehavior(
+            new SizeOverLife(
+                curve([
+                    [0, 0.1],
+                    [0.35, 0.8],
+                    [1, 1],
+                ])
+            )
+        );
+        ring.addBehavior(new ColorOverLife(fade(0, 0.25)));
+        ring.emitter.name = name;
+        ring.emitter.position.y = y;
+        return ring;
+    };
+    const groundShock = shock('Ground shock', RenderMode.HorizontalBillBoard, 8, FLOOR + 0.03, 0.6);
+    const airShock = shock('Air shock', RenderMode.BillBoard, 4, 0, 0.4);
+
     const prefab = new QuarksPrefab('blast', scene);
     prefab.registerBatchedRenderer(batchRenderer);
-    for (const system of [charge, core, release, flash, smoke]) {
+    for (const system of [sigil, charge, core, release, flash, groundShock, airShock, smoke]) {
         system.emitter.parent = prefab;
         // The timeline starts them; until then they wait.
         system.stop();
         add(system);
     }
+    prefab.addParticleSystemAnimation(sigil.emitter as ParticleEmitter, 0, 0.01);
     prefab.addParticleSystemAnimation(charge.emitter as ParticleEmitter, 0, CHARGE);
     prefab.addParticleSystemAnimation(core.emitter as ParticleEmitter, 0, CHARGE);
     // Far shorter than a frame: the prefab still plays it when a frame steps over it.
     prefab.addParticleSystemAnimation(release.emitter as ParticleEmitter, CHARGE, 0.01);
     prefab.addParticleSystemAnimation(flash.emitter as ParticleEmitter, CHARGE, 0.01);
+    prefab.addParticleSystemAnimation(groundShock.emitter as ParticleEmitter, CHARGE, 0.01);
+    prefab.addParticleSystemAnimation(airShock.emitter as ParticleEmitter, CHARGE, 0.01);
     prefab.addParticleSystemAnimation(smoke.emitter as ParticleEmitter, CHARGE, 0.8);
     prefab.play();
 

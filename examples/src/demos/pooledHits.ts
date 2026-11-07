@@ -18,18 +18,20 @@ import {
     QuarksUtil,
     RandomColor,
     RenderMode,
+    RotationOverLife,
     SizeOverLife,
+    SpeedOverLife,
     SphereEmitter,
 } from 'babylon.quarks';
 import {curve, fade} from '../shared/curves';
 import {addGround} from '../shared/stage';
-import {baseTexture, sheetOf} from '../shared/textures';
+import {baseTexture, kenneySheet, kenneyTexture, sheetOf} from '../shared/textures';
 import {every} from '../shared/timing';
 import type {DemoContext, DemoRun} from '../types';
 
 /** Targets the hits land on, laid out in a ring. */
 const TARGET_COUNT = 6;
-const TARGET_RADIUS = 5;
+const TARGET_RADIUS = 3.6;
 
 /**
  * Builds the template of one hit, layered and staged as a game's hit is: two stacked star flashes
@@ -60,7 +62,7 @@ function createHitTemplate({scene, batchRenderer}: DemoContext): TransformNode {
 
     const flash = layer('Flash', {
         startLife: new IntervalValue(0.18, 0.26),
-        startSize: new IntervalValue(2.6, 3.2),
+        startSize: new IntervalValue(1.9, 2.4),
         startRotation: new IntervalValue(0, Math.PI * 2),
         startColor: new RandomColor(new Color4(1, 1, 1, 1), new Color4(1, 0.85, 0.55, 1)),
         emissionBursts: burst(2),
@@ -79,7 +81,7 @@ function createHitTemplate({scene, batchRenderer}: DemoContext): TransformNode {
 
     const glow = layer('Glow', {
         startLife: new ConstantValue(0.18),
-        startSize: new ConstantValue(3.2),
+        startSize: new ConstantValue(2.6),
         startColor: new ConstantColor(new Color4(1, 0.45, 0.15, 1)),
         emissionBursts: burst(1),
         texture: baseTexture(scene, 'glow'),
@@ -98,7 +100,7 @@ function createHitTemplate({scene, batchRenderer}: DemoContext): TransformNode {
 
     const ring = layer('Ring', {
         startLife: new ConstantValue(0.35),
-        startSize: new ConstantValue(3.4),
+        startSize: new ConstantValue(2.8),
         startColor: new ConstantColor(new Color4(1, 0.7, 0.35, 1)),
         emissionBursts: burst(1, 0.03),
         texture: baseTexture(scene, 'ring'),
@@ -146,29 +148,45 @@ function createHitTemplate({scene, batchRenderer}: DemoContext): TransformNode {
     embers.addBehavior(new ApplyForce(new BVector3(0, -1, 0), new ConstantValue(8)));
     embers.addBehavior(new ColorOverLife(fade(0.05, 0.7)));
 
+    // The smoke the hit leaves: a few puffs (each a random one of the sheet) that swell, turn and
+    // rise for a couple of seconds, so a hit's smoke is still there as the next ones land.
     const smoke = layer('Smoke', {
-        duration: 1.2,
-        startLife: new IntervalValue(0.7, 1),
-        startSpeed: new IntervalValue(0.3, 0.7),
-        startSize: new IntervalValue(1.2, 1.6),
+        duration: 2.4,
+        startLife: new IntervalValue(1.6, 2.2),
+        startSpeed: new IntervalValue(0.3, 0.8),
+        startSize: new IntervalValue(0.8, 1.2),
         startRotation: new IntervalValue(0, Math.PI * 2),
-        startColor: new RandomColor(new Color4(0.45, 0.42, 0.4, 0.6), new Color4(0.6, 0.56, 0.52, 0.7)),
-        emissionBursts: burst(3, 0.08),
+        startColor: new RandomColor(new Color4(0.36, 0.34, 0.33, 0.7), new Color4(0.52, 0.49, 0.46, 0.8)),
+        worldSpace: true,
+        emissionBursts: burst(4, 0.06),
         shape: new SphereEmitter({radius: 0.3}),
-        texture: baseTexture(scene, 'smoke_puff'),
-        ...sheetOf('smoke_puff'),
-        blendTiles: true,
+        texture: kenneyTexture(scene, 'puffs'),
+        ...kenneySheet('puffs'),
+        startTileIndex: new IntervalValue(0, 25),
         blendMode: Constants.ALPHA_COMBINE,
         renderOrder: 1,
     });
+    smoke.addBehavior(new ColorOverLife(fade(0.08, 0.35)));
     smoke.addBehavior(
-        new FrameOverLife(
+        new SizeOverLife(
             curve([
-                [0, 0],
-                [1, 15.99],
+                [0, 0.6],
+                [0.3, 1.1],
+                [1, 1.7],
             ])
         )
     );
+    smoke.addBehavior(
+        new SpeedOverLife(
+            curve([
+                [0, 1],
+                [0.3, 0.3],
+                [1, 0.2],
+            ])
+        )
+    );
+    smoke.addBehavior(new ApplyForce(new BVector3(0, 1, 0), new ConstantValue(0.6)));
+    smoke.addBehavior(new RotationOverLife(new IntervalValue(-0.6, 0.6)));
 
     QuarksUtil.addToBatchRenderer(root, batchRenderer);
     root.setEnabled(false);
@@ -177,8 +195,8 @@ function createHitTemplate({scene, batchRenderer}: DemoContext): TransformNode {
 
 export function init(ctx: DemoContext): DemoRun {
     const {scene, camera, systems} = ctx;
-    camera.setPosition(new BVector3(0, 8, 17));
-    camera.setTarget(new BVector3(0, 0.8, 0));
+    camera.setPosition(new BVector3(0, 5.5, 11.5));
+    camera.setTarget(new BVector3(0, 1, 0));
     addGround(scene);
 
     // Dummies in a ring; each hit lands on a dummy's chest, on the side toward the camera.
