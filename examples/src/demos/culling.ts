@@ -1,6 +1,8 @@
 import {Constants} from '@babylonjs/core/Engines/constants';
+import {StandardMaterial} from '@babylonjs/core/Materials/standardMaterial';
 import {Color3, Color4} from '@babylonjs/core/Maths/math.color';
 import {Vector3 as BVector3} from '@babylonjs/core/Maths/math.vector';
+import {MeshBuilder} from '@babylonjs/core/Meshes/meshBuilder';
 import {TransformNode} from '@babylonjs/core/Meshes/transformNode';
 import {
     ApplyForce,
@@ -34,11 +36,12 @@ const OFF_SCREEN = 1.5;
  * What a system does when no camera sees it, and which cameras draw it, one topic at a time
  * (picked in the panel), each labelled in the scene.
  *
- * - Culling mode: three clocks, a comet each going round at one turn every few seconds, its own
- *   time under it. Every few seconds the row is moved off screen for a moment. `'always'` keeps
- *   simulating, so it comes back where it would have been; `'pause'` freezes off screen, so it
- *   falls behind a little more each time; `'pauseAndCatchUp'` freezes too, then runs the time it
- *   missed when it is seen again, and comes back in step.
+ * - Culling mode: three clocks, a comet each going round its face at one turn every few seconds,
+ *   its own time under it, and a white mark on each face where a comet that never stopped is.
+ *   Every few seconds the comets are moved off screen for a moment (the faces stay). `'always'`
+ *   keeps simulating, so it comes back on its mark; `'pause'` freezes off screen, so it comes back
+ *   behind its mark, a little further each time; `'pauseAndCatchUp'` freezes too, then runs the
+ *   time it missed when it is seen again, and comes back on its mark.
  * - Layers: two fountains on camera layers 1 and 2 (`system.layers.mask`). The panel sets which
  *   layers the camera draws (`camera.layerMask`), as a second camera (a minimap, a portrait) would
  *   draw only its own.
@@ -47,7 +50,7 @@ export function init({scene, camera, add, controls}: DemoContext): DemoRun {
     camera.setPosition(new BVector3(0, 1.2, 12.5));
     camera.setTarget(new BVector3(0, 0.5, 0));
     addGround(scene, FLOOR);
-    const streak = baseTexture(scene, 'streak');
+    const glow = baseTexture(scene, 'glow');
     const spark = baseTexture(scene, 'spark');
 
     const system = (parent: TransformNode, parameters: Omit<ParticleSystemParameters, 'scene'>) => {
@@ -71,6 +74,13 @@ export function init({scene, camera, add, controls}: DemoContext): DemoRun {
                 {mode: 'pauseAndCatchUp', color: new Color3(0.7, 1, 0.45)},
             ];
             const radius = 1.3;
+            const faceMaterial = new StandardMaterial('face', scene);
+            faceMaterial.emissiveColor = new Color3(0.35, 0.38, 0.48);
+            faceMaterial.disableLighting = true;
+            const markerMaterial = new StandardMaterial('marker', scene);
+            markerMaterial.emissiveColor = new Color3(1, 1, 1);
+            markerMaterial.disableLighting = true;
+            markerMaterial.alpha = 0.85;
             const clocks = modes.map(({mode, color}, index) => {
                 const x = (index - 1) * 4.4;
                 // One comet that lives as long as the demo, going round a point beside where it is
@@ -81,14 +91,14 @@ export function init({scene, camera, add, controls}: DemoContext): DemoRun {
                     cullingMode: mode,
                     startLife: new ConstantValue(1e4),
                     startSpeed: new ConstantValue(0),
-                    startSize: new ConstantValue(0.3),
+                    startSize: new ConstantValue(0.5),
                     startColor: new ConstantColor(new Color4(color.r, color.g, color.b, 1)),
                     emissionOverTime: new ConstantValue(0),
                     emissionBursts: [{time: 0, count: new ConstantValue(1), cycle: 1, interval: 0, probability: 1}],
                     shape: new PointEmitter(),
                     renderMode: RenderMode.Trail,
                     rendererEmitterSettings: {startLength: new ConstantValue(40)},
-                    texture: streak,
+                    texture: glow,
                     transparent: true,
                     blendMode: Constants.ALPHA_ADD,
                 });
@@ -100,7 +110,8 @@ export function init({scene, camera, add, controls}: DemoContext): DemoRun {
                         new ConstantValue(0),
                         new ConstantValue(0),
                         new ConstantValue(0),
-                        new ConstantValue(2),
+                        // Slow enough that what 'pause' misses off screen is a part of a turn.
+                        new ConstantValue(1.1),
                         'local',
                         new ConstantValue(0),
                         {x: radius, y: 0, z: 0}
@@ -128,18 +139,47 @@ export function init({scene, camera, add, controls}: DemoContext): DemoRun {
                     `cullingMode: '${mode}'`
                 );
                 const status = addStatus(scene, row, new BVector3(x, -1.9, 0.5));
-                return {comet, status};
+                // The clock's face, which stays on screen: the comet's round, and a marker where a
+                // comet that never stopped is (the 'always' one's place, which keeps simulating).
+                const face = MeshBuilder.CreateTorus(
+                    `face ${mode}`,
+                    {diameter: radius * 2, thickness: 0.03, tessellation: 64},
+                    scene
+                );
+                face.rotation.x = Math.PI / 2;
+                face.position.set(x, 0.4, 0);
+                face.material = faceMaterial;
+                face.parent = group;
+                // A ring, so the comet's head shows through it when it is on its mark.
+                const marker = MeshBuilder.CreateTorus(
+                    `marker ${mode}`,
+                    {diameter: 0.55, thickness: 0.07, tessellation: 32},
+                    scene
+                );
+                marker.rotation.x = Math.PI / 2;
+                marker.material = markerMaterial;
+                marker.parent = group;
+                return {comet, status, marker, x};
             });
             const clock = addStatus(scene, group, new BVector3(0, -2.5, 3.5));
+            addStatus(scene, group, new BVector3(0, 2.4, 0))('white ring: where a comet that never stopped is');
+            const reference = clocks[0].comet;
             let time = 0;
             ticks.push((delta) => {
                 time += delta;
                 const away = time % (ON_SCREEN + OFF_SCREEN) >= ON_SCREEN;
                 row.position.x = away ? 30 : 0;
-                for (const {comet, status} of clocks) {
+                // The 'always' comet keeps simulating off screen: its place is every clock's mark.
+                const head = reference.particleNum > 0 ? reference.particles[0].position : undefined;
+                for (const {comet, status, marker, x} of clocks) {
                     status(`its time: ${comet.time.toFixed(1)} s`);
+                    if (head) marker.position.set(x - radius + head.x, 0.4 + head.y, head.z);
                 }
-                clock(away ? `off screen · demo time ${time.toFixed(1)} s` : `demo time ${time.toFixed(1)} s`);
+                clock(
+                    away
+                        ? `the comets are off screen, culled · demo time ${time.toFixed(1)} s`
+                        : `back on screen: on its mark, or behind it? · demo time ${time.toFixed(1)} s`
+                );
             });
         },
     });

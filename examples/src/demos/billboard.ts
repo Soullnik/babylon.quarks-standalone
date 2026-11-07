@@ -1,4 +1,3 @@
-import {VertexBuffer} from '@babylonjs/core/Buffers/buffer';
 import {Constants} from '@babylonjs/core/Engines/constants';
 import {StandardMaterial} from '@babylonjs/core/Materials/standardMaterial';
 import {Color3, Color4} from '@babylonjs/core/Maths/math.color';
@@ -11,6 +10,7 @@ import {
     ConeEmitter,
     ConstantColor,
     ConstantValue,
+    EulerGenerator,
     FrameOverLife,
     Gradient,
     IntervalValue,
@@ -28,9 +28,10 @@ import {
     WidthOverLength,
 } from 'babylon.quarks';
 import {curve, fade} from '../shared/curves';
+import {crystal} from '../shared/geometry';
 import {addLabel} from '../shared/labels';
 import {addGround} from '../shared/stage';
-import {baseTexture, sheetOf} from '../shared/textures';
+import {baseTexture, kenneyTexture, rampTexture, sheetOf} from '../shared/textures';
 import type {DemoContext, DemoRun} from '../types';
 
 /** Colour over life from white through `mid` to `end`, alpha in by 10 % and out from `out`. */
@@ -54,7 +55,8 @@ function warmth(mid: Color3, end: Color3, out = 0.6): Gradient {
  * Every render mode, each on its own labelled pad doing what it is for: billboards facing the
  * camera (smoke), stretched billboards laid along their motion (sparks), horizontal ones flat on
  * the ground (ripples), vertical ones upright but turning to the camera (flames), mesh particles
- * lit by the renderer's light (crystals), trails (ribbons spiralling up) and a beam (a bolt between two
+ * lit by the renderer's light (ice crystals, a texture coloured by a gradient map, a glowing rim),
+ * trails (ribbons spiralling up) and a beam (a bolt between two
  * points).
  */
 export function init({scene, camera, add}: DemoContext): DemoRun {
@@ -190,32 +192,41 @@ export function init({scene, camera, add}: DemoContext): DemoRun {
     flames.addBehavior(new ColorOverLife(fade(0.15, 0.7)));
     flames.emitter.position.y = 0.65;
 
-    // Mesh particles: faceted crystals tumbling up, lit by the scene's light.
-    const gem = MeshBuilder.CreateIcoSphere('gem', {radius: 0.5, subdivisions: 1, flat: true}, scene);
-    gem.scaling.y = 1.6;
-    gem.bakeCurrentTransformIntoVertices();
-    gem.isVisible = false;
-    gem.setEnabled(false);
+    // Mesh particles: ice crystals tumbling up, lit by a fixed light, streaks and cracks running
+    // through them coloured by an ice ramp, their edges glowing.
+    const iceRamp = rampTexture(scene, 'ice', [
+        [0, '#0b2a5c', 1],
+        [0.45, '#2f86d6', 1],
+        [0.8, '#9fe4ff', 1],
+        [1, '#ffffff', 1],
+    ]);
     const crystals = up(
         system(4, 'Crystals', {
             startLife: new IntervalValue(1.6, 2.2),
             startSpeed: new IntervalValue(0.8, 1.4),
-            startSize: new IntervalValue(0.35, 0.6),
+            startSize: new IntervalValue(0.7, 1.1),
             startRotation: new RandomQuatGenerator(),
-            startColor: new RandomColor(new Color4(0.55, 0.85, 1, 1), new Color4(0.85, 0.6, 1, 1)),
+            startColor: new RandomColor(new Color4(0.8, 0.92, 1, 1), new Color4(1, 1, 1, 1)),
             emissionOverTime: new ConstantValue(5),
             shape: new ConeEmitter({radius: 0.6, angle: 0.25}),
             transparent: false,
+            depthWrite: true,
+            renderFace: 'front',
             blendMode: Constants.ALPHA_DISABLE,
             renderMode: RenderMode.Mesh,
             lighting: 'fixed',
-            instancingGeometry: new Float32Array(gem.getVerticesData(VertexBuffer.PositionKind)!),
-            instancingNormals: new Float32Array(gem.getVerticesData(VertexBuffer.NormalKind)!),
-            instancingUVs: new Float32Array(gem.getVerticesData(VertexBuffer.UVKind)!),
-            instancingIndices: new Uint32Array(gem.getIndices()!),
+            ...crystal(0.2),
+            texture: kenneyTexture(scene, 'veins', true),
+            gradientMap: {ramp: iceRamp, channel: 'r'},
+            rim: {color: [0.6, 0.9, 1], power: 2.5, strength: 0.8, mode: 'add'},
         })
     );
-    crystals.addBehavior(new Rotation3DOverLife(new RandomQuatGenerator()));
+    // A slow tumble, under a turn and a half a second about any axis, so a crystal reads as it turns.
+    crystals.addBehavior(
+        new Rotation3DOverLife(
+            new EulerGenerator(new IntervalValue(-1, 1), new IntervalValue(-1.5, 1.5), new IntervalValue(-1, 1), 'YXZ')
+        )
+    );
     crystals.addBehavior(
         new SizeOverLife(
             curve([

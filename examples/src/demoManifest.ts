@@ -158,7 +158,7 @@ export const demoManifest: DemoManifestEntry[] = [
         section: 'features',
         category: 'Rendering',
         description:
-            'Every render mode doing what it is for, each on a labelled pad: billboards (smoke), stretched billboards (sparks), horizontal (ripples), vertical (flames), lit mesh particles (crystals), trails (ribbons) and a beam (a bolt between two points).',
+            'Every render mode doing what it is for, each on a labelled pad: billboards (smoke), stretched billboards (sparks), horizontal (ripples), vertical (flames), lit mesh particles (ice crystals), trails (ribbons) and a beam (a bolt between two points).',
         tags: ['RenderMode', 'StretchedBillBoard', 'Mesh', 'Trail', 'Beam'],
         captureAt: 2,
     },
@@ -180,7 +180,7 @@ export const demoManifest: DemoManifestEntry[] = [
         section: 'features',
         category: 'Rendering',
         description:
-            'One topic at a time: the same smoke in five blend modes over light and dark (premultiplied draws smoke that covers and a glow that adds from one map), the material colour, its scale and the particle colour left out, leaves cut out by an alpha test against blended ones, soft particles fading before the floor and pillars, and a sorting fudge that keeps the smoke over a nearer glow.',
+            'One topic at a time: the same smoke in five blend modes rising from a bright horizon into a dark sky (premultiplied draws smoke that covers and a glow that adds from one map), the material colour, its scale and the particle colour left out, leaves cut out by an alpha test against blended ones, soft particles fading before the floor and pillars, and a sorting fudge that keeps the smoke over a nearer glow.',
         tags: [
             'blendMode',
             'premultipliedMap',
@@ -199,9 +199,9 @@ export const demoManifest: DemoManifestEntry[] = [
         section: 'features',
         category: 'Rendering',
         description:
-            "One topic at a time: shards solid and fading along their own vertex colours; plates spun about the mesh's Z or an axis from their direction; tilted leaves spun about their own axis or keeping their tilt ('angles' integration); and leaves from a turning emitter, turning with it or upright in the world.",
+            "One topic at a time: ice and blood spikes bursting out of the ground, a texture coloured by a ramp with lit edges (gradientMap, rim); shards solid and fading along their own vertex colours; plates spun about the mesh's Z or an axis from their direction; tilted leaves spun about their own axis or keeping their tilt ('angles' integration); and leaves from a turning emitter, turning with it or upright in the world.",
         tags: ['instancingColors', 'rotationAxis', 'Rotation3DOverLife', 'renderAlignment'],
-        captureAt: 2,
+        captureAt: 0.8,
     },
     {
         key: 'ImageProcessingDemo',
@@ -363,7 +363,7 @@ export const demoManifest: DemoManifestEntry[] = [
         section: 'features',
         category: 'Performance',
         description:
-            'One topic at a time: three clocks moved off screen every few seconds, one that keeps running, one that pauses and falls behind, one that pauses and catches up (cullingMode); and fountains on camera layers 1 and 2, the camera set in the panel to draw both or one (layers.mask, camera.layerMask).',
+            'One topic at a time: three clocks whose comets are moved off screen every few seconds, a mark on each face showing where a comet that never stopped is: one keeps running, one pauses and falls behind its mark, one pauses and catches up (cullingMode); and fountains on camera layers 1 and 2, the camera set in the panel to draw both or one (layers.mask, camera.layerMask).',
         tags: ['cullingMode', 'layerMask', 'layers'],
         captureAt: 9.5,
     },

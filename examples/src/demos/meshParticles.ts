@@ -5,10 +5,12 @@ import {Vector3 as BVector3} from '@babylonjs/core/Maths/math.vector';
 import {MeshBuilder} from '@babylonjs/core/Meshes/meshBuilder';
 import type {TransformNode} from '@babylonjs/core/Meshes/transformNode';
 import {
+    ApplyForce,
     AxisAngleGenerator,
     ConeEmitter,
     ConstantColor,
     ConstantValue,
+    DonutEmitter,
     EulerGenerator,
     IntervalValue,
     ParticleSystem,
@@ -22,10 +24,10 @@ import {
     SphereEmitter,
 } from 'babylon.quarks';
 import {curve} from '../shared/curves';
-import {geometryOf} from '../shared/geometry';
+import {geometryOf, spike} from '../shared/geometry';
 import {addCaption} from '../shared/labels';
 import {addGround} from '../shared/stage';
-import {baseTexture} from '../shared/textures';
+import {baseTexture, kenneyTexture, rampTexture} from '../shared/textures';
 import {showTopics, type Topic} from '../shared/topics';
 import type {DemoContext, DemoRun} from '../types';
 
@@ -38,6 +40,9 @@ const FLOOR = -2.6;
  * - Vertex colours: shards bursting out, solid; then with the mesh's own vertex colours
  *   (`instancingColors`), bright at the base and fading out to the tip, as a glTF `COLOR_0`
  *   would draw them.
+ * - Textured spikes: ice and blood spikes bursting out of the ground in a ring, standing, then
+ *   sinking back, as a game's stakes: a faceted mesh with streaks and cracks running up it, coloured
+ *   by a ramp (`gradientMap`), its edges lit (`rim`), kept upright by `renderAlignment: 'world'`.
  * - Rotation axis: triangular plates rising in a column and spun by a number rotation. About the
  *   mesh's own Z (`'z'`) they tumble, edge on now and then; about an axis picked from the direction
  *   they are emitted in (`'emission'`), here their own normal, they spin flat, facing the camera.
@@ -63,6 +68,112 @@ export function init({scene, camera, add, controls}: DemoContext): DemoRun {
     const quad = geometryOf(MeshBuilder.CreatePlane('quad', {size: 1}, scene));
     const ticks: ((delta: number) => void)[] = [];
     const topics: Topic[] = [];
+
+    topics.push({
+        name: 'Textured spikes',
+        build(group) {
+            // Spikes as a game's ice or blood stakes: a faceted mesh with streaks and cracks running
+            // up it (a texture), coloured by a ramp (gradientMap), its edges lit (rim), bursting out
+            // of the ground in a ring, standing, then sinking back. renderAlignment 'world' keeps
+            // them upright although the ring is laid flat by turning the emitter.
+            const veins = kenneyTexture(scene, 'veins', true);
+            const kinds = [
+                {
+                    x: -3.4,
+                    title: 'Ice',
+                    ramp: rampTexture(scene, 'ice', [
+                        [0, '#1d4f94', 1],
+                        [0.35, '#4aa6f0', 1],
+                        [0.7, '#bff0ff', 1],
+                        [1, '#ffffff', 1],
+                    ]),
+                    rim: [0.55, 0.85, 1] as [number, number, number],
+                    debris: [new Color4(0.7, 0.9, 1, 1), new Color4(1, 1, 1, 1)],
+                },
+                {
+                    x: 3.4,
+                    title: 'Blood',
+                    ramp: rampTexture(scene, 'blood', [
+                        [0, '#2a0006', 1],
+                        [0.35, '#8a0c18', 1],
+                        [0.7, '#e0243a', 1],
+                        [1, '#ffb0b0', 1],
+                    ]),
+                    rim: [1, 0.3, 0.3] as [number, number, number],
+                    debris: [new Color4(0.45, 0.01, 0.03, 1), new Color4(0.8, 0.06, 0.08, 1)],
+                },
+            ];
+            const once = (count: number) => [
+                {time: 0, count: new ConstantValue(count), cycle: 1, interval: 0, probability: 1},
+            ];
+            for (const kind of kinds) {
+                const spikes = system(group, {
+                    duration: 2,
+                    looping: true,
+                    startLife: new IntervalValue(1.8, 2.1),
+                    startSpeed: new ConstantValue(0),
+                    startSize: new IntervalValue(1.1, 2.1),
+                    startRotation: new EulerGenerator(
+                        new IntervalValue(-0.35, 0.35),
+                        new IntervalValue(0, Math.PI * 2),
+                        new IntervalValue(-0.35, 0.35),
+                        'YXZ'
+                    ),
+                    startColor: new ConstantColor(new Color4(1, 1, 1, 1)),
+                    emissionOverTime: new ConstantValue(0),
+                    emissionBursts: once(9),
+                    shape: new DonutEmitter({radius: 1, donutRadius: 0.35, thickness: 1, arc: Math.PI * 2}),
+                    renderMode: RenderMode.Mesh,
+                    renderAlignment: 'world',
+                    ...spike(0.16),
+                    texture: veins,
+                    gradientMap: {ramp: kind.ramp, channel: 'r'},
+                    rim: {color: kind.rim, power: 2, strength: 1, mode: 'add'},
+                    lighting: 'fixed',
+                    transparent: false,
+                    // An opaque mesh writes depth and shows its outer faces only, or its far
+                    // faces draw over its near ones.
+                    depthWrite: true,
+                    renderFace: 'front',
+                    blendMode: Constants.ALPHA_DISABLE,
+                });
+                spikes.emitter.position.set(kind.x, FLOOR, 0);
+                spikes.emitter.rotation.x = -Math.PI / 2; // the donut lies in its xy plane: lay it flat
+                spikes.addBehavior(
+                    new SizeOverLife(
+                        curve([
+                            [0, 0],
+                            [0.08, 1.08],
+                            [0.14, 1],
+                            [0.8, 1],
+                            [1, 0],
+                        ])
+                    )
+                );
+                // Shards or drops thrown up as they burst out, falling back.
+                const debris = system(group, {
+                    duration: 2,
+                    looping: true,
+                    startLife: new IntervalValue(0.6, 1),
+                    startSpeed: new IntervalValue(2.5, 4.5),
+                    startSize: new IntervalValue(0.08, 0.16),
+                    startColor: new RandomColor(kind.debris[0], kind.debris[1]),
+                    emissionOverTime: new ConstantValue(0),
+                    emissionBursts: once(30),
+                    shape: new ConeEmitter({radius: 1.1, angle: 0.5, thickness: 0.4}),
+                    texture: baseTexture(scene, 'spark'),
+                    renderMode: RenderMode.StretchedBillBoard,
+                    rendererEmitterSettings: {speedFactor: 0.06, lengthFactor: 1},
+                    transparent: true,
+                    blendMode: kind.title === 'Ice' ? Constants.ALPHA_ADD : Constants.ALPHA_COMBINE,
+                });
+                debris.emitter.position.set(kind.x, FLOOR + 0.1, 0);
+                debris.emitter.rotation.x = -Math.PI / 2;
+                debris.addBehavior(new ApplyForce(new BVector3(0, -1, 0), new ConstantValue(9)));
+                addCaption(scene, group, kind.x, kind.title, 'texture + gradientMap + rim');
+            }
+        },
+    });
 
     topics.push({
         name: 'Vertex colours',
@@ -149,6 +260,7 @@ export function init({scene, camera, add, controls}: DemoContext): DemoRun {
                     ...plate,
                     lighting: 'fixed',
                     transparent: false,
+                    depthWrite: true,
                 });
                 ps.emitter.position.set(x, FLOOR + 0.4, 0);
                 ps.emitter.rotation.x = -Math.PI / 2; // the cone emits along +z; aim it up
@@ -179,6 +291,7 @@ export function init({scene, camera, add, controls}: DemoContext): DemoRun {
         ...quad,
         lighting: 'unlit',
         transparent: false,
+        depthWrite: true,
         alphaTest: 0.5,
         ...parameters,
     });

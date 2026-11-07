@@ -85,6 +85,41 @@ function emberTexture(scene: Scene): RawTexture {
 }
 
 /** An unlit flat colour for the scene's props: the blend modes' backdrop, the soft particles' pillars. */
+/**
+ * An evening sky, a column of texels from a warm bright horizon (bottom) up to a dark night (top),
+ * as an unlit material: a backdrop each blend mode shows over, light low down and dark high up.
+ */
+function skyMaterial(scene: Scene): StandardMaterial {
+    const stops: [number, Color3][] = [
+        [0, Color3.FromHexString('#f6cf96')],
+        [0.18, Color3.FromHexString('#e08a5a')],
+        [0.42, Color3.FromHexString('#6a4a6e')],
+        [0.7, Color3.FromHexString('#1e1a30')],
+        [1, Color3.FromHexString('#090b14')],
+    ];
+    const height = 256;
+    const data = new Uint8Array(height * 4);
+    for (let row = 0; row < height; row++) {
+        const t = row / (height - 1);
+        let i = 0;
+        while (i < stops.length - 2 && t > stops[i + 1][0]) i++;
+        const [t0, c0] = stops[i];
+        const [t1, c1] = stops[i + 1];
+        const c = Color3.Lerp(c0, c1, (t - t0) / (t1 - t0));
+        data.set([Math.round(c.r * 255), Math.round(c.g * 255), Math.round(c.b * 255), 255], row * 4);
+    }
+    const texture = RawTexture.CreateRGBATexture(data, 1, height, scene, false, false, Texture.BILINEAR_SAMPLINGMODE);
+    texture.wrapU = Texture.CLAMP_ADDRESSMODE;
+    texture.wrapV = Texture.CLAMP_ADDRESSMODE;
+    const material = new StandardMaterial('sky', scene);
+    material.emissiveTexture = texture;
+    material.disableLighting = true;
+    material.specularColor = Color3.Black();
+    // A plane faces away from a camera in front of it: draw both its sides.
+    material.backFaceCulling = false;
+    return material;
+}
+
 function flat(scene: Scene, name: string, color: Color3, lit = false): StandardMaterial {
     const material = new StandardMaterial(name, scene);
     material.specularColor = Color3.Black();
@@ -102,10 +137,10 @@ function flat(scene: Scene, name: string, color: Color3, lit = false): StandardM
  * How particles are blended into the frame and coloured by their material, one topic at a time
  * (picked in the panel), each labelled in the scene.
  *
- * - Blend modes: the same smoke in five modes over a backdrop light above and dark below. Alpha
- *   blending covers, additive and screen add light (only on the dark), multiply darkens (only on
- *   the light), and premultiplied blending draws one map that does both: smoke that covers, and a
- *   glow round it that adds.
+ * - Blend modes: the same smoke in five modes, rising from a bright evening horizon into a dark
+ *   sky. Alpha blending covers, additive and screen add light (seen on the dark), multiply darkens
+ *   (seen on the light), and premultiplied blending draws one map that does both: smoke that
+ *   covers, and a glow round it that adds. The puffs crossfade their frames (`blendTiles`).
  * - Material colour: the same flame with the material's colour (`materialColor`), brightened in
  *   linear space (`materialColorScale`), and with the particle's own colour left out
  *   (`particleColor: false`): a white flame, its fade gone.
@@ -147,16 +182,14 @@ export function init({scene, camera, batchRenderer, add, controls}: DemoContext)
     topics.push({
         name: 'Blend modes',
         build(group) {
-            // A backdrop light above and dark below: each mode shows on both.
-            const backdrop = (y: number, height: number, color: Color3) => {
-                const plane = MeshBuilder.CreatePlane('backdrop', {width: 19.5, height}, scene);
-                plane.position.set(0, y, -1.4);
-                plane.material = flat(scene, 'backdrop', color);
-                plane.isPickable = false;
-                plane.parent = group;
-            };
-            backdrop(1.4, 2.4, new Color3(0.74, 0.74, 0.76));
-            backdrop(-1.2, 2.8, new Color3(0.04, 0.045, 0.06));
+            // An evening sky behind, bright at the horizon and dark above: the smoke rises from
+            // light into dark, so each mode shows over both (multiply only darkens what is light,
+            // screen and additive only lighten what is dark).
+            const sky = MeshBuilder.CreatePlane('sky', {width: 46, height: 18}, scene);
+            sky.position.set(0, FLOOR + 8.4, -6);
+            sky.material = skyMaterial(scene);
+            sky.isPickable = false;
+            sky.parent = group;
 
             const ember = emberTexture(scene);
             const modes: {title: string; code: string; blendMode: number; premultiplied?: boolean}[] = [
@@ -178,8 +211,8 @@ export function init({scene, camera, batchRenderer, add, controls}: DemoContext)
                         duration: 3,
                         looping: true,
                         prewarm: true,
-                        startLife: new IntervalValue(2.6, 3.2),
-                        startSpeed: new IntervalValue(1.2, 1.5),
+                        startLife: new IntervalValue(2, 2.4),
+                        startSpeed: new IntervalValue(1.7, 2.1),
                         // The ember fills its square more than a puff's frames do: drawn smaller.
                         startSize: mode.premultiplied ? new IntervalValue(1.3, 1.6) : new IntervalValue(1.9, 2.4),
                         startRotation: new IntervalValue(0, Math.PI * 2),
@@ -190,7 +223,9 @@ export function init({scene, camera, batchRenderer, add, controls}: DemoContext)
                         shape: new ConeEmitter({radius: 0.3, angle: 0.12}),
                         ...(mode.premultiplied
                             ? {texture: ember, premultipliedMap: true}
-                            : {texture: smoke, ...sheetOf('smoke_puff')}),
+                            : // Each frame crossfaded into the next: 16 frames over a 2 s life would
+                              // step otherwise.
+                              {texture: smoke, ...sheetOf('smoke_puff'), blendTiles: true}),
                         transparent: true,
                         blendMode: mode.blendMode,
                     })

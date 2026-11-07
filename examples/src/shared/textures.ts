@@ -73,6 +73,11 @@ export const KENNEY = {
     puffs: {cols: 5, rows: 5},
     /** Four shafts of light rising from the bottom edge, tall cells side by side. */
     shafts: {cols: 4, rows: 1},
+    /**
+     * Streaks and cracks running up a spike or crystal, brighter toward the tip (V = 1); seamless
+     * round it (U), for a gradient map.
+     */
+    veins: {cols: 1, rows: 1},
 } as const;
 
 export type KenneyTexture = keyof typeof KENNEY;

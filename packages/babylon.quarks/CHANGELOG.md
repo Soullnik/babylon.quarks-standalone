@@ -291,6 +291,10 @@ and the package's version moves in lockstep with `quarks.core`.
   of light. Black Hole is rebuilt after Gargantua (turbulent gas in spiral arms, the far side of the
   disk bent over and under the shadow, a thin photon ring), Electric Ball crackles with a web of
   electricity instead of rings, and Level-Up flares shafts of light round the character.
+  Mesh Particles gains ice and blood spikes bursting out of the ground (a texture coloured by a
+  ramp, lit edges), Render Modes draws ice crystals tumbling slowly, opaque meshes write depth
+  so their far faces never show through, Blending's smoke rises over an evening sky and crossfades
+  its frames, and Culling marks on each clock where a comet that never stopped is.
 
 ### Fixed
 
