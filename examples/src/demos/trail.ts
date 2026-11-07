@@ -9,6 +9,7 @@ import {
     ConeEmitter,
     ConstantColor,
     ConstantValue,
+    FrameOverLife,
     Gradient,
     IntervalValue,
     ParticleSystem,
@@ -19,7 +20,7 @@ import {
 } from 'babylon.quarks';
 import {curve, fade} from '../shared/curves';
 import {addGround} from '../shared/stage';
-import {baseTexture} from '../shared/textures';
+import {baseTexture, kenneyTexture, sheetOf} from '../shared/textures';
 import {every, replay} from '../shared/timing';
 import type {DemoContext, DemoRun} from '../types';
 
@@ -40,18 +41,19 @@ export function init({scene, camera, add}: DemoContext): DemoRun {
         looping: false,
         startLife: new IntervalValue(2.2, 3),
         startSpeed: new IntervalValue(7, 11),
-        startSize: new IntervalValue(0.08, 0.14),
+        startSize: new IntervalValue(0.2, 0.3),
         startColor: new RandomColor(new Color4(1, 0.95, 0.8, 1), new Color4(1, 0.8, 0.45, 1)),
         worldSpace: true,
         emissionOverTime: new ConstantValue(0),
         emissionBursts: [
-            {time: 0, count: new ConstantValue(40), cycle: 1, interval: 0, probability: 1},
-            {time: 0.35, count: new ConstantValue(25), cycle: 1, interval: 0, probability: 1},
+            {time: 0, count: new ConstantValue(55), cycle: 1, interval: 0, probability: 1},
+            {time: 0.35, count: new ConstantValue(35), cycle: 1, interval: 0, probability: 1},
         ],
         shape: new ConeEmitter({radius: 0.15, angle: 0.55}),
         renderMode: RenderMode.Trail,
         rendererEmitterSettings: {startLength: new ConstantValue(24)},
-        texture: baseTexture(scene, 'streak'),
+        // Soft edges and a bright line down the middle.
+        texture: kenneyTexture(scene, 'ribbon'),
         transparent: true,
         blendMode: Constants.ALPHA_ADD,
     });
@@ -127,5 +129,38 @@ export function init({scene, camera, add}: DemoContext): DemoRun {
     glow.emitter.position.y = 0.04;
     add(glow);
 
-    return {update: every(3.2, () => replay([sparks, glow]))};
+    // The flash they burst out of.
+    const flash = new ParticleSystem({
+        scene,
+        duration: 2,
+        looping: false,
+        startLife: new ConstantValue(0.3),
+        startSpeed: new ConstantValue(0),
+        startSize: new IntervalValue(2.4, 2.8),
+        startRotation: new IntervalValue(0, Math.PI * 2),
+        startColor: new ConstantColor(new Color4(1, 0.85, 0.55, 1)),
+        emissionOverTime: new ConstantValue(0),
+        emissionBursts: [
+            {time: 0, count: new ConstantValue(1), cycle: 1, interval: 0, probability: 1},
+            {time: 0.35, count: new ConstantValue(1), cycle: 1, interval: 0, probability: 1},
+        ],
+        shape: new ConeEmitter({radius: 0.01, angle: 0}),
+        texture: baseTexture(scene, 'flash'),
+        ...sheetOf('flash'),
+        transparent: true,
+        blendMode: Constants.ALPHA_ADD,
+    });
+    flash.emitter.name = 'Flash';
+    flash.addBehavior(
+        new FrameOverLife(
+            curve([
+                [0, 0],
+                [1, 5.99],
+            ])
+        )
+    );
+    flash.emitter.position.y = 0.5;
+    add(flash);
+
+    return {update: every(3.2, () => replay([sparks, glow, flash]))};
 }

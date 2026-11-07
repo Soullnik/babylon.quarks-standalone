@@ -305,6 +305,8 @@ and the package's version moves in lockstep with `quarks.core`.
   The effect files Loading Effects loads are rebuilt in layers: Ember burst a fireball of rolling
   flame, embers trailing light and dark smoke; Frost ring ice spikes bursting out of the ground
   with frost, glints and mist; Arcane swirl a magic circle under orbiting ribbons and glyphs.
+  Trails and Collision bursts a sheaf of thick glowing ribbons out of a flash, and Sub Emitter's
+  fireworks go up twice as often, burst into trailing sparks and flare.
 
 ### Fixed
 

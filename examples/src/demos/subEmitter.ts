@@ -20,10 +20,11 @@ import {
     SizeOverLife,
     SphereEmitter,
     SubParticleEmitMode,
+    WidthOverLength,
 } from 'babylon.quarks';
 import {curve, fade} from '../shared/curves';
 import {addGround} from '../shared/stage';
-import {baseTexture} from '../shared/textures';
+import {baseTexture, kenneySheet, kenneyTexture} from '../shared/textures';
 import type {DemoContext} from '../types';
 
 /**
@@ -38,12 +39,12 @@ import type {DemoContext} from '../types';
  *   (`emitProbability` 0.35), a little white pop each.
  */
 export function init({scene, camera, add}: DemoContext) {
-    camera.setPosition(new BVector3(0, 4, 24));
+    camera.setPosition(new BVector3(0, 5, 18));
     camera.setTarget(new BVector3(0, 8, 0));
     addGround(scene);
     const spark = baseTexture(scene, 'spark');
-    const streak = baseTexture(scene, 'streak');
-    const glow = baseTexture(scene, 'glow');
+    const ribbon = kenneyTexture(scene, 'ribbon');
+    const stars = kenneyTexture(scene, 'stars');
     const glint = baseTexture(scene, 'glint');
 
     const system = (name: string, parameters: Partial<ParticleSystemParameters>) => {
@@ -69,12 +70,13 @@ export function init({scene, camera, add}: DemoContext) {
     const rockets = system('Rockets', {
         duration: 3,
         looping: true,
+        prewarm: true,
         startLife: new IntervalValue(1.1, 1.4),
         startSpeed: new IntervalValue(10, 12),
         startSize: new ConstantValue(0.16),
         startColor: new RandomColor(new Color4(1, 0.35, 0.2, 1), new Color4(0.35, 0.75, 1, 1)),
-        emissionOverTime: new ConstantValue(1.4),
-        shape: new ConeEmitter({radius: 2.5, angle: 0.2}),
+        emissionOverTime: new ConstantValue(2.6),
+        shape: new ConeEmitter({radius: 3, angle: 0.22}),
         texture: spark,
     });
     rockets.addBehavior(new ApplyForce(new BVector3(0, -1, 0), new ConstantValue(5)));
@@ -87,9 +89,9 @@ export function init({scene, camera, add}: DemoContext) {
         onlyUsedByOther: true,
         startLife: new IntervalValue(0.3, 0.6),
         startSpeed: new IntervalValue(0.2, 0.8),
-        startSize: new IntervalValue(0.06, 0.12),
+        startSize: new IntervalValue(0.08, 0.14),
         startColor: new ConstantColor(new Color4(1, 0.8, 0.5, 1)),
-        emissionOverTime: new ConstantValue(40),
+        emissionOverTime: new ConstantValue(60),
         shape: new SphereEmitter({radius: 0.05}),
         texture: spark,
     });
@@ -102,14 +104,23 @@ export function init({scene, camera, add}: DemoContext) {
         onlyUsedByOther: true,
         startLife: new IntervalValue(1.2, 1.7),
         startSpeed: new IntervalValue(6, 8),
-        startSize: new IntervalValue(0.16, 0.26),
+        startSize: new IntervalValue(0.12, 0.2),
         startColor: new ConstantColor(new Color4(1, 1, 1, 1)),
-        emissionBursts: burst(90),
+        emissionBursts: burst(150),
         shape: new SphereEmitter({radius: 0.1}),
-        texture: streak,
-        renderMode: RenderMode.StretchedBillBoard,
-        rendererEmitterSettings: {speedFactor: 0.12, lengthFactor: 1},
+        // Each spark trails light behind it, narrowing to its tail.
+        texture: ribbon,
+        renderMode: RenderMode.Trail,
+        rendererEmitterSettings: {startLength: new ConstantValue(26), followLocalOrigin: false},
     });
+    shell.addBehavior(
+        new WidthOverLength(
+            curve([
+                [0, 0],
+                [1, 1],
+            ])
+        )
+    );
     shell.addBehavior(
         new LimitSpeedOverLife(
             curve([
@@ -141,11 +152,15 @@ export function init({scene, camera, add}: DemoContext) {
         duration: 0.2,
         onlyUsedByOther: true,
         startLife: new ConstantValue(0.35),
-        startSize: new ConstantValue(4),
-        startColor: new ConstantColor(new Color4(1, 0.9, 0.7, 0.8)),
+        startSize: new ConstantValue(6),
+        startRotation: new IntervalValue(0, Math.PI * 2),
+        startColor: new ConstantColor(new Color4(1, 0.92, 0.75, 1)),
         emissionBursts: burst(1),
         shape: new PointEmitter(),
-        texture: glow,
+        // A flare: a hot point with a halo and thin rays.
+        texture: stars,
+        ...kenneySheet('stars'),
+        startTileIndex: new ConstantValue(3),
     });
     flash.addBehavior(
         new SizeOverLife(

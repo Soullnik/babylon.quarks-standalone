@@ -277,7 +277,7 @@ export const demoManifest: DemoManifestEntry[] = [
         description:
             'Sparks thrown up in bursts, each with a trail white-hot at its head and cooling down its length (ColorOverLength, WidthOverLength), falling and bouncing on the floor through a collision plane.',
         tags: ['Trail', 'ColorOverLength', 'WidthOverLength', 'ApplyCollision'],
-        captureAt: 1.5,
+        captureAt: 0.6,
     },
     {
         key: 'TrailTextureDemo',
