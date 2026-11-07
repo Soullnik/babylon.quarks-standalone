@@ -87,6 +87,11 @@ export const KENNEY = {
     ribbon: {cols: 1, rows: 1},
     /** A magic circle for the ground: an outer ring and an inner ring of linked beads. */
     sigil: {cols: 1, rows: 1},
+    /**
+     * A whip of fire round a circle, 3x3 frames: an arc sweeping out to a third of the circle,
+     * brightest at its head, then breaking up. Played over a short life on a card turned at random.
+     */
+    arcs: {cols: 3, rows: 3},
 } as const;
 
 export type KenneyTexture = keyof typeof KENNEY;

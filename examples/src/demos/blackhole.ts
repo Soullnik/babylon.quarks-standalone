@@ -8,6 +8,8 @@ import {
     ConstantColor,
     ConstantValue,
     DonutEmitter,
+    EulerGenerator,
+    FrameOverLife,
     Gradient,
     GravityForce,
     IntervalValue,
@@ -16,13 +18,16 @@ import {
     type ParticleSystemParameters,
     PointEmitter,
     RandomColor,
+    RandomQuatGenerator,
     RenderMode,
+    Rotation3DOverLife,
+    RotationOverLife,
     SizeOverLife,
     SphereEmitter,
     Vector3Function,
 } from 'babylon.quarks';
 import {curve, fade} from '../shared/curves';
-import {band, type BandShape, featheredEnds} from '../shared/geometry';
+import {band, type BandShape, crystal, featheredEnds} from '../shared/geometry';
 import {baseTexture, kenneySheet, kenneyTexture, rampTexture} from '../shared/textures';
 import type {DemoContext} from '../types';
 
@@ -281,6 +286,154 @@ export function init({scene, camera, add, controls}: DemoContext) {
     );
     infall.emitter.rotation.x = -Math.PI / 2 + DISK_TILT;
     add(infall);
+
+    // Whips of fire round the hole, as a game's portals whip flame round their rim: big cards each
+    // playing an arc that sweeps out round them and breaks up (a 3x3 sheet over a short life),
+    // turned at random, a stream of them; in the screen's plane round the shadow, and laid in the
+    // disk.
+    const arcs = kenneyTexture(scene, 'arcs');
+    const whips = (name: string, params: Partial<ParticleSystemParameters>) => {
+        const whip = new ParticleSystem({
+            scene,
+            duration: 1,
+            looping: true,
+            prewarm: true,
+            startLife: new IntervalValue(0.8, 1.15),
+            startSpeed: new ConstantValue(0),
+            startRotation: new IntervalValue(0, Math.PI * 2),
+            shape: new PointEmitter(),
+            texture: arcs,
+            ...kenneySheet('arcs'),
+            blendTiles: true,
+            transparent: true,
+            blendMode: Constants.ALPHA_ADD,
+            ...params,
+        } as ParticleSystemParameters);
+        whip.emitter.name = name;
+        whip.addBehavior(
+            new FrameOverLife(
+                curve([
+                    [0, 0],
+                    [1, 8.99],
+                ])
+            )
+        );
+        whip.addBehavior(new RotationOverLife(new IntervalValue(-1.2, -0.6)));
+        add(whip);
+        return whip;
+    };
+    whips('Whips round the shadow', {
+        startSize: new IntervalValue(8.6, 10.4),
+        startColor: new RandomColor(new Color4(1, 0.7, 0.35, 1), new Color4(1, 0.92, 0.7, 1)),
+        emissionOverTime: new ConstantValue(6),
+        renderOrder: 2,
+    });
+    whips('Whips in the disk', {
+        startSize: new IntervalValue(13, 19),
+        startColor: new RandomColor(new Color4(1, 0.55, 0.2, 1), new Color4(1, 0.8, 0.5, 1)),
+        emissionOverTime: new ConstantValue(5),
+        renderMode: RenderMode.HorizontalBillBoard,
+        renderOrder: 1,
+    });
+
+    // Dark wisps drawn into the hole across the glowing disk: smoke as dark as the shadow, the dark
+    // twin a game sets beside every bright layer, so the light has something to stand against.
+    const darkWisps = new ParticleSystem({
+        scene,
+        duration: 3,
+        looping: true,
+        prewarm: true,
+        startLife: new IntervalValue(2.2, 3.2),
+        startSpeed: new ConstantValue(0),
+        startSize: new IntervalValue(1.1, 2),
+        startRotation: new IntervalValue(0, Math.PI * 2),
+        startColor: new RandomColor(new Color4(0.03, 0.015, 0.02, 0.6), new Color4(0.08, 0.03, 0.02, 0.75)),
+        emissionOverTime: new ConstantValue(10),
+        // Born over the bright inner disk, where a dark wisp has light to stand against.
+        shape: new DonutEmitter({radius: 5.5, donutRadius: 1.6, thickness: 1, arc: Math.PI * 2}),
+        texture: kenneyTexture(scene, 'wisps'),
+        ...kenneySheet('wisps'),
+        startTileIndex: new IntervalValue(0, 4),
+        transparent: true,
+        blendMode: Constants.ALPHA_COMBINE,
+        renderOrder: 3,
+    });
+    darkWisps.emitter.name = 'Dark wisps';
+    darkWisps.addBehavior(new OrbitOverLife(new IntervalValue(0.45, 0.75), new BVector3(0, 0, 1)));
+    darkWisps.addBehavior(new GravityForce(new BVector3(0, 0, 0), 10));
+    darkWisps.addBehavior(new RotationOverLife(new IntervalValue(-0.8, 0.8)));
+    darkWisps.addBehavior(new ColorOverLife(fade(0.2, 0.6)));
+    darkWisps.emitter.rotation.x = -Math.PI / 2 + DISK_TILT;
+    add(darkWisps);
+
+    // Debris falling in: dark rocks, lit, their edges glowing with the disk's light, tumbling on
+    // their orbits down into the hole. Opaque, they write depth: the shadow hides those behind it.
+    const debris = new ParticleSystem({
+        scene,
+        duration: 4,
+        looping: true,
+        prewarm: true,
+        startLife: new IntervalValue(3, 4.5),
+        startSpeed: new ConstantValue(0),
+        startSize: new IntervalValue(0.35, 0.8),
+        startRotation: new RandomQuatGenerator(),
+        startColor: new RandomColor(new Color4(0.22, 0.17, 0.16, 1), new Color4(0.35, 0.26, 0.22, 1)),
+        emissionOverTime: new ConstantValue(4),
+        shape: new DonutEmitter({radius: 9, donutRadius: 1.5, thickness: 1, arc: Math.PI * 2}),
+        renderMode: RenderMode.Mesh,
+        ...crystal(0.3),
+        rim: {color: [1, 0.55, 0.2], power: 2.2, strength: 1, mode: 'add'},
+        lighting: 'fixed',
+        transparent: false,
+        renderFace: 'front',
+        blendMode: Constants.ALPHA_DISABLE,
+    });
+    debris.emitter.name = 'Debris';
+    debris.addBehavior(new OrbitOverLife(new IntervalValue(0.35, 0.6), new BVector3(0, 0, 1)));
+    debris.addBehavior(new GravityForce(new BVector3(0, 0, 0), 14));
+    debris.addBehavior(
+        new Rotation3DOverLife(
+            new EulerGenerator(new IntervalValue(-1, 1), new IntervalValue(-1, 1), new IntervalValue(-1, 1), 'YXZ')
+        )
+    );
+    debris.addBehavior(
+        new SizeOverLife(
+            curve([
+                [0, 0],
+                [0.1, 1],
+                [0.85, 1],
+                [1, 0],
+            ])
+        )
+    );
+    debris.emitter.rotation.x = -Math.PI / 2 + DISK_TILT;
+    add(debris);
+
+    // Glints flickering on the photon ring, where the light is bent tightest.
+    const ringGlints = new ParticleSystem({
+        scene,
+        duration: 1,
+        looping: true,
+        prewarm: true,
+        startLife: new IntervalValue(0.35, 0.7),
+        startSpeed: new ConstantValue(0),
+        startSize: new IntervalValue(0.35, 0.8),
+        startRotation: new IntervalValue(0, Math.PI * 2),
+        startColor: new RandomColor(new Color4(1, 0.85, 0.6, 1), new Color4(1, 1, 0.95, 1)),
+        emissionOverTime: new ConstantValue(9),
+        // The donut lies in its xy plane: facing the camera, round the shadow.
+        shape: new DonutEmitter({radius: SHADOW + 0.15, donutRadius: 0.12, thickness: 1, arc: Math.PI * 2}),
+        texture: kenneyTexture(scene, 'stars'),
+        ...kenneySheet('stars'),
+        startTileIndex: new IntervalValue(0, 3),
+        transparent: true,
+        blendMode: Constants.ALPHA_ADD,
+        renderOrder: 3,
+    });
+    ringGlints.emitter.name = 'Ring glints';
+    ringGlints.addBehavior(new ColorOverLife(fade(0.3, 0.6)));
+    ringGlints.addBehavior(new RotationOverLife(new IntervalValue(-2, 2)));
+    add(ringGlints);
 
     // Stars twinkling far round it.
     const starfield = new ParticleSystem({

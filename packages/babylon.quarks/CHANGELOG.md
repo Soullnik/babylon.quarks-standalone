@@ -325,6 +325,9 @@ and the package's version moves in lockstep with `quarks.core`.
   and Arcane swirl fade in from the head and out to the tail and narrow as they go, so none ends in
   a hard cut; Level-Up's dust is turning, swelling puffs instead of a sheet eaten away frame by
   frame.
+  Black Hole gains whips of fire sweeping round the shadow and through the disk (an arc flipbook
+  of our gas on big cards turned at random), dark wisps drawn in across the disk, lit debris
+  tumbling down and glints on the photon ring.
 
 ### Fixed
 
