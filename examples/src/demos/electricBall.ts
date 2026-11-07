@@ -14,27 +14,28 @@ import {
     PointEmitter,
     RandomColor,
     RenderMode,
-    RotationOverLife,
     SizeOverLife,
     SphereEmitter,
     Vector3Function,
 } from 'babylon.quarks';
 import {curve, fade} from '../shared/curves';
-import {baseTexture, sheetOf} from '../shared/textures';
+import {baseTexture, kenneySheet, kenneyTexture} from '../shared/textures';
 import type {DemoContext, DemoRun} from '../types';
 
 /**
  * A ball of lightning drifting on a figure-eight. Its core flickers (short glows replacing each
- * other), a shell of filaments turns round it, bolts crack out of its centre in every direction
- * (a card whose `pivot` puts its left end on the particle, turned at random, each showing a random
- * bolt of the sheet for a moment), and sparks thrown off in world space stay behind as it moves.
+ * other), a web of electricity crackles over it and in it (webs of the sheet lit for a moment each,
+ * turned and picked at random, overlapping into a net), bolts crack out of its centre in every
+ * direction (a card whose `pivot` puts its left end on the particle, turned at random, each
+ * showing a random bolt of the sheet for a moment), and sparks thrown off in world space stay
+ * behind as it moves. Its webs and bolts are made from Kenney's CC0 particle pack.
  */
 export function init({scene, camera, add}: DemoContext): DemoRun {
-    camera.setPosition(new BVector3(0, 3.2, 10.5));
+    camera.setPosition(new BVector3(0, 3, 8.2));
     camera.setTarget(new BVector3(0, 1.9, 0));
     const glow = baseTexture(scene, 'glow');
-    const bolts = baseTexture(scene, 'bolts');
-    const shellTexture = baseTexture(scene, 'ring_fibers');
+    const bolts = kenneyTexture(scene, 'bolts');
+    const webs = kenneyTexture(scene, 'webs');
     const spark = baseTexture(scene, 'spark');
 
     // A ground to float over, lit by the ball where it passes.
@@ -75,8 +76,8 @@ export function init({scene, camera, add}: DemoContext): DemoRun {
             ...common,
             startLife: new IntervalValue(0.08, 0.16),
             startSpeed: new ConstantValue(0),
-            startSize: new IntervalValue(1.2, 1.9),
-            startColor: new RandomColor(new Color4(0.75, 0.88, 1, 1), new Color4(1, 1, 1, 1)),
+            startSize: new IntervalValue(0.6, 1),
+            startColor: new RandomColor(new Color4(0.6, 0.78, 1, 0.75), new Color4(0.9, 0.95, 1, 0.9)),
             emissionOverTime: new ConstantValue(30),
             shape: new PointEmitter(),
             texture: glow,
@@ -85,31 +86,33 @@ export function init({scene, camera, add}: DemoContext): DemoRun {
         'Core'
     ).addBehavior(new ColorOverLife(fade(0.2, 0.5)));
 
-    // A shell of filaments turning round it, two of them the other way.
-    for (const [name, size, spin] of [
-        ['Shell', 3.2, 1.6],
-        ['Shell inner', 2.5, -2.4],
+    // A web of electricity over it: crackling webs the size of the ball, each lit for a moment,
+    // turned at random and a random one of the sheet, so they overlap into a net that never holds
+    // still; smaller, brighter ones crackle inside.
+    for (const [name, size, rate, color, order] of [
+        ['Web', [3, 4.4], 34, [new Color4(0.35, 0.55, 1, 0.85), new Color4(0.7, 0.85, 1, 1)], 1],
+        ['Crackle', [1.3, 2], 22, [new Color4(0.5, 0.7, 1, 0.85), new Color4(0.85, 0.93, 1, 1)], 2],
     ] as const) {
-        const shell = attach(
+        attach(
             new ParticleSystem({
                 ...common,
-                startLife: new ConstantValue(1.2),
+                startLife: new IntervalValue(0.06, 0.14),
                 startSpeed: new ConstantValue(0),
-                startSize: new ConstantValue(size),
+                startSize: new IntervalValue(size[0], size[1]),
                 startRotation: new IntervalValue(0, Math.PI * 2),
-                startColor: new ConstantColor(new Color4(0.45, 0.7, 1, 0.8)),
-                emissionOverTime: new ConstantValue(2),
+                startColor: new RandomColor(color[0], color[1]),
+                emissionOverTime: new ConstantValue(rate),
                 shape: new PointEmitter(),
-                texture: shellTexture,
-                renderOrder: 1,
+                texture: webs,
+                ...kenneySheet('webs'),
+                startTileIndex: new IntervalValue(0, 4),
+                renderOrder: order,
             }),
             name
         );
-        shell.addBehavior(new RotationOverLife(new ConstantValue(spin)));
-        shell.addBehavior(new ColorOverLife(fade(0.3, 0.7)));
     }
 
-    // Bolts out of the centre: a 4:1 card whose left end sits on the particle (pivot +0.5 in x),
+    // Bolts out of the centre: a 3:1 card whose left end sits on the particle (pivot +0.5 in x),
     // turned at random, flickering through random bolts of the sheet.
     const boltSystem = attach(
         new ParticleSystem({
@@ -117,23 +120,23 @@ export function init({scene, camera, add}: DemoContext): DemoRun {
             startLife: new IntervalValue(0.08, 0.2),
             startSpeed: new ConstantValue(0),
             startSize: new Vector3Function(
-                new IntervalValue(1.6, 2.8),
-                new IntervalValue(0.35, 0.55),
+                new IntervalValue(1.8, 3.2),
+                new IntervalValue(0.55, 0.9),
                 new ConstantValue(1)
             ),
             startRotation: new IntervalValue(0, Math.PI * 2),
             startColor: new RandomColor(new Color4(0.55, 0.75, 1, 1), new Color4(0.9, 0.95, 1, 1)),
-            emissionOverTime: new ConstantValue(32),
+            emissionOverTime: new ConstantValue(18),
             shape: new PointEmitter(),
             texture: bolts,
-            ...sheetOf('bolts'),
+            ...kenneySheet('bolts'),
             startTileIndex: new ConstantValue(0),
             pivot: new BVector3(0.5, 0, 0),
             renderOrder: 3,
         }),
         'Bolts'
     );
-    boltSystem.addBehavior(new FrameOverLife(new ConstantValue(0), {fps: 24, frameCount: 8, random: true}));
+    boltSystem.addBehavior(new FrameOverLife(new ConstantValue(0), {fps: 24, frameCount: 4, random: true}));
 
     // Sparks thrown off, simulated in world space: they stay where they were thrown as the ball
     // moves on, and fall.

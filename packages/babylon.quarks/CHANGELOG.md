@@ -284,6 +284,14 @@ and the package's version moves in lockstep with `quarks.core`.
   Renderer Options gains a Flip pair. The base texture set gains a leaf and a sheet of four
   glyphs, one per row.
 
+- **The examples are drawn with real effect textures.** The base set's smoke, dust, fire, flash,
+  bolts, streak, glint, ring, swirl, fibers and aura strip are redrawn from Kenney's CC0 particle
+  packs (kenney.nl), photographed and painted smoke, flame, lightning and light, in place of
+  geometric shapes; a Kenney set adds gas, crackling webs, bolts, streaks, stars, puffs and shafts
+  of light. Black Hole is rebuilt after Gargantua (turbulent gas in spiral arms, the far side of the
+  disk bent over and under the shadow, a thin photon ring), Electric Ball crackles with a web of
+  electricity instead of rings, and Level-Up flares shafts of light round the character.
+
 ### Fixed
 
 - **A start frame keeps its fraction.** `FrameOverLife`'s `startFrame` was floored, so a start

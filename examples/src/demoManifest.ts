@@ -29,7 +29,7 @@ export const demoManifest: DemoManifestEntry[] = [
         section: 'showcase',
         category: 'Magic',
         description:
-            'A black hole seen almost edge-on: a filament disk scrolling round it (mesh rings, mapUV, gradientMap), its far side lensed into a ring round the shadow, and matter orbiting and falling in, heated by its speed (OrbitOverLife, GravityForce, ColorBySpeed).',
+            'A black hole seen nearly edge-on: turbulent gas streaming round it in spiral arms (mesh rings, mapUV scroll, gradientMap), its far side bent over and under the shadow by gravity, a thin photon ring, and matter orbiting and falling in, heated by its speed (OrbitOverLife, GravityForce, ColorBySpeed).',
         tags: ['ColorBySpeed', 'GravityForce', 'OrbitOverLife', 'mapUV', 'gradientMap'],
         captureAt: 3,
     },
@@ -40,7 +40,7 @@ export const demoManifest: DemoManifestEntry[] = [
         section: 'showcase',
         category: 'Magic',
         description:
-            'A ball of lightning drifting over the ground: a flickering core, a turning shell of filaments, bolts cracking out of its centre (a pivoted card on random frames) and sparks left behind in world space.',
+            'A ball of lightning drifting over the ground: a flickering core, a web of electricity crackling over it and in it (webs lit for a moment each, overlapping into a net), bolts cracking out of its centre (a pivoted card on random frames) and sparks left behind in world space.',
         tags: ['FrameOverLife', 'pivot', 'worldSpace'],
         captureAt: 1.3,
     },
@@ -51,7 +51,7 @@ export const demoManifest: DemoManifestEntry[] = [
         section: 'showcase',
         category: 'Buffs and auras',
         description:
-            'One-shot character effect: ground shockwave, light column, spiralling trail ribbons and falling stars.',
+            'One-shot character effect: light gathering on the ground, shafts of light flaring up round the character in waves, shockwaves and dust, spiralling trail ribbons and falling stars.',
         tags: ['Trail', 'OrbitOverLife', 'HorizontalBillBoard'],
         captureAt: 1.2,
     },

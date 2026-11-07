@@ -152,9 +152,10 @@ out of `babylon.quarks`' exports.
    `ctx.addEffect`), name what a feature demo compares with `addCaption` (a title and the setting
    as code) or `addLabel` (`shared/labels.ts`), and offer switches with `ctx.controls`. A feature
    demo with several topics builds each under its own node and lets the panel pick one with
-   `showTopics` (`shared/topics.ts`). Draw with the base texture set (`baseTexture` in
-   `shared/textures.ts`, greyscale sheets and shapes tinted by the particles' colour, made outside
-   this repository) and stand the demo on `addGround` (`shared/stage.ts`), mid-dark so additive
+   `showTopics` (`shared/topics.ts`). Draw with the base texture set and the Kenney set
+   (`baseTexture` and `kenneyTexture` in `shared/textures.ts`, greyscale sheets and shapes tinted by
+   the particles' colour, made outside this repository, most of them from Kenney's CC0 particle
+   packs) and stand the demo on `addGround` (`shared/stage.ts`), mid-dark so additive
    light and alpha-blended smoke both read. Time comes only from `update`'s `delta`: it pauses,
    slows down and steps with the viewer. `shared/timing.ts` replays one-shot effects.
 2. Register it in `examples/src/demoManifest.ts`: its section (`showcase` for a finished effect,

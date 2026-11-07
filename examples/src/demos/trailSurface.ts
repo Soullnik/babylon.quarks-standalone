@@ -43,20 +43,6 @@ function canvasTexture(
     return texture;
 }
 
-/** Soft bands along U that tile: the red channel runs 0…1 across each band, alpha follows. */
-function bands(ctx: CanvasRenderingContext2D, size: number): void {
-    const image = ctx.createImageData(size, size);
-    for (let y = 0; y < size; y++) {
-        for (let x = 0; x < size; x++) {
-            const v = 0.5 + 0.5 * Math.sin((x / size) * Math.PI * 2 * 3);
-            const i = (y * size + x) * 4;
-            image.data[i] = image.data[i + 1] = image.data[i + 2] = Math.round(v * 255);
-            image.data[i + 3] = Math.round(Math.pow(v, 2) * 255);
-        }
-    }
-    ctx.putImageData(image, 0, 0);
-}
-
 /** Ice ramp along U: deep blue, cyan, white. */
 function iceRamp(ctx: CanvasRenderingContext2D, size: number): void {
     const gradient = ctx.createLinearGradient(0, 0, size, 0);
@@ -78,8 +64,8 @@ function iceRamp(ctx: CanvasRenderingContext2D, size: number): void {
  * simulates in its local space.
  *
  * Right: mesh-particle ripples. The disc's second UV set is radial, the map is
- * laid on UV channel 1 and scrolled, so the bands flow outward from the centre;
- * a gradient map colours them by the band's red channel.
+ * laid on UV channel 1 and scrolled, so smoke flows outward from the centre in
+ * broken rings; a gradient map colours it by the smoke's red channel, as frost.
  */
 export function init({scene, camera, add}: DemoContext): DemoRun {
     camera.setPosition(new BVector3(0, 4, 15));
@@ -157,8 +143,9 @@ export function init({scene, camera, add}: DemoContext): DemoRun {
         worldSpace: false,
         emissionOverTime: new ConstantValue(2),
         shape: new PointEmitter(),
-        texture: canvasTexture(scene, 'bands', 256, true, bands),
-        mapUV: {channel: 1, tiling: [2, 1], scroll: [-0.8, 0]},
+        // Smoke run outward from the centre: broken rings of frost, not even bands.
+        texture: baseTexture(scene, 'swirl', true),
+        mapUV: {channel: 1, tiling: [1.5, 2], scroll: [-0.6, 0]},
         gradientMap: {ramp: canvasTexture(scene, 'iceRamp', 256, false, iceRamp), channel: 'r'},
         transparent: true,
         blendMode: Constants.ALPHA_ADD,

@@ -26,7 +26,7 @@ import {
     WidthOverLength,
 } from 'babylon.quarks';
 import {curve} from '../shared/curves';
-import {baseTexture, sheetOf} from '../shared/textures';
+import {baseTexture, kenneySheet, kenneyTexture, sheetOf} from '../shared/textures';
 import {every, replay} from '../shared/timing';
 import type {DemoContext, DemoRun} from '../types';
 
@@ -70,7 +70,8 @@ const DEEP = new Color3(1, 0.45, 0.1);
 
 /**
  * A level-up on a character, built in stages as a game's effect is: the light gathers on the
- * ground and a column of light stands round the character, rings rising up it; two shockwaves run out over the ground and kick up
+ * ground and a column of light stands round the character, shafts of light flaring up round it in
+ * waves and rings rising up it; two shockwaves run out over the ground and kick up
  * dust; golden ribbons spiral up (Trail with `OrbitOverLife` and `WidthOverLength`); then a flash
  * at the chest throws glints that spin and fall, and motes keep rising after. Replayed every few
  * seconds.
@@ -85,6 +86,7 @@ export function init({scene, camera, add, systems}: DemoContext): DemoRun {
     const flash = baseTexture(scene, 'flash');
     const dust = baseTexture(scene, 'dust_puff');
     const spark = baseTexture(scene, 'spark');
+    const shafts = kenneyTexture(scene, 'shafts');
 
     // The character and the ground it stands on, mid-toned so dust and light both read on it.
     const ground = MeshBuilder.CreateDisc('ground', {radius: 40, tessellation: 64}, scene);
@@ -135,7 +137,7 @@ export function init({scene, camera, add, systems}: DemoContext): DemoRun {
     const column = system('Light column', {
         startLife: new ConstantValue(1.3),
         startSize: new Vector3Function(new ConstantValue(2.4), new ConstantValue(7), new ConstantValue(1)),
-        startColor: new ConstantColor(new Color4(1, 0.78, 0.4, 0.8)),
+        startColor: new ConstantColor(new Color4(1, 0.78, 0.4, 0.45)),
         emissionBursts: [burst(0, 1)],
         texture: glow,
         renderMode: RenderMode.VerticalBillBoard,
@@ -152,6 +154,26 @@ export function init({scene, camera, add, systems}: DemoContext): DemoRun {
         )
     );
     column.emitter.position.y = 2.2;
+    // Shafts of light standing up round the character in waves, each a random shaft of the sheet,
+    // its foot on the ground (a shaft is drawn from the bottom of its card), drifting up as it
+    // fades. The cone emits in its xy plane; turned flat, it rings the character.
+    const shaftHeight = new IntervalValue(5.5, 7.5);
+    const lightShafts = system('Light shafts', {
+        startLife: new IntervalValue(0.8, 1.2),
+        startSpeed: new IntervalValue(0.2, 0.5),
+        startSize: new Vector3Function(new IntervalValue(1, 2.2), shaftHeight, new ConstantValue(1)),
+        startColor: new RandomColor(new Color4(1, 0.8, 0.4, 0.6), new Color4(1, 0.92, 0.7, 0.75)),
+        emissionBursts: [burst(0, 3), burst(0.08, 2), burst(0.18, 3), burst(0.32, 2)],
+        shape: new ConeEmitter({radius: 0.7, angle: 0, thickness: 1}),
+        texture: shafts,
+        ...kenneySheet('shafts'),
+        startTileIndex: new IntervalValue(0, 4),
+        renderMode: RenderMode.VerticalBillBoard,
+        renderOrder: 2,
+    });
+    lightShafts.addBehavior(new ColorOverLife(hold(WHITE, GOLD, 0.45, 0.15)));
+    lightShafts.emitter.rotation.x = -Math.PI / 2;
+    lightShafts.emitter.position.y = 3.2;
     const risingRings = system('Rising rings', {
         duration: 0.6,
         startLife: new IntervalValue(0.7, 0.9),
@@ -238,10 +260,10 @@ export function init({scene, camera, add, systems}: DemoContext): DemoRun {
         duration: 0.5,
         startLife: new IntervalValue(1, 1.3),
         startSpeed: new IntervalValue(4, 5.5),
-        startSize: new IntervalValue(0.14, 0.22),
+        startSize: new IntervalValue(0.22, 0.34),
         startColor: new ConstantColor(new Color4(1, 0.85, 0.5, 1)),
         startDelay: new ConstantValue(0.1),
-        emissionOverTime: new ConstantValue(24),
+        emissionOverTime: new ConstantValue(30),
         shape: new ConeEmitter({radius: 1.2, angle: 0, thickness: 0}),
         texture: streak,
         renderMode: RenderMode.Trail,
