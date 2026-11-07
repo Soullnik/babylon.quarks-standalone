@@ -40,7 +40,7 @@ export const demoManifest: DemoManifestEntry[] = [
         section: 'showcase',
         category: 'Magic',
         description:
-            'A ball of lightning drifting over the ground: a flickering core, a web of electricity crackling over it and in it (webs lit for a moment each, overlapping into a net), bolts cracking out of its centre (a pivoted card on random frames) and sparks left behind in world space.',
+            'A ball of lightning drifting over the ground: a flickering core, a web of electricity crackling over it and in it (webs lit for a moment each, overlapping into a net), short bolts cracking out of it (a pivoted card on random frames), strikes to the ground now and then (a one-burst system restarted), and sparks left behind in world space.',
         tags: ['FrameOverLife', 'pivot', 'worldSpace'],
         captureAt: 1.3,
     },
@@ -51,7 +51,7 @@ export const demoManifest: DemoManifestEntry[] = [
         section: 'showcase',
         category: 'Buffs and auras',
         description:
-            'One-shot character effect: light gathering on the ground, shafts of light flaring up round the character in waves, shockwaves and dust, spiralling trail ribbons and falling stars.',
+            'One-shot character effect: a magic circle opening on the ground, light gathering there, shafts of light flaring up round the character in waves, shockwaves and dust, spiralling trail ribbons and falling stars.',
         tags: ['Trail', 'OrbitOverLife', 'HorizontalBillBoard'],
         captureAt: 1.2,
     },

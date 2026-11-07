@@ -69,8 +69,8 @@ const GOLD = new Color3(1, 0.72, 0.25);
 const DEEP = new Color3(1, 0.45, 0.1);
 
 /**
- * A level-up on a character, built in stages as a game's effect is: the light gathers on the
- * ground and a column of light stands round the character, shafts of light flaring up round it in
+ * A level-up on a character, built in stages as a game's effect is: a magic circle opens on the
+ * ground under it, the light gathers there and a column of light stands round the character, shafts of light flaring up round it in
  * waves and rings rising up it; two shockwaves run out over the ground and kick up
  * dust; golden ribbons spiral up (Trail with `OrbitOverLife` and `WidthOverLength`); then a flash
  * at the chest throws glints that spin and fall, and motes keep rising after. Replayed every few
@@ -81,12 +81,13 @@ export function init({scene, camera, add, systems}: DemoContext): DemoRun {
     camera.setTarget(new BVector3(0, 1.7, 0));
     const glow = baseTexture(scene, 'glow');
     const ringTexture = baseTexture(scene, 'ring');
-    const streak = baseTexture(scene, 'streak');
     const glint = baseTexture(scene, 'glint');
     const flash = baseTexture(scene, 'flash');
     const dust = baseTexture(scene, 'dust_puff');
     const spark = baseTexture(scene, 'spark');
     const shafts = kenneyTexture(scene, 'shafts');
+    const ribbon = kenneyTexture(scene, 'ribbon', true);
+    const sigil = kenneyTexture(scene, 'sigil');
 
     // The character and the ground it stands on, mid-toned so dust and light both read on it.
     const ground = MeshBuilder.CreateDisc('ground', {radius: 40, tessellation: 64}, scene);
@@ -132,12 +133,37 @@ export function init({scene, camera, add, systems}: DemoContext): DemoRun {
     groundLight.addBehavior(new ColorOverLife(hold(WHITE, GOLD, 0.55, 0.1)));
     groundLight.emitter.position.y = 0.03;
 
+    // 0 s: a magic circle on the ground under the character, opening out and turning slowly, there
+    // for the whole effect and the last to fade.
+    const circle = system('Magic circle', {
+        startLife: new ConstantValue(2.2),
+        startSize: new ConstantValue(5.2),
+        startRotation: new IntervalValue(0, Math.PI * 2),
+        startColor: new ConstantColor(new Color4(1, 0.78, 0.38, 0.9)),
+        emissionBursts: [burst(0, 1)],
+        texture: sigil,
+        renderMode: RenderMode.HorizontalBillBoard,
+        renderOrder: 1,
+    });
+    circle.addBehavior(new ColorOverLife(hold(WHITE, GOLD, 0.7, 0.08)));
+    circle.addBehavior(new RotationOverLife(new ConstantValue(0.6)));
+    circle.addBehavior(
+        new SizeOverLife(
+            curve([
+                [0, 0.5],
+                [0.12, 1],
+                [1, 1.05],
+            ])
+        )
+    );
+    circle.emitter.position.y = 0.05;
+
     // 0 s: a column of light: a tall upright glow, and rings of light rising up it, narrowing as
     // they go.
     const column = system('Light column', {
         startLife: new ConstantValue(1.3),
         startSize: new Vector3Function(new ConstantValue(2.4), new ConstantValue(7), new ConstantValue(1)),
-        startColor: new ConstantColor(new Color4(1, 0.78, 0.4, 0.45)),
+        startColor: new ConstantColor(new Color4(1, 0.62, 0.22, 0.45)),
         emissionBursts: [burst(0, 1)],
         texture: glow,
         renderMode: RenderMode.VerticalBillBoard,
@@ -162,7 +188,7 @@ export function init({scene, camera, add, systems}: DemoContext): DemoRun {
         startLife: new IntervalValue(0.8, 1.2),
         startSpeed: new IntervalValue(0.2, 0.5),
         startSize: new Vector3Function(new IntervalValue(1, 2.2), shaftHeight, new ConstantValue(1)),
-        startColor: new RandomColor(new Color4(1, 0.8, 0.4, 0.6), new Color4(1, 0.92, 0.7, 0.75)),
+        startColor: new RandomColor(new Color4(1, 0.92, 0.75, 0.7), new Color4(1, 1, 0.92, 0.85)),
         emissionBursts: [burst(0, 3), burst(0.08, 2), burst(0.18, 3), burst(0.32, 2)],
         shape: new ConeEmitter({radius: 0.7, angle: 0, thickness: 1}),
         texture: shafts,
@@ -261,12 +287,12 @@ export function init({scene, camera, add, systems}: DemoContext): DemoRun {
         duration: 0.5,
         startLife: new IntervalValue(1, 1.3),
         startSpeed: new IntervalValue(4, 5.5),
-        startSize: new IntervalValue(0.22, 0.34),
+        startSize: new IntervalValue(0.55, 0.8),
         startColor: new ConstantColor(new Color4(1, 0.85, 0.5, 1)),
         startDelay: new ConstantValue(0.1),
         emissionOverTime: new ConstantValue(30),
         shape: new ConeEmitter({radius: 1.2, angle: 0, thickness: 0}),
-        texture: streak,
+        texture: ribbon,
         renderMode: RenderMode.Trail,
         rendererEmitterSettings: {startLength: new ConstantValue(40), followLocalOrigin: false},
         renderOrder: 3,
@@ -308,10 +334,10 @@ export function init({scene, camera, add, systems}: DemoContext): DemoRun {
     const glints = system('Glints', {
         startLife: new IntervalValue(1.1, 1.6),
         startSpeed: new IntervalValue(4, 7),
-        startSize: new IntervalValue(0.35, 0.7),
+        startSize: new IntervalValue(0.18, 0.36),
         startRotation: new IntervalValue(-Math.PI, Math.PI),
         startColor: new RandomColor(new Color4(1, 0.85, 0.35, 1), new Color4(1, 1, 0.85, 1)),
-        emissionBursts: [burst(0.25, 26)],
+        emissionBursts: [burst(0.25, 55)],
         shape: new SphereEmitter({radius: 0.4, thickness: 1, arc: Math.PI * 2}),
         texture: glint,
         renderOrder: 4,

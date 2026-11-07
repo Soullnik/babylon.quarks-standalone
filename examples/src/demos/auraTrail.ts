@@ -72,24 +72,48 @@ export function init({scene, camera, add}: DemoContext): DemoRun {
         shape: new PointEmitter(),
     };
 
-    // The crown: tongues standing on a band round the character, turning, breathing, rim-faded.
-    const crown = system('Crown', {
+    // The crown: two bands of flame tongues round the character, the inner one hotter and turning
+    // the other way, flickering (uvDistortion), faded where they face the camera (rim 'fade') so
+    // they read thick at the silhouette, and their light on the ground.
+    const crownLayer = (name: string, color: Color4, shape: Parameters<typeof band>[0], scroll: number) =>
+        system(name, {
+            ...standing,
+            startSize: new ConstantValue(1),
+            startColor: new ConstantColor(color),
+            renderMode: RenderMode.Mesh,
+            renderAlignment: 'local',
+            lighting: 'unlit',
+            ...band(shape),
+            texture: baseTexture(scene, 'aura_strip', true, false),
+            mapUV: {tiling: [4, 1], scroll: [scroll, 0]},
+            uvDistortion: {
+                map: baseTexture(scene, 'swirl', true),
+                strength: 0.04,
+                mapUV: {tiling: [2, 1], scroll: [0, -0.7]},
+            },
+            rim: {mode: 'fade', strength: 0.6, power: 3},
+        });
+    const crown = crownLayer(
+        'Crown',
+        new Color4(1, 0.58, 0.2, 1),
+        {bottom: 0.9, top: 0.75, height: 2.2, segments: 48},
+        0.06
+    );
+    const innerCrown = crownLayer(
+        'Inner crown',
+        new Color4(1, 0.85, 0.5, 1),
+        {bottom: 0.7, top: 0.55, height: 1.5, segments: 48},
+        -0.09
+    );
+    innerCrown.emitter.position.set(-2.6, 0, 0);
+    const groundGlow = system('Ground glow', {
         ...standing,
-        startSize: new ConstantValue(1),
-        startColor: new ConstantColor(new Color4(1, 0.82, 0.42, 1)),
-        renderMode: RenderMode.Mesh,
-        renderAlignment: 'local',
-        lighting: 'unlit',
-        ...band({bottom: 0.9, top: 0.75, height: 2.2, segments: 48}),
-        texture: baseTexture(scene, 'aura_strip', true, false),
-        mapUV: {tiling: [4, 1], scroll: [0.06, 0]},
-        uvDistortion: {
-            map: baseTexture(scene, 'swirl', true),
-            strength: 0.025,
-            mapUV: {tiling: [2, 1], scroll: [0, -0.5]},
-        },
-        rim: {mode: 'fade', strength: 0.35, power: 2},
+        startSize: new ConstantValue(3.4),
+        startColor: new ConstantColor(new Color4(1, 0.55, 0.2, 0.6)),
+        texture: baseTexture(scene, 'glow'),
+        renderMode: RenderMode.HorizontalBillBoard,
     });
+    groundGlow.emitter.position.set(-2.6, 0.03, 0);
     crown.emitter.position.set(-2.6, 0, 0);
 
     const motes = system('Motes', {

@@ -83,6 +83,10 @@ export const KENNEY = {
      * hilt (V = 0) and dense toward the tip, with a hard bright edge inside the tip (V = 1).
      */
     smear: {cols: 1, rows: 1},
+    /** A ribbon for trails: soft edges, a bright line down the middle (V), faint streaks along U. */
+    ribbon: {cols: 1, rows: 1},
+    /** A magic circle for the ground: an outer ring and an inner ring of linked beads. */
+    sigil: {cols: 1, rows: 1},
 } as const;
 
 export type KenneyTexture = keyof typeof KENNEY;

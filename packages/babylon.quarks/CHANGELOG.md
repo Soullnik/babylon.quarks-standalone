@@ -299,6 +299,9 @@ and the package's version moves in lockstep with `quarks.core`.
   topic's name flashes up, and `#Key/Topic` opens a demo on one) instead of a select in the panel,
   and the weapon trail is a smear: a crescent dense toward the blade's tip with a bright edge, a
   wide glow and a white core, on a fast cut and a hold.
+  Electric Ball keeps a saturated blue web with hairline white bolts and strikes the ground now and
+  then; Level-Up opens a magic circle under the character and spirals wide ribbons; the aura is a
+  crown of flame tongues in two layers with its light on the ground.
 
 ### Fixed
 
