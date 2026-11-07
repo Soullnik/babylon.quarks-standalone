@@ -93,6 +93,23 @@ export function spike(radius = 0.16): InstancingGeometry {
     );
 }
 
+/**
+ * Vertex colours for a partial `band` of `segments` round: white, its alpha rising from 0 at both
+ * ends to 1 over `fraction` of the way round, straight, so two bands overlapping by that much
+ * crossfade without a seam (their alphas add up to 1), and a band ending on its own fades out.
+ */
+export function featheredEnds(segments: number, rows: number, fraction: number): Float32Array {
+    const colors = new Float32Array((rows + 1) * (segments + 1) * 4);
+    for (let r = 0; r <= rows; r++) {
+        for (let s = 0; s <= segments; s++) {
+            const u = s / segments;
+            const alpha = Math.min(1, u / fraction, (1 - u) / fraction);
+            colors.set([1, 1, 1, alpha], (r * (segments + 1) + s) * 4);
+        }
+    }
+    return colors;
+}
+
 /** The arrays a mesh particle takes, read off a Babylon mesh, which is then hidden. */
 export function geometryOf(mesh: Mesh): InstancingGeometry {
     mesh.isVisible = false;

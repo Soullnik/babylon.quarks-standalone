@@ -22,13 +22,19 @@ import {
     Vector3Function,
 } from 'babylon.quarks';
 import {curve, fade} from '../shared/curves';
-import {band, type BandShape} from '../shared/geometry';
+import {band, type BandShape, featheredEnds} from '../shared/geometry';
 import {baseTexture, kenneySheet, kenneyTexture, rampTexture} from '../shared/textures';
 import type {DemoContext} from '../types';
 
 /** The disk's tilt toward the camera, radians: seen nearly edge-on, a little of its face showing. */
 const DISK_TILT = 0.12;
 /** The shadow's radius; the photon ring hugs it and the lensed disk rises from it. */
+/**
+ * Each half of the disk runs 10 degrees past the quarter on either side and fades in over those
+ * 20 degrees, so where the far and the near half meet they crossfade instead of butting together.
+ */
+const OVERLAP_ARC = 200;
+const OVERLAP_FEATHER = 20 / OVERLAP_ARC;
 const SHADOW = 2.75;
 
 /** One particle that stays: a part of the hole that never dies, drawn from the first frame. */
@@ -103,7 +109,16 @@ export function init({scene, camera, add, controls}: DemoContext) {
     const gasRing = (
         name: string,
         shape: BandShape,
-        params: {size?: number; tiling: number; across?: number; scroll: number; ramp: typeof diskRamp; order: number}
+        params: {
+            size?: number;
+            tiling: number;
+            across?: number;
+            scroll: number;
+            ramp: typeof diskRamp;
+            order: number;
+            /** The share of the way round over which the band fades in at each end. */
+            feather?: number;
+        }
     ) => {
         const ring = new ParticleSystem(
             standing({
@@ -112,10 +127,12 @@ export function init({scene, camera, add, controls}: DemoContext) {
                 renderAlignment: 'local',
                 lighting: 'unlit',
                 ...band(shape),
+                ...(params.feather
+                    ? {instancingColors: featheredEnds(shape.segments ?? 48, shape.rows ?? 1, params.feather)}
+                    : {}),
                 startSize: new ConstantValue(params.size ?? 1),
                 texture: gas,
                 blendMode: Constants.ALPHA_ADD,
-                // Whole repeats round a half, so the halves meet without a seam.
                 // `across` < 1 spreads the gas's inner, brightest part over the whole width.
                 mapUV: {tiling: [params.tiling, params.across ?? 1], scroll: [params.scroll, 0]},
                 gradientMap: {ramp: params.ramp, channel: 'r'},
@@ -156,13 +173,22 @@ export function init({scene, camera, add, controls}: DemoContext) {
     ] as const) {
         const outer = gasRing(
             `Disk (${half})`,
-            {bottom: 0.2, top: 0.5, height: 0, arc: 180, center, segments: 128, rows: 8, twist: 0.35},
-            {size: 26, tiling: 2, scroll: 0.025, ramp: diskRamp, order}
+            {bottom: 0.2, top: 0.5, height: 0, arc: OVERLAP_ARC, center, segments: 128, rows: 8, twist: 0.35},
+            {size: 26, tiling: 2, scroll: 0.025, ramp: diskRamp, order, feather: OVERLAP_FEATHER}
         );
         const inner = gasRing(
             `Inner disk (${half})`,
-            {bottom: SHADOW / 10 + 0.02, top: 0.55, height: 0, arc: 180, center, segments: 128, rows: 8, twist: 0.25},
-            {size: 10, tiling: 2, scroll: 0.07, ramp: hotRamp, order}
+            {
+                bottom: SHADOW / 10 + 0.02,
+                top: 0.55,
+                height: 0,
+                arc: OVERLAP_ARC,
+                center,
+                segments: 128,
+                rows: 8,
+                twist: 0.25,
+            },
+            {size: 10, tiling: 2, scroll: 0.07, ramp: hotRamp, order, feather: OVERLAP_FEATHER}
         );
         outer.emitter.rotation.x = DISK_TILT;
         inner.emitter.rotation.x = DISK_TILT;
@@ -184,12 +210,12 @@ export function init({scene, camera, add, controls}: DemoContext) {
         gasRing(
             'Lensed disk (over)',
             {bottom: SHADOW + 0.1, top: SHADOW + 1.7, height: 0, arc: 180, center: -90, segments: 96, rows: 6},
-            {tiling: 1, across: 0.45, scroll: -0.05, ramp: hotRamp, order: 2}
+            {tiling: 1, across: 0.45, scroll: -0.05, ramp: hotRamp, order: 2, feather: 0.22}
         ),
         gasRing(
             'Lensed disk (under)',
             {bottom: SHADOW + 0.12, top: SHADOW + 1.1, height: 0, arc: 180, center: 90, segments: 96, rows: 4},
-            {tiling: 1, across: 0.6, scroll: 0.05, ramp: diskRamp, order: 2}
+            {tiling: 1, across: 0.6, scroll: 0.05, ramp: diskRamp, order: 2, feather: 0.28}
         ),
         // The photon ring: light that went round the hole, a thin bright line hugging the shadow.
         gasRing(
