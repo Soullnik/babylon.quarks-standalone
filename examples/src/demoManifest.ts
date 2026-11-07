@@ -169,7 +169,7 @@ export const demoManifest: DemoManifestEntry[] = [
         section: 'features',
         category: 'Rendering',
         description:
-            'Eight pairs, option off on the left and on on the right: sort mode, align to direction on mesh darts, min/max on-screen particle size, shape vs hierarchy scaling under a scaled parent, render face on open mesh bowls, render alignment on flat mesh quads, billboard rings laid on the ground by render alignment, and flame tongues mirrored at random by flip.',
+            'Eight pairs, option off on the left and on on the right: sort mode on light and dark smoke, align to direction on ice shards, min/max on-screen particle size, shape vs hierarchy scaling under a scaled parent, render face on tumbling leaves, render alignment on magic circles, billboard rings laid on the ground by render alignment, and flame tongues mirrored at random by flip.',
         tags: ['sortMode', 'renderAlignment', 'scalingMode', 'flip'],
         captureAt: 3,
     },

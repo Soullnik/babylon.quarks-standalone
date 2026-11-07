@@ -340,6 +340,10 @@ and the package's version moves in lockstep with `quarks.core`.
   couple of seconds; Timeline opens a magic circle under the charge and sends shock rings out at the
   release; Electric Ball's light on the ground crackles; the Flipbooks smoke plays its sheet fast
   enough not to step, and the glyph sheet's strokes are thicker.
+  Renderer Options shows its pairs on effects instead of flat shapes: light and dark smoke for the
+  sort mode, ice shards turned along their flight, stars for the size limits and the scaling,
+  leaves tumbling down for the render face, magic circles for the mesh render alignment, and
+  larger flames for the flip.
 
 ### Fixed
 
