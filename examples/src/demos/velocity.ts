@@ -15,7 +15,6 @@ import {
     ParticleSystem,
     type ParticleSystemParameters,
     RandomizeDirection,
-    RenderMode,
     RotationBySpeed,
     SizeBySpeed,
     SphereEmitter,
@@ -44,9 +43,10 @@ function columns(count: number, gap: number): number[] {
  *   a point beside it (`orbitalOffset`).
  * - By speed: fountains whose sparks slow to a stop at the top and speed up as they fall back,
  *   sized (`SizeBySpeed`), spun (`RotationBySpeed`) and coloured (`ColorBySpeed`) by their speed.
- * - Emit direction: one narrow cone of streaks, then each streak's start direction randomised
- *   part of the way (`RandomizeDirection`), and turned away from its own by an angle
- *   (`ChangeEmitDirection`), which opens the cone into a hollow one.
+ * - Emit direction: volleys from one narrow cone: as they are, a tight knot; each start direction
+ *   randomised part of the way (`RandomizeDirection`), a filled cloud; and each turned away from
+ *   its own by the same angle (`ChangeEmitDirection`), a hollow cone, so a volley flies out as a
+ *   ring.
  * - Forces: a random sideways force over life, picked once per particle (each goes its own way)
  *   or every step (`randomized`: it jitters and averages out); and a fountain under an emitter
  *   scaled to half, whose gravity shrinks with it (`scaleWithEmitter`) or keeps its full strength.
@@ -57,7 +57,6 @@ export function init({scene, camera, add, controls}: DemoContext) {
     addGround(scene, FLOOR);
     const spark = baseTexture(scene, 'spark');
     const glint = baseTexture(scene, 'glint');
-    const streak = baseTexture(scene, 'streak');
 
     const system = (parent: TransformNode, parameters: Omit<ParticleSystemParameters, 'scene'>) => {
         const ps = new ParticleSystem({scene, ...parameters});
@@ -252,38 +251,43 @@ export function init({scene, camera, add, controls}: DemoContext) {
         name: 'Emit direction',
         build(group) {
             const kinds: {title: string; code: string; add?: (ps: ParticleSystem) => void}[] = [
-                {title: 'A narrow cone', code: 'ConeEmitter angle: 0.05'},
+                {title: 'A narrow cone', code: 'ConeEmitter angle: 0.02'},
                 {
-                    title: 'Randomised a third',
+                    title: 'Randomised a third: a filled spray',
                     code: 'RandomizeDirection(0.35)',
                     add: (ps) => ps.addBehavior(new RandomizeDirection(0.35)),
                 },
                 {
-                    title: 'Turned by an angle',
-                    code: 'ChangeEmitDirection(0.5)',
-                    add: (ps) => ps.addBehavior(new ChangeEmitDirection(new ConstantValue(0.5))),
+                    title: 'Turned by an angle: a ring',
+                    code: 'ChangeEmitDirection(0.45)',
+                    add: (ps) => ps.addBehavior(new ChangeEmitDirection(new ConstantValue(0.45))),
                 },
             ];
             const xs = columns(3, 4.4);
             kinds.forEach((kind, index) => {
+                // Volleys, all at one speed, so each flies out as one shape: a tight knot from the
+                // narrow cone, a filled cloud when randomised, a ring when every one is turned by
+                // the same angle (a hollow cone). Aimed up and toward the camera, so the ring opens.
                 const ps = toUp(
                     system(group, {
-                        duration: 1,
+                        duration: 0.45,
                         looping: true,
                         prewarm: true,
-                        startLife: new IntervalValue(0.7, 0.9),
-                        startSpeed: new IntervalValue(5, 6),
-                        startSize: new IntervalValue(0.1, 0.14),
+                        startLife: new ConstantValue(0.8),
+                        startSpeed: new ConstantValue(5),
+                        startSize: new IntervalValue(0.14, 0.2),
                         startColor: new ConstantColor(new Color4(0.55, 0.85, 1, 1)),
-                        emissionOverTime: new ConstantValue(70),
-                        shape: new ConeEmitter({radius: 0.05, angle: 0.05}),
-                        texture: streak,
+                        emissionOverTime: new ConstantValue(0),
+                        emissionBursts: [
+                            {time: 0, count: new ConstantValue(36), cycle: 1, interval: 0, probability: 1},
+                        ],
+                        shape: new ConeEmitter({radius: 0.01, angle: 0.02}),
+                        texture: spark,
                         transparent: true,
                         blendMode: Constants.ALPHA_ADD,
-                        renderMode: RenderMode.StretchedBillBoard,
-                        rendererEmitterSettings: {speedFactor: 0.12, lengthFactor: 1},
                     })
                 );
+                ps.emitter.rotation.x += 0.7;
                 ps.emitter.position.set(xs[index], FLOOR + 0.2, 0);
                 kind.add?.(ps);
                 ps.addBehavior(new ColorOverLife(fade(0.05, 0.6)));
