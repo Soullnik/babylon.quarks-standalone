@@ -117,7 +117,7 @@ describe('settings table', () => {
             const ps = new ParticleSystem({scene, renderMode});
             for (const setting of SETTINGS) {
                 if (setting.param === 'renderMode') continue;
-                expect([setting.param, setting.isDefault(setting.get(ps))]).toEqual([setting.param, true]);
+                expect([setting.param, setting.isDefault(setting.get(ps), ps)]).toEqual([setting.param, true]);
             }
             ps.dispose();
         }

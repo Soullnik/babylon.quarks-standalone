@@ -170,6 +170,16 @@ and the package's version moves in lockstep with `quarks.core`.
 
 ### Changed
 
+- **An opaque system writes depth by default.** Until `depthWrite` is set (as a parameter, with
+  the setter, or by a Babylon material's `disableDepthWrite`), it follows `transparent`: an opaque
+  or cutout system writes depth and a transparent one does not, as Unity's particle materials do
+  (measured in Unity 6000.6: the Standard Particles shaders' Opaque and Cutout modes set ZWrite on,
+  Fade, Transparent, Additive, Subtractive and Modulate off). Before, `depthWrite` was false unless
+  set, so an opaque mesh particle's far faces drew over its near ones and cut-out leaves drew in
+  any order. Setting `transparent` later carries `depthWrite` with it until `depthWrite` is set.
+  Files write `depthWrite` only where it differs from the surface's default, and a file that leaves
+  it out takes that default: an opaque system saved without it now writes depth.
+
 - **Behaviour change: geometries are wound as Babylon winds a front face, and `MeshSurfaceEmitter`
   emits out of it.** A triangle's front face, the one `renderFace: 'front'` draws and a lit mesh
   lights, is the side `(c - a) × (b - a)` points to, as on Babylon's own meshes (see

@@ -322,7 +322,10 @@ export interface ParticleSystemParameters {
      * (Unity's `ZTest Always`), in every render mode. Default `true`.
      */
     depthTest?: boolean;
-    /** Whether the particles write depth. Default false. */
+    /**
+     * Whether the particles write depth. Default: as the surface, `!transparent` (opaque and
+     * cutout systems write depth, transparent ones do not), as Unity's particle materials do.
+     */
     depthWrite?: boolean;
     /** Alpha below which a fragment is discarded, 0 to 1. Default 0: nothing is. */
     alphaTest?: number;

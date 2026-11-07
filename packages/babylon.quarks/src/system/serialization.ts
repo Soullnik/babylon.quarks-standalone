@@ -250,7 +250,8 @@ export function particleSystemParametersFromJSON(
         blendMode: materialMeta?.alphaMode ?? settings.blendMode ?? Constants.ALPHA_ADD,
         transparent: materialMeta?.transparent ?? settings.transparent ?? true,
         depthTest: materialMeta?.depthTest ?? settings.depthTest ?? true,
-        depthWrite: materialMeta?.depthWrite ?? settings.depthWrite ?? false,
+        // Left out, it follows the surface (the system's default).
+        depthWrite: materialMeta?.depthWrite ?? settings.depthWrite,
         alphaTest: materialMeta?.alphaTest ?? settings.alphaTest ?? 0,
         behaviors: [],
         lighting: materialMeta?.lighting,

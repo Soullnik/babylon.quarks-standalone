@@ -66,8 +66,11 @@ export interface SettingDescriptor {
     readonly json?: keyof ParticleSystemJSONParameters;
     /** The current value on a system. */
     get(system: ParticleSystem): unknown;
-    /** Whether `value` is what the constructor gives a system that leaves the setting out. */
-    isDefault(value: unknown): boolean;
+    /**
+     * Whether `value` is what the constructor gives a system that leaves the setting out; `system`
+     * for a default that depends on its other settings.
+     */
+    isDefault(value: unknown, system: ParticleSystem): boolean;
     /** The value as JSON. */
     toJSON(value: unknown): unknown;
     /** The constructor parameter for a JSON value that is present; undefined takes the default. */
@@ -323,7 +326,15 @@ export const SETTINGS: ReadonlyArray<SettingDescriptor> = [
     plain('blendMode', (s) => s.blending, Constants.ALPHA_ADD, number, {json: 'blending'}),
     plain('transparent', (s) => s.transparent, true, boolean),
     plain('depthTest', (s) => s.depthTest, true, boolean),
-    plain('depthWrite', (s) => s.depthWrite, false, boolean),
+    {
+        // Its default follows the surface: written only when it differs from `!transparent`.
+        param: 'depthWrite',
+        get: (s) => s.depthWrite,
+        isDefault: (value, system) => value === !system.transparent,
+        toJSON: (value) => value,
+        fromJSON: boolean,
+        clone: (value) => value,
+    },
     plain('alphaTest', (s) => s.alphaTest, 0, number),
     plain('worldSpace', (s) => s.worldSpace, false, boolean),
     {
@@ -360,7 +371,7 @@ export function settingsToJSON(system: ParticleSystem): Record<string, unknown> 
     const json: Record<string, unknown> = {};
     for (const setting of SETTINGS) {
         const value = setting.get(system);
-        if (!setting.isDefault(value)) {
+        if (!setting.isDefault(value, system)) {
             json[settingJSONKey(setting)] = setting.toJSON(value);
         }
     }

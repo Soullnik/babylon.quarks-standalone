@@ -288,7 +288,8 @@
                     "type": "boolean"
                 },
                 "depthWrite": {
-                    "type": "boolean"
+                    "type": "boolean",
+                    "description": "Whether the particles write depth. Left out, it follows the surface: true for an opaque or cutout material (transparent false), false for a transparent one, as Unity's particle materials set ZWrite."
                 },
                 "alphaTest": {
                     "type": "number"
@@ -704,7 +705,7 @@
                 },
                 "depthWrite": {
                     "type": "boolean",
-                    "description": "The material entry's value wins."
+                    "description": "The material entry's value wins. Left out of both, it follows the surface: true when transparent is false."
                 },
                 "alphaTest": {
                     "type": "number",

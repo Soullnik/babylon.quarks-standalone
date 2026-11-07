@@ -1284,7 +1284,8 @@ export class QuarksLoader {
                 blending: matDef.blending ?? 1,
                 side: matDef.side ?? 2,
                 depthTest: matDef.depthTest ?? true,
-                depthWrite: matDef.depthWrite ?? false,
+                // Left out, depth writing follows the surface, as a system's default does.
+                depthWrite: matDef.depthWrite ?? !(matDef.transparent ?? true),
                 alphaTest: matDef.alphaTest ?? 0,
                 texture: null,
             };

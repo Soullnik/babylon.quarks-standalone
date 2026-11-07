@@ -1005,6 +1005,9 @@ export class ParticleSystem implements IParticleSystem {
 
     set transparent(transparent: boolean) {
         this.rendererSettings.materialTransparent = transparent;
+        if (!this.depthWriteChosen) {
+            this.rendererSettings.materialDepthWrite = !transparent;
+        }
         this.neededToUpdateRender = true;
     }
 
@@ -1023,17 +1026,24 @@ export class ParticleSystem implements IParticleSystem {
     }
 
     /**
-     * Whether particles write depth, so later draws are hidden behind them. Default false, or the
-     * material's `disableDepthWrite` inverted. Systems that differ are batched apart.
+     * Whether particles write depth, so later draws are hidden behind them. Until it is set (here,
+     * as a parameter or by a material's `disableDepthWrite`), it follows {@link transparent}, as a
+     * Unity particle material's ZWrite follows its surface type: an opaque or cutout system writes
+     * depth, so a mesh's far faces never show through its near ones and cut-out leaves stand in
+     * front of each other; a transparent one does not. Systems that differ are batched apart.
      */
     get depthWrite(): boolean {
         return this.rendererSettings.materialDepthWrite;
     }
 
     set depthWrite(depthWrite: boolean) {
+        this.depthWriteChosen = true;
         this.rendererSettings.materialDepthWrite = depthWrite;
         this.neededToUpdateRender = true;
     }
+
+    /** Whether {@link depthWrite} has been set; until it is, it follows {@link transparent}. */
+    private depthWriteChosen = false;
 
     /**
      * Alpha below which a fragment is discarded (Unity's Alpha Clip Threshold), 0…1; 0 (the
@@ -1395,7 +1405,8 @@ export class ParticleSystem implements IParticleSystem {
             materialBlendMode: parameters.blendMode ?? Constants.ALPHA_ADD,
             materialTransparent: parameters.transparent ?? true,
             materialDepthTest: parameters.depthTest ?? true,
-            materialDepthWrite: parameters.depthWrite ?? false,
+            // Until it is chosen, depth writing follows the surface: opaque writes, transparent does not.
+            materialDepthWrite: parameters.depthWrite ?? !(parameters.transparent ?? true),
             materialAlphaTest: validAlphaTest(parameters.alphaTest),
             texture: parameters.texture ?? null,
             reflectionTexture: null,
@@ -1500,6 +1511,14 @@ export class ParticleSystem implements IParticleSystem {
             return;
         }
         const resolved = resolveMaterialSettings(material, overrides, this.rendererSettings);
+        // A depth write given, or one the material has, is chosen; otherwise it follows the surface.
+        if (
+            overrides.depthWrite !== undefined ||
+            typeof material?.disableDepthWrite === 'boolean' ||
+            typeof material?.forceDepthWrite === 'boolean'
+        ) {
+            this.depthWriteChosen = true;
+        }
 
         this.rendererSettings.texture = resolved.texture;
         this.rendererSettings.reflectionTexture = resolved.reflectionTexture;
@@ -1530,7 +1549,7 @@ export class ParticleSystem implements IParticleSystem {
         this.rendererSettings.materialBlendMode = resolved.blendMode;
         this.rendererSettings.materialTransparent = resolved.transparent;
         this.rendererSettings.materialDepthTest = resolved.depthTest;
-        this.rendererSettings.materialDepthWrite = resolved.depthWrite;
+        this.rendererSettings.materialDepthWrite = this.depthWriteChosen ? resolved.depthWrite : !resolved.transparent;
         this.rendererSettings.materialAlphaTest = validAlphaTest(resolved.alphaTest);
         if (overrides.layerMask !== undefined) {
             this.rendererSettings.layerMask = overrides.layerMask;

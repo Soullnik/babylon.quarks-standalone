@@ -440,7 +440,9 @@ describe('material flags after construction', () => {
         s.depthWrite = true;
         s.alphaTest = 0.25;
         const json = s.toJSON(meta);
-        expect(json).toMatchObject({transparent: false, depthTest: false, depthWrite: true, alphaTest: 0.25});
+        // An opaque system's depth write of true is its default: left out of the file.
+        expect(json).toMatchObject({transparent: false, depthTest: false, alphaTest: 0.25});
+        expect(json).not.toHaveProperty('depthWrite');
         const loaded = ParticleSystem.fromJSON(json, meta, scene);
         expect([loaded.transparent, loaded.depthTest, loaded.depthWrite, loaded.alphaTest]).toEqual([
             false,
@@ -450,5 +452,55 @@ describe('material flags after construction', () => {
         ]);
         const copy = s.clone();
         expect([copy.transparent, copy.depthTest, copy.depthWrite, copy.alphaTest]).toEqual([false, false, true, 0.25]);
+    });
+});
+
+describe('depth writing by default', () => {
+    // Unity's particle materials write depth by their surface type: Opaque and Cutout write it,
+    // Fade, Transparent and the additive ones do not; so does a system until its depthWrite is set.
+    it('follows the surface: an opaque system writes depth, a transparent one does not', () => {
+        expect(system().depthWrite).toBe(false);
+        expect(system({transparent: false}).depthWrite).toBe(true);
+        expect(system({transparent: false, alphaTest: 0.5}).depthWrite).toBe(true);
+    });
+
+    it('follows the surface set later, until it is set itself', () => {
+        const s = system();
+        s.transparent = false;
+        expect(s.depthWrite).toBe(true);
+        s.transparent = true;
+        expect(s.depthWrite).toBe(false);
+        s.depthWrite = true;
+        s.transparent = false;
+        s.transparent = true;
+        expect(s.depthWrite).toBe(true);
+        expect(system({transparent: false, depthWrite: false}).depthWrite).toBe(false);
+    });
+
+    it('reaches the batch material of an opaque system that never set it', () => {
+        const renderer = new BatchedRenderer('opaque', scene);
+        const s = system({transparent: false});
+        renderer.addSystem(s);
+        frame(renderer);
+        expect(materialOf(renderer, s).disableDepthWrite).toBe(false);
+        renderer.dispose();
+    });
+
+    it('writes an opaque system that does not write depth as such, and reads it back', () => {
+        const meta: BabylonMetaData = {geometries: {}, materials: {}, textures: {}};
+        const s = system({transparent: false, depthWrite: false});
+        const json = s.toJSON(meta);
+        expect(json).toMatchObject({transparent: false, depthWrite: false});
+        expect(ParticleSystem.fromJSON(json, meta, scene).depthWrite).toBe(false);
+    });
+
+    it('takes the surface for a file that leaves it out', () => {
+        const meta: BabylonMetaData = {geometries: {}, materials: {}, textures: {}};
+        const json = system({transparent: false}).toJSON(meta);
+        for (const material of Object.values(meta.materials) as {depthWrite?: boolean}[]) {
+            delete material.depthWrite;
+        }
+        delete (json as {depthWrite?: boolean}).depthWrite;
+        expect(ParticleSystem.fromJSON(json, meta, scene).depthWrite).toBe(true);
     });
 });
