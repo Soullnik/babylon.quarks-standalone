@@ -344,6 +344,13 @@ and the package's version moves in lockstep with `quarks.core`.
   sort mode, ice shards turned along their flight, stars for the size limits and the scaling,
   leaves tumbling down for the render face, magic circles for the mesh render alignment, and
   larger flames for the flip.
+  Render Modes and Texture Effects mark their pads with a faint ring instead of a grey disc, at
+  closer framing; Render Modes' crystals are smaller and its trails wide ribbons, Texture Effects'
+  flames are larger and clear the floor and its erosion burns at a wider, brighter edge. Image
+  Processing's flames are larger beside small spheres; Mesh Particles with a Material lights its
+  gold coins with a warm key light, with glints over the fountain; Trail Texture Modes lays a
+  chevron along its ribbons, so each mode's pattern shows; Surface Trails' knot is steel and its
+  trails wider, white at the head and fading to the tail.
 
 ### Fixed
 

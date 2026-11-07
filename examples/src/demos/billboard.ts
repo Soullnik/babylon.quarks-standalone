@@ -60,12 +60,15 @@ function warmth(mid: Color3, end: Color3, out = 0.6): Gradient {
  * points).
  */
 export function init({scene, camera, add}: DemoContext): DemoRun {
-    camera.setPosition(new BVector3(0, 7.5, 14.5));
-    camera.setTarget(new BVector3(0, 0.6, -0.4));
+    camera.setPosition(new BVector3(0, 6.4, 12));
+    camera.setTarget(new BVector3(0, 0.8, -0.2));
     addGround(scene);
+    // Each pad is a faint ring marked on the floor, not a solid disc, so the effect is what reads.
     const padMaterial = new StandardMaterial('pad', scene);
-    padMaterial.diffuseColor = new Color3(0.24, 0.25, 0.3);
+    padMaterial.diffuseColor = Color3.Black();
     padMaterial.specularColor = Color3.Black();
+    padMaterial.emissiveColor = new Color3(0.3, 0.33, 0.42);
+    padMaterial.disableLighting = true;
 
     const pads = [
         'BillBoard',
@@ -80,9 +83,9 @@ export function init({scene, camera, add}: DemoContext): DemoRun {
         const row = i < 4 ? 0 : 1;
         const x = row === 0 ? (i - 1.5) * 4.2 : (i - 4 - 1) * 4.2;
         const z = row === 0 ? -3.2 : 3;
-        const pad = MeshBuilder.CreateDisc(`pad:${name}`, {radius: 1.4, tessellation: 48}, scene);
-        pad.rotation.x = Math.PI / 2;
+        const pad = MeshBuilder.CreateTorus(`pad:${name}`, {diameter: 2.8, thickness: 0.04, tessellation: 64}, scene);
         pad.position.set(x, 0.01, z);
+        pad.isPickable = false;
         pad.material = padMaterial;
         addLabel(scene, `RenderMode.${name}`, new BVector3(x, 0.3, z + 1.75), {height: 0.34});
         const spot = new TransformNode(name, scene);
@@ -179,7 +182,7 @@ export function init({scene, camera, add}: DemoContext): DemoRun {
     const flames = system(3, 'Flames', {
         startLife: new IntervalValue(0.7, 0.9),
         startSpeed: new ConstantValue(0),
-        startSize: new IntervalValue(1.1, 1.5),
+        startSize: new IntervalValue(1.6, 2.1),
         startColor: new RandomColor(new Color4(1, 0.5, 0.15, 1), new Color4(1, 0.75, 0.3, 1)),
         emissionOverTime: new ConstantValue(6),
         shape: new SphereEmitter({radius: 0.25, thickness: 1}),
@@ -192,7 +195,7 @@ export function init({scene, camera, add}: DemoContext): DemoRun {
         new FrameOverLife(new ConstantValue(0), {fps: 20, frameCount: 16, startFrame: new IntervalValue(0, 16)})
     );
     flames.addBehavior(new ColorOverLife(fade(0.15, 0.7)));
-    flames.emitter.position.y = 0.65;
+    flames.emitter.position.y = 0.85;
 
     // Mesh particles: ice crystals tumbling up, lit by a fixed light, streaks and cracks running
     // through them coloured by an ice ramp, their edges glowing.
@@ -204,9 +207,9 @@ export function init({scene, camera, add}: DemoContext): DemoRun {
     ]);
     const crystals = up(
         system(4, 'Crystals', {
-            startLife: new IntervalValue(1.6, 2.2),
-            startSpeed: new IntervalValue(0.8, 1.4),
-            startSize: new IntervalValue(0.7, 1.1),
+            startLife: new IntervalValue(1.4, 1.8),
+            startSpeed: new IntervalValue(0.6, 1),
+            startSize: new IntervalValue(0.5, 0.75),
             startRotation: new RandomQuatGenerator(),
             startColor: new RandomColor(new Color4(0.8, 0.92, 1, 1), new Color4(1, 1, 1, 1)),
             emissionOverTime: new ConstantValue(5),
@@ -244,11 +247,11 @@ export function init({scene, camera, add}: DemoContext): DemoRun {
         system(5, 'Ribbons', {
             startLife: new IntervalValue(1, 1.3),
             startSpeed: new IntervalValue(2, 2.6),
-            startSize: new IntervalValue(0.12, 0.18),
+            startSize: new IntervalValue(0.32, 0.45),
             startColor: new RandomColor(new Color4(0.6, 1, 0.7, 1), new Color4(0.3, 0.8, 1, 1)),
             emissionOverTime: new ConstantValue(6),
             shape: new ConeEmitter({radius: 0.9, angle: 0, thickness: 0}),
-            texture: baseTexture(scene, 'streak'),
+            texture: kenneyTexture(scene, 'ribbon'),
             renderMode: RenderMode.Trail,
             rendererEmitterSettings: {startLength: new ConstantValue(30), followLocalOrigin: false},
         })

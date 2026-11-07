@@ -31,7 +31,7 @@ import type {DemoContext} from '../types';
  * the graded spheres.
  */
 export function init({scene, camera, add}: DemoContext) {
-    camera.setTarget(new BVector3(0, 1.5, 0));
+    camera.setTarget(new BVector3(0, 1.9, 0));
     camera.setPosition(new BVector3(0, 2.5, 9));
     scene.clearColor = new Color4(0.22, 0.24, 0.3, 1);
     const config = scene.imageProcessingConfiguration;
@@ -40,30 +40,30 @@ export function init({scene, camera, add}: DemoContext) {
     config.exposure = 1.6;
     config.contrast = 1.4;
     config.vignetteEnabled = true;
-    config.vignetteWeight = 2.5;
+    config.vignetteWeight = 1.6;
     config.vignetteColor = new Color4(0, 0, 0, 0);
     addGround(scene, 0, new Color3(0.3, 0.32, 0.38));
     const texture = baseTexture(scene, 'fire');
-    addLabel(scene, 'applyImageProcessing: true', new BVector3(-3, 3.4, 0), {height: 0.36});
-    addLabel(scene, 'applyImageProcessing: false', new BVector3(3, 3.4, 0), {height: 0.36});
+    addLabel(scene, 'applyImageProcessing: true', new BVector3(-3, 4.3, 0), {height: 0.36});
+    addLabel(scene, 'applyImageProcessing: false', new BVector3(3, 4.3, 0), {height: 0.36});
 
     const flame = (x: number, applyImageProcessing: boolean) => {
-        const sphere = MeshBuilder.CreateSphere(`sphere-${x}`, {diameter: 0.8}, scene);
+        const sphere = MeshBuilder.CreateSphere(`sphere-${x}`, {diameter: 0.5}, scene);
         const material = new StandardMaterial(`sphere-${x}`, scene);
         material.diffuseColor = new Color3(1, 0.55, 0.25);
         sphere.material = material;
-        sphere.position.set(x + (x < 0 ? -1.6 : 1.6), 0.6, -0.5);
+        sphere.position.set(x + (x < 0 ? -1.9 : 1.9), 0.25, -0.3);
 
         const system = new ParticleSystem({
             scene,
             duration: 1,
             looping: true,
             startLife: new IntervalValue(0.7, 1),
-            startSpeed: new IntervalValue(0.6, 1),
-            startSize: new IntervalValue(2.6, 3.4),
+            startSpeed: new IntervalValue(0.8, 1.3),
+            startSize: new IntervalValue(4.4, 5.4),
             startColor: new ConstantColor(new Color4(1, 1, 1, 1)),
             worldSpace: true,
-            emissionOverTime: new ConstantValue(12),
+            emissionOverTime: new ConstantValue(10),
             shape: new ConeEmitter({radius: 0.35, angle: 0.15}),
             renderMode: RenderMode.BillBoard,
             texture,
@@ -102,7 +102,8 @@ export function init({scene, camera, add}: DemoContext) {
             )
         );
         system.emitter.rotation.x = -Math.PI / 2;
-        system.emitter.position.set(x, 0.4, 0);
+        // High enough that the cards (up to 2.7 across half) clear the floor rather than being cut by it.
+        system.emitter.position.set(x, 1.7, 0);
         add(system);
     };
 

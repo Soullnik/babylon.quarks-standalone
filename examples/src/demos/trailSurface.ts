@@ -9,8 +9,10 @@ import {TransformNode} from '@babylonjs/core/Meshes/transformNode';
 import type {Scene} from '@babylonjs/core/scene';
 import {
     Bezier,
+    ColorOverLength,
     ConstantColor,
     ConstantValue,
+    Gradient,
     IntervalValue,
     MeshSurfaceEmitter,
     ParticleSystem,
@@ -19,11 +21,13 @@ import {
     RandomColor,
     RenderMode,
     SizeOverLife,
+    WidthOverLength,
 } from 'babylon.quarks';
+import {curve} from '../shared/curves';
 import {band} from '../shared/geometry';
 import {addLabel} from '../shared/labels';
 import {addGround} from '../shared/stage';
-import {baseTexture} from '../shared/textures';
+import {baseTexture, kenneyTexture} from '../shared/textures';
 import type {DemoContext, DemoRun} from '../types';
 
 /** A square canvas texture painted by `paint`, wrapping or clamped, without mipmaps. */
@@ -73,7 +77,8 @@ export function init({scene, camera, add}: DemoContext): DemoRun {
     addGround(scene, -2.2);
     addLabel(scene, 'MeshSurfaceEmitter trails', new BVector3(-5, 3, 0), {height: 0.42});
     addLabel(scene, 'Mesh UV2 + gradientMap', new BVector3(5, 1.6, 0), {height: 0.42});
-    const sheet = baseTexture(scene, 'streak');
+    // Soft edges and a bright line down the middle.
+    const sheet = kenneyTexture(scene, 'ribbon');
 
     // Left: the knot and the trails shed from its surface.
     const pivot = new TransformNode('knotPivot', scene);
@@ -84,10 +89,12 @@ export function init({scene, camera, add}: DemoContext): DemoRun {
         scene
     );
     knot.parent = pivot;
+    // Polished steel: grey, a tight bright highlight, a little of its own colour in the shade.
     const knotMaterial = new StandardMaterial('knot', scene);
-    knotMaterial.diffuseColor = new Color3(0.15, 0.18, 0.3);
-    knotMaterial.emissiveColor = new Color3(0.05, 0.08, 0.2);
-    knotMaterial.specularColor = Color3.Black();
+    knotMaterial.diffuseColor = new Color3(0.42, 0.44, 0.5);
+    knotMaterial.emissiveColor = new Color3(0.06, 0.065, 0.08);
+    knotMaterial.specularColor = new Color3(0.9, 0.9, 0.95);
+    knotMaterial.specularPower = 64;
     knot.material = knotMaterial;
 
     const trails = new ParticleSystem({
@@ -96,7 +103,7 @@ export function init({scene, camera, add}: DemoContext): DemoRun {
         looping: true,
         startLife: new IntervalValue(0.8, 1.2),
         startSpeed: new IntervalValue(2, 4),
-        startSize: new ConstantValue(0.14),
+        startSize: new ConstantValue(0.28),
         startColor: new RandomColor(new Color4(1, 0.5, 0.2, 1), new Color4(1, 0.9, 0.4, 1)),
         worldSpace: false,
         emissionOverTime: new ConstantValue(60),
@@ -117,6 +124,29 @@ export function init({scene, camera, add}: DemoContext): DemoRun {
         },
     });
     trails.addBehavior(new SizeOverLife(new PiecewiseBezier([[new Bezier(1, 0.8, 0.4, 0), 0]])));
+    // White at the head, the particle's colour behind it, fading out to the tail, and narrowing.
+    trails.addBehavior(
+        new ColorOverLength(
+            new Gradient(
+                [
+                    [new Color3(1, 1, 1), 0],
+                    [new Color3(1, 1, 1), 1],
+                ],
+                [
+                    [1, 0],
+                    [0, 1],
+                ]
+            )
+        )
+    );
+    trails.addBehavior(
+        new WidthOverLength(
+            curve([
+                [0, 1],
+                [1, 0.25],
+            ])
+        )
+    );
     trails.emitter.parent = pivot;
     add(trails);
 

@@ -74,17 +74,20 @@ const RAMPS = {
  *   reaches out to the target and draws back.
  */
 export function init({scene, camera, add, controls}: DemoContext): DemoRun {
-    camera.setPosition(new BVector3(0, 4.2, 12.5));
-    camera.setTarget(new BVector3(0, 1.1, 0));
+    camera.setPosition(new BVector3(0, 3.8, 12.5));
+    camera.setTarget(new BVector3(0, 1.3, 0));
     addGround(scene);
+    // Each pad is a faint ring marked on the floor, so the effect is what reads.
     const padMaterial = new StandardMaterial('pad', scene);
-    padMaterial.diffuseColor = new Color3(0.24, 0.25, 0.3);
+    padMaterial.diffuseColor = Color3.Black();
     padMaterial.specularColor = Color3.Black();
+    padMaterial.emissiveColor = new Color3(0.3, 0.33, 0.42);
+    padMaterial.disableLighting = true;
     const spots = ['mapUV scroll', 'gradientMap', 'erosion', 'Beam + mask on UV1'].map((name, i) => {
-        const x = (i - 1.5) * 4.4;
-        const pad = MeshBuilder.CreateDisc(`pad:${name}`, {radius: 1.5, tessellation: 48}, scene);
-        pad.rotation.x = Math.PI / 2;
+        const x = (i - 1.5) * 4;
+        const pad = MeshBuilder.CreateTorus(`pad:${name}`, {diameter: 3, thickness: 0.04, tessellation: 64}, scene);
         pad.position.set(x, 0.01, 0);
+        pad.isPickable = false;
         pad.material = padMaterial;
         addLabel(scene, name, new BVector3(x, 0.3, 1.9), {height: 0.36});
         const spot = new TransformNode(name, scene);
@@ -140,8 +143,8 @@ export function init({scene, camera, add, controls}: DemoContext): DemoRun {
     ) as Record<keyof typeof RAMPS, ReturnType<typeof rampTexture>>;
     const flames = system(1, 'Flames', {
         startLife: new IntervalValue(0.7, 1),
-        startSpeed: new IntervalValue(0.5, 0.9),
-        startSize: new IntervalValue(1.4, 2),
+        startSpeed: new IntervalValue(0.6, 1),
+        startSize: new IntervalValue(2, 2.5),
         startColor: new ConstantColor(new Color4(1, 1, 1, 1)),
         emissionOverTime: new ConstantValue(12),
         shape: new ConeEmitter({radius: 0.45, angle: 0.15}),
@@ -179,7 +182,8 @@ export function init({scene, camera, add, controls}: DemoContext): DemoRun {
         )
     );
     flames.emitter.rotation.x = -Math.PI / 2;
-    flames.emitter.position.y = 0.3;
+    // High enough that the cards clear the floor rather than being cut along it.
+    flames.emitter.position.y = 0.85;
     controls.choice('Gradient map', Object.keys(RAMPS) as (keyof typeof RAMPS)[], 'Fire', (name) => {
         flames.gradientMap = {ramp: ramps[name], channel: 'r'};
     });
@@ -200,9 +204,9 @@ export function init({scene, camera, add, controls}: DemoContext): DemoRun {
         blendMode: Constants.ALPHA_COMBINE,
         erosion: {
             mask: baseTexture(scene, 'swirl', true),
-            softness: 0.06,
-            edgeWidth: 0.07,
-            edgeColor: [1.6, 0.55, 0.1],
+            softness: 0.05,
+            edgeWidth: 0.12,
+            edgeColor: [2.6, 0.9, 0.2],
         },
     });
     smoke.addBehavior(

@@ -1,5 +1,6 @@
 import {VertexBuffer} from '@babylonjs/core/Buffers/buffer';
 import {Constants} from '@babylonjs/core/Engines/constants';
+import {DirectionalLight} from '@babylonjs/core/Lights/directionalLight';
 import {StandardMaterial} from '@babylonjs/core/Materials/standardMaterial';
 import {CubeTexture} from '@babylonjs/core/Materials/Textures/cubeTexture';
 import {Texture} from '@babylonjs/core/Materials/Textures/texture';
@@ -19,9 +20,12 @@ import {
     RandomQuatGenerator,
     RenderMode,
     Rotation3DOverLife,
+    SizeOverLife,
+    SphereEmitter,
 } from 'babylon.quarks';
+import {curve} from '../shared/curves';
 import {addGround} from '../shared/stage';
-import {baseTexture} from '../shared/textures';
+import {baseTexture, kenneySheet, kenneyTexture} from '../shared/textures';
 import type {DemoContext} from '../types';
 
 const ENV_FACE_URLS = [
@@ -36,12 +40,13 @@ const ENV_FACE_URLS = [
 /**
  * Mesh particles drawn with a Babylon material: gold coins thrown up in a fountain, a
  * `StandardMaterial` with an environment map for their shine, tumbling (`Rotation3DOverLife`),
- * falling and bouncing on the floor (`ApplyCollision` with a plane) until they fade. A glow under
- * the fountain is an ordinary additive billboard system beside them.
+ * falling and bouncing on the floor (`ApplyCollision` with a plane) until they fade, lit by a warm
+ * key light. A glow under the fountain and glints over it are ordinary additive billboard systems
+ * beside them.
  */
 export function init({scene, camera, add}: DemoContext) {
-    camera.setPosition(new BVector3(0, 4.5, 10));
-    camera.setTarget(new BVector3(0, 1.4, 0));
+    camera.setPosition(new BVector3(0, 3.6, 7.6));
+    camera.setTarget(new BVector3(0, 1.1, 0));
     addGround(scene);
 
     const environment = CubeTexture.CreateFromImages(ENV_FACE_URLS, scene, true);
@@ -49,10 +54,19 @@ export function init({scene, camera, add}: DemoContext) {
     const gold = new StandardMaterial('gold', scene);
     gold.diffuseColor = new Color3(0.85, 0.6, 0.18);
     gold.specularColor = new Color3(1, 0.9, 0.6);
-    gold.specularPower = 48;
+    gold.specularPower = 64;
+    // A little of the metal's own colour whichever way a coin faces, so a face turned from both
+    // lights reads as dark gold, not grey.
+    gold.emissiveColor = new Color3(0.3, 0.19, 0.04);
     gold.reflectionTexture = environment;
-    gold.reflectionTexture.level = 0.55;
+    gold.reflectionTexture.level = 0.2;
     gold.backFaceCulling = false;
+    // A warm key light from in front and above, so the faces turned to the camera catch the light
+    // and flash as they tumble; the scene's own light is from straight above.
+    const key = new DirectionalLight('key', new BVector3(-0.35, -0.55, -0.75), scene);
+    key.diffuse = new Color3(1, 0.86, 0.6);
+    key.specular = new Color3(1, 0.92, 0.7);
+    key.intensity = 1.3;
 
     // A coin: a short cylinder, about 1 across.
     const coin = MeshBuilder.CreateCylinder('coin', {diameter: 1, height: 0.12, tessellation: 24}, scene);
@@ -119,4 +133,35 @@ export function init({scene, camera, add}: DemoContext) {
     glow.emitter.name = 'Glow';
     glow.emitter.position.y = 0.04;
     add(glow);
+
+    // Glints flashing over the fountain, as light catching the coins.
+    const glints = new ParticleSystem({
+        scene,
+        duration: 1,
+        looping: true,
+        startLife: new IntervalValue(0.15, 0.3),
+        startSpeed: new ConstantValue(0),
+        startSize: new IntervalValue(0.35, 0.6),
+        startRotation: new IntervalValue(0, Math.PI * 2),
+        startColor: new RandomColor(new Color4(1, 0.9, 0.6, 1), new Color4(1, 1, 0.9, 1)),
+        emissionOverTime: new ConstantValue(26),
+        shape: new SphereEmitter({radius: 1.6, thickness: 1}),
+        texture: kenneyTexture(scene, 'stars'),
+        ...kenneySheet('stars'),
+        startTileIndex: new IntervalValue(0, 3),
+        transparent: true,
+        blendMode: Constants.ALPHA_ADD,
+    });
+    glints.addBehavior(
+        new SizeOverLife(
+            curve([
+                [0, 0],
+                [0.4, 1],
+                [1, 0],
+            ])
+        )
+    );
+    glints.emitter.name = 'Glints';
+    glints.emitter.position.y = 2;
+    add(glints);
 }

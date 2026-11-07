@@ -288,7 +288,7 @@ export const demoManifest: DemoManifestEntry[] = [
         description:
             'Five trails of a moving emitter: the texture stretched by distance, distributed per segment, tiled per world unit with a minimum vertex distance and a lifetime, repeated per segment; and a teleporting emitter cleared with clearTrails().',
         tags: ['textureMode', 'clearTrails'],
-        captureAt: 3,
+        captureAt: 4.3,
     },
     {
         key: 'TrailSurfaceDemo',
