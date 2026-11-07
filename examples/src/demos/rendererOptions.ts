@@ -311,6 +311,7 @@ export function init({scene, camera, add, controls}: DemoContext) {
                     shape: new BoxEmitter({width: 3, height: 0.1, depth: 0.6}),
                     texture: fire,
                     ...sheetOf('fire'),
+                    blendTiles: true,
                     transparent: true,
                     blendMode: Constants.ALPHA_ADD,
                     ...(side === 1 ? {flip: {x: 0.5, y: 0}} : {}),

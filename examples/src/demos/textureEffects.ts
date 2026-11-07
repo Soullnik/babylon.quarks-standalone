@@ -147,6 +147,7 @@ export function init({scene, camera, add, controls}: DemoContext): DemoRun {
         shape: new ConeEmitter({radius: 0.45, angle: 0.15}),
         texture: baseTexture(scene, 'fire'),
         ...sheetOf('fire'),
+        blendTiles: true,
         gradientMap: {ramp: ramps.Fire, channel: 'r'},
     });
     flames.addBehavior(
@@ -194,6 +195,7 @@ export function init({scene, camera, add, controls}: DemoContext): DemoRun {
         shape: new SphereEmitter({radius: 0.4}),
         texture: baseTexture(scene, 'smoke_puff'),
         ...sheetOf('smoke_puff'),
+        blendTiles: true,
         startTileIndex: new IntervalValue(4, 8),
         blendMode: Constants.ALPHA_COMBINE,
         erosion: {

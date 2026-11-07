@@ -284,6 +284,7 @@ export function init({scene, camera, batchRenderer, add, controls}: DemoContext)
                         shape: new ConeEmitter({radius: 0.35, angle: 0.1}),
                         texture: fire,
                         ...sheetOf('fire'),
+                        blendTiles: true,
                         transparent: true,
                         blendMode: Constants.ALPHA_ADD,
                         ...column.options,
@@ -477,6 +478,7 @@ export function init({scene, camera, batchRenderer, add, controls}: DemoContext)
                         shape: new ConeEmitter({radius: 0.4, angle: 0.15}),
                         texture: smoke,
                         ...sheetOf('smoke_puff'),
+                        blendTiles: true,
                         transparent: true,
                         blendMode: Constants.ALPHA_COMBINE,
                     })

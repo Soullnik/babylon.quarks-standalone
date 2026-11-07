@@ -94,6 +94,7 @@ export function init({scene, camera, batchRenderer, add}: DemoContext): DemoRun 
         shape: new PointEmitter(),
         texture: baseTexture(scene, 'smoke_puff'),
         ...sheetOf('smoke_puff'),
+        blendTiles: true,
         transparent: true,
         blendMode: Constants.ALPHA_COMBINE,
         renderMode: RenderMode.BillBoard,

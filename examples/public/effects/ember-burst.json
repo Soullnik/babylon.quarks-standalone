@@ -119,12 +119,12 @@
     }
   ],
   "object": {
-    "uuid": "e2610ff7-3d56-44cd-a465-b4bd2cd17378",
+    "uuid": "e98273d4-0e6a-4ca1-a16c-0b0bfd1984d7",
     "type": "Group",
     "name": "Ember burst",
     "children": [
       {
-        "uuid": "94d47f40-a18b-4b7e-a2b9-d3b735fd2c9a",
+        "uuid": "6e4b6126-4447-42eb-9b5b-cf14b27c9b50",
         "type": "ParticleEmitter",
         "name": "Flash",
         "ps": {
@@ -197,7 +197,7 @@
         }
       },
       {
-        "uuid": "1c420e00-08be-4663-8a38-c0312fe90c35",
+        "uuid": "244ef472-afbc-40fd-bd67-ca9884440280",
         "type": "ParticleEmitter",
         "name": "Embers",
         "quaternion": [
@@ -333,7 +333,7 @@
         }
       },
       {
-        "uuid": "bb1d13e8-25f5-4504-9a2b-5ff4e3bc615c",
+        "uuid": "f4468fe3-e305-43df-9e1e-4ed3b34668b9",
         "type": "ParticleEmitter",
         "name": "Smoke",
         "quaternion": [
@@ -401,6 +401,7 @@
           "renderOrder": -1,
           "uTileCount": 4,
           "vTileCount": 4,
+          "blendTiles": true,
           "blending": 2,
           "instancingGeometry": "quarks_geometry_1",
           "material": "quarks_material_7",

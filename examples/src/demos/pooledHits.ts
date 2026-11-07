@@ -157,6 +157,7 @@ function createHitTemplate({scene, batchRenderer}: DemoContext): TransformNode {
         shape: new SphereEmitter({radius: 0.3}),
         texture: baseTexture(scene, 'smoke_puff'),
         ...sheetOf('smoke_puff'),
+        blendTiles: true,
         blendMode: Constants.ALPHA_COMBINE,
         renderOrder: 1,
     });

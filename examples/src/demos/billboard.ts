@@ -122,6 +122,7 @@ export function init({scene, camera, add}: DemoContext): DemoRun {
             shape: new ConeEmitter({radius: 0.4, angle: 0.2}),
             texture: baseTexture(scene, 'smoke_puff'),
             ...sheetOf('smoke_puff'),
+            blendTiles: true,
             blendMode: Constants.ALPHA_COMBINE,
         })
     );
@@ -184,6 +185,7 @@ export function init({scene, camera, add}: DemoContext): DemoRun {
         shape: new SphereEmitter({radius: 0.25, thickness: 1}),
         texture: baseTexture(scene, 'fire'),
         ...sheetOf('fire'),
+        blendTiles: true,
         renderMode: RenderMode.VerticalBillBoard,
     });
     flames.addBehavior(

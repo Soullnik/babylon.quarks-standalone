@@ -147,6 +147,7 @@ export function init({scene, camera, add, systems}: DemoContext): DemoRun {
             renderMode: RenderMode.BillBoard,
             texture: smokeSheet,
             ...sheetOf('smoke_puff'),
+            blendTiles: true,
             transparent: true,
             blendMode: Constants.ALPHA_COMBINE,
             renderOrder: -2,

@@ -124,6 +124,7 @@ export function emberBurst(scene: Scene): TransformNode {
             shape: new ConeEmitter({radius: 0.3, angle: 0.3}),
             texture: baseTexture(scene, 'smoke_puff'),
             ...sheetOf('smoke_puff'),
+            blendTiles: true,
             transparent: true,
             blendMode: Constants.ALPHA_COMBINE,
             renderOrder: -1,

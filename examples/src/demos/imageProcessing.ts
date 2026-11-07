@@ -70,6 +70,7 @@ export function init({scene, camera, add}: DemoContext) {
             transparent: true,
             blendMode: Constants.ALPHA_ADD,
             ...sheetOf('fire'),
+            blendTiles: true,
             applyImageProcessing,
         });
         system.addBehavior(

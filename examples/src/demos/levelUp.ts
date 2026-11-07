@@ -231,6 +231,7 @@ export function init({scene, camera, add, systems}: DemoContext): DemoRun {
         shape: new ConeEmitter({radius: 0.6, angle: (80 * Math.PI) / 180, thickness: 1}),
         texture: dust,
         ...sheetOf('dust_puff'),
+        blendTiles: true,
         blendMode: Constants.ALPHA_COMBINE,
         renderOrder: 1,
     });
