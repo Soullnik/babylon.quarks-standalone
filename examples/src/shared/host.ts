@@ -8,6 +8,7 @@ import type {DemoContext, DemoControls} from '../types';
 export const NO_CONTROLS: DemoControls = {
     toggle() {},
     choice() {},
+    topics() {},
     button() {},
 };
 

@@ -27,6 +27,8 @@ const titleEl = byId('demo-name');
 const categoryEl = byId('demo-category');
 const descriptionEl = byId('demo-description');
 const controlsEl = byId('demo-controls');
+const topicBarEl = byId('topic-bar');
+const topicToast = byId('topic-toast');
 const pauseBtn = byId<HTMLButtonElement>('pauseBtn');
 const speedSelect = byId<HTMLSelectElement>('speed-select');
 const sourceLink = byId<HTMLAnchorElement>('source-link');
@@ -59,11 +61,24 @@ let frameCount = 0;
 let lastFpsTime = performance.now();
 let dragDepth = 0;
 
+/** A demo's topics as the viewer shows them: a tab bar, built before the demo is shown. */
+interface TopicBar {
+    element: HTMLElement;
+    names: readonly string[];
+    index: number;
+    pick(index: number, announce?: boolean): void;
+}
+
+/** The topics of the demo shown, if it has any. */
+let topicBar: TopicBar | null = null;
+/** A topic named in the address (`#Key/Topic`) to open the next demo on. */
+let topicFromHash: string | null = null;
+
 /**
  * A new scene with the viewer's camera, light and batch renderer, and a set of panel controls,
- * which go into the panel once the demo is shown.
+ * which go into the panel once the demo is shown; `topics` receives the demo's topic bar.
  */
-function createScene(controls: HTMLElement): DemoContext {
+function createScene(controls: HTMLElement, topics: {bar: TopicBar | null}): DemoContext {
     const scene = new Scene(engine);
     scene.useRightHandedSystem = true;
     scene.clearColor = CLEAR_COLOR.clone();
@@ -71,11 +86,73 @@ function createScene(controls: HTMLElement): DemoContext {
     camera.attachControl(canvas, true);
     camera.minZ = 0.1;
     new HemisphericLight('light', new BVector3(0, 1, 0), scene);
-    return createDemoContext(scene, camera, new BatchedRenderer('batchRenderer', scene), panelControls(controls));
+    return createDemoContext(
+        scene,
+        camera,
+        new BatchedRenderer('batchRenderer', scene),
+        panelControls(controls, topics)
+    );
 }
 
-/** Controls drawn into `container`, the panel's part under the description. */
-function panelControls(container: HTMLElement): DemoControls {
+/** Flashes `text` large in the middle of the screen for a moment. */
+function announce(text: string) {
+    if (!topicToast) return;
+    topicToast.textContent = text;
+    topicToast.classList.remove('is-shown');
+    // Restart the fade: a reflow between taking the class off and putting it back.
+    void topicToast.offsetWidth;
+    topicToast.classList.add('is-shown');
+}
+
+/** A bar of numbered tabs, one per topic, with arrows either side; `onChange` gets the name. */
+function buildTopicBar(names: readonly string[], value: string, onChange: (name: string) => void): TopicBar {
+    const element = document.createElement('div');
+    element.className = 'topic-bar-inner';
+    const arrow = (text: string, label: string, by: number) => {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'topic-arrow';
+        button.textContent = text;
+        button.title = label;
+        button.addEventListener('click', () => bar.pick((bar.index + by + names.length) % names.length, true));
+        return button;
+    };
+    const tabs = names.map((name, index) => {
+        const tab = document.createElement('button');
+        tab.type = 'button';
+        tab.className = 'topic-tab';
+        const number = document.createElement('span');
+        number.className = 'topic-number';
+        number.textContent = String(index + 1);
+        tab.append(number, name);
+        tab.title = `${name} (${index + 1})`;
+        tab.addEventListener('click', () => bar.pick(index, true));
+        return tab;
+    });
+    element.append(arrow('‹', 'Previous topic (Up)', -1), ...tabs, arrow('›', 'Next topic (Down)', 1));
+    const bar: TopicBar = {
+        element,
+        names,
+        index: Math.max(0, names.indexOf(value)),
+        pick(index, show = false) {
+            bar.index = index;
+            tabs.forEach((tab, i) => {
+                tab.classList.toggle('is-active', i === index);
+                tab.setAttribute('aria-pressed', String(i === index));
+            });
+            onChange(names[index]);
+            if (show) {
+                announce(`${index + 1} / ${names.length} · ${names[index]}`);
+                if (shown) history.replaceState(null, '', `#${shown.key}/${encodeURIComponent(names[index])}`);
+            }
+        },
+    };
+    tabs.forEach((tab, i) => tab.classList.toggle('is-active', i === bar.index));
+    return bar;
+}
+
+/** Controls drawn into `container`, the panel's part under the description; topics into a bar. */
+function panelControls(container: HTMLElement, topics: {bar: TopicBar | null}): DemoControls {
     const row = (label: string, input: HTMLElement) => {
         const wrap = document.createElement('label');
         wrap.className = 'control';
@@ -100,6 +177,9 @@ function panelControls(container: HTMLElement): DemoControls {
             }
             select.addEventListener('change', () => onChange(select.value as typeof value));
             row(label, select);
+        },
+        topics(names, value, onChange) {
+            topics.bar = buildTopicBar(names, value, onChange);
         },
         button(label, onClick) {
             const button = document.createElement('button');
@@ -151,7 +231,8 @@ function showError(error: unknown) {
 async function show(build: (ctx: DemoContext) => Promise<Omit<Shown, 'ctx' | 'run'> & {run: DemoRun}>) {
     const token = ++loadToken;
     const controls = document.createElement('div');
-    const ctx = createScene(controls);
+    const topics: {bar: TopicBar | null} = {bar: null};
+    const ctx = createScene(controls, topics);
     try {
         const built = await build(ctx);
         if (token !== loadToken) {
@@ -169,7 +250,18 @@ async function show(build: (ctx: DemoContext) => Promise<Omit<Shown, 'ctx' | 'ru
         peakParticles = 0;
         setPaused(false);
         describe();
-        window.location.hash = '#' + shown.key;
+        topicBar = topics.bar;
+        if (topicBarEl) {
+            topicBarEl.replaceChildren(...(topicBar ? [topicBar.element] : []));
+            topicBarEl.hidden = !topicBar;
+        }
+        const wanted = topicBar && topicFromHash ? topicBar.names.indexOf(topicFromHash) : -1;
+        topicFromHash = null;
+        if (topicBar && wanted > 0) {
+            topicBar.pick(wanted, true);
+        } else {
+            window.location.hash = '#' + shown.key;
+        }
     } catch (error) {
         ctx.scene.dispose();
         if (token === loadToken) {
@@ -392,9 +484,22 @@ function step(direction: 1 | -1) {
     void loadDemo(demos.findIndex((demo) => demo.key === next));
 }
 
+/** The demo the address names (`#Key`, or `#Key/Topic` to open it on a topic). */
 function indexOfHash(): number {
-    const hash = window.location.hash.substring(1);
-    return demos.findIndex((demo) => demo.key === hash);
+    const [key, topic] = window.location.hash.substring(1).split('/');
+    topicFromHash = topic ? decodeURIComponent(topic) : null;
+    return demos.findIndex((demo) => demo.key === key);
+}
+
+// The topic bar sits under the HUD, which wraps to more rows on a narrow window.
+const hud = document.querySelector<HTMLElement>('.hud');
+if (hud && topicBarEl) {
+    const place = () => {
+        topicBarEl.style.top = `${Math.round(hud.getBoundingClientRect().bottom + 10)}px`;
+    };
+    new ResizeObserver(place).observe(hud);
+    window.addEventListener('resize', place);
+    place();
 }
 
 fillPicker();
@@ -430,6 +535,16 @@ document.addEventListener('keydown', (event) => {
         setPaused(!paused);
     }
     if (event.key === 'r' || event.key === 'R') restart();
+    if (topicBar) {
+        const bar = topicBar;
+        const digit = Number(event.key);
+        if (Number.isInteger(digit) && digit >= 1 && digit <= bar.names.length) bar.pick(digit - 1, true);
+        if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+            event.preventDefault();
+            const by = event.key === 'ArrowDown' ? 1 : -1;
+            bar.pick((bar.index + by + bar.names.length) % bar.names.length, true);
+        }
+    }
 });
 window.addEventListener('hashchange', () => {
     const index = indexOfHash();

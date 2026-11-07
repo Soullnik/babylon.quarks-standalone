@@ -11,6 +11,11 @@ import type {BatchedRenderer, ParticleSystem} from 'babylon.quarks';
 export interface DemoControls {
     toggle(label: string, value: boolean, onChange: (value: boolean) => void): void;
     choice<T extends string>(label: string, options: readonly T[], value: T, onChange: (value: T) => void): void;
+    /**
+     * The demo's topics, one shown at a time: the viewer draws them as a bar of tabs over the
+     * scene, switched by click, digit or arrow keys. `onChange` gets the name picked.
+     */
+    topics(names: readonly string[], value: string, onChange: (name: string) => void): void;
     button(label: string, onClick: () => void): void;
 }
 

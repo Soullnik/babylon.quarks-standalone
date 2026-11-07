@@ -221,6 +221,117 @@
                 color: #8193c2;
             }
 
+            /* A demo's topics: tabs over the scene, under the HUD, always in view. */
+            .topic-bar {
+                position: fixed;
+                top: 78px;
+                left: 50%;
+                transform: translateX(-50%);
+                z-index: 19;
+                max-width: calc(100% - 28px);
+            }
+
+            .topic-bar-inner {
+                display: flex;
+                flex-wrap: wrap;
+                justify-content: center;
+                align-items: center;
+                gap: 6px;
+                padding: 6px;
+                border: 1px solid rgba(151, 172, 255, 0.3);
+                border-radius: 22px;
+                background: rgba(8, 12, 24, 0.78);
+                backdrop-filter: blur(10px);
+                box-shadow: 0 6px 24px rgba(0, 0, 0, 0.45);
+            }
+
+            .topic-tab,
+            .topic-arrow {
+                border: 1px solid transparent;
+                border-radius: 999px;
+                background: rgba(27, 41, 79, 0.6);
+                color: #dbe4ff;
+                font-size: 15px;
+                height: 36px;
+                padding: 0 16px 0 6px;
+                display: inline-flex;
+                align-items: center;
+                gap: 8px;
+                cursor: pointer;
+            }
+
+            .topic-arrow {
+                padding: 0 12px;
+                font-size: 20px;
+                background: none;
+                color: #8ea3d8;
+            }
+
+            .topic-tab:hover,
+            .topic-arrow:hover {
+                border-color: #5b7cff;
+                color: #fff;
+            }
+
+            .topic-number {
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                width: 24px;
+                height: 24px;
+                border-radius: 50%;
+                background: rgba(91, 124, 255, 0.25);
+                font-size: 13px;
+                font-weight: 600;
+            }
+
+            .topic-tab.is-active {
+                background: #5b7cff;
+                color: #fff;
+                font-weight: 600;
+            }
+
+            .topic-tab.is-active .topic-number {
+                background: rgba(255, 255, 255, 0.25);
+            }
+
+            /* The topic's name, large for a moment when it is switched to. */
+            .topic-toast {
+                position: fixed;
+                top: 38%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                z-index: 18;
+                font-size: 30px;
+                font-weight: 600;
+                color: #fff;
+                text-shadow: 0 2px 16px rgba(0, 0, 0, 0.8);
+                pointer-events: none;
+                opacity: 0;
+                white-space: nowrap;
+            }
+
+            .topic-toast.is-shown {
+                animation: topic-toast 1.6s ease-out forwards;
+            }
+
+            @keyframes topic-toast {
+                0% {
+                    opacity: 0;
+                    transform: translate(-50%, -40%);
+                }
+                12% {
+                    opacity: 1;
+                    transform: translate(-50%, -50%);
+                }
+                70% {
+                    opacity: 1;
+                }
+                100% {
+                    opacity: 0;
+                }
+            }
+
             .panel.is-collapsed .panel-description,
             .panel.is-collapsed .panel-controls,
             .panel.is-collapsed .panel-foot {
@@ -389,6 +500,8 @@
                 >
             </div>
         </header>
+        <nav id="topic-bar" class="topic-bar" aria-label="Topics of this demo" hidden></nav>
+        <div id="topic-toast" class="topic-toast" aria-live="polite"></div>
         <div id="drop-overlay" class="drop-overlay" aria-hidden="true">
             <div class="drop-overlay-inner">
                 <strong>Drop Quarks JSON</strong>
@@ -402,7 +515,8 @@
             <div id="demo-controls" class="panel-controls" hidden></div>
             <div class="panel-foot">
                 <span class="panel-hint"
-                    >Left/Right: switch demo · Space: pause · R: restart · drop a .json to open it</span
+                    >Left/Right: switch demo · 1-9, Up/Down: topic · Space: pause · R: restart · drop a .json to open
+                    it</span
                 >
                 <button id="openJsonBtn" class="ui-btn ui-btn-small" type="button">Open JSON</button>
             </div>

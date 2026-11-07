@@ -151,8 +151,9 @@ out of `babylon.quarks`' exports.
    Keep the demo's state in that closure, add systems with `ctx.add` (or a whole effect with
    `ctx.addEffect`), name what a feature demo compares with `addCaption` (a title and the setting
    as code) or `addLabel` (`shared/labels.ts`), and offer switches with `ctx.controls`. A feature
-   demo with several topics builds each under its own node and lets the panel pick one with
-   `showTopics` (`shared/topics.ts`). Draw with the base texture set and the Kenney set
+   demo with several topics builds each under its own node and shows them as a bar of numbered
+   tabs over the scene with `showTopics` (`shared/topics.ts`; digits and Up/Down switch them, and
+   `#Key/Topic` opens a demo on a topic). Draw with the base texture set and the Kenney set
    (`baseTexture` and `kenneyTexture` in `shared/textures.ts`, greyscale sheets and shapes tinted by
    the particles' colour, made outside this repository, most of them from Kenney's CC0 particle
    packs) and stand the demo on `addGround` (`shared/stage.ts`), mid-dark so additive

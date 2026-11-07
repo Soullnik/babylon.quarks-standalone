@@ -295,6 +295,10 @@ and the package's version moves in lockstep with `quarks.core`.
   ramp, lit edges), Render Modes draws ice crystals tumbling slowly, opaque meshes write depth
   so their far faces never show through, Blending's smoke rises over an evening sky and crossfades
   its frames, and Culling marks on each clock where a comet that never stopped is.
+  A demo's topics are a bar of numbered tabs over the scene (digits and Up/Down switch them, the
+  topic's name flashes up, and `#Key/Topic` opens a demo on one) instead of a select in the panel,
+  and the weapon trail is a smear: a crescent dense toward the blade's tip with a bright edge, a
+  wide glow and a white core, on a fast cut and a hold.
 
 ### Fixed
 

@@ -5,10 +5,12 @@ import {Vector3 as BVector3} from '@babylonjs/core/Maths/math.vector';
 import {MeshBuilder} from '@babylonjs/core/Meshes/meshBuilder';
 import {TransformNode} from '@babylonjs/core/Meshes/transformNode';
 import {
+    ColorOverLength,
     ColorOverLife,
     ConeEmitter,
     ConstantColor,
     ConstantValue,
+    Gradient,
     IntervalValue,
     ParticleSystem,
     type ParticleSystemParameters,
@@ -20,7 +22,7 @@ import {fade} from '../shared/curves';
 import {band} from '../shared/geometry';
 import {addLabel} from '../shared/labels';
 import {addGround} from '../shared/stage';
-import {baseTexture} from '../shared/textures';
+import {baseTexture, kenneyTexture} from '../shared/textures';
 import type {DemoContext, DemoRun} from '../types';
 
 /**
@@ -116,29 +118,88 @@ export function init({scene, camera, add}: DemoContext): DemoRun {
     const tip = new TransformNode('Blade tip', scene);
     tip.parent = pivot;
     tip.position.x = 1.3;
-    const swing = system('Blade trail', {
-        ...standing,
-        startSize: new ConstantValue(2.4),
-        startColor: new ConstantColor(new Color4(1, 0.75, 0.4, 1)),
-        worldSpace: true,
-        renderMode: RenderMode.Trail,
-        texture: baseTexture(scene, 'streak'),
-        rendererEmitterSettings: {
-            startLength: new ConstantValue(26),
-            followLocalOrigin: true,
-            sideAxis: new BVector3(1, 0, 0),
-            tessellation: 6,
-        },
-    });
-    swing.emitter.parent = tip;
+    // The smear: a wide glow and a short white-hot core on the same tip, each a swept trail whose
+    // texture runs bright at the head (the blade) to nothing at the tail and dense toward the
+    // blade's tip, coloured along its length.
+    const smear = kenneyTexture(scene, 'smear');
+    const smearLayer = (name: string, length: number, color: Color4, overLength: Gradient) => {
+        const layer = system(name, {
+            ...standing,
+            startSize: new ConstantValue(2.4),
+            startColor: new ConstantColor(color),
+            worldSpace: true,
+            renderMode: RenderMode.Trail,
+            texture: smear,
+            rendererEmitterSettings: {
+                startLength: new ConstantValue(length),
+                followLocalOrigin: true,
+                // Along the blade, the way the smear's V runs from the hilt to the tip.
+                sideAxis: new BVector3(-1, 0, 0),
+                tessellation: 6,
+            },
+        });
+        layer.addBehavior(new ColorOverLength(overLength));
+        layer.emitter.parent = tip;
+        return layer;
+    };
+    smearLayer(
+        'Blade glow',
+        30,
+        new Color4(1, 0.62, 0.28, 1),
+        new Gradient(
+            [
+                [new Color3(0.9, 0.25, 0.05), 0],
+                [new Color3(1, 0.6, 0.2), 0.6],
+                [new Color3(1, 0.85, 0.55), 1],
+            ],
+            [
+                [0, 0],
+                [1, 0.3],
+                [1, 1],
+            ]
+        )
+    );
+    smearLayer(
+        'Blade core',
+        12,
+        new Color4(1, 0.95, 0.85, 1),
+        new Gradient(
+            [
+                [new Color3(1, 0.8, 0.5), 0],
+                [new Color3(1, 1, 1), 1],
+            ],
+            [
+                [0, 0],
+                [1, 1],
+            ]
+        )
+    );
+
+    // A sword's swing: a fast cut, a hold while the smear dies away, the cut back, a hold.
+    const CUT = 0.18;
+    const HOLD = 0.62;
+    const FROM = 1.7;
+    const TO = -0.75;
+    const ease = (x: number) => 1 - Math.pow(1 - x, 3);
+    const angleAt = (time: number) => {
+        const phase = time % (2 * (CUT + HOLD));
+        if (phase < CUT) return FROM + (TO - FROM) * ease(phase / CUT);
+        if (phase < CUT + HOLD) return TO;
+        if (phase < 2 * CUT + HOLD) return TO + (FROM - TO) * ease((phase - CUT - HOLD) / CUT);
+        return FROM;
+    };
 
     let t = 0;
     return {
         update(delta) {
             t += delta;
-            // Cuts to and fro in the screen's plane, the arc tipping a little as it goes.
-            pivot.rotation.z = 0.5 + Math.sin(t * 4.5) * 1.2;
-            pivot.rotation.y = 0.3 + Math.sin(t * 2.25) * 0.25;
+            // Cuts in the screen's plane, the arc tipping a little toward the camera.
+            pivot.rotation.z = angleAt(t);
+            pivot.rotation.y = 0.35;
+            // The tip's place this frame, before the renderer samples it (Babylon would update the
+            // world matrices only when it draws, a frame after the trail read them).
+            pivot.computeWorldMatrix(true);
+            tip.computeWorldMatrix(true);
         },
     };
 }

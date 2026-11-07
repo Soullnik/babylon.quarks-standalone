@@ -78,6 +78,11 @@ export const KENNEY = {
      * round it (U), for a gradient map.
      */
     veins: {cols: 1, rows: 1},
+    /**
+     * A sword smear for a swept trail: bright at the head (U = 1) fading to the tail, thin near the
+     * hilt (V = 0) and dense toward the tip, with a hard bright edge inside the tip (V = 1).
+     */
+    smear: {cols: 1, rows: 1},
 } as const;
 
 export type KenneyTexture = keyof typeof KENNEY;
