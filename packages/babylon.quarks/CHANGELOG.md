@@ -302,6 +302,9 @@ and the package's version moves in lockstep with `quarks.core`.
   Electric Ball keeps a saturated blue web with hairline white bolts and strikes the ground now and
   then; Level-Up opens a magic circle under the character and spirals wide ribbons; the aura is a
   crown of flame tongues in two layers with its light on the ground.
+  The effect files Loading Effects loads are rebuilt in layers: Ember burst a fireball of rolling
+  flame, embers trailing light and dark smoke; Frost ring ice spikes bursting out of the ground
+  with frost, glints and mist; Arcane swirl a magic circle under orbiting ribbons and glyphs.
 
 ### Fixed
 
