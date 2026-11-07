@@ -25,6 +25,7 @@ export const BASE = {
     dust_puff: {cols: 4, rows: 4},
     flash: {cols: 4, rows: 2},
     fire: {cols: 4, rows: 4},
+    glyphs: {cols: 4, rows: 4},
 } as const;
 
 export type BaseTexture = keyof typeof BASE;

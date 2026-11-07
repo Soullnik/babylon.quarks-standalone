@@ -14,6 +14,7 @@ export const SECTIONS: readonly {id: DemoSection; title: string; categories: rea
             'Trails',
             'Sub-emitters',
             'Playback and pooling',
+            'Effect files',
             'Extending',
             'Performance',
         ],
@@ -66,6 +67,17 @@ export const demoManifest: DemoManifestEntry[] = [
         captureAt: 3,
     },
     {
+        key: 'EmissionTimingDemo',
+        name: 'Emission Timing',
+        module: 'emissionTiming',
+        section: 'features',
+        category: 'Emission and shapes',
+        description:
+            "One topic at a time: bursts, their waves and the chance of each; start delay, prewarm and a shorter warm-up; playback speed; seeded systems that play out alike; and the stop action with the 'finished' event that starts the next effect.",
+        tags: ['emissionBursts', 'startDelay', 'prewarm', 'playbackSpeed', 'seed', 'stopAction'],
+        captureAt: 1,
+    },
+    {
         key: 'FollowObjectDemo',
         name: 'Following Moving Objects',
         module: 'followObject',
@@ -86,6 +98,36 @@ export const demoManifest: DemoManifestEntry[] = [
             'Ring Buffer Mode: a full system replaces its oldest particles, which wait paused (footprints) or looping (pulsing dots) until then.',
         tags: ['ringBufferMode', 'maxParticles'],
         captureAt: 4,
+    },
+    {
+        key: 'VelocityDemo',
+        name: 'Velocity and Speed',
+        module: 'velocity',
+        section: 'features',
+        category: 'Motion and forces',
+        description:
+            'One topic at a time: velocity over life (linear on a curve, orbital, radial, round an offset point); size, spin and colour by speed on fountains that stop at the top; start directions randomised or turned by an angle; and forces picked once per particle or every step, and gravity that scales with a half-size emitter or keeps its strength.',
+        tags: [
+            'VelocityOverLife',
+            'SizeBySpeed',
+            'RotationBySpeed',
+            'ColorBySpeed',
+            'RandomizeDirection',
+            'ChangeEmitDirection',
+            'ForceOverLife',
+        ],
+        captureAt: 2,
+    },
+    {
+        key: 'NoiseDemo',
+        name: 'Noise and Turbulence',
+        module: 'noise',
+        section: 'features',
+        category: 'Motion and forces',
+        description:
+            'One topic at a time: rising wisps shaken by Noise, turned, scrolled faster and snapped through a remap curve; streaks each shaken its own way next to a turbulence field the whole cloud flows through, with one octave and three; and sparks from swinging emitters left behind, thrown along at birth or carried along by InheritVelocity.',
+        tags: ['Noise', 'TurbulenceField', 'InheritVelocity'],
+        captureAt: 2,
     },
     {
         key: 'ForceSpaceDemo',
@@ -127,8 +169,8 @@ export const demoManifest: DemoManifestEntry[] = [
         section: 'features',
         category: 'Rendering',
         description:
-            'Seven pairs, option off on the left and on on the right: sort mode, align to direction on mesh darts, min/max on-screen particle size, shape vs hierarchy scaling under a scaled parent, render face on open mesh bowls, render alignment on flat mesh quads, and billboard rings laid on the ground by render alignment.',
-        tags: ['sortMode', 'renderAlignment', 'scalingMode'],
+            'Eight pairs, option off on the left and on on the right: sort mode, align to direction on mesh darts, min/max on-screen particle size, shape vs hierarchy scaling under a scaled parent, render face on open mesh bowls, render alignment on flat mesh quads, billboard rings laid on the ground by render alignment, and flame tongues mirrored at random by flip.',
+        tags: ['sortMode', 'renderAlignment', 'scalingMode', 'flip'],
         captureAt: 3,
     },
     {
@@ -149,6 +191,17 @@ export const demoManifest: DemoManifestEntry[] = [
             'sortingFudge',
         ],
         captureAt: 3,
+    },
+    {
+        key: 'MeshParticlesDemo',
+        name: 'Mesh Particles',
+        module: 'meshParticles',
+        section: 'features',
+        category: 'Rendering',
+        description:
+            "One topic at a time: shards solid and fading along their own vertex colours; plates spun about the mesh's Z or an axis from their direction; tilted leaves spun about their own axis or keeping their tilt ('angles' integration); and leaves from a turning emitter, turning with it or upright in the world.",
+        tags: ['instancingColors', 'rotationAxis', 'Rotation3DOverLife', 'renderAlignment'],
+        captureAt: 2,
     },
     {
         key: 'ImageProcessingDemo',
@@ -181,6 +234,17 @@ export const demoManifest: DemoManifestEntry[] = [
         description:
             'A spiral of light climbing a pillar (mapUV scroll), one greyscale fire sheet burning as fire, ice, poison or arcane (gradientMap, switch it in the panel), smoke burning away through a mask (erosion), and a bolt reaching out and back (a mask on UV channel 1).',
         tags: ['mapUV', 'gradientMap', 'erosion'],
+        captureAt: 2,
+    },
+    {
+        key: 'FlipbooksDemo',
+        name: 'Flipbooks',
+        module: 'flipbooks',
+        section: 'features',
+        category: 'Textures and materials',
+        description:
+            'One topic at a time: a sheet played once over life, three times (cycles), at a frame rate, and once then held; a sheet of four glyphs played whole, by one row, by a random row per particle and a random frame per tick; and slow smoke frame by frame against crossfaded frames (blendTiles).',
+        tags: ['FrameOverLife', 'cycles', 'fps', 'rowLength', 'randomRow', 'blendTiles'],
         captureAt: 2,
     },
     {
@@ -271,6 +335,17 @@ export const demoManifest: DemoManifestEntry[] = [
         captureAt: 1.6,
     },
     {
+        key: 'LoadingEffectsDemo',
+        name: 'Loading Effects',
+        module: 'loadingEffects',
+        section: 'features',
+        category: 'Effect files',
+        description:
+            'One topic at a time: three effect files loaded together by QuarksLoader.loadAll; an effect built in code beside the same effect saved with serializeEffect and loaded back from its JSON; and one loaded effect with copies made by QuarksUtil.instantiate, sharing its textures and batches.',
+        tags: ['QuarksLoader', 'loadAll', 'serializeEffect', 'loadFromJSON', 'instantiate'],
+        captureAt: 0.6,
+    },
+    {
         key: 'CustomPluginDemo',
         name: 'Custom Plugin',
         module: 'customPlugin',
@@ -280,6 +355,17 @@ export const demoManifest: DemoManifestEntry[] = [
             'A behaviour of your own, registered with loadPlugin as docs/EXTENDING.md describes: a travelling wave that lifts and colours a grid of sparks; it shows in the editor and saves with the effect.',
         tags: ['loadPlugin', 'Behavior'],
         captureAt: 3,
+    },
+    {
+        key: 'CullingDemo',
+        name: 'Culling and Layers',
+        module: 'culling',
+        section: 'features',
+        category: 'Performance',
+        description:
+            'One topic at a time: three clocks moved off screen every few seconds, one that keeps running, one that pauses and falls behind, one that pauses and catches up (cullingMode); and fountains on camera layers 1 and 2, the camera set in the panel to draw both or one (layers.mask, camera.layerMask).',
+        tags: ['cullingMode', 'layerMask', 'layers'],
+        captureAt: 9.5,
     },
     {
         key: 'MuzzleFlashDemo',

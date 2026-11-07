@@ -5,7 +5,7 @@ import {Texture} from '@babylonjs/core/Materials/Textures/texture';
 import {Color3, Color4} from '@babylonjs/core/Maths/math.color';
 import {Vector3 as BVector3} from '@babylonjs/core/Maths/math.vector';
 import {MeshBuilder} from '@babylonjs/core/Meshes/meshBuilder';
-import {TransformNode} from '@babylonjs/core/Meshes/transformNode';
+import type {TransformNode} from '@babylonjs/core/Meshes/transformNode';
 import '@babylonjs/core/Rendering/depthRendererSceneComponent';
 import type {Scene} from '@babylonjs/core/scene';
 import {
@@ -29,13 +29,13 @@ import {
 } from 'babylon.quarks';
 import {curve, fade} from '../shared/curves';
 import {geometryOf} from '../shared/geometry';
-import {addLabel} from '../shared/labels';
+import {addCaption} from '../shared/labels';
 import {addGround} from '../shared/stage';
 import {baseTexture, sheetOf} from '../shared/textures';
+import {showTopics, type Topic} from '../shared/topics';
 import type {DemoContext, DemoRun} from '../types';
 
 const FLOOR = -2.6;
-const TITLE_Y = 3.4;
 
 /** A smoothstep of `t`, clamped to 0…1. */
 function smooth(t: number): number {
@@ -98,11 +98,6 @@ function flat(scene: Scene, name: string, color: Color3, lit = false): StandardM
     return material;
 }
 
-interface Topic {
-    name: string;
-    build(group: TransformNode): void;
-}
-
 /**
  * How particles are blended into the frame and coloured by their material, one topic at a time
  * (picked in the panel), each labelled in the scene.
@@ -138,10 +133,6 @@ export function init({scene, camera, batchRenderer, add, controls}: DemoContext)
         ps.emitter.parent = parent;
         add(ps);
         return ps;
-    };
-    const caption = (group: TransformNode, x: number, title: string, code: string) => {
-        addLabel(scene, title, new BVector3(x, TITLE_Y, 0.5), {height: 0.42}).parent = group;
-        addLabel(scene, code, new BVector3(x, TITLE_Y - 0.48, 0.5), {height: 0.3, color: '#9fb4d8'}).parent = group;
     };
     const toUp = (ps: ParticleSystem) => {
         ps.emitter.rotation.x = -Math.PI / 2; // cones emit along +z; aim them up
@@ -221,7 +212,7 @@ export function init({scene, camera, batchRenderer, add, controls}: DemoContext)
                     )
                 );
                 puffs.addBehavior(new ColorOverLife(fade(0.12, 0.7)));
-                caption(group, x, mode.title, mode.code);
+                addCaption(scene, group, x, mode.title, mode.code);
             });
         },
     });
@@ -296,7 +287,7 @@ export function init({scene, camera, batchRenderer, add, controls}: DemoContext)
                         )
                     )
                 );
-                caption(group, x, column.title, column.code);
+                addCaption(scene, group, x, column.title, column.code);
             });
         },
     });
@@ -357,7 +348,7 @@ export function init({scene, camera, batchRenderer, add, controls}: DemoContext)
                         ])
                     )
                 );
-                caption(group, x, side.title, side.code);
+                addCaption(scene, group, x, side.title, side.code);
             });
         },
     });
@@ -398,7 +389,8 @@ export function init({scene, camera, batchRenderer, add, controls}: DemoContext)
                 mist.emitter.position.set(x, FLOOR + 0.3, 0);
                 mist.addBehavior(new ApplyForce(new BVector3(1, 0, 0), new ConstantValue(0.08)));
                 mist.addBehavior(new ColorOverLife(fade(0.25, 0.7)));
-                caption(
+                addCaption(
+                    scene,
                     group,
                     x,
                     soft ? 'Fades before the scene' : 'Cut by the floor and pillars',
@@ -468,7 +460,8 @@ export function init({scene, camera, batchRenderer, add, controls}: DemoContext)
                 });
                 light.emitter.position.set(x, -0.2, 1.2);
                 light.addBehavior(new ColorOverLife(fade(0.3, 0.7)));
-                caption(
+                addCaption(
+                    scene,
                     group,
                     x,
                     fudge === 0 ? 'By distance: the glow over the smoke' : 'Fudged: the smoke over the glow',
@@ -478,23 +471,7 @@ export function init({scene, camera, batchRenderer, add, controls}: DemoContext)
         },
     });
 
-    const groups = topics.map((topic) => {
-        const group = new TransformNode(topic.name, scene);
-        topic.build(group);
-        return group;
-    });
-    const show = (name: string) => {
-        for (const group of groups) {
-            group.setEnabled(group.name === name);
-        }
-    };
-    show(topics[0].name);
-    controls.choice(
-        'Topic',
-        topics.map((topic) => topic.name),
-        topics[0].name,
-        show
-    );
+    showTopics(scene, controls, topics);
 
     return {
         dispose() {

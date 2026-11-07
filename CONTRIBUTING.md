@@ -149,8 +149,10 @@ out of `babylon.quarks`' exports.
 1. Create a module in `examples/src/demos/` whose `init(ctx)` builds the demo and returns its
    `update(delta)` and, when it needs clean-up, `dispose()` (`DemoRun` in `examples/src/types.ts`).
    Keep the demo's state in that closure, add systems with `ctx.add` (or a whole effect with
-   `ctx.addEffect`), name what a feature demo compares with `addLabel` (`shared/labels.ts`), and
-   offer switches with `ctx.controls`. Draw with the base texture set (`baseTexture` in
+   `ctx.addEffect`), name what a feature demo compares with `addCaption` (a title and the setting
+   as code) or `addLabel` (`shared/labels.ts`), and offer switches with `ctx.controls`. A feature
+   demo with several topics builds each under its own node and lets the panel pick one with
+   `showTopics` (`shared/topics.ts`). Draw with the base texture set (`baseTexture` in
    `shared/textures.ts`, greyscale sheets and shapes tinted by the particles' colour, made outside
    this repository) and stand the demo on `addGround` (`shared/stage.ts`), mid-dark so additive
    light and alpha-blended smoke both read. Time comes only from `update`'s `delta`: it pauses,
@@ -163,6 +165,10 @@ out of `babylon.quarks`' exports.
    as above). The gallery shows `examples/public/previews/<key>.png`.
 4. Run `npm run docs:demos`: it writes the demo tables and counts of the READMEs and the landing
    page from the manifest; CI fails when they are out of date.
+
+The effect files the Loading Effects demo loads, `examples/public/effects/*.json`, are written from
+`examples/src/shared/sampleEffects.ts` by `npx tsx scripts/write-sample-effects.mts`, with the
+library built; run it after changing a sample effect.
 
 `npm run check:demos` opens every demo and fails on a page or console error, a demo whose `init`
 does not finish, one that never has a particle alive or leaves the canvas empty, and one without

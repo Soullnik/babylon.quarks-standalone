@@ -2,9 +2,10 @@ import {DynamicTexture} from '@babylonjs/core/Materials/Textures/dynamicTexture'
 import {Material} from '@babylonjs/core/Materials/material';
 import {StandardMaterial} from '@babylonjs/core/Materials/standardMaterial';
 import {Color3} from '@babylonjs/core/Maths/math.color';
-import type {Vector3 as BVector3} from '@babylonjs/core/Maths/math.vector';
+import {Vector3, type Vector3 as BVector3} from '@babylonjs/core/Maths/math.vector';
 import {Mesh} from '@babylonjs/core/Meshes/mesh';
 import {MeshBuilder} from '@babylonjs/core/Meshes/meshBuilder';
+import type {TransformNode} from '@babylonjs/core/Meshes/transformNode';
 import type {Scene} from '@babylonjs/core/scene';
 
 export interface LabelOptions {
@@ -52,4 +53,39 @@ export function addLabel(scene: Scene, text: string, position: BVector3, options
         plane.billboardMode = Mesh.BILLBOARDMODE_ALL;
     }
     return plane;
+}
+
+/** The line under a caption's title: what it names, as code. */
+const CODE_COLOR = '#9fb4d8';
+
+/**
+ * A feature demo's caption over what it compares: a title, and under it the setting as code,
+ * both facing the camera, at `x` and `y` (the title's height), under `parent`.
+ */
+export function addCaption(scene: Scene, parent: TransformNode, x: number, title: string, code: string, y = 3.4): void {
+    addLabel(scene, title, new Vector3(x, y, 0.5), {height: 0.42}).parent = parent;
+    addLabel(scene, code, new Vector3(x, y - 0.48, 0.5), {height: 0.3, color: CODE_COLOR}).parent = parent;
+}
+
+/**
+ * A line of text whose words change while the demo runs, such as a system's state: the label is
+ * drawn again only when the text differs from the last one set.
+ */
+export function addStatus(
+    scene: Scene,
+    parent: TransformNode,
+    position: Vector3,
+    options: LabelOptions = {}
+): (text: string) => void {
+    let current: Mesh | null = null;
+    let shown = '';
+    return (text) => {
+        if (text === shown) {
+            return;
+        }
+        shown = text;
+        current?.dispose(false, true);
+        current = addLabel(scene, text, position, {height: 0.3, color: CODE_COLOR, ...options});
+        current.parent = parent;
+    };
 }

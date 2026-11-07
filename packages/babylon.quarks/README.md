@@ -203,7 +203,7 @@ QuarksUtil.play(effect);
 
 Effect files are described by a JSON Schema, shipped as `babylon.quarks/schema/effect.schema.json` and published at <https://soullnik.github.io/babylon.quarks-standalone/schema/effect-3.schema.json>; point a file's `$schema` at it for completion and checks in your editor. The [format reference](https://github.com/Soullnik/babylon.quarks-standalone/blob/main/docs/FORMAT.md) has the details.
 
-See the [examples app](https://github.com/Soullnik/babylon.quarks-standalone/tree/main/examples) in the monorepo for <!-- demos:count -->24<!-- /demos:count --> interactive demos and usage patterns.
+See the [examples app](https://github.com/Soullnik/babylon.quarks-standalone/tree/main/examples) in the monorepo for <!-- demos:count -->31<!-- /demos:count --> interactive demos and usage patterns.
 
 ## Custom behaviors and shapes
 

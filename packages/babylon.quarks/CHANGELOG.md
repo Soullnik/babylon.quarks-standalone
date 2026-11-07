@@ -262,6 +262,27 @@ and the package's version moves in lockstep with `quarks.core`.
   `particleColor`), cutout leaves by an alpha test against blended ones, soft particles at the
   floor and pillars, and a sorting fudge holding smoke over a nearer glow. Alpha test and soft
   particles are back in the gallery this way, on textures of our own.
+- **Seven more feature demos**, one topic at a time each, so every part of the library has a
+  page in the gallery:
+  - **Emission Timing:** bursts, their waves and their chance; start delay, prewarm and a shorter
+    warm-up; playback speed; seeded twins; and the stop action, with the `'finished'` event
+    starting the next effect.
+  - **Velocity and Speed:** velocity over life (linear, orbital, radial, round an offset point);
+    size, spin and colour by speed; `RandomizeDirection` and `ChangeEmitDirection`; forces picked
+    per particle or per step; and gravity that scales with the emitter or not.
+  - **Noise and Turbulence:** `Noise` turned, scrolled and remapped; noise beside a
+    `TurbulenceField`; and `InheritVelocity` at birth and every step.
+  - **Flipbooks:** a sheet over life, in cycles, at a frame rate and held; whole sheet, one row,
+    a random row and a random frame; and frame blending.
+  - **Mesh Particles:** vertex colours, the rotation axis, `'angles'` integration and world
+    alignment.
+  - **Loading Effects:** three effect files loaded by `loadAll`, a `serializeEffect` round trip and
+    `QuarksUtil.instantiate` copies. The files are written by `scripts/write-sample-effects.mts`.
+  - **Culling and Layers:** the three culling modes on clocks moved off screen, and camera layer
+    masks.
+
+  Renderer Options gains a Flip pair. The base texture set gains a leaf and a sheet of four
+  glyphs, one per row.
 
 ### Fixed
 

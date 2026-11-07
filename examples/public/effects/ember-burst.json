@@ -1,0 +1,480 @@
+{
+  "metadata": {
+    "version": 4.5,
+    "type": "Object3D",
+    "generator": "babylon.quarks examples",
+    "quarksFormat": 3
+  },
+  "geometries": [
+    {
+      "uuid": "quarks_geometry_1",
+      "type": "QuarksGeometry",
+      "positions": [
+        -0.5,
+        -0.5,
+        0,
+        0.5,
+        -0.5,
+        0,
+        0.5,
+        0.5,
+        0,
+        -0.5,
+        0.5,
+        0
+      ],
+      "indices": [
+        0,
+        1,
+        2,
+        0,
+        2,
+        3
+      ],
+      "uvs": [
+        0,
+        0,
+        1,
+        0,
+        1,
+        1,
+        0,
+        1
+      ]
+    }
+  ],
+  "materials": [
+    {
+      "uuid": "quarks_material_3",
+      "type": "QuarksMaterial",
+      "transparent": true,
+      "alphaMode": 1,
+      "depthTest": true,
+      "depthWrite": false,
+      "alphaTest": 0,
+      "texture": "quarks_texture_2",
+      "reflectionLevel": 1
+    },
+    {
+      "uuid": "quarks_material_5",
+      "type": "QuarksMaterial",
+      "transparent": true,
+      "alphaMode": 1,
+      "depthTest": true,
+      "depthWrite": false,
+      "alphaTest": 0,
+      "texture": "quarks_texture_4",
+      "reflectionLevel": 1
+    },
+    {
+      "uuid": "quarks_material_7",
+      "type": "QuarksMaterial",
+      "transparent": true,
+      "alphaMode": 2,
+      "depthTest": true,
+      "depthWrite": false,
+      "alphaTest": 0,
+      "texture": "quarks_texture_6",
+      "reflectionLevel": 1
+    }
+  ],
+  "textures": [
+    {
+      "uuid": "quarks_texture_2",
+      "image": "quarks_image_1",
+      "wrap": [
+        1001,
+        1001
+      ]
+    },
+    {
+      "uuid": "quarks_texture_4",
+      "image": "quarks_image_2",
+      "wrap": [
+        1001,
+        1001
+      ]
+    },
+    {
+      "uuid": "quarks_texture_6",
+      "image": "quarks_image_3",
+      "wrap": [
+        1001,
+        1001
+      ]
+    }
+  ],
+  "images": [
+    {
+      "uuid": "quarks_image_1",
+      "url": "../textures/base/flash.png"
+    },
+    {
+      "uuid": "quarks_image_2",
+      "url": "../textures/base/streak.png"
+    },
+    {
+      "uuid": "quarks_image_3",
+      "url": "../textures/base/smoke_puff.png"
+    }
+  ],
+  "object": {
+    "uuid": "e2610ff7-3d56-44cd-a465-b4bd2cd17378",
+    "type": "Group",
+    "name": "Ember burst",
+    "children": [
+      {
+        "uuid": "94d47f40-a18b-4b7e-a2b9-d3b735fd2c9a",
+        "type": "ParticleEmitter",
+        "name": "Flash",
+        "ps": {
+          "shape": {
+            "type": "point"
+          },
+          "duration": 2,
+          "startLife": {
+            "type": "ConstantValue",
+            "value": 0.35
+          },
+          "startRotation": {
+            "type": "IntervalValue",
+            "a": 0,
+            "b": 6.283185307179586
+          },
+          "startSize": {
+            "type": "IntervalValue",
+            "a": 2.6,
+            "b": 3
+          },
+          "startColor": {
+            "type": "ConstantColor",
+            "color": {
+              "r": 1,
+              "g": 0.7,
+              "b": 0.35,
+              "a": 1
+            }
+          },
+          "emissionOverTime": {
+            "type": "ConstantValue",
+            "value": 0
+          },
+          "emissionBursts": [
+            {
+              "time": 0,
+              "count": {
+                "type": "ConstantValue",
+                "value": 1
+              },
+              "probability": 1,
+              "interval": 0,
+              "cycle": 1
+            }
+          ],
+          "uTileCount": 4,
+          "vTileCount": 2,
+          "instancingGeometry": "quarks_geometry_1",
+          "material": "quarks_material_3",
+          "behaviors": [
+            {
+              "type": "FrameOverLife",
+              "frame": {
+                "type": "PiecewiseBezier",
+                "functions": [
+                  {
+                    "function": {
+                      "p0": 0,
+                      "p1": 2.6633333333333336,
+                      "p2": 5.326666666666667,
+                      "p3": 7.99
+                    },
+                    "start": 0
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      {
+        "uuid": "1c420e00-08be-4663-8a38-c0312fe90c35",
+        "type": "ParticleEmitter",
+        "name": "Embers",
+        "quaternion": [
+          -0.7071067811865475,
+          0,
+          0,
+          0.7071067811865476
+        ],
+        "ps": {
+          "shape": {
+            "type": "cone",
+            "radius": 0.2,
+            "angle": 0.7
+          },
+          "duration": 2,
+          "startLife": {
+            "type": "IntervalValue",
+            "a": 1,
+            "b": 1.5
+          },
+          "startSpeed": {
+            "type": "IntervalValue",
+            "a": 3,
+            "b": 5.5
+          },
+          "startSize": {
+            "type": "IntervalValue",
+            "a": 0.14,
+            "b": 0.26
+          },
+          "startColor": {
+            "type": "RandomColor",
+            "a": {
+              "r": 1,
+              "g": 0.85,
+              "b": 0.45,
+              "a": 1
+            },
+            "b": {
+              "r": 1,
+              "g": 0.4,
+              "b": 0.12,
+              "a": 1
+            }
+          },
+          "emissionOverTime": {
+            "type": "ConstantValue",
+            "value": 0
+          },
+          "emissionBursts": [
+            {
+              "time": 0,
+              "count": {
+                "type": "ConstantValue",
+                "value": 45
+              },
+              "probability": 1,
+              "interval": 0,
+              "cycle": 1
+            }
+          ],
+          "renderMode": 1,
+          "instancingGeometry": "quarks_geometry_1",
+          "rendererEmitterSettings": {
+            "speedFactor": 0.06,
+            "lengthFactor": 1
+          },
+          "material": "quarks_material_5",
+          "behaviors": [
+            {
+              "type": "ApplyForce",
+              "direction": [
+                0,
+                -1,
+                0
+              ],
+              "magnitude": {
+                "type": "ConstantValue",
+                "value": 7
+              }
+            },
+            {
+              "type": "ColorOverLife",
+              "color": {
+                "type": "Gradient",
+                "color": {
+                  "type": "CLinearFunction",
+                  "subType": "Color",
+                  "keys": [
+                    {
+                      "value": {
+                        "r": 1,
+                        "g": 1,
+                        "b": 1
+                      },
+                      "pos": 0
+                    },
+                    {
+                      "value": {
+                        "r": 1,
+                        "g": 1,
+                        "b": 1
+                      },
+                      "pos": 1
+                    }
+                  ]
+                },
+                "alpha": {
+                  "type": "CLinearFunction",
+                  "subType": "Number",
+                  "keys": [
+                    {
+                      "value": 0,
+                      "pos": 0
+                    },
+                    {
+                      "value": 1,
+                      "pos": 0
+                    },
+                    {
+                      "value": 1,
+                      "pos": 0.6
+                    },
+                    {
+                      "value": 0,
+                      "pos": 1
+                    }
+                  ]
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "uuid": "bb1d13e8-25f5-4504-9a2b-5ff4e3bc615c",
+        "type": "ParticleEmitter",
+        "name": "Smoke",
+        "quaternion": [
+          -0.7071067811865475,
+          0,
+          0,
+          0.7071067811865476
+        ],
+        "ps": {
+          "shape": {
+            "type": "cone",
+            "radius": 0.3,
+            "angle": 0.3
+          },
+          "duration": 2,
+          "startDelay": {
+            "type": "ConstantValue",
+            "value": 0.1
+          },
+          "startLife": {
+            "type": "IntervalValue",
+            "a": 1.4,
+            "b": 1.8
+          },
+          "startSpeed": {
+            "type": "IntervalValue",
+            "a": 0.5,
+            "b": 0.9
+          },
+          "startRotation": {
+            "type": "IntervalValue",
+            "a": 0,
+            "b": 6.283185307179586
+          },
+          "startSize": {
+            "type": "IntervalValue",
+            "a": 1.2,
+            "b": 1.6
+          },
+          "startColor": {
+            "type": "ConstantColor",
+            "color": {
+              "r": 0.32,
+              "g": 0.28,
+              "b": 0.3,
+              "a": 0.8
+            }
+          },
+          "emissionOverTime": {
+            "type": "ConstantValue",
+            "value": 0
+          },
+          "emissionBursts": [
+            {
+              "time": 0,
+              "count": {
+                "type": "ConstantValue",
+                "value": 5
+              },
+              "probability": 1,
+              "interval": 0,
+              "cycle": 1
+            }
+          ],
+          "renderOrder": -1,
+          "uTileCount": 4,
+          "vTileCount": 4,
+          "blending": 2,
+          "instancingGeometry": "quarks_geometry_1",
+          "material": "quarks_material_7",
+          "behaviors": [
+            {
+              "type": "FrameOverLife",
+              "frame": {
+                "type": "PiecewiseBezier",
+                "functions": [
+                  {
+                    "function": {
+                      "p0": 0,
+                      "p1": 5.33,
+                      "p2": 10.66,
+                      "p3": 15.99
+                    },
+                    "start": 0
+                  }
+                ]
+              }
+            },
+            {
+              "type": "ColorOverLife",
+              "color": {
+                "type": "Gradient",
+                "color": {
+                  "type": "CLinearFunction",
+                  "subType": "Color",
+                  "keys": [
+                    {
+                      "value": {
+                        "r": 1,
+                        "g": 1,
+                        "b": 1
+                      },
+                      "pos": 0
+                    },
+                    {
+                      "value": {
+                        "r": 1,
+                        "g": 1,
+                        "b": 1
+                      },
+                      "pos": 1
+                    }
+                  ]
+                },
+                "alpha": {
+                  "type": "CLinearFunction",
+                  "subType": "Number",
+                  "keys": [
+                    {
+                      "value": 0,
+                      "pos": 0
+                    },
+                    {
+                      "value": 1,
+                      "pos": 0.1
+                    },
+                    {
+                      "value": 1,
+                      "pos": 0.6
+                    },
+                    {
+                      "value": 0,
+                      "pos": 1
+                    }
+                  ]
+                }
+              }
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

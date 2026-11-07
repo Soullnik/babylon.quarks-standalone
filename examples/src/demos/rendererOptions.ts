@@ -4,9 +4,11 @@ import {Vector3 as BVector3} from '@babylonjs/core/Maths/math.vector';
 import {MeshBuilder} from '@babylonjs/core/Meshes/meshBuilder';
 import {TransformNode} from '@babylonjs/core/Meshes/transformNode';
 import {
+    BoxEmitter,
     ConeEmitter,
     ConstantColor,
     ConstantValue,
+    FrameOverLife,
     IntervalValue,
     ParticleSystem,
     type ParticleSystemParameters,
@@ -20,7 +22,7 @@ import {curve} from '../shared/curves';
 import {geometryOf} from '../shared/geometry';
 import {addLabel} from '../shared/labels';
 import {addGround} from '../shared/stage';
-import {baseTexture} from '../shared/textures';
+import {baseTexture, sheetOf} from '../shared/textures';
 import type {DemoContext} from '../types';
 
 /**
@@ -41,6 +43,8 @@ import type {DemoContext} from '../types';
  *   them with it, edge-on, `'view'` lays them face to the camera.
  * - Billboard render alignment: rings from an emitter turned to lie on the ground; `'view'` faces
  *   them to the camera, `'local'` lays them in the emitter's plane, flat on the ground.
+ * - Flip: tongues of one flame sheet curling the same way; with `flip` half are mirrored and curl
+ *   the other way.
  */
 export function init({scene, camera, add, controls}: DemoContext) {
     camera.setPosition(new BVector3(0, 3.5, 15));
@@ -50,6 +54,7 @@ export function init({scene, camera, add, controls}: DemoContext) {
     const spark = baseTexture(scene, 'spark');
     const ring = baseTexture(scene, 'ring');
     const disc = baseTexture(scene, 'disc');
+    const fire = baseTexture(scene, 'fire');
 
     const options: {name: string; off: string; on: string; build: (side: 0 | 1, parent: TransformNode) => void}[] = [];
     const system = (parameters: ParticleSystemParameters, parent: TransformNode) => {
@@ -278,6 +283,44 @@ export function init({scene, camera, add, controls}: DemoContext) {
                     curve([
                         [0, 1],
                         [1, 5],
+                    ])
+                )
+            );
+        },
+    });
+
+    options.push({
+        name: 'Flip',
+        off: 'flip: none',
+        on: 'flip: (0.5, 0)',
+        build: (side, parent) => {
+            // Tongues of one flame sheet, whose tip curls one way; flipped, half curl the other.
+            const ps = system(
+                {
+                    scene,
+                    duration: 1,
+                    looping: true,
+                    prewarm: true,
+                    startLife: new IntervalValue(0.8, 1.1),
+                    startSpeed: new ConstantValue(0),
+                    startSize: new IntervalValue(1.4, 1.7),
+                    startColor: new ConstantColor(new Color4(0.9, 0.5, 0.22, 1)),
+                    emissionOverTime: new ConstantValue(5),
+                    shape: new BoxEmitter({width: 3, height: 0.1, depth: 0.6}),
+                    texture: fire,
+                    ...sheetOf('fire'),
+                    transparent: true,
+                    blendMode: Constants.ALPHA_ADD,
+                    ...(side === 1 ? {flip: {x: 0.5, y: 0}} : {}),
+                },
+                parent
+            );
+            ps.emitter.position.y = -2.2;
+            ps.addBehavior(
+                new FrameOverLife(
+                    curve([
+                        [0, 0],
+                        [1, 15.99],
                     ])
                 )
             );
