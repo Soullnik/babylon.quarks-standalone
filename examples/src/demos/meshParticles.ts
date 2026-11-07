@@ -131,9 +131,6 @@ export function init({scene, camera, add, controls}: DemoContext): DemoRun {
                     rim: {color: kind.rim, power: 2, strength: 1, mode: 'add'},
                     lighting: 'fixed',
                     transparent: false,
-                    // An opaque mesh writes depth and shows its outer faces only, or its far
-                    // faces draw over its near ones.
-                    depthWrite: true,
                     renderFace: 'front',
                     blendMode: Constants.ALPHA_DISABLE,
                 });
@@ -260,7 +257,6 @@ export function init({scene, camera, add, controls}: DemoContext): DemoRun {
                     ...plate,
                     lighting: 'fixed',
                     transparent: false,
-                    depthWrite: true,
                 });
                 ps.emitter.position.set(x, FLOOR + 0.4, 0);
                 ps.emitter.rotation.x = -Math.PI / 2; // the cone emits along +z; aim it up
@@ -291,7 +287,6 @@ export function init({scene, camera, add, controls}: DemoContext): DemoRun {
         ...quad,
         lighting: 'unlit',
         transparent: false,
-        depthWrite: true,
         alphaTest: 0.5,
         ...parameters,
     });

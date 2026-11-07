@@ -311,7 +311,6 @@ export function frostRing(scene: Scene): TransformNode {
             rim: {color: [0.7, 0.92, 1], power: 2, strength: 1, mode: 'add'},
             lighting: 'fixed',
             transparent: false,
-            depthWrite: true,
             renderFace: 'front',
             blendMode: Constants.ALPHA_DISABLE,
         },

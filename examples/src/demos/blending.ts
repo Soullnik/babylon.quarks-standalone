@@ -147,8 +147,8 @@ function flat(scene: Scene, name: string, color: Color3, lit = false): StandardM
  * - Alpha test: tumbling leaves blown toward the camera, green when they set off and red by the
  *   time they are near. Blended and unsorted on the left, they are drawn in the order they were
  *   born (or nearly, as dead ones' places are reused), so green ones behind are drawn over red
- *   ones in front; cut out by an alpha test and writing depth (`depthWrite`, off by default even
- *   for an opaque system) on the right, the red ones stay in front.
+ *   ones in front; cut out by an alpha test on the right, an opaque system, which writes depth
+ *   (`depthWrite` follows `transparent` until it is set), the red ones stay in front.
  * - Soft particles: mist among pillars, hard where it cuts the floor and the pillars on the left,
  *   fading out before them on the right (`softParticles`, read from the scene's depth).
  * - Sorting fudge: a glow nearer the camera than the smoke round it. By distance the glow draws
@@ -343,9 +343,9 @@ export function init({scene, camera, batchRenderer, add, controls}: DemoContext)
                 },
                 {
                     title: 'Cut out: depth written',
-                    code: 'transparent: false, alphaTest: 0.5, depthWrite: true',
-                    // Depth is written only when asked, opaque or not.
-                    options: {transparent: false, alphaTest: 0.5, depthWrite: true},
+                    code: 'transparent: false, alphaTest: 0.5',
+                    // Opaque, so it writes depth: a depth write not set follows the surface.
+                    options: {transparent: false, alphaTest: 0.5},
                 },
             ];
             sides.forEach((side, index) => {

@@ -81,7 +81,6 @@ export function init({scene, camera, add}: DemoContext) {
         renderMode: RenderMode.Mesh,
         transparent: false,
         blendMode: Constants.ALPHA_DISABLE,
-        depthWrite: true,
     });
     coins.emitter.name = 'Coins';
     coins.addBehavior(

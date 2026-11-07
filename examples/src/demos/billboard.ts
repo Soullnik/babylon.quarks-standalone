@@ -212,7 +212,6 @@ export function init({scene, camera, add}: DemoContext): DemoRun {
             emissionOverTime: new ConstantValue(5),
             shape: new ConeEmitter({radius: 0.6, angle: 0.25}),
             transparent: false,
-            depthWrite: true,
             renderFace: 'front',
             blendMode: Constants.ALPHA_DISABLE,
             renderMode: RenderMode.Mesh,
