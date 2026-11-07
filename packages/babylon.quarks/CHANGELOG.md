@@ -351,6 +351,10 @@ and the package's version moves in lockstep with `quarks.core`.
   gold coins with a warm key light, with glints over the fountain; Trail Texture Modes lays a
   chevron along its ribbons, so each mode's pattern shows; Surface Trails' knot is steel and its
   trails wider, white at the head and fading to the tail.
+  Blending's premultiplied column is fireballs in billowing smoke (the smoke covers, the fire adds
+  light) instead of dark blobs with a lit rim, and its material-colour flames clear the floor;
+  Emitter Shapes marks its pads with rings; Emission Timing's status sits on the floor in front of
+  each burst, clear of its particles.
 
 ### Fixed
 

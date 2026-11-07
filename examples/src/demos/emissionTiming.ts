@@ -266,7 +266,8 @@ export function init({scene, camera, add, controls, systems}: DemoContext): Demo
             const replays = actions.map((action, index) => {
                 const x = (index - 1.5) * 3.6;
                 addCaption(scene, group, x, action.title, `stopAction: '${action.stopAction}'`);
-                const status = addStatus(scene, group, new BVector3(x, -1.9, 0.5));
+                // On the floor in front of the burst, under where its particles fall, so they never cover it.
+                const status = addStatus(scene, group, new BVector3(x, FLOOR + 0.12, 1.2));
                 let current = oneShot(x, action.color, action.stopAction);
                 let finished = false;
                 let disposed = false;

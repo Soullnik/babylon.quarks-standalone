@@ -44,9 +44,10 @@ function smooth(t: number): number {
 }
 
 /**
- * A premultiplied map, computed: a ball of dark smoke whose rim is lit from inside, in a halo of
- * orange light. The smoke has alpha and covers what is behind it; the light has none and only adds.
- * Its colour is already multiplied by its alpha, and carries light where the alpha is 0, which is
+ * A premultiplied map, computed: a hot core of fire wrapped in billowing dark smoke. The smoke has
+ * alpha and covers what is behind it; the core is light with little alpha, so it adds its glow and
+ * lets the background through, and the two blend into each other where the fire meets the smoke.
+ * Its colour is already multiplied by its alpha, and carries light where the alpha is low, which is
  * what `premultipliedMap` tells the shader.
  */
 function emberTexture(scene: Scene): RawTexture {
@@ -58,23 +59,28 @@ function emberTexture(scene: Scene): RawTexture {
             const y = ((j + 0.5) / size) * 2 - 1;
             const r = Math.hypot(x, y);
             const angle = Math.atan2(y, x);
+            // A billowing edge: lobes round the outline, and lumps inside it that shade the smoke.
             const edge =
-                0.48 +
-                0.035 * Math.sin(3 * angle + 0.7) +
-                0.025 * Math.sin(7 * angle + 2.1) +
-                0.012 * Math.sin(13 * angle + 0.3);
-            const body = smooth((edge - r) / 0.1);
-            const rim = Math.exp(-(((r - edge + 0.04) / 0.07) ** 2));
-            const halo = 1.3 * Math.max(0, 1 - r) ** 1.6 * (1 - body);
-            // Smoke, times its own alpha, then the light on top of it.
-            const red = 0.07 * body + 1.0 * rim + 1.0 * halo;
-            const green = 0.06 * body + 0.62 * rim + 0.42 * halo;
-            const blue = 0.07 * body + 0.25 * rim + 0.12 * halo;
+                0.6 +
+                0.045 * Math.sin(3 * angle + 0.7) +
+                0.03 * Math.sin(7 * angle + 2.1) +
+                0.015 * Math.sin(11 * angle + 0.3) +
+                0.04 * Math.sin(6 * x - 4 * y + 0.5);
+            const lumps = 0.5 + 0.25 * Math.sin(9 * x + 2 * y) * Math.sin(8 * y - 3 * x + 1.3);
+            const body = smooth((edge - r) / 0.2);
+            const core = Math.exp(-((r / 0.3) ** 2));
+            const heat = core * (0.75 + 0.25 * lumps);
+            // Smoke, dark and lumpy, times its own alpha; then the fire's light on top of it.
+            const smoke = 0.05 + 0.08 * lumps;
+            const alpha = body * (1 - 0.65 * core);
+            const red = smoke * alpha + 1.5 * heat;
+            const green = smoke * alpha * 0.95 + 0.85 * heat ** 1.3;
+            const blue = smoke * alpha * 0.9 + 0.35 * heat ** 2.5;
             const k = (j * size + i) * 4;
             data[k] = Math.round(Math.min(red, 1) * 255);
             data[k + 1] = Math.round(Math.min(green, 1) * 255);
             data[k + 2] = Math.round(Math.min(blue, 1) * 255);
-            data[k + 3] = Math.round(body * 255);
+            data[k + 3] = Math.round(alpha * 255);
         }
     }
     const texture = RawTexture.CreateRGBATexture(data, size, size, scene, true, false, Texture.TRILINEAR_SAMPLINGMODE);
@@ -211,15 +217,16 @@ export function init({scene, camera, batchRenderer, add, controls}: DemoContext)
                         duration: 3,
                         looping: true,
                         prewarm: true,
-                        startLife: new IntervalValue(2, 2.4),
+                        // Fireballs in smoke, smaller and more of them, so they overlap: where one
+                        // covers another its smoke darkens it and its fire still adds light.
+                        startLife: mode.premultiplied ? new IntervalValue(1.3, 1.6) : new IntervalValue(2, 2.4),
                         startSpeed: new IntervalValue(1.7, 2.1),
-                        // The ember fills its square more than a puff's frames do: drawn smaller.
-                        startSize: mode.premultiplied ? new IntervalValue(1.3, 1.6) : new IntervalValue(1.9, 2.4),
+                        startSize: mode.premultiplied ? new IntervalValue(1.1, 1.5) : new IntervalValue(1.9, 2.4),
                         startRotation: new IntervalValue(0, Math.PI * 2),
                         startColor: new ConstantColor(
                             mode.premultiplied ? new Color4(1, 1, 1, 1) : new Color4(1, 0.58, 0.28, 1)
                         ),
-                        emissionOverTime: new ConstantValue(4.5),
+                        emissionOverTime: new ConstantValue(mode.premultiplied ? 9 : 4.5),
                         shape: new ConeEmitter({radius: 0.3, angle: 0.12}),
                         ...(mode.premultiplied
                             ? {texture: ember, premultipliedMap: true}
@@ -290,7 +297,8 @@ export function init({scene, camera, batchRenderer, add, controls}: DemoContext)
                         ...column.options,
                     })
                 );
-                flame.emitter.position.set(x, -2.3, 0);
+                // High enough that the cards clear the floor rather than being cut along it.
+                flame.emitter.position.set(x, -1.5, 0);
                 flame.addBehavior(
                     new FrameOverLife(
                         curve([

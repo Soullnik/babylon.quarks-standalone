@@ -59,9 +59,12 @@ export function init({scene, camera, add, controls}: DemoContext) {
     groundMaterial.diffuseColor = new Color3(0.16, 0.17, 0.21);
     groundMaterial.specularColor = Color3.Black();
     ground.material = groundMaterial;
+    // Each pad is a faint ring marked on the floor, so the shape's sparks are what read.
     const padMaterial = new StandardMaterial('pad', scene);
-    padMaterial.diffuseColor = new Color3(0.24, 0.25, 0.3);
+    padMaterial.diffuseColor = Color3.Black();
     padMaterial.specularColor = Color3.Black();
+    padMaterial.emissiveColor = new Color3(0.3, 0.33, 0.42);
+    padMaterial.disableLighting = true;
 
     const warm = new Gradient(
         [
@@ -102,9 +105,9 @@ export function init({scene, camera, add, controls}: DemoContext) {
     shapes.forEach(([name, shape, rate], i) => {
         const x = ((i % 4) - 1.5) * 4;
         const z = (Math.floor(i / 4) - 1) * 3.6;
-        const pad = MeshBuilder.CreateDisc(`pad:${name}`, {radius: 1.3, tessellation: 48}, scene);
-        pad.rotation.x = Math.PI / 2;
+        const pad = MeshBuilder.CreateTorus(`pad:${name}`, {diameter: 2.6, thickness: 0.04, tessellation: 64}, scene);
         pad.position.set(x, 0.01, z);
+        pad.isPickable = false;
         pad.material = padMaterial;
         addLabel(scene, name, new BVector3(x, 0.35, z + 1.55), {height: 0.36});
 
