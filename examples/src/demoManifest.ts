@@ -29,7 +29,7 @@ export const demoManifest: DemoManifestEntry[] = [
         section: 'showcase',
         category: 'Magic',
         description:
-            'A black hole seen nearly edge-on: turbulent gas streaming round it in spiral arms (mesh rings, mapUV scroll, gradientMap), its far side bent over and under the shadow by gravity, a thin photon ring with glints, whips of fire sweeping round it (a flipbook arc on cards turned at random), dark wisps and lit debris drawn in, and matter orbiting and falling in, heated by its speed (OrbitOverLife, GravityForce, ColorBySpeed).',
+            'A black hole seen nearly edge-on: turbulent gas streaming round it in spiral arms (mesh rings, mapUV scroll, gradientMap), its far side bent over and under the shadow by gravity, a thin photon ring with glints, whips of fire sweeping round it (a flipbook arc on cards turned at random), dark wisps and painted rocks drawn in, and matter orbiting and falling in, heated by its speed (OrbitOverLife, GravityForce, ColorBySpeed).',
         tags: ['ColorBySpeed', 'GravityForce', 'OrbitOverLife', 'mapUV', 'gradientMap'],
         captureAt: 3,
     },

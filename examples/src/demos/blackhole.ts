@@ -8,7 +8,6 @@ import {
     ConstantColor,
     ConstantValue,
     DonutEmitter,
-    EulerGenerator,
     FrameOverLife,
     Gradient,
     GravityForce,
@@ -18,16 +17,14 @@ import {
     type ParticleSystemParameters,
     PointEmitter,
     RandomColor,
-    RandomQuatGenerator,
     RenderMode,
-    Rotation3DOverLife,
     RotationOverLife,
     SizeOverLife,
     SphereEmitter,
     Vector3Function,
 } from 'babylon.quarks';
 import {curve, fade} from '../shared/curves';
-import {band, type BandShape, crystal, featheredEnds} from '../shared/geometry';
+import {band, type BandShape, featheredEnds} from '../shared/geometry';
 import {baseTexture, kenneySheet, kenneyTexture, rampTexture} from '../shared/textures';
 import type {DemoContext} from '../types';
 
@@ -80,7 +77,7 @@ function toggle(system: ParticleSystem, behavior: Behavior, on: boolean): void {
  * round. A thin photon ring hugs the shadow. Streaks of matter fall in (`OrbitOverLife` and a `GravityForce`), heated from orange to white as gravity
  * speeds them up (`ColorBySpeed`). The panel switches gravity and the colour by speed off and on.
  *
- * Its gas, streaks and stars are made from Kenney's CC0 particle packs.
+ * Its gas, streaks, stars, whips and rocks are made from Kenney's CC0 particle packs.
  */
 export function init({scene, camera, add, controls}: DemoContext) {
     camera.setPosition(new BVector3(0, 1.4, 19));
@@ -366,8 +363,9 @@ export function init({scene, camera, add, controls}: DemoContext) {
     darkWisps.emitter.rotation.x = -Math.PI / 2 + DISK_TILT;
     add(darkWisps);
 
-    // Debris falling in: dark rocks, lit, their edges glowing with the disk's light, tumbling on
-    // their orbits down into the hole. Opaque, they write depth: the shadow hides those behind it.
+    // Rocks falling in, as a game's debris is drawn: painted rocks on cards (each a random one of
+    // the sheet), turning, swirled round on their orbits and pulled down into the hole. Cut out and
+    // opaque, they write depth: the shadow hides those that pass behind it.
     const debris = new ParticleSystem({
         scene,
         duration: 4,
@@ -375,27 +373,22 @@ export function init({scene, camera, add, controls}: DemoContext) {
         prewarm: true,
         startLife: new IntervalValue(3, 4.5),
         startSpeed: new ConstantValue(0),
-        startSize: new IntervalValue(0.35, 0.8),
-        startRotation: new RandomQuatGenerator(),
-        startColor: new RandomColor(new Color4(0.22, 0.17, 0.16, 1), new Color4(0.35, 0.26, 0.22, 1)),
-        emissionOverTime: new ConstantValue(4),
+        startSize: new IntervalValue(0.45, 1.1),
+        startRotation: new IntervalValue(0, Math.PI * 2),
+        startColor: new RandomColor(new Color4(0.42, 0.33, 0.28, 1), new Color4(0.62, 0.48, 0.38, 1)),
+        emissionOverTime: new ConstantValue(4.5),
         shape: new DonutEmitter({radius: 9, donutRadius: 1.5, thickness: 1, arc: Math.PI * 2}),
-        renderMode: RenderMode.Mesh,
-        ...crystal(0.3),
-        rim: {color: [1, 0.55, 0.2], power: 2.2, strength: 1, mode: 'add'},
-        lighting: 'fixed',
+        texture: kenneyTexture(scene, 'rocks'),
+        ...kenneySheet('rocks'),
+        startTileIndex: new IntervalValue(0, 8),
         transparent: false,
-        renderFace: 'front',
+        alphaTest: 0.5,
         blendMode: Constants.ALPHA_DISABLE,
     });
     debris.emitter.name = 'Debris';
     debris.addBehavior(new OrbitOverLife(new IntervalValue(0.35, 0.6), new BVector3(0, 0, 1)));
     debris.addBehavior(new GravityForce(new BVector3(0, 0, 0), 14));
-    debris.addBehavior(
-        new Rotation3DOverLife(
-            new EulerGenerator(new IntervalValue(-1, 1), new IntervalValue(-1, 1), new IntervalValue(-1, 1), 'YXZ')
-        )
-    );
+    debris.addBehavior(new RotationOverLife(new IntervalValue(-1.6, 1.6)));
     debris.addBehavior(
         new SizeOverLife(
             curve([

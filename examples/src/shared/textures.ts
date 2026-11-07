@@ -92,6 +92,11 @@ export const KENNEY = {
      * brightest at its head, then breaking up. Played over a short life on a card turned at random.
      */
     arcs: {cols: 3, rows: 3},
+    /**
+     * Eight painted rocks, 4x2: lumps of a few broad faces lit from the top left, a grain over them,
+     * outlined dark; shading in RGB, coverage in alpha, for billboard debris turned at random.
+     */
+    rocks: {cols: 4, rows: 2},
 } as const;
 
 export type KenneyTexture = keyof typeof KENNEY;
