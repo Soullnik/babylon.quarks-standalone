@@ -1,6 +1,8 @@
 import {Constants} from '@babylonjs/core/Engines/constants';
+import {StandardMaterial} from '@babylonjs/core/Materials/standardMaterial';
 import {Color3, Color4} from '@babylonjs/core/Maths/math.color';
 import {Vector3 as BVector3} from '@babylonjs/core/Maths/math.vector';
+import {MeshBuilder} from '@babylonjs/core/Meshes/meshBuilder';
 import {
     type Behavior,
     ColorBySpeed,
@@ -21,7 +23,6 @@ import {
     RotationOverLife,
     SizeOverLife,
     SphereEmitter,
-    Vector3Function,
 } from 'babylon.quarks';
 import {curve, fade} from '../shared/curves';
 import {band, type BandShape, featheredEnds} from '../shared/geometry';
@@ -39,6 +40,15 @@ const OVERLAP_ARC = 200;
 const OVERLAP_FEATHER = 20 / OVERLAP_ARC;
 const SHADOW = 2.75;
 
+/** Turns xyz triples a quarter round x in place, z into y: a band laid in XZ stands in XY, its -z half up. */
+function standUp(xyz: Float32Array): void {
+    for (let i = 0; i < xyz.length; i += 3) {
+        const y = xyz[i + 1];
+        xyz[i + 1] = -xyz[i + 2];
+        xyz[i + 2] = y;
+    }
+}
+
 /** One particle that stays: a part of the hole that never dies, drawn from the first frame. */
 function standing(params: Partial<ParticleSystemParameters>): ParticleSystemParameters {
     return {
@@ -55,11 +65,6 @@ function standing(params: Partial<ParticleSystemParameters>): ParticleSystemPara
     } as ParticleSystemParameters;
 }
 
-/** A size of `x` by `y` for a billboard. */
-function size2(x: number, y: number): Vector3Function {
-    return new Vector3Function(new ConstantValue(x), new ConstantValue(y), new ConstantValue(1));
-}
-
 /** Adds or takes out a behaviour, for a switch in the panel. */
 function toggle(system: ParticleSystem, behavior: Behavior, on: boolean): void {
     const index = system.behaviors.indexOf(behavior);
@@ -71,8 +76,8 @@ function toggle(system: ParticleSystem, behavior: Behavior, on: boolean): void {
  * A black hole seen nearly edge-on, after the renderings of Gargantua. Its accretion disk is
  * turbulent gas streaming round it: flat ring meshes with a gas texture scrolled round them
  * (`mapUV` scroll), wound into spiral arms (U sheared by V) and coloured from dark red to white-hot
- * at the inner edge by a `gradientMap`, each split in a far and a near half so the shadow sits
- * between them. The far side of the disk, bent by the hole's gravity, rises over the shadow and
+ * at the inner edge by a `gradientMap`, and a glow lying in the disk's plane. The shadow is a black
+ * sphere that writes depth, so whatever passes behind it is hidden from any side. The far side of the disk, bent by the hole's gravity, rises over the shadow and
  * hangs under it: rings of the same gas standing up round it, thick above and thin below, flowing
  * round. A thin photon ring hugs the shadow. Streaks of matter fall in (`OrbitOverLife` and a `GravityForce`), heated from orange to white as gravity
  * speeds them up (`ColorBySpeed`). The panel switches gravity and the colour by speed off and on.
@@ -83,7 +88,6 @@ export function init({scene, camera, add, controls}: DemoContext) {
     camera.setPosition(new BVector3(0, 1.4, 19));
     camera.setTarget(new BVector3(0, 0.2, 0));
     const glow = baseTexture(scene, 'glow');
-    const disc = baseTexture(scene, 'disc');
     const gas = kenneyTexture(scene, 'gas', true);
     const traces = kenneyTexture(scene, 'traces');
     const stars = kenneyTexture(scene, 'stars');
@@ -120,15 +124,25 @@ export function init({scene, camera, add, controls}: DemoContext) {
             order: number;
             /** The share of the way round over which the band fades in at each end. */
             feather?: number;
+            /**
+             * Stood up facing the camera: the band turned into the mesh's XY plane (its -z half up)
+             * and drawn with the 'view' alignment, so it rings the shadow however the camera turns.
+             */
+            facing?: boolean;
         }
     ) => {
+        const geometry = band(shape);
+        if (params.facing) {
+            standUp(geometry.instancingGeometry);
+            standUp(geometry.instancingNormals);
+        }
         const ring = new ParticleSystem(
             standing({
                 scene,
                 renderMode: RenderMode.Mesh,
-                renderAlignment: 'local',
+                renderAlignment: params.facing ? 'view' : 'local',
                 lighting: 'unlit',
-                ...band(shape),
+                ...geometry,
                 ...(params.feather
                     ? {instancingColors: featheredEnds(shape.segments ?? 48, shape.rows ?? 1, params.feather)}
                     : {}),
@@ -153,19 +167,16 @@ export function init({scene, camera, add, controls}: DemoContext) {
         texture: glow,
         renderOrder: 0,
     });
-    sprite('Glare', {
-        startSize: size2(44, 2.2),
-        startColor: new ConstantColor(new Color4(1, 0.55, 0.2, 0.4)),
+    // The disk's light scattered in its own plane: a glow lying flat in the disk, so it turns with
+    // the disk however the camera goes round (a card facing the camera would stay a level band on
+    // the screen while the disk tips into an ellipse). Drawn before the shadow.
+    sprite('Disk glow', {
+        startSize: new ConstantValue(30),
+        startColor: new ConstantColor(new Color4(1, 0.5, 0.18, 0.45)),
         texture: glow,
-        renderOrder: 4,
+        renderMode: RenderMode.HorizontalBillBoard,
+        renderOrder: 1,
     });
-    // The side of the disk turning toward us, brighter (Doppler beaming); +x is screen right.
-    sprite('Beaming', {
-        startSize: size2(10, 2.6),
-        startColor: new ConstantColor(new Color4(1, 0.7, 0.35, 0.4)),
-        texture: glow,
-        renderOrder: 4,
-    }).emitter.position.set(-4.8, 0, 0);
 
     // The disk: a wide outer ring and a hotter, faster inner one, each a far half drawn before the
     // shadow and a near half after it (the camera looks from +z, so the near half is the +z one).
@@ -196,39 +207,38 @@ export function init({scene, camera, add, controls}: DemoContext) {
         inner.emitter.rotation.x = DISK_TILT;
     }
 
-    // The shadow, between the disk's halves.
-    sprite('Shadow', {
-        startSize: new ConstantValue(SHADOW * 2),
-        startColor: new ConstantColor(new Color4(0, 0, 0, 1)),
-        texture: disc,
-        blendMode: Constants.ALPHA_COMBINE,
-        renderOrder: 2,
-    });
+    // The shadow: a black sphere, opaque, so it writes depth. Seen from anywhere it is a black
+    // disc, and whatever is behind it (the disk's far side, the glow in its plane, wisps, rocks) is
+    // hidden by the depth test while what passes in front of it stays in front, however the camera
+    // turns: no light comes out of the hole.
+    const shadow = MeshBuilder.CreateSphere('Shadow', {diameter: SHADOW * 2, segments: 48}, scene);
+    const shadowMaterial = new StandardMaterial('shadow', scene);
+    shadowMaterial.diffuseColor = Color3.Black();
+    shadowMaterial.specularColor = Color3.Black();
+    shadowMaterial.emissiveColor = Color3.Black();
+    shadowMaterial.disableLighting = true;
+    shadow.material = shadowMaterial;
+    shadow.isPickable = false;
 
     // The far side of the disk bent over the shadow and under it: rings of gas standing up facing
-    // the camera (the band lies flat; turned a quarter round x, its -z half is the top), thick above
-    // and thin below, flowing round. The inner edge, nearest the shadow, is the brightest.
-    const lensed = [
-        gasRing(
-            'Lensed disk (over)',
-            {bottom: SHADOW + 0.1, top: SHADOW + 1.7, height: 0, arc: 180, center: -90, segments: 96, rows: 6},
-            {tiling: 1, across: 0.45, scroll: -0.05, ramp: hotRamp, order: 2, feather: 0.22}
-        ),
-        gasRing(
-            'Lensed disk (under)',
-            {bottom: SHADOW + 0.12, top: SHADOW + 1.1, height: 0, arc: 180, center: 90, segments: 96, rows: 4},
-            {tiling: 1, across: 0.6, scroll: 0.05, ramp: diskRamp, order: 2, feather: 0.28}
-        ),
-        // The photon ring: light that went round the hole, a thin bright line hugging the shadow.
-        gasRing(
-            'Photon ring',
-            {bottom: SHADOW - 0.02, top: SHADOW + 0.3, height: 0, segments: 128, rows: 2},
-            {tiling: 4, scroll: 0.2, ramp: hotRamp, order: 2}
-        ),
-    ];
-    for (const ring of lensed) {
-        ring.emitter.rotation.x = Math.PI / 2;
-    }
+    // the camera, as the bent light rings the shadow from wherever it is seen, thick above and thin
+    // below, flowing round. The inner edge, nearest the shadow, is the brightest.
+    gasRing(
+        'Lensed disk (over)',
+        {bottom: SHADOW + 0.1, top: SHADOW + 1.7, height: 0, arc: 180, center: -90, segments: 96, rows: 6},
+        {tiling: 1, across: 0.45, scroll: -0.05, ramp: hotRamp, order: 2, feather: 0.22, facing: true}
+    );
+    gasRing(
+        'Lensed disk (under)',
+        {bottom: SHADOW + 0.12, top: SHADOW + 1.1, height: 0, arc: 180, center: 90, segments: 96, rows: 4},
+        {tiling: 1, across: 0.6, scroll: 0.05, ramp: diskRamp, order: 2, feather: 0.28, facing: true}
+    );
+    // The photon ring: light that went round the hole, a thin bright line hugging the shadow.
+    gasRing(
+        'Photon ring',
+        {bottom: SHADOW - 0.02, top: SHADOW + 0.3, height: 0, segments: 128, rows: 2},
+        {tiling: 4, scroll: 0.2, ramp: hotRamp, order: 2, facing: true}
+    );
 
     // Matter falling in: wavering streaks that orbit in the disk and are pulled to the hole, laid
     // along their motion, heated by their speed.

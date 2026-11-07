@@ -329,6 +329,9 @@ and the package's version moves in lockstep with `quarks.core`.
   of our gas on big cards turned at random), dark wisps drawn in across the disk, painted rocks
   (a sheet of our own low-poly lumps lit from the top left) tumbling down, and glints on the
   photon ring.
+  Its shadow is a black sphere that writes depth, so whatever passes behind the hole is hidden from
+  any side while the near side of the disk passes in front of it; the glow along the disk lies in
+  the disk's plane instead of a card facing the camera, and the lensed rings face the camera.
 
 ### Fixed
 
