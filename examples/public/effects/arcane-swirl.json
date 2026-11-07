@@ -165,12 +165,12 @@
     }
   ],
   "object": {
-    "uuid": "2f20388a-7c7f-467f-a3d1-2d0b6435b1f4",
+    "uuid": "8013bdbe-4c5a-4beb-8600-62aa501e2db8",
     "type": "Group",
     "name": "Arcane swirl",
     "children": [
       {
-        "uuid": "9d74ad53-3b25-4879-a419-4d5481735e5f",
+        "uuid": "338b731c-3141-485b-87b0-6b3fcd46068f",
         "type": "ParticleEmitter",
         "name": "Circle",
         "ps": {
@@ -226,7 +226,7 @@
         }
       },
       {
-        "uuid": "c2d2be84-1e39-40cb-bf73-3d84262550ec",
+        "uuid": "3768cdd9-0ced-4192-8ad6-81a405b97a22",
         "type": "ParticleEmitter",
         "name": "Core",
         "position": [
@@ -264,7 +264,7 @@
         }
       },
       {
-        "uuid": "22f034d5-b499-4c79-9245-d34750d4153b",
+        "uuid": "3cbaa50e-0349-4440-9bc7-7c06a4e2b1f1",
         "type": "ParticleEmitter",
         "name": "Ribbons",
         "position": [
@@ -378,12 +378,89 @@
                   ]
                 }
               }
+            },
+            {
+              "type": "ColorOverLength",
+              "color": {
+                "type": "Gradient",
+                "color": {
+                  "type": "CLinearFunction",
+                  "subType": "Color",
+                  "keys": [
+                    {
+                      "value": {
+                        "r": 1,
+                        "g": 1,
+                        "b": 1
+                      },
+                      "pos": 0
+                    },
+                    {
+                      "value": {
+                        "r": 1,
+                        "g": 1,
+                        "b": 1
+                      },
+                      "pos": 1
+                    }
+                  ]
+                },
+                "alpha": {
+                  "type": "CLinearFunction",
+                  "subType": "Number",
+                  "keys": [
+                    {
+                      "value": 0,
+                      "pos": 0
+                    },
+                    {
+                      "value": 1,
+                      "pos": 0.12
+                    },
+                    {
+                      "value": 1,
+                      "pos": 0.45
+                    },
+                    {
+                      "value": 0,
+                      "pos": 1
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "type": "WidthOverLength",
+              "width": {
+                "type": "PiecewiseBezier",
+                "functions": [
+                  {
+                    "function": {
+                      "p0": 0.7,
+                      "p1": 0.7999999999999999,
+                      "p2": 0.9,
+                      "p3": 1
+                    },
+                    "start": 0
+                  },
+                  {
+                    "function": {
+                      "p0": 1,
+                      "p1": 0.75,
+                      "p2": 0.5,
+                      "p3": 0.25
+                    },
+                    "start": 0.15
+                  }
+                ]
+              },
+              "absolute": false
             }
           ]
         }
       },
       {
-        "uuid": "00e26663-d167-484c-9ba8-6f88c212fe4d",
+        "uuid": "5927d8ed-3068-4c41-9a6a-ce13cb61345a",
         "type": "ParticleEmitter",
         "name": "Sparks",
         "position": [
@@ -495,7 +572,7 @@
         }
       },
       {
-        "uuid": "48765d92-e765-4d24-a82d-c27fd2e7c613",
+        "uuid": "92646216-f017-4257-b11d-fb577af57420",
         "type": "ParticleEmitter",
         "name": "Glyphs",
         "position": [

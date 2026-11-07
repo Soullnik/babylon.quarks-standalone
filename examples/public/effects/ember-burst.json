@@ -153,12 +153,12 @@
     }
   ],
   "object": {
-    "uuid": "15a13fae-ef94-43b5-acba-9b1d0d779947",
+    "uuid": "dcfcffdb-5990-4276-835a-1113513791de",
     "type": "Group",
     "name": "Ember burst",
     "children": [
       {
-        "uuid": "dd096da5-6df4-4efd-8d64-955075987742",
+        "uuid": "732a17ab-864c-4fe1-874d-0daba11f08f7",
         "type": "ParticleEmitter",
         "name": "Smoke",
         "quaternion": [
@@ -320,7 +320,7 @@
         }
       },
       {
-        "uuid": "e64d8e70-1b74-4237-8399-de4cc4d82252",
+        "uuid": "06a18cf6-1543-4d65-9d2d-86d4716b639e",
         "type": "ParticleEmitter",
         "name": "Fireball",
         "position": [
@@ -468,7 +468,7 @@
         }
       },
       {
-        "uuid": "880d737e-bf77-48c0-a656-d869348d6d60",
+        "uuid": "c8cebe89-b2a4-458a-83a6-1ebbbfccae86",
         "type": "ParticleEmitter",
         "name": "Flash",
         "position": [
@@ -546,7 +546,7 @@
         }
       },
       {
-        "uuid": "94986eb7-c78d-4e84-a28e-d94bfdcf5076",
+        "uuid": "4eeffcd1-02b2-4b7a-9a41-f57436464121",
         "type": "ParticleEmitter",
         "name": "Embers",
         "position": [
@@ -684,12 +684,89 @@
                   ]
                 }
               }
+            },
+            {
+              "type": "ColorOverLength",
+              "color": {
+                "type": "Gradient",
+                "color": {
+                  "type": "CLinearFunction",
+                  "subType": "Color",
+                  "keys": [
+                    {
+                      "value": {
+                        "r": 1,
+                        "g": 1,
+                        "b": 1
+                      },
+                      "pos": 0
+                    },
+                    {
+                      "value": {
+                        "r": 1,
+                        "g": 1,
+                        "b": 1
+                      },
+                      "pos": 1
+                    }
+                  ]
+                },
+                "alpha": {
+                  "type": "CLinearFunction",
+                  "subType": "Number",
+                  "keys": [
+                    {
+                      "value": 0,
+                      "pos": 0
+                    },
+                    {
+                      "value": 1,
+                      "pos": 0.12
+                    },
+                    {
+                      "value": 1,
+                      "pos": 0.45
+                    },
+                    {
+                      "value": 0,
+                      "pos": 1
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "type": "WidthOverLength",
+              "width": {
+                "type": "PiecewiseBezier",
+                "functions": [
+                  {
+                    "function": {
+                      "p0": 0.7,
+                      "p1": 0.7999999999999999,
+                      "p2": 0.9,
+                      "p3": 1
+                    },
+                    "start": 0
+                  },
+                  {
+                    "function": {
+                      "p0": 1,
+                      "p1": 0.75,
+                      "p2": 0.5,
+                      "p3": 0.25
+                    },
+                    "start": 0.15
+                  }
+                ]
+              },
+              "absolute": false
             }
           ]
         }
       },
       {
-        "uuid": "428784e2-0121-4905-860e-673136c5b1e2",
+        "uuid": "5b5feb8d-a55d-4dab-b0df-eb25dee3bc42",
         "type": "ParticleEmitter",
         "name": "Ground glow",
         "position": [

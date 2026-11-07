@@ -1,4 +1,3 @@
-import {VertexBuffer} from '@babylonjs/core/Buffers/buffer';
 import {Constants} from '@babylonjs/core/Engines/constants';
 import {StandardMaterial} from '@babylonjs/core/Materials/standardMaterial';
 import {DynamicTexture} from '@babylonjs/core/Materials/Textures/dynamicTexture';
@@ -21,6 +20,7 @@ import {
     RenderMode,
     SizeOverLife,
 } from 'babylon.quarks';
+import {band} from '../shared/geometry';
 import {addLabel} from '../shared/labels';
 import {addGround} from '../shared/stage';
 import {baseTexture} from '../shared/textures';
@@ -120,17 +120,14 @@ export function init({scene, camera, add}: DemoContext): DemoRun {
     trails.emitter.parent = pivot;
     add(trails);
 
-    // Right: a disc whose second UV set is radial (U = distance from the centre, V = angle).
-    const disc = MeshBuilder.CreateDisc('ripple', {radius: 1, tessellation: 48}, scene);
-    disc.isVisible = false;
-    disc.setEnabled(false);
-    const positions = disc.getVerticesData(VertexBuffer.PositionKind)!;
-    const uvs2 = new Float32Array((positions.length / 3) * 2);
-    for (let i = 0; i < positions.length / 3; i++) {
-        const x = positions[i * 3];
-        const y = positions[i * 3 + 1];
-        uvs2[i * 2] = Math.sqrt(x * x + y * y);
-        uvs2[i * 2 + 1] = Math.atan2(y, x) / (Math.PI * 2) + 0.5;
+    // Right: a disc whose second UV set is radial (U = distance from the centre, V = angle). Built
+    // as a flat band from the centre out, which repeats its seam column, so V runs 0 to 1 round it
+    // without the jump an atan2 angle makes where it wraps (a seam smeared across the triangles).
+    const disc = band({bottom: 0, top: 1, height: 0, segments: 64, rows: 12});
+    const uvs2 = new Float32Array(disc.instancingUVs.length);
+    for (let i = 0; i < uvs2.length; i += 2) {
+        uvs2[i] = disc.instancingUVs[i + 1];
+        uvs2[i + 1] = disc.instancingUVs[i];
     }
     const ripples = new ParticleSystem({
         scene,
@@ -150,15 +147,11 @@ export function init({scene, camera, add}: DemoContext): DemoRun {
         transparent: true,
         blendMode: Constants.ALPHA_ADD,
         renderMode: RenderMode.Mesh,
-        instancingGeometry: new Float32Array(positions),
-        instancingNormals: new Float32Array(disc.getVerticesData(VertexBuffer.NormalKind)!),
-        instancingUVs: new Float32Array(disc.getVerticesData(VertexBuffer.UVKind)!),
+        ...disc,
         instancingUVs2: uvs2,
-        instancingIndices: new Uint32Array(disc.getIndices()!),
     });
     ripples.addBehavior(new SizeOverLife(new PiecewiseBezier([[new Bezier(0.3, 0.8, 1, 1), 0]])));
     ripples.emitter.position = new BVector3(5, -1, 0);
-    ripples.emitter.rotation.x = Math.PI / 2; // lay the disc flat
     add(ripples);
 
     return {

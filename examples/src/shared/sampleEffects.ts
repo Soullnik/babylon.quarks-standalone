@@ -4,6 +4,7 @@ import {TransformNode} from '@babylonjs/core/Meshes/transformNode';
 import type {Scene} from '@babylonjs/core/scene';
 import {
     ApplyForce,
+    ColorOverLength,
     ColorOverLife,
     ConeEmitter,
     ConstantColor,
@@ -22,6 +23,7 @@ import {
     SizeOverLife,
     SphereEmitter,
     VelocityOverLife,
+    WidthOverLength,
 } from 'babylon.quarks';
 import {curve, fade} from './curves';
 import {spike} from './geometry';
@@ -68,6 +70,39 @@ function heat(from: Color3, to: Color3, holdUntil = 0.4): Gradient {
             [1, holdUntil],
             [0, 1],
         ]
+    );
+}
+
+/**
+ * Soft ends for a trail, as a game's long particles have: its alpha rises over the first part from
+ * the head, holds, and runs out to nothing at the tail (`ColorOverLength`, 0 at the head), and it
+ * narrows toward the tail (`WidthOverLength`), so it never ends in a hard cut.
+ */
+function softEnds(trail: ParticleSystem): void {
+    trail.addBehavior(
+        new ColorOverLength(
+            new Gradient(
+                [
+                    [new Color3(1, 1, 1), 0],
+                    [new Color3(1, 1, 1), 1],
+                ],
+                [
+                    [0, 0],
+                    [1, 0.12],
+                    [1, 0.45],
+                    [0, 1],
+                ]
+            )
+        )
+    );
+    trail.addBehavior(
+        new WidthOverLength(
+            curve([
+                [0, 0.7],
+                [0.15, 1],
+                [1, 0.25],
+            ])
+        )
     );
 }
 
@@ -210,6 +245,7 @@ export function emberBurst(scene: Scene): TransformNode {
     embers.emitter.position.y = 0.4;
     embers.addBehavior(new ApplyForce({x: 0, y: -1, z: 0}, new ConstantValue(7)));
     embers.addBehavior(new ColorOverLife(fade(0, 0.65)));
+    softEnds(embers);
 
     // Its light on the ground.
     const glow = layer(
@@ -476,6 +512,7 @@ export function arcaneSwirl(scene: Scene): TransformNode {
         )
     );
     ribbons.addBehavior(new ColorOverLife(fade(0.15, 0.6)));
+    softEnds(ribbons);
 
     const sparks = layer(
         root,

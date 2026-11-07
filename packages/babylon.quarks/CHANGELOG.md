@@ -310,6 +310,11 @@ and the package's version moves in lockstep with `quarks.core`.
   Every demo stands under a sky now: the floor darkens out to the horizon's colour and the sky rises
   from it to a darker zenith, so the scenes no longer end at the hard edge of a grey disc; Texture
   Effects, Timeline and Image Processing are framed closer.
+  Renderer Options picks its pairs on the topic tabs too; the Trail Surface ripples have no seam
+  (the disc is a band whose angle runs round without wrapping); the trails of Level-Up, Ember burst
+  and Arcane swirl fade in from the head and out to the tail and narrow as they go, so none ends in
+  a hard cut; Level-Up's dust is turning, swelling puffs instead of a sheet eaten away frame by
+  frame.
 
 ### Fixed
 

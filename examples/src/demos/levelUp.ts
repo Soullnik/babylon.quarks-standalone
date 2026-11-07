@@ -5,6 +5,7 @@ import {Vector3 as BVector3} from '@babylonjs/core/Maths/math.vector';
 import {MeshBuilder} from '@babylonjs/core/Meshes/meshBuilder';
 import {
     ApplyForce,
+    ColorOverLength,
     ColorOverLife,
     ConeEmitter,
     ConstantColor,
@@ -84,7 +85,6 @@ export function init({scene, camera, add, systems}: DemoContext): DemoRun {
     const ringTexture = baseTexture(scene, 'ring');
     const glint = baseTexture(scene, 'glint');
     const flash = baseTexture(scene, 'flash');
-    const dust = baseTexture(scene, 'dust_puff');
     const spark = baseTexture(scene, 'spark');
     const shafts = kenneyTexture(scene, 'shafts');
     const ribbon = kenneyTexture(scene, 'ribbon', true);
@@ -243,28 +243,32 @@ export function init({scene, camera, add, systems}: DemoContext): DemoRun {
     shockwave.emitter.position.y = 0.05;
 
     // 0.05 s: dust kicked up round the feet, alpha-blended so it reads on the light ground.
+    // Puffs of a random shape each (no frames to step through: a puff that is eaten away frame by
+    // frame jumps and breaks up when it plays slowly), turning, swelling and fading out.
     const dustRing = system('Dust', {
-        startLife: new IntervalValue(0.6, 1),
+        startLife: new IntervalValue(0.7, 1.1),
         startSpeed: new IntervalValue(2.5, 4),
-        startSize: new IntervalValue(1, 1.5),
+        startSize: new IntervalValue(0.9, 1.3),
         startRotation: new IntervalValue(0, Math.PI * 2),
-        startColor: new RandomColor(new Color4(1, 0.95, 0.85, 0.7), new Color4(1, 1, 0.95, 0.85)),
-        emissionBursts: [burst(0.05, 14)],
+        startColor: new RandomColor(new Color4(1, 0.95, 0.85, 0.55), new Color4(1, 1, 0.95, 0.7)),
+        emissionBursts: [burst(0.05, 16)],
         shape: new ConeEmitter({radius: 0.6, angle: (80 * Math.PI) / 180, thickness: 1}),
-        texture: dust,
-        ...sheetOf('dust_puff'),
-        blendTiles: true,
+        texture: kenneyTexture(scene, 'puffs'),
+        ...kenneySheet('puffs'),
+        startTileIndex: new IntervalValue(0, 25),
         blendMode: Constants.ALPHA_COMBINE,
         renderOrder: 1,
     });
+    dustRing.addBehavior(new RotationOverLife(new IntervalValue(-0.8, 0.8)));
     dustRing.addBehavior(
-        new FrameOverLife(
+        new SizeOverLife(
             curve([
-                [0, 0],
-                [1, 15.99],
+                [0, 0.7],
+                [1, 1.6],
             ])
         )
     );
+    dustRing.addBehavior(new ColorOverLife(hold(WHITE, WHITE, 0.35, 0.1)));
     dustRing.addBehavior(
         new LimitSpeedOverLife(
             curve([
@@ -295,10 +299,29 @@ export function init({scene, camera, add, systems}: DemoContext): DemoRun {
     });
     spiral.addBehavior(new OrbitOverLife(new ConstantValue(4.5), new BVector3(0, 0, 1)));
     spiral.addBehavior(new ColorOverLife(hold(new Color3(1, 1, 0.9), DEEP, 0.6)));
+    // Soft ends: the ribbon rises in from its head and runs out to nothing at its tail (0 is the
+    // head), narrowing as it goes, so no end is a hard cut.
+    spiral.addBehavior(
+        new ColorOverLength(
+            new Gradient(
+                [
+                    [WHITE, 0],
+                    [WHITE, 1],
+                ],
+                [
+                    [0, 0],
+                    [1, 0.15],
+                    [1, 0.5],
+                    [0, 1],
+                ]
+            )
+        )
+    );
     spiral.addBehavior(
         new WidthOverLength(
             curve([
-                [0, 1],
+                [0, 0.6],
+                [0.15, 1],
                 [1, 0],
             ])
         )

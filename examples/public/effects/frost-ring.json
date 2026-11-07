@@ -734,12 +734,12 @@
     }
   ],
   "object": {
-    "uuid": "108d85c6-4794-4102-bae3-93061d0f595e",
+    "uuid": "8f40df7e-b54f-4df6-b1d9-ea0a46082461",
     "type": "Group",
     "name": "Frost ring",
     "children": [
       {
-        "uuid": "73685614-c8dc-4c3d-b61e-e964db7ae9cc",
+        "uuid": "da045c52-7f9f-4cf2-8ee1-2e43a0eb7974",
         "type": "ParticleEmitter",
         "name": "Ice spikes",
         "quaternion": [
@@ -867,7 +867,7 @@
         }
       },
       {
-        "uuid": "a91c067d-5673-47bd-8711-a5643b049ea3",
+        "uuid": "e31e9b6c-3076-4e08-9bdd-df73299126db",
         "type": "ParticleEmitter",
         "name": "Ring",
         "position": [
@@ -1002,7 +1002,7 @@
         }
       },
       {
-        "uuid": "12fd7f9f-8f6c-4f08-8d3a-b3df9388d2b9",
+        "uuid": "d02d7c0b-fdfa-481a-bf42-1e5d9fdea57b",
         "type": "ParticleEmitter",
         "name": "Glints",
         "quaternion": [
@@ -1120,7 +1120,7 @@
         }
       },
       {
-        "uuid": "f9c831a0-938b-445d-ab7c-d424fa7c2ecb",
+        "uuid": "eeb9c143-73d8-4963-a208-2d3375dbb184",
         "type": "ParticleEmitter",
         "name": "Mist",
         "position": [

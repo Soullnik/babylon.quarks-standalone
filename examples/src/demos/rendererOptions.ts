@@ -350,8 +350,8 @@ export function init({scene, camera, add, controls}: DemoContext) {
         }
     };
     show(options[0].name);
-    controls.choice(
-        'Option',
+    // One option at a time, on the viewer's bar of topic tabs as every multi-topic demo.
+    controls.topics(
         options.map((option) => option.name),
         options[0].name,
         show
