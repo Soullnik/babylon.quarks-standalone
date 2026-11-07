@@ -265,6 +265,14 @@ and the package's version moves in lockstep with `quarks.core`.
 
 ### Fixed
 
+- **Frames blend at a frame rate too.** `FrameOverLife` with `fps` gave whole frames, so a system
+  with `blendTiles` never faded one frame into the next when its sheet played at a frame rate,
+  only over life. Unity's frame in FPS mode is not whole: measured in Unity 6000.6, a 4x4 sheet at
+  4 fps is at frame 0.4 at 0.1 s and 1.5 at 0.375 s, the same as in Lifetime mode at that rate,
+  and the part past the whole frame is the blend. `FrameOverLife` now keeps that part in FPS mode;
+  a held last frame is whole, and `random` frames stay whole, the next one not being the next tile.
+  Without `blendTiles` the tile shown is the same as before.
+
 - **A paused trail comes back when its emitter does.** With a `cullingMode` other than
   `'always'`, a trail is measured from the ribbon it draws, in world space, and a culled system
   draws nothing, so its bounds stayed where it was last drawn. A local-space trail whose emitter

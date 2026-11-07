@@ -14,7 +14,10 @@ export interface FrameOverLifeOptions {
      * Frames per second. Above zero the sheet plays by the particle's age in
      * seconds instead of its life fraction, Unity's "FPS" time mode: `frame`
      * then gives the first frame of the segment, and the frame advances by one
-     * every `1 / fps` seconds. Needs {@link frameCount}.
+     * every `1 / fps` seconds. Needs {@link frameCount}. As in Unity, the frame
+     * runs on between whole frames (2.5 halfway from frame 2 to frame 3), so a
+     * system with `blendTiles` fades each frame into the next at any frame rate;
+     * without it the tile shown is the whole frame.
      */
     fps?: number;
     /**
@@ -36,7 +39,8 @@ export interface FrameOverLifeOptions {
      * FPS mode: every `1 / fps` seconds show a random frame of the segment
      * instead of the next one, each particle its own sequence: the flicker of
      * lightning, sparks or a neon sign. Needs {@link frameCount}; `loop` does
-     * not apply. Default false.
+     * not apply. The frames are whole, so `blendTiles` does not fade between
+     * them: the next random frame is not the tile after this one. Default false.
      */
     random?: boolean;
     /**
@@ -209,14 +213,17 @@ export class FrameOverLife implements Behavior {
         if (this.fps > 0) {
             const first = this.sampleFrame(particle, t);
             const n = this.frameCount;
-            let step = Math.floor(age * this.fps) + this.offset(particle);
+            // Unity's frame in FPS mode is not floored: the part past the whole frame is how far
+            // it has blended into the next (AnimBlend), as in life mode.
+            let played = age * this.fps + this.offset(particle);
             if (this.random && n > 0) {
-                return first + Math.floor(FrameOverLife.hash(step, this.saltOf(particle)) * n);
+                const tick = Math.floor(played);
+                return first + Math.floor(FrameOverLife.hash(tick, this.saltOf(particle)) * n);
             }
             if (n > 0) {
-                step = this.loop ? FrameOverLife.wrap(step, n) : Math.min(step, n - 1);
+                played = this.loop ? FrameOverLife.wrap(played, n) : Math.min(played, n - 1);
             }
-            return first + step;
+            return first + played;
         }
         let frame: number;
         if (this.cycles !== 1 && this.cycles > 0) {

@@ -50,14 +50,23 @@ describe('FrameOverLife', () => {
         expect(frames.map((f) => Math.round(f * 100) / 100)).toEqual([0, 1.5, 0, 1.5, 3]);
     });
 
+    const rounded = (frames: number[]) => frames.map((f) => Math.round(f * 100) / 100);
+
     it('plays at a frame rate by age in seconds, wrapping within the segment', () => {
         const behavior = new FrameOverLife(new ConstantValue(4), {fps: 10, frameCount: 3});
-        expect(framesOf(behavior, [0, 0.1, 0.25, 0.3, 0.45], 10)).toEqual([4, 5, 6, 4, 5]);
+        expect(rounded(framesOf(behavior, [0, 0.1, 0.2, 0.3, 0.4], 10))).toEqual([4, 5, 6, 4, 5]);
     });
 
-    it('holds the last frame of the segment when not looping', () => {
+    it('runs on between whole frames at a frame rate, as Unity does, so tiles can blend', () => {
+        // Unity 6000.6, 4x4 sheet at 4 fps: AnimFrame 0.4 at 0.1 s, 1.5 at 0.375 s, and 1.6 at
+        // 4.4 s, wrapped round the 16 frames; the blend is the part past the whole frame.
+        const behavior = new FrameOverLife(new ConstantValue(0), {fps: 4, frameCount: 16});
+        expect(rounded(framesOf(behavior, [0.1, 0.375, 1.125, 3.9, 4.4], 10))).toEqual([0.4, 1.5, 4.5, 15.6, 1.6]);
+    });
+
+    it('holds the last frame of the segment when not looping, whole', () => {
         const behavior = new FrameOverLife(new ConstantValue(0), {fps: 10, frameCount: 3, loop: false});
-        expect(framesOf(behavior, [0, 0.15, 0.25, 0.9], 10)).toEqual([0, 1, 2, 2]);
+        expect(rounded(framesOf(behavior, [0, 0.15, 0.25, 0.9], 10))).toEqual([0, 1.5, 2, 2]);
     });
 
     it('starts each particle at its own random frame', () => {
