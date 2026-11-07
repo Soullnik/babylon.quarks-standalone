@@ -265,6 +265,14 @@ and the package's version moves in lockstep with `quarks.core`.
 
 ### Fixed
 
+- **A paused trail comes back when its emitter does.** With a `cullingMode` other than
+  `'always'`, a trail is measured from the ribbon it draws, in world space, and a culled system
+  draws nothing, so its bounds stayed where it was last drawn. A local-space trail whose emitter
+  moved out of view and back stayed paused for good: the renderer kept testing the old place. The
+  ribbon of a trail whose samples are kept in its emitter's space is now measured in that space,
+  so its bounds go with the emitter, as a local sprite system's do. A trail that records in world
+  space stays where it was drawn, as before.
+
 - **A local-space trail that follows its local origin is drawn where its emitter is.** With
   `followLocalOrigin`, a local-space system put the particle at its local position through the
   emitter's matrix, in world space, and then the renderer (or `recordWorldSpace`, recording its

@@ -1996,7 +1996,10 @@ export class ParticleSystem implements IParticleSystem {
 
     /**
      * Records bounds a renderer measured in world space, for systems whose
-     * drawn extent the store does not hold (trail ribbons).
+     * drawn extent the store does not hold (trail ribbons). `followsEmitter` says
+     * what was measured is drawn through the emitter (samples kept in its space), so
+     * the bounds go with the emitter until they are measured again: a paused system
+     * whose emitter comes back into view is seen there.
      * @internal
      */
     setWorldBounds(
@@ -2006,9 +2009,10 @@ export class ParticleSystem implements IParticleSystem {
         maxX: number,
         maxY: number,
         maxZ: number,
-        padding: number
+        padding: number,
+        followsEmitter = false
     ) {
-        this.bounds.setWorld(minX, minY, minZ, maxX, maxY, maxZ, padding);
+        this.bounds.setWorld(minX, minY, minZ, maxX, maxY, maxZ, padding, followsEmitter ? this.emitter : undefined);
     }
 
     /** Length of one simulation step, in seconds. See {@link simulationResidual}. */

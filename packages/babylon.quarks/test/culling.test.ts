@@ -304,6 +304,58 @@ describe('visibility culling', () => {
         renderer.dispose();
     });
 
+    it('resumes a local-space trail whose emitter comes back into view while it is paused', () => {
+        // The ribbon is drawn through the emitter, so its bounds go where the emitter goes even
+        // while the system is paused and its ribbon is not measured again.
+        const renderer = new BatchedRenderer('r', scene);
+        const system = oneParticle({
+            cullingMode: 'pause',
+            renderMode: RenderMode.Trail,
+            startSpeed: new ConstantValue(1),
+            rendererEmitterSettings: {startLength: new ConstantValue(10)},
+        });
+        renderer.addSystem(system);
+        const moveEmitter = (x: number) => {
+            system.emitter.position.x = x;
+            system.emitter.computeWorldMatrix(true);
+        };
+        frames(renderer, 5);
+        expect(system.culled).toBe(false);
+
+        moveEmitter(100);
+        frames(renderer, 3);
+        expect(system.culled).toBe(true);
+        const age = system.particles[0].age;
+
+        moveEmitter(0);
+        frames(renderer, 1);
+        expect(system.culled).toBe(false);
+        expect(system.particles[0].age).toBeGreaterThan(age);
+        renderer.dispose();
+    });
+
+    it('keeps a world-space trail culled where its ribbon is, wherever the emitter goes', () => {
+        const renderer = new BatchedRenderer('r', scene);
+        const system = oneParticle({
+            cullingMode: 'pause',
+            worldSpace: true,
+            renderMode: RenderMode.Trail,
+            startSpeed: new ConstantValue(1),
+            rendererEmitterSettings: {startLength: new ConstantValue(10)},
+        });
+        renderer.addSystem(system);
+        frames(renderer, 5);
+        // The ribbon is out of view; the emitter moving into view leaves it there.
+        lookAt(0, 0, -20);
+        frames(renderer, 2);
+        expect(system.culled).toBe(true);
+        system.emitter.position.z = -20;
+        system.emitter.computeWorldMatrix(true);
+        frames(renderer, 1);
+        expect(system.culled).toBe(true);
+        renderer.dispose();
+    });
+
     it('round-trips the culling mode through JSON only when set', () => {
         expect(makeSystem().toJSON().cullingMode).toBeUndefined();
         const json = makeSystem({cullingMode: 'pauseAndCatchUp'}).toJSON();

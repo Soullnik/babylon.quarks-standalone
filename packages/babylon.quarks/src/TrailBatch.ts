@@ -894,7 +894,7 @@ export class TrailBatch extends VFXBatch {
                     colors[o + 3] *= tint.a;
                 }
             }
-            this.measureSystemBounds(system as ParticleSystem, firstVertex, index);
+            this.measureSystemBounds(system as ParticleSystem, firstVertex, index, !samplesInWorld);
         }
         systemVertices[visibleSystems.length] = index;
         systemTriangles[visibleSystems.length] = triangles;
@@ -907,9 +907,16 @@ export class TrailBatch extends VFXBatch {
     /**
      * Records a system's world bounds from the ribbon vertices just written for
      * it, padded by the widest ribbon. The store only holds each trail's head,
-     * so this is where a trail's extent is known.
+     * so this is where a trail's extent is known. `followsEmitter`: the samples
+     * are kept in the emitter's space, so the ribbon moves with it, and so do the
+     * bounds until the next measurement (one that culling skips).
      */
-    private measureSystemBounds(system: ParticleSystem, fromVertex: number, toVertex: number): void {
+    private measureSystemBounds(
+        system: ParticleSystem,
+        fromVertex: number,
+        toVertex: number,
+        followsEmitter: boolean
+    ): void {
         if (toVertex <= fromVertex || typeof system.setWorldBounds !== 'function') {
             return;
         }
@@ -938,7 +945,7 @@ export class TrailBatch extends VFXBatch {
             const w = widths[v];
             if (w > maxWidth) maxWidth = w;
         }
-        system.setWorldBounds(minX, minY, minZ, maxX, maxY, maxZ, maxWidth);
+        system.setWorldBounds(minX, minY, minZ, maxX, maxY, maxZ, maxWidth, followsEmitter);
     }
 
     /**

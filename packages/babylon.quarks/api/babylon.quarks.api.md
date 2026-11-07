@@ -2146,7 +2146,7 @@ export class ParticleSystem implements IParticleSystem {
     set seed(seed: number | undefined);
     setQualityFactor(qualityFactor: number): void;
     // @internal
-    setWorldBounds(minX: number, minY: number, minZ: number, maxX: number, maxY: number, maxZ: number, padding: number): void;
+    setWorldBounds(minX: number, minY: number, minZ: number, maxX: number, maxY: number, maxZ: number, padding: number, followsEmitter?: boolean): void;
     get simulationResidual(): number;
     get simulationStep(): number;
     get softFarFade(): number;
