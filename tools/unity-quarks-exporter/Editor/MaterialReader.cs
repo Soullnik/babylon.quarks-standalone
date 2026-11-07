@@ -63,6 +63,13 @@ namespace BabylonQuarks.UnityExporter
         /// material colour alone.
         /// </summary>
         public bool ParticleColor = true;
+
+        /// <summary>
+        /// The material's Flip-Book Blending switch (the built-in Standard Particles' Flip-Book Mode
+        /// Blended, <c>_FlipbookMode</c>; URP's <c>_FlipbookBlending</c>); null when the shader has
+        /// none, as a custom shader, which blends or not in its own code.
+        /// </summary>
+        public bool? FlipbookBlending;
     }
 
     /// <summary>
@@ -131,6 +138,14 @@ namespace BabylonQuarks.UnityExporter
                 // in every opaque and cutout shader it ships (Diffuse, VertexLit, Unlit, Mobile,
                 // Standard), where the particle and sprite shaders, all transparent, draw both faces.
                 info.RenderFace = "front";
+            }
+            if (mat.HasProperty("_FlipbookMode"))
+            {
+                info.FlipbookBlending = mat.GetFloat("_FlipbookMode") > 0.5f;
+            }
+            else if (mat.HasProperty("_FlipbookBlending"))
+            {
+                info.FlipbookBlending = mat.GetFloat("_FlipbookBlending") > 0.5f;
             }
             if (SoftParticlesOn(mat))
             {

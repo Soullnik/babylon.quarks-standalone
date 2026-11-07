@@ -63,7 +63,8 @@ Three tiers: ✅ shipped · 🟡 runtime supports it, editor UI missing · 🔴 
 ## Texture Sheet Animation
 - ✅ tiles U/V, start tile, frame-over-life curve, atlas preview with tile grid + start-tile highlight
 - ✅ tile blending, over life and in FPS time mode (the frame runs on between whole frames, the part past the whole frame being the blend, as Unity's AnimBlend)
-- ✅ cycles, FPS time mode, frame count / start frame, loop, random frame (`FrameOverLife` options)
+- ✅ cycles, FPS time mode, frame count / start frame (fraction kept, as Unity's), loop, random frame (`FrameOverLife` options); the Unity exporter writes the FPS mode, Start Frame and Flip-Book Blending
+- 🔴 Speed time mode
 - ✅ single-row mode, custom or random row (`FrameOverLife` `rowLength`, `rowCount`, `row`, `randomRow`)
 - 🔴 sprites mode, row from mesh index
 

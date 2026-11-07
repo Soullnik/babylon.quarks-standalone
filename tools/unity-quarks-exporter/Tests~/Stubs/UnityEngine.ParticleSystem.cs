@@ -2,12 +2,15 @@
 // system; here they are classes, which reads the same and lets fixtures set them directly.
 // Program.CheckModuleUse fails the Editor scripts on what a class allows and a struct does not.
 using System;
+using System.Collections.Generic;
 
 namespace UnityEngine
 {
     public enum ParticleSystemCurveMode { Constant = 0, Curve = 1, TwoCurves = 2, TwoConstants = 3 }
     public enum ParticleSystemAnimationType { WholeSheet = 0, SingleRow = 1 }
     public enum ParticleSystemAnimationRowMode { Custom = 0, Random = 1, MeshIndex = 2 }
+    public enum ParticleSystemAnimationTimeMode { Lifetime = 0, Speed = 1, FPS = 2 }
+    public enum ParticleSystemVertexStream { Position = 0, Normal = 1, Tangent = 2, Color = 3, UV = 4, UV2 = 5, UV3 = 6, UV4 = 7, AnimBlend = 8, AnimFrame = 9 }
     public enum ParticleSystemGradientMode { Color = 0, Gradient = 1, TwoColors = 2, TwoGradients = 3, RandomColor = 4 }
     public enum ParticleSystemSimulationSpace { Local = 0, World = 1, Custom = 2 }
     public enum ParticleSystemScalingMode { Hierarchy = 0, Local = 1, Shape = 2 }
@@ -76,6 +79,27 @@ namespace UnityEngine
         public Vector3 pivot { get; set; }
         public Vector3 flip { get; set; }
         public ParticleSystemRenderSpace alignment { get; set; }
+
+        // Unity's default streams: what every particle shader reads.
+        private readonly List<ParticleSystemVertexStream> _streams = new List<ParticleSystemVertexStream>
+        {
+            ParticleSystemVertexStream.Position,
+            ParticleSystemVertexStream.Normal,
+            ParticleSystemVertexStream.Color,
+            ParticleSystemVertexStream.UV,
+        };
+
+        public void GetActiveVertexStreams(List<ParticleSystemVertexStream> streams)
+        {
+            streams.Clear();
+            streams.AddRange(_streams);
+        }
+
+        public void SetActiveVertexStreams(List<ParticleSystemVertexStream> streams)
+        {
+            _streams.Clear();
+            _streams.AddRange(streams);
+        }
     }
 
     public class ParticleSystem : Component
@@ -441,6 +465,8 @@ namespace UnityEngine
             public ParticleSystemAnimationType animation { get; set; }
             public ParticleSystemAnimationRowMode rowMode { get; set; }
             public int rowIndex { get; set; }
+            public ParticleSystemAnimationTimeMode timeMode { get; set; }
+            public float fps { get; set; } = 30f;
         }
 
         public class TrailModule

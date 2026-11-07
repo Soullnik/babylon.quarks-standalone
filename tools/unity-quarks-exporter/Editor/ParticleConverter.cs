@@ -122,7 +122,7 @@ namespace BabylonQuarks.UnityExporter
                 obj.Set("alignToDirection", true);
             }
 
-            BuildTextureSheet(ps, obj, behaviors, trailOnly);
+            BuildTextureSheet(ps, renderer, material, obj, behaviors, trailOnly);
 
             // Blending, depth and alpha test are the material entry's.
             obj.Set("worldSpace", main.simulationSpace != ParticleSystemSimulationSpace.Local);
@@ -731,7 +731,8 @@ namespace BabylonQuarks.UnityExporter
         // ---- Texture Sheet Animation -----------------------------------------------------
 
         /// <param name="trail">Unity's trails ignore Texture Sheet Animation, so trail systems keep one tile.</param>
-        private static void BuildTextureSheet(ParticleSystem ps, JObject obj, JArray behaviors, bool trail)
+        private static void BuildTextureSheet(
+            ParticleSystem ps, ParticleSystemRenderer renderer, ParticleMaterial material, JObject obj, JArray behaviors, bool trail)
         {
             var tsa = ps.textureSheetAnimation;
             if (tsa.enabled && !trail)
@@ -739,35 +740,33 @@ namespace BabylonQuarks.UnityExporter
                 int u = Mathf.Max(1, tsa.numTilesX);
                 int v = Mathf.Max(1, tsa.numTilesY);
                 int tiles = Mathf.Max(1, u * v);
-                obj.Set("startTileIndex", ValueConverter.Curve(tsa.startFrame))
+                // The frame is FrameOverLife's from birth on, the start frame with it.
+                obj.Set("startTileIndex", ValueConverter.Constant(0))
                     .Set("uTileCount", u)
                     .Set("vTileCount", v)
-                    .Set("blendTiles", false);
-                // Unity frameOverTime is authored in normalized tile space (0..1) and shows tile
-                // floor(value x tiles), holding 1.0 on the last tile. quarks floors the value it is
-                // given, so scale by just under `tiles`: every tile then gets an equal share of the
-                // sweep, where scaling by tiles - 1 left the last tile on screen for an instant at
-                // most (and a random pick never chose it). Constants, random ranges and curves keep
-                // their shape.
+                    .Set("blendTiles", BlendsTiles(ps, renderer, material));
                 // Single Row plays one row of the sheet: the frames are counted within the row,
                 // and quarks adds the row's first frame (the row fixed, or picked per particle).
                 bool singleRow = tsa.animation == ParticleSystemAnimationType.SingleRow && v > 1;
-                float frameScale = (singleRow ? u : tiles) - 0.001f;
-                var frameOverTime = tsa.frameOverTime;
-                int cycles = Mathf.Max(1, tsa.cycleCount);
-                bool curved = frameOverTime.mode == ParticleSystemCurveMode.Curve
-                    || frameOverTime.mode == ParticleSystemCurveMode.TwoCurves;
-                // Cycles replay the curve that many times over the particle's life; a constant or
-                // random frame is the same in every cycle.
-                float frameMultiplier = frameOverTime.curveMultiplier * frameScale;
-                JToken frame = !curved || cycles <= 1
-                    ? ScaleCurve(frameOverTime, frameScale)
-                    : frameOverTime.mode == ParticleSystemCurveMode.TwoCurves
-                        ? ValueConverter.TwoCurves(frameOverTime.curveMin, frameOverTime.curveMax, frameMultiplier, cycles)
-                        : ValueConverter.Bezier(frameOverTime.curve, frameMultiplier, cycles);
+                int frames = singleRow ? u : tiles;
+                bool atRate = tsa.timeMode == ParticleSystemAnimationTimeMode.FPS && tsa.fps > 0f;
+                // Start Frame is a fraction of the frames played, which Unity adds whole and fraction
+                // alike and wraps round them, in every time mode (measured in Unity 6000.6: 0.3 of 16
+                // frames puts the frame 4.8 on). quarks' startFrame counts frames.
+                bool startsLater = !IsZero(tsa.startFrame);
                 var frameOverLife = new JObject()
                     .Set("type", "FrameOverLife")
-                    .Set("frame", frame);
+                    .Set("frame", tsa.timeMode == ParticleSystemAnimationTimeMode.FPS ? ValueConverter.Constant(0) : FrameOverTime(ps, tsa, frames));
+                if (tsa.timeMode == ParticleSystemAnimationTimeMode.Speed)
+                {
+                    Debug.LogWarning($"[Quarks Exporter] '{ps.name}': Texture Sheet Animation Time Mode Speed has no quarks counterpart; the sheet plays over lifetime.");
+                }
+                // FPS mode plays fps frames a second from the first, round the frames played, the frame
+                // running on between whole frames as Unity's AnimFrame does; Frame over Time and Cycles
+                // are not read, and at 0 fps the frame stays (measured in Unity 6000.6).
+                if (atRate) frameOverLife.Set("fps", tsa.fps);
+                if (atRate || startsLater) frameOverLife.Set("frameCount", frames);
+                if (startsLater) frameOverLife.Set("startFrame", ScaleCurve(tsa.startFrame, frames));
                 if (singleRow)
                 {
                     if (tsa.rowMode == ParticleSystemAnimationRowMode.MeshIndex)
@@ -785,6 +784,61 @@ namespace BabylonQuarks.UnityExporter
                     .Set("uTileCount", 1)
                     .Set("vTileCount", 1)
                     .Set("blendTiles", false);
+            }
+        }
+
+        /// <summary>
+        /// The frame over the particle's life in Lifetime mode, from Frame over Time and Cycles.
+        /// </summary>
+        private static JToken FrameOverTime(ParticleSystem ps, ParticleSystem.TextureSheetAnimationModule tsa, int frames)
+        {
+            // Unity frameOverTime is authored in normalized tile space (0..1) and shows tile
+            // floor(value x tiles), holding 1.0 on the last tile. quarks floors the value it is
+            // given, so scale by just under the frames: every tile then gets an equal share of the
+            // sweep, where scaling by tiles - 1 left the last tile on screen for an instant at
+            // most (and a random pick never chose it). Constants, random ranges and curves keep
+            // their shape.
+            float frameScale = frames - 0.001f;
+            var frameOverTime = tsa.frameOverTime;
+            int cycles = Mathf.Max(1, tsa.cycleCount);
+            bool curved = frameOverTime.mode == ParticleSystemCurveMode.Curve
+                || frameOverTime.mode == ParticleSystemCurveMode.TwoCurves;
+            // Cycles replay the curve that many times over the particle's life; a constant or
+            // random frame is the same in every cycle.
+            float frameMultiplier = frameOverTime.curveMultiplier * frameScale;
+            return !curved || cycles <= 1
+                ? ScaleCurve(frameOverTime, frameScale)
+                : frameOverTime.mode == ParticleSystemCurveMode.TwoCurves
+                    ? ValueConverter.TwoCurves(frameOverTime.curveMin, frameOverTime.curveMax, frameMultiplier, cycles)
+                    : ValueConverter.Bezier(frameOverTime.curve, frameMultiplier, cycles);
+        }
+
+        /// <summary>
+        /// Whether Unity blends each frame into the next. The shader does it from the next tile's
+        /// UV and the blend the renderer sends it (the UV2 and AnimBlend vertex streams), when the
+        /// material's Flip-Book Blending is on. A shader without that switch, a custom one, is
+        /// taken to blend when the renderer sends it AnimBlend, the one thing that stream is for.
+        /// </summary>
+        private static bool BlendsTiles(ParticleSystem ps, ParticleSystemRenderer renderer, ParticleMaterial material)
+        {
+            var streams = new List<ParticleSystemVertexStream>();
+            renderer.GetActiveVertexStreams(streams);
+            bool sent = streams.Contains(ParticleSystemVertexStream.UV2) && streams.Contains(ParticleSystemVertexStream.AnimBlend);
+            if (material.FlipbookBlending == true && !sent)
+            {
+                Debug.LogWarning($"[Quarks Exporter] '{ps.name}': the material blends flip-book frames, but the renderer does not send the UV2 and AnimBlend vertex streams, so Unity draws no blend and neither does the export.");
+            }
+            return sent && material.FlipbookBlending != false;
+        }
+
+        /// <summary>Whether a curve is 0 throughout: a constant 0, or 0 to 0.</summary>
+        private static bool IsZero(ParticleSystem.MinMaxCurve c)
+        {
+            switch (c.mode)
+            {
+                case ParticleSystemCurveMode.Constant: return c.constant == 0f;
+                case ParticleSystemCurveMode.TwoConstants: return c.constantMin == 0f && c.constantMax == 0f;
+                default: return c.curveMultiplier == 0f;
             }
         }
 

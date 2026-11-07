@@ -6,6 +6,16 @@ All notable changes to the Unity Quarks Exporter are documented here.
 
 ### Added
 
+- **Texture Sheet Animation's FPS time mode** → `FrameOverLife` `fps`, playing round the frames
+  (the sheet's, or the row's in Single Row), as Unity does: Frame over Time and Cycles are not read
+  and at 0 fps the frame stays (measured in Unity 6000.6). Before, every sheet played over
+  lifetime. Time Mode Speed has no counterpart and plays over lifetime, with a warning.
+- **Flip-Book Blending** → `blendTiles`: the built-in Standard Particles' Flip-Book Mode Blended
+  (`_FlipbookMode`) and URP's `_FlipbookBlending`, when the renderer sends the UV2 and AnimBlend
+  vertex streams Unity's shader blends from; a material that blends without them is warned about,
+  as Unity draws no blend. A custom shader, which has no such switch, blends when it is sent
+  AnimBlend. Before, `blendTiles` was always false.
+
 - **Unity's mesh shaders draw a particle without its colour** → `particleColor: false`: the legacy
   shaders outside Particles (Diffuse, Specular, Bumped, VertexLit, their Transparent and Cutout
   variants, Self-Illumin), Mobile's outside Particles, Unlit/* and Standard ignore the vertex
@@ -55,6 +65,12 @@ All notable changes to the Unity Quarks Exporter are documented here.
   Unity 6).
 
 ### Fixed
+
+- **Texture Sheet Animation's Start Frame is exported.** Unity's Start Frame is a fraction of the
+  frames played, constant or random, added whole and fraction alike and wrapped round them in
+  every time mode (0.3 of a 16-frame sheet puts the frame 4.8 on, measured in Unity 6000.6); it is
+  now `FrameOverLife`'s `startFrame` in frames. Before, it went to `startTileIndex`, which
+  `FrameOverLife` overrides, so every particle started on the first frame.
 
 - **The trails of particles that never show are exported.** A system that draws both its
   particles and their trails keeps only its particles, a quarks system having one render mode; but

@@ -17,6 +17,7 @@ namespace BabylonQuarks.UnityExporter.Tests
             ["trails"] = TrailsAndSubEmitters,
             ["blending"] = Blending,
             ["surfaces"] = Surfaces,
+            ["flipbooks"] = Flipbooks,
         };
 
         // ---- builders ------------------------------------------------------------------------
@@ -615,6 +616,81 @@ namespace BabylonQuarks.UnityExporter.Tests
         /// modes as its inspector sets them. Each is an opaque, lit surface that culls its back
         /// faces; the cutout ones clip at their _Cutoff.
         /// </summary>
+        /// <summary>
+        /// Texture Sheet Animation's time modes, Start Frame and Flip-Book Blending, on a 4x4 sheet,
+        /// with what Unity draws for each measured in Unity 6000.6 (see the babylon.quarks tests).
+        /// </summary>
+        private static GameObject Flipbooks()
+        {
+            var root = new GameObject("Flipbooks");
+            var blendStreams = new List<ParticleSystemVertexStream>
+            {
+                ParticleSystemVertexStream.Position,
+                ParticleSystemVertexStream.Normal,
+                ParticleSystemVertexStream.Color,
+                ParticleSystemVertexStream.UV,
+                ParticleSystemVertexStream.UV2,
+                ParticleSystemVertexStream.AnimBlend,
+            };
+            ParticleSystem.TextureSheetAnimationModule Sheet(string name, Material mat, bool sendsBlend)
+            {
+                var (_, ps, renderer) = MakeSystem(name, root.transform);
+                renderer.sharedMaterial = mat;
+                if (sendsBlend) renderer.SetActiveVertexStreams(blendStreams);
+                var sheet = ps.textureSheetAnimation;
+                sheet.enabled = true;
+                sheet.numTilesX = 4;
+                sheet.numTilesY = 4;
+                return sheet;
+            }
+            Material Standard(string name, int flipbookMode)
+            {
+                var mat = new Material(Shader.Find("Particles/Standard Unlit")) { name = name };
+                mat.SetFloat("_Mode", 4);
+                mat.SetFloat("_SrcBlend", 1);
+                mat.SetFloat("_DstBlend", 1);
+                mat.SetFloat("_ZWrite", 0);
+                mat.SetFloat("_FlipbookMode", flipbookMode);
+                return mat;
+            }
+
+            // 12 frames a second from a random frame, blended (URP's Flip-Book Blending).
+            var urp = Urp("SmokeBlended", 1, 5, 10, Spark());
+            urp.SetFloat("_FlipbookBlending", 1);
+            var fps = Sheet("FpsBlended", urp, true);
+            fps.timeMode = ParticleSystemAnimationTimeMode.FPS;
+            fps.fps = 12f;
+            fps.startFrame = new ParticleSystem.MinMaxCurve(0f, 1f);
+
+            // One row at 8 frames a second, a quarter of the row on. The material blends, but the
+            // renderer does not send the streams the blend needs, so Unity draws none.
+            var row = Sheet("FpsRow", Standard("FlareNoStreams", 1), false);
+            row.timeMode = ParticleSystemAnimationTimeMode.FPS;
+            row.fps = 8f;
+            row.animation = ParticleSystemAnimationType.SingleRow;
+            row.rowMode = ParticleSystemAnimationRowMode.Custom;
+            row.rowIndex = 2;
+            row.startFrame = 0.25f;
+
+            // Over life twice, from 0.3 of the sheet on, through a custom shader that is sent AnimBlend.
+            var life = Sheet("LifeStart", new Material(Shader.Find("Effects/Embers")) { name = "Embers" }, true);
+            life.cycleCount = 2;
+            life.startFrame = 0.3f;
+
+            // By speed, which quarks has no counterpart for: played over life.
+            var speed = Sheet("SpeedMode", Standard("SparkSimple", 0), false);
+            speed.timeMode = ParticleSystemAnimationTimeMode.Speed;
+
+            // At 0 frames a second the frame stays.
+            var held = Sheet("FpsHeld", Standard("GlyphHeld", 0), false);
+            held.timeMode = ParticleSystemAnimationTimeMode.FPS;
+            held.fps = 0f;
+
+            // The streams are sent, but the material's Flip-Book Mode is Simple: no blend.
+            Sheet("SimpleFlipbook", Standard("DustSimple", 0), true);
+            return root;
+        }
+
         private static GameObject Surfaces()
         {
             var root = new GameObject("Surfaces");

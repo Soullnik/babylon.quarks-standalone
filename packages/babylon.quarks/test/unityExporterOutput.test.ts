@@ -17,13 +17,16 @@ import {
     ConeEmitFrom,
     ConeEmitter,
     ForceOverLife,
+    FrameOverLife,
     InheritVelocity,
     LimitSpeedOverLife,
     loadPlugin,
+    ParticleStore,
     Quaternion,
     RandomBetweenCurves,
     Rotation3DOverLife,
     SizeBySpeed,
+    SpriteParticle,
     TrailParticle,
     Vector3,
     Vector3Function,
@@ -73,7 +76,14 @@ describe('Unity exporter output', () => {
     };
 
     it('has the golden files of every fixture', () => {
-        expect(inline.sort()).toEqual(['billboard.json', 'blending.json', 'mesh.json', 'surfaces.json', 'trails.json']);
+        expect(inline.sort()).toEqual([
+            'billboard.json',
+            'blending.json',
+            'flipbooks.json',
+            'mesh.json',
+            'surfaces.json',
+            'trails.json',
+        ]);
         const files = (dir: string): string[] =>
             fs
                 .readdirSync(path.join(GOLDEN, dir), {withFileTypes: true})
@@ -476,6 +486,35 @@ describe('Unity exporter output', () => {
         expect(atlas.wrapU).toBe(Texture.CLAMP_ADDRESSMODE);
         expect(atlas.wrapV).toBe(Texture.CLAMP_ADDRESSMODE);
         expect((reflective.texture as Texture).wrapU).toBe(Texture.MIRROR_ADDRESSMODE);
+    });
+
+    it("plays Texture Sheet Animation's time modes and start frame and blends as Unity draws them", () => {
+        const {system} = load('flipbooks.json');
+        /** The frame the system's FrameOverLife gives a new particle at `age` s, `t` of its life. */
+        const frameOf = (name: string, age: number, t = 0) => {
+            const behavior = system(name).behaviors.find((b) => b instanceof FrameOverLife) as FrameOverLife;
+            const particle = new SpriteParticle(new ParticleStore(1), 0);
+            behavior.initialize(particle);
+            return behavior.frameAt(particle, age, t);
+        };
+        // Unity 6000.6 on a 4x4 sheet. FPS mode: row 2 at 8 fps from a quarter of the row on is at
+        // 0.8 + 1 frames into the row at 0.1 s, and wraps round its 4 frames by 0.4 s.
+        expect(frameOf('FpsRow', 0.1)).toBeCloseTo(8 + 1.8, 3);
+        expect(frameOf('FpsRow', 0.4)).toBeCloseTo(8 + 0.2, 3);
+        // Lifetime mode twice over, from 0.3 of the sheet (4.8 frames) on, wrapping round the sheet.
+        expect(frameOf('LifeStart', 0, 0.25)).toBeCloseTo(8 + 4.8, 2);
+        expect(frameOf('LifeStart', 0, 0.45)).toBeCloseTo(14.4 + 4.8 - 16, 2);
+        // A random start frame anywhere on the sheet; at 0 fps the frame stays.
+        const start = frameOf('FpsBlended', 0);
+        expect(start).toBeGreaterThanOrEqual(0);
+        expect(start).toBeLessThan(16);
+        expect(frameOf('FpsHeld', 3)).toBe(0);
+        // Blended where the material blends and the renderer sends UV2 and AnimBlend, or a custom
+        // shader is sent AnimBlend.
+        const blends = ['FpsBlended', 'FpsRow', 'LifeStart', 'SpeedMode', 'FpsHeld', 'SimpleFlipbook'].filter(
+            (name) => system(name).blendTiles
+        );
+        expect(blends).toEqual(['FpsBlended', 'LifeStart']);
     });
 
     it('references asset files that the export wrote', () => {

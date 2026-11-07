@@ -1,0 +1,2 @@
+[Quarks Exporter] 'FpsRow': the material blends flip-book frames, but the renderer does not send the UV2 and AnimBlend vertex streams, so Unity draws no blend and neither does the export.
+[Quarks Exporter] 'SpeedMode': Texture Sheet Animation Time Mode Speed has no quarks counterpart; the sheet plays over lifetime.
