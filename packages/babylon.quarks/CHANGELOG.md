@@ -286,6 +286,12 @@ and the package's version moves in lockstep with `quarks.core`.
 
 ### Fixed
 
+- **A start frame keeps its fraction.** `FrameOverLife`'s `startFrame` was floored, so a start
+  of 4.8 frames played as 4. Unity adds its Start Frame whole and fraction alike (0.3 of a 16-frame
+  sheet is frame 4.8 on, measured in Unity 6000.6), so the tile shown is the one 4.8 frames on and
+  `blendTiles` blends 0.8 into the next. A whole start frame, and a random one without
+  `blendTiles`, plays as before but for the tile a fraction can carry it onto.
+
 - **Frames blend at a frame rate too.** `FrameOverLife` with `fps` gave whole frames, so a system
   with `blendTiles` never faded one frame into the next when its sheet played at a frame rate,
   only over life. Unity's frame in FPS mode is not whole: measured in Unity 6000.6, a 4x4 sheet at

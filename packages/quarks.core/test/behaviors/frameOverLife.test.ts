@@ -76,12 +76,27 @@ describe('FrameOverLife', () => {
             startFrame: new IntervalValue(0, 16),
         });
         const frames = framesOf(behavior, new Array(32).fill(0), 10);
-        expect(new Set(frames).size).toBeGreaterThan(4);
+        expect(new Set(frames.map((f) => Math.floor(f))).size).toBeGreaterThan(4);
         for (const frame of frames) {
-            expect(Number.isInteger(frame)).toBe(true);
             expect(frame).toBeGreaterThanOrEqual(0);
             expect(frame).toBeLessThan(16);
         }
+    });
+
+    it("adds the start frame fraction and all and wraps it round the frames, as Unity's Start Frame", () => {
+        // Unity 6000.6, 4x4 sheet, Start Frame 0.3 (4.8 frames): frame 5.2 at 0.1 s at 4 fps and
+        // over a 4 s life; Start Frame 0.25 (4 frames) at 3.9 s of a 4 s life: 15.6 + 4 wraps to 3.6.
+        const atRate = new FrameOverLife(new ConstantValue(0), {
+            fps: 4,
+            frameCount: 16,
+            startFrame: new ConstantValue(4.8),
+        });
+        expect(rounded(framesOf(atRate, [0.1], 10))).toEqual([5.2]);
+        const sweep = () => new PiecewiseBezier([[new Bezier(0, 16 / 3, 32 / 3, 16), 0]]);
+        const overLife = new FrameOverLife(sweep(), {frameCount: 16, startFrame: new ConstantValue(4.8)});
+        expect(rounded(framesOf(overLife, [0.1], 4))).toEqual([5.2]);
+        const nearEnd = new FrameOverLife(sweep(), {frameCount: 16, startFrame: new ConstantValue(4)});
+        expect(rounded(framesOf(nearEnd, [3.9], 4))).toEqual([3.6]);
     });
 
     it('round-trips its options through JSON and clone', () => {

@@ -45,7 +45,10 @@ export interface FrameOverLifeOptions {
     random?: boolean;
     /**
      * Per-particle frame offset, sampled once at birth: an `IntervalValue(0, n)`
-     * starts each particle on a random frame (Unity's "Start Frame"). Default none.
+     * starts each particle on a random frame (Unity's "Start Frame", which is a
+     * fraction of the frames: this is that fraction times {@link frameCount}).
+     * As in Unity it is added whole and fraction alike: 4.8 shows the frame 4
+     * frames on, blended 0.8 into the next with `blendTiles`. Default none.
      */
     startFrame?: ValueGenerator;
     /**
@@ -242,8 +245,9 @@ export class FrameOverLife implements Behavior {
         return frame;
     }
 
+    /** The start frame offset, fraction kept, as Unity adds its Start Frame. */
     private offset(particle: Particle): number {
-        return this.startFrame !== undefined ? Math.floor(this.startFrame.genValue(particle.memory)) : 0;
+        return this.startFrame !== undefined ? this.startFrame.genValue(particle.memory) : 0;
     }
 
     /** The particle's salt; 0 for a particle born before this behaviour was added. */
