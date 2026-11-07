@@ -132,6 +132,25 @@ export const demoManifest: DemoManifestEntry[] = [
         captureAt: 3,
     },
     {
+        key: 'BlendingDemo',
+        name: 'Blending and Material Colour',
+        module: 'blending',
+        section: 'features',
+        category: 'Rendering',
+        description:
+            'One topic at a time: the same smoke in five blend modes over light and dark (premultiplied draws smoke that covers and a glow that adds from one map), the material colour, its scale and the particle colour left out, leaves cut out by an alpha test against blended ones, soft particles fading before the floor and pillars, and a sorting fudge that keeps the smoke over a nearer glow.',
+        tags: [
+            'blendMode',
+            'premultipliedMap',
+            'materialColor',
+            'particleColor',
+            'alphaTest',
+            'softParticles',
+            'sortingFudge',
+        ],
+        captureAt: 3,
+    },
+    {
         key: 'ImageProcessingDemo',
         name: 'Image Processing',
         module: 'imageProcessing',

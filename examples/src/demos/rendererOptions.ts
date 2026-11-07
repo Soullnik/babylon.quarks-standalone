@@ -1,8 +1,6 @@
-import {VertexBuffer} from '@babylonjs/core/Buffers/buffer';
 import {Constants} from '@babylonjs/core/Engines/constants';
 import {Color4} from '@babylonjs/core/Maths/math.color';
 import {Vector3 as BVector3} from '@babylonjs/core/Maths/math.vector';
-import type {Mesh} from '@babylonjs/core/Meshes/mesh';
 import {MeshBuilder} from '@babylonjs/core/Meshes/meshBuilder';
 import {TransformNode} from '@babylonjs/core/Meshes/transformNode';
 import {
@@ -19,22 +17,11 @@ import {
     SphereEmitter,
 } from 'babylon.quarks';
 import {curve} from '../shared/curves';
+import {geometryOf} from '../shared/geometry';
 import {addLabel} from '../shared/labels';
 import {addGround} from '../shared/stage';
 import {baseTexture} from '../shared/textures';
 import type {DemoContext} from '../types';
-
-/** The arrays a mesh particle takes, read off a Babylon mesh that is then hidden. */
-function geometryOf(mesh: Mesh) {
-    mesh.isVisible = false;
-    mesh.setEnabled(false);
-    return {
-        instancingGeometry: new Float32Array(mesh.getVerticesData(VertexBuffer.PositionKind)!),
-        instancingNormals: new Float32Array(mesh.getVerticesData(VertexBuffer.NormalKind)!),
-        instancingUVs: new Float32Array(mesh.getVerticesData(VertexBuffer.UVKind)!),
-        instancingIndices: new Uint32Array(mesh.getIndices()!),
-    };
-}
 
 /**
  * Renderer options, one at a time: the panel picks an option and the same effect stands twice,

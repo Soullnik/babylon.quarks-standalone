@@ -18,6 +18,7 @@ export const BASE = {
     fibers: {cols: 1, rows: 1},
     ring_fibers: {cols: 1, rows: 1},
     disc: {cols: 1, rows: 1},
+    leaf: {cols: 1, rows: 1},
     bolts: {cols: 1, rows: 8},
     aura_strip: {cols: 1, rows: 1},
     smoke_puff: {cols: 4, rows: 4},

@@ -1,3 +1,6 @@
+import {VertexBuffer} from '@babylonjs/core/Buffers/buffer';
+import type {Mesh} from '@babylonjs/core/Meshes/mesh';
+
 /**
  * Geometry for mesh particles, as the `instancing*` arrays a system takes. A particle of size 1
  * draws it at the sizes below.
@@ -7,6 +10,18 @@ export interface InstancingGeometry {
     instancingNormals: Float32Array;
     instancingUVs: Float32Array;
     instancingIndices: Uint32Array;
+}
+
+/** The arrays a mesh particle takes, read off a Babylon mesh, which is then hidden. */
+export function geometryOf(mesh: Mesh): InstancingGeometry {
+    mesh.isVisible = false;
+    mesh.setEnabled(false);
+    return {
+        instancingGeometry: new Float32Array(mesh.getVerticesData(VertexBuffer.PositionKind)!),
+        instancingNormals: new Float32Array(mesh.getVerticesData(VertexBuffer.NormalKind)!),
+        instancingUVs: new Float32Array(mesh.getVerticesData(VertexBuffer.UVKind)!),
+        instancingIndices: new Uint32Array(mesh.getIndices()!),
+    };
 }
 
 export interface BandShape {

@@ -256,6 +256,12 @@ and the package's version moves in lockstep with `quarks.core`.
   alive, and one whose particles leave the canvas empty. The Explosion, Soft Particle and Alpha
   Test demos are gone with their third-party textures and mesh, and the Magic Zone, Pick-Up,
   Turbulence and Custom Blending demos with them; the Sub Emitter demo is built in code.
+- **A Blending and Material Colour demo** shows, one topic at a time: the blend modes over light
+  and dark, a premultiplied map that covers and glows at once (`premultipliedMap`), the material
+  colour, its scale and the particle colour left out (`materialColor`, `materialColorScale`,
+  `particleColor`), cutout leaves by an alpha test against blended ones, soft particles at the
+  floor and pillars, and a sorting fudge holding smoke over a nearer glow. Alpha test and soft
+  particles are back in the gallery this way, on textures of our own.
 
 ### Fixed
 
