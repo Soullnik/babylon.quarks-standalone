@@ -1,8 +1,6 @@
 import {Constants} from '@babylonjs/core/Engines/constants';
-import {StandardMaterial} from '@babylonjs/core/Materials/standardMaterial';
 import {Color3, Color4} from '@babylonjs/core/Maths/math.color';
 import {Vector3 as BVector3} from '@babylonjs/core/Maths/math.vector';
-import {MeshBuilder} from '@babylonjs/core/Meshes/meshBuilder';
 import {TransformNode} from '@babylonjs/core/Meshes/transformNode';
 import {
     ColorOverLife,
@@ -19,6 +17,7 @@ import {
     Vector3Function,
 } from 'babylon.quarks';
 import {curve, fade} from '../shared/curves';
+import {addGround} from '../shared/stage';
 import {baseTexture, kenneySheet, kenneyTexture} from '../shared/textures';
 import type {DemoContext, DemoRun} from '../types';
 
@@ -39,12 +38,7 @@ export function init({scene, camera, add}: DemoContext): DemoRun {
     const spark = baseTexture(scene, 'spark');
 
     // A ground to float over, lit by the ball where it passes.
-    const ground = MeshBuilder.CreateDisc('ground', {radius: 30, tessellation: 64}, scene);
-    ground.rotation.x = Math.PI / 2;
-    const groundMaterial = new StandardMaterial('ground', scene);
-    groundMaterial.diffuseColor = new Color3(0.2, 0.22, 0.27);
-    groundMaterial.specularColor = Color3.Black();
-    ground.material = groundMaterial;
+    addGround(scene, 0, new Color3(0.2, 0.22, 0.27));
 
     const ball = new TransformNode('Ball lightning', scene);
     const attach = (system: ParticleSystem, name: string) => {

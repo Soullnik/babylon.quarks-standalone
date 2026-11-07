@@ -37,7 +37,7 @@ const CHARGE = 1.2;
  * motion through the prefab's `timeScale`.
  */
 export function init({scene, camera, batchRenderer, add}: DemoContext): DemoRun {
-    camera.setPosition(new BVector3(0, 3.5, 12));
+    camera.setPosition(new BVector3(0, 2.8, 9));
     camera.setTarget(new BVector3(0, 1.4, 0));
     addGround(scene, -1.6);
     const streak = baseTexture(scene, 'streak');

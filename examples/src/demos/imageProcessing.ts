@@ -48,7 +48,7 @@ export function init({scene, camera, add}: DemoContext) {
     addLabel(scene, 'applyImageProcessing: false', new BVector3(3, 3.4, 0), {height: 0.36});
 
     const flame = (x: number, applyImageProcessing: boolean) => {
-        const sphere = MeshBuilder.CreateSphere(`sphere-${x}`, {diameter: 1.2}, scene);
+        const sphere = MeshBuilder.CreateSphere(`sphere-${x}`, {diameter: 0.8}, scene);
         const material = new StandardMaterial(`sphere-${x}`, scene);
         material.diffuseColor = new Color3(1, 0.55, 0.25);
         sphere.material = material;
@@ -60,7 +60,7 @@ export function init({scene, camera, add}: DemoContext) {
             looping: true,
             startLife: new IntervalValue(0.7, 1),
             startSpeed: new IntervalValue(0.6, 1),
-            startSize: new IntervalValue(1.3, 1.9),
+            startSize: new IntervalValue(2.6, 3.4),
             startColor: new ConstantColor(new Color4(1, 1, 1, 1)),
             worldSpace: true,
             emissionOverTime: new ConstantValue(12),

@@ -156,7 +156,7 @@ out of `babylon.quarks`' exports.
    `#Key/Topic` opens a demo on a topic). Draw with the base texture set and the Kenney set
    (`baseTexture` and `kenneyTexture` in `shared/textures.ts`, greyscale sheets and shapes tinted by
    the particles' colour, made outside this repository, most of them from Kenney's CC0 particle
-   packs) and stand the demo on `addGround` (`shared/stage.ts`), mid-dark so additive
+   packs) and stand the demo on `addGround` (`shared/stage.ts`, a floor fading into a sky), mid-dark so additive
    light and alpha-blended smoke both read. Time comes only from `update`'s `delta`: it pauses,
    slows down and steps with the viewer. `shared/timing.ts` replays one-shot effects.
 2. Register it in `examples/src/demoManifest.ts`: its section (`showcase` for a finished effect,

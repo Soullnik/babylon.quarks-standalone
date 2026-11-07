@@ -307,6 +307,9 @@ and the package's version moves in lockstep with `quarks.core`.
   with frost, glints and mist; Arcane swirl a magic circle under orbiting ribbons and glyphs.
   Trails and Collision bursts a sheaf of thick glowing ribbons out of a flash, and Sub Emitter's
   fireworks go up twice as often, burst into trailing sparks and flare.
+  Every demo stands under a sky now: the floor darkens out to the horizon's colour and the sky rises
+  from it to a darker zenith, so the scenes no longer end at the hard edge of a grey disc; Texture
+  Effects, Timeline and Image Processing are framed closer.
 
 ### Fixed
 

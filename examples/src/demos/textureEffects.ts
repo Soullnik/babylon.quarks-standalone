@@ -74,8 +74,8 @@ const RAMPS = {
  *   reaches out to the target and draws back.
  */
 export function init({scene, camera, add, controls}: DemoContext): DemoRun {
-    camera.setPosition(new BVector3(0, 5.5, 13));
-    camera.setTarget(new BVector3(0, 1.4, 0));
+    camera.setPosition(new BVector3(0, 4.2, 12.5));
+    camera.setTarget(new BVector3(0, 1.1, 0));
     addGround(scene);
     const padMaterial = new StandardMaterial('pad', scene);
     padMaterial.diffuseColor = new Color3(0.24, 0.25, 0.3);

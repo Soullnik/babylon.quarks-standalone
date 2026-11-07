@@ -23,7 +23,7 @@ const OUTPUT_DIR = path.resolve('examples/public/previews');
 const LANDING_DIR = path.resolve('examples/public/landing');
 const landingOnly = process.argv.includes('--landing');
 // The viewer's toolbar, hint and drop overlay are UI, not the effect; previews show the effect only.
-const HIDE_VIEWER_UI = '.hud, .panel, .drop-overlay { display: none !important; }';
+const HIDE_VIEWER_UI = '.hud, .panel, .drop-overlay, .topic-bar, .topic-toast { display: none !important; }';
 const only = process.argv
     .find((a) => a.startsWith('--only='))
     ?.slice('--only='.length)

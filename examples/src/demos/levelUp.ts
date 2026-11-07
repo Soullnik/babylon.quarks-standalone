@@ -26,6 +26,7 @@ import {
     WidthOverLength,
 } from 'babylon.quarks';
 import {curve} from '../shared/curves';
+import {addGround} from '../shared/stage';
 import {baseTexture, kenneySheet, kenneyTexture, sheetOf} from '../shared/textures';
 import {every, replay} from '../shared/timing';
 import type {DemoContext, DemoRun} from '../types';
@@ -90,12 +91,7 @@ export function init({scene, camera, add, systems}: DemoContext): DemoRun {
     const sigil = kenneyTexture(scene, 'sigil');
 
     // The character and the ground it stands on, mid-toned so dust and light both read on it.
-    const ground = MeshBuilder.CreateDisc('ground', {radius: 40, tessellation: 64}, scene);
-    ground.rotation.x = Math.PI / 2;
-    const groundMaterial = new StandardMaterial('ground', scene);
-    groundMaterial.diffuseColor = new Color3(0.24, 0.25, 0.3);
-    groundMaterial.specularColor = Color3.Black();
-    ground.material = groundMaterial;
+    addGround(scene, 0, new Color3(0.24, 0.25, 0.3));
     const hero = MeshBuilder.CreateCapsule('hero', {height: 2.4, radius: 0.45}, scene);
     hero.position.y = 1.2;
     const heroMaterial = new StandardMaterial('hero', scene);
