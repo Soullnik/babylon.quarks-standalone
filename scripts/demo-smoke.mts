@@ -153,6 +153,9 @@ if (shard === 1) {
             await page.waitForFunction(() => window.__quarksLanding?.ready === true, undefined, {timeout: 60000});
             const stage = await page.evaluate(() => window.__quarksLanding!.stage);
             if (stage !== 'live') problems.push(`stage: expected 'live', got '${stage}'`);
+            // The gallery opens on the showcase and a few feature demos; the button shows the rest.
+            const showAll = page.locator('#demos-grid [data-show-all]');
+            if (await showAll.count()) await showAll.click();
             const cards = await page.locator('#demos-grid .demo').count();
             if (cards !== demoManifest.length)
                 problems.push(`gallery: ${cards} cards for ${demoManifest.length} demos`);
