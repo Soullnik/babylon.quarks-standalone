@@ -1794,10 +1794,12 @@ figcaption code {
     transform: translateY(-50%) rotate(45deg);
 }
 
+/* The submenu opens to the left, as a menu near the screen's right edge does: Tools sits halfway
+   across the sketch, and opening right would run the submenu out of its box over the text. */
 .unity-submenu {
-    left: 100%;
+    right: 100%;
     top: -5px;
-    margin-left: 2px;
+    margin-right: 2px;
 }
 
 .unity-dropdown .is-active,
