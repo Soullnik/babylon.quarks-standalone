@@ -21,6 +21,8 @@ interface StageEffect {
     load: () => Promise<DemoModule>;
     /** Whether dragging orbits the camera; the vortex follows the pointer instead. */
     orbit: boolean;
+    /** How the stage frames a demo: the camera's distance and the point it looks at. */
+    frame?: {radius: number; target: [number, number, number]};
 }
 
 /** The elements the stage drives, all inside `[data-stage]`. */
@@ -46,25 +48,42 @@ const pointer: StagePointer = {x: 0, y: 0, seen: false};
 
 const EFFECTS: Record<string, StageEffect> = {
     vortex: {demoKey: null, load: async () => createVortex(pointer), orbit: false},
-    electric: {demoKey: 'ElectricBallDemo', load: () => import('../demos/electricBall'), orbit: true},
-    levelUp: {demoKey: 'LevelUpDemo', load: () => import('../demos/levelUp'), orbit: true},
-    weapons: {demoKey: 'AuraTrailDemo', load: () => import('../demos/auraTrail'), orbit: true},
-    forces: {demoKey: 'ForceSpaceDemo', load: () => import('../demos/forceSpace'), orbit: true},
+    electric: {
+        demoKey: 'ElectricBallDemo',
+        load: () => import('../demos/electricBall'),
+        orbit: true,
+        frame: {radius: 6.4, target: [0, 1.7, 0]},
+    },
+    levelUp: {
+        demoKey: 'LevelUpDemo',
+        load: () => import('../demos/levelUp'),
+        orbit: true,
+        frame: {radius: 10, target: [0, 2.1, 0]},
+    },
+    forces: {
+        demoKey: 'ForceSpaceDemo',
+        load: () => import('../demos/forceSpace'),
+        orbit: true,
+        frame: {radius: 12.5, target: [0, 1, 0]},
+    },
 };
 
 /**
  * A demo on the stage keeps the void of the landing: the sky and ground the demo set up and the
  * captions it draws (`addGround`, `addSky`, `addLabel` in the shared helpers, found by name) are
- * switched off, and the camera steps back a little so the effect stays in the window as it moves.
- * The demo itself is untouched; the demo viewer shows it with everything on.
+ * switched off, and the camera is set to the take's frame, centred on the effect. The demo itself
+ * is untouched; the demo viewer shows it with everything on.
  */
-function dressForStage(scene: Scene, camera: ArcRotateCamera) {
+function dressForStage(scene: Scene, camera: ArcRotateCamera, entry: StageEffect) {
     for (const mesh of scene.meshes) {
         if (mesh.name === 'sky' || mesh.name === 'ground' || mesh.name.startsWith('label:')) {
             mesh.setEnabled(false);
         }
     }
-    camera.radius *= 1.15;
+    if (entry.frame) {
+        camera.setTarget(new BVector3(...entry.frame.target));
+        camera.radius = entry.frame.radius;
+    }
 }
 
 /** The effect's display name: the gallery's name for a demo, "Vortex" for the landing effect. */
@@ -172,6 +191,7 @@ export async function mountHeroStage(root: HTMLElement): Promise<() => void> {
             tab.setAttribute('aria-pressed', String(pressed));
             tab.tabIndex = pressed ? 0 : -1;
         }
+        el.root.dataset.effect = id;
     };
 
     const describe = (id: string) => {
@@ -220,7 +240,7 @@ export async function mountHeroStage(root: HTMLElement): Promise<() => void> {
                 return false;
             }
             if (entry.demoKey) {
-                dressForStage(scene, camera);
+                dressForStage(scene, camera, entry);
             }
             if (entry.orbit) {
                 camera.attachControl(el.canvas, true);

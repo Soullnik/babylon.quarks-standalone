@@ -1,4 +1,4 @@
-import {ArrowRight, ArrowUpRight, Copy, createIcons, Menu, Moon, Play, Search, Sun} from 'lucide';
+import {ArrowRight, ArrowUpRight, Copy, createIcons, Menu, Moon, Play, Search, Sun, X} from 'lucide';
 import {siGithub, siNpm} from 'simple-icons';
 import {demoManifest, previewFile, SECTIONS} from '../demoManifest';
 import type {DemoManifestEntry} from '../types';
@@ -79,7 +79,7 @@ function setupIcons() {
         }
     }
     createIcons({
-        icons: {ArrowRight, ArrowUpRight, Copy, Menu, Moon, Play, Search, Sun},
+        icons: {ArrowRight, ArrowUpRight, Copy, Menu, Moon, Play, Search, Sun, X},
         attrs: {'stroke-width': 1.75, 'aria-hidden': 'true'},
     });
 }
@@ -132,7 +132,8 @@ function copySource(button: HTMLButtonElement) {
     const panel = card
         ? Array.from(card.querySelectorAll<HTMLElement>('[role="tabpanel"]')).find((p) => !p.hidden)
         : null;
-    return panel?.querySelector('code')?.textContent ?? '';
+    const code = panel?.querySelector<HTMLElement>('code');
+    return code?.dataset.source ?? code?.textContent ?? '';
 }
 
 function setupCopyButtons() {
@@ -260,13 +261,16 @@ function setupStageControls() {
  */
 function setupCode() {
     for (const block of Array.from(document.querySelectorAll<HTMLElement>('pre code[data-lang="ts"]'))) {
+        // The raw text is kept for the copy buttons: the wrapped lines lose their line breaks.
+        const source = block.textContent ?? '';
+        block.dataset.source = source;
         // No token of the highlighter spans a line break, so the lines can be wrapped afterwards.
-        block.innerHTML = highlightTs(block.textContent ?? '')
+        block.innerHTML = highlightTs(source)
             .split('\n')
             .map((line) => `<span class="ln">${line}</span>`)
             .join('');
     }
-    const lines = (document.getElementById('src-code')?.textContent ?? '').split('\n');
+    const lines = (document.getElementById('src-code')?.dataset.source ?? '').split('\n');
     const curveLine = lines.findIndex((line) => line.includes('new Bezier(')) + 1;
     const caption = document.querySelector('[data-curve-line]');
     if (caption && curveLine > 0) {
@@ -295,6 +299,9 @@ function setupBreakdown() {
     legend.querySelector('[data-breakdown-vortex]')?.addEventListener('click', () => {
         tabs.find((tab) => tab.dataset.effect === 'vortex')?.click();
     });
+    legend.querySelector('[data-layers-all]')?.addEventListener('click', () => {
+        legend.dataset.expanded = 'true';
+    });
     sync();
 }
 
@@ -305,25 +312,22 @@ function escapeHtml(text: string) {
 function demoCard(demo: DemoManifestEntry) {
     const showcase = demo.section === 'showcase';
     const tags = [
-        ...(showcase ? [] : [`<li class="demo-category">${escapeHtml(demo.category)}</li>`]),
-        ...demo.tags.slice(0, 3).map((tag) => `<li>${escapeHtml(tag)}</li>`),
+        `<li class="demo-category">${escapeHtml(demo.category)}</li>`,
+        ...demo.tags.slice(0, 2).map((tag) => `<li>${escapeHtml(tag)}</li>`),
     ].join('');
-    const description = showcase
-        ? ''
-        : `
-  <p>${escapeHtml(demo.description)}</p>`;
     return `<li class="demo${showcase ? ' demo-large' : ''}">
   <a class="demo-link" href="./babylonDemo.html#${encodeURIComponent(demo.key)}">
     <span class="demo-shot"><img src="./previews/${previewFile(demo.key)}" alt="" loading="lazy" decoding="async" width="640" height="360" /></span>
     <span class="demo-name">${escapeHtml(demo.name)}</span>
-  </a>${description}
-  <ul class="demo-tags" aria-label="Tags">${tags}</ul>
+  </a>
+  <p>${escapeHtml(demo.description)}</p>
+  <ul class="demo-tags" aria-label="Category and tags">${tags}</ul>
 </li>`;
 }
 
-/** On a phone the gallery opens on the showcase and the first feature demos, with a button for the rest. */
-const PHONE_FEATURES = 6;
+/** The gallery opens on the showcase and the first feature demos, with a button for the rest. */
 const phone = window.matchMedia?.('(max-width: 640px)');
+const initialFeatures = () => (phone?.matches ? 6 : 8);
 
 /**
  * The gallery: the showcase as large cards, then every feature demo in one dense grid, in the
@@ -378,11 +382,11 @@ function setupGallery() {
         grid.toggleAttribute('data-filtered', filtered);
         let shown = cards;
         let hidden = 0;
-        if (!filtered && !expanded && phone?.matches) {
+        if (!filtered && !expanded) {
             const showcase = cards.filter((demo) => demo.section === 'showcase');
             const features = cards.filter((demo) => demo.section !== 'showcase');
-            shown = [...showcase, ...features.slice(0, PHONE_FEATURES)];
-            hidden = features.length - PHONE_FEATURES;
+            shown = [...showcase, ...features.slice(0, initialFeatures())];
+            hidden = features.length - initialFeatures();
         }
         const parts = shown.map(demoCard);
         if (cards.length === 0) {
@@ -391,7 +395,7 @@ function setupGallery() {
             );
         } else if (hidden > 0) {
             parts.push(
-                `<li class="demo-more"><button type="button" class="text-button" data-show-all>Show all ${hidden + PHONE_FEATURES} feature demos</button></li>`
+                `<li class="demo-more"><button type="button" class="text-button" data-show-all>Show all ${hidden + initialFeatures()} feature demos</button></li>`
             );
         }
         grid.innerHTML = parts.join('');
