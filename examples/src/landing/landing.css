@@ -1,7 +1,7 @@
 /*
- * Landing page for babylon.quarks, laid out as a VFX artist's breakdown sheet: numbered sheets with
- * ruled headers, the live effects in windows with registration marks at the corners, and the hero
- * effect followed by the legend of the systems it is made of.
+ * Landing page for babylon.quarks, laid out as a VFX artist's breakdown sheet: ruled headers, the
+ * live effects in windows with viewfinder brackets at the corners, and the hero effect followed by
+ * the legend of the systems it is made of.
  *
  * Colour comes from the logo: an orb in two tilted orbit rings, cyan through violet to magenta.
  * The ground is dark first (additive particles only read on a dark ground, and the ramp glows
@@ -316,7 +316,7 @@ h3 {
     justify-items: start;
 }
 
-/* A window: a dark surface with registration marks at the four corners, the L of a cut sheet. */
+/* A window: a dark surface with a viewfinder bracket hugging each of its four corners. */
 .window {
     position: relative;
     background: var(--window);
@@ -325,38 +325,39 @@ h3 {
 
 .reg {
     position: absolute;
-    width: 10px;
-    height: 10px;
+    width: 14px;
+    height: 14px;
     pointer-events: none;
     z-index: 2;
+    border: 0 solid var(--ink-soft);
 }
 
 .reg:nth-of-type(1) {
-    left: -15px;
-    top: -15px;
-    border-right: 1px solid var(--ink);
-    border-bottom: 1px solid var(--ink);
+    left: -7px;
+    top: -7px;
+    border-left-width: 1px;
+    border-top-width: 1px;
 }
 
 .reg:nth-of-type(2) {
-    right: -15px;
-    top: -15px;
-    border-left: 1px solid var(--ink);
-    border-bottom: 1px solid var(--ink);
+    right: -7px;
+    top: -7px;
+    border-right-width: 1px;
+    border-top-width: 1px;
 }
 
 .reg:nth-of-type(3) {
-    left: -15px;
-    bottom: -15px;
-    border-right: 1px solid var(--ink);
-    border-top: 1px solid var(--ink);
+    left: -7px;
+    bottom: -7px;
+    border-left-width: 1px;
+    border-bottom-width: 1px;
 }
 
 .reg:nth-of-type(4) {
-    right: -15px;
-    bottom: -15px;
-    border-left: 1px solid var(--ink);
-    border-top: 1px solid var(--ink);
+    right: -7px;
+    bottom: -7px;
+    border-right-width: 1px;
+    border-bottom-width: 1px;
 }
 
 figcaption {
@@ -694,10 +695,12 @@ figcaption code {
     gap: 12px;
 }
 
+/* The takes line up with the frame below them and stand clear of its corner brackets. */
 .stage-bar {
     display: flex;
     align-items: baseline;
     gap: 2px;
+    margin: 0 15px 4px;
     overflow-x: auto;
     scrollbar-width: none;
     font-family: var(--font-mono);
@@ -731,7 +734,7 @@ figcaption code {
 
 /* The hero window's frame is the ramp itself: a 1px gradient edge around the canvas. */
 .stage-frame {
-    margin-inline: 15px; /* room for the registration marks inside the column */
+    margin-inline: 15px; /* room for the corner brackets inside the column */
     padding: 1px;
     background: var(--ramp-diagonal);
     position: relative;
