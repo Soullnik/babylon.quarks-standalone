@@ -251,7 +251,7 @@ h3 {
     vertical-align: -0.12em;
     margin-right: 0.15em;
     fill: none;
-    stroke: url(#orbit-ramp);
+    stroke: url(#ring-mark-ramp);
     stroke-width: 1.5;
     overflow: visible;
 }
@@ -758,73 +758,34 @@ figcaption code {
     border: 0;
 }
 
-/* The orbit rings: tilted ellipses a little wider than the window, split so the back halves pass
-   behind it and the front halves over it. They stay inside the window's height, clear of the rows
-   above and below. */
+/* The orbit rings, drawn by orbits.ts to the window's size: the back layer under the window, the
+   front layer over it, both with the same stroke so the ring runs on across the window's edge. */
 .orbit {
     position: absolute;
-    left: -9%;
-    top: 6%;
-    width: 118%;
-    height: 88%;
+    inset: 0;
+    width: 100%;
+    height: 100%;
     pointer-events: none;
     overflow: visible;
     fill: none;
     stroke: url(#orbit-ramp);
     stroke-width: 1.5;
+    stroke-linecap: round;
+    opacity: 0.85;
+    transition: opacity 0.6s ease;
 }
 
 .orbit-back {
     z-index: 0;
-    opacity: 0.55;
 }
 
 .orbit-front {
     z-index: 3;
-    opacity: 0.9;
-    transition: opacity 0.6s ease;
 }
 
-/* Another take on the stage: the ring is not the subject, so it steps back. */
-.stage[data-effect]:not([data-effect='vortex']) .orbit-front {
-    opacity: 0.2;
-}
-
-.stage[data-effect]:not([data-effect='vortex']) .orbit-back {
-    opacity: 0.3;
-}
-
-/* A slow drift keeps the rings alive without drawing the eye. */
-@keyframes orbit-drift {
-    from {
-        transform: translate(0, 0);
-    }
-
-    to {
-        transform: translate(0.6%, -1.6%);
-    }
-}
-
-.orbit {
-    animation: orbit-drift 14s ease-in-out infinite alternate;
-}
-
-.orbit-front {
-    animation-duration: 18s;
-    animation-direction: alternate-reverse;
-}
-
-@media (prefers-reduced-motion: reduce) {
-    .orbit {
-        animation: none;
-    }
-}
-
-@media (max-width: 960px) {
-    .orbit {
-        left: -5%;
-        width: 110%;
-    }
+/* Another take on the stage: the rings are not the subject, so they step back, both together. */
+.stage[data-effect]:not([data-effect='vortex']) .orbit {
+    opacity: 0.25;
 }
 
 .stage-view canvas,
@@ -1022,26 +983,6 @@ figcaption code {
     font-style: italic;
 }
 
-/* Another take is running: the legend stays where it is, dimmed, under one quiet line. */
-.breakdown-note {
-    display: none;
-    grid-column: 1 / -1;
-    color: var(--ink-soft);
-    font-size: 0.95rem;
-}
-
-.breakdown[data-active-effect]:not([data-active-effect='vortex']) .breakdown-note {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 4px 16px;
-}
-
-.breakdown[data-active-effect]:not([data-active-effect='vortex']) .breakdown-head,
-.breakdown[data-active-effect]:not([data-active-effect='vortex']) .layers {
-    opacity: 0.45;
-    transition: opacity 0.3s ease;
-}
-
 .text-button {
     font: inherit;
     font-weight: 600;
@@ -1114,12 +1055,16 @@ figcaption code {
     padding-top: 10px;
 }
 
+.layer-behaviors.is-empty {
+    color: var(--ink-soft);
+}
+
 @media (max-width: 640px) {
     .breakdown:not([data-expanded]) .layers li:nth-child(n + 4) {
         display: none;
     }
 
-    .breakdown:not([data-expanded]) .layers-more {
+    .breakdown:not([data-expanded]) .layers-more:not([hidden]) {
         display: block;
     }
 }
@@ -1137,29 +1082,25 @@ figcaption code {
 /* ---------- the module band: the one shaped transition, with a ramp line on each diagonal ---------- */
 
 .band {
-    background: var(--ground-2);
+    position: relative;
+    isolation: isolate;
     padding-top: calc(var(--slant) + var(--section));
     padding-bottom: calc(var(--slant) + var(--section));
-    clip-path: polygon(0 var(--slant), 100% 0, 100% calc(100% - var(--slant)), 0 100%);
 }
 
-.band-edge {
+/* The band's ground is a box skewed by 2deg, so its top and bottom borders are the diagonals and
+   the ramp runs along them as a border image. Inset by half the rise, so the slanted edges stay
+   inside the section. */
+.band::before {
+    content: '';
     position: absolute;
-    left: 0;
-    width: 100%;
-    height: var(--slant);
-    stroke: url(#band-ramp);
-    stroke-width: 2.5;
-    opacity: 0.8;
-    pointer-events: none;
-}
-
-.band-edge-top {
-    top: 0;
-}
-
-.band-edge-bottom {
-    bottom: 0;
+    inset: 1.75vw 0;
+    z-index: -1;
+    background: var(--ground-2);
+    border-block: 2px solid;
+    border-inline: 0;
+    border-image: var(--ramp) 1;
+    transform: skewY(-2deg);
 }
 
 .rows {

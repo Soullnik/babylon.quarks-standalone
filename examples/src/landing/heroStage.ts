@@ -8,11 +8,81 @@ import {Vector3 as BVector3} from '@babylonjs/core/Maths/math.vector';
 import {Scene} from '@babylonjs/core/scene';
 // Side-effect import: registers Scene.createPickingRay, used to project the pointer into the world.
 import '@babylonjs/core/Culling/ray';
-import {BatchedRenderer, BehaviorTypes, EmitterShapes} from 'babylon.quarks';
+import {Constants} from '@babylonjs/core/Engines/constants';
+import {BatchedRenderer, BehaviorTypes, EmitterShapes, RenderMode, type ParticleSystem} from 'babylon.quarks';
 import {demoManifest} from '../demoManifest';
 import {createDemoContext, effectRoots, MAX_FRAME, particleCount} from '../shared/host';
 import type {DemoContext, DemoModule, DemoRun} from '../types';
 import {createVortex, type StagePointer} from './vortex';
+
+/** One system of the effect on the stage, as the breakdown legend lists it. */
+export interface StageLayer {
+    name: string;
+    /** Render mode, blending and emitter shape, e.g. "Billboard · additive · SphereEmitter". */
+    mode: string;
+    behaviors: string[];
+}
+
+/**
+ * Sent on the stage root as `stage:effect` once an effect is on the stage: which effect, and the
+ * systems it is made of, read from the running systems themselves.
+ */
+export interface StageEffectDetail {
+    id: string;
+    demoKey: string | null;
+    name: string;
+    layers: StageLayer[];
+}
+
+const RENDER_MODES: Record<number, string> = {
+    [RenderMode.BillBoard]: 'Billboard',
+    [RenderMode.StretchedBillBoard]: 'Stretched billboard',
+    [RenderMode.Mesh]: 'Mesh',
+    [RenderMode.Trail]: 'Trail',
+    [RenderMode.HorizontalBillBoard]: 'Horizontal billboard',
+    [RenderMode.VerticalBillBoard]: 'Vertical billboard',
+    [RenderMode.Beam]: 'Beam',
+};
+
+const BLENDING: Record<number, string> = {
+    [Constants.ALPHA_ADD]: 'additive',
+    [Constants.ALPHA_COMBINE]: 'alpha blend',
+    [Constants.ALPHA_PREMULTIPLIED]: 'premultiplied',
+    [Constants.ALPHA_PREMULTIPLIED_PORTERDUFF]: 'premultiplied',
+    [Constants.ALPHA_MULTIPLY]: 'multiply',
+    [Constants.ALPHA_SUBTRACT]: 'subtract',
+    [Constants.ALPHA_ONEONE]: 'one-one',
+    [Constants.ALPHA_DISABLE]: 'opaque',
+};
+
+const SHAPES: Record<string, string> = {
+    point: 'PointEmitter',
+    sphere: 'SphereEmitter',
+    hemisphere: 'HemisphereEmitter',
+    cone: 'ConeEmitter',
+    donut: 'DonutEmitter',
+    circle: 'CircleEmitter',
+    box: 'BoxEmitter',
+    grid: 'GridEmitter',
+    rectangle: 'RectangleEmitter',
+    edge: 'EdgeEmitter',
+    mesh_surface: 'MeshSurfaceEmitter',
+};
+
+/** A system as one line of the legend: its emitter's name, how it draws, what drives it. */
+function describeSystem(system: ParticleSystem): StageLayer {
+    const shape = system.emitterShape?.type;
+    const mode = [
+        RENDER_MODES[system.renderMode] ?? `Render mode ${system.renderMode}`,
+        BLENDING[system.blending] ?? `blend mode ${system.blending}`,
+        shape ? (SHAPES[shape] ?? shape) : null,
+    ].filter(Boolean);
+    return {
+        name: system.emitter.name,
+        mode: mode.join(' · '),
+        behaviors: [...new Set(system.behaviors.map((behavior) => behavior.type))],
+    };
+}
 
 /** One effect the hero stage can show. */
 interface StageEffect {
@@ -60,11 +130,10 @@ const EFFECTS: Record<string, StageEffect> = {
         orbit: true,
         frame: {radius: 10, target: [0, 2.1, 0]},
     },
-    forces: {
-        demoKey: 'ForceSpaceDemo',
-        load: () => import('../demos/forceSpace'),
+    blackHole: {
+        demoKey: 'BlackHoleDemo',
+        load: () => import('../demos/blackhole'),
         orbit: true,
-        frame: {radius: 12.5, target: [0, 1, 0]},
     },
 };
 
@@ -256,6 +325,13 @@ export async function mountHeroStage(root: HTMLElement): Promise<() => void> {
             previous?.run.dispose?.();
             previous?.ctx.scene.dispose();
             describe(id);
+            const detail: StageEffectDetail = {
+                id,
+                demoKey: entry.demoKey,
+                name: effectName(id),
+                layers: ctx.systems.map(describeSystem),
+            };
+            el.root.dispatchEvent(new CustomEvent('stage:effect', {detail}));
             return true;
         } catch (error) {
             console.error(`The stage could not start "${id}":`, error);

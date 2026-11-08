@@ -2,7 +2,12 @@ import {ArrowRight, ArrowUpRight, Copy, createIcons, Menu, Moon, Play, Search, S
 import {siGithub, siNpm} from 'simple-icons';
 import {demoManifest, previewFile, SECTIONS} from '../demoManifest';
 import type {DemoManifestEntry} from '../types';
+import type {StageEffectDetail} from './heroStage';
 import {highlightTs} from './highlight';
+import {setupOrbits} from './orbits';
+
+/** The repository, for links to source files. */
+const REPO = 'https://github.com/Soullnik/babylon.quarks-standalone';
 
 /** State the demo smoke test reads to know the landing page came up. */
 interface LandingHook {
@@ -282,27 +287,69 @@ function setupCode() {
  * The breakdown legend below the stage describes the Vortex. It records which take the stage is
  * on, so the stylesheet can mark the legend as describing another take than the one running.
  */
+/**
+ * The breakdown under the stage follows the effect on it. The Vortex keeps its written legend (it
+ * names what the pointer does, which the systems alone do not say); any other take is listed from
+ * its running systems, which the stage sends with `stage:effect`, so the legend cannot drift from
+ * the demo's code.
+ */
 function setupBreakdown() {
     const legend = document.querySelector<HTMLElement>('[data-breakdown]');
-    const tabs = Array.from(document.querySelectorAll<HTMLButtonElement>('[data-stage] [data-effect]'));
-    if (!legend || tabs.length === 0) {
+    const stage = document.querySelector<HTMLElement>('[data-stage]');
+    const title = legend?.querySelector<HTMLElement>('[data-breakdown-title]');
+    const lead = legend?.querySelector<HTMLElement>('[data-breakdown-lead]');
+    const source = legend?.querySelector<HTMLElement>('[data-breakdown-source]');
+    const layers = legend?.querySelector<HTMLElement>('[data-breakdown-layers]');
+    const more = legend?.querySelector<HTMLButtonElement>('[data-layers-all]');
+    if (!legend || !stage || !title || !lead || !source || !layers || !more) {
         return;
     }
-    const sync = () => {
-        const active = tabs.find((tab) => tab.getAttribute('aria-pressed') === 'true');
-        legend.dataset.activeEffect = active?.dataset.effect ?? 'vortex';
+    const vortex = {
+        title: title.innerHTML,
+        lead: lead.innerHTML,
+        source: source.innerHTML,
+        layers: layers.innerHTML,
+        count: layers.children.length,
     };
-    const observer = new MutationObserver(sync);
-    for (const tab of tabs) {
-        observer.observe(tab, {attributes: true, attributeFilter: ['aria-pressed']});
-    }
-    legend.querySelector('[data-breakdown-vortex]')?.addEventListener('click', () => {
-        tabs.find((tab) => tab.dataset.effect === 'vortex')?.click();
+    const showMore = (count: number) => {
+        more.textContent = `Show all ${count} layers`;
+        more.parentElement?.toggleAttribute('hidden', count <= 3);
+    };
+
+    stage.addEventListener('stage:effect', (event) => {
+        const detail = (event as CustomEvent<StageEffectDetail>).detail;
+        const demo = detail.demoKey ? demoManifest.find((entry) => entry.key === detail.demoKey) : undefined;
+        if (!demo) {
+            title.innerHTML = vortex.title;
+            lead.innerHTML = vortex.lead;
+            source.innerHTML = vortex.source;
+            layers.innerHTML = vortex.layers;
+            showMore(vortex.count);
+            return;
+        }
+        const count = detail.layers.length;
+        // The manifest's description up to its first colon: what the effect is, before the parts.
+        const what = demo.description.split(/:\s/)[0].replace(/\.$/, '');
+        const file = `examples/src/demos/${demo.module}.ts`;
+        title.textContent = `What the ${detail.name} is made of`;
+        lead.textContent = `${what}. ${count} systems under one renderer; drag in the window to orbit the camera.`;
+        source.innerHTML = `Source: <a href="${REPO}/blob/main/${file}" target="_blank" rel="noopener noreferrer">${escapeHtml(file)}</a>. “Open in editor” loads the same ${count} systems.`;
+        layers.innerHTML = detail.layers
+            .map(
+                (layer, i) => `<li>
+  <span class="layer-no">${i}</span>
+  <span class="layer-name">${escapeHtml(layer.name)}</span>
+  <span class="layer-mode">${escapeHtml(layer.mode)}</span>
+  ${layer.behaviors.length ? `<span class="layer-behaviors">${escapeHtml(layer.behaviors.join(', '))}</span>` : '<span class="layer-behaviors is-empty">No behaviors</span>'}
+</li>`
+            )
+            .join('');
+        showMore(count);
     });
-    legend.querySelector('[data-layers-all]')?.addEventListener('click', () => {
+    more.addEventListener('click', () => {
         legend.dataset.expanded = 'true';
     });
-    sync();
+    showMore(vortex.count);
 }
 
 function escapeHtml(text: string) {
@@ -495,6 +542,10 @@ setupMenu();
 setupCopyButtons();
 setupTabs();
 setupStageControls();
+const stageFrame = document.querySelector<HTMLElement>('.stage-frame');
+if (stageFrame) {
+    setupOrbits(stageFrame);
+}
 setupBreakdown();
 setupCode();
 setupGallery();
