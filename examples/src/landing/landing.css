@@ -244,6 +244,23 @@ h3 {
     letter-spacing: -0.01em;
 }
 
+/* The logo's rings, once more, as the mark of the demos. */
+.ring-mark {
+    width: 1.5em;
+    height: 1em;
+    vertical-align: -0.12em;
+    margin-right: 0.15em;
+    fill: none;
+    stroke: url(#orbit-ramp);
+    stroke-width: 1.5;
+    overflow: visible;
+}
+
+.ring-mark circle {
+    fill: var(--ink);
+    stroke: none;
+}
+
 .sheet-lead {
     color: var(--ink-soft);
     font-size: var(--step-1);
@@ -407,7 +424,6 @@ figcaption code {
     height: 36px;
     padding: 0 6px;
     background: var(--window);
-    border-radius: 6px;
 }
 
 .brand-mark img {
@@ -451,6 +467,17 @@ figcaption code {
     text-decoration-color: var(--violet);
 }
 
+.site-nav [data-brand] {
+    width: 1.25em;
+    height: 1.25em;
+}
+
+.site-nav [data-brand] svg {
+    width: 100%;
+    height: 100%;
+    display: block;
+}
+
 .masthead-tools {
     display: flex;
     gap: 6px;
@@ -488,6 +515,15 @@ figcaption code {
 
 .menu-button {
     display: none;
+}
+
+.menu-button .i-close,
+.menu-button[aria-expanded='true'] .i-menu {
+    display: none;
+}
+
+.menu-button[aria-expanded='true'] .i-close {
+    display: block;
 }
 
 @media (max-width: 480px) {
@@ -746,6 +782,42 @@ figcaption code {
 .orbit-front {
     z-index: 3;
     opacity: 0.9;
+    transition: opacity 0.6s ease;
+}
+
+/* Another take on the stage: the ring is not the subject, so it steps back. */
+.stage[data-effect]:not([data-effect='vortex']) .orbit-front {
+    opacity: 0.2;
+}
+
+.stage[data-effect]:not([data-effect='vortex']) .orbit-back {
+    opacity: 0.3;
+}
+
+/* A slow drift keeps the rings alive without drawing the eye. */
+@keyframes orbit-drift {
+    from {
+        transform: translate(0, 0);
+    }
+
+    to {
+        transform: translate(0.6%, -1.6%);
+    }
+}
+
+.orbit {
+    animation: orbit-drift 14s ease-in-out infinite alternate;
+}
+
+.orbit-front {
+    animation-duration: 18s;
+    animation-direction: alternate-reverse;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .orbit {
+        animation: none;
+    }
 }
 
 @media (max-width: 960px) {
@@ -933,6 +1005,13 @@ figcaption code {
     gap: 12px;
 }
 
+@media (min-width: 961px) {
+    .breakdown-head {
+        position: sticky;
+        top: calc(var(--masthead-h) + 24px);
+    }
+}
+
 .breakdown-head p {
     color: var(--ink-soft);
     max-width: 34em;
@@ -1027,6 +1106,21 @@ figcaption code {
 @media (max-width: 960px) {
     .breakdown {
         grid-template-columns: minmax(0, 1fr);
+    }
+}
+
+.layers-more {
+    display: none;
+    padding-top: 10px;
+}
+
+@media (max-width: 640px) {
+    .breakdown:not([data-expanded]) .layers li:nth-child(n + 4) {
+        display: none;
+    }
+
+    .breakdown:not([data-expanded]) .layers-more {
+        display: block;
     }
 }
 
@@ -1186,99 +1280,6 @@ figcaption code {
 
 /* ---------- get started: the flow strip and the listings ---------- */
 
-/* Author, file, loader, scene: the four artefacts of the pipeline, joined by a line. */
-.flow {
-    list-style: none;
-    margin: 0 0 clamp(28px, 4vw, 44px);
-    padding: 0;
-    display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 28px;
-}
-
-.flow li {
-    position: relative;
-    display: grid;
-    grid-template-rows: auto 1fr;
-    gap: 10px;
-    min-width: 0;
-}
-
-.flow li + li::before {
-    content: '';
-    position: absolute;
-    left: -28px;
-    width: 28px;
-    top: calc(var(--flow-h) / 2);
-    height: 1px;
-    background: var(--ramp);
-    opacity: 0.8;
-}
-
-.flow {
-    --flow-h: 150px;
-}
-
-.flow-shot,
-.flow-code,
-.flow-still {
-    display: block;
-    height: var(--flow-h);
-    margin: 0;
-    background: var(--window);
-    border: 1px solid var(--rule-strong);
-    overflow: hidden;
-}
-
-.flow-shot img,
-.flow-still {
-    width: 100%;
-    height: var(--flow-h);
-    object-fit: cover;
-    object-position: 50% 40%;
-}
-
-.flow-code {
-    padding: 12px 14px;
-    color: var(--window-fg);
-    font-size: 0.7rem;
-    line-height: 1.5;
-    white-space: pre;
-}
-
-.flow-code code {
-    font-size: inherit;
-}
-
-.flow p {
-    font-size: 0.92rem;
-    color: var(--ink-soft);
-}
-
-.flow p a {
-    color: var(--ink);
-}
-
-@media (max-width: 1100px) {
-    .flow {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-
-    .flow li:nth-child(3)::before {
-        display: none;
-    }
-}
-
-@media (max-width: 520px) {
-    .flow {
-        grid-template-columns: minmax(0, 1fr);
-    }
-
-    .flow li + li::before {
-        display: none;
-    }
-}
-
 .start-grid {
     display: grid;
     grid-template-columns: minmax(0, 8fr) minmax(0, 4fr);
@@ -1288,7 +1289,37 @@ figcaption code {
 
 .start-aside {
     display: grid;
-    gap: 16px;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 22px;
+    align-content: start;
+}
+
+.start-aside .install {
+    display: flex;
+    width: auto;
+}
+
+.start-facts {
+    margin: 0;
+    display: grid;
+    gap: 10px;
+    font-size: 0.95rem;
+}
+
+.start-facts > div {
+    display: grid;
+    gap: 2px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--rule);
+}
+
+.start-facts dt {
+    color: var(--ink-soft);
+    font-size: 0.86rem;
+}
+
+.start-facts dd {
+    margin: 0;
 }
 
 .curve-fig {
@@ -1572,7 +1603,7 @@ figcaption code {
 }
 
 /* While a filter or a search is on, every card is the same size, so the grid has no holes. */
-.demo-grid[data-filtered] .demo {
+.demo-grid[data-filtered] .demo-large {
     grid-column: span 3;
 }
 
@@ -1677,45 +1708,39 @@ figcaption code {
     margin: 0;
     padding: 0;
     display: flex;
-    gap: 10px;
-    overflow: hidden;
-    white-space: nowrap;
+    flex-wrap: wrap;
+    gap: 2px 10px;
     font-family: var(--font-mono);
     font-size: 0.8125rem;
     color: var(--ink-soft);
 }
 
-.demo-tags li {
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
 .demo-category {
+    flex-basis: 100%;
+    font-family: var(--font-ui);
     color: var(--cyan);
 }
 
 @media (max-width: 1100px) {
-    .demo {
+    .demo,
+    .demo-large,
+    .demo-grid[data-filtered] .demo-large {
         grid-column: span 4;
-    }
-
-    .demo-large {
-        grid-column: span 6;
     }
 }
 
 @media (max-width: 800px) {
-    .demo {
+    .demo,
+    .demo-large,
+    .demo-grid[data-filtered] .demo-large {
         grid-column: span 6;
-    }
-
-    .demo-large {
-        grid-column: span 12;
     }
 }
 
 @media (max-width: 480px) {
-    .demo {
+    .demo,
+    .demo-large,
+    .demo-grid[data-filtered] .demo-large {
         grid-column: span 12;
     }
 }
@@ -1726,7 +1751,12 @@ figcaption code {
     display: grid;
     grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
     gap: clamp(28px, 4vw, 64px);
-    align-items: start;
+    align-items: center;
+}
+
+/* The Unity sheet gives its sketch the wide column, so the submenu has room to open to the right. */
+.plate-grid-flip {
+    grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
 }
 
 .plate-grid-flip .plate-text {
@@ -1901,7 +1931,7 @@ figcaption code {
     margin-top: 2px;
 }
 
-@container (min-width: 680px) {
+@container (min-width: 640px) {
     .unity-submenu {
         left: 100%;
         right: auto;
@@ -2029,9 +2059,11 @@ figcaption code {
     background: none;
     padding: 0;
     font-size: 0.86rem;
+    white-space: nowrap;
 }
 
 .colophon nav a span {
+    display: block;
     color: var(--ink-soft);
     font-size: 0.86rem;
 }
@@ -2048,6 +2080,12 @@ figcaption code {
 
     .colophon-text {
         grid-column: 1 / -1;
+    }
+}
+
+@media (max-width: 480px) {
+    .colophon-grid {
+        grid-template-columns: minmax(0, 1fr);
     }
 }
 

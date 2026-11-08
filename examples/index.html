@@ -112,7 +112,8 @@
                         aria-expanded="false"
                         aria-label="Menu"
                     >
-                        <i data-lucide="menu" class="icon" aria-hidden="true"></i>
+                        <i data-lucide="menu" class="icon i-menu" aria-hidden="true"></i>
+                        <i data-lucide="x" class="icon i-close" aria-hidden="true"></i>
                     </button>
                 </div>
             </div>
@@ -160,9 +161,6 @@
                                 <button type="button" data-effect="electric" aria-pressed="false" tabindex="-1">
                                     Electric ball
                                 </button>
-                                <button type="button" data-effect="weapons" aria-pressed="false" tabindex="-1">
-                                    Weapon trail
-                                </button>
                                 <button type="button" data-effect="levelUp" aria-pressed="false" tabindex="-1">
                                     Level-up
                                 </button>
@@ -182,9 +180,9 @@
                                 >
                                     <defs>
                                         <linearGradient id="orbit-ramp" x1="0" y1="0" x2="1" y2="0">
-                                            <stop offset="0" stop-color="#5ef0f5" />
-                                            <stop offset="0.55" stop-color="#8a3cf0" />
-                                            <stop offset="1" stop-color="#d63ce0" />
+                                            <stop offset="0" style="stop-color: var(--cyan)" />
+                                            <stop offset="0.55" style="stop-color: var(--violet)" />
+                                            <stop offset="1" style="stop-color: var(--magenta)" />
                                         </linearGradient>
                                     </defs>
                                     <path
@@ -359,6 +357,9 @@
                                 >
                             </li>
                         </ol>
+                        <p class="layers-more">
+                            <button type="button" class="text-button" data-layers-all>Show all 7 layers</button>
+                        </p>
                     </div>
                 </div>
             </section>
@@ -368,9 +369,9 @@
                 <svg class="band-edge band-edge-top" viewBox="0 0 100 1" preserveAspectRatio="none" aria-hidden="true">
                     <defs>
                         <linearGradient id="band-ramp" x1="0" y1="0" x2="1" y2="0">
-                            <stop offset="0" stop-color="#5ef0f5" />
-                            <stop offset="0.55" stop-color="#8a3cf0" />
-                            <stop offset="1" stop-color="#d63ce0" />
+                            <stop offset="0" style="stop-color: var(--cyan)" />
+                            <stop offset="0.55" style="stop-color: var(--violet)" />
+                            <stop offset="1" style="stop-color: var(--magenta)" />
                         </linearGradient>
                     </defs>
                     <line x1="0" y1="1" x2="100" y2="0" vector-effect="non-scaling-stroke" />
@@ -550,59 +551,12 @@
             <section id="get-started" class="sheet" aria-labelledby="start-title">
                 <div class="wrap">
                     <header class="sheet-head">
-                        <h2 id="start-title">From the editor to your scene</h2>
+                        <h2 id="start-title">Running in a few lines</h2>
                         <p class="sheet-lead">
-                            Install next to <code>@babylonjs/core</code> 9.24 or newer. The package ships ES modules
-                            with types, and a UMD build for the Babylon.js Playground.
+                            Load an effect file from the editor or the Unity exporter, build a system in code, or embed
+                            the editor itself.
                         </p>
                     </header>
-
-                    <ol class="flow" aria-label="From authoring to rendering">
-                        <li>
-                            <a class="flow-shot" href="./editor.html">
-                                <img
-                                    src="./landing/editor.jpg"
-                                    alt="The effect editor"
-                                    loading="lazy"
-                                    width="1440"
-                                    height="900"
-                                />
-                            </a>
-                            <p>
-                                Author in the <a href="./editor.html">editor</a>, or in Unity with the
-                                <a href="#unity">exporter</a>.
-                            </p>
-                        </li>
-                        <li>
-                            <pre class="flow-code"><code>{
-  "metadata": { "quarksFormat": 1 },
-  "object": {
-    "type": "ParticleEmitter",
-    "ps": { … }, "children": [ … ]
-  }
-}</code></pre>
-                            <p>One JSON file per effect, textures embedded or referenced by URL.</p>
-                        </li>
-                        <li>
-                            <pre class="flow-code"><code>const effect = await
-  new QuarksLoader(scene)
-    .load('effects/hit.json');</code></pre>
-                            <p><code>QuarksLoader</code> resolves textures and meshes once and shares them.</p>
-                        </li>
-                        <li>
-                            <img
-                                class="flow-still"
-                                src="./previews/pooled-hits.png"
-                                alt="A pooled hit effect playing in a scene"
-                                loading="lazy"
-                                width="640"
-                                height="360"
-                            />
-                            <p>
-                                <code>BatchedRenderer.update(dt)</code> once a frame simulates and draws every system.
-                            </p>
-                        </li>
-                    </ol>
 
                     <div class="start-grid">
                         <div class="listing code-card">
@@ -707,9 +661,9 @@ const editor = QuarksEffectEditor.Show({
                                 <svg viewBox="0 0 220 130" aria-hidden="true">
                                     <defs>
                                         <linearGradient id="curve-ramp" x1="0" y1="0" x2="1" y2="0">
-                                            <stop offset="0" stop-color="#5ef0f5" />
-                                            <stop offset="0.55" stop-color="#8a3cf0" />
-                                            <stop offset="1" stop-color="#d63ce0" />
+                                            <stop offset="0" style="stop-color: var(--d-cyan)" />
+                                            <stop offset="0.55" style="stop-color: var(--d-violet)" />
+                                            <stop offset="1" style="stop-color: var(--d-magenta)" />
                                         </linearGradient>
                                     </defs>
                                     <path
@@ -732,7 +686,30 @@ const editor = QuarksEffectEditor.Show({
                             </figure>
                         </div>
 
-                        <div class="start-aside">
+                        <aside class="start-aside">
+                            <div class="install" role="group" aria-label="Install">
+                                <code
+                                    ><span class="prompt" aria-hidden="true">$</span>
+                                    <span id="install-cmd-2">npm i babylon.quarks @babylonjs/core</span></code
+                                >
+                                <button type="button" class="copy" data-copy-target="install-cmd-2">
+                                    <span class="copy-label">Copy</span>
+                                </button>
+                            </div>
+                            <dl class="start-facts">
+                                <div>
+                                    <dt>Peer</dt>
+                                    <dd><code>@babylonjs/core</code> 9.24 or newer</dd>
+                                </div>
+                                <div>
+                                    <dt>Ships</dt>
+                                    <dd>ES modules with types; a UMD build for the Babylon.js Playground</dd>
+                                </div>
+                                <div>
+                                    <dt>Effect files</dt>
+                                    <dd>One JSON file per effect, textures embedded or by URL, with a schema</dd>
+                                </div>
+                            </dl>
                             <ul class="plain-links">
                                 <li>
                                     <a
@@ -753,6 +730,15 @@ const editor = QuarksEffectEditor.Show({
                                 <li>
                                     <a
                                         class="arrow-link"
+                                        href="https://github.com/Soullnik/babylon.quarks-standalone/blob/main/docs/FORMAT.md"
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        >Effect file format</a
+                                    >
+                                </li>
+                                <li>
+                                    <a
+                                        class="arrow-link"
                                         href="https://stackblitz.com/github/Soullnik/babylon.quarks-standalone/tree/main/starters/vite?file=src%2Fmain.ts"
                                         target="_blank"
                                         rel="noopener noreferrer"
@@ -760,7 +746,7 @@ const editor = QuarksEffectEditor.Show({
                                     >
                                 </li>
                             </ul>
-                        </div>
+                        </aside>
                     </div>
                 </div>
             </section>
@@ -770,7 +756,14 @@ const editor = QuarksEffectEditor.Show({
                 <div class="wrap">
                     <header class="sheet-head sheet-head-row">
                         <div>
-                            <h2 id="demos-title">Every demo runs live in your browser</h2>
+                            <h2 id="demos-title">
+                                <svg class="ring-mark" viewBox="0 0 48 32" aria-hidden="true" focusable="false">
+                                    <ellipse cx="24" cy="16" rx="22" ry="8" transform="rotate(-14 24 16)" />
+                                    <ellipse cx="24" cy="16" rx="18" ry="5" transform="rotate(-26 24 16)" />
+                                    <circle cx="24" cy="16" r="3" />
+                                </svg>
+                                Every demo runs live in your browser
+                            </h2>
                             <p class="sheet-lead">
                                 Open any of them full screen, read its source, or send it to the editor and change it.
                             </p>
@@ -938,19 +931,19 @@ const editor = QuarksEffectEditor.Show({
                 <nav aria-label="Packages">
                     <h2>Packages</h2>
                     <a href="https://www.npmjs.com/package/babylon.quarks" target="_blank" rel="noopener noreferrer"
-                        ><code>babylon.quarks</code> <span>runtime, loader, renderer</span></a
+                        ><code>babylon.quarks</code><span>runtime, loader, renderer</span></a
                     >
                     <a
                         href="https://www.npmjs.com/package/babylon.quarks-editor"
                         target="_blank"
                         rel="noopener noreferrer"
-                        ><code>babylon.quarks-editor</code> <span>React components, headless session</span></a
+                        ><code>babylon.quarks-editor</code><span>React components, headless session</span></a
                     >
                     <a
                         href="https://github.com/Soullnik/babylon.quarks-standalone/tree/main/tools/unity-quarks-exporter"
                         target="_blank"
                         rel="noopener noreferrer"
-                        ><code>unity-quarks-exporter</code> <span>Unity Editor tool</span></a
+                        ><code>unity-quarks-exporter</code><span>Unity Editor tool</span></a
                     >
                 </nav>
                 <nav aria-label="Learn">
