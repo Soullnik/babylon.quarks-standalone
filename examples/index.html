@@ -70,7 +70,7 @@
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
         <link
             rel="stylesheet"
-            href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&family=JetBrains+Mono:wght@400;500&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;1,8..60,400&display=swap"
+            href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&family=JetBrains+Mono:wght@400;500&display=swap"
         />
         <link rel="stylesheet" href="./src/landing/landing.css" />
     </head>
@@ -79,7 +79,7 @@
         <header class="masthead">
             <div class="wrap masthead-row">
                 <a class="brand" href="./" aria-label="Babylon.quarks home">
-                    <img src="./logo.png" width="22" height="22" alt="" />
+                    <img src="./logo.png" width="44" height="44" alt="" />
                     <span class="brand-name">babylon.quarks</span>
                     <span class="brand-version">%VITE_QUARKS_VERSION%</span>
                 </a>
@@ -129,14 +129,13 @@
                             <stop offset="1" stop-color="#d63ce0" />
                         </linearGradient>
                     </defs>
-                    <ellipse cx="1068" cy="420" rx="352" ry="150" transform="rotate(-12 1068 420)" />
-                    <ellipse cx="1080" cy="445" rx="318" ry="108" transform="rotate(-20 1080 445)" />
+                    <ellipse cx="1150" cy="338" rx="330" ry="128" transform="rotate(-14 1150 338)" />
+                    <ellipse cx="1160" cy="356" rx="300" ry="88" transform="rotate(-22 1160 356)" />
                     <circle cx="1500" cy="250" r="1.4" />
                     <circle cx="1430" cy="700" r="1.6" />
                     <circle cx="700" cy="140" r="1.1" />
                 </svg>
                 <div class="wrap">
-                    <p class="sheet-no"><span>Sheet 01</span><span>Hero effect, live</span></p>
                     <div class="hero-grid">
                         <div class="hero-copy">
                             <h1 id="hero-title">
@@ -204,7 +203,6 @@
                         <div class="hero-side">
                             <figure class="stage" data-stage>
                                 <div class="stage-bar" role="toolbar" aria-label="Choose an effect">
-                                    <span class="stage-bar-label" aria-hidden="true">Take</span>
                                     <button type="button" data-effect="vortex" aria-pressed="true">Vortex</button>
                                     <button type="button" data-effect="electric" aria-pressed="false" tabindex="-1">
                                         Electric ball
@@ -346,7 +344,6 @@
             <!-- Sheet 02: the module stack. -->
             <section id="features" class="sheet band-inverse" aria-labelledby="features-title">
                 <div class="wrap">
-                    <p class="sheet-no"><span>Sheet 02</span><span>Module stack</span></p>
                     <header class="sheet-head">
                         <h2 id="features-title">The modules, in Shuriken's order</h2>
                         <p class="sheet-lead">
@@ -365,7 +362,6 @@
 
                     <ol class="rows">
                         <li class="row">
-                            <span class="row-no">2.1</span>
                             <div class="row-text">
                                 <p class="row-module">Renderer</p>
                                 <h3>One batched renderer per scene</h3>
@@ -387,9 +383,8 @@
                             />
                         </li>
                         <li class="row">
-                            <span class="row-no">2.2</span>
                             <div class="row-text">
-                                <p class="row-module">Trails · Beam</p>
+                                <p class="row-module">Trails and beam</p>
                                 <h3>Trails, ribbons and beams</h3>
                                 <p>
                                     <code>RenderMode.Trail</code> draws a ribbon through a particle's past positions,
@@ -409,9 +404,8 @@
                             />
                         </li>
                         <li class="row">
-                            <span class="row-no">2.3</span>
                             <div class="row-text">
-                                <p class="row-module">Renderer · Mesh</p>
+                                <p class="row-module">Mesh renderer</p>
                                 <h3>Mesh particles</h3>
                                 <p>
                                     Instance any mesh as a particle, lit or unlit, with vertex colours, a rotation axis
@@ -428,9 +422,8 @@
                             />
                         </li>
                         <li class="row">
-                            <span class="row-no">2.4</span>
                             <div class="row-text">
-                                <p class="row-module">Sub Emitters</p>
+                                <p class="row-module">Sub-emitters</p>
                                 <h3>Sub-emitters</h3>
                                 <p>
                                     <code>EmitSubParticleSystem</code> spawns a whole system when a particle is born or
@@ -446,9 +439,8 @@
                             />
                         </li>
                         <li class="row">
-                            <span class="row-no">2.5</span>
                             <div class="row-text">
-                                <p class="row-module">Over Lifetime · By Speed · Forces</p>
+                                <p class="row-module">Over lifetime, by speed, forces</p>
                                 <h3><span data-count="behaviors">25</span> behaviors</h3>
                                 <p>
                                     Each is a class you add to a system; curves are <code>PiecewiseBezier</code>,
@@ -484,9 +476,8 @@
                             />
                         </li>
                         <li class="row">
-                            <span class="row-no">2.6</span>
                             <div class="row-text">
-                                <p class="row-module">Texture Sheet · Material</p>
+                                <p class="row-module">Texture sheet and material</p>
                                 <h3>Texture effects inside the particle shader</h3>
                                 <p>
                                     Flipbooks with frame blending, gradient maps, alpha erosion, UV distortion, soft
@@ -504,7 +495,6 @@
                             />
                         </li>
                         <li class="row row-short">
-                            <span class="row-no">2.7</span>
                             <div class="row-text">
                                 <p class="row-module">Playback</p>
                                 <h3>Pools and timelines</h3>
@@ -516,7 +506,6 @@
                             </div>
                         </li>
                         <li class="row row-short">
-                            <span class="row-no">2.8</span>
                             <div class="row-text">
                                 <p class="row-module">WebGPU</p>
                                 <h3>GLSL and WGSL, both hand-written</h3>
@@ -527,7 +516,6 @@
                             </div>
                         </li>
                         <li class="row row-short">
-                            <span class="row-no">2.9</span>
                             <div class="row-text">
                                 <p class="row-module">Effect files</p>
                                 <h3>A documented JSON format</h3>
@@ -552,14 +540,12 @@
             <!-- Sheet 03: the pipeline, drawn as a four-frame flipbook sheet. -->
             <section id="workflow" class="sheet sheet-pipeline" aria-labelledby="workflow-title">
                 <div class="wrap">
-                    <p class="sheet-no"><span>Sheet 03</span><span>Pipeline</span></p>
                     <header class="sheet-head">
                         <h2 id="workflow-title">From the authoring tool to your scene</h2>
                         <p class="sheet-lead">Four frames, read like a flipbook: left to right, top to bottom.</p>
                     </header>
                     <ol class="frames" aria-label="Pipeline steps">
                         <li>
-                            <span class="frame-no" aria-hidden="true">frame 0</span>
                             <i data-lucide="pen-tool" class="frame-glyph" aria-hidden="true"></i>
                             <h3>Author</h3>
                             <p>
@@ -568,19 +554,16 @@
                             </p>
                         </li>
                         <li>
-                            <span class="frame-no" aria-hidden="true">frame 1</span>
                             <i data-lucide="file-json" class="frame-glyph" aria-hidden="true"></i>
                             <h3>Export JSON</h3>
                             <p>One file per effect, textures embedded or referenced by URL, with a schema.</p>
                         </li>
                         <li>
-                            <span class="frame-no" aria-hidden="true">frame 2</span>
                             <i data-lucide="package-open" class="frame-glyph" aria-hidden="true"></i>
                             <h3>Load</h3>
                             <p><code>QuarksLoader</code> resolves textures and meshes once and shares them.</p>
                         </li>
                         <li>
-                            <span class="frame-no" aria-hidden="true">frame 3</span>
                             <i data-lucide="sparkles" class="frame-glyph" aria-hidden="true"></i>
                             <h3>Render</h3>
                             <p>
@@ -594,7 +577,6 @@
             <!-- Sheet 04: code listings. -->
             <section id="get-started" class="sheet band-2 sheet-code" aria-labelledby="start-title">
                 <div class="wrap">
-                    <p class="sheet-no"><span>Sheet 04</span><span>Code</span></p>
                     <div class="start-grid">
                         <header class="sheet-head">
                             <h2 id="start-title">Running in a few lines</h2>
@@ -782,7 +764,6 @@ const editor = QuarksEffectEditor.Show({
                     <circle cx="800" cy="420" r="1.2" />
                 </svg>
                 <div class="wrap">
-                    <p class="sheet-no"><span>Sheet 05</span><span>Contact sheet</span></p>
                     <header class="sheet-head sheet-head-row">
                         <div>
                             <h2 id="demos-title">Every demo runs live in your browser</h2>
@@ -812,7 +793,6 @@ const editor = QuarksEffectEditor.Show({
             <!-- Sheet 06: the editor, with callouts. -->
             <section id="editor" class="sheet" aria-labelledby="editor-title">
                 <div class="wrap">
-                    <p class="sheet-no"><span>Sheet 06</span><span>Editor</span></p>
                     <div class="plate-grid">
                         <div class="plate-text">
                             <h2 id="editor-title">A Shuriken-style editor that runs in the browser</h2>
@@ -871,7 +851,6 @@ const editor = QuarksEffectEditor.Show({
             <!-- Sheet 07: the Unity exporter. -->
             <section id="unity" class="sheet band-slant" aria-labelledby="unity-title">
                 <div class="wrap">
-                    <p class="sheet-no"><span>Sheet 07</span><span>Unity exporter</span></p>
                     <div class="plate-grid plate-grid-flip">
                         <div class="plate-text">
                             <h2 id="unity-title">Bring your Unity effects with you</h2>
@@ -944,7 +923,6 @@ const editor = QuarksEffectEditor.Show({
             <!-- Sheet 08: the packages. -->
             <section id="packages" class="sheet" aria-labelledby="packages-title">
                 <div class="wrap">
-                    <p class="sheet-no"><span>Sheet 08</span><span>Packages</span></p>
                     <header class="sheet-head">
                         <h2 id="packages-title">Released together, versioned together</h2>
                     </header>
@@ -1009,7 +987,7 @@ const editor = QuarksEffectEditor.Show({
                     <p>
                         Open source under the MIT license. The engine descends from three.quarks. Every effect on this
                         page is rendered live by babylon.quarks %VITE_QUARKS_VERSION% in your browser; the stills were
-                        captured from the same demos. Set in Source Serif 4, Archivo and JetBrains Mono.
+                        captured from the same demos. Set in Chakra Petch, IBM Plex Sans and JetBrains Mono.
                     </p>
                 </div>
                 <nav aria-label="Learn">

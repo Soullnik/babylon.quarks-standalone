@@ -59,8 +59,8 @@
     --tok-call: #c9b4ff;
     --tok-comment: #7d879b;
 
-    --font-display: 'Source Serif 4', 'Iowan Old Style', Georgia, 'Times New Roman', serif;
-    --font-ui: 'Archivo', 'Segoe UI', system-ui, -apple-system, sans-serif;
+    --font-display: 'Chakra Petch', 'Segoe UI', system-ui, sans-serif;
+    --font-ui: 'IBM Plex Sans', 'Segoe UI', system-ui, -apple-system, sans-serif;
     --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
 
     --step--1: 0.875rem;
@@ -189,7 +189,8 @@ h3 {
 
 h2,
 h3 {
-    font-family: var(--font-ui);
+    font-family: var(--font-display);
+    font-weight: 600;
 }
 
 :focus-visible {
@@ -238,32 +239,6 @@ h3 {
 
 /* ---------- sheet furniture ---------- */
 
-/* The sheet's number and title, with the ramp running out to the margin as the rule. */
-.sheet-no {
-    display: flex;
-    align-items: center;
-    gap: 14px;
-    font-family: var(--font-mono);
-    font-size: 0.72rem;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    color: var(--ink-soft);
-    white-space: nowrap;
-}
-
-.sheet-no span:first-child {
-    color: var(--cyan);
-    font-weight: 500;
-}
-
-.sheet-no::after {
-    content: '';
-    flex: 1;
-    height: 1px;
-    background: var(--ramp);
-    opacity: 0.7;
-}
-
 .sheet {
     position: relative;
     padding-block: clamp(36px, 5vw, 64px) clamp(44px, 7vw, 96px);
@@ -272,18 +247,14 @@ h3 {
 .sheet-head {
     display: grid;
     gap: 14px;
-    margin: clamp(22px, 3vw, 36px) 0 clamp(26px, 4vw, 44px);
+    margin: 0 0 clamp(26px, 4vw, 44px);
     max-width: 44rem;
 }
 
 .sheet h2 {
-    font-family: var(--font-ui);
-    font-stretch: 68%;
-    font-weight: 700;
     font-size: var(--step-3);
-    line-height: 1;
-    letter-spacing: -0.005em;
-    text-transform: uppercase;
+    line-height: 1.1;
+    letter-spacing: -0.01em;
 }
 
 .sheet-lead {
@@ -389,7 +360,6 @@ h3 {
 }
 
 figcaption {
-    font-family: var(--font-display);
     font-style: italic;
     font-size: 0.95rem;
     color: var(--ink-soft);
@@ -454,12 +424,15 @@ figcaption code {
 }
 
 .brand-name {
-    font-family: var(--font-ui);
-    font-stretch: 75%;
-    font-weight: 700;
-    font-size: 1.05rem;
-    letter-spacing: 0.02em;
-    text-transform: uppercase;
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: 1.15rem;
+}
+
+.brand img {
+    width: 44px;
+    height: 44px;
+    margin: -6px -4px -6px -6px;
 }
 
 .brand-version {
@@ -572,8 +545,6 @@ figcaption code {
     align-items: center;
     gap: 6px;
     font: 500 0.74rem var(--font-mono);
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
     padding: 5px 10px;
     border: 1px solid var(--window-rule);
     background: transparent;
@@ -612,7 +583,6 @@ figcaption code {
     grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
     gap: clamp(28px, 4vw, 64px);
     align-items: start;
-    margin-top: clamp(24px, 3vw, 40px);
 }
 
 .hero-copy {
@@ -623,10 +593,10 @@ figcaption code {
 
 .hero h1 {
     font-family: var(--font-display);
-    font-weight: 400;
+    font-weight: 600;
     font-size: var(--step-4);
-    line-height: 1.08;
-    letter-spacing: -0.015em;
+    line-height: 1.06;
+    letter-spacing: -0.01em;
 }
 
 .lead {
@@ -700,10 +670,7 @@ figcaption code {
 
 .spec dt {
     order: 1;
-    font-family: var(--font-mono);
-    font-size: 0.68rem;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
+    font-size: 0.86rem;
     color: var(--ink-soft);
     white-space: nowrap;
 }
@@ -712,9 +679,8 @@ figcaption code {
     order: 3;
     margin: 0;
     white-space: nowrap;
-    font-family: var(--font-ui);
-    font-stretch: 75%;
-    font-weight: 700;
+    font-family: var(--font-display);
+    font-weight: 600;
     font-size: 1.05rem;
     font-variant-numeric: tabular-nums;
 }
@@ -740,14 +706,6 @@ figcaption code {
 
 .stage-bar::-webkit-scrollbar {
     display: none;
-}
-
-.stage-bar-label {
-    color: var(--cyan);
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    font-size: 0.7rem;
-    margin-right: 10px;
 }
 
 .stage-bar button {
@@ -895,6 +853,7 @@ figcaption code {
 
 .breakdown h2 {
     font-size: var(--step-2);
+    line-height: 1.15;
 }
 
 .breakdown-head {
@@ -971,7 +930,6 @@ figcaption code {
 }
 
 .breakdown-source {
-    font-family: var(--font-display);
     font-style: italic;
     font-size: 0.95rem;
     color: var(--ink-soft);
@@ -1017,18 +975,11 @@ figcaption code {
 
 .row {
     display: grid;
-    grid-template-columns: 4rem minmax(0, 1fr) minmax(0, 360px);
+    grid-template-columns: minmax(0, 1fr) minmax(0, 360px);
     gap: 24px clamp(16px, 3vw, 40px);
     padding: clamp(22px, 3vw, 34px) 0;
     border-bottom: 1px solid var(--rule);
     align-items: start;
-}
-
-.row-no {
-    font-family: var(--font-mono);
-    font-size: 0.8rem;
-    color: var(--cyan);
-    padding-top: 0.35em;
 }
 
 .row-text {
@@ -1038,16 +989,11 @@ figcaption code {
 }
 
 .row-module {
-    font-family: var(--font-mono);
-    font-size: 0.7rem;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    color: var(--ink-soft);
+    font-size: 0.86rem;
+    color: var(--cyan);
 }
 
 .row h3 {
-    font-family: var(--font-display);
-    font-weight: 400;
     font-size: var(--step-2);
     line-height: 1.15;
 }
@@ -1070,7 +1016,7 @@ figcaption code {
 }
 
 .row-short {
-    grid-template-columns: 4rem minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr);
 }
 
 .behavior-list {
@@ -1094,11 +1040,10 @@ figcaption code {
 @media (max-width: 800px) {
     .row,
     .row-short {
-        grid-template-columns: 3rem minmax(0, 1fr);
+        grid-template-columns: minmax(0, 1fr);
     }
 
     .row img {
-        grid-column: 2;
         max-width: 480px;
     }
 }
@@ -1128,24 +1073,13 @@ figcaption code {
     display: grid;
     gap: 10px;
     align-content: start;
-    padding: 44px 22px 26px;
+    padding: 26px 22px;
     border-left: 1px dashed var(--rule-strong);
     min-width: 0;
 }
 
 .frames li:first-child {
     border-left: 0;
-}
-
-.frame-no {
-    position: absolute;
-    top: 10px;
-    left: 12px;
-    font-family: var(--font-mono);
-    font-size: 0.7rem;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: var(--ink-soft);
 }
 
 .frame-glyph {
@@ -1156,8 +1090,6 @@ figcaption code {
 }
 
 .frames h3 {
-    font-family: var(--font-display);
-    font-weight: 400;
     font-size: var(--step-2);
 }
 
@@ -1388,8 +1320,8 @@ figcaption code {
 }
 
 .sheet-contact .orbits {
-    right: -340px;
-    top: -140px;
+    right: -300px;
+    top: -300px;
     width: 900px;
     height: 520px;
     opacity: 0.45;
@@ -1447,9 +1379,7 @@ figcaption code {
 }
 
 .chip {
-    font: 500 0.78rem var(--font-mono);
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
+    font: 500 0.9rem var(--font-ui);
     padding: 4px 0;
     border: 0;
     border-bottom: 2px solid transparent;
@@ -1499,20 +1429,13 @@ figcaption code {
     display: flex;
     align-items: baseline;
     gap: 12px;
-    font-family: var(--font-ui);
-    font-stretch: 75%;
-    font-weight: 700;
-    font-size: 1.1rem;
-    text-transform: uppercase;
-    letter-spacing: 0.02em;
+    font-size: 1.2rem;
 }
 
 .demo-group h3 span {
-    font-family: var(--font-mono);
-    font-size: 0.68rem;
+    font-family: var(--font-ui);
+    font-size: 0.86rem;
     font-weight: 400;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
     color: var(--ink-soft);
 }
 
@@ -1612,7 +1535,6 @@ figcaption code {
     grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
     gap: clamp(28px, 4vw, 64px);
     align-items: start;
-    margin-top: clamp(22px, 3vw, 36px);
 }
 
 .plate-grid-flip .plate-text {
@@ -1815,11 +1737,8 @@ figcaption code {
 }
 
 .packages thead th {
-    font-family: var(--font-mono);
-    font-weight: 500;
-    font-size: 0.68rem;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
+    font-weight: 400;
+    font-size: 0.86rem;
     color: var(--ink-soft);
     border-bottom: 1px solid var(--rule-strong);
 }
@@ -1895,7 +1814,6 @@ figcaption code {
 }
 
 .colophon-text p {
-    font-family: var(--font-display);
     font-style: italic;
     color: var(--ink-soft);
     font-size: 0.95rem;
@@ -1909,12 +1827,7 @@ figcaption code {
 }
 
 .colophon h2 {
-    font-family: var(--font-mono);
-    font-size: 0.68rem;
-    font-weight: 500;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    color: var(--ink-soft);
+    font-size: 1rem;
     margin-bottom: 4px;
 }
 
