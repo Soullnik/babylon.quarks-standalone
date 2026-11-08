@@ -1,18 +1,4 @@
-import {
-    ArrowRight,
-    ArrowUpRight,
-    Copy,
-    createIcons,
-    FileJson,
-    Menu,
-    Moon,
-    PackageOpen,
-    PenTool,
-    Play,
-    Search,
-    Sparkles,
-    Sun,
-} from 'lucide';
+import {ArrowRight, ArrowUpRight, Copy, createIcons, Menu, Moon, Play, Search, Sun} from 'lucide';
 import {siGithub, siNpm} from 'simple-icons';
 import {demoManifest, previewFile, SECTIONS} from '../demoManifest';
 import type {DemoManifestEntry} from '../types';
@@ -93,20 +79,7 @@ function setupIcons() {
         }
     }
     createIcons({
-        icons: {
-            ArrowRight,
-            ArrowUpRight,
-            Copy,
-            FileJson,
-            Menu,
-            Moon,
-            PackageOpen,
-            PenTool,
-            Play,
-            Search,
-            Sparkles,
-            Sun,
-        },
+        icons: {ArrowRight, ArrowUpRight, Copy, Menu, Moon, Play, Search, Sun},
         attrs: {'stroke-width': 1.75, 'aria-hidden': 'true'},
     });
 }
@@ -201,7 +174,10 @@ function rovingIndex(key: string, index: number, count: number) {
     }
 }
 
-/** Tab lists: `[role=tablist]` buttons with `aria-controls` panels; arrows, Home and End move between tabs. */
+/**
+ * Tab lists: `[role=tablist]` buttons with `aria-controls` panels; arrows, Home and End move between
+ * tabs. A figure with `data-tab-figure="<tab id>"` shows only while that tab is selected.
+ */
 function setupTabs() {
     for (const list of Array.from(document.querySelectorAll<HTMLElement>('[role="tablist"][data-panels]'))) {
         const tabs = Array.from(list.querySelectorAll<HTMLButtonElement>('[role="tab"]'));
@@ -214,6 +190,9 @@ function setupTabs() {
                 if (panel) {
                     panel.hidden = !selected;
                 }
+            }
+            for (const figure of Array.from(document.querySelectorAll<HTMLElement>('[data-tab-figure]'))) {
+                figure.hidden = figure.dataset.tabFigure !== tab.id;
             }
             if (focus) {
                 tab.focus();
@@ -310,20 +289,28 @@ function escapeHtml(text: string) {
 }
 
 function demoCard(demo: DemoManifestEntry) {
-    const tags = demo.tags.map((tag) => `<li>${escapeHtml(tag)}</li>`).join('');
-    return `<li class="demo">
+    const showcase = demo.section === 'showcase';
+    const tags = [
+        ...(showcase ? [] : [`<li class="demo-category">${escapeHtml(demo.category)}</li>`]),
+        ...demo.tags.map((tag) => `<li>${escapeHtml(tag)}</li>`),
+    ].join('');
+    const description = showcase
+        ? ''
+        : `
+  <p>${escapeHtml(demo.description)}</p>`;
+    return `<li class="demo${showcase ? ' demo-large' : ''}">
   <a class="demo-link" href="./babylonDemo.html#${encodeURIComponent(demo.key)}">
     <span class="demo-shot"><img src="./previews/${previewFile(demo.key)}" alt="" loading="lazy" decoding="async" width="640" height="360" /></span>
     <span class="demo-name">${escapeHtml(demo.name)}</span>
-  </a>
-  <p>${escapeHtml(demo.description)}</p>
+  </a>${description}
   <ul class="demo-tags" aria-label="Tags">${tags}</ul>
 </li>`;
 }
 
 /**
- * The gallery: the showcase, then the feature demos, each under its category's heading. The chips
- * pick a section; the search matches names, descriptions, categories and tags.
+ * The gallery: the showcase as large cards, then every feature demo in one dense grid, in the
+ * manifest's section and category order. The chips pick a section; the search matches names,
+ * descriptions, categories and tags.
  */
 function setupGallery() {
     const grid = document.getElementById('demos-grid');
@@ -361,29 +348,19 @@ function setupGallery() {
                 `${demo.name} ${demo.description} ${demo.category} ${demo.tags.join(' ')}`
                     .toLowerCase()
                     .includes(query));
-        let count = 0;
-        const groups: string[] = [];
-        for (const section of SECTIONS) {
-            for (const category of section.categories) {
-                const cards = demoManifest.filter(
+        const cards = SECTIONS.flatMap((section) =>
+            section.categories.flatMap((category) =>
+                demoManifest.filter(
                     (demo) => demo.section === section.id && demo.category === category && matches(demo)
-                );
-                if (cards.length === 0) {
-                    continue;
-                }
-                count += cards.length;
-                groups.push(
-                    `<li class="demo-group"><h3>${escapeHtml(category)}<span>${escapeHtml(section.title)}</span></h3></li>`,
-                    ...cards.map(demoCard)
-                );
-            }
-        }
-        grid.innerHTML = groups.join('');
+                )
+            )
+        );
+        grid.innerHTML = cards.map(demoCard).join('');
         if (status) {
             status.textContent =
-                count === demoManifest.length
+                cards.length === demoManifest.length
                     ? `${demoManifest.length} demos`
-                    : `${count} of ${demoManifest.length} demos`;
+                    : `${cards.length} of ${demoManifest.length} demos`;
         }
     };
     search?.addEventListener('input', render);

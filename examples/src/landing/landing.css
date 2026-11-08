@@ -1,18 +1,16 @@
 /*
- * Landing page for babylon.quarks, laid out as a VFX artist's breakdown sheet: ruled headers, the
- * live effects in windows with viewfinder brackets at the corners, and the hero effect followed by
- * the legend of the systems it is made of.
+ * Landing page for babylon.quarks. The live effects sit in windows with viewfinder brackets at the
+ * corners; the hero effect is followed by the facts and by the legend of the systems it is made of.
  *
  * Colour comes from the logo: an orb in two tilted orbit rings, cyan through violet to magenta.
  * The ground is dark first (additive particles only read on a dark ground, and the ramp glows
- * there) with a cool paper theme as the alternative. The ramp is used with intent: the sheet rules,
- * the frame of the hero window, the active take, the callouts and the orbit line-art; never as a
- * haze. Sections differ in shape: the hero sits on orbit rings, the module stack is an inverted
- * band with slanted edges, the pipeline's flipbook straddles the rule into the code band, and the
- * contact sheet carries one large orbit arc behind its header.
+ * there) with a cool paper theme as the alternative. The ramp is used with intent: the masthead
+ * and footer rules, the frame of the hero window and the two rings that orbit it, the active take
+ * and tab, the callouts, the curve figure and the edges of the module band. The module band is
+ * the page's one shaped transition.
  */
 :root {
-    /* The two palettes; `--ground` and friends pick one, `.band-inverse` the other. */
+    /* The two palettes; `--ground` and friends pick one. */
     --d-ground: #0b0d12;
     --d-ground-2: #11141b;
     --d-ink: #e9ebf2;
@@ -29,7 +27,7 @@
     --p-ink-soft: #555c6e;
     --p-rule: #c8cdd9;
     --p-rule-strong: #8b93a6;
-    --p-cyan: #0a8792;
+    --p-cyan: #066d77;
     --p-violet: #6b2fd6;
     --p-magenta: #b227c4;
 
@@ -74,6 +72,7 @@
     --gutter: 24px;
     --masthead-h: 56px;
     --slant: clamp(24px, 3.5vw, 56px);
+    --section: clamp(40px, 5vw, 72px);
 }
 
 :root[data-theme='light'] {
@@ -88,35 +87,6 @@
     --violet: var(--p-violet);
     --magenta: var(--p-magenta);
     --focus: var(--p-violet);
-}
-
-/* The inverted band prints the other palette. */
-.band-inverse {
-    --ground: var(--p-ground);
-    --ground-2: var(--p-ground-2);
-    --ink: var(--p-ink);
-    --ink-soft: var(--p-ink-soft);
-    --rule: var(--p-rule);
-    --rule-strong: var(--p-rule-strong);
-    --cyan: var(--p-cyan);
-    --violet: var(--p-violet);
-    --magenta: var(--p-magenta);
-    --focus: var(--p-violet);
-    color-scheme: light;
-}
-
-:root[data-theme='light'] .band-inverse {
-    --ground: var(--d-ground);
-    --ground-2: var(--d-ground-2);
-    --ink: var(--d-ink);
-    --ink-soft: var(--d-ink-soft);
-    --rule: var(--d-rule);
-    --rule-strong: var(--d-rule-strong);
-    --cyan: var(--d-cyan);
-    --violet: var(--d-violet);
-    --magenta: var(--d-magenta);
-    --focus: var(--d-cyan);
-    color-scheme: dark;
 }
 
 *,
@@ -237,17 +207,17 @@ h3 {
     padding-right: max(var(--gutter), env(safe-area-inset-right, 0px));
 }
 
-/* ---------- sheet furniture ---------- */
+/* ---------- sections ---------- */
 
 .sheet {
     position: relative;
-    padding-block: clamp(36px, 5vw, 64px) clamp(44px, 7vw, 96px);
+    padding-block: var(--section);
 }
 
 .sheet-head {
     display: grid;
     gap: 14px;
-    margin: 0 0 clamp(26px, 4vw, 44px);
+    margin: 0 0 clamp(26px, 4vw, 40px);
     max-width: 44rem;
 }
 
@@ -282,6 +252,13 @@ h3 {
     max-width: 40rem;
 }
 
+/* The second ground, as a plain band with rules. */
+.band-2 {
+    background: var(--ground-2);
+    border-top: 1px solid var(--rule);
+    border-bottom: 1px solid var(--rule);
+}
+
 /* An arrow link: plain text with Lucide's arrow, the page's only call-to-action style. */
 .arrow-link {
     display: inline-flex;
@@ -309,14 +286,14 @@ h3 {
 
 .plain-links {
     list-style: none;
-    margin: 4px 0 0;
+    margin: 0;
     padding: 0;
     display: grid;
     gap: 8px;
     justify-items: start;
 }
 
-/* A window: a dark surface with a viewfinder bracket hugging each of its four corners. */
+/* A window: a dark surface with viewfinder brackets hugging its corners. */
 .window {
     position: relative;
     background: var(--window);
@@ -370,24 +347,6 @@ figcaption code {
     font-style: normal;
 }
 
-/* Orbit line-art: two tilted rings and a few sparkles, the logo's motif drawn as hairlines. */
-.orbits {
-    position: absolute;
-    pointer-events: none;
-    z-index: 0;
-    overflow: visible;
-}
-
-.orbits ellipse {
-    fill: none;
-    stroke: url(#orbit-ramp);
-    stroke-width: 1;
-}
-
-.orbits circle {
-    fill: var(--cyan);
-}
-
 /* ---------- masthead ---------- */
 
 .masthead {
@@ -424,16 +383,25 @@ figcaption code {
     flex-shrink: 0;
 }
 
+/* The mark on a dark tile, so it stays crisp on the paper theme too; the art is untouched. */
+.brand-mark {
+    display: inline-grid;
+    place-items: center;
+    height: 36px;
+    padding: 0 6px;
+    background: var(--window);
+    border-radius: 6px;
+}
+
+.brand-mark img {
+    height: 26px;
+    width: auto;
+}
+
 .brand-name {
     font-family: var(--font-display);
     font-weight: 600;
     font-size: 1.15rem;
-}
-
-.brand img {
-    width: 44px;
-    height: 44px;
-    margin: -6px -4px -6px -6px;
 }
 
 .brand-version {
@@ -505,6 +473,16 @@ figcaption code {
     display: none;
 }
 
+@media (max-width: 480px) {
+    .brand-version {
+        display: none;
+    }
+
+    .masthead-row {
+        gap: 12px;
+    }
+}
+
 @media (max-width: 900px) {
     .menu-button {
         display: inline-grid;
@@ -523,7 +501,8 @@ figcaption code {
         align-items: stretch;
         gap: 0;
         margin: 0;
-        padding: 4px max(16px, env(safe-area-inset-right, 0px)) 12px max(16px, env(safe-area-inset-left, 0px));
+        padding: 4px max(var(--gutter), env(safe-area-inset-right, 0px)) 12px
+            max(var(--gutter), env(safe-area-inset-left, 0px));
         background: var(--ground);
         border-bottom: 1px solid var(--rule-strong);
     }
@@ -533,7 +512,7 @@ figcaption code {
     }
 
     .site-nav a {
-        padding: 12px 4px;
+        padding: 12px 0;
         font-size: 1rem;
         border-bottom: 1px solid var(--rule);
     }
@@ -558,46 +537,42 @@ figcaption code {
     border-color: var(--window-muted);
 }
 
-/* ---------- sheet 01: hero ---------- */
+/* ---------- hero ---------- */
 
 .hero {
     overflow: hidden;
 }
 
-.hero .wrap {
-    position: relative;
-    z-index: 1;
-}
-
-/* The rings hug the hero window, the way the logo's rings hug its orb; the window covers the rest. */
-.hero .orbits {
-    left: 50%;
-    top: 0;
-    width: 1600px;
-    height: 900px;
-    transform: translateX(-50%);
-    opacity: 0.5;
-}
-
+/* Title and copy on the left, the stage on the right; on narrow screens the stage follows the title. */
 .hero-grid {
     display: grid;
     grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
-    gap: clamp(28px, 4vw, 64px);
+    grid-template-areas:
+        'title stage'
+        'copy stage';
+    gap: 24px clamp(28px, 4vw, 64px);
     align-items: start;
 }
 
-.hero-copy {
-    display: grid;
-    gap: 22px;
-    min-width: 0;
-}
-
-.hero h1 {
+.hero-title {
+    grid-area: title;
     font-family: var(--font-display);
     font-weight: 600;
     font-size: var(--step-4);
     line-height: 1.06;
     letter-spacing: -0.01em;
+}
+
+.hero-copy {
+    grid-area: copy;
+    display: grid;
+    gap: 22px;
+    min-width: 0;
+    align-content: start;
+}
+
+.hero-side {
+    grid-area: stage;
 }
 
 .lead {
@@ -644,46 +619,14 @@ figcaption code {
     font-size: 1rem;
 }
 
-/* The spec list: label, dotted leader, value, like a data sheet's margin. */
-.spec {
-    margin: clamp(28px, 4vw, 48px) 0 0;
-    display: grid;
-    gap: 0;
-    border-top: 1px solid var(--rule-strong);
-}
-
-.spec > div {
-    display: flex;
-    align-items: baseline;
-    gap: 10px;
-    padding: 9px 0;
-    border-bottom: 1px solid var(--rule);
-}
-
-.spec > div::before {
-    content: '';
-    order: 2;
-    flex: 1;
-    border-bottom: 1px dotted var(--rule-strong);
-    transform: translateY(-0.3em);
-    min-width: 16px;
-}
-
-.spec dt {
-    order: 1;
-    font-size: 0.86rem;
-    color: var(--ink-soft);
-    white-space: nowrap;
-}
-
-.spec dd {
-    order: 3;
-    margin: 0;
-    white-space: nowrap;
-    font-family: var(--font-display);
-    font-weight: 600;
-    font-size: 1.05rem;
-    font-variant-numeric: tabular-nums;
+@media (max-width: 960px) {
+    .hero-grid {
+        grid-template-columns: minmax(0, 1fr);
+        grid-template-areas:
+            'title'
+            'stage'
+            'copy';
+    }
 }
 
 /* ---------- the stage ---------- */
@@ -695,12 +638,11 @@ figcaption code {
     gap: 12px;
 }
 
-/* The takes line up with the frame below them and stand clear of its corner brackets. */
 .stage-bar {
     display: flex;
     align-items: baseline;
     gap: 2px;
-    margin: 0 15px 4px;
+    margin: 0 0 4px;
     overflow-x: auto;
     scrollbar-width: none;
     font-family: var(--font-mono);
@@ -722,6 +664,10 @@ figcaption code {
     cursor: pointer;
 }
 
+.stage-bar button:first-child {
+    padding-left: 0;
+}
+
 .stage-bar button:hover {
     color: var(--ink);
 }
@@ -734,17 +680,50 @@ figcaption code {
 
 /* The hero window's frame is the ramp itself: a 1px gradient edge around the canvas. */
 .stage-frame {
-    margin-inline: 15px; /* room for the corner brackets inside the column */
+    position: relative;
     padding: 1px;
     background: var(--ramp-diagonal);
-    position: relative;
 }
 
 .stage-view {
+    position: relative;
+    z-index: 1;
     aspect-ratio: 16 / 10;
     max-width: 100%;
     border: 0;
+}
+
+/* The orbit rings: tilted ellipses a little wider than the window, split so the back halves pass
+   behind it and the front halves over it. They stay inside the window's height, clear of the rows
+   above and below. */
+.orbit {
+    position: absolute;
+    left: -9%;
+    top: 6%;
+    width: 118%;
+    height: 88%;
+    pointer-events: none;
     overflow: visible;
+    fill: none;
+    stroke: url(#orbit-ramp);
+    stroke-width: 1.5;
+}
+
+.orbit-back {
+    z-index: 0;
+    opacity: 0.55;
+}
+
+.orbit-front {
+    z-index: 3;
+    opacity: 0.9;
+}
+
+@media (max-width: 960px) {
+    .orbit {
+        left: -5%;
+        width: 110%;
+    }
 }
 
 .stage-view canvas,
@@ -780,12 +759,12 @@ figcaption code {
     align-items: center;
     gap: 8px;
     font: 500 0.8rem var(--font-mono);
-    letter-spacing: 0.04em;
     padding: 10px 16px;
     border: 1px solid rgb(255 255 255 / 40%);
     background: rgb(7 9 13 / 75%);
     color: var(--window-fg);
     cursor: pointer;
+    z-index: 4;
 }
 
 .stage-play[hidden] {
@@ -797,7 +776,6 @@ figcaption code {
     flex-wrap: wrap;
     align-items: baseline;
     gap: 6px 18px;
-    padding: 0 15px;
     font-family: var(--font-mono);
     font-size: 0.76rem;
     color: var(--ink-soft);
@@ -845,13 +823,66 @@ figcaption code {
     color: var(--violet);
 }
 
-/* ---------- the breakdown legend, under the stage ---------- */
+@media (max-width: 640px) {
+    .stage-bar {
+        flex-wrap: wrap;
+        overflow: visible;
+    }
+}
+
+/* ---------- the spec strip ---------- */
+
+.spec {
+    margin: clamp(28px, 4vw, 44px) 0 0;
+    display: grid;
+    grid-template-columns: repeat(7, auto);
+    justify-content: space-between;
+    gap: 12px 24px;
+    padding: 14px 0;
+    border-top: 1px solid var(--rule-strong);
+    border-bottom: 1px solid var(--rule);
+}
+
+.spec > div {
+    display: grid;
+    gap: 2px;
+}
+
+.spec dt {
+    font-size: 0.86rem;
+    color: var(--ink-soft);
+    white-space: nowrap;
+}
+
+.spec dd {
+    margin: 0;
+    white-space: nowrap;
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: 1.1rem;
+    font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 960px) {
+    .spec {
+        grid-template-columns: repeat(4, auto);
+    }
+}
+
+@media (max-width: 640px) {
+    .spec {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+/* ---------- the breakdown legend ---------- */
 
 .breakdown {
-    margin-top: clamp(28px, 3vw, 40px);
-    padding-inline: 15px;
+    margin-top: clamp(32px, 4vw, 48px);
     display: grid;
-    gap: 14px;
+    grid-template-columns: minmax(0, 4fr) minmax(0, 8fr);
+    gap: 20px clamp(28px, 4vw, 64px);
+    align-items: start;
 }
 
 .breakdown h2 {
@@ -861,28 +892,34 @@ figcaption code {
 
 .breakdown-head {
     display: grid;
-    gap: 10px;
+    gap: 12px;
 }
 
 .breakdown-head p {
     color: var(--ink-soft);
-    max-width: 40em;
+    max-width: 34em;
     font-size: 0.95rem;
 }
 
+.breakdown-source {
+    font-style: italic;
+}
+
+/* Another take is running: the legend does not describe it, so it steps aside with one quiet line. */
 .breakdown-note {
     display: none;
-    font-family: var(--font-mono);
-    font-size: 0.76rem;
-    color: var(--magenta) !important;
+    grid-column: 1 / -1;
+    color: var(--ink-soft);
+    font-size: 0.95rem;
 }
 
 .breakdown[data-active-effect]:not([data-active-effect='vortex']) .breakdown-note {
     display: block;
 }
 
+.breakdown[data-active-effect]:not([data-active-effect='vortex']) .breakdown-head,
 .breakdown[data-active-effect]:not([data-active-effect='vortex']) .layers {
-    opacity: 0.45;
+    display: none;
 }
 
 .layers {
@@ -891,7 +928,6 @@ figcaption code {
     padding: 0;
     border-top: 1px solid var(--rule-strong);
     font-size: 0.9rem;
-    transition: opacity 0.3s ease;
 }
 
 .layers li {
@@ -921,7 +957,7 @@ figcaption code {
 .layer-mode {
     grid-area: mode;
     font-family: var(--font-mono);
-    font-size: 0.74rem;
+    font-size: 0.76rem;
     color: var(--ink-soft);
 }
 
@@ -932,19 +968,9 @@ figcaption code {
     color: var(--ink);
 }
 
-.breakdown-source {
-    font-style: italic;
-    font-size: 0.95rem;
-    color: var(--ink-soft);
-}
-
 @media (max-width: 960px) {
-    .hero-grid {
+    .breakdown {
         grid-template-columns: minmax(0, 1fr);
-    }
-
-    .hero .orbits {
-        display: none;
     }
 }
 
@@ -958,15 +984,32 @@ figcaption code {
     }
 }
 
-/* ---------- sheet 02: the inverted, slanted band of module rows ---------- */
+/* ---------- the module band: the one shaped transition, with a ramp line on each diagonal ---------- */
 
-.band-inverse {
-    background: var(--ground);
-    color: var(--ink);
-    margin-top: var(--slant);
-    padding-top: calc(var(--slant) + clamp(36px, 5vw, 64px));
-    padding-bottom: calc(var(--slant) + clamp(44px, 7vw, 96px));
+.band {
+    background: var(--ground-2);
+    padding-top: calc(var(--slant) + var(--section));
+    padding-bottom: calc(var(--slant) + var(--section));
     clip-path: polygon(0 var(--slant), 100% 0, 100% calc(100% - var(--slant)), 0 100%);
+}
+
+.band-edge {
+    position: absolute;
+    left: 0;
+    width: 100%;
+    height: var(--slant);
+    stroke: url(#band-ramp);
+    stroke-width: 2.5;
+    opacity: 0.8;
+    pointer-events: none;
+}
+
+.band-edge-top {
+    top: 0;
+}
+
+.band-edge-bottom {
+    bottom: 0;
 }
 
 .rows {
@@ -978,22 +1021,16 @@ figcaption code {
 
 .row {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 360px);
-    gap: 24px clamp(16px, 3vw, 40px);
+    grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
+    gap: 24px clamp(24px, 4vw, 56px);
     padding: clamp(22px, 3vw, 34px) 0;
     border-bottom: 1px solid var(--rule);
-    align-items: start;
+    align-items: center;
 }
 
 .row-text {
     display: grid;
     gap: 10px;
-    max-width: 38rem;
-}
-
-.row-module {
-    font-size: 0.86rem;
-    color: var(--cyan);
 }
 
 .row h3 {
@@ -1001,7 +1038,7 @@ figcaption code {
     line-height: 1.15;
 }
 
-.row p:not(.row-module) {
+.row p {
     color: var(--ink-soft);
 }
 
@@ -1018,10 +1055,6 @@ figcaption code {
     border: 1px solid var(--rule-strong);
 }
 
-.row-short {
-    grid-template-columns: minmax(0, 1fr);
-}
-
 .behavior-list {
     list-style: none;
     margin: 6px 0 0;
@@ -1030,7 +1063,7 @@ figcaption code {
     flex-wrap: wrap;
     gap: 4px 12px;
     font-family: var(--font-mono);
-    font-size: 0.74rem;
+    font-size: 0.78rem;
     color: var(--ink-soft);
 }
 
@@ -1040,133 +1073,167 @@ figcaption code {
     color: var(--violet);
 }
 
-@media (max-width: 800px) {
-    .row,
-    .row-short {
-        grid-template-columns: minmax(0, 1fr);
-    }
-
-    .row img {
-        max-width: 480px;
-    }
-}
-
-/* ---------- sheet 03: the flipbook, straddling the rule into the code band ---------- */
-
-.sheet-pipeline {
-    padding-bottom: 0;
-    z-index: 2;
-}
-
-.frames {
+/* The three shorter topics, as one strip under the rows. */
+.row-strip {
     list-style: none;
-    margin: 0 0 calc(-1 * var(--overlap));
+    margin: 0;
     padding: 0;
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    border: 1px solid var(--rule-strong);
-    background: var(--ground);
-    counter-reset: frame;
-    position: relative;
-    --overlap: clamp(48px, 6vw, 88px);
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: clamp(24px, 4vw, 56px);
+    padding-top: clamp(22px, 3vw, 34px);
 }
 
-.frames li {
-    position: relative;
+.row-strip li {
     display: grid;
-    gap: 10px;
+    gap: 8px;
     align-content: start;
-    padding: 26px 22px;
-    border-left: 1px dashed var(--rule-strong);
-    min-width: 0;
+    justify-items: start;
 }
 
-.frames li:first-child {
-    border-left: 0;
+.row-strip h3 {
+    font-size: 1.2rem;
+    line-height: 1.2;
 }
 
-.frame-glyph {
-    width: 40px;
-    height: 40px;
-    color: var(--cyan);
-    margin-bottom: 6px;
-}
-
-.frames h3 {
-    font-size: var(--step-2);
-}
-
-.frames h3::before {
-    counter-increment: frame;
-    content: counter(frame) '. ';
-    color: var(--violet);
-}
-
-.frames p {
+.row-strip p {
     color: var(--ink-soft);
     font-size: 0.95rem;
 }
 
-.frames a {
-    color: var(--ink);
-}
-
 @media (max-width: 800px) {
-    .frames {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-
-    .frames li:nth-child(3) {
-        border-left: 0;
-    }
-
-    .frames li:nth-child(n + 3) {
-        border-top: 1px dashed var(--rule-strong);
-    }
-}
-
-@media (max-width: 420px) {
-    .frames {
+    .row {
         grid-template-columns: minmax(0, 1fr);
     }
 
-    .frames li {
-        border-left: 0;
+    .row img {
+        max-width: 520px;
     }
 
-    .frames li + li {
-        border-top: 1px dashed var(--rule-strong);
+    .row-strip {
+        grid-template-columns: minmax(0, 1fr);
     }
 }
 
-/* ---------- sheet 04: the code band, full bleed on the second ground ---------- */
+/* ---------- get started: the flow strip and the listings ---------- */
 
-.band-2 {
-    background: var(--ground-2);
-    border-top: 1px solid var(--rule);
-    border-bottom: 1px solid var(--rule);
+/* Author, file, loader, scene: the four artefacts of the pipeline, joined by a line. */
+.flow {
+    list-style: none;
+    margin: 0 0 clamp(28px, 4vw, 44px);
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 28px;
 }
 
-.sheet-code {
-    padding-top: calc(clamp(48px, 6vw, 88px) + clamp(36px, 5vw, 64px));
+.flow li {
+    position: relative;
+    display: grid;
+    grid-template-rows: auto 1fr;
+    gap: 10px;
+    min-width: 0;
+}
+
+.flow li + li::before {
+    content: '';
+    position: absolute;
+    left: -28px;
+    width: 28px;
+    top: calc(var(--flow-h) / 2);
+    height: 1px;
+    background: var(--ramp);
+    opacity: 0.8;
+}
+
+.flow {
+    --flow-h: 150px;
+}
+
+.flow-shot,
+.flow-code,
+.flow-still {
+    display: block;
+    height: var(--flow-h);
+    margin: 0;
+    background: var(--window);
+    border: 1px solid var(--rule-strong);
+    overflow: hidden;
+}
+
+.flow-shot img,
+.flow-still {
+    width: 100%;
+    height: var(--flow-h);
+    object-fit: cover;
+    object-position: 50% 40%;
+}
+
+.flow-code {
+    padding: 12px 14px;
+    color: var(--window-fg);
+    font-size: 0.7rem;
+    line-height: 1.5;
+    white-space: pre;
+}
+
+.flow-code code {
+    font-size: inherit;
+}
+
+.flow p {
+    font-size: 0.92rem;
+    color: var(--ink-soft);
+}
+
+.flow p a {
+    color: var(--ink);
+}
+
+@media (max-width: 900px) {
+    .flow {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .flow li:nth-child(3)::before {
+        display: none;
+    }
+}
+
+@media (max-width: 520px) {
+    .flow {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .flow li + li::before {
+        display: none;
+    }
 }
 
 .start-grid {
     display: grid;
-    grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+    grid-template-columns: minmax(0, 8fr) minmax(0, 4fr);
     gap: clamp(28px, 4vw, 64px);
     align-items: start;
 }
 
-.start-grid .sheet-head {
-    margin-bottom: 0;
+.start-aside {
+    display: grid;
+    gap: 16px;
 }
 
 .curve-fig {
-    margin: 18px 0 0;
+    margin: 0;
+    padding: 16px 20px 18px;
     display: grid;
-    gap: 8px;
-    max-width: 300px;
+    grid-template-columns: 200px minmax(0, 1fr);
+    gap: 16px;
+    align-items: center;
+    border-top: 1px solid var(--window-rule);
+}
+
+.curve-fig[hidden] {
+    display: none;
 }
 
 .curve-fig svg {
@@ -1174,14 +1241,17 @@ figcaption code {
     height: auto;
     font-family: var(--font-mono);
     font-size: 9px;
-    fill: var(--ink-soft);
+    fill: var(--window-muted);
+}
+
+.curve-fig figcaption {
+    color: var(--window-muted);
 }
 
 .curve-grid {
     fill: none;
-    stroke: var(--rule-strong);
+    stroke: var(--window-rule);
     stroke-width: 1;
-    opacity: 0.6;
 }
 
 .curve-line {
@@ -1191,8 +1261,8 @@ figcaption code {
 }
 
 .curve-key {
-    fill: var(--ground);
-    stroke: var(--ink);
+    fill: var(--window);
+    stroke: var(--window-fg);
     stroke-width: 1.5;
 }
 
@@ -1239,6 +1309,25 @@ figcaption code {
 .code-tabs button[aria-selected='true'] {
     color: var(--window-fg);
     border-image: var(--ramp) 1;
+}
+
+@media (max-width: 640px) {
+    .listing-head {
+        flex-wrap: wrap;
+        padding: 8px 10px;
+        gap: 6px;
+    }
+
+    .code-tabs {
+        flex-wrap: wrap;
+        overflow: visible;
+        padding: 0;
+        flex-basis: 100%;
+    }
+
+    .code-tabs button {
+        padding: 6px 8px;
+    }
 }
 
 .code-panel pre {
@@ -1314,26 +1403,14 @@ figcaption code {
     .start-grid {
         grid-template-columns: minmax(0, 1fr);
     }
+
+    .curve-fig {
+        grid-template-columns: minmax(0, 1fr);
+        max-width: 420px;
+    }
 }
 
-/* ---------- sheet 05: the contact sheet, with one orbit arc behind its header ---------- */
-
-.sheet-contact {
-    overflow: hidden;
-}
-
-.sheet-contact .orbits {
-    right: -300px;
-    top: -300px;
-    width: 900px;
-    height: 520px;
-    opacity: 0.45;
-}
-
-.sheet-contact .wrap {
-    position: relative;
-    z-index: 1;
-}
+/* ---------- the demos: the showcase large, the features dense ---------- */
 
 .search {
     position: relative;
@@ -1402,52 +1479,34 @@ figcaption code {
 
 .demo-status {
     font-family: var(--font-mono);
-    font-size: 0.76rem;
+    font-size: 0.78rem;
     color: var(--ink-soft);
     font-variant-numeric: tabular-nums;
 }
 
+/* Twelve columns: a showcase card takes four, a feature card three. */
 .demo-grid {
     list-style: none;
     margin: 0;
     padding: 0;
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(min(250px, 100%), 1fr));
+    grid-template-columns: repeat(12, minmax(0, 1fr));
     gap: 28px 20px;
     counter-reset: demo;
 }
 
-.demo-group {
-    grid-column: 1 / -1;
-    margin-top: 10px;
-    border-bottom: 1px solid var(--rule-strong);
-    padding-bottom: 6px;
-}
-
-.demo-group:first-child {
-    margin-top: 0;
-}
-
-.demo-group h3 {
-    display: flex;
-    align-items: baseline;
-    gap: 12px;
-    font-size: 1.2rem;
-}
-
-.demo-group h3 span {
-    font-family: var(--font-ui);
-    font-size: 0.86rem;
-    font-weight: 400;
-    color: var(--ink-soft);
-}
-
 .demo {
+    grid-column: span 3;
     display: grid;
-    grid-template-rows: auto 1fr auto;
+    grid-template-rows: auto auto auto;
+    align-content: start;
     gap: 8px;
     min-width: 0;
     counter-increment: demo;
+}
+
+.demo-large {
+    grid-column: span 4;
 }
 
 .demo-link {
@@ -1460,10 +1519,13 @@ figcaption code {
     position: relative;
 }
 
+/* The stills are 16:9 with a grey floor along the bottom and captions near the top; the feature
+   cards crop both away by showing a wider band of the picture. The showcase stills stay whole. */
 .demo-shot img {
     width: 100%;
-    aspect-ratio: 16 / 9;
+    aspect-ratio: 2 / 1;
     object-fit: cover;
+    object-position: 50% 62%;
     background: var(--window);
     border: 1px solid var(--rule-strong);
     transition: outline-color 0.15s ease;
@@ -1471,14 +1533,18 @@ figcaption code {
     outline-offset: 2px;
 }
 
+.demo-large .demo-shot img {
+    aspect-ratio: 16 / 9;
+    object-position: 50% 50%;
+}
+
 .demo-shot::before {
     content: counter(demo, decimal-leading-zero);
     position: absolute;
     left: 0;
     top: 0;
-    padding: 2px 6px;
-    font: 500 0.68rem var(--font-mono);
-    letter-spacing: 0.06em;
+    padding: 2px 7px;
+    font: 500 0.78rem var(--font-mono);
     background: var(--ground);
     color: var(--ink);
     border-right: 1px solid var(--rule-strong);
@@ -1491,10 +1557,14 @@ figcaption code {
 }
 
 .demo-name {
-    font-family: var(--font-mono);
-    font-weight: 500;
-    font-size: 0.86rem;
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: 1rem;
     line-height: 1.3;
+}
+
+.demo-large .demo-name {
+    font-size: 1.25rem;
 }
 
 .demo-link:hover .demo-name {
@@ -1502,14 +1572,14 @@ figcaption code {
     text-decoration-color: var(--violet);
 }
 
+/* One line of the description; the full text is on the demo page. */
 .demo p {
     color: var(--ink-soft);
     font-size: 0.86rem;
     line-height: 1.5;
-    display: -webkit-box;
-    -webkit-line-clamp: 3;
-    -webkit-box-orient: vertical;
+    white-space: nowrap;
     overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .demo-tags {
@@ -1520,18 +1590,41 @@ figcaption code {
     flex-wrap: wrap;
     gap: 2px 10px;
     font-family: var(--font-mono);
-    font-size: 0.68rem;
+    font-size: 0.78rem;
     color: var(--ink-soft);
 }
 
-/* ---------- sheets 06 and 07: plates; the Unity sheet is a slanted band ---------- */
-
-.band-slant {
-    background: var(--ground-2);
-    padding-top: calc(var(--slant) + clamp(36px, 5vw, 64px));
-    padding-bottom: calc(var(--slant) + clamp(44px, 7vw, 96px));
-    clip-path: polygon(0 0, 100% var(--slant), 100% 100%, 0 calc(100% - var(--slant)));
+.demo-category {
+    color: var(--cyan);
 }
+
+@media (max-width: 1100px) {
+    .demo {
+        grid-column: span 4;
+    }
+
+    .demo-large {
+        grid-column: span 6;
+    }
+}
+
+@media (max-width: 800px) {
+    .demo {
+        grid-column: span 6;
+    }
+
+    .demo-large {
+        grid-column: span 12;
+    }
+}
+
+@media (max-width: 480px) {
+    .demo {
+        grid-column: span 12;
+    }
+}
+
+/* ---------- the editor and the Unity exporter: plates ---------- */
 
 .plate-grid {
     display: grid;
@@ -1589,7 +1682,6 @@ figcaption code {
     min-width: 0;
     display: grid;
     gap: 10px;
-    padding-inline: 15px;
 }
 
 .plate-shot {
@@ -1619,7 +1711,7 @@ figcaption code {
     }
 }
 
-/* A sketch of Unity's Tools menu above the JSON it produces; stays dark like the listings. */
+/* A sketch of Unity's Tools menu open on the exporter, above the JSON it writes. */
 .unity-visual {
     margin: 0;
     min-width: 0;
@@ -1633,8 +1725,6 @@ figcaption code {
     font: 0.82rem/1.4 var(--font-ui);
     border: 1px solid var(--rule-strong);
     border-bottom: 0;
-    padding-bottom: 14px;
-    overflow: hidden;
 }
 
 .unity-menubar {
@@ -1643,10 +1733,9 @@ figcaption code {
     padding: 4px 6px;
     background: #1f1f1f;
     border-bottom: 1px solid #3a3a3a;
-    overflow: hidden;
 }
 
-.unity-menubar span {
+.unity-menubar > span {
     padding: 3px 9px;
     border-radius: 3px;
 }
@@ -1656,30 +1745,44 @@ figcaption code {
     color: #ffffff;
 }
 
-.unity-dropdown {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: flex-start;
-    gap: 4px;
-    margin: 6px 0 0 clamp(80px, 26%, 230px);
-}
-
-.unity-submenu,
-.unity-dropdown ul {
-    background: #303030;
-    border: 1px solid #191919;
-    border-radius: 3px;
-    box-shadow: 0 6px 18px rgb(0 0 0 / 45%);
-}
-
-.unity-submenu {
-    padding: 5px 28px 5px 12px;
-    background: #3e5f96;
-    color: #ffffff;
+.unity-tools {
     position: relative;
 }
 
-.unity-submenu::after {
+.unity-dropdown,
+.unity-submenu {
+    list-style: none;
+    margin: 0;
+    padding: 4px;
+    position: absolute;
+    background: #303030;
+    color: #d2d2d2;
+    border: 1px solid #191919;
+    border-radius: 3px;
+    box-shadow: 0 6px 18px rgb(0 0 0 / 45%);
+    white-space: nowrap;
+    z-index: 1;
+}
+
+.unity-dropdown {
+    top: 100%;
+    left: 0;
+    margin-top: 2px;
+    min-width: 150px;
+}
+
+.unity-dropdown li,
+.unity-submenu li {
+    padding: 5px 14px;
+    border-radius: 2px;
+}
+
+.unity-has-sub {
+    position: relative;
+    padding-right: 28px !important;
+}
+
+.unity-has-sub::after {
     content: '';
     position: absolute;
     right: 10px;
@@ -1691,98 +1794,59 @@ figcaption code {
     transform: translateY(-50%) rotate(45deg);
 }
 
-.unity-dropdown ul {
-    list-style: none;
-    margin: 0;
-    padding: 4px;
+.unity-submenu {
+    left: 100%;
+    top: -5px;
+    margin-left: 2px;
 }
 
-.unity-dropdown li {
-    padding: 5px 14px;
-    border-radius: 2px;
-    white-space: nowrap;
-}
-
-.unity-dropdown .is-active {
+.unity-dropdown .is-active,
+.unity-submenu .is-active {
     background: #3e5f96;
     color: #ffffff;
 }
 
+.unity-body {
+    height: 118px;
+}
+
+/* Narrow: the dropdown hangs from the right edge of Tools and the submenu opens under it, so the
+   sketch stays inside its box; the two menus after Tools make room. */
+@media (max-width: 560px) {
+    .unity-menubar > span:nth-child(n + 6) {
+        display: none;
+    }
+
+    .unity-dropdown {
+        left: auto;
+        right: 0;
+    }
+
+    .unity-submenu {
+        left: auto;
+        right: 0;
+        top: 100%;
+        margin: 2px 0 0;
+    }
+
+    .unity-body {
+        height: 196px;
+    }
+}
+
 .unity-json {
     margin: 0;
-    padding: 18px 20px;
+    padding: 16px;
     background: var(--window);
     color: var(--window-fg);
     border: 1px solid var(--rule-strong);
-    font-size: 0.8rem;
+    font-size: 0.78rem;
     line-height: 1.6;
     overflow-x: auto;
 }
 
 .unity-json code {
     font-size: inherit;
-}
-
-/* ---------- sheet 08: packages ---------- */
-
-.packages {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 0.95rem;
-}
-
-.packages th,
-.packages td {
-    text-align: left;
-    vertical-align: top;
-    padding: 12px 16px 12px 0;
-    border-bottom: 1px solid var(--rule);
-}
-
-.packages thead th {
-    font-weight: 400;
-    font-size: 0.86rem;
-    color: var(--ink-soft);
-    border-bottom: 1px solid var(--rule-strong);
-}
-
-.packages tbody th {
-    font-weight: 500;
-    white-space: nowrap;
-}
-
-.packages tbody th code {
-    font-size: 0.9rem;
-    background: none;
-    padding: 0;
-}
-
-.packages td {
-    color: var(--ink-soft);
-}
-
-.packages td a {
-    color: var(--ink);
-    text-decoration-color: var(--violet);
-}
-
-@media (max-width: 640px) {
-    .packages thead {
-        display: none;
-    }
-
-    .packages tr {
-        display: grid;
-        gap: 2px;
-        padding: 12px 0;
-        border-bottom: 1px solid var(--rule);
-    }
-
-    .packages th,
-    .packages td {
-        padding: 0;
-        border: 0;
-    }
 }
 
 /* ---------- colophon ---------- */
@@ -1806,7 +1870,7 @@ figcaption code {
 
 .colophon-grid {
     display: grid;
-    grid-template-columns: minmax(0, 1.8fr) repeat(3, minmax(0, 1fr));
+    grid-template-columns: minmax(0, 1.4fr) minmax(0, 1.4fr) repeat(2, minmax(0, 1fr));
     gap: 32px;
 }
 
@@ -1817,10 +1881,9 @@ figcaption code {
 }
 
 .colophon-text p {
-    font-style: italic;
     color: var(--ink-soft);
     font-size: 0.95rem;
-    max-width: 30rem;
+    max-width: 24rem;
 }
 
 .colophon nav {
@@ -1839,6 +1902,17 @@ figcaption code {
     font-size: 0.92rem;
 }
 
+.colophon nav a code {
+    background: none;
+    padding: 0;
+    font-size: 0.86rem;
+}
+
+.colophon nav a span {
+    color: var(--ink-soft);
+    font-size: 0.86rem;
+}
+
 .colophon nav a:hover {
     text-decoration: underline;
     text-decoration-color: var(--violet);
@@ -1846,17 +1920,11 @@ figcaption code {
 
 @media (max-width: 800px) {
     .colophon-grid {
-        grid-template-columns: repeat(3, minmax(0, 1fr));
+        grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
     .colophon-text {
         grid-column: 1 / -1;
-    }
-}
-
-@media (max-width: 480px) {
-    .colophon-grid {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 }
 
