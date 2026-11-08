@@ -205,13 +205,29 @@ visibly.
    `packages/babylon.quarks/package.json` (`quarks.core` takes the same version). If the
    editor changed too, do the same for `packages/babylon.quarks-editor/CHANGELOG.md` and
    `package.json`.
-   - **A new minor moves the editor with it.** The editor imports the library's newest API, so
+   - **The editor's peer follows the library.** The editor imports the library's newest API, so
      its peer dependency on `babylon.quarks` is the library's own minor line, `~X.Y.0`, or the
-     prerelease itself (`~1.0.0-rc.1`); bump it with the library's minor and publish the editor in
-     the same release. The editor stays on 0.x from babylon.quarks 1.0 on, so it bumps its own
-     minor (0.31 with 1.0) rather than taking the library's version. Any change to its peer
-     range is a new editor version (0.31.1 with 1.0.0), since npm cannot republish one.
+     prerelease itself (`~1.0.0-rc.2`); when the library moves to a new minor or a new
+     prerelease, move the peer with it and publish the editor in the same release.
      `npm run check:pack` fails when the peer is out of step.
+   - **The editor keeps its own 0.x line**, versioned by what a project that depends on it with
+     `^0.Y.0` would get. On 0.x, `^` takes patches only, so a patch reaches every such project on
+     its next install and must not be able to break one:
+
+     | The editor's change                                       | Its version                           |
+     | --------------------------------------------------------- | ------------------------------------- |
+     | Fixes only, the peer range unchanged                      | patch (0.31.0 → 0.31.1)               |
+     | The peer range widened (it accepts more library versions) | patch                                 |
+     | New features                                              | minor (0.31 → 0.32)                   |
+     | The peer range narrowed (it needs a newer library)        | minor                                 |
+     | A breaking change to its own API                          | minor (on 0.x the minor is the major) |
+
+     A narrower peer is a minor even with no code change: a project still on the older library
+     would take it as a patch and fail to install (npm's peer conflict). So the editor of
+     babylon.quarks 1.0.0-rc.2 is 0.32.0, and the editor of 1.0.0 (`~1.0.0` leaves the release
+     candidates out) is a new minor too. The editor takes semver's 1.0.0 once its own API is
+     settled; npm cannot republish a version, so any change at all is a new one.
+
    - **The Unity exporter takes every version.** Set the library's version in
      `tools/unity-quarks-exporter/package.json` and `ExporterInfo.Version`
      (`tools/unity-quarks-exporter/Editor/ExporterInfo.cs`), and add a
