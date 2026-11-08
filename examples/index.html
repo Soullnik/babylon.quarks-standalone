@@ -136,7 +136,9 @@
                                     ><span class="prompt" aria-hidden="true">$</span>
                                     <span id="install-cmd">npm i babylon.quarks</span></code
                                 >
-                                <button type="button" class="copy" data-copy-target="install-cmd">Copy</button>
+                                <button type="button" class="copy" data-copy-target="install-cmd">
+                                    <span class="copy-label">Copy</span>
+                                </button>
                             </div>
                             <ul class="hero-links">
                                 <li><a class="arrow-link" href="#get-started">Get started</a></li>
@@ -280,7 +282,12 @@
                     </dl>
 
                     <div class="breakdown" id="breakdown" data-breakdown>
-                        <p class="breakdown-note" data-breakdown-note>The breakdown below is of the Vortex take.</p>
+                        <p class="breakdown-note" data-breakdown-note>
+                            Breakdown of the Vortex take.
+                            <button type="button" class="text-button" data-breakdown-vortex>
+                                Switch back to the Vortex
+                            </button>
+                        </p>
                         <div class="breakdown-head">
                             <h2>What the Vortex is made of</h2>
                             <p>
@@ -436,39 +443,6 @@
                         </li>
                         <li class="row">
                             <div class="row-text">
-                                <h3>Mesh particles</h3>
-                                <p>
-                                    Instance any mesh as a particle, lit or unlit, with vertex colours, a rotation axis
-                                    per particle and rim lighting; or emit from the surface of a mesh with
-                                    <code>MeshSurfaceEmitter</code>.
-                                </p>
-                            </div>
-                            <img
-                                src="./previews/mesh-material.png"
-                                alt="Mesh particles with an environment map"
-                                loading="lazy"
-                                width="640"
-                                height="360"
-                            />
-                        </li>
-                        <li class="row">
-                            <div class="row-text">
-                                <h3>Sub-emitters</h3>
-                                <p>
-                                    <code>EmitSubParticleSystem</code> spawns a whole system when a particle is born or
-                                    dies, or for every frame it lives, inheriting what you choose from the parent.
-                                </p>
-                            </div>
-                            <img
-                                src="./previews/sub-emitter.png"
-                                alt="Particles spawning secondary systems as they die"
-                                loading="lazy"
-                                width="640"
-                                height="360"
-                            />
-                        </li>
-                        <li class="row">
-                            <div class="row-text">
                                 <h3><span data-count="behaviors">25</span> behaviors</h3>
                                 <p>
                                     Each is a class you add to a system; curves are <code>PiecewiseBezier</code>,
@@ -524,6 +498,21 @@
                     </ol>
 
                     <ul class="row-strip">
+                        <li>
+                            <h3>Mesh particles</h3>
+                            <p>
+                                Any mesh as a particle, lit or unlit, with vertex colours, a rotation axis per particle
+                                and rim lighting; or emission from a mesh's surface with
+                                <code>MeshSurfaceEmitter</code>.
+                            </p>
+                        </li>
+                        <li>
+                            <h3>Sub-emitters</h3>
+                            <p>
+                                <code>EmitSubParticleSystem</code> spawns a whole system when a particle is born or
+                                dies, or for every frame it lives, inheriting what you choose from the parent.
+                            </p>
+                        </li>
                         <li>
                             <h3>Pools and timelines</h3>
                             <p>
@@ -626,7 +615,8 @@
                                         aria-controls="code-load"
                                         aria-selected="true"
                                     >
-                                        1 · Load an effect
+                                        <span class="tab-long">1 · Load an effect</span
+                                        ><span class="tab-short">Load</span>
                                     </button>
                                     <button
                                         type="button"
@@ -636,7 +626,8 @@
                                         aria-selected="false"
                                         tabindex="-1"
                                     >
-                                        2 · Build in code
+                                        <span class="tab-long">2 · Build in code</span
+                                        ><span class="tab-short">Build</span>
                                     </button>
                                     <button
                                         type="button"
@@ -646,10 +637,13 @@
                                         aria-selected="false"
                                         tabindex="-1"
                                     >
-                                        3 · Embed the editor
+                                        <span class="tab-long">3 · Embed the editor</span
+                                        ><span class="tab-short">Embed</span>
                                     </button>
                                 </div>
-                                <button type="button" class="copy" data-copy-panel>Copy</button>
+                                <button type="button" class="copy" data-copy-panel aria-label="Copy the code">
+                                    <span class="copy-label">Copy</span>
+                                </button>
                             </div>
                             <div class="code-panel" id="code-load" role="tabpanel" aria-labelledby="tab-load">
                                 <pre><code id="src-load" data-lang="ts">import {BatchedRenderer, QuarksLoader, QuarksUtil} from 'babylon.quarks';
@@ -685,7 +679,8 @@ const sparks = new ParticleSystem({
     rendererEmitterSettings: {speedFactor: 0.05},
     texture: new Texture('spark.png', scene),
 });
-sparks.addBehavior(new SizeOverLife(new PiecewiseBezier([[new Bezier(1, 0.8, 0.4, 0), 0]])));
+const shrink = new PiecewiseBezier([[new Bezier(1, 0.8, 0.4, 0), 0]]);
+sparks.addBehavior(new SizeOverLife(shrink));
 renderer.addSystem(sparks);
 sparks.play();</code></pre>
                             </div>
@@ -730,8 +725,9 @@ const editor = QuarksEffectEditor.Show({
                                     <text x="200" y="124">life</text>
                                 </svg>
                                 <figcaption>
-                                    The <code>SizeOverLife</code> curve on line 21: one piece,
-                                    <code>Bezier(1, 0.8, 0.4, 0)</code>, so a spark shrinks to nothing over its life.
+                                    The <code>SizeOverLife</code> curve on line <span data-curve-line>20</span>: one
+                                    piece, <code>Bezier(1, 0.8, 0.4, 0)</code>, so a spark shrinks to nothing over its
+                                    life.
                                 </figcaption>
                             </figure>
                         </div>
@@ -809,7 +805,7 @@ const editor = QuarksEffectEditor.Show({
                                 drive its headless session API without any UI.
                             </p>
                             <ol class="callout-legend">
-                                <li><b>1</b> Hierarchy: the effect's systems, shown and hidden with the eye.</li>
+                                <li><b>1</b> Scene: the effect's systems, shown and hidden with the eye.</li>
                                 <li><b>2</b> Viewport, with the gizmo of the selected emitter.</li>
                                 <li><b>3</b> Inspector: the module stack with curves and gradients.</li>
                                 <li>
@@ -841,10 +837,10 @@ const editor = QuarksEffectEditor.Show({
                                     width="1440"
                                     height="900"
                                 />
-                                <span class="callout" style="--x: 9%; --y: 52%" aria-hidden="true">1</span>
-                                <span class="callout" style="--x: 60%; --y: 32%" aria-hidden="true">2</span>
-                                <span class="callout" style="--x: 86%; --y: 56%" aria-hidden="true">3</span>
-                                <span class="callout" style="--x: 30%; --y: 86%" aria-hidden="true">4</span>
+                                <span class="callout" style="--x: 17.5%; --y: 4.5%" aria-hidden="true">1</span>
+                                <span class="callout" style="--x: 29%; --y: 4.5%" aria-hidden="true">2</span>
+                                <span class="callout" style="--x: 90%; --y: 4.5%" aria-hidden="true">3</span>
+                                <span class="callout" style="--x: 13%; --y: 75%" aria-hidden="true">4</span>
                             </a>
                             <figcaption>The editor with the Vortex loaded from the stage above.</figcaption>
                         </figure>
@@ -885,7 +881,7 @@ const editor = QuarksEffectEditor.Show({
                                 </li>
                             </ul>
                         </div>
-                        <figure class="unity-visual">
+                        <figure class="unity-visual" data-unity-sketch>
                             <div class="unity-menu" aria-hidden="true">
                                 <div class="unity-menubar">
                                     <span>File</span><span>Edit</span><span>Assets</span><span>GameObject</span

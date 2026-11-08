@@ -93,6 +93,7 @@ function setupMenu() {
     const setOpen = (open: boolean) => {
         toggle.setAttribute('aria-expanded', String(open));
         nav.dataset.open = String(open);
+        document.documentElement.classList.toggle('menu-open', open);
     };
     toggle.addEventListener('click', () => setOpen(toggle.getAttribute('aria-expanded') !== 'true'));
     nav.addEventListener('click', (event) => {
@@ -138,7 +139,7 @@ function setupCopyButtons() {
     for (const button of Array.from(
         document.querySelectorAll<HTMLButtonElement>('[data-copy-target], [data-copy-panel]')
     )) {
-        const label = Array.from(button.childNodes).find((node) => node.nodeType === Node.TEXT_NODE) ?? button;
+        const label = button.querySelector('.copy-label') ?? button;
         const original = label.textContent;
         button.addEventListener('click', () => {
             const text = copySource(button);
@@ -252,7 +253,11 @@ function setupStageControls() {
     root.querySelector('[data-stage-play]')?.addEventListener('click', () => startLiveStage(root));
 }
 
-/** Highlights the listings and wraps each line so the stylesheet can number it (`.ln`). */
+/**
+ * Highlights the listings and wraps each line so the stylesheet can number it (`.ln`). The curve
+ * figure's caption names the line of listing 2 that holds the curve, read from the text so it
+ * cannot drift from the code.
+ */
 function setupCode() {
     for (const block of Array.from(document.querySelectorAll<HTMLElement>('pre code[data-lang="ts"]'))) {
         // No token of the highlighter spans a line break, so the lines can be wrapped afterwards.
@@ -260,6 +265,12 @@ function setupCode() {
             .split('\n')
             .map((line) => `<span class="ln">${line}</span>`)
             .join('');
+    }
+    const lines = (document.getElementById('src-code')?.textContent ?? '').split('\n');
+    const curveLine = lines.findIndex((line) => line.includes('new Bezier(')) + 1;
+    const caption = document.querySelector('[data-curve-line]');
+    if (caption && curveLine > 0) {
+        caption.textContent = String(curveLine);
     }
 }
 
@@ -281,6 +292,9 @@ function setupBreakdown() {
     for (const tab of tabs) {
         observer.observe(tab, {attributes: true, attributeFilter: ['aria-pressed']});
     }
+    legend.querySelector('[data-breakdown-vortex]')?.addEventListener('click', () => {
+        tabs.find((tab) => tab.dataset.effect === 'vortex')?.click();
+    });
     sync();
 }
 
@@ -292,7 +306,7 @@ function demoCard(demo: DemoManifestEntry) {
     const showcase = demo.section === 'showcase';
     const tags = [
         ...(showcase ? [] : [`<li class="demo-category">${escapeHtml(demo.category)}</li>`]),
-        ...demo.tags.map((tag) => `<li>${escapeHtml(tag)}</li>`),
+        ...demo.tags.slice(0, 3).map((tag) => `<li>${escapeHtml(tag)}</li>`),
     ].join('');
     const description = showcase
         ? ''
@@ -307,10 +321,14 @@ function demoCard(demo: DemoManifestEntry) {
 </li>`;
 }
 
+/** On a phone the gallery opens on the showcase and the first feature demos, with a button for the rest. */
+const PHONE_FEATURES = 6;
+const phone = window.matchMedia?.('(max-width: 640px)');
+
 /**
  * The gallery: the showcase as large cards, then every feature demo in one dense grid, in the
  * manifest's section and category order. The chips pick a section; the search matches names,
- * descriptions, categories and tags.
+ * descriptions, categories and tags. With a filter or a search on, every card is the same size.
  */
 function setupGallery() {
     const grid = document.getElementById('demos-grid');
@@ -321,6 +339,7 @@ function setupGallery() {
         return;
     }
     let activeSection = '';
+    let expanded = false;
     if (chips) {
         chips.innerHTML = [{id: '', title: 'All'}, ...SECTIONS]
             .map(
@@ -355,7 +374,27 @@ function setupGallery() {
                 )
             )
         );
-        grid.innerHTML = cards.map(demoCard).join('');
+        const filtered = Boolean(activeSection || query);
+        grid.toggleAttribute('data-filtered', filtered);
+        let shown = cards;
+        let hidden = 0;
+        if (!filtered && !expanded && phone?.matches) {
+            const showcase = cards.filter((demo) => demo.section === 'showcase');
+            const features = cards.filter((demo) => demo.section !== 'showcase');
+            shown = [...showcase, ...features.slice(0, PHONE_FEATURES)];
+            hidden = features.length - PHONE_FEATURES;
+        }
+        const parts = shown.map(demoCard);
+        if (cards.length === 0) {
+            parts.push(
+                `<li class="demo-empty">No demo matches “${escapeHtml(query)}”. <button type="button" class="text-button" data-clear-search>Clear the search</button></li>`
+            );
+        } else if (hidden > 0) {
+            parts.push(
+                `<li class="demo-more"><button type="button" class="text-button" data-show-all>Show all ${hidden + PHONE_FEATURES} feature demos</button></li>`
+            );
+        }
+        grid.innerHTML = parts.join('');
         if (status) {
             status.textContent =
                 cards.length === demoManifest.length
@@ -363,6 +402,18 @@ function setupGallery() {
                     : `${cards.length} of ${demoManifest.length} demos`;
         }
     };
+    grid.addEventListener('click', (event) => {
+        const target = event.target as HTMLElement;
+        if (target.closest('[data-clear-search]') && search) {
+            search.value = '';
+            render();
+            search.focus();
+        } else if (target.closest('[data-show-all]')) {
+            expanded = true;
+            render();
+        }
+    });
+    phone?.addEventListener('change', render);
     search?.addEventListener('input', render);
     render();
 }

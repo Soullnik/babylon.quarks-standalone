@@ -52,6 +52,21 @@ const EFFECTS: Record<string, StageEffect> = {
     forces: {demoKey: 'ForceSpaceDemo', load: () => import('../demos/forceSpace'), orbit: true},
 };
 
+/**
+ * A demo on the stage keeps the void of the landing: the sky and ground the demo set up and the
+ * captions it draws (`addGround`, `addSky`, `addLabel` in the shared helpers, found by name) are
+ * switched off, and the camera steps back a little so the effect stays in the window as it moves.
+ * The demo itself is untouched; the demo viewer shows it with everything on.
+ */
+function dressForStage(scene: Scene, camera: ArcRotateCamera) {
+    for (const mesh of scene.meshes) {
+        if (mesh.name === 'sky' || mesh.name === 'ground' || mesh.name.startsWith('label:')) {
+            mesh.setEnabled(false);
+        }
+    }
+    camera.radius *= 1.15;
+}
+
 /** The effect's display name: the gallery's name for a demo, "Vortex" for the landing effect. */
 function effectName(id: string) {
     const key = EFFECTS[id]?.demoKey;
@@ -203,6 +218,9 @@ export async function mountHeroStage(root: HTMLElement): Promise<() => void> {
                 run.dispose?.();
                 scene.dispose();
                 return false;
+            }
+            if (entry.demoKey) {
+                dressForStage(scene, camera);
             }
             if (entry.orbit) {
                 camera.attachControl(el.canvas, true);
