@@ -355,6 +355,17 @@ and the package's version moves in lockstep with `quarks.core`.
   light) instead of dark blobs with a lit rim, and its material-colour flames clear the floor;
   Emitter Shapes marks its pads with rings; Emission Timing's status sits on the floor in front of
   each burst, clear of its particles.
+  Black Hole's disk is built from geometry, as a sword's slash is a curved wall rather than a card:
+  some seventy ribbons swept along spirals winding in round the hole, each rising and falling a
+  little and turning about its length from lying flat to standing as a wall, a fibre texture
+  scrolled along it. Seen from any side some ribbons face the camera and some are on edge, so the
+  disk has a body; edge-on it is a thick band of light, not a line, and the whole disk lies in one
+  plane with what falls into it, so it no longer splits into two disks as the camera turns. The
+  light bent over and under the shadow is sheaves of the same ribbons, a few long ribbons arc up out
+  of the disk, trails of light orbit in it, a faint dark haze lies over the whole of it instead of
+  dark clouds in patches, and faceted rocks fall in from space on every side, faster and faster,
+  heating as they go and vanishing at the shadow, rather than orbiting as round a planet. The whips
+  of flipbook arcs over the photon ring, which read as hard streaks, are gone.
 
 ### Fixed
 
