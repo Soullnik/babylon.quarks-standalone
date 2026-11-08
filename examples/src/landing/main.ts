@@ -1,3 +1,19 @@
+import {
+    ArrowRight,
+    ArrowUpRight,
+    Copy,
+    createIcons,
+    FileJson,
+    Menu,
+    Moon,
+    PackageOpen,
+    PenTool,
+    Play,
+    Search,
+    Sparkles,
+    Sun,
+} from 'lucide';
+import {siGithub, siNpm} from 'simple-icons';
 import {demoManifest, previewFile, SECTIONS} from '../demoManifest';
 import type {DemoManifestEntry} from '../types';
 import {highlightTs} from './highlight';
@@ -13,37 +29,30 @@ const hook: LandingHook = {ready: false, stage: 'pending'};
 (window as unknown as {__quarksLanding: LandingHook}).__quarksLanding = hook;
 
 const THEME_KEY = 'quarks-theme';
-type ThemeChoice = 'system' | 'light' | 'dark';
+/** Dark first: additive particles read on a dark ground. Paper is the choice the visitor makes. */
+type ThemeChoice = 'light' | 'dark';
+const THEME_COLOR: Record<ThemeChoice, string> = {dark: '#0b0d12', light: '#eef0f5'};
 
 function readTheme(): ThemeChoice {
     try {
-        const stored = localStorage.getItem(THEME_KEY);
-        return stored === 'light' || stored === 'dark' ? stored : 'system';
+        return localStorage.getItem(THEME_KEY) === 'light' ? 'light' : 'dark';
     } catch {
-        return 'system';
+        return 'dark';
     }
 }
 
 function applyTheme(choice: ThemeChoice) {
-    const root = document.documentElement;
-    if (choice === 'system') {
-        root.removeAttribute('data-theme');
-    } else {
-        root.setAttribute('data-theme', choice);
-    }
+    document.documentElement.setAttribute('data-theme', choice);
     const button = document.querySelector<HTMLButtonElement>('[data-theme-toggle]');
     if (button) {
         button.dataset.choice = choice;
-        const label = {system: 'Theme: system', light: 'Theme: light', dark: 'Theme: dark'}[choice];
-        button.setAttribute('aria-label', `${label}. Switch theme`);
-        button.title = label;
+        const next = choice === 'dark' ? 'paper' : 'dark';
+        button.setAttribute('aria-label', `Theme: ${choice === 'dark' ? 'dark' : 'paper'}. Switch to ${next}`);
+        button.title = `Switch to the ${next} theme`;
     }
-    // The browser chrome follows an explicit choice; with "system" each meta's media query decides.
-    for (const meta of Array.from(document.querySelectorAll<HTMLMetaElement>('meta[name="theme-color"]'))) {
-        meta.dataset.media ??= meta.media;
-        meta.dataset.content ??= meta.content;
-        meta.media = choice === 'system' ? meta.dataset.media : 'all';
-        meta.content = choice === 'system' ? meta.dataset.content : choice === 'dark' ? '#161513' : '#f1ece2';
+    const meta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
+    if (meta) {
+        meta.content = THEME_COLOR[choice];
     }
 }
 
@@ -51,18 +60,54 @@ function setupTheme() {
     let choice = readTheme();
     applyTheme(choice);
     document.querySelector('[data-theme-toggle]')?.addEventListener('click', () => {
-        const order: ThemeChoice[] = ['system', 'light', 'dark'];
-        choice = order[(order.indexOf(choice) + 1) % order.length];
+        choice = choice === 'dark' ? 'light' : 'dark';
         applyTheme(choice);
         try {
-            if (choice === 'system') {
-                localStorage.removeItem(THEME_KEY);
-            } else {
-                localStorage.setItem(THEME_KEY, choice);
-            }
+            localStorage.setItem(THEME_KEY, choice);
         } catch {
             // Storage blocked: the choice lasts for this page view only.
         }
+    });
+}
+
+/**
+ * Every icon on the page comes from one set: Lucide glyphs, replaced in place from `data-lucide`,
+ * plus the GitHub and npm marks from Simple Icons, which Lucide does not carry. Arrow links, copy
+ * buttons and the stage's editor action get their glyph here rather than in the markup, so the
+ * markup stays text and the glyphs stay in one place.
+ */
+function setupIcons() {
+    for (const link of Array.from(document.querySelectorAll('.arrow-link'))) {
+        link.insertAdjacentHTML('beforeend', '<i data-lucide="arrow-right" class="icon" aria-hidden="true"></i>');
+    }
+    for (const button of Array.from(document.querySelectorAll('.copy'))) {
+        button.insertAdjacentHTML('afterbegin', '<i data-lucide="copy" class="icon" aria-hidden="true"></i>');
+    }
+    document
+        .querySelector('[data-stage-editor]')
+        ?.insertAdjacentHTML('beforeend', '<i data-lucide="arrow-up-right" class="icon" aria-hidden="true"></i>');
+    for (const mark of Array.from(document.querySelectorAll<HTMLElement>('[data-brand]'))) {
+        const brand = mark.dataset.brand === 'github' ? siGithub : mark.dataset.brand === 'npm' ? siNpm : null;
+        if (brand) {
+            mark.innerHTML = `<svg viewBox="0 0 24 24" class="icon" aria-hidden="true"><path fill="currentColor" d="${brand.path}"/></svg>`;
+        }
+    }
+    createIcons({
+        icons: {
+            ArrowRight,
+            ArrowUpRight,
+            Copy,
+            FileJson,
+            Menu,
+            Moon,
+            PackageOpen,
+            PenTool,
+            Play,
+            Search,
+            Sparkles,
+            Sun,
+        },
+        attrs: {'stroke-width': 1.75, 'aria-hidden': 'true'},
     });
 }
 
@@ -120,12 +165,13 @@ function setupCopyButtons() {
     for (const button of Array.from(
         document.querySelectorAll<HTMLButtonElement>('[data-copy-target], [data-copy-panel]')
     )) {
-        const original = button.textContent;
+        const label = Array.from(button.childNodes).find((node) => node.nodeType === Node.TEXT_NODE) ?? button;
+        const original = label.textContent;
         button.addEventListener('click', () => {
             const text = copySource(button);
             const done = (ok: boolean) => {
-                button.textContent = ok ? 'Copied' : 'Copy failed';
-                window.setTimeout(() => (button.textContent = original), 1400);
+                label.textContent = ok ? 'Copied' : 'Copy failed';
+                window.setTimeout(() => (label.textContent = original), 1400);
             };
             if (navigator.clipboard?.writeText) {
                 navigator.clipboard.writeText(text.trim()).then(
@@ -408,6 +454,7 @@ async function startStage() {
 }
 
 setupTheme();
+setupIcons();
 setupMenu();
 setupCopyButtons();
 setupTabs();
