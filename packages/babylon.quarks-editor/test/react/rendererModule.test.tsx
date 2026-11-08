@@ -242,6 +242,7 @@ describe('Main module', () => {
                 uvs: [0, 0, 1, 0, 1, 1, 0, 1],
                 uvs2: [0, 0, 0.5, 0, 0.5, 0.5, 0, 0.5],
                 normals: [0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1],
+                colors: [0, 0, 0, 1, 0.5, 0.5, 0.5, 1, 1, 1, 1, 1, 1, 1, 1, 0.5],
             },
         ];
         const element = () => <RendererModule binding={binding} geometryOptions={geometryOptions} />;
@@ -253,11 +254,13 @@ describe('Main module', () => {
         expect(Array.from(system.instancingIndices)).toEqual([0, 1, 2, 0, 2, 3]);
         expect(Array.from(system.instancingUVs2!)).toEqual(geometryOptions[1].uvs2);
         expect(system.getRendererSettings().instancingNormals).toHaveLength(12);
+        expect(Array.from(system.instancingColors!)).toEqual(geometryOptions[1].colors);
 
         pick(geometry(), 'host:0');
         expect(Array.from(system.instancingIndices)).toEqual([0, 1, 2, 3, 4, 5]);
         expect(system.instancingUVs).toHaveLength(12);
         expect(system.instancingUVs2).toBeUndefined();
+        expect(system.instancingColors).toBeUndefined();
         // The mesh shader reads normals, so the system keeps the library's fallback ones.
         expect(system.getRendererSettings().instancingNormals).toHaveLength(18);
 

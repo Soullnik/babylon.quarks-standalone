@@ -1,201 +1,152 @@
 import {Constants} from '@babylonjs/core/Engines/constants';
 import {StandardMaterial} from '@babylonjs/core/Materials/standardMaterial';
-import {DynamicTexture} from '@babylonjs/core/Materials/Textures/dynamicTexture';
-import type {Texture} from '@babylonjs/core/Materials/Textures/texture';
 import {Color3, Color4} from '@babylonjs/core/Maths/math.color';
 import {Vector3 as BVector3} from '@babylonjs/core/Maths/math.vector';
 import {MeshBuilder} from '@babylonjs/core/Meshes/meshBuilder';
-import type {Scene} from '@babylonjs/core/scene';
 import {
-    Bezier,
+    BoxEmitFrom,
+    BoxEmitter,
     CircleEmitter,
+    ColorOverLife,
     ConeEmitFrom,
     ConeEmitter,
+    ConstantColor,
     ConstantValue,
     DonutEmitter,
+    EdgeEmitter,
     EmitterMode,
+    type EmitterShape,
+    Gradient,
     GridEmitter,
     GridSampling,
     HemisphereEmitter,
     IntervalValue,
     ParticleSystem,
-    PiecewiseBezier,
     PointEmitter,
-    RandomColor,
     RectangleEmitter,
-    RenderMode,
     SizeOverLife,
     SphereEmitter,
-    type EmitterShape,
 } from 'babylon.quarks';
-import {createSharedTexture} from '../shared/common';
+import {curve} from '../shared/curves';
+import {addLabel} from '../shared/labels';
+import {baseTexture} from '../shared/textures';
 import type {DemoContext} from '../types';
 
-function createLabel(scene: Scene, text: string, position: BVector3) {
-    const plane = MeshBuilder.CreatePlane(`label-${text}`, {size: 1.6}, scene);
-    plane.position = position;
-    const texture = new DynamicTexture(`label-tex-${text}`, {width: 256, height: 64}, scene, false);
-    texture.drawText(text, 16, 44, 'bold 36px Arial', 'white', 'transparent', true);
-    const material = new StandardMaterial(`label-mat-${text}`, scene);
-    material.diffuseTexture = texture;
-    material.emissiveColor = new Color3(1, 1, 1);
-    material.opacityTexture = texture;
-    material.backFaceCulling = false;
-    plane.material = material;
-}
+/** Shapes with an arc mode: where on the arc each particle starts. */
+type ArcShape = EmitterShape & {mode: EmitterMode};
 
-function createShapeSystem({
-    scene,
-    batchRenderer,
-    systems,
-    texture,
-    shape,
-    position,
-    rate = 1000,
-}: {
-    scene: Scene;
-    batchRenderer: DemoContext['batchRenderer'];
-    systems: DemoContext['systems'];
-    texture: Texture;
-    shape: EmitterShape;
-    position?: BVector3;
-    /** Particles per second. */
-    rate?: number;
-}) {
-    const ps = new ParticleSystem({
-        scene,
-        duration: 5,
-        looping: true,
-        startLife: new IntervalValue(1, 1),
-        startSpeed: new IntervalValue(1, 1),
-        startSize: new IntervalValue(0.1, 0.1),
-        startColor: new RandomColor(new Color4(1, 0.91, 0.51, 1), new Color4(1, 0.44, 0.16, 1)),
-        worldSpace: true,
-        emissionOverTime: new ConstantValue(rate),
-        shape,
-        renderMode: RenderMode.Mesh,
-        texture,
-        transparent: true,
-        blendMode: Constants.ALPHA_ADD,
-        startTileIndex: new ConstantValue(0),
-        uTileCount: 10,
-        vTileCount: 10,
-        renderOrder: 1,
-    });
-    ps.addBehavior(new SizeOverLife(new PiecewiseBezier([[new Bezier(1, 0.8, 0.4, 0), 0]])));
-    if (position) {
-        ps.emitter.position = position;
-    }
-    batchRenderer.addSystem(ps);
-    systems.push(ps);
-}
+const MODES = {
+    Random: EmitterMode.Random,
+    Loop: EmitterMode.Loop,
+    'Ping-pong': EmitterMode.PingPong,
+    Burst: EmitterMode.Burst,
+} as const;
 
-export function init({scene, camera, batchRenderer, systems}: DemoContext) {
-    camera.setTarget(new BVector3(2.5, 0, 0));
-    camera.setPosition(new BVector3(2.5, 0, 24));
-    const texture = createSharedTexture(scene);
+/**
+ * Every emitter shape on its own pad, labelled, each throwing the same warm sparks up so only
+ * where they start differs. The emitters are turned so their +z, the way cones, circles and
+ * rectangles emit, points up. The panel's arc mode switches where the shapes with an arc (sphere,
+ * circle, edge, rectangle) start their particles: anywhere, sweeping round, back and forth, or
+ * spread evenly over a burst.
+ */
+export function init({scene, camera, add, controls}: DemoContext) {
+    camera.setPosition(new BVector3(0, 9, 12.5));
+    camera.setTarget(new BVector3(0, 0, 0.6));
+    const spark = baseTexture(scene, 'spark');
 
-    createShapeSystem({
-        scene,
-        batchRenderer,
-        systems,
-        texture,
-        shape: new PointEmitter(),
-        position: new BVector3(-5, -5, 2),
-    });
-    createShapeSystem({
-        scene,
-        batchRenderer,
-        systems,
-        texture,
-        shape: new SphereEmitter({radius: 1, thickness: 0.2, arc: Math.PI * 2}),
-        position: new BVector3(-5, 0, 2),
-    });
-    createShapeSystem({
-        scene,
-        batchRenderer,
-        systems,
-        texture,
-        shape: new HemisphereEmitter({radius: 1, thickness: 0.2, arc: Math.PI * 2}),
-        position: new BVector3(-5, 5, 2),
-    });
-    createShapeSystem({
-        scene,
-        batchRenderer,
-        systems,
-        texture,
-        shape: new ConeEmitter({radius: 1, thickness: 1, arc: Math.PI * 2, angle: Math.PI / 4}),
-        position: new BVector3(0, -5, 2),
-    });
-    createShapeSystem({
-        scene,
-        batchRenderer,
-        systems,
-        texture,
-        shape: new CircleEmitter({radius: 1, arc: Math.PI * 2, thickness: 1}),
-        position: new BVector3(0, 0, 2),
-    });
-    createShapeSystem({
-        scene,
-        batchRenderer,
-        systems,
-        texture,
-        shape: new DonutEmitter({radius: 2, donutRadius: 0.2, arc: Math.PI * 2}),
-        position: new BVector3(0, 5, 2),
-    });
-    createShapeSystem({
-        scene,
-        batchRenderer,
-        systems,
-        texture,
-        shape: new RectangleEmitter({
-            width: 2,
-            height: 2,
-            thickness: 0.2,
-            mode: EmitterMode.Loop,
-            spread: 0,
-            speed: new ConstantValue(1),
-        }),
-        position: new BVector3(5, -5, 2),
-    });
-    createShapeSystem({
-        scene,
-        batchRenderer,
-        systems,
-        texture,
-        shape: new GridEmitter({width: 2, height: 2, column: 10, row: 10}),
-        position: new BVector3(5, 0, 2),
+    const ground = MeshBuilder.CreateGround('ground', {width: 60, height: 60}, scene);
+    const groundMaterial = new StandardMaterial('ground', scene);
+    groundMaterial.diffuseColor = new Color3(0.16, 0.17, 0.21);
+    groundMaterial.specularColor = Color3.Black();
+    ground.material = groundMaterial;
+    // Each pad is a faint ring marked on the floor, so the shape's sparks are what read.
+    const padMaterial = new StandardMaterial('pad', scene);
+    padMaterial.diffuseColor = Color3.Black();
+    padMaterial.specularColor = Color3.Black();
+    padMaterial.emissiveColor = new Color3(0.3, 0.33, 0.42);
+    padMaterial.disableLighting = true;
+
+    const warm = new Gradient(
+        [
+            [new Color3(1, 0.95, 0.8), 0],
+            [new Color3(1, 0.6, 0.2), 0.5],
+            [new Color3(0.9, 0.2, 0.05), 1],
+        ],
+        [
+            [0, 0],
+            [1, 0.1],
+            [1, 0.5],
+            [0, 1],
+        ]
+    );
+
+    const shapes: [string, EmitterShape, number?][] = [
+        ['Point', new PointEmitter()],
+        ['Sphere', new SphereEmitter({radius: 0.8, thickness: 0.2})],
+        ['Hemisphere', new HemisphereEmitter({radius: 0.8, thickness: 0.2})],
+        ['Box (edges)', new BoxEmitter({width: 1.4, height: 1.4, depth: 0.6, emitFrom: BoxEmitFrom.Edge})],
+        ['Cone', new ConeEmitter({radius: 0.5, angle: Math.PI / 6, thickness: 1})],
+        [
+            'Cone (volume)',
+            new ConeEmitter({radius: 0.5, angle: Math.PI / 6, length: 1.5, emitFrom: ConeEmitFrom.Volume}),
+        ],
+        ['Circle', new CircleEmitter({radius: 0.8, thickness: 0.1})],
+        ['Donut', new DonutEmitter({radius: 0.8, donutRadius: 0.2})],
+        ['Edge', new EdgeEmitter({radius: 0.9})],
+        ['Rectangle', new RectangleEmitter({width: 1.4, height: 1.4, thickness: 0.1})],
+        ['Grid', new GridEmitter({width: 1.4, height: 1.4, column: 8, row: 8})],
+        [
+            'Grid in turn',
+            new GridEmitter({width: 1.4, height: 1.4, column: 8, row: 8, sampling: GridSampling.Sequential}),
+            64,
+        ],
+    ];
+    const arcShapes: ArcShape[] = [];
+    shapes.forEach(([name, shape, rate], i) => {
+        const x = ((i % 4) - 1.5) * 4;
+        const z = (Math.floor(i / 4) - 1) * 3.6;
+        const pad = MeshBuilder.CreateTorus(`pad:${name}`, {diameter: 2.6, thickness: 0.04, tessellation: 64}, scene);
+        pad.position.set(x, 0.01, z);
+        pad.isPickable = false;
+        pad.material = padMaterial;
+        addLabel(scene, name, new BVector3(x, 0.35, z + 1.55), {height: 0.36});
+
+        const system = new ParticleSystem({
+            scene,
+            duration: 1,
+            looping: true,
+            startLife: new IntervalValue(0.6, 0.9),
+            startSpeed: new IntervalValue(0.3, 0.6),
+            startSize: new IntervalValue(0.18, 0.28),
+            startColor: new ConstantColor(new Color4(1, 1, 1, 1)),
+            emissionOverTime: new ConstantValue(rate ?? 260),
+            shape,
+            texture: spark,
+            transparent: true,
+            blendMode: Constants.ALPHA_ADD,
+        });
+        system.emitter.name = name;
+        system.addBehavior(new ColorOverLife(warm));
+        system.addBehavior(
+            new SizeOverLife(
+                curve([
+                    [0, 1],
+                    [1, 0.4],
+                ])
+            )
+        );
+        // +z, the way the shapes emit, up; the edge and the box stand as they are.
+        system.emitter.rotation.x = name === 'Edge' ? 0 : -Math.PI / 2;
+        system.emitter.position.set(x, name === 'Edge' || name.startsWith('Box') ? 0.8 : 0.15, z);
+        add(system);
+        if ('mode' in shape && name !== 'Donut') {
+            arcShapes.push(shape as ArcShape);
+        }
     });
 
-    createShapeSystem({
-        scene,
-        batchRenderer,
-        systems,
-        texture,
-        shape: new ConeEmitter({radius: 0.5, angle: Math.PI / 6, length: 2, emitFrom: ConeEmitFrom.Volume}),
-        position: new BVector3(10, -5, 2),
+    controls.choice('Arc mode', Object.keys(MODES) as (keyof typeof MODES)[], 'Random', (mode) => {
+        for (const shape of arcShapes) {
+            shape.mode = MODES[mode];
+        }
     });
-    // In turn, cell by cell: a wave that sweeps the grid row by row.
-    createShapeSystem({
-        scene,
-        batchRenderer,
-        systems,
-        texture,
-        shape: new GridEmitter({width: 2, height: 2, column: 10, row: 10, sampling: GridSampling.Sequential}),
-        position: new BVector3(10, 0, 2),
-        rate: 60,
-    });
-
-    systems[2].emitter.rotation.x = -Math.PI / 2;
-
-    createLabel(scene, 'Point', new BVector3(-5, -7, 2));
-    createLabel(scene, 'Sphere', new BVector3(-5, -2, 2));
-    createLabel(scene, 'Hemisphere', new BVector3(-5, 3, 2));
-    createLabel(scene, 'Cone', new BVector3(0, -7, 2));
-    createLabel(scene, 'Circle', new BVector3(0, -2, 2));
-    createLabel(scene, 'Donut', new BVector3(0, 3, 2));
-    createLabel(scene, 'Rectangle', new BVector3(5, -7, 2));
-    createLabel(scene, 'Grid', new BVector3(5, -2, 2));
-    createLabel(scene, 'Cone volume', new BVector3(10, -7, 2));
-    createLabel(scene, 'Grid in turn', new BVector3(10, -2, 2));
 }

@@ -202,47 +202,11 @@
   "object": {
     "uuid": "node-0",
     "name": "Blending",
-    "matrix": [
-      1,
-      0,
-      0,
-      0,
-      0,
-      1,
-      0,
-      0,
-      0,
-      0,
-      1,
-      0,
-      0,
-      0,
-      0,
-      1
-    ],
     "type": "Group",
     "children": [
       {
         "uuid": "node-1",
         "name": "UrpAlpha",
-        "matrix": [
-          1,
-          0,
-          0,
-          0,
-          0,
-          1,
-          0,
-          0,
-          0,
-          0,
-          1,
-          0,
-          0,
-          0,
-          0,
-          1
-        ],
         "type": "ParticleEmitter",
         "ps": {
           "looping": true,
@@ -321,24 +285,6 @@
       {
         "uuid": "node-2",
         "name": "UrpPremultiply",
-        "matrix": [
-          1,
-          0,
-          0,
-          0,
-          0,
-          1,
-          0,
-          0,
-          0,
-          0,
-          1,
-          0,
-          0,
-          0,
-          0,
-          1
-        ],
         "type": "ParticleEmitter",
         "ps": {
           "looping": true,
@@ -417,24 +363,6 @@
       {
         "uuid": "node-3",
         "name": "UrpAdditive",
-        "matrix": [
-          1,
-          0,
-          0,
-          0,
-          0,
-          1,
-          0,
-          0,
-          0,
-          0,
-          1,
-          0,
-          0,
-          0,
-          0,
-          1
-        ],
         "type": "ParticleEmitter",
         "ps": {
           "looping": true,
@@ -513,24 +441,6 @@
       {
         "uuid": "node-4",
         "name": "UrpMultiply",
-        "matrix": [
-          1,
-          0,
-          0,
-          0,
-          0,
-          1,
-          0,
-          0,
-          0,
-          0,
-          1,
-          0,
-          0,
-          0,
-          0,
-          1
-        ],
         "type": "ParticleEmitter",
         "ps": {
           "looping": true,
@@ -609,24 +519,6 @@
       {
         "uuid": "node-5",
         "name": "UrpOpaque",
-        "matrix": [
-          1,
-          0,
-          0,
-          0,
-          0,
-          1,
-          0,
-          0,
-          0,
-          0,
-          1,
-          0,
-          0,
-          0,
-          0,
-          1
-        ],
         "type": "ParticleEmitter",
         "ps": {
           "looping": true,
@@ -705,24 +597,6 @@
       {
         "uuid": "node-6",
         "name": "UrpOdd",
-        "matrix": [
-          1,
-          0,
-          0,
-          0,
-          0,
-          1,
-          0,
-          0,
-          0,
-          0,
-          1,
-          0,
-          0,
-          0,
-          0,
-          1
-        ],
         "type": "ParticleEmitter",
         "ps": {
           "looping": true,
@@ -801,24 +675,6 @@
       {
         "uuid": "node-7",
         "name": "LegacyAdditive",
-        "matrix": [
-          1,
-          0,
-          0,
-          0,
-          0,
-          1,
-          0,
-          0,
-          0,
-          0,
-          1,
-          0,
-          0,
-          0,
-          0,
-          1
-        ],
         "type": "ParticleEmitter",
         "ps": {
           "looping": true,
@@ -897,24 +753,6 @@
       {
         "uuid": "node-8",
         "name": "LegacySoftAdditive",
-        "matrix": [
-          1,
-          0,
-          0,
-          0,
-          0,
-          1,
-          0,
-          0,
-          0,
-          0,
-          1,
-          0,
-          0,
-          0,
-          0,
-          1
-        ],
         "type": "ParticleEmitter",
         "ps": {
           "looping": true,
@@ -993,24 +831,6 @@
       {
         "uuid": "node-9",
         "name": "LegacyMultiply",
-        "matrix": [
-          1,
-          0,
-          0,
-          0,
-          0,
-          1,
-          0,
-          0,
-          0,
-          0,
-          1,
-          0,
-          0,
-          0,
-          0,
-          1
-        ],
         "type": "ParticleEmitter",
         "ps": {
           "looping": true,
@@ -1089,24 +909,6 @@
       {
         "uuid": "node-10",
         "name": "NoMaterial",
-        "matrix": [
-          1,
-          0,
-          0,
-          0,
-          0,
-          1,
-          0,
-          0,
-          0,
-          0,
-          1,
-          0,
-          0,
-          0,
-          0,
-          1
-        ],
         "type": "ParticleEmitter",
         "ps": {
           "looping": true,
@@ -1185,24 +987,6 @@
       {
         "uuid": "node-11",
         "name": "StdOpaque",
-        "matrix": [
-          1,
-          0,
-          0,
-          0,
-          0,
-          1,
-          0,
-          0,
-          0,
-          0,
-          1,
-          0,
-          0,
-          0,
-          0,
-          1
-        ],
         "type": "ParticleEmitter",
         "ps": {
           "looping": true,
@@ -1281,24 +1065,6 @@
       {
         "uuid": "node-12",
         "name": "StdCutout",
-        "matrix": [
-          1,
-          0,
-          0,
-          0,
-          0,
-          1,
-          0,
-          0,
-          0,
-          0,
-          1,
-          0,
-          0,
-          0,
-          0,
-          1
-        ],
         "type": "ParticleEmitter",
         "ps": {
           "looping": true,
@@ -1377,24 +1143,6 @@
       {
         "uuid": "node-13",
         "name": "StdFade",
-        "matrix": [
-          1,
-          0,
-          0,
-          0,
-          0,
-          1,
-          0,
-          0,
-          0,
-          0,
-          1,
-          0,
-          0,
-          0,
-          0,
-          1
-        ],
         "type": "ParticleEmitter",
         "ps": {
           "looping": true,
@@ -1473,24 +1221,6 @@
       {
         "uuid": "node-14",
         "name": "StdTransparent",
-        "matrix": [
-          1,
-          0,
-          0,
-          0,
-          0,
-          1,
-          0,
-          0,
-          0,
-          0,
-          1,
-          0,
-          0,
-          0,
-          0,
-          1
-        ],
         "type": "ParticleEmitter",
         "ps": {
           "looping": true,
@@ -1569,24 +1299,6 @@
       {
         "uuid": "node-15",
         "name": "StdAdditive",
-        "matrix": [
-          1,
-          0,
-          0,
-          0,
-          0,
-          1,
-          0,
-          0,
-          0,
-          0,
-          1,
-          0,
-          0,
-          0,
-          0,
-          1
-        ],
         "type": "ParticleEmitter",
         "ps": {
           "looping": true,
@@ -1665,24 +1377,6 @@
       {
         "uuid": "node-16",
         "name": "StdSubtractive",
-        "matrix": [
-          1,
-          0,
-          0,
-          0,
-          0,
-          1,
-          0,
-          0,
-          0,
-          0,
-          1,
-          0,
-          0,
-          0,
-          0,
-          1
-        ],
         "type": "ParticleEmitter",
         "ps": {
           "looping": true,
@@ -1761,24 +1455,6 @@
       {
         "uuid": "node-17",
         "name": "StdModulate",
-        "matrix": [
-          1,
-          0,
-          0,
-          0,
-          0,
-          1,
-          0,
-          0,
-          0,
-          0,
-          1,
-          0,
-          0,
-          0,
-          0,
-          1
-        ],
         "type": "ParticleEmitter",
         "ps": {
           "looping": true,
@@ -1857,24 +1533,6 @@
       {
         "uuid": "node-18",
         "name": "Reflective",
-        "matrix": [
-          1,
-          0,
-          0,
-          0,
-          0,
-          1,
-          0,
-          0,
-          0,
-          0,
-          1,
-          0,
-          0,
-          0,
-          0,
-          1
-        ],
         "type": "ParticleEmitter",
         "ps": {
           "looping": true,

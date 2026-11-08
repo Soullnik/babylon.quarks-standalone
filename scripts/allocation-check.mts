@@ -36,10 +36,12 @@ import {
     Bezier,
     ChangeEmitDirection,
     ColorBySpeed,
+    ColorOverLength,
     ColorOverLife,
     ConstantColor,
     ConstantValue,
     EmitterShape,
+    EulerGenerator,
     ForceOverLife,
     FrameOverLife,
     Gradient,
@@ -50,6 +52,7 @@ import {
     Noise,
     OrbitOverLife,
     PiecewiseBezier,
+    RandomizeDirection,
     Rotation3DOverLife,
     RotationBySpeed,
     RotationOverLife,
@@ -127,6 +130,11 @@ const behaviorCases: Array<[string, () => Behavior, RenderMode?]> = [
     ['ColorBySpeed', () => new ColorBySpeed(fade(), new IntervalValue(0, 10))],
     ['ColorOverLife', () => new ColorOverLife(fade())],
     ['ForceOverLife', () => new ForceOverLife(curve(), new ConstantValue(-2), curve())],
+    [
+        'ForceOverLife randomized',
+        () =>
+            new ForceOverLife(new IntervalValue(-3, 4), new ConstantValue(-2), new IntervalValue(-4, 3), 'world', true),
+    ],
     ['FrameOverLife', () => new FrameOverLife(new PiecewiseBezier([[new Bezier(0, 2, 4, 6), 0]]))],
     ['GravityForce', () => new GravityForce(new Vector3(0, 8, 0), 30)],
     ['InheritVelocity', () => new InheritVelocity(new ConstantValue(0.5), 'current')],
@@ -151,6 +159,16 @@ const behaviorCases: Array<[string, () => Behavior, RenderMode?]> = [
         () => new Rotation3DOverLife(new AxisAngleGenerator(new Vector3(0, 1, 0), new ConstantValue(3))),
         RenderMode.Mesh,
     ],
+    [
+        'Rotation3DOverLife angles',
+        () =>
+            new Rotation3DOverLife(
+                new EulerGenerator(new ConstantValue(0.2), new ConstantValue(1.5), new IntervalValue(0, 1), 'YXZ'),
+                {integration: 'angles'}
+            ),
+        RenderMode.Mesh,
+    ],
+    ['RandomizeDirection', () => new RandomizeDirection(0.5)],
     ['RotationBySpeed', () => new RotationBySpeed(new ConstantValue(4), new IntervalValue(0, 10))],
     ['RotationOverLife', () => new RotationOverLife(new ConstantValue(2))],
     ['SizeBySpeed', () => new SizeBySpeed(curve(), new IntervalValue(0, 10))],
@@ -169,11 +187,17 @@ const behaviorCases: Array<[string, () => Behavior, RenderMode?]> = [
     ],
     ['WidthOverLength', () => new WidthOverLength(curve()), RenderMode.Trail],
     ['ColorOverLife', () => new ColorOverLife(fade()), RenderMode.Trail],
+    ['ColorOverLength', () => new ColorOverLength(fade()), RenderMode.Trail],
 ];
 
 /** The behaviors that apply in `renderMode`, all at once, as an effect stacks them. */
 function everyBehavior(renderMode: RenderMode): Behavior[] {
-    const only: Record<string, RenderMode> = {Rotation3DOverLife: RenderMode.Mesh, WidthOverLength: RenderMode.Trail};
+    const only: Record<string, RenderMode> = {
+        Rotation3DOverLife: RenderMode.Mesh,
+        'Rotation3DOverLife angles': RenderMode.Mesh,
+        WidthOverLength: RenderMode.Trail,
+        ColorOverLength: RenderMode.Trail,
+    };
     const seen = new Set<string>();
     const behaviors: Behavior[] = [];
     for (const [name, behavior] of behaviorCases) {

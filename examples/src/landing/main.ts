@@ -1,6 +1,13 @@
-import {demoManifest} from '../demoManifest';
+import {ArrowRight, ArrowUpRight, Copy, createIcons, Menu, Moon, Play, Search, Sun, X} from 'lucide';
+import {siGithub, siNpm} from 'simple-icons';
+import {demoManifest, previewFile, SECTIONS} from '../demoManifest';
 import type {DemoManifestEntry} from '../types';
+import type {StageEffectDetail} from './heroStage';
 import {highlightTs} from './highlight';
+import {setupOrbits} from './orbits';
+
+/** The repository, for links to source files. */
+const REPO = 'https://github.com/Soullnik/babylon.quarks-standalone';
 
 /** State the demo smoke test reads to know the landing page came up. */
 interface LandingHook {
@@ -13,37 +20,30 @@ const hook: LandingHook = {ready: false, stage: 'pending'};
 (window as unknown as {__quarksLanding: LandingHook}).__quarksLanding = hook;
 
 const THEME_KEY = 'quarks-theme';
-type ThemeChoice = 'system' | 'light' | 'dark';
+/** Dark first: additive particles read on a dark ground. Paper is the choice the visitor makes. */
+type ThemeChoice = 'light' | 'dark';
+const THEME_COLOR: Record<ThemeChoice, string> = {dark: '#0b0d12', light: '#eef0f5'};
 
 function readTheme(): ThemeChoice {
     try {
-        const stored = localStorage.getItem(THEME_KEY);
-        return stored === 'light' || stored === 'dark' ? stored : 'system';
+        return localStorage.getItem(THEME_KEY) === 'light' ? 'light' : 'dark';
     } catch {
-        return 'system';
+        return 'dark';
     }
 }
 
 function applyTheme(choice: ThemeChoice) {
-    const root = document.documentElement;
-    if (choice === 'system') {
-        root.removeAttribute('data-theme');
-    } else {
-        root.setAttribute('data-theme', choice);
-    }
+    document.documentElement.setAttribute('data-theme', choice);
     const button = document.querySelector<HTMLButtonElement>('[data-theme-toggle]');
     if (button) {
         button.dataset.choice = choice;
-        const label = {system: 'Theme: system', light: 'Theme: light', dark: 'Theme: dark'}[choice];
-        button.setAttribute('aria-label', `${label}. Switch theme`);
-        button.title = label;
+        const next = choice === 'dark' ? 'paper' : 'dark';
+        button.setAttribute('aria-label', `Theme: ${choice === 'dark' ? 'dark' : 'paper'}. Switch to ${next}`);
+        button.title = `Switch to the ${next} theme`;
     }
-    // The browser chrome follows an explicit choice; with "system" each meta's media query decides.
-    for (const meta of Array.from(document.querySelectorAll<HTMLMetaElement>('meta[name="theme-color"]'))) {
-        meta.dataset.media ??= meta.media;
-        meta.dataset.content ??= meta.content;
-        meta.media = choice === 'system' ? meta.dataset.media : 'all';
-        meta.content = choice === 'system' ? meta.dataset.content : choice === 'dark' ? '#0a0c11' : '#f4f5f8';
+    const meta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
+    if (meta) {
+        meta.content = THEME_COLOR[choice];
     }
 }
 
@@ -51,18 +51,41 @@ function setupTheme() {
     let choice = readTheme();
     applyTheme(choice);
     document.querySelector('[data-theme-toggle]')?.addEventListener('click', () => {
-        const order: ThemeChoice[] = ['system', 'light', 'dark'];
-        choice = order[(order.indexOf(choice) + 1) % order.length];
+        choice = choice === 'dark' ? 'light' : 'dark';
         applyTheme(choice);
         try {
-            if (choice === 'system') {
-                localStorage.removeItem(THEME_KEY);
-            } else {
-                localStorage.setItem(THEME_KEY, choice);
-            }
+            localStorage.setItem(THEME_KEY, choice);
         } catch {
             // Storage blocked: the choice lasts for this page view only.
         }
+    });
+}
+
+/**
+ * Every icon on the page comes from one set: Lucide glyphs, replaced in place from `data-lucide`,
+ * plus the GitHub and npm marks from Simple Icons, which Lucide does not carry. Arrow links, copy
+ * buttons and the stage's editor action get their glyph here rather than in the markup, so the
+ * markup stays text and the glyphs stay in one place.
+ */
+function setupIcons() {
+    for (const link of Array.from(document.querySelectorAll('.arrow-link'))) {
+        link.insertAdjacentHTML('beforeend', '<i data-lucide="arrow-right" class="icon" aria-hidden="true"></i>');
+    }
+    for (const button of Array.from(document.querySelectorAll('.copy'))) {
+        button.insertAdjacentHTML('afterbegin', '<i data-lucide="copy" class="icon" aria-hidden="true"></i>');
+    }
+    document
+        .querySelector('[data-stage-editor]')
+        ?.insertAdjacentHTML('beforeend', '<i data-lucide="arrow-up-right" class="icon" aria-hidden="true"></i>');
+    for (const mark of Array.from(document.querySelectorAll<HTMLElement>('[data-brand]'))) {
+        const brand = mark.dataset.brand === 'github' ? siGithub : mark.dataset.brand === 'npm' ? siNpm : null;
+        if (brand) {
+            mark.innerHTML = `<svg viewBox="0 0 24 24" class="icon" aria-hidden="true"><path fill="currentColor" d="${brand.path}"/></svg>`;
+        }
+    }
+    createIcons({
+        icons: {ArrowRight, ArrowUpRight, Copy, Menu, Moon, Play, Search, Sun, X},
+        attrs: {'stroke-width': 1.75, 'aria-hidden': 'true'},
     });
 }
 
@@ -75,6 +98,7 @@ function setupMenu() {
     const setOpen = (open: boolean) => {
         toggle.setAttribute('aria-expanded', String(open));
         nav.dataset.open = String(open);
+        document.documentElement.classList.toggle('menu-open', open);
     };
     toggle.addEventListener('click', () => setOpen(toggle.getAttribute('aria-expanded') !== 'true'));
     nav.addEventListener('click', (event) => {
@@ -113,19 +137,21 @@ function copySource(button: HTMLButtonElement) {
     const panel = card
         ? Array.from(card.querySelectorAll<HTMLElement>('[role="tabpanel"]')).find((p) => !p.hidden)
         : null;
-    return panel?.querySelector('code')?.textContent ?? '';
+    const code = panel?.querySelector<HTMLElement>('code');
+    return code?.dataset.source ?? code?.textContent ?? '';
 }
 
 function setupCopyButtons() {
     for (const button of Array.from(
         document.querySelectorAll<HTMLButtonElement>('[data-copy-target], [data-copy-panel]')
     )) {
-        const original = button.textContent;
+        const label = button.querySelector('.copy-label') ?? button;
+        const original = label.textContent;
         button.addEventListener('click', () => {
             const text = copySource(button);
             const done = (ok: boolean) => {
-                button.textContent = ok ? 'Copied' : 'Copy failed';
-                window.setTimeout(() => (button.textContent = original), 1400);
+                label.textContent = ok ? 'Copied' : 'Copy failed';
+                window.setTimeout(() => (label.textContent = original), 1400);
             };
             if (navigator.clipboard?.writeText) {
                 navigator.clipboard.writeText(text.trim()).then(
@@ -155,7 +181,10 @@ function rovingIndex(key: string, index: number, count: number) {
     }
 }
 
-/** Tab lists: `[role=tablist]` buttons with `aria-controls` panels; arrows, Home and End move between tabs. */
+/**
+ * Tab lists: `[role=tablist]` buttons with `aria-controls` panels; arrows, Home and End move between
+ * tabs. A figure with `data-tab-figure="<tab id>"` shows only while that tab is selected.
+ */
 function setupTabs() {
     for (const list of Array.from(document.querySelectorAll<HTMLElement>('[role="tablist"][data-panels]'))) {
         const tabs = Array.from(list.querySelectorAll<HTMLButtonElement>('[role="tab"]'));
@@ -168,6 +197,9 @@ function setupTabs() {
                 if (panel) {
                     panel.hidden = !selected;
                 }
+            }
+            for (const figure of Array.from(document.querySelectorAll<HTMLElement>('[data-tab-figure]'))) {
+                figure.hidden = figure.dataset.tabFigure !== tab.id;
             }
             if (focus) {
                 tab.focus();
@@ -227,18 +259,97 @@ function setupStageControls() {
     root.querySelector('[data-stage-play]')?.addEventListener('click', () => startLiveStage(root));
 }
 
+/**
+ * Highlights the listings and wraps each line so the stylesheet can number it (`.ln`). The curve
+ * figure's caption names the line of listing 2 that holds the curve, read from the text so it
+ * cannot drift from the code.
+ */
 function setupCode() {
     for (const block of Array.from(document.querySelectorAll<HTMLElement>('pre code[data-lang="ts"]'))) {
-        block.innerHTML = highlightTs(block.textContent ?? '');
+        // The raw text is kept for the copy buttons: the wrapped lines lose their line breaks.
+        const source = block.textContent ?? '';
+        block.dataset.source = source;
+        // No token of the highlighter spans a line break, so the lines can be wrapped afterwards.
+        block.innerHTML = highlightTs(source)
+            .split('\n')
+            .map((line) => `<span class="ln">${line}</span>`)
+            .join('');
+    }
+    const lines = (document.getElementById('src-code')?.dataset.source ?? '').split('\n');
+    const curveLine = lines.findIndex((line) => line.includes('new Bezier(')) + 1;
+    const caption = document.querySelector('[data-curve-line]');
+    if (caption && curveLine > 0) {
+        caption.textContent = String(curveLine);
     }
 }
 
-/** `examples/public/previews/<kebab-key>.png`, as `npm run capture:previews` writes it. */
-function previewFile(demoKey: string) {
-    return demoKey
-        .replace(/Demo$/u, '')
-        .replace(/([a-z0-9])([A-Z])/g, '$1-$2')
-        .toLowerCase();
+/**
+ * The breakdown legend below the stage describes the Vortex. It records which take the stage is
+ * on, so the stylesheet can mark the legend as describing another take than the one running.
+ */
+/**
+ * The breakdown under the stage follows the effect on it. The Vortex keeps its written legend (it
+ * names what the pointer does, which the systems alone do not say); any other take is listed from
+ * its running systems, which the stage sends with `stage:effect`, so the legend cannot drift from
+ * the demo's code.
+ */
+function setupBreakdown() {
+    const legend = document.querySelector<HTMLElement>('[data-breakdown]');
+    const stage = document.querySelector<HTMLElement>('[data-stage]');
+    const title = legend?.querySelector<HTMLElement>('[data-breakdown-title]');
+    const lead = legend?.querySelector<HTMLElement>('[data-breakdown-lead]');
+    const source = legend?.querySelector<HTMLElement>('[data-breakdown-source]');
+    const layers = legend?.querySelector<HTMLElement>('[data-breakdown-layers]');
+    const more = legend?.querySelector<HTMLButtonElement>('[data-layers-all]');
+    if (!legend || !stage || !title || !lead || !source || !layers || !more) {
+        return;
+    }
+    const vortex = {
+        title: title.innerHTML,
+        lead: lead.innerHTML,
+        source: source.innerHTML,
+        layers: layers.innerHTML,
+        count: layers.children.length,
+    };
+    const showMore = (count: number) => {
+        more.textContent = `Show all ${count} layers`;
+        more.parentElement?.toggleAttribute('hidden', count <= 3);
+    };
+
+    stage.addEventListener('stage:effect', (event) => {
+        const detail = (event as CustomEvent<StageEffectDetail>).detail;
+        const demo = detail.demoKey ? demoManifest.find((entry) => entry.key === detail.demoKey) : undefined;
+        if (!demo) {
+            title.innerHTML = vortex.title;
+            lead.innerHTML = vortex.lead;
+            source.innerHTML = vortex.source;
+            layers.innerHTML = vortex.layers;
+            showMore(vortex.count);
+            return;
+        }
+        const count = detail.layers.length;
+        // The manifest's description up to its first colon: what the effect is, before the parts.
+        const what = demo.description.split(/:\s/)[0].replace(/\.$/, '');
+        const file = `examples/src/demos/${demo.module}.ts`;
+        title.textContent = `What the ${detail.name} is made of`;
+        lead.textContent = `${what}. ${count} systems under one renderer; drag in the window to orbit the camera.`;
+        source.innerHTML = `Source: <a href="${REPO}/blob/main/${file}" target="_blank" rel="noopener noreferrer">${escapeHtml(file)}</a>. “Open in editor” loads the same ${count} systems.`;
+        layers.innerHTML = detail.layers
+            .map(
+                (layer, i) => `<li>
+  <span class="layer-no">${i}</span>
+  <span class="layer-name">${escapeHtml(layer.name)}</span>
+  <span class="layer-mode">${escapeHtml(layer.mode)}</span>
+  ${layer.behaviors.length ? `<span class="layer-behaviors">${escapeHtml(layer.behaviors.join(', '))}</span>` : '<span class="layer-behaviors is-empty">No behaviors</span>'}
+</li>`
+            )
+            .join('');
+        showMore(count);
+    });
+    more.addEventListener('click', () => {
+        legend.dataset.expanded = 'true';
+    });
+    showMore(vortex.count);
 }
 
 function escapeHtml(text: string) {
@@ -246,31 +357,33 @@ function escapeHtml(text: string) {
 }
 
 function demoCard(demo: DemoManifestEntry) {
-    const tags = demo.tags.map((tag) => `<li>${escapeHtml(tag)}</li>`).join('');
-    return `<li class="demo">
+    const showcase = demo.section === 'showcase';
+    const tags = [
+        `<li class="demo-category">${escapeHtml(demo.category)}</li>`,
+        ...demo.tags.slice(0, 2).map((tag) => `<li>${escapeHtml(tag)}</li>`),
+    ].join('');
+    return `<li class="demo${showcase ? ' demo-large' : ''}">
   <a class="demo-link" href="./babylonDemo.html#${encodeURIComponent(demo.key)}">
-    <img src="./previews/${previewFile(demo.key)}.png" alt="" loading="lazy" decoding="async" width="640" height="360" />
+    <span class="demo-shot"><img src="./previews/${previewFile(demo.key)}" alt="" loading="lazy" decoding="async" width="640" height="360" /></span>
     <span class="demo-name">${escapeHtml(demo.name)}</span>
   </a>
   <p>${escapeHtml(demo.description)}</p>
-  <ul class="demo-tags" aria-label="Tags">${tags}</ul>
+  <ul class="demo-tags" aria-label="Category and tags">${tags}</ul>
 </li>`;
 }
 
-/** Tags that appear on at least two demos, most common first: the gallery's filter chips. */
-function filterTags() {
-    const counts = new Map<string, number>();
-    for (const demo of demoManifest) {
-        for (const tag of demo.tags) {
-            counts.set(tag, (counts.get(tag) ?? 0) + 1);
-        }
-    }
-    return [...counts.entries()]
-        .filter(([, count]) => count >= 2)
-        .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
-        .map(([tag]) => tag);
-}
+/** The gallery opens on the showcase and the first feature demos, with a button for the rest. */
+const phone = window.matchMedia?.('(max-width: 640px)');
+/** The grid runs three feature cards to a row between these widths (`.demo` spans 4 of 12). */
+const threeUp = window.matchMedia?.('(min-width: 801px) and (max-width: 1100px)');
+/** How many feature demos show before "Show all": whole rows at every width. */
+const initialFeatures = () => (phone?.matches ? 6 : threeUp?.matches ? 9 : 8);
 
+/**
+ * The gallery: the showcase as large cards, then every feature demo in one dense grid, in the
+ * manifest's section and category order. The chips pick a section; the search matches names,
+ * descriptions, categories and tags. With a filter or a search on, every card is the same size.
+ */
 function setupGallery() {
     const grid = document.getElementById('demos-grid');
     const search = document.getElementById('demo-search') as HTMLInputElement | null;
@@ -279,23 +392,22 @@ function setupGallery() {
     if (!grid) {
         return;
     }
-    let activeTag = '';
+    let activeSection = '';
+    let expanded = false;
     if (chips) {
-        chips.innerHTML = ['', ...filterTags()]
+        chips.innerHTML = [{id: '', title: 'All'}, ...SECTIONS]
             .map(
-                (tag) =>
-                    `<button type="button" class="chip" data-tag="${escapeHtml(tag)}" aria-pressed="${tag === ''}">${
-                        tag === '' ? 'All' : escapeHtml(tag)
-                    }</button>`
+                ({id, title}) =>
+                    `<button type="button" class="chip" data-section="${id}" aria-pressed="${id === ''}">${escapeHtml(title)}</button>`
             )
             .join('');
         chips.addEventListener('click', (event) => {
-            const chip = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-tag]');
+            const chip = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-section]');
             if (!chip) {
                 return;
             }
-            activeTag = chip.dataset.tag ?? '';
-            for (const other of Array.from(chips.querySelectorAll('[data-tag]'))) {
+            activeSection = chip.dataset.section ?? '';
+            for (const other of Array.from(chips.querySelectorAll('[data-section]'))) {
                 other.setAttribute('aria-pressed', String(other === chip));
             }
             render();
@@ -303,23 +415,60 @@ function setupGallery() {
     }
     const render = () => {
         const query = (search?.value ?? '').trim().toLowerCase();
-        const shown = demoManifest.filter((demo) => {
-            if (activeTag && !demo.tags.includes(activeTag)) {
-                return false;
-            }
-            if (!query) {
-                return true;
-            }
-            return `${demo.name} ${demo.description} ${demo.tags.join(' ')}`.toLowerCase().includes(query);
-        });
-        grid.innerHTML = shown.map(demoCard).join('');
+        const matches = (demo: DemoManifestEntry) =>
+            (!activeSection || demo.section === activeSection) &&
+            (!query ||
+                `${demo.name} ${demo.description} ${demo.category} ${demo.tags.join(' ')}`
+                    .toLowerCase()
+                    .includes(query));
+        const cards = SECTIONS.flatMap((section) =>
+            section.categories.flatMap((category) =>
+                demoManifest.filter(
+                    (demo) => demo.section === section.id && demo.category === category && matches(demo)
+                )
+            )
+        );
+        const filtered = Boolean(activeSection || query);
+        grid.toggleAttribute('data-filtered', filtered);
+        let shown = cards;
+        let hidden = 0;
+        if (!filtered && !expanded) {
+            const showcase = cards.filter((demo) => demo.section === 'showcase');
+            const features = cards.filter((demo) => demo.section !== 'showcase');
+            shown = [...showcase, ...features.slice(0, initialFeatures())];
+            hidden = features.length - initialFeatures();
+        }
+        const parts = shown.map(demoCard);
+        if (cards.length === 0) {
+            parts.push(
+                `<li class="demo-empty">No demo matches “${escapeHtml(query)}”. <button type="button" class="text-button" data-clear-search>Clear the search</button></li>`
+            );
+        } else if (hidden > 0) {
+            parts.push(
+                `<li class="demo-more"><button type="button" class="text-button" data-show-all>Show all ${hidden + initialFeatures()} feature demos</button></li>`
+            );
+        }
+        grid.innerHTML = parts.join('');
         if (status) {
             status.textContent =
-                shown.length === demoManifest.length
+                cards.length === demoManifest.length
                     ? `${demoManifest.length} demos`
-                    : `${shown.length} of ${demoManifest.length} demos`;
+                    : `${cards.length} of ${demoManifest.length} demos`;
         }
     };
+    grid.addEventListener('click', (event) => {
+        const target = event.target as HTMLElement;
+        if (target.closest('[data-clear-search]') && search) {
+            search.value = '';
+            render();
+            search.focus();
+        } else if (target.closest('[data-show-all]')) {
+            expanded = true;
+            render();
+        }
+    });
+    phone?.addEventListener('change', render);
+    threeUp?.addEventListener('change', render);
     search?.addEventListener('input', render);
     render();
 }
@@ -388,10 +537,16 @@ async function startStage() {
 }
 
 setupTheme();
+setupIcons();
 setupMenu();
 setupCopyButtons();
 setupTabs();
 setupStageControls();
+const stageFrame = document.querySelector<HTMLElement>('.stage-frame');
+if (stageFrame) {
+    setupOrbits(stageFrame);
+}
+setupBreakdown();
 setupCode();
 setupGallery();
 setCount('demos', demoManifest.length);

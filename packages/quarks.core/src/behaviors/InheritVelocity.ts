@@ -4,6 +4,7 @@ import {IParticleSystem} from '../IParticleSystem';
 import {Quaternion, Vector3} from '../math';
 import {Particle} from '../Particle';
 import {Behavior, BehaviorJSON} from './Behavior';
+import {stepEndLife} from './stepAge';
 
 /**
  * How {@link InheritVelocity} applies the emitter's velocity: `'initial'` once at spawn,
@@ -92,7 +93,7 @@ export class InheritVelocity implements Behavior {
         }
         particle.position.addScaledVector(
             this._temp,
-            this.multiplier.genValue(particle.memory, particle.age / particle.life) * delta
+            this.multiplier.genValue(particle.memory, stepEndLife(particle, delta)) * delta
         );
     }
 

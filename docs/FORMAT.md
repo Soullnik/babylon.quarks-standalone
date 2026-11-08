@@ -66,12 +66,17 @@ and raises the schema's `quarksFormat` and `$id`.
 
 ## Nodes
 
-Every node has a `uuid`, a `type`, a `name` and a local `matrix` (column-major, as Babylon's
-`Matrix.asArray()`; `position`, `quaternion`/`rotation` and `scale` are read too). `visible: false`
-loads the node disabled, with everything under it. `isVisible: false` on a mesh loads it undrawn,
-and leaves its children drawn, as a mesh surface shape's source that also parents emitters needs.
-`children` holds its child nodes. The matrix is the node's position, rotation and scale; a pivot
-matrix is not written.
+Every node has a `uuid`, a `type` and a `name`, and its local transform as `position` `[x, y, z]`,
+`quaternion` `[x, y, z, w]` and `scale` `[x, y, z]`, each left out at its default (the origin, no
+turn, 1). The scale keeps its signs: a node mirrored along X is `scale` `[-1, 1, 1]`, not the same
+matrix turned half round Z with `[1, -1, 1]`, and a system below it turns by which one it is, as
+Unity's `transform.rotation` does (see `ScalingMode`). Writers before 1.0 wrote a column-major
+`matrix` instead (as Babylon's `Matrix.asArray()`); it is still read, in place of the three, and a
+mirror in it lands on the axis Babylon's `decompose` picks; re-save or re-export such a file to
+keep it where it was. three.js files may give Euler `rotation` in radians instead of `quaternion`.
+`visible: false` loads the node disabled, with everything under it. `isVisible: false` on a mesh
+loads it undrawn, and leaves its children drawn, as a mesh surface shape's source that also
+parents emitters needs. `children` holds its child nodes. A pivot matrix is not written.
 
 | `type` | Reads | Writes |
 | --- | --- | --- |
@@ -85,6 +90,30 @@ gives a system that leaves the setting out, and a missing field reads as that de
 `instancingGeometry` and `material` are always written; `behaviors` only when there are any. A curve
 written as a bare number reads as a constant; a flag written as a number reads as true unless it is
 0. Files that write every setting, as earlier releases did, still load.
+
+`particleColor: false` draws a system's particles without their colour (start colour, colour over
+life, alpha included, and a mesh's vertex colours): the texture times the material colour alone, as
+Unity's mesh shaders (Legacy Diffuse and its family, Mobile, Unlit, Standard) draw a particle. A
+loader that does not know it draws the particle colour.
+
+A system's `instancingGeometry` names a geometry entry. A `QuarksGeometry` holds `positions`,
+`indices`, `uvs`, `uvs2` (the second UV set), `normals` and `colors`: the mesh's vertex colours,
+`r, g, b, a` per vertex from 0 to 1 and linear, which a mesh particle's colour is multiplied by as
+they are, as Unity does and as glTF stores `COLOR_0`. A three.js `BufferGeometry` gives its `color`
+attribute (`r, g, b` with alpha 1, or `r, g, b, a`; normalized integers scaled to 0 to 1) as
+`colors`. A `Mesh` node is drawn without vertex colours, and an older loader draws a mesh particle
+without them.
+
+Geometries are wound as Babylon's own meshes are: a triangle's front face, the one
+`renderFace: 'front'` draws, a lit mesh lights and a `mesh_surface` shape emits from, is the side
+its normal `(c - a) × (b - a)` points to (`a`, `b`, `c` its corners in order). Indices a file gives
+are read as they are; the geometries the loader builds (`PlaneGeometry`, facing +Z, and
+`SphereGeometry`, facing out) are wound so. Unity and three.js wind their front faces the other
+way: the Unity exporter swaps each triangle's last two corners. Older files are wound the other
+way where they hold a mesh from an earlier Unity exporter or an earlier save of a three.js plane or
+sphere: such a mesh shows its inside with `renderFace: 'front'`, is lit from behind, and a
+`mesh_surface` shape on it emits inwards. Re-export it from Unity, or save the three.js original
+again; nothing else in such a file changes, and the format version is the same.
 
 The shape and each behavior write their `type` and each field only when it differs from the default
 the type reads a missing field as (`EmitterToJSON`, `BehaviorToJSON`); a field the type needs, such
@@ -172,3 +201,5 @@ Textures are shared per scene between effects that use the same image and sample
 a loaded effect's root (`QuarksLoader.disposeEffect(root)`, `root.dispose()`, or a parent's or the
 scene's dispose) frees its nodes, the materials made for it and each texture once no other loaded
 effect, or `QuarksUtil.instantiate` copy, still uses it. `EffectPool` copies work the same way.
+A node kept after its root goes, such as a child made the root in place of a wrapper group, keeps
+them with `QuarksUtil.shareResources(root, node)` before the root is disposed.

@@ -1,7 +1,7 @@
 import {mkdir} from 'node:fs/promises';
 import path from 'node:path';
 import {chromium} from 'playwright';
-import {demoManifest} from '../examples/src/demoManifest.ts';
+import {demoManifest, previewFile} from '../examples/src/demoManifest.ts';
 
 /**
  * Screenshots every demo into `examples/public/previews/<key>.png`, what the gallery shows
@@ -13,16 +13,17 @@ import {demoManifest} from '../examples/src/demoManifest.ts';
  *   CHROMIUM_PATH      a Chromium to use instead of Playwright's own
  *   --only=A,B         capture only these demo keys (default every demo in the manifest)
  *   --landing          capture only the landing page's images
- *   --wait=MS          how long each demo runs before its screenshot (default 3000)
+ *
+ * Each demo is shot at its manifest's `captureAt`, in seconds of the demo's own time, so the
+ * preview shows the moment chosen for it however fast the machine renders.
  */
 const VIEWPORT = {width: 1280, height: 720};
 const BASE_URL = process.env.EXAMPLES_BASE_URL ?? 'http://localhost:3010';
 const OUTPUT_DIR = path.resolve('examples/public/previews');
 const LANDING_DIR = path.resolve('examples/public/landing');
 const landingOnly = process.argv.includes('--landing');
-const waitMs = Number(process.argv.find((a) => a.startsWith('--wait='))?.slice('--wait='.length) ?? 3000);
 // The viewer's toolbar, hint and drop overlay are UI, not the effect; previews show the effect only.
-const HIDE_VIEWER_UI = '.hud, .hint, .drop-overlay { display: none !important; }';
+const HIDE_VIEWER_UI = '.hud, .panel, .drop-overlay, .topic-bar, .topic-toast { display: none !important; }';
 const only = process.argv
     .find((a) => a.startsWith('--only='))
     ?.slice('--only='.length)
@@ -30,27 +31,25 @@ const only = process.argv
     .filter(Boolean);
 
 /**
- * Builds deterministic preview filename from demo key.
- */
-function getPreviewFilename(demoKey: string) {
-    const fileSafeName = demoKey
-        .replace(/Demo$/u, '')
-        .replace(/([a-z0-9])([A-Z])/g, '$1-$2')
-        .toLowerCase();
-    return `${fileSafeName}.png`;
-}
-
-/**
  * Captures one screenshot for a specific demo page hash.
  */
 async function captureDemoPreview(page: import('playwright').Page, demo: (typeof demoManifest)[number]) {
-    const previewFilename = getPreviewFilename(demo.key);
+    const previewFilename = previewFile(demo.key);
     const previewPath = path.join(OUTPUT_DIR, previewFilename);
-    const demoUrl = `${BASE_URL}/babylonDemo.html#${demo.key}`;
+    // The viewer stops the demo at `pauseAt` seconds of its own time and keeps drawing that frame.
+    const demoUrl = `${BASE_URL}/babylonDemo.html?pauseAt=${demo.captureAt}#${demo.key}`;
 
     await page.goto(demoUrl, {waitUntil: 'networkidle'});
     await page.addStyleTag({content: HIDE_VIEWER_UI});
-    await page.waitForTimeout(waitMs);
+    await page.waitForFunction(
+        (key) => {
+            const viewer = (window as never as {__quarksViewer?: {ready: string | null; paused: boolean}})
+                .__quarksViewer;
+            return viewer?.ready === key && viewer.paused;
+        },
+        demo.key,
+        {timeout: 120000, polling: 100}
+    );
     await page.screenshot({path: previewPath});
 
     return previewFilename;
@@ -67,6 +66,8 @@ async function captureLanding(browser: import('playwright').Browser) {
     await stagePage.goto(`${BASE_URL}/?engine=webgl`, {waitUntil: 'networkidle'});
     await stagePage.waitForFunction(() => document.querySelector('[data-stage]')?.getAttribute('data-live') === 'true');
     await stagePage.waitForTimeout(6000);
+    // The poster stands in for the canvas alone; the orbit rings drawn over the window stay live.
+    await stagePage.addStyleTag({content: '.orbit { display: none !important; }'});
     await stagePage
         .locator('.stage-view canvas')
         .screenshot({path: path.join(LANDING_DIR, 'stage-poster.jpg'), quality: 82});

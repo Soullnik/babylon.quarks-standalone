@@ -75,14 +75,20 @@ import {
     validCullingMode,
     validLighting,
     validLoopRange,
+    validMaterialColor,
+    validMaterialColorScale,
     validMaxParticles,
+    validRenderAlignment,
     validRenderFace,
     validRingBufferMode,
+    validRotationAxis,
     validScalingMode,
     validSoftFade,
+    validSortingFudge,
     validSortMode,
     validStopAction,
     validTileCount,
+    WHITE_MATERIAL_COLOR,
 } from './system/normalize';
 import {ParticleSpawner} from './system/ParticleSpawner';
 import {
@@ -107,6 +113,7 @@ import {
     ParticleGradientMap,
     ParticleUVDistortion,
     ParticleUVDistortionOptions,
+    RenderAlignment,
     RenderFace,
     RenderMode,
     SortMode,
@@ -121,6 +128,7 @@ import type {
     ParticleSystemJSONParameters,
     ParticleSystemParameters,
     RingBufferMode,
+    RotationAxis,
     ScalingMode,
     StopAction,
 } from './system/types';
@@ -134,6 +142,7 @@ export type {
     ParticleSystemJSONParameters,
     ParticleSystemParameters,
     RingBufferMode,
+    RotationAxis,
     ScalingMode,
     StopAction,
 } from './system/types';
@@ -513,6 +522,95 @@ export class ParticleSystem implements IParticleSystem {
     }
 
     /**
+     * Whether the texture's colour is already multiplied by its alpha (Unity's Alpha Blended
+     * Premultiply takes its texture so), and may carry light where its alpha is 0, such as a soft
+     * glow. With premultiplied blending the colour is then drawn times the vertex colour and alpha
+     * only, as Unity draws it, and the texture's alpha only lets the frame through; other blend
+     * modes ignore it. False by default.
+     */
+    get premultipliedMap(): boolean {
+        return this.rendererSettings.premultipliedMap === true;
+    }
+
+    set premultipliedMap(premultiplied: boolean) {
+        this.rendererSettings.premultipliedMap = premultiplied === true;
+        this.neededToUpdateRender = true;
+    }
+
+    /**
+     * Whether the particle's colour (its start colour, Color over Life and the like, alpha
+     * included, times a mesh's vertex colours) is drawn, as a shader that reads the vertex colour
+     * draws it: Unity's particle and sprite shaders, Unreal's Particle Color node. Off, a particle
+     * is drawn in the texture times the material colour alone, its alpha too, which the alpha test
+     * and the blend then read, as Unity's mesh shaders draw one (Legacy Diffuse and its family,
+     * Mobile, Unlit and Standard, measured in Unity 6: a particle tinted or faded draws as a white
+     * one). Every render mode. True by default.
+     */
+    get particleColor(): boolean {
+        return this.rendererSettings.particleColor !== false;
+    }
+
+    set particleColor(particleColor: boolean) {
+        this.rendererSettings.particleColor = particleColor !== false;
+        this.neededToUpdateRender = true;
+    }
+
+    /**
+     * The material's colour (Unity's material Color and Tint Color): it multiplies every
+     * particle's colour, alpha included, as it is drawn. Given in gamma space like the particles'
+     * colours, it is brought into the shader's working space on its own, so under the scene's
+     * image processing it multiplies in linear space, as Unity's Linear colour space does. Unlike
+     * {@link tint} it belongs to the effect: saved in the effect JSON, and systems with different
+     * material colours draw from different batches, though with the same shader. Default white.
+     * Set it from any `Color4Like`, such as a Babylon `Color4`; the value is copied, and the one
+     * returned is a copy.
+     */
+    get materialColor(): Color4Like {
+        const [r, g, b, a] = this.rendererSettings.materialColor ?? WHITE_MATERIAL_COLOR;
+        return {r, g, b, a};
+    }
+
+    set materialColor(color: Color4Like) {
+        this.rendererSettings.materialColor = validMaterialColor(color);
+        this.neededToUpdateRender = true;
+    }
+
+    /**
+     * How far behind other transparent objects the system is sorted, in world units: Unity's
+     * renderer Sorting Fudge. The renderer draws its transparent systems back to front by the
+     * distance from the camera to the centre of each one's bounds, among the scene's transparent
+     * meshes; this is added to that distance, so a positive fudge draws the system before (under)
+     * others nearer than it plus the fudge, and a negative one after (over) them, however near. An
+     * author uses it to keep a glow under the smoke and the smoke over the sparks whichever way the
+     * camera turns. Systems with different fudges draw from different batches. See
+     * {@link quarksTransparentSortCompare}. Default 0: by distance alone.
+     */
+    get sortingFudge(): number {
+        return this.rendererSettings.sortingFudge ?? 0;
+    }
+
+    set sortingFudge(fudge: number) {
+        this.rendererSettings.sortingFudge = validSortingFudge(fudge);
+        this.neededToUpdateRender = true;
+    }
+
+    /**
+     * What {@link materialColor} is multiplied by, alpha included, once it is in the shader's
+     * working space: an intensity that brightens the material in linear space under the scene's
+     * image processing, where a colour above 1 in gamma space would grow by its power curve.
+     * Unity's legacy particle shaders double their Tint Color in linear space: a material colour
+     * of that tint with a scale of 2. At least 0; default 1.
+     */
+    get materialColorScale(): number {
+        return this.rendererSettings.materialColorScale ?? 1;
+    }
+
+    set materialColorScale(scale: number) {
+        this.rendererSettings.materialColorScale = validMaterialColorScale(scale);
+        this.neededToUpdateRender = true;
+    }
+
+    /**
      * Fade particles out as they near the scene behind them (Unity's Soft Particles, Unreal's
      * Depth Fade), between {@link softNearFade} and {@link softFarFade}. Needs a depth texture on
      * the renderer, see `BatchedRenderer.setDepthTexture`; without one particles draw hard.
@@ -554,6 +652,25 @@ export class ParticleSystem implements IParticleSystem {
 
     set renderFace(face: RenderFace) {
         this.rendererSettings.renderFace = validRenderFace(face);
+        this.neededToUpdateRender = true;
+    }
+
+    /**
+     * The axes a mesh particle's rotation is measured in and a billboard's quad is laid along
+     * (Unity's renderer Render Alignment): `'simulation'` by default (the system's simulation
+     * space, as quarks always drew meshes; billboards face the camera), `'view'` to lay each mesh
+     * along the camera's axes so a flat quad faces the camera, `'world'` for the world axes,
+     * `'local'` for the emitter's axes even in a world-space system. A `'world'` or `'local'`
+     * billboard lies in those axes' XY plane instead of facing the camera. Applies to the Mesh and
+     * BillBoard render modes; the other modes ignore it. Systems that differ are batched apart. See
+     * {@link RenderAlignment}. Saved in the effect JSON only when not `'simulation'`.
+     */
+    get renderAlignment(): RenderAlignment {
+        return this.rendererSettings.renderAlignment ?? 'simulation';
+    }
+
+    set renderAlignment(alignment: RenderAlignment) {
+        this.rendererSettings.renderAlignment = validRenderAlignment(alignment);
         this.neededToUpdateRender = true;
     }
 
@@ -748,10 +865,10 @@ export class ParticleSystem implements IParticleSystem {
     /**
      * The mesh particles' positions, three values per vertex.
      * Setting it restarts the system. A new geometry with a different vertex
-     * count drops UV sets, normals and indices that no longer fit it: the first UV set
-     * falls back to zeros, the second to none, the normals to +Z, the indices to the vertex
-     * sequence. Assign {@link instancingUVs}, {@link instancingUVs2} and {@link instancingIndices}
-     * after it.
+     * count drops UV sets, normals, vertex colours and indices that no longer fit it: the first
+     * UV set falls back to zeros, the second to none, the normals to +Z, the colours to none, the
+     * indices to the vertex sequence. Assign {@link instancingUVs}, {@link instancingUVs2},
+     * {@link instancingColors} and {@link instancingIndices} after it.
      */
     get instancingGeometry(): Float32Array {
         return this.rendererSettings.instancingGeometry;
@@ -782,6 +899,9 @@ export class ParticleSystem implements IParticleSystem {
         }
         if (settings.instancingUVs2 && settings.instancingUVs2.length !== uvLength) {
             settings.instancingUVs2 = undefined;
+        }
+        if (settings.instancingColors && settings.instancingColors.length !== (geometry.length / 3) * 4) {
+            settings.instancingColors = undefined;
         }
         this.ensureMeshNormals();
         this.neededToUpdateRender = true;
@@ -843,6 +963,24 @@ export class ParticleSystem implements IParticleSystem {
     }
 
     /**
+     * The mesh particles' vertex colours, `r, g, b, a` per vertex from 0 to 1, or none. A mesh
+     * particle's colour at a vertex is its own times the vertex's, as Unity draws a particle mesh
+     * that has vertex colours, so a mesh can fade out toward its ends. The values are linear and
+     * taken as they are: unlike the particle colour, given in gamma space, they are not converted,
+     * as Unity takes them in its Linear colour space and glTF stores `COLOR_0`. A set that does
+     * not hold four values per vertex is left out, with a warning. Systems whose colours are not
+     * the same array are batched apart.
+     */
+    get instancingColors(): Float32Array | undefined {
+        return this.rendererSettings.instancingColors;
+    }
+
+    set instancingColors(colors: Float32Array | undefined) {
+        this.rendererSettings.instancingColors = colors;
+        this.neededToUpdateRender = true;
+    }
+
+    /**
      * Babylon alpha mode the particles blend with: `Constants.ALPHA_ADD` (the default) for glows,
      * `Constants.ALPHA_COMBINE` for smoke and anything alpha blended. Systems that differ are
      * batched apart.
@@ -867,6 +1005,9 @@ export class ParticleSystem implements IParticleSystem {
 
     set transparent(transparent: boolean) {
         this.rendererSettings.materialTransparent = transparent;
+        if (!this.depthWriteChosen) {
+            this.rendererSettings.materialDepthWrite = !transparent;
+        }
         this.neededToUpdateRender = true;
     }
 
@@ -885,17 +1026,24 @@ export class ParticleSystem implements IParticleSystem {
     }
 
     /**
-     * Whether particles write depth, so later draws are hidden behind them. Default false, or the
-     * material's `disableDepthWrite` inverted. Systems that differ are batched apart.
+     * Whether particles write depth, so later draws are hidden behind them. Until it is set (here,
+     * as a parameter or by a material's `disableDepthWrite`), it follows {@link transparent}, as a
+     * Unity particle material's ZWrite follows its surface type: an opaque or cutout system writes
+     * depth, so a mesh's far faces never show through its near ones and cut-out leaves stand in
+     * front of each other; a transparent one does not. Systems that differ are batched apart.
      */
     get depthWrite(): boolean {
         return this.rendererSettings.materialDepthWrite;
     }
 
     set depthWrite(depthWrite: boolean) {
+        this.depthWriteChosen = true;
         this.rendererSettings.materialDepthWrite = depthWrite;
         this.neededToUpdateRender = true;
     }
+
+    /** Whether {@link depthWrite} has been set; until it is, it follows {@link transparent}. */
+    private depthWriteChosen = false;
 
     /**
      * Alpha below which a fragment is discarded (Unity's Alpha Clip Threshold), 0…1; 0 (the
@@ -1090,7 +1238,7 @@ export class ParticleSystem implements IParticleSystem {
     scalingMode: ScalingMode = 'local';
 
     /**
-     * What world-space forces and speed limits are multiplied by this step: the mean of the axes
+     * What world-space forces are multiplied by this step: the mean of the axes
      * of the scale the {@link scalingMode} applies (the emitter's own in `'local'`, its world scale
      * in `'hierarchy'`, 1 in `'shape'`) in a world-space system, 1 in a local-space one, whose
      * emitter matrix scales them already. Updated before every simulation step.
@@ -1105,6 +1253,13 @@ export class ParticleSystem implements IParticleSystem {
      * left as it is. False by default.
      */
     alignToDirection = false;
+
+    /**
+     * The axis a number rotation turns a mesh particle about, see {@link RotationAxis}. `'z'` by
+     * default; `'emission'` picks it per particle at birth, as Unity does for a mesh particle when
+     * its Shape module is on.
+     */
+    rotationAxis: RotationAxis = 'z';
 
     private seedValue?: number;
     /** The system's own generator while it steps, when seeded; see {@link seed}. */
@@ -1233,18 +1388,25 @@ export class ParticleSystem implements IParticleSystem {
                 (parameters.instancingGeometry ? fallbackUVsForPositions(parameters.instancingGeometry) : DEFAULT_UVS),
             instancingUVs2: parameters.instancingUVs2,
             instancingNormals: parameters.instancingNormals,
+            instancingColors: parameters.instancingColors,
             renderMode: parameters.renderMode ?? RenderMode.BillBoard,
             renderOrder: parameters.renderOrder ?? 0,
             uTileCount: validTileCount(parameters.uTileCount),
             vTileCount: validTileCount(parameters.vTileCount),
             blendTiles: parameters.blendTiles ?? false,
             softParticles: parameters.softParticles ?? false,
+            premultipliedMap: parameters.premultipliedMap === true,
+            particleColor: parameters.particleColor !== false,
+            materialColor: validMaterialColor(parameters.materialColor),
+            materialColorScale: validMaterialColorScale(parameters.materialColorScale),
+            sortingFudge: validSortingFudge(parameters.sortingFudge),
             softNearFade: validSoftFade(parameters.softNearFade, 0),
             softFarFade: validSoftFade(parameters.softFarFade, DEFAULT_SOFT_FAR_FADE),
             materialBlendMode: parameters.blendMode ?? Constants.ALPHA_ADD,
             materialTransparent: parameters.transparent ?? true,
             materialDepthTest: parameters.depthTest ?? true,
-            materialDepthWrite: parameters.depthWrite ?? false,
+            // Until it is chosen, depth writing follows the surface: opaque writes, transparent does not.
+            materialDepthWrite: parameters.depthWrite ?? !(parameters.transparent ?? true),
             materialAlphaTest: validAlphaTest(parameters.alphaTest),
             texture: parameters.texture ?? null,
             reflectionTexture: null,
@@ -1254,6 +1416,7 @@ export class ParticleSystem implements IParticleSystem {
             pivot: nonZeroPivot(parameters.pivot),
             sortMode: validSortMode(parameters.sortMode),
             renderFace: validRenderFace(parameters.renderFace),
+            renderAlignment: validRenderAlignment(parameters.renderAlignment),
             minParticleSize: Math.max(0, parameters.minParticleSize ?? 0),
             maxParticleSize: parameters.maxParticleSize ?? Infinity,
             renderingGroupId: parameters.renderingGroupId ?? 0,
@@ -1270,6 +1433,7 @@ export class ParticleSystem implements IParticleSystem {
         this.playbackSpeed = parameters.playbackSpeed ?? 1;
         this.cullingMode = validCullingMode(parameters.cullingMode);
         this.scalingMode = validScalingMode(parameters.scalingMode);
+        this.rotationAxis = validRotationAxis(parameters.rotationAxis);
         this.alignToDirection = parameters.alignToDirection === true;
         this.seed = parameters.seed;
         this.ensureMeshNormals();
@@ -1347,6 +1511,14 @@ export class ParticleSystem implements IParticleSystem {
             return;
         }
         const resolved = resolveMaterialSettings(material, overrides, this.rendererSettings);
+        // A depth write given, or one the material has, is chosen; otherwise it follows the surface.
+        if (
+            overrides.depthWrite !== undefined ||
+            typeof material?.disableDepthWrite === 'boolean' ||
+            typeof material?.forceDepthWrite === 'boolean'
+        ) {
+            this.depthWriteChosen = true;
+        }
 
         this.rendererSettings.texture = resolved.texture;
         this.rendererSettings.reflectionTexture = resolved.reflectionTexture;
@@ -1377,7 +1549,7 @@ export class ParticleSystem implements IParticleSystem {
         this.rendererSettings.materialBlendMode = resolved.blendMode;
         this.rendererSettings.materialTransparent = resolved.transparent;
         this.rendererSettings.materialDepthTest = resolved.depthTest;
-        this.rendererSettings.materialDepthWrite = resolved.depthWrite;
+        this.rendererSettings.materialDepthWrite = this.depthWriteChosen ? resolved.depthWrite : !resolved.transparent;
         this.rendererSettings.materialAlphaTest = validAlphaTest(resolved.alphaTest);
         if (overrides.layerMask !== undefined) {
             this.rendererSettings.layerMask = overrides.layerMask;
@@ -1843,7 +2015,10 @@ export class ParticleSystem implements IParticleSystem {
 
     /**
      * Records bounds a renderer measured in world space, for systems whose
-     * drawn extent the store does not hold (trail ribbons).
+     * drawn extent the store does not hold (trail ribbons). `followsEmitter` says
+     * what was measured is drawn through the emitter (samples kept in its space), so
+     * the bounds go with the emitter until they are measured again: a paused system
+     * whose emitter comes back into view is seen there.
      * @internal
      */
     setWorldBounds(
@@ -1853,9 +2028,10 @@ export class ParticleSystem implements IParticleSystem {
         maxX: number,
         maxY: number,
         maxZ: number,
-        padding: number
+        padding: number,
+        followsEmitter = false
     ) {
-        this.bounds.setWorld(minX, minY, minZ, maxX, maxY, maxZ, padding);
+        this.bounds.setWorld(minX, minY, minZ, maxX, maxY, maxZ, padding, followsEmitter ? this.emitter : undefined);
     }
 
     /** Length of one simulation step, in seconds. See {@link simulationResidual}. */
@@ -1929,6 +2105,7 @@ export class ParticleSystem implements IParticleSystem {
             snapshotSize,
             snapshotColor,
             renderMode === RenderMode.StretchedBillBoard,
+            renderMode === RenderMode.StretchedBillBoard && this.behaviorPlan.animatesVelocity,
             this.rebindParticles
         );
 
@@ -1956,7 +2133,15 @@ export class ParticleSystem implements IParticleSystem {
             // then removal, each over the particle objects the history lives on.
             const trailSettings = this.rendererEmitterSettings as TrailSettings;
             collapseTrailNewborns(store, particleCount, snapshotSize, snapshotColor);
-            moveTrails(delta, particles, store, particleCount, Boolean(trailSettings.followLocalOrigin), emitterMatrix);
+            moveTrails(
+                delta,
+                particles,
+                store,
+                particleCount,
+                Boolean(trailSettings.followLocalOrigin),
+                this.worldSpace,
+                emitterMatrix
+            );
             recordTrailHistory(particles, particleCount, trailSettings, this.worldSpace, emitterMatrix);
             liveParticleCount = removeDeadTrails(particles, store, liveParticleCount, onDied);
         }
@@ -2202,6 +2387,7 @@ export class ParticleSystem implements IParticleSystem {
             instancingUVs: this.rendererSettings.instancingUVs,
             instancingUVs2: this.rendererSettings.instancingUVs2,
             instancingNormals: this.rendererSettings.instancingNormals,
+            instancingColors: this.rendererSettings.instancingColors,
             rendererEmitterSettings,
             material: this.materialRef,
             texture: this.rendererSettings.texture,

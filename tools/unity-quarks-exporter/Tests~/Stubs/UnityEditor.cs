@@ -1,5 +1,6 @@
 // The UnityEditor API the exporter calls. Dialogs and menus do nothing; AssetDatabase reports the
-// test hook Texture.assetPath. See UnityEngine.Math.cs.
+// test hook Texture.assetPath, and a texture imports with sRGB on unless its path is in the test
+// hook TextureImporter.LinearPaths. See UnityEngine.Math.cs.
 using System;
 using System.Collections.Generic;
 using UnityEngine;
@@ -33,6 +34,20 @@ namespace UnityEditor
         public static string GUIDToAssetPath(string guid) => "";
         public static T LoadAssetAtPath<T>(string assetPath) where T : UnityEngine.Object => null;
         public static bool IsValidFolder(string path) => false;
+    }
+
+    public class AssetImporter : UnityEngine.Object
+    {
+        public static AssetImporter GetAtPath(string path) =>
+            string.IsNullOrEmpty(path) ? null : new TextureImporter { sRGBTexture = !TextureImporter.LinearPaths.Contains(path) };
+    }
+
+    public class TextureImporter : AssetImporter
+    {
+        /// <summary>Test hook: the asset paths whose textures are imported with sRGB off.</summary>
+        public static readonly HashSet<string> LinearPaths = new HashSet<string>();
+
+        public bool sRGBTexture { get; set; } = true;
     }
 
     public static class Selection

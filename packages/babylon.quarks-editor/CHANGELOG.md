@@ -7,8 +7,24 @@ needs in its peer dependency.
 
 ## [Unreleased]
 
+## [0.32.0] — 2026-11-08
+
+Released with babylon.quarks 1.0.0-rc.2, on npm's `next` tag with it; its peer dependency is
+`~1.0.0-rc.2`, for the API the candidate adds (mesh vertex colours).
+
+### Added
+
+- **Mesh vertex colours** in the Mesh render mode's geometry: a host's `geometryOptions` and
+  `resolveGeometry` can give `colors`, `r, g, b, a` per vertex and linear, which the particle colour
+  is multiplied by (`ParticleSystem.instancingColors`). Picking another geometry clears them. The
+  example editor's glTF import reads `COLOR_0`.
+
 ### Fixed
 
+- An effect whose root is a group around one emitter, as the Unity exporter writes them, drew
+  nothing: the editor makes the emitter the root and disposes the group, and the group held the
+  effect's textures, which went with it. The emitter now takes the hold first
+  (`QuarksUtil.shareResources`).
 - A field row without a label spans the whole inspector width: the min and max of _Random between
   two_, a constant's value, the colour swatch of Start color and the angles of Start rotation. It
   sat in the 110 px label column, which left each number box about 26 px wide and the min and max

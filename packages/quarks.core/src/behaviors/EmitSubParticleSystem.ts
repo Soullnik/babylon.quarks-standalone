@@ -12,7 +12,11 @@ const BASIS_EPSILON = 1e-6;
 export enum SubParticleEmitMode {
     /** Once, when the parent particle dies. */
     Death,
-    /** Once, when the parent particle is born. */
+    /**
+     * From the parent particle's birth until it dies, as Unity's Birth trigger: the sub system's own
+     * rate and bursts run for the parent while it lives, over the sub system's duration, again and
+     * again while the parent lives if the sub system loops, and end with the parent.
+     */
     Birth,
     /** All the parent particle's life: the sub system's own rate and bursts run for each parent particle. */
     Frame,
@@ -23,6 +27,11 @@ interface SubEmissionState extends EmissionState {
     particle: undefined | Particle;
     /** The parent's {@link Particle.serial} when the emission started. */
     serial: number | undefined;
+    /**
+     * The emission lasts as long as its parent (a Birth emission): it ends when the parent dies, and
+     * a looping target loops until then. Otherwise it runs the target's duration once.
+     */
+    endsWithParent: boolean;
     /**
      * A still copy of a dying parent, for a Death emission: the parent's own object is reused for
      * the next particle, but the emission stays where it died and inherits what it was.
@@ -191,6 +200,7 @@ export class EmitSubParticleSystem implements Behavior {
                       travelDistance: 0,
                       particle: undefined,
                       serial: undefined,
+                      endsWithParent: false,
                       previousWorldPos: undefined,
                   };
         state.burstParticleCount = 0;
@@ -208,6 +218,7 @@ export class EmitSubParticleSystem implements Behavior {
             state.particle = particle;
             state.serial = particle.serial;
         }
+        state.endsWithParent = this.mode === SubParticleEmitMode.Birth;
         state.inherit = subEmitterInheritMask(this.inherit);
         if (this.mode === SubParticleEmitMode.Death) {
             // A dying parent has no life left to hand on.
@@ -226,35 +237,48 @@ export class EmitSubParticleSystem implements Behavior {
             return;
         }
         for (let i = 0; i < this.subEmissions.length; i++) {
-            if (this.subEmissions[i].time >= target.duration) {
-                const finished = this.subEmissions[i];
-                finished.particle = undefined;
-                // Local-space particles of the child share this matrix so that they follow the
-                // parent; the ones that outlive the emission keep it where the parent last was,
-                // and the next emission gets a matrix of its own.
-                finished.matrix = new Matrix4();
-                this.spareEmissions.push(finished);
-                this.subEmissions[i] = this.subEmissions[this.subEmissions.length - 1];
-                this.subEmissions.length = this.subEmissions.length - 1;
+            const subEmissionState = this.subEmissions[i];
+            // A looping target runs its cycle again for a parent still alive; `emit` starts it over.
+            if (subEmissionState.time >= target.duration && !(subEmissionState.endsWithParent && target.looping)) {
+                this.finishEmission(i);
                 i--;
-            } else {
-                const subEmissionState = this.subEmissions[i];
-                const parent = subEmissionState.particle;
-                if (parent !== undefined && parent === subEmissionState.ghost) {
-                    // A Death emission stays where its parent died.
-                } else if (
-                    parent !== undefined &&
-                    parent.age < parent.life &&
-                    parent.serial === subEmissionState.serial
-                ) {
-                    this.setMatrixFromParticle(subEmissionState.matrix, parent);
-                } else {
-                    // The parent died, and its object may already hold a newborn.
-                    subEmissionState.particle = undefined;
-                }
-                target.emit(delta, subEmissionState, subEmissionState.matrix);
+                continue;
             }
+            const parent = subEmissionState.particle;
+            if (parent !== undefined && parent === subEmissionState.ghost) {
+                // A Death emission stays where its parent died.
+            } else if (
+                parent !== undefined &&
+                parent.serial === subEmissionState.serial &&
+                // A ring buffer's particles are held or looped at the end of their life, not killed.
+                (parent.age < parent.life || this.particleSystem.ringBufferActive)
+            ) {
+                this.setMatrixFromParticle(subEmissionState.matrix, parent);
+            } else if (subEmissionState.endsWithParent) {
+                // A Birth emission ends with its parent, rate and bursts still due alike (measured
+                // in Unity 6): a parent of 0.5 s with a sub system of 2 s at 10 per second emits 4.
+                this.finishEmission(i);
+                i--;
+                continue;
+            } else {
+                // The parent died, and its object may already hold a newborn.
+                subEmissionState.particle = undefined;
+            }
+            target.emit(delta, subEmissionState, subEmissionState.matrix);
         }
+    }
+
+    /** Drops the running emission at `index`, keeping its state for reuse. */
+    private finishEmission(index: number): void {
+        const finished = this.subEmissions[index];
+        finished.particle = undefined;
+        // Local-space particles of the child share this matrix so that they follow the parent; the
+        // ones that outlive the emission keep it where the parent last was, and the next emission
+        // gets a matrix of its own.
+        finished.matrix = new Matrix4();
+        this.spareEmissions.push(finished);
+        this.subEmissions[index] = this.subEmissions[this.subEmissions.length - 1];
+        this.subEmissions.length = this.subEmissions.length - 1;
     }
 
     toJSON(): EmitSubParticleSystemJSON {

@@ -343,7 +343,7 @@ describe('ParticleSystem', () => {
         renderer.dispose();
     });
 
-    it('should update trail particles from local origin with parent matrix', () => {
+    it('keeps a local-space trail particle at its local origin, in the frame its parent matrix carries', () => {
         const ps = new ParticleSystem({
             scene,
             onlyUsedByOther: true,
@@ -374,7 +374,11 @@ describe('ParticleSystem', () => {
         expect(particle.parentMatrix).toBeDefined();
 
         ps.update(1 / 60);
-        expect(particle.position.x).toBeCloseTo(3, 5);
+        // The system simulates in local space: the particle stays at its local origin, and its
+        // parent matrix (the frame it was emitted in) takes it to the world, once, when drawn.
+        expect(particle.position.x).toBeCloseTo(0, 5);
+        const world = particle.position.clone().applyMatrix4(particle.parentMatrix!);
+        expect(world.x).toBeCloseTo(3, 5);
     });
 
     it('should support removing listeners by callback and by event', () => {

@@ -21,6 +21,12 @@ export interface ValueGenerator {
     startGen(memory: GeneratorMemory): void;
     /** The number, from what `memory` holds. */
     genValue(memory: GeneratorMemory): number;
+    /**
+     * Rolls again what {@link ValueGenerator.startGen} rolled into `memory`, so later reads give a
+     * new random number: what a behavior that picks a new value every step (Unity's Randomize of
+     * Force over Lifetime) calls before reading. Only generators that roll implement it.
+     */
+    reroll?(memory: GeneratorMemory): void;
     /** See FunctionValueGenerator.refreshTable. */
     refreshTable?(): void;
     /** The generator's JSON. */
@@ -43,6 +49,8 @@ export interface FunctionValueGenerator {
     startGen(memory: GeneratorMemory): void;
     /** The number at `t`. */
     genValue(memory: GeneratorMemory, t: number): number;
+    /** See {@link ValueGenerator.reroll}. */
+    reroll?(memory: GeneratorMemory): void;
     /**
      * Optional hook for generators that can precompute a sampled table of
      * themselves. Called once per frame by behaviors that evaluate the

@@ -26,6 +26,7 @@ import {
     CircleEmitter,
     ColorBySpeed,
     ColorGeneratorFromJSON,
+    ColorOverLength,
     ColorOverLife,
     ColorRange,
     ConeEmitter,
@@ -57,6 +58,7 @@ import {
     RandomBetweenCurves,
     RandomColor,
     RandomColorBetweenGradient,
+    RandomizeDirection,
     RandomQuatGenerator,
     readFormat,
     RectangleEmitter,
@@ -176,16 +178,28 @@ const behaviors: Record<string, () => Behavior> = {
         new TurbulenceField(new Vector3(2, 3, 4), 3, new Vector3(1, 2, 3), new Vector3(0.1, 0.2, 0.3), 7),
     GravityForce: () => new GravityForce(new Vector3(1, 2, 3), 4),
     ColorOverLife: () => new ColorOverLife(gradient()),
+    ColorOverLength: () => new ColorOverLength(gradient()),
     RotationOverLife: () => new RotationOverLife(curve()),
-    Rotation3DOverLife: () => new Rotation3DOverLife(new AxisAngleGenerator(new Vector3(0, 0, 1), curve())),
+    Rotation3DOverLife: () =>
+        new Rotation3DOverLife(new EulerGenerator(curve(), new ConstantValue(1), new IntervalValue(0, 2), 'YXZ'), {
+            integration: 'angles',
+        }),
     SizeOverLife: () => new SizeOverLife(new Vector3Function(curve(), new ConstantValue(2), new IntervalValue(1, 3))),
     ColorBySpeed: () => new ColorBySpeed(gradient(), new IntervalValue(1, 5)),
     RotationBySpeed: () => new RotationBySpeed(curve(), new IntervalValue(1, 5)),
     SizeBySpeed: () => new SizeBySpeed(curve(), new IntervalValue(1, 5)),
     SpeedOverLife: () => new SpeedOverLife(curve()),
     FrameOverLife: () =>
-        new FrameOverLife(new IntervalValue(1, 4), {fps: 12, frameCount: 8, startFrame: new ConstantValue(2)} as never),
-    ForceOverLife: () => new ForceOverLife(curve(), new ConstantValue(2), new IntervalValue(-1, 1), 'local'),
+        new FrameOverLife(new IntervalValue(1, 4), {
+            fps: 12,
+            frameCount: 8,
+            startFrame: new ConstantValue(2),
+            rowLength: 4,
+            rowCount: 2,
+            row: 1,
+            randomRow: true,
+        } as never),
+    ForceOverLife: () => new ForceOverLife(curve(), new ConstantValue(2), new IntervalValue(-1, 1), 'local', true),
     VelocityOverLife: () =>
         new VelocityOverLife(
             curve(),
@@ -202,6 +216,7 @@ const behaviors: Record<string, () => Behavior> = {
     OrbitOverLife: () => new OrbitOverLife(curve(), new Vector3(1, 0, 0), 'world'),
     WidthOverLength: () => new WidthOverLength(curve(), true),
     ChangeEmitDirection: () => new ChangeEmitDirection(new IntervalValue(0.1, 0.5)),
+    RandomizeDirection: () => new RandomizeDirection(0.5),
     ApplySequences: () => {
         const sequencer = new TextureSequencer(0.5, 0.25, new Vector3(1, 2, 3));
         sequencer.locations = [new Vector2(1, 2), new Vector2(3, 4)];
@@ -215,7 +230,13 @@ const behaviors: Record<string, () => Behavior> = {
             0.5,
             'world'
         ),
-    ApplyCollision: () => new ApplyCollision({resolve: () => false} as never, 0.6),
+    ApplyCollision: () =>
+        new ApplyCollision({resolve: () => false} as never, 0.6, {
+            planes: [{position: new Vector3(0, 0.5, 0), normal: new Vector3(0, 1, 0)}],
+            dampen: 0.2,
+            lifetimeLoss: 0.1,
+            radiusScale: 0.5,
+        }),
 };
 
 /** Fields a behavior writes that an editor edits through code, not as a plain parameter. */

@@ -6,10 +6,11 @@ import {RawTexture} from '@babylonjs/core/Materials/Textures/rawTexture';
 import {Vector2 as BVector2, Vector3 as BVector3} from '@babylonjs/core/Maths/math.vector';
 import {Mesh} from '@babylonjs/core/Meshes/mesh';
 import {Scene} from '@babylonjs/core/scene';
-import type {Color4Like} from 'quarks.core';
+import type {Color4Like, IParticleSystem} from 'quarks.core';
 import {
     IParticle,
     Matrix3,
+    Matrix4,
     ParticleStore,
     Quaternion,
     SpriteParticle,
@@ -17,14 +18,23 @@ import {
     Vector3,
 } from 'quarks.core';
 import {VFXBatchSettings} from './BatchedRenderer';
-import {hasSizeLimits, takesPivotAndSizeLimits, tilesSheet} from './batchKey';
+import {alignsBillboards, hasSizeLimits, takesPivotAndSizeLimits, tilesSheet} from './batchKey';
+import {InstanceAttribute, InstanceRun, STRETCH_ATTRIBUTE} from './instanceRun';
 import {gather, sortByKey, SortScratch} from './instanceSort';
+import type {ParticleEmitter} from './ParticleEmitter';
 import type {ParticleSystem} from './ParticleSystem';
-import {copyPrefix, PrefixViews} from './prefixViews';
+import {copyPrefix, copyRange, PrefixViews} from './prefixViews';
 import {drawsAlongVelocity, shaderProgram} from './shaderProgram';
 import {registerShaders, shaderLanguageFor} from './shaders/shaderLanguageSupport';
 import type {DepthBinding} from './softDepth';
+import {clearDrawOrder, setDrawOrder} from './transparentSort';
 import {defaultMeshLighting, MeshLightingSettings, RenderMode, VFXBatch} from './VFXBatch';
+
+/** The speed factor a stretched billboard with a speed factor of 0 is drawn with, see `update`. */
+const STRETCH_DIRECTION_ONLY = 1e-4;
+
+/** How far toward its geometry a mesh system's sorting centre moves, see `sortCentre`. */
+const SORT_NUDGE = 1e-3;
 
 /** The batch of billboard, stretched, mesh and beam particles. @internal */
 export class SpriteBatch extends VFXBatch {
@@ -48,11 +58,18 @@ export class SpriteBatch extends VFXBatch {
         return texture;
     }
     private offsetBuffer!: Float32Array;
+    /** The centre of the mesh's bounds in its own space; zero for a mesh centred on its pivot. */
+    private readonly meshCenter = new Vector3();
     private rotationBuffer!: Float32Array;
     private sizeBuffer!: Float32Array;
     private colorBuffer!: Float32Array;
     private uvTileBuffer!: Float32Array;
     private velocityBuffer?: Float32Array;
+    /**
+     * Each mesh instance's stretch, its three columns one after another (see {@link meshStretch}):
+     * what the vertex shader applies after the particle's turn. Mesh batches only.
+     */
+    private stretchBuffer?: Float32Array;
 
     /** Concretely typed handle on the batch material, for the lighting and live-parameter writes. */
     private shaderMaterial: ShaderMaterial | null = null;
@@ -70,8 +87,31 @@ export class SpriteBatch extends VFXBatch {
     private colorVB!: VertexBuffer;
     private uvTileVB!: VertexBuffer;
     private velocityVB?: VertexBuffer;
+    /**
+     * The GPU side of {@link stretchBuffer}: one buffer the three columns are views of, so WebGPU
+     * binds them once.
+     */
+    private stretchGPUBuffer?: Buffer;
     /** The batch's geometry, interleaved; see {@link setupBuffers}. */
     private geometryBuffer?: Buffer;
+    /** The geometry's vertex buffers in {@link geometryBuffer}: kind, offset and size in floats. */
+    private readonly geometryLayout: Array<[kind: string, offset: number, size: number]> = [];
+    private vertexCount = 0;
+    /** The instance attributes, in the order of {@link instanceSources}. */
+    private instanceLayout: InstanceAttribute[] = [];
+    /** The instance arrays in the order of {@link instanceLayout}, gathered each frame a run draws. */
+    private readonly instanceSources: Array<Float32Array | undefined> = [];
+    /** The meshes of the runs after the first (see `runCount`), kept while the geometry is. */
+    private readonly runs: InstanceRun[] = [];
+    /** Where each filled system's instances start, and past the last one where they end. */
+    private readonly systemStarts: number[] = [];
+    /** Instances the last fill wrote, over all runs. */
+    private filledInstances = 0;
+    /**
+     * For a batch of meshes that lie off their pivot, where each system's meshes were drawn on
+     * average in the last fill, in the world; see {@link sortCentre}.
+     */
+    private readonly geometryCentres = new Map<IParticleSystem, Vector3>();
 
     constructor(settings: VFXBatchSettings, scene: Scene, depth: DepthBinding | null = null) {
         super(settings, scene, depth);
@@ -81,8 +121,140 @@ export class SpriteBatch extends VFXBatch {
         this.rebuildMaterial();
     }
 
+    /**
+     * Whether each instance turns by a quaternion rather than an angle: a mesh, or a billboard
+     * laid along the world's or the emitter's axes (see `RenderAlignment`).
+     */
+    private turnsByQuaternion(): boolean {
+        return this.settings.renderMode === RenderMode.Mesh || alignsBillboards(this.settings);
+    }
+
+    /** Sets {@link meshCenter} from the mesh's vertices. */
+    private measureMeshCenter(positions: ArrayLike<number>, vertexCount: number): void {
+        if (this.settings.renderMode !== RenderMode.Mesh || vertexCount === 0) {
+            this.meshCenter.set(0, 0, 0);
+            return;
+        }
+        let minX = Infinity,
+            minY = Infinity,
+            minZ = Infinity;
+        let maxX = -Infinity,
+            maxY = -Infinity,
+            maxZ = -Infinity;
+        for (let v = 0; v < vertexCount; v++) {
+            const x = positions[v * 3],
+                y = positions[v * 3 + 1],
+                z = positions[v * 3 + 2];
+            if (x < minX) minX = x;
+            if (x > maxX) maxX = x;
+            if (y < minY) minY = y;
+            if (y > maxY) maxY = y;
+            if (z < minZ) minZ = z;
+            if (z > maxZ) maxZ = z;
+        }
+        this.meshCenter.set((minX + maxX) / 2, (minY + maxY) / 2, (minZ + maxZ) / 2);
+        // A centre within a thousandth of the mesh's size of its pivot counts as on it.
+        const extent = Math.max(maxX - minX, maxY - minY, maxZ - minZ);
+        if (this.meshCenter.length() <= extent * 1e-3) {
+            this.meshCenter.set(0, 0, 0);
+        }
+    }
+
+    /**
+     * The mean of where the instances from `first` to `end` draw their mesh's centre, in the
+     * world, into `out`: each one's offset plus its mesh centre scaled by its size, turned by its
+     * rotation and stretched by its stretch, as the vertex shader places it.
+     */
+    private meanGeometryCenter(first: number, end: number, out: Vector3): Vector3 {
+        const c = this.meshCenter;
+        const offsets = this.offsetBuffer;
+        const sizes = this.sizeBuffer;
+        const rotations = this.rotationBuffer;
+        const stretches = this.stretchBuffer!;
+        let sx = 0,
+            sy = 0,
+            sz = 0;
+        for (let i = first; i < end; i++) {
+            const i3 = i * 3;
+            const i4 = i * 4;
+            const i9 = i * 9;
+            const vx = c.x * sizes[i3],
+                vy = c.y * sizes[i3 + 1],
+                vz = c.z * sizes[i3 + 2];
+            const qx = rotations[i4],
+                qy = rotations[i4 + 1],
+                qz = rotations[i4 + 2],
+                qw = rotations[i4 + 3];
+            // v + 2w(u × v) + 2u × (u × v), u the vector part.
+            const tx = 2 * (qy * vz - qz * vy),
+                ty = 2 * (qz * vx - qx * vz),
+                tz = 2 * (qx * vy - qy * vx);
+            const rx = vx + qw * tx + (qy * tz - qz * ty);
+            const ry = vy + qw * ty + (qz * tx - qx * tz);
+            const rz = vz + qw * tz + (qx * ty - qy * tx);
+            sx += offsets[i3] + stretches[i9] * rx + stretches[i9 + 3] * ry + stretches[i9 + 6] * rz;
+            sy += offsets[i3 + 1] + stretches[i9 + 1] * rx + stretches[i9 + 4] * ry + stretches[i9 + 7] * rz;
+            sz += offsets[i3 + 2] + stretches[i9 + 2] * rx + stretches[i9 + 5] * ry + stretches[i9 + 8] * rz;
+        }
+        const count = end - first;
+        return out.set(sx / count, sy / count, sz / count);
+    }
+
+    /**
+     * Records each filled system's {@link geometryCentres} entry, for a batch of meshes that lie
+     * off their pivot and are not turned to face the camera.
+     */
+    private measureGeometryCentres(systems: IParticleSystem[]): void {
+        if (this.settings.renderAlignment === 'view' || this.meshCenter.lengthSq() === 0) {
+            this.geometryCentres.clear();
+            return;
+        }
+        const starts = this.systemStarts;
+        for (let s = 0; s < systems.length; s++) {
+            const first = starts[s];
+            const end = starts[s + 1];
+            if (end === first) {
+                continue;
+            }
+            const system = systems[s];
+            let centre = this.geometryCentres.get(system);
+            if (centre === undefined) {
+                centre = new Vector3();
+                this.geometryCentres.set(system, centre);
+            }
+            this.meanGeometryCenter(first, end, centre);
+        }
+    }
+
+    /**
+     * The centre of `system`'s bounds, moved a thousandth of the way toward where its meshes are
+     * drawn when they lie off their pivot. Unity sorts renderers by the centre of their bounds,
+     * which for mesh particles is where the particles are. Two systems emitting at one point tie,
+     * and Unity breaks the tie by internal ids, so a dark copy laid behind a light one could
+     * be drawn over it. Moving the centre
+     * toward the geometry breaks the tie by it, the farther drawn first, also as the meshes turn,
+     * and changes no order that is not a tie.
+     */
+    protected override sortCentre(system: ParticleSystem, out: Vector3): Vector3 {
+        super.sortCentre(system, out);
+        const geometry = this.geometryCentres.get(system);
+        if (geometry !== undefined) {
+            out.x += (geometry.x - out.x) * SORT_NUDGE;
+            out.y += (geometry.y - out.y) * SORT_NUDGE;
+            out.z += (geometry.z - out.z) * SORT_NUDGE;
+        }
+        return out;
+    }
+
+    /** @internal */
+    override removeSystem(system: IParticleSystem): void {
+        super.removeSystem(system);
+        this.geometryCentres.delete(system);
+    }
+
     /** @internal */
     setupBuffers(): void {
+        this.disposeRuns();
         this.mesh?.dispose();
         this.geometryBuffer?.dispose();
         this.mesh = new Mesh('spriteBatch', this.scene);
@@ -90,14 +262,16 @@ export class SpriteBatch extends VFXBatch {
 
         const positions = this.settings.instancingGeometry;
         const vertexCount = positions.length / 3;
+        this.measureMeshCenter(positions, vertexCount);
         const uvs = this.settings.instancingUVs;
         const normals = this.settings.instancingNormals;
         const uvs2 = this.meshUV2() ? this.settings.instancingUVs2! : null;
-        // The geometry goes up as one interleaved buffer, position, uv, then normal and the second
-        // UV set when the batch has them: one vertex buffer binding instead of up to four. WebGPU
-        // allows 8 by default, and a batch also binds five per-instance buffers (six drawn along
-        // velocity); four geometry buffers took a mesh with a second UV set to 9, and no pipeline
-        // could be made for it.
+        const colors = this.meshColors() ? this.settings.instancingColors! : null;
+        // The geometry goes up as one interleaved buffer, position, uv, then normal, the second
+        // UV set and the vertex colours when the batch has them: one vertex buffer binding instead
+        // of up to five. WebGPU allows 8 by default, and a batch also binds five per-instance
+        // buffers (six drawn along velocity); four geometry buffers took a mesh with a second UV
+        // set to 9, and no pipeline could be made for it.
         const parts: Array<[string, ArrayLike<number> | null, number]> = [
             [VertexBuffer.PositionKind, positions, 3],
             // WebGL (especially iOS) raises INVALID_OPERATION if the shader reads
@@ -109,6 +283,9 @@ export class SpriteBatch extends VFXBatch {
         }
         if (uvs2) {
             parts.push([VertexBuffer.UV2Kind, uvs2, 2]);
+        }
+        if (colors) {
+            parts.push(['meshColor', colors, 4]);
         }
         const stride = parts.reduce((sum, [, , size]) => sum + size, 0);
         const data = new Float32Array(vertexCount * stride);
@@ -125,14 +302,44 @@ export class SpriteBatch extends VFXBatch {
         }
         const engine = this.scene.getEngine();
         this.geometryBuffer = new Buffer(engine, data, false, stride);
+        this.geometryLayout.length = 0;
+        this.vertexCount = vertexCount;
         offset = 0;
         for (const [kind, , size] of parts) {
-            this.mesh.setVerticesBuffer(this.geometryBuffer.createVertexBuffer(kind, offset, size), true, vertexCount);
+            this.geometryLayout.push([kind, offset, size]);
             offset += size;
         }
-        this.mesh.setIndices(this.settings.instancingIndices, vertexCount);
+        this.bindGeometry(this.mesh);
 
         this.buildExpandableBuffers();
+    }
+
+    /** Binds the batch's geometry, its shared vertex buffer and its indices, to `mesh`. */
+    private bindGeometry(mesh: Mesh): void {
+        for (const [kind, offset, size] of this.geometryLayout) {
+            mesh.setVerticesBuffer(this.geometryBuffer!.createVertexBuffer(kind, offset, size), true, this.vertexCount);
+        }
+        mesh.setIndices(this.settings.instancingIndices, this.vertexCount);
+    }
+
+    /** The mesh of the `index`th run after the first, made over the batch's geometry the first time. */
+    private runAt(index: number): InstanceRun {
+        let run = this.runs[index];
+        if (run === undefined) {
+            const mesh = new Mesh('spriteBatchRun', this.scene);
+            this.configureDrawMesh(mesh);
+            this.bindGeometry(mesh);
+            run = new InstanceRun(mesh);
+            this.runs[index] = run;
+        }
+        return run;
+    }
+
+    private disposeRuns(): void {
+        for (const run of this.runs) {
+            run.dispose();
+        }
+        this.runs.length = 0;
     }
 
     /**
@@ -162,6 +369,31 @@ export class SpriteBatch extends VFXBatch {
         return true;
     }
 
+    private warnedColors = false;
+
+    /**
+     * True when a mesh batch has vertex colours, four values per vertex. A set of any other length
+     * is left out with a warning, and the mesh is drawn without them.
+     */
+    private meshColors(): boolean {
+        const colors = this.settings.instancingColors;
+        if (this.settings.renderMode !== RenderMode.Mesh || !colors) {
+            return false;
+        }
+        const expected = (this.settings.instancingGeometry.length / 3) * 4;
+        if (colors.length !== expected) {
+            if (!this.warnedColors) {
+                this.warnedColors = true;
+                console.warn(
+                    `[babylon.quarks] instancingColors has ${colors.length} values for ${expected / 4} vertices ` +
+                        '(four per vertex expected); the mesh is drawn without vertex colours.'
+                );
+            }
+            return false;
+        }
+        return true;
+    }
+
     /** Releases the instance vertex buffers so a resize does not leak GPU memory. */
     private disposeExpandableBuffers(): void {
         this.offsetVB?.dispose();
@@ -172,6 +404,10 @@ export class SpriteBatch extends VFXBatch {
         this.velocityVB?.dispose();
         this.velocityVB = undefined;
         this.velocityBuffer = undefined;
+        // The column views do not own the buffer they read.
+        this.stretchGPUBuffer?.dispose();
+        this.stretchGPUBuffer = undefined;
+        this.stretchBuffer = undefined;
     }
 
     private buildExpandableBuffers(): void {
@@ -193,7 +429,7 @@ export class SpriteBatch extends VFXBatch {
         this.uvTileVB = new VertexBuffer(engine, this.uvTileBuffer, 'uvTile', true, false, 1, true);
         this.mesh.setVerticesBuffer(this.uvTileVB);
 
-        if (this.settings.renderMode === RenderMode.Mesh) {
+        if (this.turnsByQuaternion()) {
             this.rotationBuffer = new Float32Array(this.maxParticles * 4);
             this.rotationVB = new VertexBuffer(engine, this.rotationBuffer, 'rotation', true, false, 4, true);
         } else {
@@ -206,6 +442,29 @@ export class SpriteBatch extends VFXBatch {
             this.velocityBuffer = new Float32Array(this.maxParticles * 4);
             this.velocityVB = new VertexBuffer(engine, this.velocityBuffer, 'velocity', true, false, 4, true);
             this.mesh.setVerticesBuffer(this.velocityVB);
+        }
+
+        if (this.settings.renderMode === RenderMode.Mesh) {
+            this.stretchBuffer = new Float32Array(this.maxParticles * 9);
+            this.stretchGPUBuffer = new Buffer(engine, this.stretchBuffer, true, 9, false, true);
+            for (const [kind, offset, size] of STRETCH_ATTRIBUTE[2]!) {
+                this.mesh.setVerticesBuffer(this.stretchGPUBuffer.createVertexBuffer(kind, offset, size));
+            }
+        }
+
+        this.instanceLayout = [
+            ['offset', 3],
+            ['size', 3],
+            ['color', 4],
+            ['uvTile', 1],
+            ['rotation', this.turnsByQuaternion() ? 4 : 1],
+        ];
+        // A mesh draws along no velocity, so a batch has one or the other, in the next slot.
+        if (this.velocityBuffer) {
+            this.instanceLayout.push(['velocity', 4]);
+        }
+        if (this.stretchBuffer) {
+            this.instanceLayout.push(STRETCH_ATTRIBUTE);
         }
 
         this.mesh.forcedInstanceCount = 0;
@@ -246,91 +505,162 @@ export class SpriteBatch extends VFXBatch {
     private readonly gatherScratch: Float32Array[] = [];
 
     /**
-     * Reorders the `count` filled instances by the batch's sort mode, so that
-     * the later (covering) draws are the nearer or the chosen-age particles.
-     * The order is computed once as a permutation and every attribute buffer
-     * is gathered through it into a spare array that then takes its place.
+     * Reorders each filled system's instances by the batch's sort mode, so that the later
+     * (covering) draws are the nearer or the chosen-age particles. Unity sorts the particles of
+     * each system among themselves; the systems are drawn in the renderer's order. Each order is
+     * computed as a permutation and every attribute buffer is gathered through it into a spare
+     * array, which then takes its place.
      */
-    private sortInstances(count: number, isMeshRender: boolean, isStretchedRender: boolean): void {
+    private sortInstances(
+        systems: IParticleSystem[],
+        count: number,
+        turnsByQuaternion: boolean,
+        usesVelocity: boolean
+    ): void {
         if (count < 2) {
             return;
         }
-        const scratch = (this.sortScratch ??= new SortScratch(this.maxParticles));
-        scratch.ensure(count);
-        const keys = scratch.keys;
         const mode = this.settings.sortMode;
+        let ex = 0;
+        let ey = 0;
+        let ez = 0;
         if (mode === 'distance') {
             const camera = this.scene.activeCameras?.[0] ?? this.scene.activeCamera;
             if (!camera) {
                 return;
             }
             const eye = camera.globalPosition;
-            const ex = eye.x;
-            const ey = eye.y;
-            const ez = eye.z;
-            const offsets = this.offsetBuffer;
-            // Farthest first: the nearer particle is drawn last and covers.
-            for (let i = 0, o = 0; i < count; i++, o += 3) {
-                const dx = offsets[o] - ex;
-                const dy = offsets[o + 1] - ey;
-                const dz = offsets[o + 2] - ez;
-                keys[i] = scratch.floatKey(dx * dx + dy * dy + dz * dz, true);
+            ex = eye.x;
+            ey = eye.y;
+            ez = eye.z;
+        }
+        const scratch = (this.sortScratch ??= new SortScratch(this.maxParticles));
+        scratch.ensure(count);
+        const keys = scratch.keys;
+        const offsets = this.offsetBuffer;
+        const spares = this.spares;
+        spares[0] = this.spareFor(0, this.offsetBuffer);
+        spares[1] = this.spareFor(1, this.sizeBuffer);
+        spares[2] = this.spareFor(2, this.colorBuffer);
+        spares[3] = this.spareFor(3, this.uvTileBuffer);
+        spares[4] = this.spareFor(4, this.rotationBuffer);
+        const sortsVelocity = usesVelocity && this.velocityBuffer !== undefined;
+        if (sortsVelocity) {
+            spares[5] = this.spareFor(5, this.velocityBuffer!);
+        }
+        const sortsStretch = this.stretchBuffer !== undefined;
+        if (sortsStretch) {
+            spares[6] = this.spareFor(6, this.stretchBuffer!);
+        }
+        const rotationStride = turnsByQuaternion ? 4 : 1;
+        const starts = this.systemStarts;
+        for (let s = 0; s < systems.length; s++) {
+            const first = starts[s];
+            const n = starts[s + 1] - first;
+            if (n === 0) {
+                continue;
             }
-        } else {
-            // Ages in the order the systems were filled, which is the instance order.
-            const youngestInFront = mode === 'youngestInFront';
-            const systems = this.visibleSystems;
-            let i = 0;
-            for (let s = 0; s < systems.length; s++) {
-                const system = systems[s];
-                const particleNum = system.particleNum;
-                const store = system.store;
-                if (particleNum === 0) {
-                    continue;
+            let sorted = n > 1;
+            if (sorted && mode === 'distance') {
+                // Farthest first: the nearer particle is drawn last and covers.
+                for (let i = 0, o = first * 3; i < n; i++, o += 3) {
+                    const dx = offsets[o] - ex;
+                    const dy = offsets[o + 1] - ey;
+                    const dz = offsets[o + 2] - ez;
+                    keys[i] = scratch.floatKey(dx * dx + dy * dy + dz * dz, true);
                 }
-                if (store === undefined) {
-                    const particles = system.particles;
-                    for (let j = 0; j < particleNum; j++) {
-                        keys[i++] = scratch.floatKey(particles[j].age, youngestInFront);
-                    }
-                    continue;
-                }
-                const scalars = store.scalars;
-                const stride = ParticleStore.SCALAR_STRIDE;
-                for (let j = 0, a = ParticleStore.AGE; j < particleNum; j++, a += stride) {
-                    keys[i++] = scratch.floatKey(scalars[a], youngestInFront);
-                }
+            } else if (sorted) {
+                sorted = this.ageKeys(systems[s], n, scratch, mode === 'youngestInFront');
             }
-            if (i !== count) {
-                return;
+            if (sorted) {
+                const order = sortByKey(scratch, n);
+                gather(this.offsetBuffer, spares[0], order, n, 3, first);
+                gather(this.sizeBuffer, spares[1], order, n, 3, first);
+                gather(this.colorBuffer, spares[2], order, n, 4, first);
+                gather(this.uvTileBuffer, spares[3], order, n, 1, first);
+                gather(this.rotationBuffer, spares[4], order, n, rotationStride, first);
+                if (sortsVelocity) {
+                    gather(this.velocityBuffer!, spares[5], order, n, 4, first);
+                }
+                if (sortsStretch) {
+                    gather(this.stretchBuffer!, spares[6], order, n, 9, first);
+                }
+            } else {
+                copyRange(spares[0], first * 3, this.offsetBuffer, first * 3, (first + n) * 3);
+                copyRange(spares[1], first * 3, this.sizeBuffer, first * 3, (first + n) * 3);
+                copyRange(spares[2], first * 4, this.colorBuffer, first * 4, (first + n) * 4);
+                copyRange(spares[3], first, this.uvTileBuffer, first, first + n);
+                copyRange(
+                    spares[4],
+                    first * rotationStride,
+                    this.rotationBuffer,
+                    first * rotationStride,
+                    (first + n) * rotationStride
+                );
+                if (sortsVelocity) {
+                    copyRange(spares[5], first * 4, this.velocityBuffer!, first * 4, (first + n) * 4);
+                }
+                if (sortsStretch) {
+                    copyRange(spares[6], first * 9, this.stretchBuffer!, first * 9, (first + n) * 9);
+                }
             }
         }
-        const order = sortByKey(scratch, count);
-        this.offsetBuffer = this.gatherInto(0, this.offsetBuffer, order, count, 3);
-        this.sizeBuffer = this.gatherInto(1, this.sizeBuffer, order, count, 3);
-        this.colorBuffer = this.gatherInto(2, this.colorBuffer, order, count, 4);
-        this.uvTileBuffer = this.gatherInto(3, this.uvTileBuffer, order, count, 1);
-        this.rotationBuffer = this.gatherInto(4, this.rotationBuffer, order, count, isMeshRender ? 4 : 1);
-        if (isStretchedRender && this.velocityBuffer) {
-            this.velocityBuffer = this.gatherInto(5, this.velocityBuffer, order, count, 4);
+        this.offsetBuffer = this.swapSpare(0, this.offsetBuffer);
+        this.sizeBuffer = this.swapSpare(1, this.sizeBuffer);
+        this.colorBuffer = this.swapSpare(2, this.colorBuffer);
+        this.uvTileBuffer = this.swapSpare(3, this.uvTileBuffer);
+        this.rotationBuffer = this.swapSpare(4, this.rotationBuffer);
+        if (sortsVelocity) {
+            this.velocityBuffer = this.swapSpare(5, this.velocityBuffer!);
+        }
+        if (sortsStretch) {
+            this.stretchBuffer = this.swapSpare(6, this.stretchBuffer!);
         }
     }
 
-    /** Gathers `source` in `order` into the spare array of `slot` and returns it; the source becomes the spare. */
-    private gatherInto(
-        slot: number,
-        source: Float32Array,
-        order: Uint32Array,
-        count: number,
-        stride: number
-    ): Float32Array {
+    /** The spare arrays the sort gathers into this frame, by buffer slot. */
+    private readonly spares: Float32Array[] = [];
+
+    /**
+     * Writes the sort keys of `system`'s `n` particles by age, in the order the fill wrote them,
+     * which is the store's. False when the fill wrote a different count, which leaves them as is.
+     */
+    private ageKeys(system: IParticleSystem, n: number, scratch: SortScratch, youngestInFront: boolean): boolean {
+        if (system.particleNum !== n) {
+            return false;
+        }
+        const keys = scratch.keys;
+        const store = system.store;
+        if (store === undefined) {
+            const particles = system.particles;
+            for (let j = 0; j < n; j++) {
+                keys[j] = scratch.floatKey(particles[j].age, youngestInFront);
+            }
+            return true;
+        }
+        const scalars = store.scalars;
+        const stride = ParticleStore.SCALAR_STRIDE;
+        for (let j = 0, a = ParticleStore.AGE; j < n; j++, a += stride) {
+            keys[j] = scratch.floatKey(scalars[a], youngestInFront);
+        }
+        return true;
+    }
+
+    /** The spare array of `slot`, as long as `source`. */
+    private spareFor(slot: number, source: Float32Array): Float32Array {
         let spare = this.gatherScratch[slot];
         if (spare === undefined || spare.length !== source.length) {
             spare = new Float32Array(source.length);
+            this.gatherScratch[slot] = spare;
         }
-        gather(source, spare, order, count, stride);
-        this.gatherScratch[slot] = source;
         return spare;
+    }
+
+    /** Returns the spare of `slot`, now holding the sorted instances; `source` becomes the spare. */
+    private swapSpare(slot: number, source: Float32Array): Float32Array {
+        const sorted = this.gatherScratch[slot];
+        this.gatherScratch[slot] = source;
+        return sorted;
     }
 
     /** @internal */
@@ -365,6 +695,7 @@ export class SpriteBatch extends VFXBatch {
             depth: this.depth,
             envAtlasReady: useEnvAtlas,
             meshUV2: this.meshUV2(),
+            meshColors: this.meshColors(),
             imageProcessing,
         });
         const {defines, attributes, uniforms, samplers} = program;
@@ -559,6 +890,7 @@ export class SpriteBatch extends VFXBatch {
     private quaternion3_ = new Quaternion();
     private quaternion4_ = new Quaternion();
     private quaternion5_ = new Quaternion();
+    private quaternion6_ = new Quaternion();
     private rotationMat_ = new Matrix3();
     private rotationMat2_ = new Matrix3();
     /** Slot 0 holds the zero-alpha instance since the batch last went empty. */
@@ -571,7 +903,10 @@ export class SpriteBatch extends VFXBatch {
         uvTile: new PrefixViews(),
         rotation: new PrefixViews(),
         velocity: new PrefixViews(),
+        stretch: new PrefixViews(),
     };
+    /** The stretch of the system being filled, three columns; see {@link meshStretch}. */
+    private readonly stretch_ = new Float64Array(9);
 
     /** @internal */
     update(): void {
@@ -583,16 +918,22 @@ export class SpriteBatch extends VFXBatch {
         const isBeamRender = renderMode === RenderMode.Beam;
         const usesVelocity = isStretchedRender || isBeamRender;
         const flipsSprites = takesPivotAndSizeLimits(renderMode);
+        const alignment = this.settings.renderAlignment;
+        // Billboards laid along the world's or the emitter's axes turn by a quaternion, as meshes.
+        const alignsQuads = alignsBillboards(this.settings);
+        const turnsByQuaternion = isMeshRender || alignsQuads;
 
-        const visibleSystems = this.getVisibleSystems();
+        const visibleSystems = this.systemsToFill();
         for (let i = 0; i < visibleSystems.length; i++) {
             particleCount += visibleSystems[i].particleNum;
         }
         this.fitBuffers(particleCount);
+        const starts = this.systemStarts;
 
         for (let s = 0; s < visibleSystems.length; s++) {
             const system = visibleSystems[s];
             const particleNum = system.particleNum;
+            starts[s] = index;
             // A finished or between-bursts system adds nothing to the batch. With many effects
             // loaded most systems are idle at any moment, so skip their per-system setup.
             if (particleNum === 0) {
@@ -604,11 +945,20 @@ export class SpriteBatch extends VFXBatch {
             const scale = this.vector3_;
             const systemWorldSpace = system.worldSpace;
             const emitterMatrix = system.emitter.matrixWorld;
-            // Only a local-space mesh needs the emitter's turn as a quaternion, and only a
-            // local-space stretched billboard its rotation matrix. Everything else needs at most
-            // the scale, which the basis column lengths give without a full decompose.
-            if (isMeshRender && !systemWorldSpace) {
+            // Whether a mesh's rotation is measured in the emitter's axes (see RenderAlignment):
+            // always for 'local', and for 'simulation' when the system simulates in local space.
+            // 'world' and 'view' write the particle's own turn; the shader turns 'view' to the camera.
+            const turnsWithEmitter = alignment === 'local' || (alignment === 'simulation' && !systemWorldSpace);
+            // Only a mesh that turns with the emitter, or a billboard laid along its axes, needs the
+            // emitter's turn as a quaternion, and only a local-space stretched billboard its
+            // rotation matrix. Everything else needs at most the scale, which the basis column
+            // lengths give without a full decompose.
+            const quadsTurnWithEmitter = alignsQuads && alignment === 'local';
+            if ((isMeshRender && turnsWithEmitter) || quadsTurnWithEmitter) {
                 emitterMatrix.decompose(translation, rotation, scale);
+                // A skewed matrix's columns are not square to each other, and the turn read from
+                // them not quite of length 1; a mesh's stretch makes up the rest (meshStretch).
+                rotation.normalize();
             } else {
                 const e = emitterMatrix.elements;
                 scale.set(
@@ -620,18 +970,49 @@ export class SpriteBatch extends VFXBatch {
             if (isStretchedRender && !systemWorldSpace) {
                 this.rotationMat_.setFromMatrix4(emitterMatrix);
             }
+            // Unity draws a mesh mirrored when the scale of its scaling mode mirrors the system
+            // (see ParticleEmitter.mirrored): one turning with the emitter is laid by the emitter's
+            // whole matrix, its mirror included, with the particle's own turn inside the mirror, so
+            // a spin turns the other way on screen (measured in Unity 6). The emitter's turn comes
+            // from `decompose`, which leaves the mirror on the X scale: the particle's turn is
+            // mirrored along X (mirrorTurn) and the X size made negative. Particles that carry
+            // their own parent transform are laid by that instead.
+            const mirrorsMeshes =
+                isMeshRender &&
+                turnsWithEmitter &&
+                system.onlyUsedByOther !== true &&
+                (system.emitter as {mirrored?: boolean}).mirrored === true;
             const absScaleX = Math.abs(scale.x);
             const absScaleY = Math.abs(scale.y);
             const absScaleZ = Math.abs(scale.z);
+            // A mesh of a local-space system takes the emitter's scale after its turn, as its
+            // stretch, and keeps its own size; see meshStretch.
+            const stretchesMesh = isMeshRender && !systemWorldSpace;
+            if (isMeshRender) {
+                SpriteBatch.meshStretch(
+                    stretchesMesh ? emitterMatrix : null,
+                    turnsWithEmitter ? rotation : null,
+                    turnsWithEmitter || !stretchesMesh
+                        ? null
+                        : ((system.emitter as Partial<ParticleEmitter>).alignedScale ?? null),
+                    this.stretch_
+                );
+            }
             // Stretched-billboard settings are per system, not per particle.
             const stretchedSettings = isStretchedRender
                 ? (system.rendererEmitterSettings as StretchedBillBoardSettings)
                 : undefined;
+            // A speed factor of 0 adds no length but still points the streak along the velocity:
+            // the shader takes its direction from what it is sent, so it is sent a tiny one,
+            // whose length (a ten-thousandth of the speed) does not show.
             const speedFactor =
                 stretchedSettings === undefined || stretchedSettings.speedFactor === 0
-                    ? 0.001
+                    ? STRETCH_DIRECTION_ONLY
                     : stretchedSettings.speedFactor;
-            const lengthFactor = stretchedSettings?.lengthFactor ?? 0;
+            // The shader takes the streak's way from the velocity it is sent, which a negative speed
+            // factor turns round; the length factor is sent turned round with it, so the length
+            // still runs along the particle's own way, as Unity's.
+            const lengthFactor = (stretchedSettings?.lengthFactor ?? 0) * (speedFactor < 0 ? -1 : 1);
 
             // Live particles occupy store rows [0, particleNum) in the same order
             // this loop writes them, so attributes that need no per-particle
@@ -731,10 +1112,12 @@ export class SpriteBatch extends VFXBatch {
                 } else {
                     copyPrefix(sizes, base, store!.size, particleNum * 3);
                 }
-                for (let o = base; o < end; o += 3) {
-                    sizes[o] *= absScaleX;
-                    sizes[o + 1] *= absScaleY;
-                    sizes[o + 2] *= absScaleZ;
+                if (!stretchesMesh) {
+                    for (let o = base; o < end; o += 3) {
+                        sizes[o] *= absScaleX;
+                        sizes[o + 1] *= absScaleY;
+                        sizes[o + 2] *= absScaleZ;
+                    }
                 }
                 copiedPositionAndSize = true;
             }
@@ -748,8 +1131,19 @@ export class SpriteBatch extends VFXBatch {
                 const columns = store!;
                 copyPrefix(this.uvTileBuffer, firstIndex, columns.uvTile, particleNum);
                 const rotations = this.rotationBuffer;
-                copyPrefix(rotations, firstIndex, columns.rotation, particleNum);
-                if (residual !== 0) {
+                if (alignsQuads) {
+                    SpriteBatch.writeQuadTurns(
+                        rotations,
+                        firstIndex * 4,
+                        columns,
+                        particleNum,
+                        residual,
+                        quadsTurnWithEmitter ? rotation : null
+                    );
+                } else {
+                    copyPrefix(rotations, firstIndex, columns.rotation, particleNum);
+                }
+                if (residual !== 0 && !alignsQuads) {
                     // Carry the spin on by the time since the last step, as the
                     // per-particle path does.
                     const rates = columns.angularVelocity;
@@ -772,7 +1166,7 @@ export class SpriteBatch extends VFXBatch {
                 index += particleNum;
             } else if (sharedTransform && store!.rotationQuaternion.length > 0) {
                 // Meshes rotate by quaternion, kept in the store too: turn them in
-                // bulk, by the emitter's rotation when the system is local.
+                // bulk, by the emitter's rotation when they turn with it.
                 const columns = store!;
                 copyPrefix(this.uvTileBuffer, firstIndex, columns.uvTile, particleNum);
                 SpriteBatch.writeQuaternions(
@@ -781,7 +1175,8 @@ export class SpriteBatch extends VFXBatch {
                     columns,
                     particleNum,
                     stepFraction,
-                    systemWorldSpace ? null : rotation
+                    turnsWithEmitter ? rotation : null,
+                    mirrorsMeshes
                 );
                 index += particleNum;
             } else {
@@ -799,8 +1194,11 @@ export class SpriteBatch extends VFXBatch {
                                 .copy(own)
                                 .multiply(SpriteBatch.partialTurn(step, stepFraction, this.quaternion5_));
                         }
+                        if (mirrorsMeshes) {
+                            own = SpriteBatch.mirrorTurn(own, this.quaternion6_);
+                        }
                         let q: Quaternion;
-                        if (systemWorldSpace) {
+                        if (!turnsWithEmitter) {
                             q = own;
                         } else {
                             let parentQ: Quaternion;
@@ -819,8 +1217,18 @@ export class SpriteBatch extends VFXBatch {
                         this.rotationBuffer[ri + 3] = q.w;
                     } else {
                         const spin = particle.angularVelocity;
-                        this.rotationBuffer[index] =
-                            (particle.rotation as number) + (typeof spin === 'number' ? spin * residual : 0);
+                        const angle = (particle.rotation as number) + (typeof spin === 'number' ? spin * residual : 0);
+                        if (alignsQuads) {
+                            let frame: Quaternion | null = null;
+                            if (quadsTurnWithEmitter) {
+                                frame = particle.parentMatrix
+                                    ? this.quaternion3_.setFromRotationMatrix(particle.parentMatrix)
+                                    : rotation;
+                            }
+                            SpriteBatch.writeQuadTurn(this.rotationBuffer, index * 4, angle, frame);
+                        } else {
+                            this.rotationBuffer[index] = angle;
+                        }
                     }
 
                     if (!copiedPositionAndSize) {
@@ -849,8 +1257,9 @@ export class SpriteBatch extends VFXBatch {
                         const size = particle.size;
                         const si = index * 3;
                         // Particle size is already in world units when the system is in world
-                        // space or the particle carries its own parent transform.
-                        if (systemWorldSpace || particle.parentMatrix) {
+                        // space or the particle carries its own parent transform, and a mesh
+                        // takes the emitter's scale as its stretch.
+                        if (systemWorldSpace || particle.parentMatrix || isMeshRender) {
                             this.sizeBuffer[si] = size.x;
                             this.sizeBuffer[si + 1] = size.y;
                             this.sizeBuffer[si + 2] = size.z;
@@ -883,6 +1292,16 @@ export class SpriteBatch extends VFXBatch {
                         const vz = velocity.z + (velocity.z - previousVelocity.z) * stepFraction;
                         const vel: Vector3 = this.vector_;
                         vel.set(vx, vy, vz);
+                        // Drawn along the total velocity, as Unity draws along totalVelocity, the
+                        // behaviors' direct moves carried on between steps as the velocity is.
+                        if (particle.animatedVelocity !== undefined) {
+                            const animated = particle.store.animatedVelocity;
+                            const previous = particle.store.previousAnimatedVelocity;
+                            const o = particle.storeIndex * 3;
+                            vel.x += animated[o] + (animated[o] - previous[o]) * stepFraction;
+                            vel.y += animated[o + 1] + (animated[o + 1] - previous[o + 1]) * stepFraction;
+                            vel.z += animated[o + 2] + (animated[o + 2] - previous[o + 2]) * stepFraction;
+                        }
                         if (!systemWorldSpace) {
                             if (particle.parentMatrix) {
                                 this.rotationMat2_.setFromMatrix4(particle.parentMatrix);
@@ -900,6 +1319,9 @@ export class SpriteBatch extends VFXBatch {
                 }
             }
 
+            if (isMeshRender) {
+                this.writeMeshStretch(firstIndex, index, sharedTransform ? null : particles);
+            }
             const tint = (system as ParticleSystem).tint;
             if (tint !== undefined && index > firstIndex) {
                 SpriteBatch.applyTint(this.colorBuffer, firstIndex * 4, index - firstIndex, tint);
@@ -911,21 +1333,33 @@ export class SpriteBatch extends VFXBatch {
                     SpriteBatch.applyFlipFromParticles(this.sizeBuffer, firstIndex * 3, particles, particleNum);
                 }
             }
+            if (mirrorsMeshes) {
+                const sizes = this.sizeBuffer;
+                for (let o = firstIndex * 3; o < index * 3; o += 3) {
+                    sizes[o] = -sizes[o];
+                }
+            }
             if (isBeamRender && this.velocityBuffer) {
                 this.writeBeams(system as ParticleSystem, firstIndex, index - firstIndex);
             }
         }
 
-        // Keep the mesh enabled even when count is 0 — toggling visibility off for a
-        // single frame (common with short lifetimes + low emission overlap) causes flicker.
-        this.mesh.forcedInstanceCount = index;
-        this.refreshBoundingInfo();
+        starts[visibleSystems.length] = index;
+        starts.length = visibleSystems.length + 1;
+        this.filledInstances = index;
+        if (isMeshRender) {
+            this.measureGeometryCentres(visibleSystems);
+        }
 
         if (index === 0) {
+            // Keep the mesh enabled even when count is 0 — toggling visibility off for a
+            // single frame (common with short lifetimes + low emission overlap) causes flicker.
+            this.mesh.forcedInstanceCount = 0;
+            this.hideRunsFrom(0);
             // Slot 0 only needs clearing once per stretch of empty frames; re-uploading it every
             // frame cost five buffer uploads per idle batch per frame.
             if (!this.clearedInstanceUploaded) {
-                this.uploadClearedInstance(isMeshRender, usesVelocity);
+                this.uploadClearedInstance(turnsByQuaternion, usesVelocity);
                 this.clearedInstanceUploaded = true;
             }
             return;
@@ -933,19 +1367,91 @@ export class SpriteBatch extends VFXBatch {
         this.clearedInstanceUploaded = false;
 
         if (this.settings.sortMode !== 'none') {
-            this.sortInstances(index, isMeshRender, usesVelocity);
+            this.sortInstances(visibleSystems, index, turnsByQuaternion, usesVelocity);
         }
+        this.drawRuns(turnsByQuaternion, usesVelocity);
+    }
 
+    /**
+     * Draws each run of the filled systems that has instances (see `runCount`): the first with
+     * the batch mesh, from the start of the buffers, each later one with a run mesh of its own,
+     * and gives each draw the run's bounds and its place in the renderer's order.
+     */
+    private drawRuns(turnsByQuaternion: boolean, usesVelocity: boolean): void {
+        const starts = this.systemStarts;
+        const sources = this.instanceSources;
+        let draws = 0;
+        let fromSystem = 0;
+        for (let r = 0; r < this.runCount; r++) {
+            const toSystem = this.runEnds[r];
+            const first = starts[fromSystem];
+            const end = starts[toSystem];
+            const runFrom = fromSystem;
+            fromSystem = toSystem;
+            if (end === first) {
+                continue;
+            }
+            let mesh: Mesh;
+            if (draws === 0) {
+                // Every run before this one is empty, so this one starts at instance 0.
+                mesh = this.mesh;
+                mesh.forcedInstanceCount = end;
+                this.uploadInstances(end, turnsByQuaternion, usesVelocity);
+            } else {
+                const run = this.runAt(draws - 1);
+                mesh = run.mesh;
+                sources[0] = this.offsetBuffer;
+                sources[1] = this.sizeBuffer;
+                sources[2] = this.colorBuffer;
+                sources[3] = this.uvTileBuffer;
+                sources[4] = this.rotationBuffer;
+                // The layout's next slot: the velocity or the stretch, as no batch has both.
+                sources[5] = this.velocityBuffer ?? this.stretchBuffer;
+                run.write(sources, this.instanceLayout, first, end - first);
+                this.syncDrawMesh(mesh);
+                mesh.isVisible = true;
+            }
+            this.refreshBoundingInfo(mesh, runFrom, toSystem);
+            const key = this.runKeys[r];
+            if (Number.isNaN(key)) {
+                clearDrawOrder(mesh.subMeshes[0]);
+            } else {
+                setDrawOrder(mesh.subMeshes[0], key, this.runSequences[r]);
+            }
+            draws++;
+        }
+        this.hideRunsFrom(Math.max(0, draws - 1));
+    }
+
+    /** Stops drawing the run meshes from `index` on. */
+    private hideRunsFrom(index: number): void {
+        for (let i = index; i < this.runs.length; i++) {
+            this.runs[i].mesh.isVisible = false;
+        }
+    }
+
+    /** Uploads the first `count` instances to the batch mesh's buffers. */
+    private uploadInstances(count: number, turnsByQuaternion: boolean, usesVelocity: boolean): void {
         // Upload only the slots filled this frame, to the next whole chunk: the buffers are sized
         // for the high-water mark and are usually far larger than the live count.
-        this.offsetVB.update(this.uploadViews.offset.of(this.offsetBuffer, index * 3));
-        this.sizeVB.update(this.uploadViews.size.of(this.sizeBuffer, index * 3));
-        this.colorVB.update(this.uploadViews.color.of(this.colorBuffer, index * 4));
-        this.uvTileVB.update(this.uploadViews.uvTile.of(this.uvTileBuffer, index));
-        this.rotationVB.update(this.uploadViews.rotation.of(this.rotationBuffer, isMeshRender ? index * 4 : index));
+        this.offsetVB.update(this.uploadViews.offset.of(this.offsetBuffer, count * 3));
+        this.sizeVB.update(this.uploadViews.size.of(this.sizeBuffer, count * 3));
+        this.colorVB.update(this.uploadViews.color.of(this.colorBuffer, count * 4));
+        this.uvTileVB.update(this.uploadViews.uvTile.of(this.uvTileBuffer, count));
+        this.rotationVB.update(
+            this.uploadViews.rotation.of(this.rotationBuffer, turnsByQuaternion ? count * 4 : count)
+        );
         if (usesVelocity && this.velocityVB && this.velocityBuffer) {
-            this.velocityVB.update(this.uploadViews.velocity.of(this.velocityBuffer, index * 4));
+            this.velocityVB.update(this.uploadViews.velocity.of(this.velocityBuffer, count * 4));
         }
+        if (this.stretchGPUBuffer && this.stretchBuffer) {
+            this.stretchGPUBuffer.update(this.uploadViews.stretch.of(this.stretchBuffer, count * 9));
+        }
+    }
+
+    /** @internal */
+    override drawnInstances(): number {
+        return this.filledInstances;
     }
 
     private readonly beamEnd_ = new Vector3();
@@ -1015,18 +1521,173 @@ export class SpriteBatch extends VFXBatch {
     }
 
     /**
+     * Writes the turns of rows `[0, count)` of a store's aligned billboards from `base` on, one
+     * quaternion each (see {@link writeQuadTurn}): each row's angle carried on by its spin over
+     * the `residual` seconds since the last step, as a camera-facing billboard's angle is.
+     */
+    private static writeQuadTurns(
+        target: Float32Array,
+        base: number,
+        store: ParticleStore,
+        count: number,
+        residual: number,
+        frame: Quaternion | null
+    ): void {
+        const angles = store.rotation;
+        const rates = store.angularVelocity;
+        for (let i = 0, t = base; i < count; i++, t += 4) {
+            SpriteBatch.writeQuadTurn(target, t, residual === 0 ? angles[i] : angles[i] + rates[i] * residual, frame);
+        }
+    }
+
+    /**
+     * Writes the turn of an aligned billboard's quad at `target[base]`, as a quaternion: `frame`,
+     * the emitter's turn for `'local'` (null for `'world'`, the world's axes), times a spin of
+     * `angle` about Z, which turns the quad in its plane as a camera-facing billboard's angle does.
+     */
+    private static writeQuadTurn(target: Float32Array, base: number, angle: number, frame: Quaternion | null): void {
+        const sz = Math.sin(angle / 2);
+        const sw = Math.cos(angle / 2);
+        if (frame === null) {
+            target[base] = 0;
+            target[base + 1] = 0;
+            target[base + 2] = sz;
+            target[base + 3] = sw;
+            return;
+        }
+        // frame * (0, 0, sz, sw)
+        target[base] = frame.x * sw + frame.y * sz;
+        target[base + 1] = frame.y * sw - frame.x * sz;
+        target[base + 2] = frame.z * sw + frame.w * sz;
+        target[base + 3] = frame.w * sw - frame.z * sz;
+    }
+
+    /**
+     * A particle's turn `q` as it shows in a frame mirrored along its X axis: the
+     * same turn seen in a mirror, X·q·X, which keeps the axis's X and turns the
+     * other way, into `out`. A mesh in a mirrored emitter is drawn as Unity
+     * draws it, its own turn inside the mirror: the emitter's turn, then this,
+     * then the mirror on the X size (see `mirrorsMeshes`).
+     */
+    private static mirrorTurn(q: Quaternion, out: Quaternion): Quaternion {
+        return out.set(q.x, -q.y, -q.z, q.w);
+    }
+
+    /**
      * Writes the mesh rotations for rows `[0, count)` of a store: each
      * particle's quaternion, carried on by `fraction` of its last turn (see
-     * {@link partialTurn}) and, for a local-space system, turned by the
-     * emitter's rotation `parent`.
+     * {@link partialTurn}), mirrored by {@link mirrorTurn} when `mirror` is
+     * set and, for a local-space system, turned by the emitter's rotation
+     * `parent`.
      */
+    /**
+     * The stretch of a system's mesh particles, into `out` as three columns: the linear map the
+     * vertex shader applies to a mesh after its size and its rotation (the emitter's turn and the
+     * particle's own, or its own alone). Unity applies the emitter's scale outside the particle's
+     * rotation, along the axes of the render alignment: a mesh turned 30, 40 and 50 degrees under
+     * an emitter scaled 2, 2 and 1 is stretched along the emitter's axes, not its own (measured in
+     * Unity 6 with `BakeMesh`, every scaling mode, both simulation spaces). A flat ring spun about
+     * its Z under an emitter squashed in Y then stays an upright ellipse as it turns, where scaling
+     * its size would spin the ellipse with it.
+     *
+     * - `matrix` and `turn`, a mesh that turns with the emitter (`'local'`, or `'simulation'` in a
+     *   local-space system): the emitter's matrix times the inverse of the turn its rotation already
+     *   carries, `L·Qᵀ`, so the mesh is drawn by `L·R`, as Unity's Local alignment, skew and all. A
+     *   mirrored emitter does not mirror its meshes, as before.
+     * - `matrix` and `scale` (`'world'` and `'view'`): the emitter's scale along the world's or the
+     *   camera's axes, `diag(scale)`, as Unity's World and View alignments, `scale` the emitter's
+     *   {@link ParticleEmitter.alignedScale}.
+     * - neither: none, for a world-space system, whose particles took the emitter's scale in their
+     *   size at birth.
+     * @internal
+     */
+    static meshStretch(
+        matrix: Matrix4 | null,
+        turn: Quaternion | null,
+        scale: Vector3 | null,
+        out: Float64Array
+    ): void {
+        out.fill(0);
+        if (matrix === null) {
+            out[0] = out[4] = out[8] = 1;
+            return;
+        }
+        const e = matrix.elements;
+        if (turn === null) {
+            // An emitter that does not give it: the lengths of the matrix's axes, which it is
+            // unless the matrix is skewed.
+            out[0] = scale ? scale.x : Math.sqrt(e[0] * e[0] + e[1] * e[1] + e[2] * e[2]);
+            out[4] = scale ? scale.y : Math.sqrt(e[4] * e[4] + e[5] * e[5] + e[6] * e[6]);
+            out[8] = scale ? scale.z : Math.sqrt(e[8] * e[8] + e[9] * e[9] + e[10] * e[10]);
+            return;
+        }
+        const {x, y, z, w} = turn;
+        // The turn as a matrix, row by row.
+        const rows = SpriteBatch.turnRows;
+        rows[0] = 1 - 2 * (y * y + z * z);
+        rows[1] = 2 * (x * y - z * w);
+        rows[2] = 2 * (x * z + y * w);
+        rows[3] = 2 * (x * y + z * w);
+        rows[4] = 1 - 2 * (x * x + z * z);
+        rows[5] = 2 * (y * z - x * w);
+        rows[6] = 2 * (x * z - y * w);
+        rows[7] = 2 * (y * z + x * w);
+        rows[8] = 1 - 2 * (x * x + y * y);
+        // Column j of L·Qᵀ is L times row j of Q.
+        for (let j = 0; j < 3; j++) {
+            const a = rows[j * 3],
+                b = rows[j * 3 + 1],
+                c = rows[j * 3 + 2];
+            for (let r = 0; r < 3; r++) {
+                out[j * 3 + r] = e[r] * a + e[4 + r] * b + e[8 + r] * c;
+            }
+        }
+        const det =
+            out[0] * (out[4] * out[8] - out[5] * out[7]) -
+            out[3] * (out[1] * out[8] - out[2] * out[7]) +
+            out[6] * (out[1] * out[5] - out[2] * out[4]);
+        if (det < 0) {
+            // Mirrored along the turn's X, where the decomposition puts a negative scale: reflect
+            // it back, S·(I − 2aaᵀ) with a that axis, the turn's first column.
+            const ax = rows[0],
+                ay = rows[3],
+                az = rows[6];
+            for (let r = 0; r < 3; r++) {
+                const sa = out[r] * ax + out[3 + r] * ay + out[6 + r] * az;
+                out[r] -= 2 * sa * ax;
+                out[3 + r] -= 2 * sa * ay;
+                out[6 + r] -= 2 * sa * az;
+            }
+        }
+    }
+
+    /** Scratch for {@link meshStretch}: a turn's matrix, row by row. */
+    private static readonly turnRows = new Float64Array(9);
+
+    /**
+     * Writes the stretch {@link meshStretch} left in {@link stretch_} to the instances from `first`
+     * to `end`; one whose particle carries its own parent transform, whose size is in world units,
+     * takes none. `particles` is null when none of them can.
+     */
+    private writeMeshStretch(first: number, end: number, particles: ReadonlyArray<IParticle> | null): void {
+        const m = this.stretch_;
+        const target = this.stretchBuffer!;
+        for (let i = first, o = first * 9; i < end; i++, o += 9) {
+            const own = particles !== null && !!(particles[i - first] as SpriteParticle).parentMatrix;
+            for (let k = 0; k < 9; k++) {
+                target[o + k] = own ? (k % 4 === 0 ? 1 : 0) : m[k];
+            }
+        }
+    }
+
     private static writeQuaternions(
         target: Float32Array,
         base: number,
         store: ParticleStore,
         count: number,
         fraction: number,
-        parent: Quaternion | null
+        parent: Quaternion | null,
+        mirror = false
     ): void {
         const rotations = store.rotationQuaternion;
         const turns = store.angularVelocityQuaternion;
@@ -1059,6 +1720,10 @@ export class SpriteBatch extends VFXBatch {
                 x = nx;
                 y = ny;
                 z = nz;
+            }
+            if (mirror) {
+                y = -y;
+                z = -z;
             }
             if (hasParent) {
                 // q = parent * own
@@ -1097,6 +1762,9 @@ export class SpriteBatch extends VFXBatch {
         const velocities = store.velocity;
         // Empty until the first stretched step has run; the velocity then has no history yet.
         const previous = store.previousVelocity.length >= count * 3 ? store.previousVelocity : velocities;
+        // The velocity of the behaviors' direct moves, added as Unity adds animatedVelocity.
+        const animated = store.animatedVelocity.length >= count * 3 ? store.animatedVelocity : null;
+        const previousAnimated = store.previousAnimatedVelocity;
         const e = rotation !== null ? rotation.elements : null;
         for (let i = 0, o = 0, t = base; i < count; i++, o += 3, t += 4) {
             let vx = velocities[o];
@@ -1106,6 +1774,11 @@ export class SpriteBatch extends VFXBatch {
                 vx += (vx - previous[o]) * fraction;
                 vy += (vy - previous[o + 1]) * fraction;
                 vz += (vz - previous[o + 2]) * fraction;
+            }
+            if (animated !== null) {
+                vx += animated[o] + (animated[o] - previousAnimated[o]) * fraction;
+                vy += animated[o + 1] + (animated[o + 1] - previousAnimated[o + 1]) * fraction;
+                vz += animated[o + 2] + (animated[o + 2] - previousAnimated[o + 2]) * fraction;
             }
             if (e !== null) {
                 const x = e[0] * vx + e[3] * vy + e[6] * vz;
@@ -1223,7 +1896,7 @@ export class SpriteBatch extends VFXBatch {
     }
 
     /** Pushes a zero-alpha instance so stale instancing data cannot linger on screen. */
-    private uploadClearedInstance(isMeshRender: boolean, isStretchedRender: boolean): void {
+    private uploadClearedInstance(turnsByQuaternion: boolean, isStretchedRender: boolean): void {
         this.colorBuffer[3] = 0;
         this.sizeBuffer[0] = 0;
         this.sizeBuffer[1] = 0;
@@ -1232,13 +1905,16 @@ export class SpriteBatch extends VFXBatch {
         this.sizeVB.update(this.uploadViews.size.of(this.sizeBuffer, 3));
         this.offsetVB.update(this.uploadViews.offset.of(this.offsetBuffer, 3));
         this.uvTileVB.update(this.uploadViews.uvTile.of(this.uvTileBuffer, 1));
-        if (isMeshRender) {
+        if (turnsByQuaternion) {
             this.rotationVB.update(this.uploadViews.rotation.of(this.rotationBuffer, 4));
         } else {
             this.rotationVB.update(this.uploadViews.rotation.of(this.rotationBuffer, 1));
         }
         if (isStretchedRender && this.velocityVB && this.velocityBuffer) {
             this.velocityVB.update(this.uploadViews.velocity.of(this.velocityBuffer, 4));
+        }
+        if (this.stretchGPUBuffer && this.stretchBuffer) {
+            this.stretchGPUBuffer.update(this.uploadViews.stretch.of(this.stretchBuffer, 9));
         }
     }
 
@@ -1250,6 +1926,7 @@ export class SpriteBatch extends VFXBatch {
         if (this.mesh.material) {
             this.mesh.material.dispose();
         }
+        this.disposeRuns();
         super.dispose();
         // The mesh's vertex buffers are views of it and do not own it.
         this.geometryBuffer?.dispose();

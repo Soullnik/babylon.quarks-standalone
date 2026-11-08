@@ -1,4 +1,3 @@
-import {VertexBuffer} from '@babylonjs/core/Buffers/buffer';
 import {Constants} from '@babylonjs/core/Engines/constants';
 import {StandardMaterial} from '@babylonjs/core/Materials/standardMaterial';
 import {DynamicTexture} from '@babylonjs/core/Materials/Textures/dynamicTexture';
@@ -10,8 +9,10 @@ import {TransformNode} from '@babylonjs/core/Meshes/transformNode';
 import type {Scene} from '@babylonjs/core/scene';
 import {
     Bezier,
+    ColorOverLength,
     ConstantColor,
     ConstantValue,
+    Gradient,
     IntervalValue,
     MeshSurfaceEmitter,
     ParticleSystem,
@@ -20,9 +21,14 @@ import {
     RandomColor,
     RenderMode,
     SizeOverLife,
+    WidthOverLength,
 } from 'babylon.quarks';
-import {createSharedTexture} from '../shared/common';
-import type {DemoContext} from '../types';
+import {curve} from '../shared/curves';
+import {band} from '../shared/geometry';
+import {addLabel} from '../shared/labels';
+import {addGround} from '../shared/stage';
+import {baseTexture, kenneyTexture} from '../shared/textures';
+import type {DemoContext, DemoRun} from '../types';
 
 /** A square canvas texture painted by `paint`, wrapping or clamped, without mipmaps. */
 function canvasTexture(
@@ -39,20 +45,6 @@ function canvasTexture(
     texture.wrapU = mode;
     texture.wrapV = mode;
     return texture;
-}
-
-/** Soft bands along U that tile: the red channel runs 0…1 across each band, alpha follows. */
-function bands(ctx: CanvasRenderingContext2D, size: number): void {
-    const image = ctx.createImageData(size, size);
-    for (let y = 0; y < size; y++) {
-        for (let x = 0; x < size; x++) {
-            const v = 0.5 + 0.5 * Math.sin((x / size) * Math.PI * 2 * 3);
-            const i = (y * size + x) * 4;
-            image.data[i] = image.data[i + 1] = image.data[i + 2] = Math.round(v * 255);
-            image.data[i + 3] = Math.round(Math.pow(v, 2) * 255);
-        }
-    }
-    ctx.putImageData(image, 0, 0);
 }
 
 /** Ice ramp along U: deep blue, cyan, white. */
@@ -76,12 +68,17 @@ function iceRamp(ctx: CanvasRenderingContext2D, size: number): void {
  * simulates in its local space.
  *
  * Right: mesh-particle ripples. The disc's second UV set is radial, the map is
- * laid on UV channel 1 and scrolled, so the bands flow outward from the centre;
- * a gradient map colours them by the band's red channel.
+ * laid on UV channel 1 and scrolled, so smoke flows outward from the centre in
+ * broken rings; a gradient map colours it by the smoke's red channel, as frost.
  */
-export function init({scene, camera, batchRenderer, systems}: DemoContext) {
-    camera.setPosition(new BVector3(0, 7, 20));
-    const sheet = createSharedTexture(scene);
+export function init({scene, camera, add}: DemoContext): DemoRun {
+    camera.setPosition(new BVector3(0, 4, 15));
+    camera.setTarget(new BVector3(0, 0, 0));
+    addGround(scene, -2.2);
+    addLabel(scene, 'MeshSurfaceEmitter trails', new BVector3(-5, 3, 0), {height: 0.42});
+    addLabel(scene, 'Mesh UV2 + gradientMap', new BVector3(5, 1.6, 0), {height: 0.42});
+    // Soft edges and a bright line down the middle.
+    const sheet = kenneyTexture(scene, 'ribbon');
 
     // Left: the knot and the trails shed from its surface.
     const pivot = new TransformNode('knotPivot', scene);
@@ -92,10 +89,12 @@ export function init({scene, camera, batchRenderer, systems}: DemoContext) {
         scene
     );
     knot.parent = pivot;
+    // Polished steel: grey, a tight bright highlight, a little of its own colour in the shade.
     const knotMaterial = new StandardMaterial('knot', scene);
-    knotMaterial.diffuseColor = new Color3(0.15, 0.18, 0.3);
-    knotMaterial.emissiveColor = new Color3(0.05, 0.08, 0.2);
-    knotMaterial.specularColor = Color3.Black();
+    knotMaterial.diffuseColor = new Color3(0.42, 0.44, 0.5);
+    knotMaterial.emissiveColor = new Color3(0.06, 0.065, 0.08);
+    knotMaterial.specularColor = new Color3(0.9, 0.9, 0.95);
+    knotMaterial.specularPower = 64;
     knot.material = knotMaterial;
 
     const trails = new ParticleSystem({
@@ -104,7 +103,7 @@ export function init({scene, camera, batchRenderer, systems}: DemoContext) {
         looping: true,
         startLife: new IntervalValue(0.8, 1.2),
         startSpeed: new IntervalValue(2, 4),
-        startSize: new ConstantValue(0.14),
+        startSize: new ConstantValue(0.28),
         startColor: new RandomColor(new Color4(1, 0.5, 0.2, 1), new Color4(1, 0.9, 0.4, 1)),
         worldSpace: false,
         emissionOverTime: new ConstantValue(60),
@@ -112,9 +111,6 @@ export function init({scene, camera, batchRenderer, systems}: DemoContext) {
         texture: sheet,
         transparent: true,
         blendMode: Constants.ALPHA_ADD,
-        startTileIndex: new ConstantValue(0),
-        uTileCount: 10,
-        vTileCount: 10,
         renderMode: RenderMode.Trail,
         rendererEmitterSettings: {
             startLength: new ConstantValue(20),
@@ -128,21 +124,40 @@ export function init({scene, camera, batchRenderer, systems}: DemoContext) {
         },
     });
     trails.addBehavior(new SizeOverLife(new PiecewiseBezier([[new Bezier(1, 0.8, 0.4, 0), 0]])));
+    // White at the head, the particle's colour behind it, fading out to the tail, and narrowing.
+    trails.addBehavior(
+        new ColorOverLength(
+            new Gradient(
+                [
+                    [new Color3(1, 1, 1), 0],
+                    [new Color3(1, 1, 1), 1],
+                ],
+                [
+                    [1, 0],
+                    [0, 1],
+                ]
+            )
+        )
+    );
+    trails.addBehavior(
+        new WidthOverLength(
+            curve([
+                [0, 1],
+                [1, 0.25],
+            ])
+        )
+    );
     trails.emitter.parent = pivot;
-    batchRenderer.addSystem(trails);
-    systems.push(trails);
+    add(trails);
 
-    // Right: a disc whose second UV set is radial (U = distance from the centre, V = angle).
-    const disc = MeshBuilder.CreateDisc('ripple', {radius: 1, tessellation: 48}, scene);
-    disc.isVisible = false;
-    disc.setEnabled(false);
-    const positions = disc.getVerticesData(VertexBuffer.PositionKind)!;
-    const uvs2 = new Float32Array((positions.length / 3) * 2);
-    for (let i = 0; i < positions.length / 3; i++) {
-        const x = positions[i * 3];
-        const y = positions[i * 3 + 1];
-        uvs2[i * 2] = Math.sqrt(x * x + y * y);
-        uvs2[i * 2 + 1] = Math.atan2(y, x) / (Math.PI * 2) + 0.5;
+    // Right: a disc whose second UV set is radial (U = distance from the centre, V = angle). Built
+    // as a flat band from the centre out, which repeats its seam column, so V runs 0 to 1 round it
+    // without the jump an atan2 angle makes where it wraps (a seam smeared across the triangles).
+    const disc = band({bottom: 0, top: 1, height: 0, segments: 64, rows: 12});
+    const uvs2 = new Float32Array(disc.instancingUVs.length);
+    for (let i = 0; i < uvs2.length; i += 2) {
+        uvs2[i] = disc.instancingUVs[i + 1];
+        uvs2[i + 1] = disc.instancingUVs[i];
     }
     const ripples = new ParticleSystem({
         scene,
@@ -155,29 +170,24 @@ export function init({scene, camera, batchRenderer, systems}: DemoContext) {
         worldSpace: false,
         emissionOverTime: new ConstantValue(2),
         shape: new PointEmitter(),
-        texture: canvasTexture(scene, 'bands', 256, true, bands),
-        mapUV: {channel: 1, tiling: [2, 1], scroll: [-0.8, 0]},
+        // Smoke run outward from the centre: broken rings of frost, not even bands.
+        texture: baseTexture(scene, 'swirl', true),
+        mapUV: {channel: 1, tiling: [1.5, 2], scroll: [-0.6, 0]},
         gradientMap: {ramp: canvasTexture(scene, 'iceRamp', 256, false, iceRamp), channel: 'r'},
         transparent: true,
         blendMode: Constants.ALPHA_ADD,
         renderMode: RenderMode.Mesh,
-        instancingGeometry: new Float32Array(positions),
-        instancingNormals: new Float32Array(disc.getVerticesData(VertexBuffer.NormalKind)!),
-        instancingUVs: new Float32Array(disc.getVerticesData(VertexBuffer.UVKind)!),
+        ...disc,
         instancingUVs2: uvs2,
-        instancingIndices: new Uint32Array(disc.getIndices()!),
     });
     ripples.addBehavior(new SizeOverLife(new PiecewiseBezier([[new Bezier(0.3, 0.8, 1, 1), 0]])));
     ripples.emitter.position = new BVector3(5, -1, 0);
-    ripples.emitter.rotation.x = Math.PI / 2; // lay the disc flat
-    batchRenderer.addSystem(ripples);
-    systems.push(ripples);
-}
+    add(ripples);
 
-export function update({scene}: DemoContext, delta: number) {
-    const pivot = scene.getTransformNodeByName('knotPivot');
-    if (pivot) {
-        pivot.rotation.y += delta * 0.6;
-        pivot.rotation.x += delta * 0.2;
-    }
+    return {
+        update(delta) {
+            pivot.rotation.y += delta * 0.6;
+            pivot.rotation.x += delta * 0.2;
+        },
+    };
 }

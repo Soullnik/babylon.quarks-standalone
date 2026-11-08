@@ -19,8 +19,9 @@ const fixtures = fs.readdirSync(FIXTURES).filter((name) => name.endsWith('.json'
 const read = (name: string): unknown => JSON.parse(fs.readFileSync(path.join(FIXTURES, name), 'utf8'));
 
 /**
- * `actual` with each number replaced by the one in `expected` when they agree to 1e-6: a node's
- * matrix goes through a decomposition each save, which moves the last bits of its entries.
+ * `actual` with each number replaced by the one in `expected` when they agree to 1e-6: an older
+ * file's node matrix goes through a decomposition as it loads, which moves the last bits of the
+ * position, rotation and scale saved from it.
  */
 function closeTo(actual: unknown, expected: unknown): unknown {
     if (typeof actual === 'number' && typeof expected === 'number') {
@@ -95,9 +96,27 @@ describe('golden fixtures', () => {
         expect([...releases].sort()).toEqual(expect.arrayContaining(['0.27.0', '0.28.0', '0.29.0', '0.30.0']));
     });
 
+    // A geometry's indices are kept as a file gives them. The geometries the loader builds itself
+    // (three.js' PlaneGeometry and SphereGeometry) are wound as Babylon winds a front face since the
+    // release after 0.30; a release before saved them wound the three.js way, each triangle's last
+    // two corners the other way round.
+    type Saved = {geometries?: Array<{indices?: number[]}>};
+    const swapped = (indices: number[]) => indices.map((_, i) => indices[i - (i % 3) + [0, 2, 1][i % 3]]);
+    const withoutIndices = (saved: Saved): Saved => ({
+        ...saved,
+        geometries: saved.geometries?.map(({indices: _indices, ...geometry}) => geometry),
+    });
+
     it.each(releaseSaves)('%s loads as the file it was written from', (name, effect) => {
         const original = fixtures.find((other) => !other.startsWith('babylon') && other.endsWith(`.${effect}.json`))!;
-        const today = resave(read(original)).saved;
-        expect(closeTo(resave(read(name)).saved, today)).toEqual(today);
+        const today = resave(read(original)).saved as Saved;
+        const release = closeTo(resave(read(name)).saved, today) as Saved;
+        expect(withoutIndices(release)).toEqual(withoutIndices(today));
+        today.geometries?.forEach((geometry, i) => {
+            const kept = release.geometries![i].indices;
+            const built = (read(original) as {geometries?: Array<{type: string}>}).geometries?.[i]?.type;
+            const rewound = built === 'PlaneGeometry' || built === 'SphereGeometry';
+            expect(kept).toEqual(rewound && geometry.indices ? swapped(geometry.indices) : geometry.indices);
+        });
     });
 });

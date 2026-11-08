@@ -2,6 +2,191 @@
 
 All notable changes to the Unity Quarks Exporter are documented here.
 
+## [Unreleased]
+
+## [1.0.0-rc.2] — 2026-11-08
+
+### Added
+
+- **Texture Sheet Animation's FPS time mode** → `FrameOverLife` `fps`, playing round the frames
+  (the sheet's, or the row's in Single Row), as Unity does: Frame over Time and Cycles are not read
+  and at 0 fps the frame stays (measured in Unity 6000.6). Before, every sheet played over
+  lifetime. Time Mode Speed has no counterpart and plays over lifetime, with a warning.
+- **Flip-Book Blending** → `blendTiles`: the built-in Standard Particles' Flip-Book Mode Blended
+  (`_FlipbookMode`) and URP's `_FlipbookBlending`, when the renderer sends the UV2 and AnimBlend
+  vertex streams Unity's shader blends from; a material that blends without them is warned about,
+  as Unity draws no blend. A custom shader, which has no such switch, blends when it is sent
+  AnimBlend. Before, `blendTiles` was always false.
+
+- **Unity's mesh shaders draw a particle without its colour** → `particleColor: false`: the legacy
+  shaders outside Particles (Diffuse, Specular, Bumped, VertexLit, their Transparent and Cutout
+  variants, Self-Illumin), Mobile's outside Particles, Unlit/* and Standard ignore the vertex
+  colour the particle renderer gives them, colour and alpha (measured in Unity 6), so a tinted or
+  fading system draws in its texture and material colour alone, and a cutout one clips at the
+  texture's alpha times the material's. Before, babylon.quarks multiplied the particle's colour in. The
+  particle and sprite shaders, URP's and any other keep the particle's colour.
+
+- **Mesh vertex colours** → the geometry's `colors`, `r, g, b, a` per vertex as Unity stores them,
+  which babylon.quarks multiplies a mesh particle's colour by as Unity does. A mesh whose vertices
+  are all white is written without them. Before, they were not exported, and a mesh that fades out
+  by its vertex colours (a stream on a spiral, black at its ends) ended in a hard edge.
+
+- **Sorting Fudge** → `sortingFudge`, so the systems an author layered with it (a glow under the
+  smoke, the smoke over the sparks) keep their order in babylon.quarks however the camera turns.
+- **sRGB textures in a Linear project** → `colorSpace: 'srgb'` on the texture, from the
+  importer's sRGB (Color Texture) setting, so babylon.quarks decodes and filters them in linear
+  space as Unity samples them. A Gamma project, a texture imported with sRGB off and one made in
+  code write none.
+- **Trail Renderer** → a trail system of one particle that rides on the node and records its path
+  in world space: Time → `lifetime`, Min Vertex Distance → `minVertexDistance`, the width curve and
+  multiplier → `WidthOverLength`, Color → `ColorOverLength`, Texture Mode → `textureMode`, the
+  material as a particle system's. On a node that also holds a particle system the trail gets a
+  child node. Alignment Transform Z is exported as View with a warning. The trail system's scaling
+  mode is `shape`: a Trail Renderer's width is in world units whatever its transform's scale, so a
+  trail on a node scaled to 0 still draws. Before, Trail Renderers were not exported.
+- **Texture Sheet Animation Single Row** → `FrameOverLife` `rowLength` / `rowCount`, with
+  `randomRow` for Row Mode Random and `row` for Custom (Mesh Index plays the first row, with a
+  warning). Before, a Single Row sheet played across all its rows.
+- **Collision Planes** → `ApplyCollision` `planes`, in the emitter's local space, with Dampen →
+  `dampen`, Lifetime Loss → `lifetimeLoss` and Radius Scale → `radiusScale`. Before, only Bounce
+  was written and a plane collision fell back to the host's colliders. A Planes collision without
+  any plane is left out, as it collides with nothing in Unity. Min / Max Kill Speed are skipped
+  with a warning.
+- **Force over Lifetime** Space: a Local force is written with `space: 'local'`; World stays the
+  default.
+- **Force over Lifetime Randomize** → `randomized: true`: a random force picks a new value every
+  frame, as in Unity, instead of once per particle.
+- **Render Alignment** of mesh particles → `renderAlignment`: View → `'view'` (Unity's default,
+  so a quad mesh now faces the camera as it does in Unity), World → `'world'`, Local → `'local'`.
+  Facing is exported as View with a warning; Velocity is left out with a warning.
+- **Render Alignment** of billboards → `renderAlignment`: World → `'world'`, Local → `'local'`,
+  so a billboard Unity lays in its node's plane (a bullet hole on the ground) stays there instead
+  of turning to the camera. View, the default, is left out; Facing (exported as View) and Velocity
+  are left out with a warning, so those billboards face the camera. Stretched, horizontal and
+  vertical billboards take none: Unity draws them the same for every alignment (measured in
+  Unity 6).
+
+### Fixed
+
+- **Texture Sheet Animation's Start Frame is exported.** Unity's Start Frame is a fraction of the
+  frames played, constant or random, added whole and fraction alike and wrapped round them in
+  every time mode (0.3 of a 16-frame sheet puts the frame 4.8 on, measured in Unity 6000.6); it is
+  now `FrameOverLife`'s `startFrame` in frames. Before, it went to `startTileIndex`, which
+  `FrameOverLife` overrides, so every particle started on the first frame.
+
+- **The trails of particles that never show are exported.** A system that draws both its
+  particles and their trails keeps only its particles, a quarks system having one render mode; but
+  when every start colour it can pick has an alpha of 0, which Color over Lifetime only multiplies,
+  and its material draws the particle colour, Unity draws nothing of the particles and only the
+  trails show. Such a system is now exported as a trail system, as one with Render Mode None is
+  (streaks carried on such particles drew nothing). A system whose particles show still keeps them, with the warning.
+- **A node is written by Unity's local position, rotation and scale, not a matrix.** A mirrored
+  node's matrix splits into a turn and a scale more than one way, and babylon.quarks turns the
+  systems below it by the one Unity has, as Unity's `transform.rotation` (a Local system
+  under a root scaled (-0.891, 0.891, 1.06) flew the wrong way). `position`, `quaternion` and `scale` keep the scale's signs as Unity has them, and
+  are left out at their defaults, which also makes the files smaller. **Re-export** effects with a
+  mirrored node.
+- **Inherit Velocity only where Unity applies it.** Unity adds the emitter's velocity to a World
+  system's particles, and in its Initial mode to a Custom one's; a Local system inherits nothing
+  in either mode, nor a Custom one in Current mode (measured in Unity 6 on a moving, turned node).
+  The module is now left out there. Before, it was exported whatever the space, and babylon.quarks
+  added the emitter's velocity to particles that already move with it: the smoke of a
+  projectile (Local, Current, 0.2) flew ahead of it at a fifth of its speed instead of trailing
+  behind it.
+
+- **Opaque and cutout mesh shaders draw as in Unity: solid, clipped at their cutoff, back faces
+  culled, lit.** A shader that keeps its surface in its code rather than in material properties
+  (the legacy Diffuse and Transparent/Cutout/*, Unlit/Texture and Unlit/Transparent Cutout,
+  Mobile/Diffuse, Standard) is read by its RenderType tag, which Unity's shaders and the effect
+  editors' all set: Opaque and TransparentCutout export as an opaque surface (`transparent: false`,
+  `depthWrite: true`) that babylon.quarks draws before the transparent systems, clipping at
+  `_Cutoff` when the shader clips (RenderType TransparentCutout, or Standard's `_ALPHATEST_ON`)
+  and, without a `_Cull` property, culling its back faces (`renderFace: 'front'`): Unity's default
+  Cull Back, which all of these shaders keep where its particle and sprite shaders draw both. The
+  legacy Diffuse and Specular shaders light (Lambert and Blinn-Phong), so their meshes are lit.
+  Measured in Unity 6: render queue, RenderType, `_Cutoff`, depth write, culling and lighting of
+  each legacy, Mobile, Unlit and Standard shader. Before, every such material exported as an
+  alpha-blended, unlit particle material without depth write, so cutout mesh spikes
+  (Transparent/Cutout/Diffuse) were see-through, showed their inner faces and the cell borders of their texture sheet; and
+  Standard's Opaque mode warned that One Zero has no counterpart and blended.
+
+- **A mesh's front faces are the ones Unity draws.** Unity winds its front faces clockwise as the
+  camera sees them, Babylon (and an effect file, as babylon.quarks writes a Babylon mesh)
+  counter-clockwise, in the same left-handed space: each triangle is now written with its last two
+  corners swapped. Before, Render Face Front (Cull Back) culled the outside of every exported mesh
+  and drew its inside, and a lit mesh took its outside for a back face and lit it from the wrong
+  side (spikes showed the inside of their far wall through the open base).
+  A Mesh shape emits out of the same faces as before, as babylon.quarks' `MeshSurfaceEmitter` now
+  takes the normal of Babylon's front face. **Re-export** an effect whose meshes use Render Face,
+  a lit shader or a Mesh shape: a mesh written by an earlier exporter is wound Unity's way, so
+  babylon.quarks culls its outside, lights it from behind, and emits from a Mesh shape on it into
+  the mesh.
+
+- **A curve whose keys stop short of 0 or 1 holds its end keys' values there, as in Unity.** A
+  flat piece is written before the first key and after the last, in every cycle of a frame curve.
+  Before, the last key's piece ran on to 1, so a Velocity over Lifetime curve that falls from 2 to
+  0 over the first 3% of the life fell over the whole life instead, and bullet
+  holes, which move for 0.13 s and then rest under the rocks in Unity (measured in Unity 6), slid
+  about 4 units away. Likewise webs whose Rotation over Lifetime stops at
+  a seventh of the life in Unity and turns them by about half a radian, kept spinning all their
+  life and turned by 3 to 4 rad.
+- **A system with no shape emits as in Unity: at the emitter's origin, along +Z.** That is a
+  disabled Shape module, or a Mesh, Mesh Renderer, Skinned Mesh Renderer, Sprite or Sprite
+  Renderer shape without its source, all of which Unity emits from the same way, ignoring the
+  module's Randomize Direction, Align to Direction and position, rotation and scale, and turning
+  mesh particles about Z (measured in Unity 6). It is written as a cone with no radius and no
+  opening, without those settings, and with the default `rotationAxis`. Before, it was a point,
+  which sends particles every way, and a Mesh shape without its mesh kept Randomize Direction and
+  `rotationAxis: 'emission'`, so mesh particles turned about random axes (cones that all
+  face one way in Unity).
+- **A material's tint is the system's `materialColor`, and the legacy particle shaders' doubling
+  its `materialColorScale` of 2**, instead of both being folded into the start colour. In a
+  Linear project Unity multiplies by the tint, and the legacy shaders double it, once it is
+  linear; folded into the colour, babylon.quarks turned the doubling linear with it, so a legacy
+  tint came out 2^2.2 ≈ 4.6 times as bright as its doubling: additive glows were over twice too
+  bright and the faint rim of a halo showed as a hard edge. The colour over lifetime and start
+  colours are now the particle system's own.
+- **Randomize Direction is left out on a Cone emitting from its base**, which Unity does not
+  randomize whatever the amount (only the Cone Volume and the other shapes take it), so a narrow
+  cone of particles that Unity keeps in one curving column no longer scatters.
+- **A mesh particle's 2D rotation turns about its axis of rotation**, as Unity's does: the start
+  rotation is written as a number and the system gets `rotationAxis: 'emission'` when the Shape
+  module is on, so a flat mesh on a box or a narrow cone spins as in Unity instead of always about
+  its own Z, which tipped level rings over.
+- **A mesh particle Unity rotates in 3D keeps the default `rotationAxis`**: with Rotation over
+  Lifetime or Rotation by Speed on with Separate Axes, Unity lays the mesh by its Euler angles,
+  its 2D start rotation the Z angle, and leaves its axis of rotation unused, whatever the X and Y
+  rates (measured in Unity 6; a module with Separate Axes that is off changes nothing). Before,
+  such a system got `rotationAxis: 'emission'`, so meshes a cone or a circle sends apart were
+  each turned about their own axis and spread out of the plane Unity keeps them in (the
+  dark swirls of a portal, or skulls that face the camera in Unity).
+- **Legacy Alpha Blended Premultiply** draws as Unity draws it: its texture is premultiplied
+  and may carry a glow where its alpha is 0, so the system is exported with `premultipliedMap`,
+  which takes the colour times the vertex colour and alpha and lets the frame through by the
+  texture's alpha. Quarks multiplied by the texture's alpha again, which darkened it most at its
+  soft edges. URP's Premultiply mode is unchanged: it takes straight textures.
+- **Systems Unity draws nothing of are left out**: a disabled renderer, Mesh render mode without a
+  mesh, or Render Mode None without trails. Their nodes stay as empty groups, so child systems
+  still play, and a warning names each. quarks drew them as billboards or default quads before.
+  One whose particles spawn sub-emitters is still exported, since those are drawn.
+- **Inactive GameObjects are exported disabled** (`visible: false`), so a system Unity does not
+  play until something activates it (an animation, a script) no longer plays from the start in
+  quarks. Enable the node (`setEnabled(true)`) where Unity would activate it.
+- **Mesh particles drawn with an unlit shader are exported unlit** (`lighting: 'unlit'`), as Unity
+  draws them. quarks lights mesh particles by default, so a legacy or Standard Unlit particle mesh
+  came out shaded and tinted by quarks' fixed light. Lit shaders (Standard Surface, Particles Lit
+  and Simple Lit, VertexLit) keep the default.
+- **Randomize Direction** → `RandomizeDirection` with the same 0..1 amount. It was written as a
+  `ChangeEmitDirection` turn of amount × π, so at 1 (Unity's old Random Direction checkbox)
+  every particle flew straight back instead of in a random direction.
+- **Gravity Modifier ignores the emitter's scale**, as in Unity: the gravity force is written with
+  `scaleWithEmitter: false`. Before, a scaled world-space emitter scaled its gravity with it, so a
+  half-size effect fell at half the speed.
+- **Rotation over Lifetime with Separate Axes on mesh particles** is written with
+  `integration: 'angles'`, so the rates add to the particle's Euler angles as in Unity. Before, a
+  mesh tilted at birth turned about its own tilted axes (a ring spun about Y on a tilted start
+  rotation wobbled instead of spinning flat), and X and Y rates logged a warning, which is gone.
+
 ## [1.0.0-rc.1] — 2026-10-26
 
 ### Changed

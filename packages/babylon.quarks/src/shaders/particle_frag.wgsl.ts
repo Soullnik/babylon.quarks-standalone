@@ -36,7 +36,9 @@ ${surfaceColorWGSL(true)}
 #ifdef USE_ALPHATEST
     if (baseColor.a < uniforms.alphaTest) { discard; }
 #else
-    if (baseColor.a < 0.01) { discard; }
+    // Only what draws nothing: a faint fringe still shows once a doubled tint or additive
+    // blending lifts it, and Unity cuts none of it.
+    if (baseColor.a <= 0.0) { discard; }
 #endif
 
 ${fogFragmentWGSL('baseColor')}

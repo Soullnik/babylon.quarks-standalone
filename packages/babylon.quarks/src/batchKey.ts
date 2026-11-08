@@ -8,11 +8,21 @@ import {
     normalizeMeshRim,
     normalizeUVDistortion,
     readsUV1,
+    RenderAlignment,
     RenderMode,
     StoredBatchSettings,
     TextureUV,
 } from './batchSettings';
-import {DEFAULT_SOFT_FAR_FADE, validRenderFace, validSoftFade, validTileCount} from './system/normalize';
+import {
+    DEFAULT_SOFT_FAR_FADE,
+    validMaterialColor,
+    validMaterialColorScale,
+    validRenderAlignment,
+    validRenderFace,
+    validSoftFade,
+    validSortingFudge,
+    validTileCount,
+} from './system/normalize';
 
 // What decides whether two systems draw from one batch.
 //
@@ -42,6 +52,17 @@ export function takesPivotAndSizeLimits(renderMode: RenderMode): boolean {
         renderMode === RenderMode.StretchedBillBoard ||
         renderMode === RenderMode.VerticalBillBoard ||
         renderMode === RenderMode.HorizontalBillBoard
+    );
+}
+
+/**
+ * Whether the settings lay billboard quads along a set of axes instead of turning them to the
+ * camera: the BillBoard render mode with a `'world'` or `'local'` {@link RenderAlignment}.
+ */
+export function alignsBillboards(settings: {renderMode: RenderMode; renderAlignment?: RenderAlignment}): boolean {
+    return (
+        settings.renderMode === RenderMode.BillBoard &&
+        (settings.renderAlignment === 'world' || settings.renderAlignment === 'local')
     );
 }
 
@@ -80,15 +101,23 @@ export function storedBatchSettings(settings: VFXBatchSettings): StoredBatchSett
         instancingGeometry: isTrail ? NO_GEOMETRY : settings.instancingGeometry,
         instancingIndices: isTrail ? NO_INDICES : settings.instancingIndices,
         instancingUVs: isTrail ? undefined : settings.instancingUVs,
-        // Normals, and the second UV set when a texture reads it, only reach mesh particles.
+        // Normals, vertex colours, and the second UV set when a texture reads it, only reach mesh
+        // particles.
         instancingUVs2: isMesh && readsUV1({mapUV, uvDistortion, erosion}) ? settings.instancingUVs2 : undefined,
         instancingNormals: isMesh ? settings.instancingNormals : undefined,
+        // The mesh's vertex colours multiply the particle's colour, and go with it.
+        instancingColors: isMesh && settings.particleColor !== false ? settings.instancingColors : undefined,
         renderOrder: settings.renderOrder,
         uTileCount,
         vTileCount,
         // A trail cuts its cell on the CPU; a 1×1 sheet has no second cell to blend into.
         blendTiles: !isTrail && settings.blendTiles && tilesSheet({uTileCount, vTileCount}),
         softParticles,
+        premultipliedMap: settings.premultipliedMap === true && settings.texture !== null,
+        particleColor: settings.particleColor !== false,
+        materialColor: validMaterialColor(settings.materialColor),
+        materialColorScale: validMaterialColorScale(settings.materialColorScale),
+        sortingFudge: validSortingFudge(settings.sortingFudge),
         softNearFade: softParticles ? validSoftFade(settings.softNearFade, 0) : 0,
         softFarFade: softParticles ? validSoftFade(settings.softFarFade, DEFAULT_SOFT_FAR_FADE) : 0,
         // An opaque batch draws with blending off, whatever mode it would blend with.
@@ -111,6 +140,9 @@ export function storedBatchSettings(settings: VFXBatchSettings): StoredBatchSett
                 : undefined,
         sortMode: settings.sortMode ?? 'none',
         renderFace: isMesh ? validRenderFace(settings.renderFace) : 'both',
+        // A camera-facing billboard is one batch whether it says 'view' or nothing.
+        renderAlignment:
+            isMesh || alignsBillboards(settings) ? validRenderAlignment(settings.renderAlignment) : 'simulation',
         minParticleSize: quad ? Math.max(0, settings.minParticleSize ?? 0) : 0,
         maxParticleSize: quad ? positiveOrUnlimited(settings.maxParticleSize) : Infinity,
         lighting: isMesh ? (settings.lighting ?? 'fixed') : 'fixed',
@@ -141,6 +173,7 @@ export function shaderKeyEqual(a: StoredBatchSettings, b: StoredBatchSettings): 
         a.instancingUVs === b.instancingUVs &&
         a.instancingUVs2 === b.instancingUVs2 &&
         a.instancingNormals === b.instancingNormals &&
+        a.instancingColors === b.instancingColors &&
         a.texture === b.texture &&
         a.reflectionTexture === b.reflectionTexture &&
         a.reflectionAtlas === b.reflectionAtlas &&
@@ -150,6 +183,8 @@ export function shaderKeyEqual(a: StoredBatchSettings, b: StoredBatchSettings): 
         a.vTileCount === b.vTileCount &&
         a.blendTiles === b.blendTiles &&
         a.softParticles === b.softParticles &&
+        a.premultipliedMap === b.premultipliedMap &&
+        a.particleColor === b.particleColor &&
         a.materialBlendMode === b.materialBlendMode &&
         a.materialTransparent === b.materialTransparent &&
         a.materialDepthTest === b.materialDepthTest &&
@@ -162,6 +197,7 @@ export function shaderKeyEqual(a: StoredBatchSettings, b: StoredBatchSettings): 
         a.applyImageProcessing === b.applyImageProcessing &&
         a.sortMode === b.sortMode &&
         a.renderFace === b.renderFace &&
+        a.renderAlignment === b.renderAlignment &&
         !a.pivot === !b.pivot &&
         hasSizeLimits(a) === hasSizeLimits(b) &&
         a.mapUV?.channel === b.mapUV?.channel &&
@@ -177,11 +213,16 @@ export function shaderKeyEqual(a: StoredBatchSettings, b: StoredBatchSettings): 
 
 /**
  * Whether two canonical settings with the same shader key set the material's uniforms to the
- * same values: the fade distances, alpha cutoff, pivot, size limits, reflection level, rim
- * colour, each effect's parameters and each texture's layout.
+ * same values (or, for the sorting fudge, sort the batch mesh the same): the material colour, the
+ * sorting fudge, the fade distances, alpha cutoff, pivot, size limits,
+ * reflection level, rim colour, each effect's parameters and each texture's layout.
  */
 export function liveParamsEqual(a: StoredBatchSettings, b: StoredBatchSettings): boolean {
     return (
+        colorEqual(a.materialColor, b.materialColor) &&
+        a.materialColor[3] === b.materialColor[3] &&
+        a.materialColorScale === b.materialColorScale &&
+        a.sortingFudge === b.sortingFudge &&
         a.softNearFade === b.softNearFade &&
         a.softFarFade === b.softFarFade &&
         a.materialAlphaTest === b.materialAlphaTest &&

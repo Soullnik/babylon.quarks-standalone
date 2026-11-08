@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
+using UnityEditor;
 using UnityEngine;
 
 namespace BabylonQuarks.UnityExporter.Tests
@@ -29,6 +30,8 @@ namespace BabylonQuarks.UnityExporter.Tests
 
             CheckVersion(root);
             CheckModuleUse(root);
+            CheckLinearProject();
+            CheckCurveEnds();
             foreach (var fixture in Fixtures.All)
             {
                 Debug.Warnings.Clear();
@@ -75,6 +78,90 @@ namespace BabylonQuarks.UnityExporter.Tests
         /// <summary>The exporter's version stays out of the golden files, so a release does not change them.</summary>
         private static string Normalize(string json) =>
             json.Replace(ExporterInfo.Generator, "babylon.quarks Unity exporter {version}") + "\n";
+
+        /// <summary>
+        /// In a Linear project a texture imported as sRGB is written with colorSpace 'srgb', so
+        /// babylon.quarks decodes it as Unity samples it, and one imported with sRGB off is not; a
+        /// Gamma project, the golden files', writes none.
+        /// </summary>
+        private static void CheckLinearProject()
+        {
+            var saved = QualitySettings.activeColorSpace;
+            var srgb = new Regex(@"""colorSpace"":\s*""srgb""");
+            try
+            {
+                QualitySettings.activeColorSpace = ColorSpace.Linear;
+                string decoded = QuarksExporter.Export(Fixtures.All["mesh"]());
+                TextureImporter.LinearPaths.Add("fixtures/spark.png");
+                string asStored = QuarksExporter.Export(Fixtures.All["mesh"]());
+                if (!srgb.IsMatch(decoded) || asStored.Contains("colorSpace"))
+                {
+                    Console.WriteLine("FAIL texture colorSpace: an sRGB texture in a Linear project is written with colorSpace 'srgb', a linear one without.");
+                    _failures++;
+                }
+            }
+            finally
+            {
+                QualitySettings.activeColorSpace = saved;
+                TextureImporter.LinearPaths.Clear();
+            }
+        }
+
+        /// <summary>
+        /// A curve whose keys stop short of 0 or 1 holds its end values there, as Unity reads it.
+        /// The numbers were measured in Unity 6000.6 on one particle with a lifetime of 2 s: Size
+        /// over Lifetime with keys (0.3, 1) (0.7, 0.2), and Rotation over Lifetime Z with keys
+        /// (0, 1) (0.1433, -0.0078) times π rad/s (a web's), which turns the particle
+        /// -0.0245 rad a second from a seventh of its life on.
+        /// </summary>
+        private static void CheckCurveEnds()
+        {
+            var size = new AnimationCurve(new Keyframe(0.3f, 1, 0, 0), new Keyframe(0.7f, 0.2f, 0, 0));
+            var sizeInUnity = new (float age, float value)[]
+            {
+                (0.05f, 1), (0.3f, 1), (0.35f, 0.96563f), (0.4f, 0.875f), (0.45f, 0.74688f), (0.5f, 0.6f),
+                (0.55f, 0.45312f), (0.6f, 0.325f), (0.65f, 0.23438f), (0.7f, 0.2f), (0.95f, 0.2f),
+            };
+            var spin = new AnimationCurve(new Keyframe(0, 1, 0, 0), new Keyframe(0.14325842f, -0.0078f, 0, 0));
+            var spinInUnity = new (float age, float value)[] { (0, Mathf.PI), (0.2f, -0.0245f), (0.95f, -0.0245f) };
+            // Two cycles replay the size curve, holding it on both sides within each half.
+            var sizeTwice = new (float age, float value)[] { (0.1f, 1), (0.25f, 0.6f), (0.45f, 0.2f), (0.55f, 1), (0.75f, 0.6f), (0.95f, 0.2f) };
+
+            CheckCurve("size keys (0.3, 1) (0.7, 0.2)", ValueConverter.Bezier(size, 1), sizeInUnity);
+            CheckCurve("rotation keys (0, 1) (0.1433, -0.0078) x pi", ValueConverter.Bezier(spin, Mathf.PI), spinInUnity);
+            CheckCurve("size keys (0.3, 1) (0.7, 0.2), 2 cycles", ValueConverter.Bezier(size, 1, 2), sizeTwice);
+        }
+
+        private static void CheckCurve(string label, JToken curve, (float age, float value)[] expected)
+        {
+            foreach (var (age, value) in expected)
+            {
+                double actual = EvaluatePiecewiseBezier((JObject)curve, age);
+                if (Math.Abs(actual - value) > 1e-3)
+                {
+                    Console.WriteLine($"FAIL curve {label}: {actual:F5} at {age}, Unity reads {value}.");
+                    _failures++;
+                    return;
+                }
+            }
+        }
+
+        /// <summary>A PiecewiseBezier's value at <paramref name="t"/>, as quarks.core reads it.</summary>
+        private static double EvaluatePiecewiseBezier(JObject curve, double t)
+        {
+            var pieces = ((JArray)Member(curve, "functions")).Items.Cast<JObject>().ToList();
+            double Number(JObject o, string key) => double.Parse(Member(o, key).ToString(), System.Globalization.CultureInfo.InvariantCulture);
+            int index = pieces.FindLastIndex(p => Number(p, "start") <= t);
+            if (index < 0) return Number((JObject)Member(pieces[0], "function"), "p0");
+            double start = Number(pieces[index], "start");
+            double end = index + 1 < pieces.Count ? Number(pieces[index + 1], "start") : 1;
+            double u = end > start ? (t - start) / (end - start) : 0;
+            var fn = (JObject)Member(pieces[index], "function");
+            double v = 1 - u;
+            return v * v * v * Number(fn, "p0") + 3 * v * v * u * Number(fn, "p1") + 3 * v * u * u * Number(fn, "p2") + u * u * u * Number(fn, "p3");
+        }
+
+        private static JToken Member(JObject o, string key) => o.Members.First(m => m.Key == key).Value;
 
         private static void CheckVersion(string root)
         {

@@ -49,7 +49,12 @@ namespace BabylonQuarks.UnityExporter
                 .Set("curve1", Bezier(min, multiplier, cycles))
                 .Set("curve2", Bezier(max, multiplier, cycles));
 
-        /// <summary>AnimationCurve (0..1 time domain) → PiecewiseBezier via Hermite→Bézier per segment.</summary>
+        /// <summary>
+        /// AnimationCurve (0..1 time domain) → PiecewiseBezier via Hermite→Bézier per segment. Unity
+        /// holds the first key's value before it and the last key's value after it; a quarks piece
+        /// runs to the next one's start, the last to 1, so a curve whose keys stop short of 0 or 1
+        /// gets a flat piece there.
+        /// </summary>
         /// <param name="cycles">Replays the curve this many times across 0..1 (a sawtooth for frames).</param>
         public static JToken Bezier(AnimationCurve curve, float multiplier, int cycles = 1)
         {
@@ -68,8 +73,15 @@ namespace BabylonQuarks.UnityExporter
             }
             else
             {
+                Keyframe first = keys[0];
+                Keyframe last = keys[keys.Length - 1];
                 for (int cycle = 0; cycle < cycles; cycle++)
                 {
+                    if (first.time > 0f && last.time > first.time)
+                    {
+                        float v = first.value * multiplier;
+                        functions.Add(BezierPiece(v, v, v, v, (float)cycle / cycles));
+                    }
                     for (int i = 0; i < keys.Length - 1; i++)
                     {
                         Keyframe k0 = keys[i];
@@ -86,6 +98,11 @@ namespace BabylonQuarks.UnityExporter
                         // Control points are in value space, so squeezing a cycle into 1/cycles
                         // of the time range only moves where each piece starts.
                         functions.Add(BezierPiece(p0, p1, p2, p3, (cycle + k0.time) / cycles));
+                    }
+                    if (last.time < 1f && last.time > first.time)
+                    {
+                        float v = last.value * multiplier;
+                        functions.Add(BezierPiece(v, v, v, v, (cycle + last.time) / cycles));
                     }
                 }
                 if (functions.Items.Count == 0)

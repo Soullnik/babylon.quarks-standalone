@@ -85,20 +85,28 @@ describe('by-speed behaviors follow the current speed', () => {
 });
 
 describe('LimitSpeedOverLife dampen', () => {
-    test('removes a third of the excess per step at 60 Hz, as before', () => {
+    test('removes dampen of the excess each 1/30 s, as Unity does', () => {
+        const behavior = new LimitSpeedOverLife(ramp(2, 2), 0.5);
+        const p = particle(5);
+        behavior.initialize(p);
+        behavior.update(p, 1 / 30);
+        expect(p.velocity.x).toBeCloseTo(5 - 3 * 0.5, 5);
+    });
+
+    test('holds the speed at the limit at dampen 1', () => {
         const behavior = new LimitSpeedOverLife(ramp(2, 2), 1);
         const p = particle(5);
         behavior.initialize(p);
         behavior.update(p, 1 / 60);
-        expect(p.velocity.x).toBeCloseTo(5 - 3 / 3, 5);
+        expect(p.velocity.x).toBeCloseTo(2, 5);
     });
 
     test('never reverses the velocity, however long the step', () => {
-        const behavior = new LimitSpeedOverLife(ramp(2, 2), 1);
+        const behavior = new LimitSpeedOverLife(ramp(2, 2), 0.9);
         const p = particle(10);
         behavior.initialize(p);
         behavior.update(p, 0.5);
-        expect(p.velocity.x).toBeGreaterThan(2);
+        expect(p.velocity.x).toBeGreaterThanOrEqual(2);
         expect(p.velocity.x).toBeLessThan(10);
     });
 

@@ -110,9 +110,10 @@ describe('live parameters written in place', () => {
         return ps;
     }
 
-    /** Which render modes a parameter is read in: a camera-facing quad, any non-mesh, or a mesh. */
-    type Reads = 'quad' | 'sprite' | 'mesh';
+    /** Which render modes a parameter is read in: a camera-facing quad, any non-mesh, a mesh, or every one. */
+    type Reads = 'quad' | 'sprite' | 'mesh' | 'all';
     const MODES: Record<Reads, RenderMode[]> = {
+        all: [RenderMode.BillBoard, RenderMode.StretchedBillBoard, RenderMode.Mesh, RenderMode.Trail],
         quad: [RenderMode.BillBoard, RenderMode.StretchedBillBoard],
         sprite: [RenderMode.BillBoard, RenderMode.StretchedBillBoard, RenderMode.Trail],
         mesh: [RenderMode.Mesh],
@@ -121,6 +122,8 @@ describe('live parameters written in place', () => {
     // The reflection level needs a loaded env atlas; batchKey.test.ts checks it is written in place.
     // The UV layouts are written when the material is bound, so these cases test that path.
     const params: Array<[string, Reads, (s: VFXBatchSettings) => void]> = [
+        ['materialColor', 'all', (s) => (s.materialColor = [1, 0.5, 0.25, 0.5])],
+        ['materialColorScale', 'all', (s) => (s.materialColorScale = 2)],
         ['softNearFade', 'sprite', (s) => (s.softNearFade = 0.2)],
         ['softFarFade', 'sprite', (s) => (s.softFarFade = 2)],
         ['materialAlphaTest', 'sprite', (s) => (s.materialAlphaTest = 0.25)],

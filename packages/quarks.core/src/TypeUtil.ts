@@ -8,7 +8,7 @@ export interface Constructable<T> {
  * vector, a generator of some kind, a reference to a mesh or system, an enum (`'emitterMode'`,
  * `'boxEmitFrom'`, `'coneEmitFrom'`, `'gridSampling'`), a shape's local transform
  * (`'shapeTransform'`), the properties a sub emitter inherits (`'subEmitterInherit'`, a list of
- * `SubEmitterInheritance`), and so on.
+ * `SubEmitterInheritance`), a list of collision planes (`'collisionPlanes'`), and so on.
  */
 export type FieldType =
     | 'vec3'
@@ -30,6 +30,7 @@ export type FieldType =
     | 'gridSampling'
     | 'subEmitterInherit'
     | 'shapeTransform'
+    | 'collisionPlanes'
     | 'vec3Func';
 /** A {@link FieldType}, or `'self'` for a field that refers to the system itself. */
 export type ParameterType = FieldType | 'self';

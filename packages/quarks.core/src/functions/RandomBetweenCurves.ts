@@ -44,6 +44,17 @@ export class RandomBetweenCurves implements FunctionValueGenerator {
         memory.push(random());
     }
 
+    /**
+     * Rolls the particle's mix again, in the slot {@link RandomBetweenCurves.startGen} claimed; a
+     * particle that was not rolled for this instance keeps the midway curve.
+     */
+    reroll(memory: GeneratorMemory): void {
+        const slot = this.indexCount;
+        if (slot >= 0 && slot < memory.length) {
+            memory[slot] = random();
+        }
+    }
+
     /** Has both curves sample their tables, as a single curve does; see {@link PiecewiseBezier.refreshTable}. */
     refreshTable(): void {
         this.curve1.refreshTable();

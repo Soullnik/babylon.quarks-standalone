@@ -1,3 +1,4 @@
+import {colorSpaceDeclarationWGSL, particleColorVertexDeclarationWGSL} from './chunks/colorSpace';
 import {fogVertexDeclarationWGSL, fogVertexWGSL} from './chunks/fog';
 import {sheetVertexDeclarationWGSL, sheetVertexWGSL} from './chunks/sheet';
 
@@ -10,7 +11,12 @@ attribute uv: vec2f;
 attribute offset: vec3f;
 attribute color: vec4f;
 attribute size: vec3f;
+#ifdef BILLBOARD_ALIGNED
+// The quad's turn, as a quaternion: the axes it is laid along and its spin about their Z.
+attribute rotation: vec4f;
+#else
 attribute rotation: f32;
+#endif
 attribute uvTile: f32;
 
 // Uniforms
@@ -20,8 +26,17 @@ uniform projection: mat4x4f;
 ${sheetVertexDeclarationWGSL}
 
 #ifdef PIVOT
-// Quad offset in particle-size units: xy in the quad's plane, z toward the camera.
+// Quad offset in particle-size units: xy in the quad's plane, z toward the camera (along the
+// axes' +Z for an aligned quad).
 uniform pivot: vec3f;
+#endif
+
+#ifdef BILLBOARD_ALIGNED
+// v turned by the unit quaternion q.
+fn applyQuaternion(v: vec3f, q: vec4f) -> vec3f {
+    let t = 2.0 * cross(q.xyz, v);
+    return v + q.w * t + cross(q.xyz, t);
+}
 #endif
 
 // Varyings
@@ -41,10 +56,14 @@ varying linearDepth: f32;
 uniform sizeLimits: vec2f;
 #endif
 ${fogVertexDeclarationWGSL}
+${colorSpaceDeclarationWGSL}
+${particleColorVertexDeclarationWGSL}
 @vertex
 fn main(input: VertexInputs) -> FragmentInputs {
+#ifndef BILLBOARD_ALIGNED
     let c = cos(vertexInputs.rotation);
     let s = sin(vertexInputs.rotation);
+#endif
 
 #ifdef SIZE_LIMITS
     // The particle's size on screen as a fraction of the viewport height, held
@@ -63,11 +82,22 @@ fn main(input: VertexInputs) -> FragmentInputs {
     // The pivot turns with the particle but is not mirrored with it.
     alignedPosition += uniforms.pivot.xy * abs(limitedSize.xy);
 #endif
+#ifndef BILLBOARD_ALIGNED
     let rotatedPosition = vec2f(
         c * alignedPosition.x - s * alignedPosition.y,
         s * alignedPosition.x + c * alignedPosition.y);
+#endif
 
-#ifdef HORIZONTAL
+#ifdef BILLBOARD_ALIGNED
+    // The quad in the XY plane of the world's or the emitter's axes, turned into them in the world.
+    var corner = vec3f(alignedPosition, 0.0);
+#ifdef PIVOT
+    corner.z = uniforms.pivot.z * abs(limitedSize.x);
+#endif
+    var mvPosition = uniforms.world * vec4f(vertexInputs.offset, 1.0);
+    mvPosition = vec4f(mvPosition.xyz + applyQuaternion(corner, vertexInputs.rotation), mvPosition.w);
+    mvPosition = uniforms.view * mvPosition;
+#elif defined(HORIZONTAL)
     var mvPosition = uniforms.world * vec4f(vertexInputs.offset, 1.0);
     mvPosition.x += rotatedPosition.x;
     mvPosition.z -= rotatedPosition.y;
@@ -86,7 +116,7 @@ fn main(input: VertexInputs) -> FragmentInputs {
     mvPosition.y += rotatedPosition.y;
 #endif
 #ifdef PIVOT
-#ifndef HORIZONTAL
+#if !defined(HORIZONTAL) && !defined(BILLBOARD_ALIGNED)
     // Toward the camera along its view axis, whichever way the view space
     // faces: anything in front of the camera has the sign of the far side.
     mvPosition.z -= sign(mvPosition.z) * uniforms.pivot.z * abs(limitedSize.x);
@@ -107,6 +137,8 @@ ${sheetVertexWGSL('vertexInputs.uv')}
 #ifdef UV1
     vertexOutputs.vUV1 = vertexInputs.uv;
 #endif
-    vertexOutputs.vColor = vertexInputs.color;
+    // The particle colour, times the material's, comes into the working space here, so it is
+    // interpolated there too.
+    vertexOutputs.vColor = quarksParticleColor(vertexInputs.color);
 }
 `;

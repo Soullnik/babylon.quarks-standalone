@@ -242,6 +242,7 @@ export function particleSystemParametersFromJSON(
         instancingUVs: resolvedGeometry.uvs,
         instancingUVs2: resolvedGeometry.uvs2,
         instancingNormals: resolvedGeometry.normals,
+        instancingColors: resolvedGeometry.colors,
         rendererEmitterSettings,
         texture,
         material,
@@ -249,7 +250,8 @@ export function particleSystemParametersFromJSON(
         blendMode: materialMeta?.alphaMode ?? settings.blendMode ?? Constants.ALPHA_ADD,
         transparent: materialMeta?.transparent ?? settings.transparent ?? true,
         depthTest: materialMeta?.depthTest ?? settings.depthTest ?? true,
-        depthWrite: materialMeta?.depthWrite ?? settings.depthWrite ?? false,
+        // Left out, it follows the surface (the system's default).
+        depthWrite: materialMeta?.depthWrite ?? settings.depthWrite,
         alphaTest: materialMeta?.alphaTest ?? settings.alphaTest ?? 0,
         behaviors: [],
         lighting: materialMeta?.lighting,
@@ -303,6 +305,7 @@ function geometryMeta(system: ParticleSystem, meta: BabylonMetaData): string {
         rs.instancingUVs,
         rs.instancingUVs2,
         rs.instancingNormals,
+        rs.instancingColors,
     ];
     let written = serializedGeometries.get(meta);
     if (written === undefined) {
@@ -325,6 +328,7 @@ function geometryMeta(system: ParticleSystem, meta: BabylonMetaData): string {
         normals: system.rendererSettings.instancingNormals
             ? Array.from(system.rendererSettings.instancingNormals)
             : undefined,
+        ...(rs.instancingColors ? {colors: Array.from(rs.instancingColors)} : {}),
     };
     return geometryUUID;
 }

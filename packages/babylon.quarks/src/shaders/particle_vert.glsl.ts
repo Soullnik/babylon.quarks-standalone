@@ -1,3 +1,4 @@
+import {colorSpaceDeclarationGLSL, particleColorVertexDeclarationGLSL} from './chunks/colorSpace';
 import {fogVertexDeclarationGLSL, fogVertexGLSL} from './chunks/fog';
 import {sheetVertexDeclarationGLSL, sheetVertexGLSL} from './chunks/sheet';
 
@@ -10,7 +11,12 @@ attribute vec2 uv;
 attribute vec3 offset;
 attribute vec4 color;
 attribute vec3 size;
+#ifdef BILLBOARD_ALIGNED
+// The quad's turn, as a quaternion: the axes it is laid along and its spin about their Z.
+attribute vec4 rotation;
+#else
 attribute float rotation;
+#endif
 attribute float uvTile;
 
 // Uniforms
@@ -20,8 +26,17 @@ uniform mat4 projection;
 ${sheetVertexDeclarationGLSL}
 
 #ifdef PIVOT
-// Quad offset in particle-size units: xy in the quad's plane, z toward the camera.
+// Quad offset in particle-size units: xy in the quad's plane, z toward the camera (along the
+// axes' +Z for an aligned quad).
 uniform vec3 pivot;
+#endif
+
+#ifdef BILLBOARD_ALIGNED
+// v turned by the unit quaternion q.
+vec3 applyQuaternion(vec3 v, vec4 q) {
+    vec3 t = 2.0 * cross(q.xyz, v);
+    return v + q.w * t + cross(q.xyz, t);
+}
 #endif
 
 // Varyings
@@ -41,9 +56,13 @@ varying float linearDepth;
 uniform vec2 sizeLimits;
 #endif
 ${fogVertexDeclarationGLSL}
+${colorSpaceDeclarationGLSL}
+${particleColorVertexDeclarationGLSL}
 void main() {
+#ifndef BILLBOARD_ALIGNED
     float c = cos(rotation);
     float s = sin(rotation);
+#endif
 
 #ifdef SIZE_LIMITS
     // The particle's size on screen as a fraction of the viewport height, held
@@ -62,11 +81,22 @@ void main() {
     // The pivot turns with the particle but is not mirrored with it.
     alignedPosition += pivot.xy * abs(limitedSize.xy);
 #endif
+#ifndef BILLBOARD_ALIGNED
     vec2 rotatedPosition;
     rotatedPosition.x = c * alignedPosition.x - s * alignedPosition.y;
     rotatedPosition.y = s * alignedPosition.x + c * alignedPosition.y;
+#endif
 
-#ifdef HORIZONTAL
+#ifdef BILLBOARD_ALIGNED
+    // The quad in the XY plane of the world's or the emitter's axes, turned into them in the world.
+    vec3 corner = vec3(alignedPosition, 0.0);
+#ifdef PIVOT
+    corner.z = pivot.z * abs(limitedSize.x);
+#endif
+    vec4 mvPosition = world * vec4(offset, 1.0);
+    mvPosition.xyz += applyQuaternion(corner, rotation);
+    mvPosition = view * mvPosition;
+#elif defined(HORIZONTAL)
     vec4 mvPosition = world * vec4(offset, 1.0);
     mvPosition.x += rotatedPosition.x;
     mvPosition.z -= rotatedPosition.y;
@@ -84,7 +114,7 @@ void main() {
     mvPosition.xy += rotatedPosition;
 #endif
 #ifdef PIVOT
-#ifndef HORIZONTAL
+#if !defined(HORIZONTAL) && !defined(BILLBOARD_ALIGNED)
     // Toward the camera along its view axis, whichever way the view space
     // faces: anything in front of the camera has the sign of the far side.
     mvPosition.z -= sign(mvPosition.z) * pivot.z * abs(limitedSize.x);
@@ -104,6 +134,8 @@ ${sheetVertexGLSL('uv')}
 #ifdef UV1
     vUV1 = uv;
 #endif
-    vColor = color;
+    // The particle colour, times the material's, comes into the working space here, so it is
+    // interpolated there too.
+    vColor = quarksParticleColor(color);
 }
 `;

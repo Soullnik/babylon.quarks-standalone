@@ -68,7 +68,7 @@ npm run typecheck                              # tsc over sources, tests, the ex
 npm run test:coverage                          # the same suites with the coverage gate (what CI runs)
 npm run docs                                   # TypeDoc API docs
 npm run docs:check                             # renders the API docs of quarks.core and babylon.quarks; fails on a missing TSDoc or broken {@link} (CI runs it)
-npm run check:demos                            # every demo in headless Chromium, fails on page/console errors or a missing gallery preview
+npm run check:demos                            # every demo in headless Chromium, fails on errors, an empty canvas or a missing gallery preview
 npm run validate:shaders                       # every shader variant, GLSL and WGSL, through a real compiler (CI runs it)
 npm run check:allocations                      # what a steady frame allocates, per render mode and behavior; nothing per particle (CI runs it)
 npm run check:pack                             # tarball contents, a consumer project importing them, and each bundle's gzipped size budget (scripts/size-budget.json)
@@ -146,16 +146,35 @@ out of `babylon.quarks`' exports.
 
 ## Adding a demo
 
-1. Create a module in `examples/src/demos/` exporting `init` (and optionally `update`) —
-   see any existing demo for the `DemoContext` shape.
-2. Register it in `examples/src/demoManifest.ts` (key, name, description, tags, preview).
+1. Create a module in `examples/src/demos/` whose `init(ctx)` builds the demo and returns its
+   `update(delta)` and, when it needs clean-up, `dispose()` (`DemoRun` in `examples/src/types.ts`).
+   Keep the demo's state in that closure, add systems with `ctx.add` (or a whole effect with
+   `ctx.addEffect`), name what a feature demo compares with `addCaption` (a title and the setting
+   as code) or `addLabel` (`shared/labels.ts`), and offer switches with `ctx.controls`. A feature
+   demo with several topics builds each under its own node and shows them as a bar of numbered
+   tabs over the scene with `showTopics` (`shared/topics.ts`; digits and Up/Down switch them, and
+   `#Key/Topic` opens a demo on a topic). Draw with the base texture set and the Kenney set
+   (`baseTexture` and `kenneyTexture` in `shared/textures.ts`, greyscale sheets and shapes tinted by
+   the particles' colour, made outside this repository, most of them from Kenney's CC0 particle
+   packs) and stand the demo on `addGround` (`shared/stage.ts`, a floor fading into a sky), mid-dark so additive
+   light and alpha-blended smoke both read. Time comes only from `update`'s `delta`: it pauses,
+   slows down and steps with the viewer. `shared/timing.ts` replays one-shot effects.
+2. Register it in `examples/src/demoManifest.ts`: its section (`showcase` for a finished effect,
+   `features` for a demo of one part of the library), category, description (the viewer's panel
+   shows it), tags and `captureAt`, the second of the demo's time its preview shows.
 3. Run `npm run dev`, verify it works, then capture the gallery preview:
-   `npm run capture:previews` (requires the dev server running; `CHROMIUM_PATH` as above). The
-   gallery shows `examples/public/previews/<key>.png`, and `npm run check:demos` fails on a demo
-   without one.
-   `npm run capture:previews -- --only=YourDemo` captures just the new one.
-4. Add it to the demo table in the root `README.md` and bump the demo count in
-   `packages/babylon.quarks/README.md`.
+   `npm run capture:previews -- --only=YourDemo` (requires the dev server running; `CHROMIUM_PATH`
+   as above). The gallery shows `examples/public/previews/<key>.png`.
+4. Run `npm run docs:demos`: it writes the demo tables and counts of the READMEs and the landing
+   page from the manifest; CI fails when they are out of date.
+
+The effect files the Loading Effects demo loads, `examples/public/effects/*.json`, are written from
+`examples/src/shared/sampleEffects.ts` by `npx tsx scripts/write-sample-effects.mts`, with the
+library built; run it after changing a sample effect.
+
+`npm run check:demos` opens every demo and fails on a page or console error, a demo whose `init`
+does not finish, one that never has a particle alive or leaves the canvas empty, and one without
+its preview.
 
 ## Landing page
 
@@ -186,13 +205,29 @@ visibly.
    `packages/babylon.quarks/package.json` (`quarks.core` takes the same version). If the
    editor changed too, do the same for `packages/babylon.quarks-editor/CHANGELOG.md` and
    `package.json`.
-   - **A new minor moves the editor with it.** The editor imports the library's newest API, so
+   - **The editor's peer follows the library.** The editor imports the library's newest API, so
      its peer dependency on `babylon.quarks` is the library's own minor line, `~X.Y.0`, or the
-     prerelease itself (`~1.0.0-rc.1`); bump it with the library's minor and publish the editor in
-     the same release. The editor stays on 0.x from babylon.quarks 1.0 on, so it bumps its own
-     minor (0.31 with 1.0) rather than taking the library's version. Any change to its peer
-     range is a new editor version (0.31.1 with 1.0.0), since npm cannot republish one.
+     prerelease itself (`~1.0.0-rc.2`); when the library moves to a new minor or a new
+     prerelease, move the peer with it and publish the editor in the same release.
      `npm run check:pack` fails when the peer is out of step.
+   - **The editor keeps its own 0.x line**, versioned by what a project that depends on it with
+     `^0.Y.0` would get. On 0.x, `^` takes patches only, so a patch reaches every such project on
+     its next install and must not be able to break one:
+
+     | The editor's change                                       | Its version                           |
+     | --------------------------------------------------------- | ------------------------------------- |
+     | Fixes only, the peer range unchanged                      | patch (0.31.0 → 0.31.1)               |
+     | The peer range widened (it accepts more library versions) | patch                                 |
+     | New features                                              | minor (0.31 → 0.32)                   |
+     | The peer range narrowed (it needs a newer library)        | minor                                 |
+     | A breaking change to its own API                          | minor (on 0.x the minor is the major) |
+
+     A narrower peer is a minor even with no code change: a project still on the older library
+     would take it as a patch and fail to install (npm's peer conflict). So the editor of
+     babylon.quarks 1.0.0-rc.2 is 0.32.0, and the editor of 1.0.0 (`~1.0.0` leaves the release
+     candidates out) is a new minor too. The editor takes semver's 1.0.0 once its own API is
+     settled; npm cannot republish a version, so any change at all is a new one.
+
    - **The Unity exporter takes every version.** Set the library's version in
      `tools/unity-quarks-exporter/package.json` and `ExporterInfo.Version`
      (`tools/unity-quarks-exporter/Editor/ExporterInfo.cs`), and add a

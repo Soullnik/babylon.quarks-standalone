@@ -3,18 +3,17 @@
     <head>
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <title>Babylon.quarks — High-Performance Particle System &amp; VFX for Babylon.js</title>
+        <title>Babylon.quarks — Particle System &amp; VFX for Babylon.js</title>
         <meta
             name="description"
-            content="Babylon.quarks is a high-performance, GPU-batched particle system and VFX library for Babylon.js: trails, mesh particles, sub-emitters, 20+ behaviors, a Shuriken-style visual editor, WebGL &amp; WebGPU support, and a Unity effect exporter. Open-source, MIT, TypeScript-first."
+            content="Babylon.quarks is a GPU-batched particle system and VFX library for Babylon.js: trails, beams, mesh particles, sub-emitters, 25 Shuriken-style behaviors, a browser effect editor, WebGL 2 and WebGPU, and a Unity effect exporter. Open source, MIT, TypeScript."
         />
         <meta
             name="keywords"
             content="babylon.js particles, babylonjs particle system, babylon vfx, gpu particles, babylon.js particle library, three.quarks babylon, webgpu particles, particle editor"
         />
         <meta name="author" content="Soullnik" />
-        <meta name="theme-color" content="#f4f5f8" media="(prefers-color-scheme: light)" />
-        <meta name="theme-color" content="#0a0c11" media="(prefers-color-scheme: dark)" />
+        <meta name="theme-color" content="#0b0d12" />
         <link rel="canonical" href="https://soullnik.github.io/babylon.quarks-standalone/" />
         <link rel="icon" type="image/png" href="./logo.png" />
         <link rel="icon" href="./favicon.ico" sizes="any" />
@@ -23,10 +22,10 @@
         <!-- Open Graph -->
         <meta property="og:type" content="website" />
         <meta property="og:site_name" content="Babylon.quarks" />
-        <meta property="og:title" content="Babylon.quarks — High-Performance Particle System for Babylon.js" />
+        <meta property="og:title" content="Babylon.quarks — Particle System for Babylon.js" />
         <meta
             property="og:description"
-            content="GPU-batched particle system &amp; VFX library for Babylon.js — trails, mesh particles, sub-emitters, 20+ behaviors, a Shuriken-style visual editor, WebGL &amp; WebGPU, and a Unity exporter."
+            content="GPU-batched particle system and VFX library for Babylon.js: trails, mesh particles, sub-emitters, 25 behaviors, a Shuriken-style browser editor, WebGL 2 and WebGPU, and a Unity exporter."
         />
         <meta property="og:url" content="https://soullnik.github.io/babylon.quarks-standalone/" />
         <meta property="og:image" content="https://soullnik.github.io/babylon.quarks-standalone/og-image.png" />
@@ -35,10 +34,10 @@
 
         <!-- Twitter -->
         <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:title" content="Babylon.quarks — High-Performance Particle System for Babylon.js" />
+        <meta name="twitter:title" content="Babylon.quarks — Particle System for Babylon.js" />
         <meta
             name="twitter:description"
-            content="GPU-batched particle system &amp; VFX library for Babylon.js with a Shuriken-style visual editor, WebGL/WebGPU, and a Unity exporter."
+            content="GPU-batched particle system and VFX library for Babylon.js with a Shuriken-style browser editor, WebGL 2 and WebGPU, and a Unity exporter."
         />
         <meta name="twitter:image" content="https://soullnik.github.io/babylon.quarks-standalone/og-image.png" />
 
@@ -47,7 +46,7 @@
                 "@context": "https://schema.org",
                 "@type": "SoftwareApplication",
                 "name": "Babylon.quarks",
-                "description": "A high-performance, GPU-batched particle system and VFX library for Babylon.js, with a Shuriken-style visual effect editor, WebGL and WebGPU rendering, and a Unity effect exporter.",
+                "description": "A GPU-batched particle system and VFX library for Babylon.js, with a Shuriken-style visual effect editor, WebGL and WebGPU rendering, and a Unity effect exporter.",
                 "applicationCategory": "DeveloperApplication",
                 "operatingSystem": "Web",
                 "url": "https://soullnik.github.io/babylon.quarks-standalone/",
@@ -71,79 +70,39 @@
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
         <link
             rel="stylesheet"
-            href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap"
+            href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&family=JetBrains+Mono:wght@400;500&display=swap"
         />
         <link rel="stylesheet" href="./src/landing/landing.css" />
     </head>
     <body>
         <a class="skip-link" href="#main">Skip to content</a>
-        <header class="site-header">
-            <div class="wrap header-row">
+        <header class="masthead">
+            <div class="wrap masthead-row">
                 <a class="brand" href="./" aria-label="Babylon.quarks home">
-                    <img src="./logo.png" width="28" height="28" alt="" />
-                    <span class="brand-name">Babylon.quarks</span>
-                    <span class="brand-version">v%VITE_QUARKS_VERSION%</span>
+                    <span class="brand-mark"><img src="./logo-mark.png" width="286" height="200" alt="" /></span>
+                    <span class="brand-name">babylon.quarks</span>
+                    <span class="brand-version">%VITE_QUARKS_VERSION%</span>
                 </a>
                 <nav id="site-nav" class="site-nav" aria-label="Main" data-open="false">
                     <a href="#get-started">Get started</a>
-                    <a href="#demos">Examples</a>
+                    <a href="#demos">Demos</a>
                     <a href="./editor.html">Editor</a>
-                    <a href="https://soullnik.github.io/babylon.quarks-standalone/docs/">Docs</a>
+                    <a href="https://soullnik.github.io/babylon.quarks-standalone/docs/">API docs</a>
                     <a href="./benchmark.html">Benchmark</a>
                     <a
-                        class="nav-icon"
                         href="https://github.com/Soullnik/babylon.quarks-standalone"
                         target="_blank"
                         rel="noopener noreferrer"
-                        ><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
-                            <path
-                                fill="currentColor"
-                                d="M12 .5a11.5 11.5 0 0 0-3.64 22.41c.58.1.79-.25.79-.56v-2.17c-3.2.7-3.88-1.36-3.88-1.36-.52-1.33-1.28-1.69-1.28-1.69-1.05-.71.08-.7.08-.7 1.16.08 1.77 1.19 1.77 1.19 1.03 1.77 2.7 1.26 3.36.96.1-.75.4-1.26.73-1.55-2.55-.29-5.24-1.28-5.24-5.69 0-1.26.45-2.29 1.19-3.09-.12-.29-.52-1.46.11-3.05 0 0 .97-.31 3.17 1.18a10.9 10.9 0 0 1 5.77 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.76.11 3.05.74.8 1.19 1.83 1.19 3.09 0 4.42-2.7 5.4-5.26 5.68.41.36.78 1.06.78 2.14v3.17c0 .31.21.67.8.56A11.5 11.5 0 0 0 12 .5Z"
-                            /></svg
-                        ><span>GitHub</span></a
+                        ><span class="icon" data-brand="github" aria-hidden="true"></span>GitHub</a
                     >
-                    <a
-                        class="nav-icon"
-                        href="https://www.npmjs.com/package/babylon.quarks"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        ><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
-                            <path
-                                fill="currentColor"
-                                d="M1.76 0C.79 0 0 .79 0 1.76v20.48C0 23.21.79 24 1.76 24h20.48c.97 0 1.76-.79 1.76-1.76V1.76C24 .79 23.21 0 22.24 0H1.76Zm3.37 5.32 13.84.02-.01 13.84h-3.46l.01-10.39h-3.46l-.01 10.38H5.11l.02-13.85Z"
-                            /></svg
-                        ><span>npm</span></a
+                    <a href="https://www.npmjs.com/package/babylon.quarks" target="_blank" rel="noopener noreferrer"
+                        ><span class="icon" data-brand="npm" aria-hidden="true"></span>npm</a
                     >
                 </nav>
-                <div class="header-tools">
+                <div class="masthead-tools">
                     <button class="icon-button" type="button" data-theme-toggle aria-label="Switch theme">
-                        <svg class="i-system" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
-                            <path
-                                fill="none"
-                                stroke="currentColor"
-                                stroke-width="1.8"
-                                d="M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18Zm0 0v18"
-                            />
-                            <path fill="currentColor" d="M12 3a9 9 0 0 1 0 18Z" />
-                        </svg>
-                        <svg class="i-light" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
-                            <circle cx="12" cy="12" r="4.2" fill="none" stroke="currentColor" stroke-width="1.8" />
-                            <path
-                                stroke="currentColor"
-                                stroke-width="1.8"
-                                stroke-linecap="round"
-                                d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M5.3 18.7l1.6-1.6M17.1 6.9l1.6-1.6"
-                            />
-                        </svg>
-                        <svg class="i-dark" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
-                            <path
-                                fill="none"
-                                stroke="currentColor"
-                                stroke-width="1.8"
-                                stroke-linejoin="round"
-                                d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5Z"
-                            />
-                        </svg>
+                        <i data-lucide="sun" class="icon i-light" aria-hidden="true"></i>
+                        <i data-lucide="moon" class="icon i-dark" aria-hidden="true"></i>
                     </button>
                     <button
                         class="icon-button menu-button"
@@ -153,142 +112,241 @@
                         aria-expanded="false"
                         aria-label="Menu"
                     >
-                        <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
-                            <path
-                                stroke="currentColor"
-                                stroke-width="1.8"
-                                stroke-linecap="round"
-                                d="M4 7h16M4 12h16M4 17h16"
-                            />
-                        </svg>
+                        <i data-lucide="menu" class="icon i-menu" aria-hidden="true"></i>
+                        <i data-lucide="x" class="icon i-close" aria-hidden="true"></i>
                     </button>
                 </div>
             </div>
         </header>
 
         <main id="main">
-            <section class="hero">
-                <div class="wrap hero-grid">
-                    <div class="hero-copy">
-                        <p class="eyebrow">Particle system &amp; VFX for Babylon.js</p>
-                        <h1>Game-ready particle effects for Babylon.js</h1>
-                        <p class="lead">
-                            Billboards, trails, beams and mesh particles, driven by Shuriken-style modules and drawn
-                            through one batched renderer on WebGL and WebGPU. Author effects in the visual editor or
-                            export them from Unity, then load them with a single call.
-                        </p>
-                        <div class="install" role="group" aria-label="Install">
-                            <code
-                                ><span class="prompt" aria-hidden="true">$</span>
-                                <span id="install-cmd">npm i babylon.quarks</span></code
-                            >
-                            <button type="button" class="copy" data-copy-target="install-cmd">Copy</button>
+            <!-- The hero: the live effect, the facts, and the breakdown of what the effect is made of. -->
+            <section id="hero" class="sheet hero" aria-labelledby="hero-title">
+                <div class="wrap">
+                    <div class="hero-grid">
+                        <h1 id="hero-title" class="hero-title">Unity-style particle effects for Babylon.js</h1>
+
+                        <div class="hero-copy">
+                            <p class="lead">
+                                A GPU-batched particle system with Shuriken's modules, one
+                                <code>BatchedRenderer</code> per scene, WebGL 2 and WebGPU. Build effects in the browser
+                                editor, export them from Unity, or write them in TypeScript.
+                            </p>
+                            <div class="install" role="group" aria-label="Install">
+                                <code
+                                    ><span class="prompt" aria-hidden="true">$</span>
+                                    <span id="install-cmd">npm i babylon.quarks</span></code
+                                >
+                                <button type="button" class="copy" data-copy-target="install-cmd">
+                                    <span class="copy-label">Copy</span>
+                                </button>
+                            </div>
+                            <ul class="hero-links">
+                                <li><a class="arrow-link" href="#get-started">Get started</a></li>
+                                <li><a class="arrow-link" href="./editor.html">Open the editor</a></li>
+                                <li>
+                                    <a class="arrow-link" href="#demos"
+                                        ><span
+                                            ><span data-count="demos"><!-- demos:count -->31<!-- /demos:count --></span>
+                                            live demos</span
+                                        ></a
+                                    >
+                                </li>
+                            </ul>
                         </div>
-                        <div class="cta-row">
-                            <a class="button primary" href="#get-started">Get started</a>
-                            <a class="button" href="./editor.html">Open the editor</a>
-                            <a class="button ghost" href="#demos"
-                                ><span><span data-count="demos">27</span> live demos</span></a
-                            >
-                        </div>
+
+                        <figure class="stage hero-side" data-stage>
+                            <div class="stage-bar" role="toolbar" aria-label="Choose an effect">
+                                <button type="button" data-effect="vortex" aria-pressed="true">Vortex</button>
+                                <button type="button" data-effect="electric" aria-pressed="false" tabindex="-1">
+                                    Electric ball
+                                </button>
+                                <button type="button" data-effect="levelUp" aria-pressed="false" tabindex="-1">
+                                    Level-up
+                                </button>
+                                <button type="button" data-effect="blackHole" aria-pressed="false" tabindex="-1">
+                                    Black hole
+                                </button>
+                            </div>
+                            <div class="stage-frame">
+                                <span class="reg" aria-hidden="true"></span><span class="reg" aria-hidden="true"></span
+                                ><span class="reg" aria-hidden="true"></span
+                                ><span class="reg" aria-hidden="true"></span>
+                                <div class="window stage-view">
+                                    <img
+                                        class="stage-poster"
+                                        src="./landing/stage-poster.jpg"
+                                        width="1200"
+                                        height="750"
+                                        alt=""
+                                        aria-hidden="true"
+                                    />
+                                    <canvas role="img" aria-label="Live babylon.quarks effect: Vortex."></canvas>
+                                    <button type="button" class="stage-play" data-stage-play hidden>
+                                        <i data-lucide="play" class="icon" aria-hidden="true"></i>Play the live effect
+                                    </button>
+                                </div>
+                                <!-- The logo's rings round the window, drawn by orbits.ts: only the ring outside
+                                     the window, over its frame line. -->
+                                <svg class="orbit" aria-hidden="true" focusable="false"></svg>
+                            </div>
+                            <div class="stage-hud">
+                                <span class="stat"
+                                    ><span class="stat-label">engine</span> <b data-stat="engine">—</b></span
+                                >
+                                <span class="stat"
+                                    ><span class="stat-label">particles</span> <b data-stat="particles">—</b></span
+                                >
+                                <span class="stat"><span class="stat-label">fps</span> <b data-stat="fps">—</b></span>
+                                <span class="stage-actions">
+                                    <a data-stage-demo href="#demos">All demos</a>
+                                    <button type="button" data-stage-editor>Open in editor</button>
+                                </span>
+                            </div>
+                        </figure>
                     </div>
 
-                    <figure class="stage" data-stage>
-                        <div class="stage-bar" role="toolbar" aria-label="Choose an effect">
-                            <button type="button" data-effect="vortex" aria-pressed="true">Vortex</button>
-                            <button type="button" data-effect="electric" aria-pressed="false" tabindex="-1">
-                                Electric ball
-                            </button>
-                            <button type="button" data-effect="weapons" aria-pressed="false" tabindex="-1">
-                                Weapon trails
-                            </button>
-                            <button type="button" data-effect="explosion" aria-pressed="false" tabindex="-1">
-                                Unity explosion
-                            </button>
-                            <button type="button" data-effect="forces" aria-pressed="false" tabindex="-1">
-                                Force space
-                            </button>
-                        </div>
-                        <div class="stage-view">
-                            <img
-                                class="stage-poster"
-                                src="./landing/stage-poster.jpg"
-                                width="1200"
-                                height="750"
-                                alt=""
-                                aria-hidden="true"
-                            />
-                            <canvas role="img" aria-label="Live babylon.quarks effect: Vortex."></canvas>
-                            <button type="button" class="stage-play" data-stage-play hidden>
-                                Play the live effect
-                            </button>
-                        </div>
-                        <div class="stage-hud">
-                            <span class="stat"><span class="stat-label">Engine</span> <b data-stat="engine">—</b></span>
-                            <span class="stat"
-                                ><span class="stat-label">Particles</span> <b data-stat="particles">—</b></span
-                            >
-                            <span class="stat"><span class="stat-label">FPS</span> <b data-stat="fps">—</b></span>
-                            <span class="stage-actions">
-                                <a data-stage-demo href="#demos">All demos</a>
-                                <button type="button" data-stage-editor>Open in editor</button>
-                            </span>
-                        </div>
-                    </figure>
-                </div>
-
-                <div class="wrap">
-                    <dl class="facts">
+                    <dl class="spec" aria-label="Library facts">
                         <div>
                             <dt>Render modes</dt>
                             <dd>7</dd>
                         </div>
                         <div>
                             <dt>Behaviors</dt>
-                            <dd data-count="behaviors">23</dd>
+                            <dd data-count="behaviors">25</dd>
                         </div>
                         <div>
                             <dt>Emitter shapes</dt>
                             <dd data-count="shapes">11</dd>
                         </div>
                         <div>
-                            <dt>Shader languages</dt>
+                            <dt>Shaders</dt>
                             <dd>GLSL + WGSL</dd>
                         </div>
                         <div>
-                            <dt>Babylon.js</dt>
-                            <dd>9+</dd>
+                            <dt>Peer</dt>
+                            <dd>@babylonjs/core ^9.24</dd>
                         </div>
                         <div>
                             <dt>License</dt>
                             <dd>MIT</dd>
                         </div>
+                        <div>
+                            <dt>Version</dt>
+                            <dd>%VITE_QUARKS_VERSION%</dd>
+                        </div>
                     </dl>
+
+                    <div class="breakdown" id="breakdown" data-breakdown>
+                        <div class="breakdown-head">
+                            <h2 data-breakdown-title>What the Vortex is made of</h2>
+                            <p data-breakdown-lead>
+                                Seven systems under one renderer, around 400 particles alive, a handful of instanced
+                                draws. Move the pointer over the window: the dust leans toward it and the last layer
+                                sheds trails along its path.
+                            </p>
+                            <p class="breakdown-source" data-breakdown-source>
+                                Source:
+                                <a
+                                    href="https://github.com/Soullnik/babylon.quarks-standalone/blob/main/examples/src/landing/vortex.ts"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    >examples/src/landing/vortex.ts</a
+                                >. “Open in editor” loads the same seven systems.
+                            </p>
+                        </div>
+                        <ol class="layers" data-breakdown-layers>
+                            <li>
+                                <span class="layer-no">0</span>
+                                <span class="layer-name">Nebula</span>
+                                <span class="layer-mode">Billboard · alpha blend · SphereEmitter r&nbsp;22</span>
+                                <span class="layer-behaviors">ColorOverLife, RotationOverLife, Noise</span>
+                            </li>
+                            <li>
+                                <span class="layer-no">1</span>
+                                <span class="layer-name">Core glow</span>
+                                <span class="layer-mode">Billboard · additive · PointEmitter</span>
+                                <span class="layer-behaviors">ColorOverLife, SizeOverLife</span>
+                            </li>
+                            <li>
+                                <span class="layer-no">2</span>
+                                <span class="layer-name">Core heart</span>
+                                <span class="layer-mode">Billboard · additive · PointEmitter</span>
+                                <span class="layer-behaviors">ColorOverLife, SizeOverLife</span>
+                            </li>
+                            <li>
+                                <span class="layer-no">3</span>
+                                <span class="layer-name">Accretion disk</span>
+                                <span class="layer-mode">Billboard · additive · DonutEmitter r&nbsp;7</span>
+                                <span class="layer-behaviors">ColorOverLife, OrbitOverLife, GravityForce</span>
+                            </li>
+                            <li>
+                                <span class="layer-no">4</span>
+                                <span class="layer-name">Comet ribbons</span>
+                                <span class="layer-mode">Trail, 60 segments · additive · DonutEmitter r&nbsp;10.3</span>
+                                <span class="layer-behaviors"
+                                    >ColorOverLife, OrbitOverLife, GravityForce, WidthOverLength</span
+                                >
+                            </li>
+                            <li>
+                                <span class="layer-no">5</span>
+                                <span class="layer-name">Stardust</span>
+                                <span class="layer-mode">Stretched billboard · additive · SphereEmitter r&nbsp;18</span>
+                                <span class="layer-behaviors"
+                                    >ColorOverLife, TurbulenceField, LimitSpeedOverLife, ApplyForce toward the
+                                    pointer</span
+                                >
+                            </li>
+                            <li>
+                                <span class="layer-no">6</span>
+                                <span class="layer-name">Cursor comets</span>
+                                <span class="layer-mode"
+                                    >Trail, 40 segments · additive · PointEmitter at the pointer</span
+                                >
+                                <span class="layer-behaviors"
+                                    >InheritVelocity, GravityForce, OrbitOverLife, LimitSpeedOverLife, WidthOverLength;
+                                    emission rate from pointer speed</span
+                                >
+                            </li>
+                        </ol>
+                        <p class="layers-more">
+                            <button type="button" class="text-button" data-layers-all>Show all 7 layers</button>
+                        </p>
+                    </div>
                 </div>
             </section>
 
-            <section id="features" class="section" aria-labelledby="features-title">
+            <!-- The modules, as a band with the page's one shaped transition. -->
+            <section id="features" class="sheet band" aria-labelledby="features-title">
                 <div class="wrap">
-                    <header class="section-head">
-                        <p class="eyebrow">What's in the box</p>
-                        <h2 id="features-title">Modules you already know from Unity</h2>
-                        <p class="section-lead">
-                            Every system is a stack of modules in Shuriken's order: emission, shape, behaviors over life
-                            and speed, sub-emitters, texture sheet and renderer. If you have built an effect in Unity,
-                            you know where everything is.
+                    <header class="sheet-head">
+                        <h2 id="features-title">The modules, in Shuriken's order</h2>
+                        <p class="sheet-lead">
+                            A system is the same stack as Unity's inspector: main settings, emission, shape, behaviors
+                            over life and by speed, forces, collision, sub-emitters, texture sheet, trails, renderer.
+                            The
+                            <a
+                                href="https://github.com/Soullnik/babylon.quarks-standalone/blob/main/docs/SHURIKEN_PARITY.md"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                >parity checklist</a
+                            >
+                            lists what is shipped and what is not.
                         </p>
                     </header>
 
-                    <div class="bento">
-                        <article class="tile tile-wide">
-                            <div class="tile-text">
-                                <p class="module"><span class="tick" aria-hidden="true"></span>Renderer</p>
-                                <h3>Batched rendering</h3>
+                    <ol class="rows">
+                        <li class="row">
+                            <div class="row-text">
+                                <h3>One batched renderer per scene</h3>
                                 <p>
                                     Systems that share a material are drawn together, so a screen full of muzzle
-                                    flashes, hits and auras costs a handful of draw calls instead of one per system.
+                                    flashes, hits and auras costs a handful of draw calls instead of one per system. The
+                                    simulation runs on a column store with compiled behavior passes; on a CPU-only
+                                    NullEngine, 100 000 particles over 16 emitters step in 9 ms where Babylon's built-in
+                                    <code>ParticleSystem</code> takes 58 ms.
                                 </p>
-                                <a class="tile-link" href="./benchmark.html">Compare with Babylon's built-in systems</a>
+                                <a class="arrow-link" href="./benchmark.html">Run the benchmark in your browser</a>
                             </div>
                             <img
                                 src="./previews/muzzle-flash.png"
@@ -297,15 +355,17 @@
                                 width="640"
                                 height="360"
                             />
-                        </article>
-
-                        <article class="tile">
-                            <div class="tile-text">
-                                <p class="module"><span class="tick" aria-hidden="true"></span>Trails</p>
+                        </li>
+                        <li class="row">
+                            <div class="row-text">
                                 <h3>Trails, ribbons and beams</h3>
                                 <p>
-                                    Ribbon trails with width over length, texture modes and world-space history, plus a
-                                    beam mode for lightning, tethers and lasers.
+                                    <code>RenderMode.Trail</code> draws a ribbon through a particle's past positions,
+                                    with <code>WidthOverLength</code>, texture modes (stretch, tile, repeat per
+                                    segment), curve tension and world-space history. <code>RenderMode.Beam</code> is for
+                                    lightning, tethers and lasers. Trails can be shed from the surface of a mesh through
+                                    <code>MeshSurfaceEmitter</code>, and a teleporting emitter clears its history with
+                                    <code>clearTrails()</code>.
                                 </p>
                             </div>
                             <img
@@ -315,76 +375,51 @@
                                 width="640"
                                 height="360"
                             />
-                        </article>
-
-                        <article class="tile">
-                            <div class="tile-text">
-                                <p class="module"><span class="tick" aria-hidden="true"></span>Mesh</p>
-                                <h3>Mesh particles</h3>
+                        </li>
+                        <li class="row">
+                            <div class="row-text">
+                                <h3><span data-count="behaviors">25</span> behaviors</h3>
                                 <p>
-                                    Instance any mesh as a particle, lit or unlit, or spawn particles across the surface
-                                    of a mesh.
+                                    Each is a class you add to a system; curves are <code>PiecewiseBezier</code>,
+                                    gradients are <code>Gradient</code>, and any of them can be random between two. Your
+                                    own behaviors register through the plugin API and save in the same JSON.
                                 </p>
+                                <ul class="behavior-list" aria-label="Some of the behaviors">
+                                    <li>ColorOverLife</li>
+                                    <li>SizeOverLife</li>
+                                    <li>RotationOverLife</li>
+                                    <li>FrameOverLife</li>
+                                    <li>VelocityOverLife</li>
+                                    <li>OrbitOverLife</li>
+                                    <li>LimitSpeedOverLife</li>
+                                    <li>ColorBySpeed</li>
+                                    <li>SizeBySpeed</li>
+                                    <li>Noise</li>
+                                    <li>TurbulenceField</li>
+                                    <li>GravityForce</li>
+                                    <li>ApplyForce</li>
+                                    <li>InheritVelocity</li>
+                                    <li>ApplyCollision</li>
+                                    <li>WidthOverLength</li>
+                                    <li>EmitSubParticleSystem</li>
+                                </ul>
                             </div>
                             <img
-                                src="./previews/mesh-material.png"
-                                alt="Mesh particles with an environment map"
+                                src="./previews/noise.png"
+                                alt="Particles bent by a noise field"
                                 loading="lazy"
                                 width="640"
                                 height="360"
                             />
-                        </article>
-
-                        <article class="tile">
-                            <div class="tile-text">
-                                <p class="module"><span class="tick" aria-hidden="true"></span>Sub Emitters</p>
-                                <h3>Sub-emitters</h3>
+                        </li>
+                        <li class="row">
+                            <div class="row-text">
+                                <h3>Texture effects inside the particle shader</h3>
                                 <p>
-                                    Spawn a whole system when a particle is born or dies, or for every frame it lives.
-                                </p>
-                            </div>
-                            <img
-                                src="./previews/sub-emitter.png"
-                                alt="Particles spawning secondary systems as they die"
-                                loading="lazy"
-                                width="640"
-                                height="360"
-                            />
-                        </article>
-
-                        <article class="tile tile-list">
-                            <div class="tile-text">
-                                <p class="module"><span class="tick" aria-hidden="true"></span>Behaviors</p>
-                                <h3><span data-count="behaviors">23</span> behaviors</h3>
-                                <p>Over lifetime, by speed, and forces. Register your own through the plugin API.</p>
-                            </div>
-                            <ul class="behavior-list">
-                                <li>ColorOverLife</li>
-                                <li>SizeOverLife</li>
-                                <li>RotationOverLife</li>
-                                <li>FrameOverLife</li>
-                                <li>ColorBySpeed</li>
-                                <li>SizeBySpeed</li>
-                                <li>Noise</li>
-                                <li>TurbulenceField</li>
-                                <li>GravityForce</li>
-                                <li>OrbitOverLife</li>
-                                <li>LimitSpeedOverLife</li>
-                                <li>InheritVelocity</li>
-                                <li>ApplyCollision</li>
-                                <li>WidthOverLength</li>
-                                <li>EmitSubParticleSystem</li>
-                            </ul>
-                        </article>
-
-                        <article class="tile tile-wide tile-flip">
-                            <div class="tile-text">
-                                <p class="module"><span class="tick" aria-hidden="true"></span>Shading</p>
-                                <h3>Texture effects in the particle shader</h3>
-                                <p>
-                                    Gradient maps, erosion, UV distortion, soft particles and flipbooks, with blend
-                                    modes that treat alpha as coverage the way Unity URP does. Each is off until you set
-                                    it and costs nothing when unused.
+                                    Flipbooks with frame blending, gradient maps, alpha erosion, UV distortion, soft
+                                    particles, per-texture tiling, offset and scroll, and blend modes that treat alpha
+                                    as coverage the way Unity's particle shaders do. Each one is off until you set it
+                                    and compiles nothing when unused.
                                 </p>
                             </div>
                             <img
@@ -394,158 +429,112 @@
                                 width="640"
                                 height="360"
                             />
-                        </article>
-
-                        <article class="tile">
-                            <div class="tile-text">
-                                <p class="module"><span class="tick" aria-hidden="true"></span>Lifecycle</p>
-                                <h3>Pools and timelines</h3>
-                                <p>
-                                    <code>EffectPool</code> reuses one-shot hits without allocating;
-                                    <code>QuarksPrefab</code> sequences systems on a timeline.
-                                </p>
-                            </div>
-                        </article>
-
-                        <article class="tile">
-                            <div class="tile-text">
-                                <p class="module"><span class="tick" aria-hidden="true"></span>WebGPU</p>
-                                <h3>Native WGSL</h3>
-                                <p>
-                                    Every GLSL shader has a WGSL twin, so WebGPU never downloads a shader transpiler.
-                                    Both languages are compiled in CI for every variant.
-                                </p>
-                            </div>
-                        </article>
-
-                        <article class="tile">
-                            <div class="tile-text">
-                                <p class="module"><span class="tick" aria-hidden="true"></span>Format</p>
-                                <h3>A versioned JSON format</h3>
-                                <p>
-                                    Effects save as documented JSON that round-trips through the loader, the editor and
-                                    the Unity exporter.
-                                </p>
-                                <a
-                                    class="tile-link"
-                                    href="https://github.com/Soullnik/babylon.quarks-standalone/blob/main/docs/FORMAT.md"
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    >Read the format spec</a
-                                >
-                            </div>
-                        </article>
-                    </div>
-                </div>
-            </section>
-
-            <section id="workflow" class="section section-alt" aria-labelledby="workflow-title">
-                <div class="wrap">
-                    <header class="section-head">
-                        <p class="eyebrow">Workflow</p>
-                        <h2 id="workflow-title">From authoring tool to your scene</h2>
-                    </header>
-                    <ol class="pipeline">
-                        <li>
-                            <span class="step-index">1</span>
-                            <h3>Author</h3>
-                            <p>
-                                Build the effect in the
-                                <a href="./editor.html">effect editor</a> or in Unity's Particle System, then run the
-                                <a href="#unity">Unity exporter</a>.
-                            </p>
-                        </li>
-                        <li>
-                            <span class="step-index">2</span>
-                            <h3>Export JSON</h3>
-                            <p>One self-contained file per effect, textures embedded or referenced by URL.</p>
-                        </li>
-                        <li>
-                            <span class="step-index">3</span>
-                            <h3>Load</h3>
-                            <p>
-                                <code>QuarksLoader</code> resolves textures and meshes once and shares them across
-                                effects.
-                            </p>
-                        </li>
-                        <li>
-                            <span class="step-index">4</span>
-                            <h3>Render</h3>
-                            <p><code>BatchedRenderer</code> simulates and draws every system in the scene.</p>
                         </li>
                     </ol>
+
+                    <ul class="row-strip">
+                        <li>
+                            <h3>Mesh particles</h3>
+                            <p>
+                                Any mesh as a particle, lit or unlit, with vertex colours, a rotation axis per particle
+                                and rim lighting; or emission from a mesh's surface with
+                                <code>MeshSurfaceEmitter</code>.
+                            </p>
+                        </li>
+                        <li>
+                            <h3>Sub-emitters</h3>
+                            <p>
+                                <code>EmitSubParticleSystem</code> spawns a whole system when a particle is born or
+                                dies, or for every frame it lives, inheriting what you choose from the parent.
+                            </p>
+                        </li>
+                        <li>
+                            <h3>Pools and timelines</h3>
+                            <p>
+                                <code>EffectPool</code> keeps copies of a one-shot effect ready so playing one allocates
+                                nothing. <code>QuarksPrefab</code> sequences systems on a timeline.
+                            </p>
+                        </li>
+                        <li>
+                            <h3>GLSL and WGSL, both hand-written</h3>
+                            <p>
+                                Every shader has a WGSL twin, so WebGPU never loads a transpiler. CI compiles every
+                                variant of both languages on each change.
+                            </p>
+                        </li>
+                        <li>
+                            <h3>A documented JSON format</h3>
+                            <p>
+                                Versioned JSON with a published schema. The same file round-trips through
+                                <code>QuarksLoader</code>, the editor and the Unity exporter; files from quarks.art load
+                                too.
+                            </p>
+                            <a
+                                class="arrow-link"
+                                href="https://github.com/Soullnik/babylon.quarks-standalone/blob/main/docs/FORMAT.md"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                >Format specification</a
+                            >
+                        </li>
+                    </ul>
                 </div>
             </section>
 
-            <section id="get-started" class="section" aria-labelledby="start-title">
-                <div class="wrap start-grid">
-                    <header class="section-head">
-                        <p class="eyebrow">Get started</p>
+            <!-- Get started: the artefacts from authoring tool to scene, then the listings. -->
+            <section id="get-started" class="sheet" aria-labelledby="start-title">
+                <div class="wrap">
+                    <header class="sheet-head">
                         <h2 id="start-title">Running in a few lines</h2>
-                        <p class="section-lead">
-                            Install the package next to <code>@babylonjs/core</code> 9 or newer. It ships ES modules
-                            with types, plus a UMD build for the Babylon.js Playground.
+                        <p class="sheet-lead">
+                            Load an effect file from the editor or the Unity exporter, build a system in code, or embed
+                            the editor itself.
                         </p>
-                        <ul class="start-links">
-                            <li>
-                                <a href="https://soullnik.github.io/babylon.quarks-standalone/docs/">API reference</a>
-                            </li>
-                            <li>
-                                <a
-                                    href="https://github.com/Soullnik/babylon.quarks-standalone/tree/main/packages/babylon.quarks#use-in-the-babylonjs-playground"
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    >Use it in the Playground</a
-                                >
-                            </li>
-                            <li>
-                                <a
-                                    href="https://github.com/Soullnik/babylon.quarks-standalone/tree/main/examples/src/demos"
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    >Source of every demo</a
-                                >
-                            </li>
-                        </ul>
                     </header>
 
-                    <div class="code-card">
-                        <div class="code-head">
-                            <div class="code-tabs" role="tablist" aria-label="Code samples" data-panels>
-                                <button
-                                    type="button"
-                                    role="tab"
-                                    id="tab-load"
-                                    aria-controls="code-load"
-                                    aria-selected="true"
-                                >
-                                    Load an effect
-                                </button>
-                                <button
-                                    type="button"
-                                    role="tab"
-                                    id="tab-code"
-                                    aria-controls="code-code"
-                                    aria-selected="false"
-                                    tabindex="-1"
-                                >
-                                    Build in code
-                                </button>
-                                <button
-                                    type="button"
-                                    role="tab"
-                                    id="tab-editor"
-                                    aria-controls="code-editor"
-                                    aria-selected="false"
-                                    tabindex="-1"
-                                >
-                                    Embed the editor
+                    <div class="start-grid">
+                        <div class="listing code-card">
+                            <div class="listing-head">
+                                <div class="code-tabs" role="tablist" aria-label="Code samples" data-panels>
+                                    <button
+                                        type="button"
+                                        role="tab"
+                                        id="tab-load"
+                                        aria-controls="code-load"
+                                        aria-selected="true"
+                                    >
+                                        <span class="tab-long">1 · Load an effect</span
+                                        ><span class="tab-short">Load</span>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        role="tab"
+                                        id="tab-code"
+                                        aria-controls="code-code"
+                                        aria-selected="false"
+                                        tabindex="-1"
+                                    >
+                                        <span class="tab-long">2 · Build in code</span
+                                        ><span class="tab-short">Build</span>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        role="tab"
+                                        id="tab-editor"
+                                        aria-controls="code-editor"
+                                        aria-selected="false"
+                                        tabindex="-1"
+                                    >
+                                        <span class="tab-long">3 · Embed the editor</span
+                                        ><span class="tab-short">Embed</span>
+                                    </button>
+                                </div>
+                                <button type="button" class="copy" data-copy-panel aria-label="Copy the code">
+                                    <span class="copy-label">Copy</span>
                                 </button>
                             </div>
-                            <button type="button" class="copy" data-copy-panel>Copy</button>
-                        </div>
-                        <div class="code-panel" id="code-load" role="tabpanel" aria-labelledby="tab-load">
-                            <pre><code id="src-load" data-lang="ts">import {BatchedRenderer, QuarksLoader, QuarksUtil} from 'babylon.quarks';
+                            <div class="code-panel" id="code-load" role="tabpanel" aria-labelledby="tab-load">
+                                <pre><code id="src-load" data-lang="ts">import {BatchedRenderer, QuarksLoader, QuarksUtil} from 'babylon.quarks';
 
 // One renderer per scene batches every system added to it.
 const renderer = new BatchedRenderer('vfx', scene);
@@ -557,9 +546,9 @@ QuarksUtil.play(effect);
 scene.onBeforeRenderObservable.add(() => {
     renderer.update(scene.getEngine().getDeltaTime() / 1000);
 });</code></pre>
-                        </div>
-                        <div class="code-panel" id="code-code" role="tabpanel" aria-labelledby="tab-code" hidden>
-                            <pre><code id="src-code" data-lang="ts">import {Texture} from '@babylonjs/core/Materials/Textures/texture';
+                            </div>
+                            <div class="code-panel" id="code-code" role="tabpanel" aria-labelledby="tab-code" hidden>
+                                <pre><code id="src-code" data-lang="ts">import {Texture} from '@babylonjs/core/Materials/Textures/texture';
 import {
     BatchedRenderer, Bezier, ConeEmitter, ConstantValue, IntervalValue,
     ParticleSystem, PiecewiseBezier, RenderMode, SizeOverLife,
@@ -578,12 +567,19 @@ const sparks = new ParticleSystem({
     rendererEmitterSettings: {speedFactor: 0.05},
     texture: new Texture('spark.png', scene),
 });
-sparks.addBehavior(new SizeOverLife(new PiecewiseBezier([[new Bezier(1, 0.8, 0.4, 0), 0]])));
+const shrink = new PiecewiseBezier([[new Bezier(1, 0.8, 0.4, 0), 0]]);
+sparks.addBehavior(new SizeOverLife(shrink));
 renderer.addSystem(sparks);
 sparks.play();</code></pre>
-                        </div>
-                        <div class="code-panel" id="code-editor" role="tabpanel" aria-labelledby="tab-editor" hidden>
-                            <pre><code id="src-editor" data-lang="ts">import {Texture} from '@babylonjs/core/Materials/Textures/texture';
+                            </div>
+                            <div
+                                class="code-panel"
+                                id="code-editor"
+                                role="tabpanel"
+                                aria-labelledby="tab-editor"
+                                hidden
+                            >
+                                <pre><code id="src-editor" data-lang="ts">import {Texture} from '@babylonjs/core/Materials/Textures/texture';
 import {QuarksEffectEditor} from 'babylon.quarks-editor/react';
 
 // The full editor (hierarchy, module inspector, timeline, undo) in any element.
@@ -594,28 +590,119 @@ const editor = QuarksEffectEditor.Show({
     resolveTexture: (url, scene) => new Texture(url, scene),
     onSave: (json) => save(json), // round-trips through QuarksLoader
 });</code></pre>
+                            </div>
+                            <figure class="curve-fig" data-tab-figure="tab-code" hidden>
+                                <svg viewBox="0 0 220 130" aria-hidden="true">
+                                    <defs>
+                                        <linearGradient id="curve-ramp" x1="0" y1="0" x2="1" y2="0">
+                                            <stop offset="0" style="stop-color: var(--d-cyan)" />
+                                            <stop offset="0.55" style="stop-color: var(--d-violet)" />
+                                            <stop offset="1" style="stop-color: var(--d-magenta)" />
+                                        </linearGradient>
+                                    </defs>
+                                    <path
+                                        class="curve-grid"
+                                        d="M30 10v100h180M30 60h180M30 35h180M30 85h180M75 10v100M120 10v100M165 10v100"
+                                    />
+                                    <path class="curve-line" d="M30 10C90 30 150 70 210 110" />
+                                    <circle class="curve-key" cx="30" cy="10" r="3" />
+                                    <circle class="curve-key" cx="210" cy="110" r="3" />
+                                    <text x="14" y="14">1</text>
+                                    <text x="14" y="114">0</text>
+                                    <text x="30" y="124">0</text>
+                                    <text x="200" y="124">life</text>
+                                </svg>
+                                <figcaption>
+                                    The <code>SizeOverLife</code> curve on line <span data-curve-line>20</span>: one
+                                    piece, <code>Bezier(1, 0.8, 0.4, 0)</code>, so a spark shrinks to nothing over its
+                                    life.
+                                </figcaption>
+                            </figure>
                         </div>
+
+                        <aside class="start-aside">
+                            <div class="install" role="group" aria-label="Install">
+                                <code
+                                    ><span class="prompt" aria-hidden="true">$</span>
+                                    <span id="install-cmd-2">npm i babylon.quarks @babylonjs/core</span></code
+                                >
+                                <button type="button" class="copy" data-copy-target="install-cmd-2">
+                                    <span class="copy-label">Copy</span>
+                                </button>
+                            </div>
+                            <dl class="start-facts">
+                                <div>
+                                    <dt>Peer</dt>
+                                    <dd><code>@babylonjs/core</code> 9.24 or newer</dd>
+                                </div>
+                                <div>
+                                    <dt>Ships</dt>
+                                    <dd>ES modules with types; a UMD build for the Babylon.js Playground</dd>
+                                </div>
+                                <div>
+                                    <dt>Effect files</dt>
+                                    <dd>One JSON file per effect, textures embedded or by URL, with a schema</dd>
+                                </div>
+                            </dl>
+                            <ul class="plain-links">
+                                <li>
+                                    <a
+                                        class="arrow-link"
+                                        href="https://soullnik.github.io/babylon.quarks-standalone/docs/"
+                                        >API reference</a
+                                    >
+                                </li>
+                                <li>
+                                    <a
+                                        class="arrow-link"
+                                        href="https://github.com/Soullnik/babylon.quarks-standalone/blob/main/docs/AUTHORING.md"
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        >Authoring an effect, step by step</a
+                                    >
+                                </li>
+                                <li>
+                                    <a
+                                        class="arrow-link"
+                                        href="https://github.com/Soullnik/babylon.quarks-standalone/blob/main/docs/FORMAT.md"
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        >Effect file format</a
+                                    >
+                                </li>
+                                <li>
+                                    <a
+                                        class="arrow-link"
+                                        href="https://stackblitz.com/github/Soullnik/babylon.quarks-standalone/tree/main/starters/vite?file=src%2Fmain.ts"
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        >Vite starter on StackBlitz</a
+                                    >
+                                </li>
+                            </ul>
+                        </aside>
                     </div>
                 </div>
             </section>
 
-            <section id="demos" class="section section-alt" aria-labelledby="demos-title">
+            <!-- The demos. -->
+            <section id="demos" class="sheet band-2" aria-labelledby="demos-title">
                 <div class="wrap">
-                    <header class="section-head section-head-row">
+                    <header class="sheet-head sheet-head-row">
                         <div>
-                            <p class="eyebrow">Examples</p>
                             <h2 id="demos-title">Every demo runs live in your browser</h2>
-                            <p class="section-lead">
+                            <p class="sheet-lead">
                                 Open any of them full screen, read its source, or send it to the editor and change it.
                             </p>
                         </div>
                         <label class="search">
                             <span class="visually-hidden">Search demos</span>
+                            <i data-lucide="search" class="icon" aria-hidden="true"></i>
                             <input id="demo-search" type="search" placeholder="Search demos" autocomplete="off" />
                         </label>
                     </header>
                     <div class="filters">
-                        <div id="demo-filters" class="chips" role="group" aria-label="Filter by tag"></div>
+                        <div id="demo-filters" class="chips" role="group" aria-label="Filter by section"></div>
                         <p id="demo-status" class="demo-status" aria-live="polite"></p>
                     </div>
                     <ul id="demos-grid" class="demo-grid">
@@ -626,83 +713,115 @@ const editor = QuarksEffectEditor.Show({
                 </div>
             </section>
 
-            <section id="editor" class="section" aria-labelledby="editor-title">
-                <div class="wrap split">
-                    <div class="split-text">
-                        <p class="eyebrow">babylon.quarks-editor</p>
-                        <h2 id="editor-title">A Shuriken-style editor that runs in the browser</h2>
-                        <p>
-                            A hierarchy of systems, a stacked module inspector with curves and gradients, a timeline,
-                            undo and project files. Use it here, or embed it in your own tools as a React component; its
-                            headless session API drives the same model without any UI.
-                        </p>
-                        <div class="cta-row">
-                            <a class="button primary" href="./editor.html">Open the editor</a>
-                            <a
-                                class="button ghost"
-                                href="https://www.npmjs.com/package/babylon.quarks-editor"
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                >npm package</a
-                            >
+            <!-- The editor, with callouts. -->
+            <section id="editor" class="sheet" aria-labelledby="editor-title">
+                <div class="wrap">
+                    <div class="plate-grid">
+                        <div class="plate-text">
+                            <h2 id="editor-title">A Shuriken-style editor that runs in the browser</h2>
+                            <p>
+                                Hierarchy, viewport with gizmos, a module inspector with curves and gradients, a
+                                timeline, undo. Use it on this site, embed it in your own tools as a React component, or
+                                drive its headless session API without any UI.
+                            </p>
+                            <ol class="callout-legend">
+                                <li><b>1</b> Scene: the effect's systems, shown and hidden with the eye.</li>
+                                <li><b>2</b> Viewport, with the gizmo of the selected emitter.</li>
+                                <li><b>3</b> Inspector: the module stack with curves and gradients.</li>
+                                <li>
+                                    <b>4</b> Timeline: every system's duration on one time axis, with playback controls.
+                                </li>
+                            </ol>
+                            <ul class="plain-links">
+                                <li><a class="arrow-link" href="./editor.html">Open the editor</a></li>
+                                <li>
+                                    <a
+                                        class="arrow-link"
+                                        href="https://www.npmjs.com/package/babylon.quarks-editor"
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        >babylon.quarks-editor on npm</a
+                                    >
+                                </li>
+                            </ul>
                         </div>
+                        <figure class="plate">
+                            <a class="window plate-shot" href="./editor.html" aria-label="Open the editor">
+                                <span class="reg" aria-hidden="true"></span><span class="reg" aria-hidden="true"></span
+                                ><span class="reg" aria-hidden="true"></span
+                                ><span class="reg" aria-hidden="true"></span>
+                                <img
+                                    src="./landing/editor.jpg"
+                                    alt="The effect editor with a hierarchy, viewport, module inspector and timeline"
+                                    loading="lazy"
+                                    width="1440"
+                                    height="900"
+                                />
+                                <span class="callout" style="--x: 17.5%; --y: 4.5%" aria-hidden="true">1</span>
+                                <span class="callout" style="--x: 29%; --y: 4.5%" aria-hidden="true">2</span>
+                                <span class="callout" style="--x: 90%; --y: 4.5%" aria-hidden="true">3</span>
+                                <span class="callout" style="--x: 13%; --y: 75%" aria-hidden="true">4</span>
+                            </a>
+                            <figcaption>The editor with the Vortex loaded from the stage above.</figcaption>
+                        </figure>
                     </div>
-                    <a class="shot" href="./editor.html" aria-label="Open the editor">
-                        <img
-                            src="./landing/editor.jpg"
-                            alt="The effect editor with a hierarchy, viewport and module inspector"
-                            loading="lazy"
-                            width="1440"
-                            height="900"
-                        />
-                    </a>
                 </div>
             </section>
 
-            <section id="unity" class="section section-alt" aria-labelledby="unity-title">
-                <div class="wrap split split-flip">
-                    <div class="split-text">
-                        <p class="eyebrow">Unity exporter</p>
-                        <h2 id="unity-title">Bring your Unity effects with you</h2>
-                        <p>
-                            Select a Particle System in Unity and choose
-                            <kbd>Tools</kbd> → <kbd>Quarks</kbd> → <kbd>Export Selected Effect to JSON</kbd>.
-                            Sub-emitters, grouped systems and textures come along, and anything Shuriken has that
-                            babylon.quarks does not is reported by name. Works with Unity 2020.3 and newer.
-                        </p>
-                        <div class="cta-row">
-                            <a
-                                class="button primary"
-                                href="https://github.com/Soullnik/babylon.quarks-standalone/releases/latest"
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                >Download the .unitypackage</a
-                            >
-                            <a
-                                class="button ghost"
-                                href="https://github.com/Soullnik/babylon.quarks-standalone/tree/main/tools/unity-quarks-exporter"
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                >Read the guide</a
-                            >
+            <!-- The Unity exporter. -->
+            <section id="unity" class="sheet band-2" aria-labelledby="unity-title">
+                <div class="wrap">
+                    <div class="plate-grid plate-grid-flip">
+                        <div class="plate-text">
+                            <h2 id="unity-title">Export effects from Unity</h2>
+                            <p>
+                                Select a Particle System in Unity and choose <kbd>Tools</kbd> › <kbd>Quarks</kbd> ›
+                                <kbd>Export Selected Effect to JSON</kbd>. Sub-emitters, grouped systems and textures
+                                come along; anything Shuriken has that babylon.quarks does not is reported by name.
+                                Unity 2020.3 and newer, installed as a .unitypackage, through UPM, or copied in.
+                            </p>
+                            <ul class="plain-links">
+                                <li>
+                                    <a
+                                        class="arrow-link"
+                                        href="https://github.com/Soullnik/babylon.quarks-standalone/releases/latest"
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        >Download the .unitypackage</a
+                                    >
+                                </li>
+                                <li>
+                                    <a
+                                        class="arrow-link"
+                                        href="https://github.com/Soullnik/babylon.quarks-standalone/tree/main/tools/unity-quarks-exporter"
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        >Exporter guide</a
+                                    >
+                                </li>
+                            </ul>
                         </div>
-                    </div>
-                    <figure class="unity-visual">
-                        <div class="unity-menu" aria-hidden="true">
-                            <div class="unity-menubar">
-                                <span>File</span><span>Edit</span><span>Assets</span><span>GameObject</span
-                                ><span class="is-open">Tools</span>
+                        <figure class="unity-visual" data-unity-sketch>
+                            <div class="unity-menu" aria-hidden="true">
+                                <div class="unity-menubar">
+                                    <span>File</span><span>Edit</span><span>Assets</span><span>GameObject</span
+                                    ><span class="unity-tools is-open"
+                                        >Tools
+                                        <ul class="unity-dropdown">
+                                            <li class="unity-has-sub is-active">
+                                                Quarks
+                                                <ul class="unity-submenu">
+                                                    <li>Exporter Settings…</li>
+                                                    <li class="is-active">Export Selected Effect to JSON</li>
+                                                    <li>Export Folder of Effects to JSON</li>
+                                                </ul>
+                                            </li>
+                                        </ul></span
+                                    ><span>Window</span><span>Help</span>
+                                </div>
+                                <div class="unity-body"></div>
                             </div>
-                            <div class="unity-dropdown">
-                                <span class="unity-submenu">Quarks</span>
-                                <ul>
-                                    <li>Exporter Settings…</li>
-                                    <li class="is-active">Export Selected Effect to JSON</li>
-                                    <li>Export Folder of Effects to JSON</li>
-                                </ul>
-                            </div>
-                        </div>
-                        <pre class="unity-json"><code data-lang="ts">{
+                            <pre class="unity-json"><code data-lang="ts">{
   "metadata": {
     "generator": "babylon.quarks Unity exporter %VITE_QUARKS_VERSION%",
     "quarksFormat": 1
@@ -717,62 +836,43 @@ const editor = QuarksEffectEditor.Show({
     ]
   }
 }</code></pre>
-                        <figcaption>
-                            The exporter's menu in Unity, and the start of the file it writes for a rocket with two
-                            sub-emitters.
-                        </figcaption>
-                    </figure>
-                </div>
-            </section>
-
-            <section id="packages" class="section" aria-labelledby="packages-title">
-                <div class="wrap">
-                    <header class="section-head">
-                        <p class="eyebrow">Packages</p>
-                        <h2 id="packages-title">Released together, versioned together</h2>
-                    </header>
-                    <div class="packages">
-                        <a
-                            class="package"
-                            href="https://www.npmjs.com/package/babylon.quarks"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                        >
-                            <code>babylon.quarks</code>
-                            <span>The runtime: systems, behaviors, emitters, loader and the batched renderer.</span>
-                        </a>
-                        <a
-                            class="package"
-                            href="https://www.npmjs.com/package/babylon.quarks-editor"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                        >
-                            <code>babylon.quarks-editor</code>
-                            <span>The effect editor as React components and a headless editing session.</span>
-                        </a>
-                        <a
-                            class="package"
-                            href="https://github.com/Soullnik/babylon.quarks-standalone/tree/main/tools/unity-quarks-exporter"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                        >
-                            <code>unity-quarks-exporter</code>
-                            <span>A Unity Editor tool that writes Shuriken effects as babylon.quarks JSON.</span>
-                        </a>
+                            <figcaption>
+                                The exporter's menu in Unity, and the start of the file it writes for a rocket with two
+                                sub-emitters.
+                            </figcaption>
+                        </figure>
                     </div>
                 </div>
             </section>
         </main>
 
-        <footer class="site-footer">
-            <div class="wrap footer-grid">
-                <div class="footer-brand">
+        <footer class="colophon">
+            <div class="wrap colophon-grid">
+                <div class="colophon-text">
                     <a class="brand" href="./">
-                        <img src="./logo.png" width="24" height="24" alt="" />
-                        <span class="brand-name">Babylon.quarks</span>
+                        <span class="brand-mark"><img src="./logo-mark.png" width="286" height="200" alt="" /></span>
+                        <span class="brand-name">babylon.quarks</span>
                     </a>
-                    <p>Open source under the MIT license. Built on Babylon.js, with roots in three.quarks.</p>
+                    <p>Open source under the MIT license. The engine descends from three.quarks.</p>
                 </div>
+                <nav aria-label="Packages">
+                    <h2>Packages</h2>
+                    <a href="https://www.npmjs.com/package/babylon.quarks" target="_blank" rel="noopener noreferrer"
+                        ><code>babylon.quarks</code><span>runtime, loader, renderer</span></a
+                    >
+                    <a
+                        href="https://www.npmjs.com/package/babylon.quarks-editor"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        ><code>babylon.quarks-editor</code><span>React components, headless session</span></a
+                    >
+                    <a
+                        href="https://github.com/Soullnik/babylon.quarks-standalone/tree/main/tools/unity-quarks-exporter"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        ><code>unity-quarks-exporter</code><span>Unity Editor tool</span></a
+                    >
+                </nav>
                 <nav aria-label="Learn">
                     <h2>Learn</h2>
                     <a href="#get-started">Get started</a>
@@ -789,13 +889,8 @@ const editor = QuarksEffectEditor.Show({
                         rel="noopener noreferrer"
                         >Shuriken parity</a
                     >
-                </nav>
-                <nav aria-label="Tools">
-                    <h2>Tools</h2>
                     <a href="./babylonDemo.html">Demo viewer</a>
-                    <a href="./editor.html">Effect editor</a>
                     <a href="./benchmark.html">Benchmark</a>
-                    <a href="#unity">Unity exporter</a>
                 </nav>
                 <nav aria-label="Project">
                     <h2>Project</h2>

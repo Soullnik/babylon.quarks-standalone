@@ -1,56 +1,75 @@
 import type {ArcRotateCamera} from '@babylonjs/core/Cameras/arcRotateCamera';
-import type {Vector3 as BVector3} from '@babylonjs/core/Maths/math.vector';
-import type {Mesh} from '@babylonjs/core/Meshes/mesh';
+import type {TransformNode} from '@babylonjs/core/Meshes/transformNode';
 import type {Scene} from '@babylonjs/core/scene';
-import type {BatchedRenderer, EffectPool, ParticleSystem, QuarksPrefab} from 'babylon.quarks';
+import type {BatchedRenderer, ParticleSystem} from 'babylon.quarks';
 
-export interface DemoState {
-    totalTime?: number;
-    refreshIndex?: number;
-    explosion?: {elapsed: number; systems: ParticleSystem[]};
-    subEmitter?: {elapsed: number; trackedSystems: ParticleSystem[]};
-    droppedJsonPreview?: {elapsed: number; systems: ParticleSystem[]};
-    followObject?: {phase: number; time: number; orbs: Mesh[]};
-    electricBall?: {tracked: ParticleSystem[]; x: number};
-    levelUp?: {tracked: ParticleSystem[]; elapsed: number};
-    pickUp?: {tracked: ParticleSystem[]; elapsed: number};
-    pooledHits?: {pool: EffectPool; targets: BVector3[]; elapsed: number; period: number; index: number};
-    timeline?: {prefab: QuarksPrefab; cycle: number; rest: number};
-    trailTexture?: {elapsed: number; trails: ParticleSystem[]; nextJump: number};
+/**
+ * Controls a demo puts next to its description in the viewer: switches that turn a setting on and
+ * off, choices between a few values, buttons that fire something. The landing page's stage has no
+ * panel, so there the calls do nothing and the demo runs with its initial values.
+ */
+export interface DemoControls {
+    toggle(label: string, value: boolean, onChange: (value: boolean) => void): void;
+    choice<T extends string>(label: string, options: readonly T[], value: T, onChange: (value: T) => void): void;
+    /**
+     * The demo's topics, one shown at a time: the viewer draws them as a bar of tabs over the
+     * scene, switched by click, digit or arrow keys. `onChange` gets the name picked.
+     */
+    topics(names: readonly string[], value: string, onChange: (name: string) => void): void;
+    button(label: string, onClick: () => void): void;
 }
 
+/** What the host (the viewer, or the landing page's stage) gives a demo to build in. */
 export interface DemoContext {
     scene: Scene;
     camera: ArcRotateCamera;
     batchRenderer: BatchedRenderer;
+    /** Every system the demo runs: the host counts their particles and opens them in the editor. */
     systems: ParticleSystem[];
-    demoState: DemoState;
+    controls: DemoControls;
+    /** Adds a system to the batch renderer and to `systems`, and returns it. */
+    add(system: ParticleSystem): ParticleSystem;
+    /** Adds every system under an effect's root, as {@link DemoContext.add} does for one. */
+    addEffect(root: TransformNode): TransformNode;
 }
 
-export type DemoInit = (ctx: DemoContext) => void | Promise<void>;
-export type DemoUpdate = (ctx: DemoContext, delta: number) => void;
+/**
+ * A running demo. The host calls `update` once a frame with the frame's time in seconds, before it
+ * updates the batch renderer, and `dispose` when it leaves the demo, before it disposes the scene.
+ * All of a demo's state lives in its own closure, so opening it again starts it fresh.
+ */
+export interface DemoRun {
+    update?(delta: number): void;
+    dispose?(): void;
+}
 
 export interface DemoModule {
-    init: DemoInit;
-    update?: DemoUpdate;
+    init(ctx: DemoContext): DemoRun | void | Promise<DemoRun | void>;
 }
 
-export interface DemoPreview {
-    icon: string;
-    gradient: string;
-}
+/**
+ * The gallery's two halves. A showcase is a finished effect as a game would ship it; a feature
+ * demo shows one part of the library, labelled in the scene, with switches to compare.
+ */
+export type DemoSection = 'showcase' | 'features';
 
 export interface DemoManifestEntry {
+    /** The page's hash, `babylonDemo.html#<key>`; kept stable, since links point at it. */
     key: string;
     name: string;
+    /** The file in `src/demos/`, without `.ts`. */
     module: string;
-    sourcePath: string;
+    section: DemoSection;
+    /** The group the gallery and the viewer's picker list the demo under. */
+    category: string;
+    /** Shown in the viewer's panel and on the gallery card: what to look at. */
     description: string;
     tags: string[];
-    preview: DemoPreview;
+    /** Seconds of simulated time the preview is taken at, the moment that shows the effect best. */
+    captureAt: number;
 }
 
 export interface DemoDefinition extends DemoManifestEntry {
-    init: DemoInit;
-    onFrame?: DemoUpdate;
+    sourcePath: string;
+    load(): Promise<DemoModule>;
 }

@@ -2,171 +2,310 @@ import {ArcRotateCamera} from '@babylonjs/core/Cameras/arcRotateCamera';
 import {HemisphericLight} from '@babylonjs/core/Lights/hemisphericLight';
 import {Color4} from '@babylonjs/core/Maths/math.color';
 import {Vector3 as BVector3} from '@babylonjs/core/Maths/math.vector';
-import type {TransformNode} from '@babylonjs/core/Meshes/transformNode';
+import type {AbstractMesh} from '@babylonjs/core/Meshes/abstractMesh';
 import {Scene} from '@babylonjs/core/scene';
-import {BatchedRenderer, ParticleSystem} from 'babylon.quarks';
+import {BatchedRenderer} from 'babylon.quarks';
 import {ensurePortableTextureUrl, serializeEffectForest} from 'babylon.quarks-editor';
-import {loadQuarksFromJson} from './loadQuarksJson';
+import {SECTIONS} from './demoManifest';
+import {playQuarksJson} from './loadQuarksJson';
 import {demos} from './registry';
 import {createEngineFromQuery} from './shared/engineFactory';
-import type {DemoContext, DemoDefinition, DemoState} from './types';
+import {createDemoContext, effectRoots, MAX_FRAME, particleCount} from './shared/host';
+import type {DemoContext, DemoControls, DemoRun} from './types';
 
 const GITHUB_BASE = 'https://github.com/Soullnik/babylon.quarks-standalone/blob/main/';
-const DROPPED_JSON_DEMO_KEY = '__dropped_json__';
-const DROPPED_JSON_REFRESH_TIME = 2;
+const DROPPED_KEY = '__dropped_json__';
+const CLEAR_COLOR = new Color4(0.05, 0.05, 0.08, 1);
+const SPEEDS = [0.25, 0.5, 1, 2] as const;
 
-const canvas = document.getElementById('renderer-canvas') as HTMLCanvasElement;
-const demoSelect = document.getElementById('demo-select') as HTMLSelectElement;
-const jsonFileInput = document.getElementById('json-file-input') as HTMLInputElement | null;
-const dropOverlay = document.getElementById('drop-overlay');
+const byId = <T extends HTMLElement>(id: string) => document.getElementById(id) as T | null;
+const canvas = byId<HTMLCanvasElement>('renderer-canvas')!;
+const demoSelect = byId<HTMLSelectElement>('demo-select')!;
+const jsonFileInput = byId<HTMLInputElement>('json-file-input');
+const dropOverlay = byId('drop-overlay');
+const titleEl = byId('demo-name');
+const categoryEl = byId('demo-category');
+const descriptionEl = byId('demo-description');
+const controlsEl = byId('demo-controls');
+const topicBarEl = byId('topic-bar');
+const topicToast = byId('topic-toast');
+const pauseBtn = byId<HTMLButtonElement>('pauseBtn');
+const speedSelect = byId<HTMLSelectElement>('speed-select');
+const sourceLink = byId<HTMLAnchorElement>('source-link');
+const particleCountEl = byId('particleCount');
+const fpsEl = byId('fps');
 const engine = await createEngineFromQuery(canvas);
+/** `?pauseAt=S`: the viewer stops each demo at S seconds of its time, the moment a preview shows. */
+const pauseAt = Number(new URLSearchParams(window.location.search).get('pauseAt')) || 0;
 
-let scene: Scene;
-let camera: ArcRotateCamera;
-let batchRenderer: BatchedRenderer;
-let systems: ParticleSystem[] = [];
+/** What the viewer is showing: a demo of the gallery, or a JSON file dropped on the page. */
+interface Shown {
+    key: string;
+    name: string;
+    category: string;
+    description: string;
+    sourcePath: string;
+    ctx: DemoContext;
+    run: DemoRun;
+}
+
+let shown: Shown | null = null;
 let demoIndex = 0;
-let activeDemo: DemoDefinition | null = null;
-let demoState: DemoState = {};
 let loadToken = 0;
+let paused = false;
+let speed = 1;
+/** Simulated seconds since the shown demo started, what previews and the smoke test wait on. */
+let demoTime = 0;
+let peakParticles = 0;
 let frameCount = 0;
 let lastFpsTime = performance.now();
 let dragDepth = 0;
 
-const droppedJsonDemo: DemoDefinition = {
-    key: DROPPED_JSON_DEMO_KEY,
-    name: 'Dropped JSON',
-    module: 'dropped',
-    sourcePath: 'examples/src/viewer.ts',
-    description: 'Preview a Quarks JSON file dropped or opened from disk.',
-    tags: ['import'],
-    preview: {icon: 'JS', gradient: 'linear-gradient(135deg, #6f90e9 0%, #1e2f72 100%)'},
-    init: async () => {},
-    onFrame: ({demoState: state}, delta) => {
-        const preview = state.droppedJsonPreview;
-        if (!preview?.systems?.length) {
-            return;
-        }
-        preview.elapsed += delta;
-        if (preview.elapsed < DROPPED_JSON_REFRESH_TIME) {
-            return;
-        }
-        preview.elapsed = 0;
-        for (const system of preview.systems) {
-            if (!system.looping) {
-                system.restart();
-                system.play();
-            }
-        }
-    },
-};
-
-/** Creates the dropped-json option in the demo picker when needed. */
-function ensureDroppedJsonOption(label: string) {
-    let option = demoSelect.querySelector(`option[value="${DROPPED_JSON_DEMO_KEY}"]`) as HTMLOptionElement | null;
-    if (!option) {
-        option = document.createElement('option');
-        option.value = DROPPED_JSON_DEMO_KEY;
-        demoSelect.insertBefore(option, demoSelect.firstChild);
-    }
-    option.textContent = label;
-    option.hidden = false;
+/** A demo's topics as the viewer shows them: a tab bar, built before the demo is shown. */
+interface TopicBar {
+    element: HTMLElement;
+    names: readonly string[];
+    index: number;
+    pick(index: number, announce?: boolean): void;
 }
 
-/** Hides the dropped-json option after switching back to a built-in demo. */
-function hideDroppedJsonOption() {
-    const option = demoSelect.querySelector(`option[value="${DROPPED_JSON_DEMO_KEY}"]`) as HTMLOptionElement | null;
-    if (option) {
-        option.hidden = true;
-    }
-}
+/** The topics of the demo shown, if it has any. */
+let topicBar: TopicBar | null = null;
+/** A topic named in the address (`#Key/Topic`) to open the next demo on. */
+let topicFromHash: string | null = null;
 
-function createBaseScene() {
-    if (scene) {
-        scene.dispose();
-    }
-    scene = new Scene(engine);
+/**
+ * A new scene with the viewer's camera, light and batch renderer, and a set of panel controls,
+ * which go into the panel once the demo is shown; `topics` receives the demo's topic bar.
+ */
+function createScene(controls: HTMLElement, topics: {bar: TopicBar | null}): DemoContext {
+    const scene = new Scene(engine);
     scene.useRightHandedSystem = true;
-    scene.clearColor = new Color4(0.05, 0.05, 0.08, 1);
-
-    camera = new ArcRotateCamera('camera', -Math.PI / 2, Math.PI / 3, 20, BVector3.Zero(), scene);
+    scene.clearColor = CLEAR_COLOR.clone();
+    const camera = new ArcRotateCamera('camera', -Math.PI / 2, Math.PI / 3, 20, BVector3.Zero(), scene);
     camera.attachControl(canvas, true);
     camera.minZ = 0.1;
     new HemisphericLight('light', new BVector3(0, 1, 0), scene);
-
-    batchRenderer = new BatchedRenderer('batchRenderer', scene);
-    systems = [];
-    demoState = {totalTime: 0, refreshIndex: 0};
+    return createDemoContext(
+        scene,
+        camera,
+        new BatchedRenderer('batchRenderer', scene),
+        panelControls(controls, topics)
+    );
 }
 
-function updateSourceLink() {
-    const sourceLink = document.getElementById('source-link') as HTMLAnchorElement | null;
-    if (!sourceLink || !activeDemo) {
+/** Flashes `text` large in the middle of the screen for a moment. */
+function announce(text: string) {
+    if (!topicToast) return;
+    topicToast.textContent = text;
+    topicToast.classList.remove('is-shown');
+    // Restart the fade: a reflow between taking the class off and putting it back.
+    void topicToast.offsetWidth;
+    topicToast.classList.add('is-shown');
+}
+
+/** A bar of numbered tabs, one per topic, with arrows either side; `onChange` gets the name. */
+function buildTopicBar(names: readonly string[], value: string, onChange: (name: string) => void): TopicBar {
+    const element = document.createElement('div');
+    element.className = 'topic-bar-inner';
+    const arrow = (text: string, label: string, by: number) => {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'topic-arrow';
+        button.textContent = text;
+        button.title = label;
+        button.addEventListener('click', () => bar.pick((bar.index + by + names.length) % names.length, true));
+        return button;
+    };
+    const tabs = names.map((name, index) => {
+        const tab = document.createElement('button');
+        tab.type = 'button';
+        tab.className = 'topic-tab';
+        const number = document.createElement('span');
+        number.className = 'topic-number';
+        number.textContent = String(index + 1);
+        tab.append(number, name);
+        tab.title = `${name} (${index + 1})`;
+        tab.addEventListener('click', () => bar.pick(index, true));
+        return tab;
+    });
+    element.append(arrow('‹', 'Previous topic (Up)', -1), ...tabs, arrow('›', 'Next topic (Down)', 1));
+    const bar: TopicBar = {
+        element,
+        names,
+        index: Math.max(0, names.indexOf(value)),
+        pick(index, show = false) {
+            bar.index = index;
+            tabs.forEach((tab, i) => {
+                tab.classList.toggle('is-active', i === index);
+                tab.setAttribute('aria-pressed', String(i === index));
+            });
+            onChange(names[index]);
+            if (show) {
+                announce(`${index + 1} / ${names.length} · ${names[index]}`);
+                if (shown) history.replaceState(null, '', `#${shown.key}/${encodeURIComponent(names[index])}`);
+            }
+        },
+    };
+    tabs.forEach((tab, i) => tab.classList.toggle('is-active', i === bar.index));
+    return bar;
+}
+
+/** Controls drawn into `container`, the panel's part under the description; topics into a bar. */
+function panelControls(container: HTMLElement, topics: {bar: TopicBar | null}): DemoControls {
+    const row = (label: string, input: HTMLElement) => {
+        const wrap = document.createElement('label');
+        wrap.className = 'control';
+        const text = document.createElement('span');
+        text.textContent = label;
+        wrap.append(input, text);
+        container.append(wrap);
+    };
+    return {
+        toggle(label, value, onChange) {
+            const input = document.createElement('input');
+            input.type = 'checkbox';
+            input.checked = value;
+            input.addEventListener('change', () => onChange(input.checked));
+            row(label, input);
+        },
+        choice(label, options, value, onChange) {
+            const select = document.createElement('select');
+            select.className = 'ui-select';
+            for (const option of options) {
+                select.add(new Option(option, option, false, option === value));
+            }
+            select.addEventListener('change', () => onChange(select.value as typeof value));
+            row(label, select);
+        },
+        topics(names, value, onChange) {
+            topics.bar = buildTopicBar(names, value, onChange);
+        },
+        button(label, onClick) {
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'ui-btn';
+            button.textContent = label;
+            button.addEventListener('click', onClick);
+            container.append(button);
+        },
+    };
+}
+
+/** Leaves what is shown: the demo's own clean-up, then its scene. */
+function leave() {
+    if (!shown) {
         return;
     }
-    if (activeDemo.key === DROPPED_JSON_DEMO_KEY) {
-        sourceLink.href = GITHUB_BASE + 'packages/babylon.quarks/src/QuarksLoader.ts';
-        sourceLink.textContent = 'Loader';
+    shown.run.dispose?.();
+    shown.ctx.scene.dispose();
+    shown = null;
+}
+
+function describe() {
+    if (!shown) {
         return;
     }
-    sourceLink.textContent = 'Source';
-    sourceLink.href = GITHUB_BASE + activeDemo.sourcePath;
-}
-
-function updateDemoSelectValue() {
-    if (demoSelect && activeDemo) {
-        demoSelect.value = activeDemo.key;
+    // The picker names the demo; the title line is only for a load error.
+    if (titleEl) titleEl.textContent = '';
+    document.title = `${shown.name} — Babylon.quarks demos`;
+    if (categoryEl) categoryEl.textContent = shown.category;
+    if (descriptionEl) descriptionEl.textContent = shown.description;
+    if (sourceLink) {
+        sourceLink.href = GITHUB_BASE + shown.sourcePath;
+        sourceLink.textContent = shown.key === DROPPED_KEY ? 'Loader' : 'Source';
+    }
+    demoSelect.value = shown.key;
+    const option = demoSelect.querySelector<HTMLOptionElement>(`option[value="${DROPPED_KEY}"]`);
+    if (option) {
+        option.hidden = shown.key !== DROPPED_KEY;
     }
 }
 
-function updateDemoTitle() {
-    const title = document.getElementById('demo-name');
-    if (title && activeDemo) {
-        title.textContent = activeDemo.name;
+function showError(error: unknown) {
+    console.error('Error loading demo:', error);
+    if (titleEl) titleEl.textContent = 'Error: ' + (error as Error).message;
+}
+
+/** Shows a new scene: the old one keeps rendering until the new one is built. */
+async function show(build: (ctx: DemoContext) => Promise<Omit<Shown, 'ctx' | 'run'> & {run: DemoRun}>) {
+    const token = ++loadToken;
+    const controls = document.createElement('div');
+    const topics: {bar: TopicBar | null} = {bar: null};
+    const ctx = createScene(controls, topics);
+    try {
+        const built = await build(ctx);
+        if (token !== loadToken) {
+            built.run.dispose?.();
+            ctx.scene.dispose();
+            return;
+        }
+        leave();
+        if (controlsEl) {
+            controlsEl.replaceChildren(...Array.from(controls.childNodes));
+            controlsEl.hidden = controlsEl.childNodes.length === 0;
+        }
+        shown = {...built, ctx};
+        demoTime = 0;
+        peakParticles = 0;
+        setPaused(false);
+        describe();
+        topicBar = topics.bar;
+        if (topicBarEl) {
+            topicBarEl.replaceChildren(...(topicBar ? [topicBar.element] : []));
+            topicBarEl.hidden = !topicBar;
+        }
+        const wanted = topicBar && topicFromHash ? topicBar.names.indexOf(topicFromHash) : -1;
+        topicFromHash = null;
+        if (topicBar && wanted > 0) {
+            topicBar.pick(wanted, true);
+        } else {
+            window.location.hash = '#' + shown.key;
+        }
+    } catch (error) {
+        ctx.scene.dispose();
+        if (token === loadToken) {
+            showError(error);
+        }
     }
 }
 
-function setDropOverlayVisible(visible: boolean) {
-    if (dropOverlay) {
-        dropOverlay.classList.toggle('is-visible', visible);
-    }
+function loadDemo(index: number) {
+    demoIndex = index;
+    const demo = demos[index];
+    return show(async (ctx) => {
+        const module = await demo.load();
+        const run = (await module.init(ctx)) ?? {};
+        return {...demo, run};
+    });
 }
 
-/** Loads a Quarks JSON file from disk into the viewer. */
 async function loadDroppedJsonFile(file: File) {
     if (!file.name.toLowerCase().endsWith('.json')) {
         throw new Error('Please choose a .json file exported from Quarks.');
     }
-
-    const token = ++loadToken;
-    createBaseScene();
-    camera.setPosition(new BVector3(0, 8, 18));
-
     const json = JSON.parse(await file.text());
-    const trackedSystems: ParticleSystem[] = [];
-    loadQuarksFromJson(scene, batchRenderer, trackedSystems, json);
-
-    if (token !== loadToken) {
-        return;
+    let option = demoSelect.querySelector<HTMLOptionElement>(`option[value="${DROPPED_KEY}"]`);
+    if (!option) {
+        option = new Option('', DROPPED_KEY);
+        demoSelect.insertBefore(option, demoSelect.firstChild);
     }
-
-    systems.push(...trackedSystems);
-    demoState.droppedJsonPreview = {elapsed: 0, systems: trackedSystems};
-    activeDemo = {...droppedJsonDemo, name: file.name};
-    ensureDroppedJsonOption(file.name);
-    updateDemoTitle();
-    updateDemoSelectValue();
-    window.location.hash = '#' + DROPPED_JSON_DEMO_KEY;
-    updateSourceLink();
+    option.textContent = file.name;
+    await show(async (ctx) => {
+        ctx.camera.setPosition(new BVector3(0, 8, 18));
+        return {
+            key: DROPPED_KEY,
+            name: file.name,
+            category: 'Dropped file',
+            description: 'A Quarks JSON file opened from disk; its one-shot systems replay every two seconds.',
+            sourcePath: 'packages/babylon.quarks/src/QuarksLoader.ts',
+            run: playQuarksJson(ctx, json),
+        };
+    });
 }
 
-/** Picks the first JSON file from a drag-and-drop or file-input event. */
-function getJsonFileFromDataTransfer(dataTransfer: DataTransfer | null): File | null {
-    if (!dataTransfer?.files?.length) {
-        return null;
-    }
-    for (let i = 0; i < dataTransfer.files.length; i++) {
-        const file = dataTransfer.files[i];
+function firstJsonFile(list: FileList | null | undefined): File | null {
+    for (const file of Array.from(list ?? [])) {
         if (file.name.toLowerCase().endsWith('.json')) {
             return file;
         }
@@ -174,243 +313,273 @@ function getJsonFileFromDataTransfer(dataTransfer: DataTransfer | null): File | 
     return null;
 }
 
-async function loadDemo(index: number) {
-    const token = ++loadToken;
-    createBaseScene();
-    activeDemo = demos[index];
-    hideDroppedJsonOption();
-    try {
-        await activeDemo.init({scene, camera, batchRenderer, systems, demoState});
-        if (token !== loadToken) {
-            return;
-        }
-        updateDemoTitle();
-        updateDemoSelectValue();
-        window.location.hash = '#' + activeDemo.key;
-        updateSourceLink();
-    } catch (e) {
-        if (token !== loadToken) {
-            return;
-        }
-        console.error('Error loading demo:', e);
-        const title = document.getElementById('demo-name');
-        if (title) {
-            title.textContent = 'Error: ' + (e as Error).message;
-        }
+function openJson(file: File | null) {
+    if (file) {
+        loadDroppedJsonFile(file).catch(showError);
     }
 }
 
-function nextDemo() {
-    demoIndex = (demoIndex + 1) % demos.length;
-    loadDemo(demoIndex);
-}
-
-function previousDemo() {
-    demoIndex = (demoIndex - 1 + demos.length) % demos.length;
-    loadDemo(demoIndex);
-}
-
-function setupJsonImportUi() {
-    document.getElementById('openJsonBtn')?.addEventListener('click', () => {
-        jsonFileInput?.click();
-    });
-
-    jsonFileInput?.addEventListener('change', async () => {
-        const file = jsonFileInput.files?.[0];
+function setupJsonImport() {
+    byId('openJsonBtn')?.addEventListener('click', () => jsonFileInput?.click());
+    jsonFileInput?.addEventListener('change', () => {
+        const file = jsonFileInput.files?.[0] ?? null;
         jsonFileInput.value = '';
-        if (!file) {
-            return;
-        }
-        try {
-            await loadDroppedJsonFile(file);
-        } catch (e) {
-            console.error('Error loading JSON file:', e);
-            const title = document.getElementById('demo-name');
-            if (title) {
-                title.textContent = 'Error: ' + (e as Error).message;
-            }
-        }
+        openJson(file);
     });
-
-    const onDragEnter = (event: DragEvent) => {
-        if (!event.dataTransfer?.types.includes('Files')) {
-            return;
-        }
+    const hasFiles = (event: DragEvent) => event.dataTransfer?.types.includes('Files') ?? false;
+    window.addEventListener('dragenter', (event) => {
+        if (!hasFiles(event)) return;
         event.preventDefault();
         dragDepth += 1;
-        setDropOverlayVisible(true);
-    };
-
-    const onDragLeave = (event: DragEvent) => {
-        if (!event.dataTransfer?.types.includes('Files')) {
-            return;
-        }
+        dropOverlay?.classList.add('is-visible');
+    });
+    window.addEventListener('dragleave', (event) => {
+        if (!hasFiles(event)) return;
         event.preventDefault();
         dragDepth = Math.max(0, dragDepth - 1);
-        if (dragDepth === 0) {
-            setDropOverlayVisible(false);
-        }
-    };
-
-    const onDragOver = (event: DragEvent) => {
-        if (!event.dataTransfer?.types.includes('Files')) {
-            return;
-        }
+        if (dragDepth === 0) dropOverlay?.classList.remove('is-visible');
+    });
+    window.addEventListener('dragover', (event) => {
+        if (!hasFiles(event)) return;
         event.preventDefault();
-        event.dataTransfer.dropEffect = 'copy';
-    };
-
-    const onDrop = async (event: DragEvent) => {
-        if (!event.dataTransfer?.types.includes('Files')) {
-            return;
-        }
+        event.dataTransfer!.dropEffect = 'copy';
+    });
+    window.addEventListener('drop', (event) => {
+        if (!hasFiles(event)) return;
         event.preventDefault();
         dragDepth = 0;
-        setDropOverlayVisible(false);
-
-        const file = getJsonFileFromDataTransfer(event.dataTransfer);
-        if (!file) {
-            return;
-        }
-        try {
-            await loadDroppedJsonFile(file);
-        } catch (e) {
-            console.error('Error loading dropped JSON:', e);
-            const title = document.getElementById('demo-name');
-            if (title) {
-                title.textContent = 'Error: ' + (e as Error).message;
-            }
-        }
-    };
-
-    window.addEventListener('dragenter', onDragEnter);
-    window.addEventListener('dragleave', onDragLeave);
-    window.addEventListener('dragover', onDragOver);
-    window.addEventListener('drop', onDrop);
+        dropOverlay?.classList.remove('is-visible');
+        openJson(firstJsonFile(event.dataTransfer?.files));
+    });
 }
 
-document.getElementById('openInEditorBtn')?.addEventListener('click', async () => {
-    if (systems.length === 0) {
+async function openInEditor() {
+    if (!shown || shown.ctx.systems.length === 0) {
         return;
     }
-    // Serialize the full scene hierarchy the demo is running (groups + nested emitters),
-    // not a flat list: walk each emitter up to its top-level effect root under the
-    // batch renderer, dedupe, and serialize the resulting forest.
-    const roots = new Set<TransformNode>();
-    for (const system of systems) {
-        let node: TransformNode = system.emitter;
-        while (node.parent && node.parent !== batchRenderer) {
-            node = node.parent as TransformNode;
-        }
-        roots.add(node);
-    }
-    // Some demos (e.g. alphaTest) assign a texture pulled straight off a loaded GLB's
-    // material; embedded glTF images only have Babylon's internal placeholder url, which
-    // can't survive the navigation to the editor's own page/engine below. Bake real pixels
-    // into a portable data URI first so the reloaded effect keeps its texture.
-    for (const system of systems) {
+    // Some demos take a texture straight off a loaded GLB's material, whose url is Babylon's
+    // internal placeholder and does not survive the move to the editor's page: bake its pixels
+    // into a portable data URI first.
+    for (const system of shown.ctx.systems) {
         if (system.texture) {
             await ensurePortableTextureUrl(system.texture);
         }
     }
-    sessionStorage.setItem('quarks-editor-effect', serializeEffectForest([...roots], activeDemo?.name ?? 'DemoEffect'));
+    sessionStorage.setItem('quarks-editor-effect', serializeEffectForest(effectRoots(shown.ctx), shown.name));
     window.location.href = './editor.html?effect=session';
-});
+}
 
-// Debug/testing hook: reach the live demo systems from the console/smoke tests.
-(window as never as {__quarksViewer: unknown}).__quarksViewer = {
-    get systems() {
-        return systems;
-    },
-};
-
-document.getElementById('nextBtn')?.addEventListener('click', nextDemo);
-document.getElementById('previousBtn')?.addEventListener('click', previousDemo);
-demoSelect.addEventListener('change', (event) => {
-    const selectedKey = (event.target as HTMLSelectElement).value;
-    if (selectedKey === DROPPED_JSON_DEMO_KEY) {
-        return;
-    }
-    const selectedIndex = demos.findIndex((demoItem) => demoItem.key === selectedKey);
-    if (selectedIndex >= 0) {
-        demoIndex = selectedIndex;
-        loadDemo(demoIndex);
-    }
-});
-
-document.addEventListener('keydown', (event) => {
-    if (event.key === 'ArrowRight') {
-        nextDemo();
-    }
-    if (event.key === 'ArrowLeft') {
-        previousDemo();
-    }
-});
-
-window.addEventListener('hashchange', () => {
-    const hash = window.location.hash.substring(1);
-    if (hash === DROPPED_JSON_DEMO_KEY) {
-        return;
-    }
-    const hashIndex = demos.findIndex((demoItem) => demoItem.key === hash);
-    if (hashIndex >= 0 && hashIndex !== demoIndex) {
-        demoIndex = hashIndex;
-        loadDemo(demoIndex);
-    }
-});
-
-demos.forEach((demoItem) => {
-    const option = document.createElement('option');
-    option.value = demoItem.key;
-    option.textContent = demoItem.name;
-    demoSelect.appendChild(option);
-});
-
-if (window.location.hash) {
-    const hash = window.location.hash.substring(1);
-    const hashIndex = demos.findIndex((demoItem) => demoItem.key === hash);
-    if (hashIndex >= 0) {
-        demoIndex = hashIndex;
+function setPaused(value: boolean) {
+    paused = value;
+    if (pauseBtn) {
+        pauseBtn.textContent = paused ? 'Play' : 'Pause';
+        pauseBtn.setAttribute('aria-pressed', String(paused));
     }
 }
 
-setupJsonImportUi();
+function restart() {
+    if (shown?.key === DROPPED_KEY) {
+        return;
+    }
+    void loadDemo(demoIndex);
+}
 
-loadDemo(demoIndex);
+/**
+ * The share of the canvas the particles cover, read back from one frame drawn with every other
+ * mesh hidden: the smoke test's proof that a demo's particles reach the screen, which a ground,
+ * labels or props drawing fine does not give.
+ */
+function coverage(): Promise<number> {
+    return new Promise((resolve, reject) => {
+        const ctx = shown?.ctx;
+        if (!ctx) {
+            resolve(0);
+            return;
+        }
+        const {scene, batchRenderer} = ctx;
+        const particles = new Set<AbstractMesh>(batchRenderer.batches.map((batch) => batch.mesh));
+        const hidden: AbstractMesh[] = [];
+        scene.onBeforeRenderObservable.addOnce(() => {
+            for (const mesh of scene.meshes) {
+                if (mesh.isVisible && !particles.has(mesh)) {
+                    mesh.isVisible = false;
+                    hidden.push(mesh);
+                }
+            }
+        });
+        scene.onAfterRenderObservable.addOnce(() => {
+            const width = engine.getRenderWidth();
+            const height = engine.getRenderHeight();
+            const clear = [scene.clearColor.r, scene.clearColor.g, scene.clearColor.b].map((c) => c * 255);
+            const read = engine.readPixels(0, 0, width, height, true, false);
+            for (const mesh of hidden) {
+                mesh.isVisible = true;
+            }
+            read.then((pixels) => {
+                const data = pixels as Uint8Array;
+                let drawn = 0;
+                for (let i = 0; i < data.length; i += 4) {
+                    const d =
+                        Math.abs(data[i] - clear[0]) +
+                        Math.abs(data[i + 1] - clear[1]) +
+                        Math.abs(data[i + 2] - clear[2]);
+                    if (d > 12) drawn++;
+                }
+                resolve(drawn / (width * height));
+            }).catch(reject);
+        });
+    });
+}
+
+// The hook previews, the smoke test and the console use to reach the running demo.
+(window as never as {__quarksViewer: unknown}).__quarksViewer = {
+    /** The key of the demo once its `init` has finished, null while it loads. */
+    get ready() {
+        return shown?.key ?? null;
+    },
+    get systems() {
+        return shown?.ctx.systems ?? [];
+    },
+    get time() {
+        return demoTime;
+    },
+    get paused() {
+        return paused;
+    },
+    /** The most particles alive at once since the demo started. */
+    get peakParticles() {
+        return peakParticles;
+    },
+    coverage,
+};
+
+function fillPicker() {
+    for (const section of SECTIONS) {
+        for (const category of section.categories) {
+            const group = document.createElement('optgroup');
+            group.label = `${section.title} · ${category}`;
+            for (const demo of demos) {
+                if (demo.section === section.id && demo.category === category) {
+                    group.append(new Option(demo.name, demo.key));
+                }
+            }
+            if (group.children.length > 0) {
+                demoSelect.append(group);
+            }
+        }
+    }
+    for (const value of SPEEDS) {
+        speedSelect?.add(new Option(`${value}×`, String(value), false, value === 1));
+    }
+}
+
+/** Prev and Next follow the picker's order, by section and category. */
+function step(direction: 1 | -1) {
+    const keys = Array.from(
+        demoSelect.querySelectorAll<HTMLOptionElement>('optgroup option'),
+        (option) => option.value
+    );
+    const current = keys.indexOf(demos[demoIndex].key);
+    const next = keys[(current + direction + keys.length) % keys.length];
+    void loadDemo(demos.findIndex((demo) => demo.key === next));
+}
+
+/** The demo the address names (`#Key`, or `#Key/Topic` to open it on a topic). */
+function indexOfHash(): number {
+    const [key, topic] = window.location.hash.substring(1).split('/');
+    topicFromHash = topic ? decodeURIComponent(topic) : null;
+    return demos.findIndex((demo) => demo.key === key);
+}
+
+// The topic bar sits under the HUD, which wraps to more rows on a narrow window.
+const hud = document.querySelector<HTMLElement>('.hud');
+if (hud && topicBarEl) {
+    const place = () => {
+        topicBarEl.style.top = `${Math.round(hud.getBoundingClientRect().bottom + 10)}px`;
+    };
+    new ResizeObserver(place).observe(hud);
+    window.addEventListener('resize', place);
+    place();
+}
+
+fillPicker();
+setupJsonImport();
+byId('openInEditorBtn')?.addEventListener('click', () => void openInEditor());
+byId('nextBtn')?.addEventListener('click', () => step(1));
+byId('previousBtn')?.addEventListener('click', () => step(-1));
+byId('restartBtn')?.addEventListener('click', restart);
+pauseBtn?.addEventListener('click', () => setPaused(!paused));
+byId('panelToggle')?.addEventListener('click', (event) => {
+    const toggle = event.currentTarget as HTMLButtonElement;
+    const collapsed = byId('demo-panel')?.classList.toggle('is-collapsed') ?? false;
+    toggle.textContent = collapsed ? 'Show' : 'Hide';
+    toggle.setAttribute('aria-expanded', String(!collapsed));
+});
+speedSelect?.addEventListener('change', () => {
+    speed = Number(speedSelect.value) || 1;
+});
+demoSelect.addEventListener('change', () => {
+    const index = demos.findIndex((demo) => demo.key === demoSelect.value);
+    if (index >= 0) {
+        void loadDemo(index);
+    }
+});
+document.addEventListener('keydown', (event) => {
+    if ((event.target as HTMLElement | null)?.closest('input, select, textarea')) {
+        return;
+    }
+    if (event.key === 'ArrowRight') step(1);
+    if (event.key === 'ArrowLeft') step(-1);
+    if (event.key === ' ') {
+        event.preventDefault();
+        setPaused(!paused);
+    }
+    if (event.key === 'r' || event.key === 'R') restart();
+    if (topicBar) {
+        const bar = topicBar;
+        const digit = Number(event.key);
+        if (Number.isInteger(digit) && digit >= 1 && digit <= bar.names.length) bar.pick(digit - 1, true);
+        if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+            event.preventDefault();
+            const by = event.key === 'ArrowDown' ? 1 : -1;
+            bar.pick((bar.index + by + bar.names.length) % bar.names.length, true);
+        }
+    }
+});
+window.addEventListener('hashchange', () => {
+    const index = indexOfHash();
+    if (index >= 0 && demos[index].key !== shown?.key) {
+        void loadDemo(index);
+    }
+});
+
+void loadDemo(Math.max(0, indexOfHash()));
 
 engine.runRenderLoop(() => {
-    if (!scene || !batchRenderer || !activeDemo) {
+    if (!shown) {
         return;
     }
     try {
-        const delta = engine.getDeltaTime() / 1000;
-        const ctx: DemoContext = {scene, camera, batchRenderer, systems, demoState};
-        if (activeDemo.onFrame) {
-            activeDemo.onFrame(ctx, delta);
+        let delta = paused ? 0 : Math.min(engine.getDeltaTime() / 1000, MAX_FRAME) * speed;
+        if (pauseAt > 0 && demoTime + delta >= pauseAt) {
+            delta = Math.max(pauseAt - demoTime, 0);
+            setPaused(true);
         }
-        batchRenderer.update(delta);
+        demoTime += delta;
+        shown.run.update?.(delta);
+        shown.ctx.batchRenderer.update(delta);
 
-        let totalParticles = 0;
-        for (const system of systems) {
-            totalParticles += system.particleNum;
-        }
-        const particleCount = document.getElementById('particleCount');
-        if (particleCount) {
-            particleCount.textContent = totalParticles.toString();
-        }
-
+        const particles = particleCount(shown.ctx);
+        peakParticles = Math.max(peakParticles, particles);
+        if (particleCountEl) particleCountEl.textContent = particles.toString();
         frameCount++;
         const now = performance.now();
         if (now - lastFpsTime >= 1000) {
-            const fps = document.getElementById('fps');
-            if (fps) {
-                fps.textContent = frameCount.toString();
-            }
+            if (fpsEl) fpsEl.textContent = frameCount.toString();
             frameCount = 0;
             lastFpsTime = now;
         }
-
-        scene.render();
+        shown.ctx.scene.render();
     } catch (e) {
         console.error('Render error:', e);
     }

@@ -50,6 +50,7 @@ const HANDLED_BY: Record<keyof ParticleSystemParameters, 'table' | 'elsewhere'> 
     instancingUVs: 'elsewhere',
     instancingUVs2: 'elsewhere',
     instancingNormals: 'elsewhere',
+    instancingColors: 'elsewhere',
     renderMode: 'table',
     rendererEmitterSettings: 'elsewhere',
     material: 'elsewhere',
@@ -59,6 +60,11 @@ const HANDLED_BY: Record<keyof ParticleSystemParameters, 'table' | 'elsewhere'> 
     vTileCount: 'table',
     blendTiles: 'table',
     softParticles: 'table',
+    premultipliedMap: 'table',
+    particleColor: 'table',
+    materialColor: 'table',
+    materialColorScale: 'table',
+    sortingFudge: 'table',
     softFarFade: 'table',
     softNearFade: 'table',
     renderOrder: 'table',
@@ -80,6 +86,7 @@ const HANDLED_BY: Record<keyof ParticleSystemParameters, 'table' | 'elsewhere'> 
     playbackSpeed: 'table',
     cullingMode: 'table',
     scalingMode: 'table',
+    rotationAxis: 'table',
     seed: 'table',
     sortMode: 'table',
     alignToDirection: 'table',
@@ -89,6 +96,7 @@ const HANDLED_BY: Record<keyof ParticleSystemParameters, 'table' | 'elsewhere'> 
     applyFog: 'table',
     applyImageProcessing: 'table',
     renderFace: 'table',
+    renderAlignment: 'table',
     scene: 'elsewhere',
 };
 
@@ -109,7 +117,7 @@ describe('settings table', () => {
             const ps = new ParticleSystem({scene, renderMode});
             for (const setting of SETTINGS) {
                 if (setting.param === 'renderMode') continue;
-                expect([setting.param, setting.isDefault(setting.get(ps))]).toEqual([setting.param, true]);
+                expect([setting.param, setting.isDefault(setting.get(ps), ps)]).toEqual([setting.param, true]);
             }
             ps.dispose();
         }

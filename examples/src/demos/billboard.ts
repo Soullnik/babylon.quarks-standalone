@@ -1,90 +1,301 @@
 import {Constants} from '@babylonjs/core/Engines/constants';
-import {Color4} from '@babylonjs/core/Maths/math.color';
+import {StandardMaterial} from '@babylonjs/core/Materials/standardMaterial';
+import {Color3, Color4} from '@babylonjs/core/Maths/math.color';
 import {Vector3 as BVector3} from '@babylonjs/core/Maths/math.vector';
+import {MeshBuilder} from '@babylonjs/core/Meshes/meshBuilder';
+import {TransformNode} from '@babylonjs/core/Meshes/transformNode';
 import {
-    Bezier,
+    ApplyForce,
+    ColorOverLife,
+    ConeEmitter,
     ConstantColor,
     ConstantValue,
+    EulerGenerator,
+    FrameOverLife,
+    Gradient,
     IntervalValue,
+    OrbitOverLife,
     ParticleSystem,
-    PiecewiseBezier,
+    type ParticleSystemParameters,
     PointEmitter,
+    RandomColor,
+    RandomQuatGenerator,
     RenderMode,
-    SpeedOverLife,
+    Rotation3DOverLife,
+    RotationOverLife,
+    SizeOverLife,
+    SphereEmitter,
+    WidthOverLength,
 } from 'babylon.quarks';
-import {createSharedTexture} from '../shared/common';
-import type {DemoContext} from '../types';
+import {curve, fade} from '../shared/curves';
+import {crystal} from '../shared/geometry';
+import {addLabel} from '../shared/labels';
+import {addGround} from '../shared/stage';
+import {baseTexture, kenneyTexture, rampTexture, sheetOf} from '../shared/textures';
+import type {DemoContext, DemoRun} from '../types';
 
-function createSystem({
-    scene,
-    batchRenderer,
-    systems,
-    texture,
-    renderMode,
-    position,
-    speedFactor,
-}: {
-    scene: DemoContext['scene'];
-    batchRenderer: DemoContext['batchRenderer'];
-    systems: DemoContext['systems'];
-    texture: ReturnType<typeof createSharedTexture>;
-    renderMode: RenderMode;
-    position: BVector3;
-    speedFactor?: number;
-}) {
-    const system = new ParticleSystem({
-        scene,
-        duration: 5,
-        looping: true,
-        startLife: new IntervalValue(4, 5),
-        startSpeed: new ConstantValue(1),
-        startSize: new IntervalValue(1, 2),
-        startColor: new ConstantColor(new Color4(1, 1, 1, 1)),
-        emissionOverTime: new ConstantValue(0),
-        emissionBursts: [{time: 0, count: new ConstantValue(10), cycle: 1, interval: 0.01, probability: 1}],
-        shape: new PointEmitter(),
-        renderMode,
-        texture,
-        transparent: true,
-        blendMode: Constants.ALPHA_COMBINE,
-        renderOrder: 2,
-        rendererEmitterSettings:
-            renderMode === RenderMode.StretchedBillBoard ? {speedFactor: speedFactor ?? 0, lengthFactor: 2} : undefined,
-        startTileIndex: new ConstantValue(0),
-        uTileCount: 1,
-        vTileCount: 1,
-    });
-    system.emitter.position = position;
-    system.addBehavior(new SpeedOverLife(new PiecewiseBezier([[new Bezier(1, 0.75, 0.5, 0), 0]])));
-    batchRenderer.addSystem(system);
-    systems.push(system);
+/** Colour over life from white through `mid` to `end`, alpha in by 10 % and out from `out`. */
+function warmth(mid: Color3, end: Color3, out = 0.6): Gradient {
+    return new Gradient(
+        [
+            [new Color3(1, 1, 1), 0],
+            [mid, 0.4],
+            [end, 1],
+        ],
+        [
+            [0, 0],
+            [1, 0.1],
+            [1, out],
+            [0, 1],
+        ]
+    );
 }
 
-export function init({scene, camera, batchRenderer, systems}: DemoContext) {
-    camera.setPosition(new BVector3(0, 6, 18));
-    const texture = createSharedTexture(scene, 'textures/triangle_curve.png');
-    createSystem({
-        scene,
-        batchRenderer,
-        systems,
-        texture,
-        renderMode: RenderMode.VerticalBillBoard,
-        position: new BVector3(-5, 0, 0),
+/**
+ * Every render mode, each on its own labelled pad doing what it is for: billboards facing the
+ * camera (smoke), stretched billboards laid along their motion (sparks), horizontal ones flat on
+ * the ground (ripples), vertical ones upright but turning to the camera (flames), mesh particles
+ * lit by the renderer's light (ice crystals, a texture coloured by a gradient map, a glowing rim),
+ * trails (ribbons spiralling up) and a beam (a bolt between two
+ * points).
+ */
+export function init({scene, camera, add}: DemoContext): DemoRun {
+    camera.setPosition(new BVector3(0, 6.4, 12));
+    camera.setTarget(new BVector3(0, 0.8, -0.2));
+    addGround(scene);
+    // Each pad is a faint ring marked on the floor, not a solid disc, so the effect is what reads.
+    const padMaterial = new StandardMaterial('pad', scene);
+    padMaterial.diffuseColor = Color3.Black();
+    padMaterial.specularColor = Color3.Black();
+    padMaterial.emissiveColor = new Color3(0.3, 0.33, 0.42);
+    padMaterial.disableLighting = true;
+
+    const pads = [
+        'BillBoard',
+        'StretchedBillBoard',
+        'HorizontalBillBoard',
+        'VerticalBillBoard',
+        'Mesh',
+        'Trail',
+        'Beam',
+    ];
+    const spots = pads.map((name, i) => {
+        const row = i < 4 ? 0 : 1;
+        const x = row === 0 ? (i - 1.5) * 4.2 : (i - 4 - 1) * 4.2;
+        const z = row === 0 ? -3.2 : 3;
+        const pad = MeshBuilder.CreateTorus(`pad:${name}`, {diameter: 2.8, thickness: 0.04, tessellation: 64}, scene);
+        pad.position.set(x, 0.01, z);
+        pad.isPickable = false;
+        pad.material = padMaterial;
+        addLabel(scene, `RenderMode.${name}`, new BVector3(x, 0.3, z + 1.75), {height: 0.34});
+        const spot = new TransformNode(name, scene);
+        spot.position.set(x, 0, z);
+        return spot;
     });
-    createSystem({
-        scene,
-        batchRenderer,
-        systems,
-        texture,
+    const system = (spot: number, name: string, parameters: Partial<ParticleSystemParameters>) => {
+        const ps = new ParticleSystem({
+            scene,
+            duration: 1,
+            looping: true,
+            transparent: true,
+            blendMode: Constants.ALPHA_ADD,
+            ...parameters,
+        } as ParticleSystemParameters);
+        ps.emitter.name = name;
+        ps.emitter.parent = spots[spot];
+        add(ps);
+        return ps;
+    };
+    const up = (ps: ParticleSystem, y = 0.1) => {
+        // Cones emit along their +z; turn it up.
+        ps.emitter.rotation.x = -Math.PI / 2;
+        ps.emitter.position.y = y;
+        return ps;
+    };
+
+    // Billboards: smoke puffs rising, each facing the camera.
+    const smoke = up(
+        system(0, 'Smoke', {
+            startLife: new IntervalValue(1.4, 2),
+            startSpeed: new IntervalValue(0.5, 0.9),
+            startSize: new IntervalValue(1, 1.6),
+            startRotation: new IntervalValue(0, Math.PI * 2),
+            startColor: new RandomColor(new Color4(0.6, 0.62, 0.68, 0.9), new Color4(0.8, 0.82, 0.86, 1)),
+            emissionOverTime: new ConstantValue(7),
+            shape: new ConeEmitter({radius: 0.4, angle: 0.2}),
+            texture: baseTexture(scene, 'smoke_puff'),
+            ...sheetOf('smoke_puff'),
+            blendTiles: true,
+            blendMode: Constants.ALPHA_COMBINE,
+        })
+    );
+    smoke.addBehavior(
+        new FrameOverLife(
+            curve([
+                [0, 0],
+                [1, 15.99],
+            ])
+        )
+    );
+    smoke.addBehavior(new RotationOverLife(new IntervalValue(-0.6, 0.6)));
+
+    // Stretched billboards: sparks in a fountain, each laid along its motion.
+    const sparks = up(
+        system(1, 'Sparks', {
+            startLife: new IntervalValue(0.6, 1),
+            startSpeed: new IntervalValue(4, 6.5),
+            startSize: new IntervalValue(0.1, 0.18),
+            startColor: new ConstantColor(new Color4(1, 1, 1, 1)),
+            emissionOverTime: new ConstantValue(60),
+            shape: new ConeEmitter({radius: 0.1, angle: 0.35}),
+            texture: baseTexture(scene, 'streak'),
+            renderMode: RenderMode.StretchedBillBoard,
+            rendererEmitterSettings: {speedFactor: 0.08, lengthFactor: 1},
+        })
+    );
+    sparks.addBehavior(new ApplyForce(new BVector3(0, -1, 0), new ConstantValue(9)));
+    sparks.addBehavior(new ColorOverLife(warmth(new Color3(1, 0.7, 0.3), new Color3(1, 0.25, 0.05))));
+
+    // Horizontal billboards: ripples spreading flat on the ground.
+    const ripples = system(2, 'Ripples', {
+        startLife: new ConstantValue(1.6),
+        startSpeed: new ConstantValue(0),
+        startSize: new ConstantValue(2.6),
+        startColor: new ConstantColor(new Color4(0.45, 0.85, 1, 1)),
+        emissionOverTime: new ConstantValue(1.6),
+        shape: new PointEmitter(),
+        texture: baseTexture(scene, 'ring'),
         renderMode: RenderMode.HorizontalBillBoard,
-        position: new BVector3(0, 0, 0),
     });
-    createSystem({
-        scene,
-        batchRenderer,
-        systems,
-        texture,
-        renderMode: RenderMode.StretchedBillBoard,
-        position: new BVector3(5, 0, 0),
+    ripples.addBehavior(
+        new SizeOverLife(
+            curve([
+                [0, 0.1],
+                [1, 1],
+            ])
+        )
+    );
+    ripples.addBehavior(new ColorOverLife(fade(0.05, 0.3)));
+    ripples.emitter.position.y = 0.04;
+
+    // Vertical billboards: flames standing upright, turning round to face the camera.
+    const flames = system(3, 'Flames', {
+        startLife: new IntervalValue(0.7, 0.9),
+        startSpeed: new ConstantValue(0),
+        startSize: new IntervalValue(1.6, 2.1),
+        startColor: new RandomColor(new Color4(1, 0.5, 0.15, 1), new Color4(1, 0.75, 0.3, 1)),
+        emissionOverTime: new ConstantValue(6),
+        shape: new SphereEmitter({radius: 0.25, thickness: 1}),
+        texture: baseTexture(scene, 'fire'),
+        ...sheetOf('fire'),
+        blendTiles: true,
+        renderMode: RenderMode.VerticalBillBoard,
     });
+    flames.addBehavior(
+        new FrameOverLife(new ConstantValue(0), {fps: 20, frameCount: 16, startFrame: new IntervalValue(0, 16)})
+    );
+    flames.addBehavior(new ColorOverLife(fade(0.15, 0.7)));
+    flames.emitter.position.y = 0.85;
+
+    // Mesh particles: ice crystals tumbling up, lit by a fixed light, streaks and cracks running
+    // through them coloured by an ice ramp, their edges glowing.
+    const iceRamp = rampTexture(scene, 'ice', [
+        [0, '#0b2a5c', 1],
+        [0.45, '#2f86d6', 1],
+        [0.8, '#9fe4ff', 1],
+        [1, '#ffffff', 1],
+    ]);
+    const crystals = up(
+        system(4, 'Crystals', {
+            startLife: new IntervalValue(1.4, 1.8),
+            startSpeed: new IntervalValue(0.6, 1),
+            startSize: new IntervalValue(0.5, 0.75),
+            startRotation: new RandomQuatGenerator(),
+            startColor: new RandomColor(new Color4(0.8, 0.92, 1, 1), new Color4(1, 1, 1, 1)),
+            emissionOverTime: new ConstantValue(5),
+            shape: new ConeEmitter({radius: 0.6, angle: 0.25}),
+            transparent: false,
+            renderFace: 'front',
+            blendMode: Constants.ALPHA_DISABLE,
+            renderMode: RenderMode.Mesh,
+            lighting: 'fixed',
+            ...crystal(0.2),
+            texture: kenneyTexture(scene, 'veins', true),
+            gradientMap: {ramp: iceRamp, channel: 'r'},
+            rim: {color: [0.6, 0.9, 1], power: 2.5, strength: 0.8, mode: 'add'},
+        })
+    );
+    // A slow tumble, under a turn and a half a second about any axis, so a crystal reads as it turns.
+    crystals.addBehavior(
+        new Rotation3DOverLife(
+            new EulerGenerator(new IntervalValue(-1, 1), new IntervalValue(-1.5, 1.5), new IntervalValue(-1, 1), 'YXZ')
+        )
+    );
+    crystals.addBehavior(
+        new SizeOverLife(
+            curve([
+                [0, 0],
+                [0.15, 1],
+                [0.85, 1],
+                [1, 0],
+            ])
+        )
+    );
+
+    // Trails: ribbons shot up from a ring and turned round the pad's axis, each drawing a helix.
+    const ribbons = up(
+        system(5, 'Ribbons', {
+            startLife: new IntervalValue(1, 1.3),
+            startSpeed: new IntervalValue(2, 2.6),
+            startSize: new IntervalValue(0.32, 0.45),
+            startColor: new RandomColor(new Color4(0.6, 1, 0.7, 1), new Color4(0.3, 0.8, 1, 1)),
+            emissionOverTime: new ConstantValue(6),
+            shape: new ConeEmitter({radius: 0.9, angle: 0, thickness: 0}),
+            texture: kenneyTexture(scene, 'ribbon'),
+            renderMode: RenderMode.Trail,
+            rendererEmitterSettings: {startLength: new ConstantValue(30), followLocalOrigin: false},
+        })
+    );
+    ribbons.addBehavior(new OrbitOverLife(new ConstantValue(3.5), new BVector3(0, 0, 1)));
+    ribbons.addBehavior(
+        new WidthOverLength(
+            curve([
+                [0, 1],
+                [1, 0],
+            ])
+        )
+    );
+    ribbons.addBehavior(new ColorOverLife(fade(0.1, 0.6)));
+
+    // Beam: a bolt from the pad to a point above it that wanders, flickering through the sheet.
+    const target = new TransformNode('Beam end', scene);
+    target.parent = spots[6];
+    const beam = system(6, 'Bolt', {
+        startLife: new ConstantValue(1e6),
+        startSpeed: new ConstantValue(0),
+        startSize: new ConstantValue(0.9),
+        startColor: new ConstantColor(new Color4(0.6, 0.8, 1, 1)),
+        emissionOverTime: new ConstantValue(0),
+        emissionBursts: [{time: 0, count: new ConstantValue(1), cycle: 1, interval: 0, probability: 1}],
+        looping: false,
+        shape: new PointEmitter(),
+        texture: baseTexture(scene, 'bolts'),
+        ...sheetOf('bolts'),
+        renderMode: RenderMode.Beam,
+    });
+    beam.addBehavior(new FrameOverLife(new ConstantValue(0), {fps: 18, frameCount: 8, random: true}));
+    beam.emitter.position.y = 0.1;
+    beam.beamEnd = target;
+
+    let time = 0;
+    return {
+        update(delta) {
+            time += delta;
+            target.position.set(
+                Math.sin(time * 1.3) * 0.9,
+                2.6 + Math.sin(time * 2.1) * 0.3,
+                Math.cos(time * 0.9) * 0.6
+            );
+        },
+    };
 }

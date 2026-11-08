@@ -1,7 +1,7 @@
 {
     "name": "examples",
     "private": true,
-    "version": "1.0.0-rc.1",
+    "version": "1.0.0-rc.2",
     "type": "module",
     "scripts": {
         "dev": "vite --port 3010",
@@ -22,7 +22,9 @@
         "@tanstack/react-virtual": "^3.14.6",
         "babylon.quarks": "file:../packages/babylon.quarks",
         "babylon.quarks-editor": "file:../packages/babylon.quarks-editor",
+        "lucide": "^1.70.0",
         "react": "^19.0.0",
-        "react-dom": "^19.0.0"
+        "react-dom": "^19.0.0",
+        "simple-icons": "^16.37.0"
     }
 }

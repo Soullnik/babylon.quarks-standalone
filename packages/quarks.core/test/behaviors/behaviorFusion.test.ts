@@ -266,6 +266,57 @@ describe('behavior fusion', () => {
         expect(snapshot(fused)).toEqual(snapshot(separate));
         expect(fused.some((particle) => particle.uvTile !== 0)).toBe(true);
     });
+    it('turns mesh particles about their own rotation axis, as the separate path does', () => {
+        const build = (): Behavior[] => [
+            new RotationOverLife(new ConstantValue(2.5)),
+            new SizeOverLife(new PiecewiseBezier([[new Bezier(1, 1, 1, 1), 0]])),
+        ];
+        const fusedBehaviors = build();
+        const separateBehaviors = build();
+        const fused = makePool(COUNT);
+        const separate = makePool(COUNT);
+        for (const pool of [fused, separate]) {
+            pool.forEach((p, i) => {
+                p.rotation = new Quaternion().setFromAxisAngle(new Vector3(0, 0, 1), i * 0.3);
+                // Every other particle keeps the default Z.
+                p.rotationAxis = i % 2 === 0 ? new Vector3(i, 1, -0.5 * i).normalize() : null;
+            });
+        }
+        for (const p of fused) for (const b of fusedBehaviors) b.initialize(p, system);
+        for (const p of separate) for (const b of separateBehaviors) b.initialize(p, system);
+        expect(planBehaviorFusion(fusedBehaviors)).toHaveLength(1);
+
+        for (let frame = 0; frame < 3; frame++) {
+            runPlan(fusedBehaviors, fused, DELTA);
+            runSeparately(separateBehaviors, separate, DELTA);
+        }
+        for (let i = 0; i < COUNT; i++) {
+            const a = fused[i].rotation as Quaternion;
+            const b = separate[i].rotation as Quaternion;
+            expect([a.x, a.y, a.z, a.w].map((n) => +n.toFixed(5))).toEqual(
+                [b.x, b.y, b.z, b.w].map((n) => +n.toFixed(5))
+            );
+            const da = fused[i].angularVelocity as Quaternion;
+            const db = separate[i].angularVelocity as Quaternion;
+            expect([da.x, da.y, da.z, da.w].map((n) => +n.toFixed(5))).toEqual(
+                [db.x, db.y, db.z, db.w].map((n) => +n.toFixed(5))
+            );
+            // The axis itself is left where it was.
+            const axis = fused[i].rotationAxis;
+            if (axis)
+                expect(
+                    axis
+                        .clone()
+                        .applyQuaternion(a)
+                        .distanceTo(
+                            axis
+                                .clone()
+                                .applyQuaternion(new Quaternion().setFromAxisAngle(new Vector3(0, 0, 1), i * 0.3))
+                        )
+                ).toBeLessThan(1e-5);
+        }
+    });
+
     it('matches the separate path for the quaternion behaviors', () => {
         // A rotated, scaled, off-origin emitter, so the world/local conversions
         // and the orbit pivot are all doing something.
@@ -426,7 +477,7 @@ describe('behavior fusion', () => {
         ['world-space', true],
         ['local-space', false],
     ])(
-        'matches the separate path for forces in both spaces, %s system, emitter turned and scaled',
+        'matches the separate path for forces in both spaces, scaled or not, %s system, emitter turned and scaled',
         (_name, worldSpace) => {
             const matrixWorld = new Matrix4().compose(
                 new Vector3(3, -1, 2),
@@ -443,6 +494,24 @@ describe('behavior fusion', () => {
                 ),
                 new ApplyForce(new Vector3(1, 0, 0), new IntervalValue(1, 3), 'local'),
                 new ApplyForce(new Vector3(0, -1, 0), new ConstantValue(2)),
+                // Forces that keep their world strength, as gravity.
+                new ForceOverLife(
+                    new ConstantValue(0.5),
+                    new ConstantValue(-1),
+                    new ConstantValue(0),
+                    'local',
+                    false,
+                    false
+                ),
+                new ForceOverLife(
+                    new ConstantValue(0),
+                    new ConstantValue(-3),
+                    new ConstantValue(0.2),
+                    'world',
+                    false,
+                    false
+                ),
+                new ApplyForce(new Vector3(0, -1, 0), new ConstantValue(1.5), 'world', false),
                 new LimitSpeedOverLife(
                     new Vector3Function(new ConstantValue(0.5), new IntervalValue(0.2, 1), new ConstantValue(0.3)),
                     0.5

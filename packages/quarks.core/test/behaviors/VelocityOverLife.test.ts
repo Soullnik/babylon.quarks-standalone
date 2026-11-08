@@ -76,7 +76,7 @@ describe('VelocityOverLife', () => {
         expect(particle.position.y).toBeCloseTo(1);
     });
 
-    test('curve velocity is sampled at age/life', () => {
+    test('curve velocity is sampled at the life fraction the step ends at', () => {
         const curve = new PiecewiseBezier([[new Bezier(0, 0, 4, 4), 0]]);
         const behavior = new VelocityOverLife(curve, new ConstantValue(0), new ConstantValue(0));
         const ps = makePS(false);
@@ -84,10 +84,11 @@ describe('VelocityOverLife', () => {
         particle.age = 0.5;
 
         behavior.initialize(particle, ps);
-        behavior.frameUpdate(1);
-        behavior.update(particle, 1);
+        behavior.frameUpdate(0.25);
+        behavior.update(particle, 0.25);
 
-        expect(particle.position.x).toBeCloseTo(curve.genValue(particle.memory, 0.5));
+        expect(particle.life).toBe(1);
+        expect(particle.position.x).toBeCloseTo(curve.genValue(particle.memory, 0.75) * 0.25);
     });
 
     test('orbital Y rotates the particle around the emitter axis', () => {

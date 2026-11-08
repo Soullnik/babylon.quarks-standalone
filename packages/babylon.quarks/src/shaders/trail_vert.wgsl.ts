@@ -1,3 +1,4 @@
+import {colorSpaceDeclarationWGSL, particleColorVertexDeclarationWGSL} from './chunks/colorSpace';
 import {fogVertexDeclarationWGSL, fogVertexWGSL} from './chunks/fog';
 
 export default /* wgsl */ `
@@ -55,6 +56,8 @@ fn trailSide(previousPoint: vec3f, point: vec3f, nextPoint: vec3f) -> vec3f {
 }
 
 ${fogVertexDeclarationWGSL}
+${colorSpaceDeclarationWGSL}
+${particleColorVertexDeclarationWGSL}
 @vertex
 fn main(input: VertexInputs) -> FragmentInputs {
     var point = (uniforms.view * vec4f(vertexInputs.position, 1.0)).xyz;
@@ -76,6 +79,8 @@ ${fogVertexWGSL('point')}
 #ifdef UV1
     vertexOutputs.vUV1 = vertexInputs.uv2;
 #endif
-    vertexOutputs.vColor = vertexInputs.color;
+    // The particle colour, times the material's, comes into the working space here, so it is
+    // interpolated there too.
+    vertexOutputs.vColor = quarksParticleColor(vertexInputs.color);
 }
 `;

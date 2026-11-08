@@ -25,11 +25,13 @@ function groupChildren(node: TransformNode): TransformNode[] {
 
 /** Reparents `only` onto `parent`, transferring the outgoing node's name if `only` doesn't
  * already have a meaningful one of its own, then disposes the now-empty wrapper. World
- * transform is preserved via `setParent`. */
+ * transform is preserved via `setParent`. The loaded root holds the effect's textures and
+ * materials, so `only` takes a hold first: a wrapper root goes, and with it that hold. */
 function collapseInto(wrapper: TransformNode, only: TransformNode, parent: Node | null): void {
     if (!hasMeaningfulName(only) && hasMeaningfulName(wrapper)) {
         only.name = wrapper.name;
     }
+    QuarksUtil.shareResources(wrapper, only);
     only.setParent(parent);
     wrapper.dispose(true, false);
 }

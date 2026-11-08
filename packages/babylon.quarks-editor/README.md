@@ -79,10 +79,11 @@ an opinion on your CDN, asset pipeline, or loader (`@babylonjs/loaders`, your ow
   `system.texture`. Return `null` or `undefined` to leave the texture unset.
 - `resolveGeometry(file) => Promise<GeometryData>` — turns a picked file (from "Load from file…"
   in the Mesh render mode's geometry dropdown) into vertex buffers: `{positions, indices?, uvs?,
-uvs2?, normals?}` (typed arrays or plain number arrays; `uvs2` is the second UV set textures on
-  UV channel 1 read).
+uvs2?, normals?, colors?}` (typed arrays or plain number arrays; `uvs2` is the second UV set textures on
+  UV channel 1 read, `colors` the vertex colours, `r, g, b, a` per vertex and linear, the particle
+  colour is multiplied by).
 - `textureOptions?: {label, url}[]` / `geometryOptions?: {label, positions, indices?, uvs?,
-uvs2?, normals?}[]` — preset lists shown alongside "Custom URL…" / "Load from file…". The texture
+uvs2?, normals?, colors?}[]` — preset lists shown alongside "Custom URL…" / "Load from file…". The texture
   presets also serve the gradient map's ramp, the erosion mask and the distortion noise.
 
 **Signature differs by entry point** — a common source of "works in the demo, throws in my

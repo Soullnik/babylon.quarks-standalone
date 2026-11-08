@@ -50,14 +50,23 @@ describe('FrameOverLife', () => {
         expect(frames.map((f) => Math.round(f * 100) / 100)).toEqual([0, 1.5, 0, 1.5, 3]);
     });
 
+    const rounded = (frames: number[]) => frames.map((f) => Math.round(f * 100) / 100);
+
     it('plays at a frame rate by age in seconds, wrapping within the segment', () => {
         const behavior = new FrameOverLife(new ConstantValue(4), {fps: 10, frameCount: 3});
-        expect(framesOf(behavior, [0, 0.1, 0.25, 0.3, 0.45], 10)).toEqual([4, 5, 6, 4, 5]);
+        expect(rounded(framesOf(behavior, [0, 0.1, 0.2, 0.3, 0.4], 10))).toEqual([4, 5, 6, 4, 5]);
     });
 
-    it('holds the last frame of the segment when not looping', () => {
+    it('runs on between whole frames at a frame rate, as Unity does, so tiles can blend', () => {
+        // Unity 6000.6, 4x4 sheet at 4 fps: AnimFrame 0.4 at 0.1 s, 1.5 at 0.375 s, and 1.6 at
+        // 4.4 s, wrapped round the 16 frames; the blend is the part past the whole frame.
+        const behavior = new FrameOverLife(new ConstantValue(0), {fps: 4, frameCount: 16});
+        expect(rounded(framesOf(behavior, [0.1, 0.375, 1.125, 3.9, 4.4], 10))).toEqual([0.4, 1.5, 4.5, 15.6, 1.6]);
+    });
+
+    it('holds the last frame of the segment when not looping, whole', () => {
         const behavior = new FrameOverLife(new ConstantValue(0), {fps: 10, frameCount: 3, loop: false});
-        expect(framesOf(behavior, [0, 0.15, 0.25, 0.9], 10)).toEqual([0, 1, 2, 2]);
+        expect(rounded(framesOf(behavior, [0, 0.15, 0.25, 0.9], 10))).toEqual([0, 1.5, 2, 2]);
     });
 
     it('starts each particle at its own random frame', () => {
@@ -67,12 +76,27 @@ describe('FrameOverLife', () => {
             startFrame: new IntervalValue(0, 16),
         });
         const frames = framesOf(behavior, new Array(32).fill(0), 10);
-        expect(new Set(frames).size).toBeGreaterThan(4);
+        expect(new Set(frames.map((f) => Math.floor(f))).size).toBeGreaterThan(4);
         for (const frame of frames) {
-            expect(Number.isInteger(frame)).toBe(true);
             expect(frame).toBeGreaterThanOrEqual(0);
             expect(frame).toBeLessThan(16);
         }
+    });
+
+    it("adds the start frame fraction and all and wraps it round the frames, as Unity's Start Frame", () => {
+        // Unity 6000.6, 4x4 sheet, Start Frame 0.3 (4.8 frames): frame 5.2 at 0.1 s at 4 fps and
+        // over a 4 s life; Start Frame 0.25 (4 frames) at 3.9 s of a 4 s life: 15.6 + 4 wraps to 3.6.
+        const atRate = new FrameOverLife(new ConstantValue(0), {
+            fps: 4,
+            frameCount: 16,
+            startFrame: new ConstantValue(4.8),
+        });
+        expect(rounded(framesOf(atRate, [0.1], 10))).toEqual([5.2]);
+        const sweep = () => new PiecewiseBezier([[new Bezier(0, 16 / 3, 32 / 3, 16), 0]]);
+        const overLife = new FrameOverLife(sweep(), {frameCount: 16, startFrame: new ConstantValue(4.8)});
+        expect(rounded(framesOf(overLife, [0.1], 4))).toEqual([5.2]);
+        const nearEnd = new FrameOverLife(sweep(), {frameCount: 16, startFrame: new ConstantValue(4)});
+        expect(rounded(framesOf(nearEnd, [3.9], 4))).toEqual([3.6]);
     });
 
     it('round-trips its options through JSON and clone', () => {
@@ -98,6 +122,57 @@ describe('FrameOverLife', () => {
         expect(new FrameOverLife(new ConstantValue(1)).toJSON()).toEqual({
             type: 'FrameOverLife',
             frame: new ConstantValue(1).toJSON(),
+        });
+    });
+
+    describe('single row', () => {
+        // A 4 x 3 sheet; the curve runs over one row's 4 frames.
+        const rowRamp = () => new PiecewiseBezier([[new Bezier(0, 4 / 3, 8 / 3, 3.999), 0]]);
+
+        it('plays the curve within a fixed row', () => {
+            const behavior = new FrameOverLife(rowRamp(), {rowLength: 4, rowCount: 3, row: 2});
+            const frames = framesOf(behavior, [0, 1, 1.9999]);
+            expect(frames.map((f) => Math.floor(f))).toEqual([8, 9, 11]);
+        });
+
+        it('picks a row per particle and keeps each one in it', () => {
+            const behavior = new FrameOverLife(rowRamp(), {rowLength: 4, rowCount: 3, randomRow: true});
+            const ages = new Array(48).fill(0).map((_, i) => (i % 2) * 1.9999);
+            const frames = framesOf(behavior, ages);
+            const rows = frames.map((f) => Math.floor(Math.floor(f) / 4));
+            expect(new Set(rows)).toEqual(new Set([0, 1, 2]));
+            for (let i = 0; i < frames.length; i++) {
+                // Young particles start their row, old ones end it; none leaves it.
+                expect(Math.floor(frames[i]) % 4).toBe(i % 2 === 0 ? 0 : 3);
+            }
+        });
+
+        it('wraps a start frame within the row, not into the next', () => {
+            const behavior = new FrameOverLife(new ConstantValue(3), {
+                frameCount: 4,
+                startFrame: new ConstantValue(2),
+                rowLength: 4,
+                rowCount: 2,
+                row: 1,
+            });
+            expect(framesOf(behavior, [0, 1]).map((f) => Math.floor(f))).toEqual([5, 5]);
+        });
+
+        it('is not plain, so the fused pass goes through frameAt', () => {
+            expect(new FrameOverLife(rowRamp(), {rowLength: 4, rowCount: 3}).isPlain()).toBe(false);
+        });
+
+        it('normalises the row and round-trips through JSON and clone', () => {
+            const behavior = new FrameOverLife(rowRamp(), {rowLength: 4.7, rowCount: 0, row: -2});
+            expect([behavior.rowLength, behavior.rowCount, behavior.row]).toEqual([4, 1, 0]);
+            const random = new FrameOverLife(rowRamp(), {rowLength: 4, rowCount: 3, row: 1, randomRow: true});
+            for (const copy of [
+                FrameOverLife.fromJSON(random.toJSON()) as FrameOverLife,
+                random.clone() as FrameOverLife,
+            ]) {
+                expect([copy.rowLength, copy.rowCount, copy.row, copy.randomRow]).toEqual([4, 3, 1, true]);
+            }
+            expect(new FrameOverLife(rowRamp()).toJSON()).toEqual({type: 'FrameOverLife', frame: rowRamp().toJSON()});
         });
     });
 

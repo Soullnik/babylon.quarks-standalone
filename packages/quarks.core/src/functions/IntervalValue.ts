@@ -35,6 +35,14 @@ export class IntervalValue implements ValueGenerator {
         memory.push(random());
     }
 
+    /** Rolls the particle's number again, in the slot {@link IntervalValue.startGen} claimed. */
+    reroll(memory: GeneratorMemory): void {
+        const slot = this.indexCount;
+        if (slot >= 0 && slot < memory.length) {
+            memory[slot] = random();
+        }
+    }
+
     /** The particle's number; rolls it first if {@link IntervalValue.startGen} has not. */
     genValue(memory: GeneratorMemory): number {
         if (this.indexCount === -1) {

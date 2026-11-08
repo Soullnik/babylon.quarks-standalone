@@ -13,7 +13,9 @@ import {
     SphereEmitter,
     Vector3Function,
 } from 'babylon.quarks';
-import {createSharedTexture} from '../shared/common';
+import {addLabel} from '../shared/labels';
+import {addGround} from '../shared/stage';
+import {baseTexture} from '../shared/textures';
 import type {DemoContext} from '../types';
 
 /**
@@ -22,9 +24,12 @@ import type {DemoContext} from '../types';
  * round. The right one limits each axis on its own, hard on the emitter's Y and loose on X and Z:
  * the cloud flattens into a disc, which leans with its emitter because the limits are local.
  */
-export function init({scene, camera, batchRenderer, systems}: DemoContext) {
-    camera.setPosition(new BVector3(0, 7, 20));
-    const texture = createSharedTexture(scene);
+export function init({scene, camera, add}: DemoContext) {
+    camera.setPosition(new BVector3(0, 6, 19));
+    addGround(scene, -4);
+    addLabel(scene, 'One speed limit', new BVector3(-5.5, 3.6, 0));
+    addLabel(scene, 'Separate axes, local', new BVector3(5.5, 3.6, 0));
+    const texture = baseTexture(scene, 'spark');
 
     const make = (x: number, tint: Color4) => {
         const system = new ParticleSystem({
@@ -42,9 +47,6 @@ export function init({scene, camera, batchRenderer, systems}: DemoContext) {
             texture,
             transparent: true,
             blendMode: Constants.ALPHA_ADD,
-            startTileIndex: new ConstantValue(0),
-            uTileCount: 10,
-            vTileCount: 10,
         });
         system.addBehavior(
             new ColorOverLife(
@@ -62,8 +64,7 @@ export function init({scene, camera, batchRenderer, systems}: DemoContext) {
             )
         );
         system.emitter.position.set(x, 0, 0);
-        batchRenderer.addSystem(system);
-        systems.push(system);
+        add(system);
         return system;
     };
 

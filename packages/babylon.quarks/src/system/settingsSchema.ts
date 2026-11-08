@@ -1,5 +1,6 @@
 import {Constants} from '@babylonjs/core/Engines/constants';
 import type {
+    Color4Like,
     ColorGeneratorJSON,
     RotationGeneratorJSON,
     ValueGeneratorJSON,
@@ -28,12 +29,18 @@ import {
     normalizeBursts,
     validCullingMode,
     validLoopRange,
+    validMaterialColor,
+    validMaterialColorScale,
+    validRenderAlignment,
     validRenderFace,
     validRingBufferMode,
+    validRotationAxis,
     validScalingMode,
+    validSortingFudge,
     validSortMode,
     validStopAction,
     validTileCount,
+    WHITE_MATERIAL_COLOR,
 } from './normalize';
 import type {
     BurstParameters,
@@ -59,8 +66,11 @@ export interface SettingDescriptor {
     readonly json?: keyof ParticleSystemJSONParameters;
     /** The current value on a system. */
     get(system: ParticleSystem): unknown;
-    /** Whether `value` is what the constructor gives a system that leaves the setting out. */
-    isDefault(value: unknown): boolean;
+    /**
+     * Whether `value` is what the constructor gives a system that leaves the setting out; `system`
+     * for a default that depends on its other settings.
+     */
+    isDefault(value: unknown, system: ParticleSystem): boolean;
     /** The value as JSON. */
     toJSON(value: unknown): unknown;
     /** The constructor parameter for a JSON value that is present; undefined takes the default. */
@@ -256,9 +266,11 @@ export const SETTINGS: ReadonlyArray<SettingDescriptor> = [
     plain('playbackSpeed', (s) => s.playbackSpeed, 1, number),
     plain('cullingMode', (s) => s.cullingMode, 'always', validCullingMode),
     plain('scalingMode', (s) => s.scalingMode, 'local', validScalingMode),
+    plain('rotationAxis', (s) => s.rotationAxis, 'z', validRotationAxis),
     plain('seed', (s) => s.seed, undefined, number),
     plain('sortMode', (s) => s.sortMode, 'none', validSortMode),
     plain('renderFace', (s) => s.renderFace, 'both', validRenderFace),
+    plain('renderAlignment', (s) => s.renderAlignment, 'simulation', validRenderAlignment),
     plain(
         'alignToDirection',
         (s) => s.alignToDirection,
@@ -278,12 +290,51 @@ export const SETTINGS: ReadonlyArray<SettingDescriptor> = [
     plain('vTileCount', (s) => s.vTileCount, 1, tileCount),
     plain('blendTiles', (s) => s.blendTiles, false, boolean),
     plain('softParticles', (s) => s.softParticles, false, boolean),
+    plain(
+        'premultipliedMap',
+        (s) => s.premultipliedMap,
+        false,
+        (json) => json === true
+    ),
+    plain('particleColor', (s) => s.particleColor, true, boolean),
+    {
+        param: 'materialColor',
+        get: (s) => s.materialColor,
+        isDefault: (value) => validMaterialColor(value) === WHITE_MATERIAL_COLOR,
+        toJSON: (value) => [...validMaterialColor(value)],
+        fromJSON: (json) => {
+            if (!Array.isArray(json)) return undefined;
+            const [r, g, b, a] = validMaterialColor(json);
+            return {r, g, b, a};
+        },
+        clone: (value) => ({...(value as Color4Like)}),
+    },
+    plain(
+        'materialColorScale',
+        (s) => s.materialColorScale,
+        1,
+        (json) => (typeof json === 'number' ? validMaterialColorScale(json) : undefined)
+    ),
+    plain(
+        'sortingFudge',
+        (s) => s.sortingFudge,
+        0,
+        (json) => (typeof json === 'number' ? validSortingFudge(json) : undefined)
+    ),
     plain('softFarFade', (s) => s.softFarFade, DEFAULT_SOFT_FAR_FADE, softFade),
     plain('softNearFade', (s) => s.softNearFade, 0, softFade),
     plain('blendMode', (s) => s.blending, Constants.ALPHA_ADD, number, {json: 'blending'}),
     plain('transparent', (s) => s.transparent, true, boolean),
     plain('depthTest', (s) => s.depthTest, true, boolean),
-    plain('depthWrite', (s) => s.depthWrite, false, boolean),
+    {
+        // Its default follows the surface: written only when it differs from `!transparent`.
+        param: 'depthWrite',
+        get: (s) => s.depthWrite,
+        isDefault: (value, system) => value === !system.transparent,
+        toJSON: (value) => value,
+        fromJSON: boolean,
+        clone: (value) => value,
+    },
     plain('alphaTest', (s) => s.alphaTest, 0, number),
     plain('worldSpace', (s) => s.worldSpace, false, boolean),
     {
@@ -320,7 +371,7 @@ export function settingsToJSON(system: ParticleSystem): Record<string, unknown> 
     const json: Record<string, unknown> = {};
     for (const setting of SETTINGS) {
         const value = setting.get(system);
-        if (!setting.isDefault(value)) {
+        if (!setting.isDefault(value, system)) {
             json[settingJSONKey(setting)] = setting.toJSON(value);
         }
     }

@@ -23,9 +23,12 @@ type StoreBackedParticle = Particle & {storeIndex: number; setStoreIndex(index: 
 const UP = new Vector3(0, 0, 1);
 const IDENTITY_QUATERNION = new Quaternion();
 const tempQ = new Quaternion();
+const alignQ = new Quaternion();
+const Y_AXIS = new Vector3(0, 1, 0);
 const tempV = new Vector3();
 const tempV2 = new Vector3();
 const tempM3 = new Matrix3();
+const unscaledDirection = new Vector3();
 
 /**
  * Gives a system its newborn particles: grows the pool and the store they live in, rolls each
@@ -142,8 +145,20 @@ export class ParticleSpawner {
         const trailSettings = isTrailMode ? (system.rendererEmitterSettings as TrailSettings) : undefined;
         const followLocalOrigin = Boolean(trailSettings?.followLocalOrigin);
         const worldSpace = system.worldSpace;
+        // A mesh's rotation is measured in the axes its render alignment names (see
+        // `RenderAlignment`). Only 'simulation' in world space measures it in the world with the
+        // emitter's turn at birth baked in; 'world', 'view' and 'local' keep the start rotation in
+        // their own axes, and the renderer turns 'local' by the emitter's rotation of the moment.
+        const alignment = system.rendererSettings.renderAlignment ?? 'simulation';
+        const bakesEmitterTurn = alignment === 'simulation';
+        // Align to direction points a 'world' aligned mesh along its travel in the world.
+        const directionFrame = isMeshMode && alignment === 'world' ? tempQ : null;
+        // A number start rotation turns a mesh about an axis picked from where the shape sends it.
+        const axisFromEmission = isMeshMode && !startRotationIsRotation && system.rotationAxis === 'emission';
+        let startAngle = 0;
         // The emitter's matrix carries the scale the scaling mode applies (see
-        // `ParticleEmitter.matrixWorld`); 'shape' scales the shape alone, here.
+        // `ParticleEmitter.matrixWorld`); 'shape' scales the shape alone, here: where it starts
+        // particles and the way it sends them.
         const shapeScale = system.scalingMode === 'shape' ? system.emitter.shapeScale : undefined;
         const particles = system.particles;
         const maxParticles = system.maxParticles;
@@ -228,10 +243,11 @@ export class ParticleSpawner {
                             timeRatio
                         );
                     } else {
-                        (sprite.rotation as Quaternion).setFromAxisAngle(
-                            UP,
-                            (startRotation as FunctionValueGenerator).genValue(sprite.memory, timeRatio)
-                        );
+                        startAngle = (startRotation as FunctionValueGenerator).genValue(sprite.memory, timeRatio);
+                        (sprite.rotation as Quaternion).setFromAxisAngle(UP, startAngle);
+                    }
+                    if (!axisFromEmission) {
+                        sprite.rotationAxis = null;
                     }
                 } else {
                     if (startRotationIsRotation) {
@@ -253,13 +269,29 @@ export class ParticleSpawner {
                 trail.resetHistory();
             }
 
+            // The axis is taken from the way the shape sends the particle, which a start speed of
+            // 0 would hide: the shape runs at a speed of 1 and the velocity is scaled after. Every
+            // shape's velocity is its direction times the start speed.
+            const startSpeed = particle.startSpeed;
+            if (axisFromEmission) {
+                particle.startSpeed = 1;
+            }
             system.emitterShape.initialize(particle, emissionState);
             if (shapeScale !== undefined) {
                 particle.position.multiply(shapeScale);
+                scaleDirection(particle.velocity, shapeScale);
+            }
+            if (axisFromEmission) {
+                const sprite = particle as SpriteParticle;
+                const axis = (sprite.rotationAxis ??= new Vector3());
+                emissionAxis(particle.velocity, particle.position, axis);
+                (sprite.rotation as Quaternion).setFromAxisAngle(axis, startAngle);
+                particle.startSpeed = startSpeed;
+                particle.velocity.multiplyScalar(startSpeed);
             }
 
             if (system.alignToDirection && isSpriteMode) {
-                alignParticleToDirection(particle as SpriteParticle, isMeshMode);
+                alignParticleToDirection(particle as SpriteParticle, isMeshMode, directionFrame);
             }
 
             const parent = emissionState.particle;
@@ -280,11 +312,13 @@ export class ParticleSpawner {
                 particle.position.applyMatrix4(matrix);
                 particle.startSize.multiply(scale).abs();
                 particle.size.copy(particle.startSize);
-                // Through the matrix's own axes, as the position is: scaled, turned and mirrored
-                // with it. For a sub emission that is the parent particle's frame, the same one
-                // its start size takes.
+                // Through the matrix's own axes, as the position is: turned, mirrored and scaled
+                // with it, as Unity starts a world-space particle (measured in Unity 6: an emitter
+                // at half scale starts it at half speed in 'local' and 'hierarchy'; 'shape' leaves
+                // the matrix unscaled). For a sub emission that is the parent particle's frame,
+                // the same one its start size takes.
                 particle.velocity.applyMatrix3(linear);
-                if (particle.rotation && particle.rotation instanceof Quaternion) {
+                if (bakesEmitterTurn && particle.rotation && particle.rotation instanceof Quaternion) {
                     particle.rotation.multiplyQuaternions(tempQ, particle.rotation);
                 }
             } else {
@@ -303,8 +337,57 @@ export class ParticleSpawner {
     }
 }
 
-/** Turns a newborn so that it faces the way its shape sent it; see `ParticleSystem.alignToDirection`. */
-function alignParticleToDirection(sprite: SpriteParticle, isMeshMode: boolean): void {
+/**
+ * Turns the way a particle starts moving by the emitter's world scale, keeping its speed, as Unity
+ * does in Shape scaling mode (measured in Unity 6): a node stretched along Z sends a cone's
+ * particles closer to Z. The axis a mesh particle turns about is then picked from the turned
+ * direction, as Unity picks it. A direction the scale takes to nothing is kept as it was.
+ */
+function scaleDirection(velocity: Vector3, scale: Vector3): void {
+    const speed = velocity.length();
+    if (speed === 0) {
+        return;
+    }
+    unscaledDirection.copy(velocity);
+    velocity.multiply(scale);
+    const length = velocity.length();
+    if (length > 0) {
+        velocity.multiplyScalar(speed / length);
+    } else {
+        velocity.copy(unscaledDirection);
+    }
+}
+
+/**
+ * The axis a mesh particle turns about, picked as Unity picks its `axisOfRotation`: square to Z
+ * and to the direction the shape sends it, whatever its start speed (`direction`, that direction
+ * at a speed of 1); for a particle sent (nearly) along Z, square to Z and to where it starts; for
+ * one that also starts (nearly) on the Z axis, Y. Both in the emitter's axes.
+ */
+function emissionAxis(direction: Vector3, position: Vector3, out: Vector3): void {
+    const length = direction.length();
+    if (length > 0) {
+        // Z × the unit direction, so its length is the sine of the angle from Z.
+        out.set(-direction.y / length, direction.x / length, 0);
+        if (out.lengthSq() >= 0.01) {
+            out.normalize();
+            return;
+        }
+    }
+    out.set(-position.y, position.x, 0);
+    if (out.lengthSq() >= 0.01) {
+        out.normalize();
+        return;
+    }
+    out.copy(Y_AXIS);
+}
+
+/**
+ * Turns a newborn so that it faces the way its shape sent it; see `ParticleSystem.alignToDirection`.
+ * The velocity is still in the emitter's axes here; a mesh measured in other axes passes their
+ * turn from the emitter's as `frame`.
+ */
+function alignParticleToDirection(sprite: SpriteParticle, isMeshMode: boolean, frame: Quaternion | null): void {
     const velocity = sprite.velocity;
     const speedSq = velocity.x * velocity.x + velocity.y * velocity.y + velocity.z * velocity.z;
     if (speedSq === 0) {
@@ -314,8 +397,13 @@ function alignParticleToDirection(sprite: SpriteParticle, isMeshMode: boolean): 
         // +Z along the velocity, with the start rotation applied first.
         const rotation = sprite.rotation as Quaternion;
         tempV.copy(velocity).divideScalar(Math.sqrt(speedSq));
-        tempQ.setFromUnitVectors(UP, tempV);
-        rotation.multiplyQuaternions(tempQ, rotation);
+        if (frame !== null) {
+            tempV.applyQuaternion(frame);
+        }
+        // Its own quaternion: tempQ holds the emitter's turn, which a world-space system still
+        // bakes into the rotation after this.
+        alignQ.setFromUnitVectors(UP, tempV);
+        rotation.multiplyQuaternions(alignQ, rotation);
     } else {
         // The quad's top (its +Y) toward the velocity in the emitter's XY plane.
         if (velocity.x !== 0 || velocity.y !== 0) {

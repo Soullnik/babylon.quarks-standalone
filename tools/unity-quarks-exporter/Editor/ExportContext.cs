@@ -62,7 +62,8 @@ namespace BabylonQuarks.UnityExporter
             string uuid = NewId("node");
             _transformUuid[t] = uuid;
             var ps = t.GetComponent<ParticleSystem>();
-            if (ps != null) _systemUuid[ps] = uuid;
+            // A system left out has no emitter for a sub-emitter reference to name.
+            if (ps != null && ParticleConverter.IsExported(ps)) _systemUuid[ps] = uuid;
             return uuid;
         }
 
@@ -85,6 +86,15 @@ namespace BabylonQuarks.UnityExporter
         public ParticleMaterial AddMaterialForRenderer(ParticleSystemRenderer renderer, bool trail = false)
         {
             Material mat = renderer == null ? null : trail ? renderer.trailMaterial : renderer.sharedMaterial;
+            return AddMaterial(mat, !trail && renderer != null && renderer.renderMode == ParticleSystemRenderMode.Mesh);
+        }
+
+        /// <summary>A Trail Renderer's material, drawn as a quarks trail.</summary>
+        public ParticleMaterial AddMaterialForTrail(TrailRenderer trail) => AddMaterial(trail.sharedMaterial, false);
+
+        /// <param name="mesh">Whether it draws mesh particles, which quarks lights unless told not to.</param>
+        private ParticleMaterial AddMaterial(Material mat, bool mesh)
+        {
             ParticleMaterial info = MaterialReader.Read(mat);
             Texture tex = mat != null ? mat.mainTexture : null;
             string textureUuid = tex != null ? AddTexture(tex) : null;
@@ -107,6 +117,11 @@ namespace BabylonQuarks.UnityExporter
                 .Set("depthTest", true)
                 .Set("depthWrite", info.DepthWrite)
                 .Set("alphaTest", info.AlphaTest);
+            // Unity's particle shaders are unlit, where quarks lights mesh particles by default.
+            if (mesh && !info.Lit)
+            {
+                m.Set("lighting", "unlit");
+            }
             if (textureUuid != null)
             {
                 m.Set("texture", textureUuid);
@@ -168,8 +183,24 @@ namespace BabylonQuarks.UnityExporter
                 t.Set("invertY", false);
                 t.Set("noMipmap", true);
             }
+            else if (SampledFromSrgb(tex))
+            {
+                t.Set("colorSpace", "srgb");
+            }
             Textures.Add(t);
             return texUuid;
+        }
+
+        /// <summary>
+        /// Whether Unity decodes the texture from sRGB to linear when it samples it: its importer's
+        /// sRGB (Color Texture) setting, which only applies in a Linear project. babylon.quarks then
+        /// loads it into an sRGB buffer, decoded and filtered in linear space as Unity does. A
+        /// texture made in code has no importer and is read as stored.
+        /// </summary>
+        private static bool SampledFromSrgb(Texture tex)
+        {
+            if (QualitySettings.activeColorSpace != ColorSpace.Linear) return false;
+            return AssetImporter.GetAtPath(AssetDatabase.GetAssetPath(tex)) is TextureImporter importer && importer.sRGBTexture;
         }
 
         /// <summary>
@@ -434,13 +465,24 @@ namespace BabylonQuarks.UnityExporter
             return uuid;
         }
 
-        /// <summary>positions / indices / uvs / normals of a mesh, in QuarksGeometry layout.</summary>
+        /// <summary>positions / indices / uvs / normals / colors of a mesh, in QuarksGeometry layout.</summary>
         private static JObject BuildGeometryData(Mesh mesh)
         {
+            Vector3[] vertices = mesh.vertices;
             var positions = new JArray();
-            foreach (var v in mesh.vertices) { positions.Add(v.x); positions.Add(v.y); positions.Add(v.z); }
+            foreach (var v in vertices) { positions.Add(v.x); positions.Add(v.y); positions.Add(v.z); }
+            // Unity's front faces wind clockwise as the camera sees them, Babylon's (and an effect
+            // file's, as babylon.quarks writes a Babylon mesh) counter-clockwise, in the same
+            // left-handed space: each triangle is written with its last two corners swapped, so
+            // Render Face culls the faces Unity culls and a mesh lights on the side Unity lights.
             var indices = new JArray();
-            foreach (var idx in mesh.triangles) { indices.Add(idx); }
+            int[] triangles = mesh.triangles;
+            for (int i = 0; i + 2 < triangles.Length; i += 3)
+            {
+                indices.Add(triangles[i]);
+                indices.Add(triangles[i + 2]);
+                indices.Add(triangles[i + 1]);
+            }
             var g = new JObject().Set("positions", positions).Set("indices", indices);
 
             AddUVs(g, "uvs", mesh.uv);
@@ -456,7 +498,27 @@ namespace BabylonQuarks.UnityExporter
                 foreach (var v in normals) { n.Add(v.x); n.Add(v.y); n.Add(v.z); }
                 g.Set("normals", n);
             }
+
+            // Vertex colours, which Unity multiplies a particle's colour by, taken as they are (it
+            // converts the particle colour into a Linear project's space, not these). A mesh whose
+            // vertices are all white multiplies by 1 and is written without them.
+            Color32[] colors = mesh.colors32;
+            if (colors != null && colors.Length == vertices.Length && !AllWhite(colors))
+            {
+                var c = new JArray();
+                foreach (var v in colors) { c.Add(v.r / 255f); c.Add(v.g / 255f); c.Add(v.b / 255f); c.Add(v.a / 255f); }
+                g.Set("colors", c);
+            }
             return g;
+        }
+
+        private static bool AllWhite(Color32[] colors)
+        {
+            foreach (var c in colors)
+            {
+                if (c.r != 255 || c.g != 255 || c.b != 255 || c.a != 255) return false;
+            }
+            return true;
         }
 
         private static void AddUVs(JObject geometry, string key, Vector2[] uv)
@@ -479,7 +541,6 @@ namespace BabylonQuarks.UnityExporter
             MeshSourceNodes.Add(new JObject()
                 .Set("uuid", nodeUuid)
                 .Set("name", mesh.name + " (emitter source)")
-                .Set("matrix", new JArray().Add(1).Add(0).Add(0).Add(0).Add(0).Add(1).Add(0).Add(0).Add(0).Add(0).Add(1).Add(0).Add(0).Add(0).Add(0).Add(1))
                 .Set("type", "Mesh")
                 .Set("isVisible", false)
                 .Set("geometry", geometryUuid));

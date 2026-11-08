@@ -1,154 +1,267 @@
 import {Constants} from '@babylonjs/core/Engines/constants';
-import {Color4} from '@babylonjs/core/Maths/math.color';
+import {Color3, Color4} from '@babylonjs/core/Maths/math.color';
 import {Vector3 as BVector3} from '@babylonjs/core/Maths/math.vector';
+import {TransformNode} from '@babylonjs/core/Meshes/transformNode';
 import {
-    Bezier,
+    ColorOverLife,
     ConstantColor,
     ConstantValue,
     FrameOverLife,
     IntervalValue,
     ParticleSystem,
-    PiecewiseBezier,
     PointEmitter,
     RandomColor,
     RenderMode,
     SizeOverLife,
     SphereEmitter,
+    Vector3Function,
 } from 'babylon.quarks';
-import {createColorOverLifeRange, createSharedTexture, SHARED_ASSETS} from '../shared/common';
-import type {DemoContext} from '../types';
+import {curve, fade} from '../shared/curves';
+import {addGround} from '../shared/stage';
+import {baseTexture, kenneySheet, kenneyTexture} from '../shared/textures';
+import type {DemoContext, DemoRun} from '../types';
 
-export function init({scene, camera, batchRenderer, systems, demoState}: DemoContext) {
-    camera.setPosition(new BVector3(0, 8, 20));
-    const texture2 = createSharedTexture(scene, SHARED_ASSETS.atlasSecondary);
-    const tracked: ParticleSystem[] = [];
+/**
+ * A ball of lightning drifting on a figure-eight. Its core flickers (short glows replacing each
+ * other), a web of electricity crackles over it and in it (webs of the sheet lit for a moment each,
+ * turned and picked at random, overlapping into a net), bolts crack out of its centre in every
+ * direction (a card whose `pivot` puts its left end on the particle, turned at random, each
+ * showing a random bolt of the sheet for a moment), and sparks thrown off in world space stay
+ * behind as it moves. Its webs and bolts are made from Kenney's CC0 particle pack.
+ */
+export function init({scene, camera, add}: DemoContext): DemoRun {
+    camera.setPosition(new BVector3(0, 3, 8.2));
+    camera.setTarget(new BVector3(0, 1.9, 0));
+    const glow = baseTexture(scene, 'glow');
+    const bolts = kenneyTexture(scene, 'bolts');
+    const webs = kenneyTexture(scene, 'webs');
+    const spark = baseTexture(scene, 'spark');
 
-    const beam = new ParticleSystem({
-        scene,
-        duration: 1,
-        looping: true,
-        startLife: new ConstantValue(1.0),
+    // A ground to float over, lit by the ball where it passes.
+    addGround(scene, 0, new Color3(0.2, 0.22, 0.27));
+
+    const ball = new TransformNode('Ball lightning', scene);
+    const attach = (system: ParticleSystem, name: string) => {
+        system.emitter.name = name;
+        system.emitter.parent = ball;
+        add(system);
+        return system;
+    };
+    const common = {scene, transparent: true, blendMode: Constants.ALPHA_ADD, looping: true, duration: 1};
+
+    // The glow round it and the flickering core: short glows, each a little different, so the
+    // brightness never settles.
+    attach(
+        new ParticleSystem({
+            ...common,
+            startLife: new IntervalValue(0.25, 0.4),
+            startSpeed: new ConstantValue(0),
+            startSize: new IntervalValue(4.2, 5),
+            startColor: new ConstantColor(new Color4(0.3, 0.5, 1, 0.6)),
+            emissionOverTime: new ConstantValue(8),
+            shape: new PointEmitter(),
+            texture: glow,
+            renderOrder: 0,
+        }),
+        'Aura'
+    ).addBehavior(new ColorOverLife(fade(0.3, 0.6)));
+    attach(
+        new ParticleSystem({
+            ...common,
+            startLife: new IntervalValue(0.08, 0.16),
+            startSpeed: new ConstantValue(0),
+            startSize: new IntervalValue(0.45, 0.75),
+            startColor: new RandomColor(new Color4(0.45, 0.65, 1, 0.6), new Color4(0.75, 0.88, 1, 0.75)),
+            emissionOverTime: new ConstantValue(16),
+            shape: new PointEmitter(),
+            texture: glow,
+            renderOrder: 2,
+        }),
+        'Core'
+    ).addBehavior(new ColorOverLife(fade(0.2, 0.5)));
+
+    // A web of electricity over it: crackling webs the size of the ball, each lit for a moment,
+    // turned at random and a random one of the sheet, so they overlap into a net that never holds
+    // still; smaller, brighter ones crackle inside.
+    for (const [name, size, rate, color, order] of [
+        ['Web', [3, 4.4], 30, [new Color4(0.22, 0.42, 1, 0.5), new Color4(0.45, 0.68, 1, 0.65)], 1],
+        ['Crackle', [1.3, 2], 18, [new Color4(0.4, 0.62, 1, 0.55), new Color4(0.7, 0.85, 1, 0.75)], 2],
+    ] as const) {
+        attach(
+            new ParticleSystem({
+                ...common,
+                startLife: new IntervalValue(0.06, 0.14),
+                startSpeed: new ConstantValue(0),
+                startSize: new IntervalValue(size[0], size[1]),
+                startRotation: new IntervalValue(0, Math.PI * 2),
+                startColor: new RandomColor(color[0], color[1]),
+                emissionOverTime: new ConstantValue(rate),
+                shape: new PointEmitter(),
+                texture: webs,
+                ...kenneySheet('webs'),
+                startTileIndex: new IntervalValue(0, 4),
+                renderOrder: order,
+            }),
+            name
+        );
+    }
+
+    // Bolts out of the centre: a 3:1 card whose left end sits on the particle (pivot +0.5 in x),
+    // turned at random, flickering through random bolts of the sheet.
+    const boltSystem = attach(
+        new ParticleSystem({
+            ...common,
+            startLife: new IntervalValue(0.06, 0.12),
+            startSpeed: new ConstantValue(0),
+            startSize: new Vector3Function(
+                new IntervalValue(1, 1.8),
+                new IntervalValue(0.4, 0.6),
+                new ConstantValue(1)
+            ),
+            startRotation: new IntervalValue(0, Math.PI * 2),
+            startColor: new RandomColor(new Color4(0.55, 0.75, 1, 1), new Color4(0.9, 0.95, 1, 1)),
+            emissionOverTime: new ConstantValue(14),
+            shape: new PointEmitter(),
+            texture: bolts,
+            ...kenneySheet('bolts'),
+            startTileIndex: new ConstantValue(0),
+            pivot: new BVector3(0.5, 0, 0),
+            renderOrder: 3,
+        }),
+        'Bolts'
+    );
+    boltSystem.addBehavior(new FrameOverLife(new ConstantValue(0), {fps: 24, frameCount: 4, random: true}));
+
+    // Sparks thrown off, simulated in world space: they stay where they were thrown as the ball
+    // moves on, and fall.
+    const sparks = attach(
+        new ParticleSystem({
+            ...common,
+            worldSpace: true,
+            startLife: new IntervalValue(0.3, 0.7),
+            startSpeed: new IntervalValue(1.5, 4),
+            startSize: new IntervalValue(0.08, 0.16),
+            startColor: new RandomColor(new Color4(0.6, 0.8, 1, 1), new Color4(1, 1, 1, 1)),
+            emissionOverTime: new ConstantValue(40),
+            shape: new SphereEmitter({radius: 0.6, thickness: 0}),
+            texture: spark,
+            renderMode: RenderMode.StretchedBillBoard,
+            rendererEmitterSettings: {speedFactor: 0.08, lengthFactor: 1},
+            renderOrder: 3,
+        }),
+        'Sparks'
+    );
+    sparks.addBehavior(
+        new SizeOverLife(
+            curve([
+                [0, 1],
+                [1, 0],
+            ])
+        )
+    );
+
+    // Its light on the ground, which follows it on the ground below.
+    const pool = new ParticleSystem({
+        ...common,
+        startLife: new IntervalValue(0.2, 0.35),
         startSpeed: new ConstantValue(0),
-        startSize: new ConstantValue(15.0),
-        startColor: new ConstantColor(new Color4(0.5220588 * 0.772549, 0.6440161 * 0.772549, 1 * 0.772549, 0.772549)),
-        worldSpace: false,
-        emissionOverTime: new ConstantValue(1),
-        emissionBursts: [],
+        startSize: new IntervalValue(4.5, 5.5),
+        startColor: new ConstantColor(new Color4(0.3, 0.5, 1, 0.5)),
+        emissionOverTime: new ConstantValue(10),
         shape: new PointEmitter(),
-        texture: texture2,
-        transparent: true,
-        blendMode: Constants.ALPHA_ADD,
-        startTileIndex: new ConstantValue(1),
-        uTileCount: 10,
-        vTileCount: 10,
-        renderMode: RenderMode.BillBoard,
+        texture: glow,
+        renderMode: RenderMode.HorizontalBillBoard,
         renderOrder: 0,
     });
-    batchRenderer.addSystem(beam);
-    systems.push(beam);
-    tracked.push(beam);
+    pool.emitter.name = 'Light on the ground';
+    pool.addBehavior(new ColorOverLife(fade(0.3, 0.6)));
+    add(pool);
 
-    const beamWorld = new ParticleSystem({
-        scene,
-        duration: 1,
-        looping: true,
-        startLife: new IntervalValue(0.1, 0.4),
+    // The charge it throws on the ground under it: webs lying flat, each lit for a moment, a
+    // random one of the sheet turned at random, so the light crackles rather than glows evenly.
+    const crackle = new ParticleSystem({
+        ...common,
+        startLife: new IntervalValue(0.06, 0.14),
         startSpeed: new ConstantValue(0),
-        startSize: new IntervalValue(7.5, 15),
-        startColor: new RandomColor(
-            new Color4(0.1397059 * 0.8, 0.3592291 * 0.8, 1 * 0.8, 1),
-            new Color4(1 * 0.8, 0.9275356 * 0.8, 0.1029412 * 0.8, 1)
-        ),
-        worldSpace: true,
-        emissionOverTime: new IntervalValue(5, 10),
-        emissionBursts: [],
-        shape: new SphereEmitter({radius: 0.01, thickness: 1, arc: Math.PI * 2}),
-        texture: texture2,
-        transparent: true,
-        blendMode: Constants.ALPHA_ADD,
-        startTileIndex: new ConstantValue(1),
-        uTileCount: 10,
-        vTileCount: 10,
-        renderMode: RenderMode.BillBoard,
+        startSize: new IntervalValue(2, 3.2),
+        startRotation: new IntervalValue(0, Math.PI * 2),
+        startColor: new RandomColor(new Color4(0.25, 0.45, 1, 0.35), new Color4(0.5, 0.72, 1, 0.55)),
+        emissionOverTime: new ConstantValue(16),
+        shape: new PointEmitter(),
+        texture: webs,
+        ...kenneySheet('webs'),
+        startTileIndex: new IntervalValue(0, 4),
+        renderMode: RenderMode.HorizontalBillBoard,
         renderOrder: 0,
     });
-    beamWorld.addBehavior(createColorOverLifeRange(new Color4(1, 1, 1, 1), new Color4(0, 0, 0, 1)));
-    batchRenderer.addSystem(beamWorld);
-    systems.push(beamWorld);
-    tracked.push(beamWorld);
+    crackle.emitter.name = 'Crackle on the ground';
+    add(crackle);
 
-    const electricity = new ParticleSystem({
-        scene,
-        duration: 0.5,
-        looping: true,
-        startLife: new IntervalValue(0.2, 0.3),
+    // Now and then it strikes the ground: a bolt from the ball down (a card hanging from its top
+    // end, turned to point down), and a flash where it lands. Each is one burst, replayed (restart)
+    // at the strike, placed under the ball.
+    const once = [{time: 0, count: new ConstantValue(1), cycle: 1, interval: 0, probability: 1}];
+    const strike = new ParticleSystem({
+        ...common,
+        looping: false,
+        duration: 0.2,
+        startLife: new ConstantValue(0.12),
         startSpeed: new ConstantValue(0),
-        startSize: new IntervalValue(3, 6),
-        startRotation: new IntervalValue(-Math.PI, Math.PI),
-        startColor: new RandomColor(new Color4(0.1397059, 0.3592291, 1, 1), new Color4(1, 0.9275356, 0.1029412, 1)),
-        worldSpace: true,
-        emissionOverTime: new IntervalValue(5, 10),
-        emissionBursts: [],
+        startSize: new Vector3Function(new ConstantValue(2.6), new IntervalValue(0.7, 0.9), new ConstantValue(1)),
+        startRotation: new ConstantValue(-Math.PI / 2),
+        startColor: new ConstantColor(new Color4(0.75, 0.88, 1, 1)),
+        emissionOverTime: new ConstantValue(0),
+        emissionBursts: once,
         shape: new PointEmitter(),
-        texture: texture2,
-        transparent: true,
-        blendMode: Constants.ALPHA_ADD,
-        startTileIndex: new ConstantValue(0),
-        uTileCount: 10,
-        vTileCount: 10,
-        renderMode: RenderMode.BillBoard,
-        renderOrder: 2,
+        texture: bolts,
+        ...kenneySheet('bolts'),
+        startTileIndex: new IntervalValue(0, 4),
+        pivot: new BVector3(0.5, 0, 0),
+        renderOrder: 3,
     });
-    electricity.addBehavior(new FrameOverLife(new PiecewiseBezier([[new Bezier(53, 56, 59, 62), 0]])));
-    electricity.addBehavior(new SizeOverLife(new PiecewiseBezier([[new Bezier(1.0, 1.0, 0.75, 0), 0]])));
-    batchRenderer.addSystem(electricity);
-    systems.push(electricity);
-    tracked.push(electricity);
-
-    const electricBall = new ParticleSystem({
-        scene,
+    strike.emitter.name = 'Strike';
+    add(strike);
+    const landing = new ParticleSystem({
+        ...common,
+        looping: false,
         duration: 0.4,
-        looping: true,
-        startLife: new IntervalValue(0.2, 0.4),
+        startLife: new ConstantValue(0.35),
         startSpeed: new ConstantValue(0),
-        startSize: new IntervalValue(5, 10),
-        startRotation: new IntervalValue(-Math.PI, Math.PI),
-        startColor: new RandomColor(new Color4(0.1397059, 0.3592291, 1, 1), new Color4(1, 0.9275356, 0.1029412, 1)),
-        worldSpace: false,
-        emissionOverTime: new ConstantValue(3),
-        emissionBursts: [],
+        startSize: new ConstantValue(2.6),
+        startRotation: new IntervalValue(0, Math.PI * 2),
+        startColor: new ConstantColor(new Color4(0.55, 0.75, 1, 1)),
+        emissionOverTime: new ConstantValue(0),
+        emissionBursts: once,
         shape: new PointEmitter(),
-        texture: texture2,
-        transparent: true,
-        blendMode: Constants.ALPHA_ADD,
-        startTileIndex: new ConstantValue(0),
-        uTileCount: 10,
-        vTileCount: 10,
-        renderMode: RenderMode.BillBoard,
+        texture: kenneyTexture(scene, 'stars'),
+        ...kenneySheet('stars'),
+        startTileIndex: new ConstantValue(3),
+        renderMode: RenderMode.HorizontalBillBoard,
         renderOrder: 1,
     });
-    electricBall.addBehavior(new FrameOverLife(new PiecewiseBezier([[new Bezier(62, 65, 68, 71), 0]])));
-    batchRenderer.addSystem(electricBall);
-    systems.push(electricBall);
-    tracked.push(electricBall);
+    landing.addBehavior(new ColorOverLife(fade(0, 0.25)));
+    landing.emitter.name = 'Strike flash';
+    add(landing);
+    strike.stop();
+    landing.stop();
 
-    demoState.electricBall = {tracked, x: 0};
-    for (const s of tracked) {
-        s.restart();
-        s.play();
-    }
-}
-
-export function update({demoState}: DemoContext, delta: number) {
-    const st = demoState.electricBall;
-    if (!st?.tracked?.length) {
-        return;
-    }
-    st.x += delta * 30;
-    if (st.x > 20) {
-        st.x = -20;
-    }
-    for (const s of st.tracked) {
-        s.emitter.position.x = st.x;
-    }
+    // Drifts on a figure-eight, bobbing.
+    let time = 0;
+    let nextStrike = 0.8;
+    return {
+        update(delta) {
+            time += delta;
+            ball.position.set(Math.sin(time * 0.6) * 2.6, 2.4 + Math.sin(time * 1.7) * 0.3, Math.sin(time * 1.2) * 1.2);
+            pool.emitter.position.set(ball.position.x, 0.02, ball.position.z);
+            crackle.emitter.position.set(ball.position.x, 0.025, ball.position.z);
+            if (time >= nextStrike) {
+                // The hanging card's top end on the ball's underside, its length to the ground.
+                strike.emitter.position.set(ball.position.x, ball.position.y - 0.2, ball.position.z);
+                landing.emitter.position.set(ball.position.x, 0.03, ball.position.z);
+                strike.restart();
+                landing.restart();
+                nextStrike = time + 0.7 + Math.random() * 0.9;
+            }
+        },
+    };
 }

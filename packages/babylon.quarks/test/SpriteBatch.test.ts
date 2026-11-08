@@ -209,7 +209,7 @@ describe('SpriteBatch', () => {
         const batch = getSpriteBatch(renderer);
         const velocityBuffer = batch['velocityBuffer'] as Float32Array;
         const material = batch.mesh.material as ShaderMaterial;
-        expect(velocityBuffer[0]).toBeCloseTo(0.003, 6);
+        expect(velocityBuffer[0]).toBeCloseTo(0.0003, 7);
         expect(velocityBuffer[3]).toBe(3);
         // The speed is baked into the velocity attribute; the shader has no speed uniform.
         expect(material['_options'].uniforms).not.toContain('speedFactor');

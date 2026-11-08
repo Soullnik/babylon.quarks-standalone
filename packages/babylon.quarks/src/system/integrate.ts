@@ -43,8 +43,10 @@ const tempV = new Vector3();
  * produces on into the part of the frame that comes after it. Size and colour are only
  * snapshotted when some behavior can change them; otherwise the columns stay what spawn wrote
  * and the renderer reads them as they are. Only stretched billboards draw from velocity, and only
- * they pay for keeping the previous one; `rebind` is called when keeping it first allocates its
- * column, since every particle then has to be re-pointed at the store.
+ * they pay for keeping the previous one, and for keeping the animated velocity the behaviors that
+ * move a position directly add to (`keepAnimatedVelocity`), which starts each step at zero;
+ * `rebind` is called when keeping either first allocates its column, since every particle then
+ * has to be re-pointed at the store.
  */
 export function snapshotPreviousState(
     store: ParticleStore,
@@ -52,6 +54,7 @@ export function snapshotPreviousState(
     snapshotSize: boolean,
     snapshotColor: boolean,
     keepVelocity: boolean,
+    keepAnimatedVelocity: boolean,
     rebind: () => void
 ): void {
     const vector3Rows = particleCount * 3;
@@ -66,6 +69,16 @@ export function snapshotPreviousState(
             rebind();
         }
         copyPrefix(store.previousVelocity, 0, store.velocity, vector3Rows);
+    }
+    if (keepAnimatedVelocity && store.keepAnimatedVelocity()) {
+        rebind();
+    }
+    // The last step's goes to previousAnimatedVelocity for the renderer's smoothing; this step's
+    // starts at zero for the behaviors to add to. Zeroed once more when it stops being read, so no
+    // stale motion is drawn.
+    if (store.animatedVelocity.length > 0) {
+        copyPrefix(store.previousAnimatedVelocity, 0, store.animatedVelocity, vector3Rows);
+        store.animatedVelocity.fill(0, 0, vector3Rows);
     }
     if (snapshotColor) {
         copyPrefix(store.previousColor, 0, store.color, particleCount * 4);
@@ -211,12 +224,21 @@ export function integrateSprites(
     let maxZ = measure ? -Infinity : carriedMax.z;
     let maxSize = measure ? 0 : bounds.maxSize;
     let maxSpeedSq = measure ? 0 : bounds.maxSpeedSq;
+    const animated = store.animatedVelocity;
+    const previousAnimated = store.previousAnimatedVelocity;
+    const hasAnimated = animated.length > 0;
     for (let i = 0; i < liveParticleCount; i++) {
         const scalar = i * stride;
         let age = scalars[scalar + ParticleStore.AGE];
         const offset = i * 3;
         const track = measure || age === 0;
         if (age === 0) {
+            // A newborn has no last step: its shape starts from this one's.
+            if (hasAnimated) {
+                previousAnimated[offset] = animated[offset];
+                previousAnimated[offset + 1] = animated[offset + 1];
+                previousAnimated[offset + 2] = animated[offset + 2];
+            }
             if (collapseSize) {
                 prevSize[offset] = curSize[offset];
                 prevSize[offset + 1] = curSize[offset + 1];
@@ -255,11 +277,18 @@ export function integrateSprites(
             maxSize = Math.max(maxSize, Math.max(curSize[offset], Math.max(curSize[offset + 1], curSize[offset + 2])));
         }
         // Speed is tracked every step: it bounds how far the particles
-        // can have moved since the last measurement.
+        // can have moved since the last measurement. A behavior's direct move counts too.
         if (frozen) {
             continue;
         }
-        maxSpeedSq = Math.max(maxSpeedSq, vx * vx + vy * vy + vz * vz);
+        if (hasAnimated) {
+            const ax = vx + animated[offset];
+            const ay = vy + animated[offset + 1];
+            const az = vz + animated[offset + 2];
+            maxSpeedSq = Math.max(maxSpeedSq, ax * ax + ay * ay + az * az);
+        } else {
+            maxSpeedSq = Math.max(maxSpeedSq, vx * vx + vy * vy + vz * vz);
+        }
         age += delta;
         scalars[scalar + ParticleStore.AGE] = age;
         if (ring !== undefined) {
@@ -340,8 +369,11 @@ export function collapseTrailNewborns(
 }
 
 /**
- * Moves and ages the trail particles: a trail that follows its local origin is placed by its
- * emitter (or parent) matrix every step, any other along its velocity.
+ * Moves and ages the trail particles: a trail that follows its local origin stays where it was
+ * emitted relative to the emitter every step, any other moves along its velocity. A world-space
+ * system holds it there by the emitter's matrix; a local-space one keeps its local position as it
+ * is, since its positions are in the frame the emitter (or, for a sub emission, the parent
+ * particle) carries: the renderer, or `recordWorldSpace`, brings them to the world once.
  */
 export function moveTrails(
     delta: number,
@@ -349,6 +381,7 @@ export function moveTrails(
     store: ParticleStore,
     particleCount: number,
     followLocalOrigin: boolean,
+    worldSpace: boolean,
     emitterMatrix: Matrix4
 ): void {
     if (followLocalOrigin) {
@@ -356,7 +389,9 @@ export function moveTrails(
             const particle = particles[i];
             if ((particle as TrailParticle).localPosition) {
                 particle.position.copy((particle as TrailParticle).localPosition!);
-                particle.position.applyMatrix4(particle.parentMatrix ?? emitterMatrix);
+                if (worldSpace) {
+                    particle.position.applyMatrix4(emitterMatrix);
+                }
             } else {
                 particle.position.addScaledVector(particle.velocity, delta * particle.speedModifier);
             }

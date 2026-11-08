@@ -1,305 +1,229 @@
-import {VertexBuffer} from '@babylonjs/core/Buffers/buffer';
 import {Constants} from '@babylonjs/core/Engines/constants';
-import {DynamicTexture} from '@babylonjs/core/Materials/Textures/dynamicTexture';
-import {Texture} from '@babylonjs/core/Materials/Textures/texture';
-import {Color4} from '@babylonjs/core/Maths/math.color';
+import {StandardMaterial} from '@babylonjs/core/Materials/standardMaterial';
+import {Color3, Color4} from '@babylonjs/core/Maths/math.color';
 import {Vector3 as BVector3} from '@babylonjs/core/Maths/math.vector';
-import {CreateCylinder} from '@babylonjs/core/Meshes/Builders/cylinderBuilder';
+import {MeshBuilder} from '@babylonjs/core/Meshes/meshBuilder';
 import {TransformNode} from '@babylonjs/core/Meshes/transformNode';
-import type {Scene} from '@babylonjs/core/scene';
 import {
-    AxisAngleGenerator,
-    Bezier,
+    ColorOverLength,
+    ColorOverLife,
+    ConeEmitter,
     ConstantColor,
     ConstantValue,
-    FrameOverLife,
+    Gradient,
     IntervalValue,
     ParticleSystem,
-    PiecewiseBezier,
+    type ParticleSystemParameters,
     PointEmitter,
+    RandomColor,
     RenderMode,
-    SizeOverLife,
-    Vector3Function,
-    VelocityOverLife,
 } from 'babylon.quarks';
-import {createColorOverLifeGradient} from '../shared/common';
-import type {DemoContext} from '../types';
+import {fade} from '../shared/curves';
+import {band} from '../shared/geometry';
+import {addLabel} from '../shared/labels';
+import {addGround} from '../shared/stage';
+import {baseTexture, kenneyTexture} from '../shared/textures';
+import type {DemoContext, DemoRun} from '../types';
 
-/** A square canvas texture painted by `paint`, wrapping or clamped. */
-function canvasTexture(
-    scene: Scene,
-    name: string,
-    size: number,
-    wrap: boolean,
-    paint: (ctx: CanvasRenderingContext2D, size: number) => void
-): DynamicTexture {
-    const texture = new DynamicTexture(name, {width: size, height: size}, scene, false);
-    paint(texture.getContext() as unknown as CanvasRenderingContext2D, size);
-    texture.update(false);
-    const mode = wrap ? Texture.WRAP_ADDRESSMODE : Texture.CLAMP_ADDRESSMODE;
-    texture.wrapU = mode;
-    texture.wrapV = mode;
-    return texture;
-}
-
-/** A tiny seeded generator, so the pictures are the same every run. */
-function seeded(seed: number): () => number {
-    return () => {
-        seed = (seed * 16807) % 2147483647;
-        return seed / 2147483647;
-    };
-}
-
-/** Spiky pillars standing up off a bright foot, tiling along U: what a crown of light is drawn from. */
-function pillars(ctx: CanvasRenderingContext2D, size: number): void {
-    const image = ctx.createImageData(size, size);
-    const random = seeded(11);
-    const heights = Array.from({length: 8}, () => 0.45 + random() * 0.5);
-    for (let y = 0; y < size; y++) {
-        // Canvas rows run top down; the foot is the bottom row.
-        const v = 1 - y / size;
-        for (let x = 0; x < size; x++) {
-            const u = (x / size) * heights.length;
-            const column = Math.floor(u);
-            const across = Math.sin((u - column) * Math.PI);
-            const top = heights[column];
-            const pillar = Math.max(0, 1 - v / top) * Math.pow(across, 2);
-            const foot = Math.exp(-v * 9);
-            const a = Math.min(1, pillar + foot);
-            const i = (y * size + x) * 4;
-            image.data[i] = image.data[i + 1] = image.data[i + 2] = 255;
-            image.data[i + 3] = Math.round(a * 255);
-        }
-    }
-    ctx.putImageData(image, 0, 0);
-}
-
-/** A soft band across V, for rings travelling up a figure. */
-function band(ctx: CanvasRenderingContext2D, size: number): void {
-    const image = ctx.createImageData(size, size);
-    for (let y = 0; y < size; y++) {
-        const across = Math.abs(y / size - 0.5) * 2;
-        const a = Math.exp(-across * across * 6);
-        for (let x = 0; x < size; x++) {
-            const i = (y * size + x) * 4;
-            image.data[i] = image.data[i + 1] = image.data[i + 2] = 255;
-            image.data[i + 3] = Math.round(a * 255);
-        }
-    }
-    ctx.putImageData(image, 0, 0);
-}
-
-/** Smooth value noise in red and green, wrapping, for UV distortion. */
-function noise(ctx: CanvasRenderingContext2D, size: number): void {
-    const cells = 6;
-    const random = seeded(5);
-    const gridR = Array.from({length: cells * cells}, random);
-    const gridG = Array.from({length: cells * cells}, random);
-    const sample = (grid: number[], fx: number, fy: number) => {
-        const ix = Math.floor(fx);
-        const iy = Math.floor(fy);
-        const tx = (fx - ix) * (fx - ix) * (3 - 2 * (fx - ix));
-        const ty = (fy - iy) * (fy - iy) * (3 - 2 * (fy - iy));
-        const at = (gx: number, gy: number) => grid[(gy % cells) * cells + (gx % cells)];
-        const top = at(ix, iy) * (1 - tx) + at(ix + 1, iy) * tx;
-        const bottom = at(ix, iy + 1) * (1 - tx) + at(ix + 1, iy + 1) * tx;
-        return top * (1 - ty) + bottom * ty;
-    };
-    const image = ctx.createImageData(size, size);
-    for (let y = 0; y < size; y++) {
-        for (let x = 0; x < size; x++) {
-            const fx = (x / size) * cells;
-            const fy = (y / size) * cells;
-            const i = (y * size + x) * 4;
-            image.data[i] = Math.round(sample(gridR, fx, fy) * 255);
-            image.data[i + 1] = Math.round(sample(gridG, fx, fy) * 255);
-            image.data[i + 2] = 128;
-            image.data[i + 3] = 255;
-        }
-    }
-    ctx.putImageData(image, 0, 0);
-}
-
-/** Six jagged strikes stacked in rows, each running along U, the last row left empty: a gap in the flicker. */
-function strikes(ctx: CanvasRenderingContext2D, size: number): void {
-    ctx.clearRect(0, 0, size, size);
-    const rows = 6;
-    const height = size / rows;
-    for (let r = 0; r < rows - 1; r++) {
-        const mid = height * (r + 0.5);
-        for (const [lineWidth, alpha] of [
-            [5, 0.25],
-            [1.6, 1],
-        ]) {
-            const random = seeded(7 + r * 31);
-            ctx.strokeStyle = `rgba(255, 255, 255, ${alpha})`;
-            ctx.lineWidth = lineWidth;
-            ctx.beginPath();
-            ctx.moveTo(0, mid);
-            for (let x = 8; x <= size; x += 8) {
-                ctx.lineTo(x, mid + (random() - 0.5) * height * 0.7 * Math.sin((x / size) * Math.PI));
-            }
-            ctx.stroke();
-        }
-    }
-}
-
-/** A blade's smear: bright at its tip (V 1), fading to the grip, and along U from the blade back. */
-function smear(ctx: CanvasRenderingContext2D, size: number): void {
-    const image = ctx.createImageData(size, size);
-    for (let y = 0; y < size; y++) {
-        const v = 1 - y / size;
-        for (let x = 0; x < size; x++) {
-            const u = x / size;
-            const a = Math.pow(v, 2) * u;
-            const i = (y * size + x) * 4;
-            image.data[i] = image.data[i + 1] = image.data[i + 2] = 255;
-            image.data[i + 3] = Math.round(a * 255);
-        }
-    }
-    ctx.putImageData(image, 0, 0);
-}
-
-/** An open tube, `radius` wide and one tall from its foot, as the geometry a mesh particle draws. */
-function tube(scene: Scene, radius: number, tessellation = 48) {
-    const mesh = CreateCylinder('tube', {height: 1, diameter: radius * 2, tessellation, cap: 0}, scene);
-    mesh.bakeTransformIntoVertices(
-        mesh
-            .computeWorldMatrix(true)
-            .clone()
-            .setTranslation(new BVector3(0, 0.5, 0))
-    );
-    const geometry = {
-        instancingGeometry: new Float32Array(mesh.getVerticesData(VertexBuffer.PositionKind)!),
-        instancingNormals: new Float32Array(mesh.getVerticesData(VertexBuffer.NormalKind)!),
-        instancingUVs: new Float32Array(mesh.getVerticesData(VertexBuffer.UVKind)!),
-        instancingIndices: new Uint32Array(mesh.getIndices()!),
-    };
-    mesh.dispose();
-    return geometry;
-}
-
-export function init({scene, camera, batchRenderer, systems}: DemoContext) {
-    camera.setPosition(new BVector3(0, 3, 12));
+/**
+ * An aura and a weapon trail, two things mesh particles and trails do that billboards cannot.
+ *
+ * Left, an aura round a character: a crown of tongues on a band mesh turning round them, breathing
+ * through `uvDistortion` (a noise map scrolled across the texture), its faces fading where they
+ * look at the camera (`rim: 'fade'`) so it reads as a shell of light thick at its edges, and
+ * motes rising.
+ *
+ * Right, a blade swinging to and fro: its trail is swept along the blade (`sideAxis`), the
+ * surface the edge passed through rather than a line behind a point, and curved between frames
+ * (`tessellation`) so a fast swing stays round.
+ */
+export function init({scene, camera, add}: DemoContext): DemoRun {
+    camera.setPosition(new BVector3(0, 3, 9.5));
     camera.setTarget(new BVector3(0, 1.2, 0));
-    const distortionMap = canvasTexture(scene, 'noise', 128, true, noise);
+    addGround(scene);
+    const heroMaterial = new StandardMaterial('hero', scene);
+    heroMaterial.diffuseColor = new Color3(0.36, 0.36, 0.42);
+    heroMaterial.specularColor = new Color3(0.1, 0.1, 0.1);
+    const hero = MeshBuilder.CreateCapsule('hero', {height: 2.2, radius: 0.42}, scene);
+    hero.position.set(-2.6, 1.1, 0);
+    hero.material = heroMaterial;
+    addLabel(scene, "Aura: uvDistortion, rim: 'fade'", new BVector3(-2.6, 2.6, 0), {height: 0.36});
+    addLabel(scene, 'Swept trail: sideAxis', new BVector3(2.6, 2.6, 0), {height: 0.36});
 
-    // A crown of light: a tube of pillars turning round, breathing through
-    // UV distortion, its faces fading so it reads thick along its edges.
-    const crown = new ParticleSystem({
-        scene,
-        duration: 1,
-        looping: true,
-        startLife: new ConstantValue(1000),
+    const system = (name: string, parameters: Partial<ParticleSystemParameters>) => {
+        const ps = new ParticleSystem({
+            scene,
+            duration: 1,
+            looping: true,
+            transparent: true,
+            blendMode: Constants.ALPHA_ADD,
+            ...parameters,
+        } as ParticleSystemParameters);
+        ps.emitter.name = name;
+        add(ps);
+        return ps;
+    };
+    const standing = {
+        startLife: new ConstantValue(1e6),
         startSpeed: new ConstantValue(0),
-        startSize: new ConstantValue(1),
-        startColor: new ConstantColor(new Color4(1, 0.8, 0.35, 1)),
         emissionOverTime: new ConstantValue(0),
         emissionBursts: [{time: 0, count: new ConstantValue(1), cycle: 1, interval: 0, probability: 1}],
+        looping: false,
         shape: new PointEmitter(),
-        renderMode: RenderMode.Mesh,
-        ...tube(scene, 0.8),
-        lighting: 'unlit',
-        texture: canvasTexture(scene, 'pillars', 256, true, pillars),
-        blendMode: Constants.ALPHA_ADD,
-        mapUV: {scroll: [0.05, 0]},
-        uvDistortion: {map: distortionMap, strength: 0.04, mapUV: {tiling: [1.5, 1.5], scroll: [0, -0.6]}},
-        rim: {mode: 'fade', strength: 0.6, power: 1},
-    });
-    crown.emitter.position = new BVector3(-3.5, 0, 0);
+    };
 
-    // Rings travelling up the same spot, closing in as they climb.
-    const rings = new ParticleSystem({
-        scene,
-        duration: 1,
-        looping: true,
-        startLife: new ConstantValue(1.4),
-        // Still at birth, each turned its own way about the tube's axis: a
-        // point emitter would fling them, and face them, any which way.
-        startSpeed: new ConstantValue(0),
-        startRotation: new AxisAngleGenerator(new BVector3(0, 1, 0), new IntervalValue(0, Math.PI * 2)),
-        startSize: new Vector3Function(new ConstantValue(1), new ConstantValue(0.12), new ConstantValue(1)),
-        startColor: new ConstantColor(new Color4(1, 0.9, 0.5, 1)),
-        emissionOverTime: new ConstantValue(1.5),
-        shape: new PointEmitter(),
-        renderMode: RenderMode.Mesh,
-        ...tube(scene, 0.9),
-        lighting: 'unlit',
-        texture: canvasTexture(scene, 'band', 64, true, band),
-        blendMode: Constants.ALPHA_ADD,
-        rim: {mode: 'fade', strength: 0.5, power: 1},
+    // The crown: two bands of flame tongues round the character, the inner one hotter and turning
+    // the other way, flickering (uvDistortion), faded where they face the camera (rim 'fade') so
+    // they read thick at the silhouette, and their light on the ground.
+    const crownLayer = (name: string, color: Color4, shape: Parameters<typeof band>[0], scroll: number) =>
+        system(name, {
+            ...standing,
+            startSize: new ConstantValue(1),
+            startColor: new ConstantColor(color),
+            renderMode: RenderMode.Mesh,
+            renderAlignment: 'local',
+            lighting: 'unlit',
+            ...band(shape),
+            texture: baseTexture(scene, 'aura_strip', true, false),
+            mapUV: {tiling: [4, 1], scroll: [scroll, 0]},
+            uvDistortion: {
+                map: baseTexture(scene, 'swirl', true),
+                strength: 0.04,
+                mapUV: {tiling: [2, 1], scroll: [0, -0.7]},
+            },
+            rim: {mode: 'fade', strength: 0.6, power: 3},
+        });
+    const crown = crownLayer(
+        'Crown',
+        new Color4(1, 0.58, 0.2, 1),
+        {bottom: 0.9, top: 0.75, height: 2.2, segments: 48},
+        0.06
+    );
+    const innerCrown = crownLayer(
+        'Inner crown',
+        new Color4(1, 0.85, 0.5, 1),
+        {bottom: 0.7, top: 0.55, height: 1.5, segments: 48},
+        -0.09
+    );
+    innerCrown.emitter.position.set(-2.6, 0, 0);
+    const groundGlow = system('Ground glow', {
+        ...standing,
+        startSize: new ConstantValue(3.4),
+        startColor: new ConstantColor(new Color4(1, 0.55, 0.2, 0.6)),
+        texture: baseTexture(scene, 'glow'),
+        renderMode: RenderMode.HorizontalBillBoard,
     });
-    rings.addBehavior(new SizeOverLife(new PiecewiseBezier([[new Bezier(1, 0.9, 0.75, 0.65), 0]])));
-    rings.addBehavior(createColorOverLifeGradient(new Color4(1, 1, 1, 1), new Color4(1, 1, 1, 0)));
-    rings.addBehavior(new VelocityOverLife(new ConstantValue(0), new ConstantValue(1.6)));
-    rings.emitter.position = new BVector3(-3.5, 0, 0);
+    groundGlow.emitter.position.set(-2.6, 0.03, 0);
+    crown.emitter.position.set(-2.6, 0, 0);
 
-    // A standing strike flickering between the sheet's rows, now and then a
-    // gap: U runs up the beam, from the ground to the ball.
-    const ball = new TransformNode('ball', scene);
-    const strike = new ParticleSystem({
-        scene,
-        duration: 1,
-        looping: true,
-        startLife: new ConstantValue(1000),
-        startSpeed: new ConstantValue(0),
-        startSize: new ConstantValue(1),
-        startColor: new ConstantColor(new Color4(0.6, 0.8, 1, 1)),
-        emissionOverTime: new ConstantValue(0),
-        emissionBursts: [{time: 0, count: new ConstantValue(1), cycle: 1, interval: 0, probability: 1}],
-        shape: new PointEmitter(),
-        renderMode: RenderMode.Beam,
-        texture: canvasTexture(scene, 'strikes', 256, false, strikes),
-        uTileCount: 1,
-        vTileCount: 6,
-        blendMode: Constants.ALPHA_ADD,
+    const motes = system('Motes', {
+        startLife: new IntervalValue(1.2, 1.8),
+        startSpeed: new IntervalValue(0.5, 1),
+        startSize: new IntervalValue(0.08, 0.16),
+        startColor: new RandomColor(new Color4(1, 0.8, 0.4, 1), new Color4(1, 0.95, 0.8, 1)),
+        emissionOverTime: new ConstantValue(18),
+        shape: new ConeEmitter({radius: 0.9, angle: 0.1, thickness: 0.2}),
+        texture: baseTexture(scene, 'spark'),
     });
-    strike.addBehavior(new FrameOverLife(new ConstantValue(0), {fps: 16, frameCount: 6, random: true}));
-    strike.emitter.position = new BVector3(0, 0, 0);
-    strike.beamEnd = ball;
+    motes.addBehavior(new ColorOverLife(fade(0.15, 0.6)));
+    motes.emitter.rotation.x = -Math.PI / 2;
+    motes.emitter.position.set(-2.6, 0.1, 0);
 
-    // A blade slashing to and fro: its trail sweeps along the blade's axis,
-    // the surface the blade passed through, curved between frames.
-    const pivot = new TransformNode('pivot', scene);
-    pivot.position = new BVector3(3.5, 1, 0);
-    const bladeNode = new TransformNode('blade', scene);
-    bladeNode.parent = pivot;
-    bladeNode.position = new BVector3(1, 0, 0);
-    const swing = new ParticleSystem({
-        scene,
-        duration: 1,
-        looping: true,
-        startLife: new ConstantValue(1000),
-        startSpeed: new ConstantValue(0),
-        startSize: new ConstantValue(1.2),
-        startColor: new ConstantColor(new Color4(1, 0.55, 0.2, 1)),
-        emissionOverTime: new ConstantValue(0),
-        emissionBursts: [{time: 0, count: new ConstantValue(1), cycle: 1, interval: 0, probability: 1}],
-        shape: new PointEmitter(),
-        renderMode: RenderMode.Trail,
-        worldSpace: true,
-        texture: canvasTexture(scene, 'smear', 64, false, smear),
-        blendMode: Constants.ALPHA_ADD,
-        rendererEmitterSettings: {
-            startLength: new ConstantValue(18),
-            followLocalOrigin: true,
-            sideAxis: new BVector3(1, 0, 0),
-            // A fast swing moves far between frames: curve the trail through
-            // its samples so it stays round instead of showing their corners.
-            tessellation: 6,
-        },
-    });
-    swing.emitter.parent = bladeNode;
+    // The blade: a pivot swinging a sword to and fro; the trail rides its tip.
+    const steel = new StandardMaterial('steel', scene);
+    steel.diffuseColor = new Color3(0.75, 0.78, 0.85);
+    steel.specularColor = new Color3(0.9, 0.9, 1);
+    const pivot = new TransformNode('Pivot', scene);
+    pivot.position.set(2.2, 0.9, 0);
+    const blade = MeshBuilder.CreateBox('blade', {width: 2.4, height: 0.09, depth: 0.02}, scene);
+    blade.material = steel;
+    blade.parent = pivot;
+    blade.position.x = 1.3;
+    const tip = new TransformNode('Blade tip', scene);
+    tip.parent = pivot;
+    tip.position.x = 1.3;
+    // The smear: a wide glow and a short white-hot core on the same tip, each a swept trail whose
+    // texture runs bright at the head (the blade) to nothing at the tail and dense toward the
+    // blade's tip, coloured along its length.
+    const smear = kenneyTexture(scene, 'smear');
+    const smearLayer = (name: string, length: number, color: Color4, overLength: Gradient) => {
+        const layer = system(name, {
+            ...standing,
+            startSize: new ConstantValue(2.4),
+            startColor: new ConstantColor(color),
+            worldSpace: true,
+            renderMode: RenderMode.Trail,
+            texture: smear,
+            rendererEmitterSettings: {
+                startLength: new ConstantValue(length),
+                followLocalOrigin: true,
+                // Along the blade, the way the smear's V runs from the hilt to the tip.
+                sideAxis: new BVector3(-1, 0, 0),
+                tessellation: 6,
+            },
+        });
+        layer.addBehavior(new ColorOverLength(overLength));
+        layer.emitter.parent = tip;
+        return layer;
+    };
+    smearLayer(
+        'Blade glow',
+        30,
+        new Color4(1, 0.62, 0.28, 1),
+        new Gradient(
+            [
+                [new Color3(0.9, 0.25, 0.05), 0],
+                [new Color3(1, 0.6, 0.2), 0.6],
+                [new Color3(1, 0.85, 0.55), 1],
+            ],
+            [
+                [0, 0],
+                [1, 0.3],
+                [1, 1],
+            ]
+        )
+    );
+    smearLayer(
+        'Blade core',
+        12,
+        new Color4(1, 0.95, 0.85, 1),
+        new Gradient(
+            [
+                [new Color3(1, 0.8, 0.5), 0],
+                [new Color3(1, 1, 1), 1],
+            ],
+            [
+                [0, 0],
+                [1, 1],
+            ]
+        )
+    );
+
+    // A sword's swing: a fast cut, a hold while the smear dies away, the cut back, a hold.
+    const CUT = 0.18;
+    const HOLD = 0.62;
+    const FROM = 1.7;
+    const TO = -0.75;
+    const ease = (x: number) => 1 - Math.pow(1 - x, 3);
+    const angleAt = (time: number) => {
+        const phase = time % (2 * (CUT + HOLD));
+        if (phase < CUT) return FROM + (TO - FROM) * ease(phase / CUT);
+        if (phase < CUT + HOLD) return TO;
+        if (phase < 2 * CUT + HOLD) return TO + (FROM - TO) * ease((phase - CUT - HOLD) / CUT);
+        return FROM;
+    };
 
     let t = 0;
-    scene.onBeforeRenderObservable.add(() => {
-        t += scene.getEngine().getDeltaTime() / 1000;
-        ball.position.set(Math.sin(t * 0.7) * 0.4, 3 + Math.sin(t * 1.3) * 0.6, 0);
-        pivot.rotation.y = Math.sin(t * 5) * 1.4;
-    });
-
-    for (const system of [crown, rings, strike, swing]) {
-        batchRenderer.addSystem(system);
-        systems.push(system);
-    }
+    return {
+        update(delta) {
+            t += delta;
+            // Cuts in the screen's plane, the arc tipping a little toward the camera.
+            pivot.rotation.z = angleAt(t);
+            pivot.rotation.y = 0.35;
+            // The tip's place this frame, before the renderer samples it (Babylon would update the
+            // world matrices only when it draws, a frame after the trail read them).
+            pivot.computeWorldMatrix(true);
+            tip.computeWorldMatrix(true);
+        },
+    };
 }

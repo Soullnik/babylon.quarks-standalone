@@ -49,7 +49,8 @@ function assertNoRuntimeDependencies(packageDir) {
  * The editor imports the library's newest API, so its peer range must be the library's own minor
  * line (`~X.Y.0`): a range that still admits an older minor lets npm install a babylon.quarks the
  * editor cannot link against, and one that leaves out the current version cannot be installed at
- * all. The two packages are released in lockstep; see CONTRIBUTING, "Releases".
+ * all. The peer moves with every new minor or prerelease of the library, and the editor, on its
+ * own 0.x line, takes a new minor whenever it does; see CONTRIBUTING, "Releases".
  */
 function assertEditorPeerInLockstep() {
     const read = (dir) => JSON.parse(readFileSync(new URL(`../packages/${dir}/package.json`, import.meta.url), 'utf8'));

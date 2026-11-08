@@ -335,6 +335,18 @@ describe('disposeEffect', () => {
         expect(texture.getScene()).toBeNull();
     });
 
+    test('a node made the root in place of its effect root keeps the textures', async () => {
+        const source = (await new QuarksLoader(scene).loadFromJSON(effect())) as Mesh;
+        const emitter = source.getChildren()[0] as ParticleEmitter;
+        const texture = (emitter.system as ParticleSystem).texture!;
+        QuarksUtil.shareResources(source, emitter);
+        emitter.setParent(null);
+        source.dispose(true);
+        expect(texture.getScene()).toBe(scene);
+        emitter.dispose();
+        expect(texture.getScene()).toBeNull();
+    });
+
     test('frees what an effect holds however it is disposed', async () => {
         const loader = new QuarksLoader(scene);
         const level = new TransformNode('level', scene);

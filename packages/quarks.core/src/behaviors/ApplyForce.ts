@@ -19,6 +19,8 @@ export interface ApplyForceJSON extends BehaviorJSON {
     force?: ValueGeneratorJSON;
     /** The space the direction is in; `'world'` when absent. */
     space?: BehaviorSpace;
+    /** Whether the force scales with the emitter; true when absent. Written only when false. */
+    scaleWithEmitter?: boolean;
 }
 
 /**
@@ -29,9 +31,9 @@ export interface ApplyForceJSON extends BehaviorJSON {
  * life, as Unity's Force over Lifetime does with Random Between Two Constants.
  *
  * The direction is authored in {@link space}: world axes by default, so gravity stays down
- * however the emitter is turned, or the emitter's own axes with `'local'`. In a world-space
- * system a world force is also multiplied by the system's `motionScale`, as every world-space
- * force is. Applies in every render mode.
+ * however the emitter is turned, or the emitter's own axes with `'local'`. The force scales with
+ * the emitter as {@link ForceOverLife}'s does, unless {@link scaleWithEmitter} is false: gravity
+ * keeps its strength in world units however the emitter is scaled. Applies in every render mode.
  */
 export class ApplyForce implements Behavior {
     type = 'ApplyForce';
@@ -62,7 +64,12 @@ export class ApplyForce implements Behavior {
         /** The force's strength, in units per second squared, rolled per particle. */
         public magnitude: ValueGenerator,
         /** The space the direction is authored in; `'world'` by default. */
-        public space: BehaviorSpace = 'world'
+        public space: BehaviorSpace = 'world',
+        /**
+         * Whether the force scales with the emitter, as {@link ForceOverLife.scaleWithEmitter}; true
+         * by default. False for gravity, which pulls as hard on a scaled copy of an effect.
+         */
+        public scaleWithEmitter = true
     ) {
         this._directionValue = vector3From(direction);
         this._direction.copy(this.direction);
@@ -76,12 +83,15 @@ export class ApplyForce implements Behavior {
     /**
      * What the magnitude is multiplied by before it reaches the velocity: the
      * step, and the system's `motionScale` for a world force in a world-space
-     * system. An unknown system (before {@link initialize}) counts as world space.
+     * system that scales with the emitter. An unknown system (before
+     * {@link initialize}) counts as world space.
      */
     _step(delta: number): number {
         const system = this.ps;
         const worldSpace = system === undefined || system.worldSpace;
-        return worldSpace && this.space === 'world' ? delta * (system?.motionScale ?? 1) : delta;
+        return worldSpace && this.space === 'world' && this.scaleWithEmitter
+            ? delta * (system?.motionScale ?? 1)
+            : delta;
     }
 
     update(particle: Particle, delta: number): void {
@@ -116,10 +126,14 @@ export class ApplyForce implements Behavior {
 
     frameUpdate(delta: number): void {
         this._direction.copy(this.direction);
-        // The frame is only read when the authored space differs from the simulation space.
-        if (this.ps !== undefined && this.ps.worldSpace !== (this.space === 'world')) {
-            this._frame.refresh(this.ps);
-            this._frame.toSimulation(this._direction, this.space, this.ps.worldSpace);
+        // The frame is only read when the force needs converting.
+        const system = this.ps;
+        if (
+            system !== undefined &&
+            EmitterFrame.forceReadsFrame(this.space, system.worldSpace, this.scaleWithEmitter)
+        ) {
+            this._frame.refresh(system);
+            this._frame.forceToSimulation(this._direction, this.space, system.worldSpace, this.scaleWithEmitter);
         }
     }
 
@@ -129,6 +143,7 @@ export class ApplyForce implements Behavior {
             direction: [this.direction.x, this.direction.y, this.direction.z],
             magnitude: this.magnitude.toJSON(),
             ...(this.space !== 'world' ? {space: this.space} : {}),
+            ...(this.scaleWithEmitter ? {} : {scaleWithEmitter: false}),
         };
     }
 
@@ -137,12 +152,13 @@ export class ApplyForce implements Behavior {
         return new ApplyForce(
             readVector3(json.direction, new Vector3(0, 0, 0)),
             ValueGeneratorFromJSON(json.magnitude ?? json.force) as ValueGenerator,
-            readBehaviorSpace(json.space, 'world')
+            readBehaviorSpace(json.space, 'world'),
+            json.scaleWithEmitter !== false
         );
     }
 
     clone(): Behavior {
-        return new ApplyForce(this.direction.clone(), this.magnitude.clone(), this.space);
+        return new ApplyForce(this.direction.clone(), this.magnitude.clone(), this.space, this.scaleWithEmitter);
     }
 
     reset(): void {}

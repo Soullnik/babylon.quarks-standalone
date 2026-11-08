@@ -5,9 +5,14 @@ import {Vector3} from '../math';
 import {Particle} from '../Particle';
 import {Behavior, BehaviorJSON} from './Behavior';
 import {BehaviorSpace, EmitterFrame, readBehaviorSpace} from './EmitterFrame';
+import {stepEndLife} from './stepAge';
 
-/** The step rate `dampen` was defined at: 1/3 of the excess per step at 60 Hz. */
-const REFERENCE_RATE = 60;
+/**
+ * The step rate `dampen` is defined at, as Unity defines it: `dampen` of the excess goes in each
+ * 1/30 s (measured in Unity 6: the excess left after a step of `delta` seconds is
+ * `(1 - dampen) ^ (30 * delta)`).
+ */
+const REFERENCE_RATE = 30;
 
 /** The JSON of a speed limit over life: a {@link LimitSpeedOverLife}. */
 export interface LimitSpeedOverLifeJSON extends BehaviorJSON {
@@ -21,7 +26,9 @@ export interface LimitSpeedOverLifeJSON extends BehaviorJSON {
 
 /**
  * Limits the speed of particles over their life, like Unity's Limit Velocity over Lifetime: a
- * particle faster than `speed` loses part of the excess each step.
+ * particle faster than `speed` loses part of the excess each step. As in Unity, the emitter's
+ * scale does not change the limit of a world-space system; a local-space system's limit is in
+ * the emitter's frame, which the scale scales.
  *
  * With a {@link Vector3Function} as `speed` it is Unity's Separate Axes: each component of the
  * velocity, measured along the axes of {@link space}, is limited by its own curve and keeps its
@@ -29,7 +36,7 @@ export interface LimitSpeedOverLifeJSON extends BehaviorJSON {
  */
 export class LimitSpeedOverLife implements Behavior {
     type = 'LimitSpeedOverLife';
-    /** Learned in {@link initialize}; its motion scale multiplies the limit of a world-space system. */
+    /** Learned in {@link initialize}; its space decides whether per-axis limits are converted. */
     ps?: IParticleSystem;
     /** The emitter's transform this frame, refreshed by {@link frameUpdate} for per-axis limits. */
     readonly _frame = new EmitterFrame();
@@ -48,12 +55,6 @@ export class LimitSpeedOverLife implements Behavior {
         this.speed.startGen(particle.memory);
     }
 
-    /** What the limit is multiplied by: the system's motion scale in world space, else 1. */
-    motionScale(): number {
-        const system = this.ps;
-        return system !== undefined && system.worldSpace ? (system.motionScale ?? 1) : 1;
-    }
-
     constructor(
         /**
          * The speed limit over the particle's life: one curve for the speed, or a
@@ -61,10 +62,9 @@ export class LimitSpeedOverLife implements Behavior {
          */
         public speed: FunctionValueGenerator | ValueGenerator | Vector3Function,
         /**
-         * How much of the excess speed goes, from 0 (none) to 1, clamped. At 60 steps a second each
-         * step removes `dampen / 3` of it; other step lengths remove the share that compounds to the
-         * same loss per second, so the result does not depend on the frame rate. Even at 1 the
-         * limit is approached over a few steps rather than held exactly.
+         * How much of the excess speed goes, from 0 (none) to 1, clamped, as Unity's Dampen:
+         * `dampen` of it in each 1/30 s, compounded over other step lengths so the result does not
+         * depend on the frame rate. At 1 the speed is held at the limit.
          */
         public dampen: number,
         /**
@@ -90,17 +90,16 @@ export class LimitSpeedOverLife implements Behavior {
      * the emitter's scale flattens keeps its velocity rather than losing it.
      * @internal
      */
-    _limitAxes(particle: Particle, t: number, step: number, motionScale: number, convert: boolean) {
+    _limitAxes(particle: Particle, t: number, step: number, convert: boolean) {
         const limit = (this.speed as Vector3Function).genValue(particle.memory, this._limit, t);
         const velocity = this._velocity.copy(particle.velocity);
         const worldSpace = this.ps === undefined || this.ps.worldSpace;
         if (convert) {
             this._frame.fromSimulation(velocity, this.space, worldSpace);
         }
-        const scale = this.space === 'world' ? motionScale : 1;
-        const ex = excess(velocity.x, limit.x * scale);
-        const ey = excess(velocity.y, limit.y * scale);
-        const ez = excess(velocity.z, limit.z * scale);
+        const ex = excess(velocity.x, limit.x);
+        const ey = excess(velocity.y, limit.y);
+        const ez = excess(velocity.z, limit.z);
         if (ex === 0 && ey === 0 && ez === 0) {
             return;
         }
@@ -114,17 +113,20 @@ export class LimitSpeedOverLife implements Behavior {
     /** The share of the excess speed one step of `delta` seconds removes; see {@link dampen}. */
     dampenStep(delta: number): number {
         const dampen = this.dampen > 1 ? 1 : this.dampen > 0 ? this.dampen : 0;
-        return 1 - Math.pow(1 - dampen / 3, delta * REFERENCE_RATE);
+        if (delta <= 0) {
+            return 0;
+        }
+        return 1 - Math.pow(1 - dampen, delta * REFERENCE_RATE);
     }
 
     update(particle: Particle, delta: number): void {
         if (this.speed instanceof Vector3Function) {
-            const t = particle.age / particle.life;
-            this._limitAxes(particle, t, this.dampenStep(delta), this.motionScale(), this._convertsSpace());
+            const t = stepEndLife(particle, delta);
+            this._limitAxes(particle, t, this.dampenStep(delta), this._convertsSpace());
             return;
         }
         const speed = particle.velocity.length();
-        const limit = this.speed.genValue(particle.memory, particle.age / particle.life) * this.motionScale();
+        const limit = this.speed.genValue(particle.memory, stepEndLife(particle, delta));
         if (speed > limit) {
             const percent = (speed - limit) / speed;
             particle.velocity.multiplyScalar(1 - percent * this.dampenStep(delta));
@@ -134,13 +136,12 @@ export class LimitSpeedOverLife implements Behavior {
     updateAll(particles: Array<Particle>, count: number, delta: number): void {
         const generator = this.speed;
         const dampenStep = this.dampenStep(delta);
-        const motionScale = this.motionScale();
         if (generator instanceof Vector3Function) {
             const convert = this._convertsSpace();
             for (let i = 0; i < count; i++) {
                 const particle = particles[i];
                 if (particle.age < particle.life) {
-                    this._limitAxes(particle, particle.age / particle.life, dampenStep, motionScale, convert);
+                    this._limitAxes(particle, stepEndLife(particle, delta), dampenStep, convert);
                 }
             }
             return;
@@ -152,7 +153,7 @@ export class LimitSpeedOverLife implements Behavior {
             }
             const velocity = particle.velocity;
             const speed = velocity.length();
-            const limit = generator.genValue(particle.memory, particle.age / particle.life) * motionScale;
+            const limit = generator.genValue(particle.memory, stepEndLife(particle, delta));
             if (speed > limit) {
                 velocity.multiplyScalar(1 - ((speed - limit) / speed) * dampenStep);
             }

@@ -133,6 +133,17 @@ describe('effect schema', () => {
             }
         );
 
+        it('with a mesh of two UV sets and vertex colours', () => {
+            const system = new ParticleSystem({
+                scene,
+                renderMode: RenderMode.Mesh,
+                instancingGeometry: new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0]),
+                instancingUVs2: new Float32Array(6),
+                instancingColors: new Float32Array([1, 0, 0, 1, 0, 1, 0, 1, 0, 0, 1, 0.5]),
+            });
+            expect(errors(save(system.emitter))).toEqual([]);
+        });
+
         it('with settings off their defaults, behaviors and generators of each kind', () => {
             const system = new ParticleSystem({
                 scene,

@@ -28,7 +28,9 @@ ${surfaceColorGLSL(false)}
 #ifdef USE_ALPHATEST
     if (baseColor.a < alphaTest) discard;
 #else
-    if (baseColor.a < 0.01) discard;
+    // Only what draws nothing: a faint fringe still shows once a doubled tint or additive
+    // blending lifts it, and Unity cuts none of it.
+    if (baseColor.a <= 0.0) discard;
 #endif
 
 ${fogFragmentGLSL('baseColor.rgb')}

@@ -53,6 +53,22 @@ export class ParticleStore {
      * between the columns that are hot and costs them their locality.
      */
     previousVelocity: Float32Array = ParticleStore.EMPTY;
+    /**
+     * The velocity of the motion a behavior gives a particle by moving its position directly
+     * rather than through its velocity, this step, 3 per row: Unity's `animatedVelocity`, which
+     * Velocity over Lifetime writes. A stretched billboard is drawn along the velocity plus this,
+     * as Unity draws it along `totalVelocity`.
+     *
+     * Empty until {@link keepAnimatedVelocity} asks for it; the system zeroes it at the start of
+     * each step and the behaviors add to it.
+     */
+    animatedVelocity: Float32Array = ParticleStore.EMPTY;
+    /**
+     * {@link animatedVelocity} as the previous step left it, 3 per row, kept with it: the renderer
+     * carries a stretched billboard's shape on between steps from the two, as it does the
+     * velocity's from {@link previousVelocity}.
+     */
+    previousAnimatedVelocity: Float32Array = ParticleStore.EMPTY;
     /** Velocity, 3 per row. */
     velocity: Float32Array;
     /** Size, 3 per row. */
@@ -164,6 +180,10 @@ export class ParticleStore {
         if (this.previousVelocity.length > 0) {
             this.previousVelocity = ParticleStore.grow(this.previousVelocity, capacity * 3);
         }
+        if (this.animatedVelocity.length > 0) {
+            this.animatedVelocity = ParticleStore.grow(this.animatedVelocity, capacity * 3);
+            this.previousAnimatedVelocity = ParticleStore.grow(this.previousAnimatedVelocity, capacity * 3);
+        }
         if (this.rotationQuaternion.length > 0) {
             const previousLength = this.rotationQuaternion.length;
             this.rotationQuaternion = ParticleStore.grow(this.rotationQuaternion, capacity * 4);
@@ -215,6 +235,20 @@ export class ParticleStore {
             return false;
         }
         this.previousVelocity = new Float32Array(this.capacity * 3);
+        return true;
+    }
+
+    /**
+     * Starts keeping {@link animatedVelocity} and {@link previousAnimatedVelocity}. Harmless to
+     * call every step; returns true on the call that allocated, which leaves every particle without
+     * its view of it until rebound.
+     */
+    keepAnimatedVelocity(): boolean {
+        if (this.animatedVelocity.length >= this.capacity * 3) {
+            return false;
+        }
+        this.animatedVelocity = new Float32Array(this.capacity * 3);
+        this.previousAnimatedVelocity = new Float32Array(this.capacity * 3);
         return true;
     }
 
@@ -308,6 +342,10 @@ export class ParticleStore {
         }
         if (this.previousVelocity.length > 0) {
             ParticleStore.swap3(this.previousVelocity, a3, b3);
+        }
+        if (this.animatedVelocity.length > 0) {
+            ParticleStore.swap3(this.animatedVelocity, a3, b3);
+            ParticleStore.swap3(this.previousAnimatedVelocity, a3, b3);
         }
         ParticleStore.swap3(this.velocity, a3, b3);
         ParticleStore.swap3(this.size, a3, b3);

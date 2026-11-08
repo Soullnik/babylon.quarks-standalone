@@ -30,15 +30,13 @@ namespace BabylonQuarks.UnityExporter
             var behaviors = new JArray();
 
             // Unity draws trails in a pass of their own beside the particles, but a quarks system has
-            // one render mode. A system that draws only its trails (Render Mode None) becomes a quarks
-            // trail system; one that draws both keeps its particles and loses the trails.
+            // one render mode. A system that draws only its trails (Render Mode None, or particles
+            // that never show) becomes a quarks trail system; one that draws both keeps its particles
+            // and loses the trails.
             bool trailOnly = IsTrailOnly(ps, renderer);
             WarnAboutTrails(ps, renderer, trailOnly);
 
             ParticleMaterial material = ctx.AddMaterialForRenderer(renderer, trailOnly);
-            // The material's tint multiplies every particle (or the whole trail), so fold it into
-            // the start color; the color-over-life behaviors multiply onto that.
-            Color tint = material.Tint;
             int renderMode = trailOnly ? RenderModeTrail : MapRenderMode(renderer.renderMode);
             string geometryUuid = renderMode == 2 && renderer.mesh != null ? ctx.AddGeometryForMesh(renderer.mesh) : null;
             JToken emissionOverTime = EmissionRate(ps, true);
@@ -55,8 +53,8 @@ namespace BabylonQuarks.UnityExporter
                 .Set("startRotation", BuildStartRotation(main, renderMode))
                 .Set("startSize", trailOnly ? BuildTrailWidth(ps) : BuildStartSize(main))
                 .Set("startColor", trailOnly && !ps.trails.inheritParticleColor
-                    ? ValueConverter.ConstantColor(tint)
-                    : ValueConverter.StartColor(main.startColor, tint))
+                    ? ValueConverter.ConstantColor(Color.white)
+                    : ValueConverter.StartColor(main.startColor, Color.white))
                 .Set("emissionOverTime", emissionOverTime)
                 .Set("emissionOverDistance", EmissionRate(ps, false))
                 .Set("emissionBursts", BuildBursts(ps))
@@ -119,17 +117,28 @@ namespace BabylonQuarks.UnityExporter
                 obj.Set("instancingGeometry", geometryUuid);
             }
             if (!trailOnly) AddPivotAndFlip(ps, renderer, renderMode, obj);
-            if (!trailOnly && ps.shape.enabled && ps.shape.alignToDirection)
+            if (!trailOnly && EmitsFromShape(ps.shape) && ps.shape.alignToDirection)
             {
                 obj.Set("alignToDirection", true);
             }
 
-            BuildTextureSheet(ps, obj, behaviors, trailOnly);
+            BuildTextureSheet(ps, renderer, material, obj, behaviors, trailOnly);
 
             // Blending, depth and alpha test are the material entry's.
             obj.Set("worldSpace", main.simulationSpace != ParticleSystemSimulationSpace.Local);
             // Render Face only means something for a mesh; billboards always face the camera.
             if (renderMode == 2 && material.RenderFace != "both") obj.Set("renderFace", material.RenderFace);
+            // Unity's Render Alignment lays out mesh particles and billboards only: its stretched,
+            // horizontal and vertical billboards draw the same for every alignment.
+            if (renderMode == 0 || renderMode == 2) AddRenderAlignment(ps, renderer, renderMode, obj);
+            if (renderMode == 2) AddRotationAxis(ps, obj);
+            // The legacy Alpha Blended Premultiply's texture is premultiplied, glow and all.
+            if (material.PremultipliedTexture) obj.Set("premultipliedMap", true);
+            // Unity's mesh shaders draw a particle without its colour.
+            if (!material.ParticleColor) obj.Set("particleColor", false);
+            AddMaterialColor(obj, material);
+            // Unity sorts the renderer by its distance plus this; authors set it to layer systems.
+            if (renderer.sortingFudge != 0f) obj.Set("sortingFudge", renderer.sortingFudge);
             if (material.SoftParticles)
             {
                 obj.Set("softParticles", true);
@@ -190,12 +199,9 @@ namespace BabylonQuarks.UnityExporter
                 }
                 return ScaleCurve(main.startRotationZ, SpinSign(renderMode));
             }
-            if (mesh)
-            {
-                // A scalar rotation on a mesh spins around Z in Unity; a plain quarks scalar would
-                // spin around Y, so wrap it as a Z-only Euler to keep the axis correct.
-                return Euler(ValueConverter.Constant(0), ValueConverter.Constant(0), ValueConverter.Curve(main.startRotation));
-            }
+            // A number rotation turns a mesh about its rotation axis, Z unless rotationAxis says
+            // otherwise (see AddRotationAxis), as Unity turns it about its axisOfRotation, or about
+            // Z when it rotates the particle in 3D.
             return ScaleCurve(main.startRotation, SpinSign(renderMode));
         }
 
@@ -237,11 +243,14 @@ namespace BabylonQuarks.UnityExporter
             // emitter's rotation turns it: a particle system carrying Unity's usual
             // -90 degrees about X had its gravity pushing along world Z instead of
             // down. ForceOverLife is the behavior that undoes the emitter transform.
+            // Unity's gravity, unlike its forces, ignores the emitter's scale in either
+            // simulation space, so it keeps its strength in world units.
             behaviors.Add(new JObject()
                 .Set("type", "ForceOverLife")
                 .Set("x", ValueConverter.Constant(0f))
                 .Set("y", ValueConverter.Constant(-9.81f * g))
-                .Set("z", ValueConverter.Constant(0f)));
+                .Set("z", ValueConverter.Constant(0f))
+                .Set("scaleWithEmitter", false));
         }
 
         // ---- Emission --------------------------------------------------------------------
@@ -302,8 +311,31 @@ namespace BabylonQuarks.UnityExporter
 
         private static JToken BuildShape(ParticleSystem.ShapeModule shape, ExportContext ctx, string owner)
         {
-            if (!shape.enabled) return new JObject().Set("type", "point");
+            // No shape: every particle starts at the origin heading along +Z, which a cone with no
+            // radius and no opening does too.
+            if (!EmitsFromShape(shape)) return new JObject().Set("type", "cone").Set("radius", 0f).Set("angle", 0f);
             return AddShapeTransform(BuildShapeType(shape, ctx, owner), shape);
+        }
+
+        /// <summary>
+        /// Whether Unity emits from the Shape module: it is on, and a shape that takes its points from
+        /// a mesh, a renderer or a sprite has one. Otherwise Unity starts every particle at the
+        /// emitter's origin heading along +Z, ignores the module's other settings (its position,
+        /// rotation and scale, Randomize Direction, Align to Direction) and turns mesh particles about
+        /// Z (measured in Unity 6).
+        /// </summary>
+        private static bool EmitsFromShape(ParticleSystem.ShapeModule shape)
+        {
+            if (!shape.enabled) return false;
+            switch (shape.shapeType)
+            {
+                case ParticleSystemShapeType.Mesh: return shape.mesh != null;
+                case ParticleSystemShapeType.MeshRenderer: return shape.meshRenderer != null;
+                case ParticleSystemShapeType.SkinnedMeshRenderer: return shape.skinnedMeshRenderer != null;
+                case ParticleSystemShapeType.Sprite: return shape.sprite != null;
+                case ParticleSystemShapeType.SpriteRenderer: return shape.spriteRenderer != null;
+                default: return true;
+            }
         }
 
         /// <summary>
@@ -357,12 +389,9 @@ namespace BabylonQuarks.UnityExporter
                 case ParticleSystemShapeType.Donut:
                     return ShapeBase("donut", shape).Set("donutRadius", shape.donutRadius);
                 case ParticleSystemShapeType.Mesh:
-                    if (shape.mesh != null)
-                    {
-                        string meshNodeUuid = ctx.AddMeshSourceNode(shape.mesh);
-                        return new JObject().Set("type", "mesh_surface").Set("mesh", meshNodeUuid);
-                    }
-                    return new JObject().Set("type", "point");
+                    // A Mesh shape without its mesh emits as no shape, see EmitsFromShape.
+                    string meshNodeUuid = ctx.AddMeshSourceNode(shape.mesh);
+                    return new JObject().Set("type", "mesh_surface").Set("mesh", meshNodeUuid);
                 case ParticleSystemShapeType.Box:
                     return BoxShape(shape, shape.scale, BoxEmitFromVolume);
                 case ParticleSystemShapeType.BoxShell:
@@ -509,12 +538,68 @@ namespace BabylonQuarks.UnityExporter
         /// <summary>quarks steps its simulation at 60Hz and records one trail sample per step.</summary>
         private const float TrailSamplesPerSecond = 60f;
 
+        /// <summary>
+        /// Why Unity draws nothing of the system, or null when it draws it: a disabled or missing
+        /// renderer, Mesh mode without a mesh, or Render Mode None without trails.
+        /// </summary>
+        internal static string WhyNothingIsDrawn(ParticleSystem ps)
+        {
+            var renderer = ps.GetComponent<ParticleSystemRenderer>();
+            if (renderer == null) return "it has no renderer";
+            if (!renderer.enabled) return "its renderer is disabled";
+            if (renderer.renderMode == ParticleSystemRenderMode.Mesh && renderer.mesh == null) return "it draws meshes but has no mesh";
+            if (renderer.renderMode == ParticleSystemRenderMode.None && !ps.trails.enabled) return "its Render Mode is None";
+            return null;
+        }
+
+        /// <summary>
+        /// Whether the system becomes a quarks emitter. One Unity draws nothing of is left out
+        /// (its node stays, for its children), unless its particles spawn sub-emitters.
+        /// </summary>
+        internal static bool IsExported(ParticleSystem ps) => ps.subEmitters.enabled || WhyNothingIsDrawn(ps) == null;
+
+        /// <summary>
+        /// Whether Unity draws only the system's trails: Render Mode None, or particles that never
+        /// show (see <see cref="DrawsParticlesSeeThrough"/>), with the Trails module on, per particle.
+        /// </summary>
         private static bool IsTrailOnly(ParticleSystem ps, ParticleSystemRenderer renderer)
         {
             var trails = ps.trails;
-            return renderer.renderMode == ParticleSystemRenderMode.None
-                && trails.enabled
-                && trails.mode == ParticleSystemTrailMode.PerParticle;
+            return trails.enabled
+                && trails.mode == ParticleSystemTrailMode.PerParticle
+                && (renderer.renderMode == ParticleSystemRenderMode.None || DrawsParticlesSeeThrough(ps, renderer));
+        }
+
+        /// <summary>
+        /// Whether the system's particles never show: every start colour it can pick has an alpha of
+        /// 0, which Color over Lifetime and Color by Speed only multiply, and the material draws the
+        /// particle's colour (see MaterialReader.ParticleColor). Trails carried on
+        /// such particles are all Unity draws of them.
+        /// </summary>
+        private static bool DrawsParticlesSeeThrough(ParticleSystem ps, ParticleSystemRenderer renderer)
+        {
+            if (!MaterialReader.Read(renderer.sharedMaterial).ParticleColor) return false;
+            const float none = 0.5f / 255f;
+            var color = ps.main.startColor;
+            switch (color.mode)
+            {
+                case ParticleSystemGradientMode.Color:
+                    return color.color.a <= none;
+                case ParticleSystemGradientMode.TwoColors:
+                    return color.colorMin.a <= none && color.colorMax.a <= none;
+                case ParticleSystemGradientMode.TwoGradients:
+                    return MaxAlpha(color.gradientMin) <= none && MaxAlpha(color.gradientMax) <= none;
+                default:
+                    return MaxAlpha(color.gradient) <= none;
+            }
+        }
+
+        private static float MaxAlpha(Gradient gradient)
+        {
+            if (gradient == null) return 1f;
+            float max = 0f;
+            foreach (var key in gradient.alphaKeys) max = Mathf.Max(max, key.alpha);
+            return max;
         }
 
         private static void WarnAboutTrails(ParticleSystem ps, ParticleSystemRenderer renderer, bool trailOnly)
@@ -646,7 +731,8 @@ namespace BabylonQuarks.UnityExporter
         // ---- Texture Sheet Animation -----------------------------------------------------
 
         /// <param name="trail">Unity's trails ignore Texture Sheet Animation, so trail systems keep one tile.</param>
-        private static void BuildTextureSheet(ParticleSystem ps, JObject obj, JArray behaviors, bool trail)
+        private static void BuildTextureSheet(
+            ParticleSystem ps, ParticleSystemRenderer renderer, ParticleMaterial material, JObject obj, JArray behaviors, bool trail)
         {
             var tsa = ps.textureSheetAnimation;
             if (tsa.enabled && !trail)
@@ -654,32 +740,43 @@ namespace BabylonQuarks.UnityExporter
                 int u = Mathf.Max(1, tsa.numTilesX);
                 int v = Mathf.Max(1, tsa.numTilesY);
                 int tiles = Mathf.Max(1, u * v);
-                obj.Set("startTileIndex", ValueConverter.Curve(tsa.startFrame))
+                // The frame is FrameOverLife's from birth on, the start frame with it.
+                obj.Set("startTileIndex", ValueConverter.Constant(0))
                     .Set("uTileCount", u)
                     .Set("vTileCount", v)
-                    .Set("blendTiles", false);
-                // Unity frameOverTime is authored in normalized tile space (0..1) and shows tile
-                // floor(value x tiles), holding 1.0 on the last tile. quarks floors the value it is
-                // given, so scale by just under `tiles`: every tile then gets an equal share of the
-                // sweep, where scaling by tiles - 1 left the last tile on screen for an instant at
-                // most (and a random pick never chose it). Constants, random ranges and curves keep
-                // their shape.
-                float frameScale = tiles - 0.001f;
-                var frameOverTime = tsa.frameOverTime;
-                int cycles = Mathf.Max(1, tsa.cycleCount);
-                bool curved = frameOverTime.mode == ParticleSystemCurveMode.Curve
-                    || frameOverTime.mode == ParticleSystemCurveMode.TwoCurves;
-                // Cycles replay the curve that many times over the particle's life; a constant or
-                // random frame is the same in every cycle.
-                float frameMultiplier = frameOverTime.curveMultiplier * frameScale;
-                JToken frame = !curved || cycles <= 1
-                    ? ScaleCurve(frameOverTime, frameScale)
-                    : frameOverTime.mode == ParticleSystemCurveMode.TwoCurves
-                        ? ValueConverter.TwoCurves(frameOverTime.curveMin, frameOverTime.curveMax, frameMultiplier, cycles)
-                        : ValueConverter.Bezier(frameOverTime.curve, frameMultiplier, cycles);
-                behaviors.Add(new JObject()
+                    .Set("blendTiles", BlendsTiles(ps, renderer, material));
+                // Single Row plays one row of the sheet: the frames are counted within the row,
+                // and quarks adds the row's first frame (the row fixed, or picked per particle).
+                bool singleRow = tsa.animation == ParticleSystemAnimationType.SingleRow && v > 1;
+                int frames = singleRow ? u : tiles;
+                bool atRate = tsa.timeMode == ParticleSystemAnimationTimeMode.FPS && tsa.fps > 0f;
+                // Start Frame is a fraction of the frames played, which Unity adds whole and fraction
+                // alike and wraps round them, in every time mode (measured in Unity 6000.6: 0.3 of 16
+                // frames puts the frame 4.8 on). quarks' startFrame counts frames.
+                bool startsLater = !IsZero(tsa.startFrame);
+                var frameOverLife = new JObject()
                     .Set("type", "FrameOverLife")
-                    .Set("frame", frame));
+                    .Set("frame", tsa.timeMode == ParticleSystemAnimationTimeMode.FPS ? ValueConverter.Constant(0) : FrameOverTime(ps, tsa, frames));
+                if (tsa.timeMode == ParticleSystemAnimationTimeMode.Speed)
+                {
+                    Debug.LogWarning($"[Quarks Exporter] '{ps.name}': Texture Sheet Animation Time Mode Speed has no quarks counterpart; the sheet plays over lifetime.");
+                }
+                // FPS mode plays fps frames a second from the first, round the frames played, the frame
+                // running on between whole frames as Unity's AnimFrame does; Frame over Time and Cycles
+                // are not read, and at 0 fps the frame stays (measured in Unity 6000.6).
+                if (atRate) frameOverLife.Set("fps", tsa.fps);
+                if (atRate || startsLater) frameOverLife.Set("frameCount", frames);
+                if (startsLater) frameOverLife.Set("startFrame", ScaleCurve(tsa.startFrame, frames));
+                if (singleRow)
+                {
+                    if (tsa.rowMode == ParticleSystemAnimationRowMode.MeshIndex)
+                        Debug.LogWarning($"[Quarks Exporter] '{ps.name}': Texture Sheet Animation Row Mode Mesh Index has no quarks counterpart; the first row plays.");
+                    frameOverLife.Set("rowLength", u).Set("rowCount", v);
+                    if (tsa.rowMode == ParticleSystemAnimationRowMode.Random) frameOverLife.Set("randomRow", true);
+                    else if (tsa.rowMode == ParticleSystemAnimationRowMode.Custom && tsa.rowIndex > 0)
+                        frameOverLife.Set("row", Mathf.Clamp(tsa.rowIndex, 0, v - 1));
+                }
+                behaviors.Add(frameOverLife);
             }
             else
             {
@@ -687,6 +784,61 @@ namespace BabylonQuarks.UnityExporter
                     .Set("uTileCount", 1)
                     .Set("vTileCount", 1)
                     .Set("blendTiles", false);
+            }
+        }
+
+        /// <summary>
+        /// The frame over the particle's life in Lifetime mode, from Frame over Time and Cycles.
+        /// </summary>
+        private static JToken FrameOverTime(ParticleSystem ps, ParticleSystem.TextureSheetAnimationModule tsa, int frames)
+        {
+            // Unity frameOverTime is authored in normalized tile space (0..1) and shows tile
+            // floor(value x tiles), holding 1.0 on the last tile. quarks floors the value it is
+            // given, so scale by just under the frames: every tile then gets an equal share of the
+            // sweep, where scaling by tiles - 1 left the last tile on screen for an instant at
+            // most (and a random pick never chose it). Constants, random ranges and curves keep
+            // their shape.
+            float frameScale = frames - 0.001f;
+            var frameOverTime = tsa.frameOverTime;
+            int cycles = Mathf.Max(1, tsa.cycleCount);
+            bool curved = frameOverTime.mode == ParticleSystemCurveMode.Curve
+                || frameOverTime.mode == ParticleSystemCurveMode.TwoCurves;
+            // Cycles replay the curve that many times over the particle's life; a constant or
+            // random frame is the same in every cycle.
+            float frameMultiplier = frameOverTime.curveMultiplier * frameScale;
+            return !curved || cycles <= 1
+                ? ScaleCurve(frameOverTime, frameScale)
+                : frameOverTime.mode == ParticleSystemCurveMode.TwoCurves
+                    ? ValueConverter.TwoCurves(frameOverTime.curveMin, frameOverTime.curveMax, frameMultiplier, cycles)
+                    : ValueConverter.Bezier(frameOverTime.curve, frameMultiplier, cycles);
+        }
+
+        /// <summary>
+        /// Whether Unity blends each frame into the next. The shader does it from the next tile's
+        /// UV and the blend the renderer sends it (the UV2 and AnimBlend vertex streams), when the
+        /// material's Flip-Book Blending is on. A shader without that switch, a custom one, is
+        /// taken to blend when the renderer sends it AnimBlend, the one thing that stream is for.
+        /// </summary>
+        private static bool BlendsTiles(ParticleSystem ps, ParticleSystemRenderer renderer, ParticleMaterial material)
+        {
+            var streams = new List<ParticleSystemVertexStream>();
+            renderer.GetActiveVertexStreams(streams);
+            bool sent = streams.Contains(ParticleSystemVertexStream.UV2) && streams.Contains(ParticleSystemVertexStream.AnimBlend);
+            if (material.FlipbookBlending == true && !sent)
+            {
+                Debug.LogWarning($"[Quarks Exporter] '{ps.name}': the material blends flip-book frames, but the renderer does not send the UV2 and AnimBlend vertex streams, so Unity draws no blend and neither does the export.");
+            }
+            return sent && material.FlipbookBlending != false;
+        }
+
+        /// <summary>Whether a curve is 0 throughout: a constant 0, or 0 to 0.</summary>
+        private static bool IsZero(ParticleSystem.MinMaxCurve c)
+        {
+            switch (c.mode)
+            {
+                case ParticleSystemCurveMode.Constant: return c.constant == 0f;
+                case ParticleSystemCurveMode.TwoConstants: return c.constantMin == 0f && c.constantMax == 0f;
+                default: return c.curveMultiplier == 0f;
             }
         }
 
@@ -715,19 +867,15 @@ namespace BabylonQuarks.UnityExporter
             if (m.separateAxes && renderMode == 2)
             {
                 // A mesh particle turns about all three of its axes, in the same order as its
-                // start rotation (see Euler). Unity adds the rates to the particle's Euler angles;
-                // babylon.quarks turns about the particle's own axes, which differs for X and Y
-                // once the particle has turned.
-                if (!IsZero(m.x) || !IsZero(m.y))
-                {
-                    Debug.LogWarning($"[Quarks Exporter] '{ps.name}': Rotation over Lifetime turns about the particle's own X and Y axes in babylon.quarks, not Unity's Euler angles.");
-                }
+                // start rotation (see Euler). Unity adds the rates to the particle's Euler angles
+                // and rebuilds its rotation from them, which is quarks' 'angles' integration.
                 behaviors.Add(new JObject()
                     .Set("type", "Rotation3DOverLife")
                     .Set("angularVelocity", Euler(
                         ValueConverter.Curve(m.x),
                         ValueConverter.Curve(m.y),
-                        ValueConverter.Curve(m.z))));
+                        ValueConverter.Curve(m.z)))
+                    .Set("integration", "angles"));
                 return;
             }
             // A billboard only turns in its own plane: about Z, whatever the separate axes say.
@@ -735,6 +883,83 @@ namespace BabylonQuarks.UnityExporter
             behaviors.Add(new JObject()
                 .Set("type", "RotationOverLife")
                 .Set("angularVelocity", ScaleCurve(m.z, SpinSign(renderMode))));
+        }
+
+        /// <summary>
+        /// The material's tint as the system's materialColor and materialColorScale, each written
+        /// only when it changes something. The tint multiplies every particle (or the whole trail),
+        /// in linear space in a Linear project, so it is not folded into the particles' colours,
+        /// where babylon.quarks would turn it linear with them.
+        /// </summary>
+        internal static void AddMaterialColor(JObject system, ParticleMaterial material)
+        {
+            Color c = material.Tint;
+            if (c.r != 1f || c.g != 1f || c.b != 1f || c.a != 1f)
+            {
+                system.Set("materialColor", new JArray().Add(c.r).Add(c.g).Add(c.b).Add(c.a));
+            }
+            if (material.TintScale != 1f) system.Set("materialColorScale", material.TintScale);
+        }
+
+        /// <summary>
+        /// Unity turns a mesh particle's 2D rotation (start rotation and Rotation over Lifetime without
+        /// separate axes) about its axisOfRotation, which the Shape module picks from where it sends the
+        /// particle when it emits from the module, and which is Z when it does not (see EmitsFromShape):
+        /// quarks' rotationAxis 'emission' and its default 'z'. A particle that rotates in 3D (see
+        /// RotatesIn3D) is laid by its three Euler angles instead, its 2D start rotation the Z angle,
+        /// so it keeps the default.
+        /// </summary>
+        private static void AddRotationAxis(ParticleSystem ps, JObject obj)
+        {
+            if (!RotatesIn3D(ps) && EmitsFromShape(ps.shape)) obj.Set("rotationAxis", "emission");
+        }
+
+        /// <summary>
+        /// Whether Unity rotates a mesh particle in 3D: its start rotation is 3D, or Rotation over
+        /// Lifetime or Rotation by Speed is on with Separate Axes, whatever their X and Y rates. Unity
+        /// then lays the mesh by its rotation3D Euler angles, a 2D start rotation being the Z angle,
+        /// and leaves axisOfRotation unused; a module with Separate Axes that is off changes nothing
+        /// (measured in Unity 6).
+        /// </summary>
+        private static bool RotatesIn3D(ParticleSystem ps) =>
+            ps.main.startRotation3D
+            || (ps.rotationOverLifetime.enabled && ps.rotationOverLifetime.separateAxes)
+            || (ps.rotationBySpeed.enabled && ps.rotationBySpeed.separateAxes);
+
+        /// <summary>
+        /// Unity's Render Alignment of a mesh particle or a billboard as babylon.quarks'
+        /// renderAlignment. World and Local keep their names: a mesh is laid along those axes, and a
+        /// billboard's quad lies in their XY plane instead of facing the camera. View is written for
+        /// a mesh, whose quarks default is its simulation axes, and left out for a billboard, which
+        /// faces the camera by default. Facing, which turns each particle toward the camera's
+        /// position, is approximated by View, toward the camera's plane. Velocity has no counterpart
+        /// and is left out, so meshes keep the system's simulation axes and billboards face the
+        /// camera.
+        /// </summary>
+        private static void AddRenderAlignment(ParticleSystem ps, ParticleSystemRenderer renderer, int renderMode, JObject obj)
+        {
+            bool mesh = renderMode == 2;
+            switch (renderer.alignment)
+            {
+                case ParticleSystemRenderSpace.View:
+                    if (mesh) obj.Set("renderAlignment", "view");
+                    break;
+                case ParticleSystemRenderSpace.World:
+                    obj.Set("renderAlignment", "world");
+                    break;
+                case ParticleSystemRenderSpace.Local:
+                    obj.Set("renderAlignment", "local");
+                    break;
+                case ParticleSystemRenderSpace.Facing:
+                    if (mesh) obj.Set("renderAlignment", "view");
+                    Debug.LogWarning($"[Quarks Exporter] '{ps.name}': Render Alignment Facing is exported as View (facing the camera's plane, not its position).");
+                    break;
+                case ParticleSystemRenderSpace.Velocity:
+                    Debug.LogWarning(mesh
+                        ? $"[Quarks Exporter] '{ps.name}': Render Alignment Velocity has no quarks counterpart; the meshes keep the simulation space's axes."
+                        : $"[Quarks Exporter] '{ps.name}': Render Alignment Velocity has no quarks counterpart; the billboards face the camera.");
+                    break;
+            }
         }
 
         /// <summary>
@@ -839,11 +1064,18 @@ namespace BabylonQuarks.UnityExporter
         {
             var m = ps.forceOverLifetime;
             if (!m.enabled) return;
-            behaviors.Add(new JObject()
+            var force = new JObject()
                 .Set("type", "ForceOverLife")
                 .Set("x", ValueConverter.Curve(m.x))
                 .Set("y", ValueConverter.Curve(m.y))
-                .Set("z", ValueConverter.Curve(m.z)));
+                .Set("z", ValueConverter.Curve(m.z));
+            // Unity's force is in the emitter's axes unless the module says World (Local is its
+            // default); quarks' is in world axes unless told otherwise. Without this, an effect on
+            // a turned emitter is pushed the wrong way.
+            if (m.space != ParticleSystemSimulationSpace.World) force.Set("space", "local");
+            // Randomize: a random force picks a new value every frame instead of once per particle.
+            if (m.randomized) force.Set("randomized", true);
+            behaviors.Add(force);
         }
 
         private static void AddNoise(ParticleSystem ps, JArray behaviors)
@@ -866,10 +1098,20 @@ namespace BabylonQuarks.UnityExporter
             behaviors.Add(noise);
         }
 
+        /// <summary>
+        /// Inherit Velocity → <c>InheritVelocity</c>, where Unity applies it: in World space, and in
+        /// Custom space for the Initial mode. A Local system inherits nothing in either mode, and a
+        /// Custom one nothing in Current mode (measured in Unity 6 on a moving, turned node), so the
+        /// module is left out there; babylon.quarks would otherwise add the emitter's velocity to
+        /// particles that already move with it.
+        /// </summary>
         private static void AddInheritVelocity(ParticleSystem ps, JArray behaviors)
         {
             var m = ps.inheritVelocity;
             if (!m.enabled) return;
+            var space = ps.main.simulationSpace;
+            if (space == ParticleSystemSimulationSpace.Local) return;
+            if (space == ParticleSystemSimulationSpace.Custom && m.mode == ParticleSystemInheritVelocityMode.Current) return;
             behaviors.Add(new JObject()
                 .Set("type", "InheritVelocity")
                 .Set("multiplier", ValueConverter.Curve(m.curve))
@@ -879,11 +1121,14 @@ namespace BabylonQuarks.UnityExporter
         private static void AddRandomizeDirection(ParticleSystem ps, JArray behaviors)
         {
             var shape = ps.shape;
-            if (!shape.enabled || shape.randomDirectionAmount <= 0f) return;
-            // Unity's randomDirectionAmount is a 0..1 blend; map to a 0..π scatter angle.
+            if (!EmitsFromShape(shape) || shape.randomDirectionAmount <= 0f) return;
+            // Unity leaves a Cone emitting from its base as it is, whatever the amount; only the
+            // Cone Volume and the other shapes take it.
+            if (shape.shapeType == ParticleSystemShapeType.Cone || shape.shapeType == ParticleSystemShapeType.ConeShell) return;
+            // The same 0..1 blend toward a random direction as Unity's.
             behaviors.Add(new JObject()
-                .Set("type", "ChangeEmitDirection")
-                .Set("angle", ValueConverter.Constant(shape.randomDirectionAmount * Mathf.PI)));
+                .Set("type", "RandomizeDirection")
+                .Set("amount", Mathf.Clamp01(shape.randomDirectionAmount)));
         }
 
         private static void AddColorBySpeed(ParticleSystem ps, JArray behaviors)
@@ -922,11 +1167,39 @@ namespace BabylonQuarks.UnityExporter
         {
             var m = ps.collision;
             if (!m.enabled) return;
-            // quarks ApplyCollision resolves against a host-provided collider; only `bounce` is
-            // portable (the plane/world colliders themselves aren't part of the effect JSON).
-            behaviors.Add(new JObject()
+            var collision = new JObject()
                 .Set("type", "ApplyCollision")
-                .Set("bounce", ConstantOf(m.bounce)));
+                .Set("bounce", ConstantOf(m.bounce));
+            if (m.type == ParticleSystemCollisionType.Planes)
+            {
+                // The planes go into the emitter's local space, so they follow it as Unity's
+                // plane Transforms follow the effect they belong to. A normal takes the inverse
+                // transpose, which for the emitter's own scale is a multiply by it.
+                var planes = new JArray();
+                Transform emitter = ps.transform;
+                for (int i = 0; i < m.planeCount; i++)
+                {
+                    Transform plane = m.GetPlane(i);
+                    if (plane == null) continue;
+                    Vector3 position = emitter.InverseTransformPoint(plane.position);
+                    Vector3 normal = Vector3.Scale(emitter.InverseTransformDirection(plane.up), emitter.lossyScale);
+                    planes.Add(new JObject()
+                        .Set("position", new JArray().Add(position.x).Add(position.y).Add(position.z))
+                        .Set("normal", new JArray().Add(normal.x).Add(normal.y).Add(normal.z)));
+                }
+                // Planes mode without a plane collides with nothing; quarks would ask the host's world.
+                if (planes.Items.Count == 0) return;
+                collision.Set("planes", planes);
+                if (m.radiusScale != 1f) collision.Set("radiusScale", m.radiusScale);
+            }
+            // World collisions bounce off the host's colliders, through the PhysicsResolver it registers.
+            float dampen = ConstantOf(m.dampen);
+            if (dampen != 0f) collision.Set("dampen", dampen);
+            float lifetimeLoss = ConstantOf(m.lifetimeLoss);
+            if (lifetimeLoss != 0f) collision.Set("lifetimeLoss", lifetimeLoss);
+            if (m.minKillSpeed > 0f || m.maxKillSpeed < 10000f)
+                Debug.LogWarning($"[Quarks Exporter] '{ps.name}': collision Min / Max Kill Speed have no quarks counterpart and are skipped.");
+            behaviors.Add(collision);
         }
 
         private static JToken SpeedRange(Vector2 range) => ValueConverter.Interval(range.x, range.y);
@@ -971,11 +1244,6 @@ namespace BabylonQuarks.UnityExporter
         // quarks SubParticleEmitMode: Death=0, Birth=1 (Frame=2 has no Unity counterpart).
         private const int SubEmitDeath = 0;
         private const int SubEmitBirth = 1;
-
-        /// <summary>Whether the curve is a constant zero.</summary>
-        private static bool IsZero(ParticleSystem.MinMaxCurve c) =>
-            (c.mode == ParticleSystemCurveMode.Constant && c.constant == 0f) ||
-            (c.mode == ParticleSystemCurveMode.TwoConstants && c.constantMin == 0f && c.constantMax == 0f);
 
         private static float ConstantOf(ParticleSystem.MinMaxCurve c)
         {

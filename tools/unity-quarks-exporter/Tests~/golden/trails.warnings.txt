@@ -1,2 +1,4 @@
+[Quarks Exporter] 'Rocket': Trail Renderer Alignment TransformZ is exported as View (facing the camera).
 [Quarks Exporter] 'Rocket': Collision sub-emitter 'TrailSparks' has no quarks counterpart and is skipped.
 [Quarks Exporter] Material 'SmokeSubtract': subtractive blending is exported as ALPHA_SUBTRACT, which darkens by the particle's color and ignores its alpha.
+[Quarks Exporter] 'WispShown': draws particles and trails; a quarks system has one render mode, so only the particles are exported.

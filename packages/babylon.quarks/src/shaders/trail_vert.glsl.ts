@@ -1,3 +1,4 @@
+import {colorSpaceDeclarationGLSL, particleColorVertexDeclarationGLSL} from './chunks/colorSpace';
 import {fogVertexDeclarationGLSL, fogVertexGLSL} from './chunks/fog';
 
 export default /* glsl */ `
@@ -55,6 +56,8 @@ vec3 trailSide(vec3 previousPoint, vec3 point, vec3 nextPoint) {
 }
 
 ${fogVertexDeclarationGLSL}
+${colorSpaceDeclarationGLSL}
+${particleColorVertexDeclarationGLSL}
 void main() {
     vec3 point = (view * vec4(position, 1.0)).xyz;
     // A swept trail lays its vertices out on the CPU and gives them no width.
@@ -74,6 +77,8 @@ ${fogVertexGLSL('point')}
 #ifdef UV1
     vUV1 = uv2;
 #endif
-    vColor = color;
+    // The particle colour, times the material's, comes into the working space here, so it is
+    // interpolated there too.
+    vColor = quarksParticleColor(color);
 }
 `;

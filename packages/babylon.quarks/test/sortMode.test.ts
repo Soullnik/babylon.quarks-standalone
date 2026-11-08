@@ -138,11 +138,14 @@ describe('sort mode and screen-size limits', () => {
             renderer.dispose();
             return zs;
         };
-        // Insertion order: the older system was added first.
-        expect(make('none')).toEqual([1, 1, 1, 2, 2, 2]);
-        // The oldest are drawn last, so they are in front.
+        // No particle order: the systems back to front, as Unity draws its renderers. The camera
+        // looks from z -10, so the younger system at z 2 is the farther and comes first.
+        expect(make('none')).toEqual([2, 2, 2, 1, 1, 1]);
+        // By age within each system, as Unity sorts the particles of each renderer among
+        // themselves; the systems stay back to front. Their particles share an age, so the order
+        // is the same either way.
         expect(make('oldestInFront')).toEqual([2, 2, 2, 1, 1, 1]);
-        expect(make('youngestInFront')).toEqual([1, 1, 1, 2, 2, 2]);
+        expect(make('youngestInFront')).toEqual([2, 2, 2, 1, 1, 1]);
     });
 
     it('batches systems with different sort modes or size limits apart', () => {

@@ -178,6 +178,11 @@ loadPlugin({
 - Without the plugin, a file that names your type still loads. The behavior is skipped, or the
   shape becomes a point, with a warning.
 
+A complete plugin that follows these rules is the examples' Custom Plugin demo,
+[`examples/src/demos/customPlugin.ts`](../examples/src/demos/customPlugin.ts)
+([live](https://soullnik.github.io/babylon.quarks-standalone/babylonDemo.html#CustomPluginDemo)): a
+wave behavior that lifts and colours a grid of particles, unloaded when the demo is left.
+
 ## Value generators
 
 Behaviors and shapes take numbers, curves and colours as generators: `ConstantValue`,

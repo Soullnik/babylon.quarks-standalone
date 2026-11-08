@@ -34,13 +34,14 @@ export function applyRendererMaterial(system: ParticleSystem, patch: RendererMat
         system.blending = patch.blendMode;
     }
     if (patch.transparent !== undefined) {
-        settings.materialTransparent = patch.transparent;
+        // The setter, so a depth write not chosen follows the surface.
+        system.transparent = patch.transparent;
     }
     if (patch.depthTest !== undefined) {
         settings.materialDepthTest = patch.depthTest;
     }
     if (patch.depthWrite !== undefined) {
-        settings.materialDepthWrite = patch.depthWrite;
+        system.depthWrite = patch.depthWrite;
     }
     if (patch.alphaTest !== undefined) {
         settings.materialAlphaTest = patch.alphaTest;

@@ -1,5 +1,5 @@
 import type {Vector3Like} from 'quarks.core';
-import {RendererEmitterSettings, StretchedBillBoardSettings, Vector3} from 'quarks.core';
+import {Matrix4, RendererEmitterSettings, StretchedBillBoardSettings, Vector3} from 'quarks.core';
 import type {VFXBatchSettings} from '../BatchedRenderer';
 import {RenderMode} from '../VFXBatch';
 
@@ -16,6 +16,49 @@ function setXYZ(out: Vector3Like, x: number, y: number, z: number): void {
     out.x = x;
     out.y = y;
     out.z = z;
+}
+
+/** Scratch for {@link BoundsTracker.setWorld}: the inverse of the matrix bounds are kept in. */
+const inverse = new Matrix4();
+
+/**
+ * The axis-aligned box, into `min` and `max`, of the eight corners of the box from
+ * `(minX, minY, minZ)` to `(maxX, maxY, maxZ)` taken through the column-major matrix `e`.
+ */
+function boxThrough(
+    e: ArrayLike<number>,
+    minX: number,
+    minY: number,
+    minZ: number,
+    maxX: number,
+    maxY: number,
+    maxZ: number,
+    min: Vector3Like,
+    max: Vector3Like
+): void {
+    let loX = Infinity;
+    let loY = Infinity;
+    let loZ = Infinity;
+    let hiX = -Infinity;
+    let hiY = -Infinity;
+    let hiZ = -Infinity;
+    for (let corner = 0; corner < 8; corner++) {
+        const x = corner & 1 ? maxX : minX;
+        const y = corner & 2 ? maxY : minY;
+        const z = corner & 4 ? maxZ : minZ;
+        const w = 1 / (e[3] * x + e[7] * y + e[11] * z + e[15]);
+        const wx = (e[0] * x + e[4] * y + e[8] * z + e[12]) * w;
+        const wy = (e[1] * x + e[5] * y + e[9] * z + e[13]) * w;
+        const wz = (e[2] * x + e[6] * y + e[10] * z + e[14]) * w;
+        if (wx < loX) loX = wx;
+        if (wx > hiX) hiX = wx;
+        if (wy < loY) loY = wy;
+        if (wy > hiY) hiY = wy;
+        if (wz < loZ) loZ = wz;
+        if (wz > hiZ) hiZ = wz;
+    }
+    setXYZ(min, loX, loY, loZ);
+    setXYZ(max, hiX, hiY, hiZ);
 }
 
 /** The largest axis of the scale in a column-major 4x4 matrix. */
@@ -98,7 +141,11 @@ export class BoundsTracker {
             padding += maxSize * this.meshGeometryRadius(settings.instancingGeometry);
         } else if (renderMode === RenderMode.StretchedBillBoard) {
             const stretch = emitterSettings as StretchedBillBoardSettings;
-            padding += maxSize * (1 + (stretch.lengthFactor ?? 0) + maxSpeed * (stretch.speedFactor ?? 0));
+            // As Unity draws it: the size times the length factor plus the speed times the speed
+            // factor long. A negative factor (Unity's negative Length or Speed Scale) stretches the
+            // quad ahead of the particle instead of behind it: as far, the other way.
+            padding +=
+                maxSize * (1 + Math.abs(stretch.lengthFactor ?? 0)) + maxSpeed * Math.abs(stretch.speedFactor ?? 0);
         } else {
             const pivot = settings.pivot;
             const pivotReach = pivot === undefined ? 0 : Math.abs(pivot.x) + Math.abs(pivot.y) + Math.abs(pivot.z);
@@ -111,13 +158,39 @@ export class BoundsTracker {
         this.valid = true;
     }
 
-    /** Records bounds already in world space, which a renderer measured. */
-    setWorld(minX: number, minY: number, minZ: number, maxX: number, maxY: number, maxZ: number, padding: number) {
+    /**
+     * Records bounds a renderer measured in world space, padded by `padding` world units. With
+     * `space`, what was measured is drawn through it (a trail whose samples are kept in its
+     * emitter's space): the box is kept in that space, so it goes where `space` goes until it is
+     * measured again, as a local system's own bounds do. A `space` scaled flat on an axis cannot be
+     * undone, and the box is then kept in world space.
+     */
+    setWorld(
+        minX: number,
+        minY: number,
+        minZ: number,
+        maxX: number,
+        maxY: number,
+        maxZ: number,
+        padding: number,
+        space?: BoundsSpace
+    ) {
+        this.valid = true;
+        if (space !== undefined) {
+            const elements = space.matrixWorld.elements;
+            const scale = maxAxisScale(elements);
+            inverse.fromArray(elements as number[]);
+            if (scale > 0 && inverse.determinant() !== 0) {
+                boxThrough(inverse.invert().elements, minX, minY, minZ, maxX, maxY, maxZ, this.min, this.max);
+                this.padding = padding / scale;
+                this.inWorld = false;
+                return;
+            }
+        }
         this.min.set(minX, minY, minZ);
         this.max.set(maxX, maxY, maxZ);
         this.padding = padding;
         this.inWorld = true;
-        this.valid = true;
     }
 
     /** The padding in world units, for bounds kept in `space`. */
@@ -145,29 +218,9 @@ export class BoundsTracker {
         // reach scaled by the emitter's largest axis.
         const e = space.matrixWorld.elements;
         const pad = this.padding * maxAxisScale(e);
-        let minX = Infinity;
-        let minY = Infinity;
-        let minZ = Infinity;
-        let maxX = -Infinity;
-        let maxY = -Infinity;
-        let maxZ = -Infinity;
-        for (let corner = 0; corner < 8; corner++) {
-            const x = corner & 1 ? bmax.x : bmin.x;
-            const y = corner & 2 ? bmax.y : bmin.y;
-            const z = corner & 4 ? bmax.z : bmin.z;
-            const w = 1 / (e[3] * x + e[7] * y + e[11] * z + e[15]);
-            const wx = (e[0] * x + e[4] * y + e[8] * z + e[12]) * w;
-            const wy = (e[1] * x + e[5] * y + e[9] * z + e[13]) * w;
-            const wz = (e[2] * x + e[6] * y + e[10] * z + e[14]) * w;
-            if (wx < minX) minX = wx;
-            if (wx > maxX) maxX = wx;
-            if (wy < minY) minY = wy;
-            if (wy > maxY) maxY = wy;
-            if (wz < minZ) minZ = wz;
-            if (wz > maxZ) maxZ = wz;
-        }
-        setXYZ(min, minX - pad, minY - pad, minZ - pad);
-        setXYZ(max, maxX + pad, maxY + pad, maxZ + pad);
+        boxThrough(e, bmin.x, bmin.y, bmin.z, bmax.x, bmax.y, bmax.z, min, max);
+        setXYZ(min, min.x - pad, min.y - pad, min.z - pad);
+        setXYZ(max, max.x + pad, max.y + pad, max.z + pad);
         return true;
     }
 

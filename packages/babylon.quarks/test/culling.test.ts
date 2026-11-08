@@ -93,6 +93,35 @@ describe('visibility culling', () => {
         expect(max.x).toBeCloseTo(5 + 0.3, 5);
     });
 
+    it('pads a stretched quad by its reach either way, a negative length factor too', () => {
+        // A shot's aura: Length Scale -2 stretches the quad ahead of the
+        // particle. The padding came out negative, turning the box inside out, so the system was
+        // culled from cameras that saw it.
+        const min = new Vector3();
+        const max = new Vector3();
+        for (const lengthFactor of [2, -2]) {
+            const system = makeSystem({
+                renderMode: RenderMode.StretchedBillBoard,
+                rendererEmitterSettings: {speedFactor: 0, lengthFactor},
+            });
+            system.update(STEP);
+            system.update(STEP);
+            expect(system.getWorldBounds(min, max)).toBe(true);
+            // The quad reaches its size times (1 + |length factor|) past the point it starts at.
+            expect(min.x).toBeCloseTo(-0.2 * 3, 5);
+            expect(max.x).toBeCloseTo(0.2 * 3, 5);
+        }
+        const renderer = new BatchedRenderer('r', scene);
+        const ahead = makeSystem({
+            renderMode: RenderMode.StretchedBillBoard,
+            rendererEmitterSettings: {speedFactor: 0, lengthFactor: -2},
+            cullingMode: 'pause',
+        });
+        renderer.addSystem(ahead);
+        frames(renderer, 3);
+        expect(ahead.culled).toBe(false);
+    });
+
     it('gives the batch mesh real bounds, so Babylon culls the draw', () => {
         const renderer = new BatchedRenderer('r', scene);
         const system = makeSystem();
@@ -272,6 +301,58 @@ describe('visibility culling', () => {
         expect(min.z).toBeLessThanOrEqual(0.2);
         expect(max.z).toBeGreaterThanOrEqual(head.z - 0.2);
         expect(renderer.batches[0].mesh.alwaysSelectAsActiveMesh).toBe(false);
+        renderer.dispose();
+    });
+
+    it('resumes a local-space trail whose emitter comes back into view while it is paused', () => {
+        // The ribbon is drawn through the emitter, so its bounds go where the emitter goes even
+        // while the system is paused and its ribbon is not measured again.
+        const renderer = new BatchedRenderer('r', scene);
+        const system = oneParticle({
+            cullingMode: 'pause',
+            renderMode: RenderMode.Trail,
+            startSpeed: new ConstantValue(1),
+            rendererEmitterSettings: {startLength: new ConstantValue(10)},
+        });
+        renderer.addSystem(system);
+        const moveEmitter = (x: number) => {
+            system.emitter.position.x = x;
+            system.emitter.computeWorldMatrix(true);
+        };
+        frames(renderer, 5);
+        expect(system.culled).toBe(false);
+
+        moveEmitter(100);
+        frames(renderer, 3);
+        expect(system.culled).toBe(true);
+        const age = system.particles[0].age;
+
+        moveEmitter(0);
+        frames(renderer, 1);
+        expect(system.culled).toBe(false);
+        expect(system.particles[0].age).toBeGreaterThan(age);
+        renderer.dispose();
+    });
+
+    it('keeps a world-space trail culled where its ribbon is, wherever the emitter goes', () => {
+        const renderer = new BatchedRenderer('r', scene);
+        const system = oneParticle({
+            cullingMode: 'pause',
+            worldSpace: true,
+            renderMode: RenderMode.Trail,
+            startSpeed: new ConstantValue(1),
+            rendererEmitterSettings: {startLength: new ConstantValue(10)},
+        });
+        renderer.addSystem(system);
+        frames(renderer, 5);
+        // The ribbon is out of view; the emitter moving into view leaves it there.
+        lookAt(0, 0, -20);
+        frames(renderer, 2);
+        expect(system.culled).toBe(true);
+        system.emitter.position.z = -20;
+        system.emitter.computeWorldMatrix(true);
+        frames(renderer, 1);
+        expect(system.culled).toBe(true);
         renderer.dispose();
     });
 

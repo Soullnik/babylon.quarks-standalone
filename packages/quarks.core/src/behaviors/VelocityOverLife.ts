@@ -5,8 +5,10 @@ import type {Vector3Like} from '../Like';
 import {Quaternion, Vector3} from '../math';
 import {vector3From} from '../math/fromLike';
 import {Particle} from '../Particle';
+import {addAnimatedVelocity} from './animatedVelocity';
 import {Behavior, BehaviorJSON} from './Behavior';
 import {BehaviorSpace} from './EmitterFrame';
+import {stepEndLife} from './stepAge';
 
 /** The space a `VelocityOverLife` is authored in; the same choice as {@link BehaviorSpace}. */
 export type VelocityOverLifeSpace = BehaviorSpace;
@@ -41,6 +43,9 @@ export interface VelocityOverLifeJSON extends BehaviorJSON {
  * Move particles with a direct velocity over their life (Unity's "Velocity over Lifetime").
  * Applied as a positional displacement, so it is not affected by speed modifiers,
  * forces, or speed limits. Orbital speeds rotate particles around the emitter axes.
+ * The velocity of the move is added to the particle's `animatedVelocity` when it keeps one, as
+ * Unity's module adds to the particle's animated velocity, so a stretched billboard is drawn
+ * along it.
  *
  * For an orbit around a single axis of any direction, or around the world origin, use
  * `OrbitOverLife`; this one orbits the emitter's three axes, with a radial speed and an offset
@@ -180,7 +185,11 @@ export class VelocityOverLife implements Behavior {
     }
 
     update(particle: Particle, delta: number): void {
-        const t = particle.age / particle.life;
+        const t = stepEndLife(particle, delta);
+        // Where the move starts, for the velocity of it a renderer may draw along.
+        const startX = particle.position.x;
+        const startY = particle.position.y;
+        const startZ = particle.position.z;
         this._temp.set(
             this.linearX.genValue(particle.memory, t),
             this.linearY.genValue(particle.memory, t),
@@ -218,6 +227,7 @@ export class VelocityOverLife implements Behavior {
             this.orbit(particle.position, this._axisZ, angleZ);
             particle.position.add(this._center);
         }
+        addAnimatedVelocity(particle, startX, startY, startZ, delta);
     }
 
     private orbit(position: Vector3, axis: Vector3, angle: number): void {

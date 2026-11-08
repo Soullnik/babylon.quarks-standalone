@@ -47,6 +47,7 @@ function bare(renderMode: RenderMode): ShaderSettings {
         minParticleSize: 0,
         maxParticleSize: Infinity,
         lighting: renderMode === RenderMode.Mesh ? 'fixed' : undefined,
+        renderAlignment: 'simulation',
         rim: undefined,
         mapUV: undefined,
         uvDistortion: undefined,
@@ -64,9 +65,13 @@ interface Axis {
 
 const NONE: Axis = {name: ''};
 
-/** The render modes and the mode-specific features: quad pivot and size limits, mesh lighting, rim and reflection. */
+/**
+ * The render modes and the mode-specific features: quad pivot and size limits, billboard and mesh
+ * alignment, mesh lighting, rim and reflection.
+ */
 const TARGETS: Axis[] = [
     {name: 'billboard', settings: {renderMode: RenderMode.BillBoard}},
+    {name: 'billboard aligned', settings: {renderMode: RenderMode.BillBoard, renderAlignment: 'local'}},
     {name: 'vertical billboard', settings: {renderMode: RenderMode.VerticalBillBoard}},
     {name: 'horizontal billboard', settings: {renderMode: RenderMode.HorizontalBillBoard}},
     {name: 'stretched', settings: {renderMode: RenderMode.StretchedBillBoard}},
@@ -74,6 +79,7 @@ const TARGETS: Axis[] = [
     {name: 'mesh', settings: {renderMode: RenderMode.Mesh}},
     {name: 'mesh scene lit', settings: {renderMode: RenderMode.Mesh, lighting: 'scene'}},
     {name: 'mesh unlit', settings: {renderMode: RenderMode.Mesh, lighting: 'unlit'}},
+    {name: 'mesh view aligned', settings: {renderMode: RenderMode.Mesh, renderAlignment: 'view'}},
     {name: 'mesh rim', settings: {renderMode: RenderMode.Mesh, rim: normalizeMeshRim({mode: 'add'})}},
     {
         name: 'mesh unlit rim mix',
@@ -95,6 +101,17 @@ const TARGETS: Axis[] = [
             lighting: 'unlit',
             reflectionAtlas: TEXTURE,
             rim: normalizeMeshRim({mode: 'fade'}),
+        },
+        context: {envAtlasReady: true},
+    },
+    {
+        name: 'mesh view aligned scene lit reflecting rim mix',
+        settings: {
+            renderMode: RenderMode.Mesh,
+            renderAlignment: 'view',
+            lighting: 'scene',
+            reflectionAtlas: TEXTURE,
+            rim: normalizeMeshRim({mode: 'mix'}),
         },
         context: {envAtlasReady: true},
     },
@@ -131,6 +148,10 @@ const FOG: Axis[] = [
 const BLEND: Axis[] = [
     {name: 'premultiplied', settings: {materialBlendMode: Constants.ALPHA_PREMULTIPLIED}},
     {name: 'premultiplied fog', settings: {materialBlendMode: Constants.ALPHA_PREMULTIPLIED, applyFog: true}},
+    {
+        name: 'premultiplied map',
+        settings: {materialBlendMode: Constants.ALPHA_PREMULTIPLIED, premultipliedMap: true, texture: TEXTURE},
+    },
     {name: 'one-one', settings: {materialBlendMode: Constants.ALPHA_ONEONE}},
     {name: 'one-one fog', settings: {materialBlendMode: Constants.ALPHA_ONEONE, applyFog: true}},
     {name: 'multiply', settings: {materialBlendMode: Constants.ALPHA_MULTIPLY}},
@@ -175,6 +196,18 @@ const SURFACE: Axis[] = (() => {
         },
     ];
 })();
+
+/** A colour texture whose texels are read in linear space, as an sRGB buffer's are (see `linearTexture`). */
+const LINEAR_TEXTURE = {gammaSpace: false} as BaseTexture;
+
+/** The map and the gradient map's ramp in linear space. */
+const LINEAR_TEXTURES: Axis[] = [
+    {name: 'linear map', settings: {texture: LINEAR_TEXTURE}},
+    {
+        name: 'linear map linear gradient',
+        settings: {texture: LINEAR_TEXTURE, gradientMap: normalizeGradientMap({ramp: LINEAR_TEXTURE})},
+    },
+];
 
 /** The targets the texture effects are tried on: one per vertex shader and fragment family. */
 const SURFACE_TARGETS = [
@@ -272,8 +305,16 @@ const IMAGE_PROCESSING_BLEND: Axis[] = [
     {name: 'multiply', settings: {materialBlendMode: Constants.ALPHA_MULTIPLY}},
 ];
 
+/** The particle's colour left out (`particleColor` off), as Unity's mesh shaders draw a particle. */
+const NO_PARTICLE_COLOR: Axis = {name: 'no particle colour', settings: {particleColor: false}};
+
 /** A mesh batch whose geometry has a second UV set. */
 const MESH_UV2: Axis = {name: 'uv2', context: {meshUV2: true}};
+/**
+ * A mesh batch whose geometry has a second UV set and vertex colours: the colours alone where the
+ * surface reads no second UV set, both, after one another in the geometry, where it does.
+ */
+const MESH_UV2_COLORS: Axis = {name: 'uv2 vertex colours', context: {meshUV2: true, meshColors: true}};
 
 /** Soft, alpha-tested and fogged at once, to try the effects with the rest of the fragment. */
 const EVERYTHING_ELSE: Axis = {
@@ -324,7 +365,7 @@ export function shaderVariants(): ShaderVariant[] {
             for (const soft of SOFT.slice(0, 2)) for (const map of MAP) add([target, blend, soft, map]);
 
     for (const target of TARGETS.filter((t) => SURFACE_TARGETS.includes(t.name)))
-        for (const uv2 of target.settings?.renderMode === RenderMode.Mesh ? [NONE, MESH_UV2] : [NONE])
+        for (const uv2 of target.settings?.renderMode === RenderMode.Mesh ? [NONE, MESH_UV2, MESH_UV2_COLORS] : [NONE])
             for (const surface of SURFACE)
                 for (const map of MAP)
                     for (const tile of [NONE, TILE[2]])
@@ -338,5 +379,15 @@ export function shaderVariants(): ShaderVariant[] {
     const everySurface = SURFACE[SURFACE.length - 3];
     for (const target of TARGETS.filter((t) => SURFACE_TARGETS.includes(t.name)))
         for (const ip of IMAGE_PROCESSING) add([target, ip, everySurface, MAP[MAP.length - 1], EVERYTHING_ELSE]);
+
+    // Linear colour textures, converted to gamma space without image processing and read as they
+    // are with it.
+    for (const target of TARGETS.filter((t) => SURFACE_TARGETS.includes(t.name)))
+        for (const ip of [NONE, IMAGE_PROCESSING[0]]) for (const linear of LINEAR_TEXTURES) add([target, ip, linear]);
+
+    // Without the particle colour, in gamma and in linear space, alpha-tested as a cutout is.
+    for (const target of TARGETS)
+        for (const ip of [NONE, IMAGE_PROCESSING[0]])
+            for (const alphaTest of ALPHA_TEST) add([target, NO_PARTICLE_COLOR, ip, alphaTest, MAP[1]]);
     return out;
 }

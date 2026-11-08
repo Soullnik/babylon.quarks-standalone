@@ -58,8 +58,10 @@ const EXEMPT: Record<string, string> = {
     ApplyCollision: 'bounces off what the host resolver reports; nothing integrates over time',
     ApplySequences: 'places particles from a texture at emission',
     ChangeEmitDirection: 'turns the velocity once, at emission',
+    RandomizeDirection: 'blends the velocity once, at emission',
     EmitSubParticleSystem: 'emits into another system; the sub-emitter tests cover its timing',
     WidthOverLength: 'shapes a trail along its length, not over time',
+    ColorOverLength: 'colors a trail along its length, not over time',
 };
 
 /** A linear ramp over the particle's life, from `from` to `to`. */

@@ -1,7 +1,10 @@
 import {VertexBuffer} from '@babylonjs/core/Buffers/buffer';
+import {BoundingInfo} from '@babylonjs/core/Culling/boundingInfo';
 import {Constants} from '@babylonjs/core/Engines/constants';
 import {ShaderMaterial} from '@babylonjs/core/Materials/shaderMaterial';
+import {Vector3 as BVector3} from '@babylonjs/core/Maths/math.vector';
 import {Mesh} from '@babylonjs/core/Meshes/mesh';
+import {SubMesh} from '@babylonjs/core/Meshes/subMesh';
 import {Scene} from '@babylonjs/core/scene';
 import {IParticleSystem, Matrix4, Quaternion, TrailParticle, TrailSettings, Vector3} from 'quarks.core';
 import {VFXBatchSettings} from './BatchedRenderer';
@@ -18,6 +21,7 @@ import {
     trailTextureMode,
     trailTextureScale,
 } from './trailSettings';
+import {clearDrawOrder, setDrawOrder} from './transparentSort';
 import {VFXBatch} from './VFXBatch';
 
 /** The texture modes as the vertex loop tells them apart, see `TrailSettings.textureMode`. */
@@ -112,6 +116,15 @@ export class TrailBatch extends VFXBatch {
     private indexBuffer!: Uint32Array;
     /** True while the batch is parked on the degenerate draw, see uploadGeometry. */
     private drawsNothing = false;
+    /**
+     * The sub meshes the runs of the batch's systems (see `runCount`) are drawn with, one each
+     * over the run's indices, kept for the mesh's life.
+     */
+    private readonly runSubMeshes: SubMesh[] = [];
+    /** Where each filled system's vertices start, and past the last one where they end. */
+    private readonly systemVertices: number[] = [];
+    /** Where each filled system's triangles start, and past the last one where they end. */
+    private readonly systemTriangles: number[] = [];
     /** The filled start of each geometry buffer, as uploaded; see {@link PrefixViews}. */
     private readonly uploadViews = {
         position: new PrefixViews(),
@@ -141,6 +154,7 @@ export class TrailBatch extends VFXBatch {
     /** @internal */
     setupBuffers(): void {
         this.mesh?.dispose();
+        this.runSubMeshes.length = 0;
         this.mesh = new Mesh('trailBatch', this.scene);
         this.configureMesh();
         this.buildGeometryBuffers();
@@ -529,7 +543,7 @@ export class TrailBatch extends VFXBatch {
         let triangles = 0;
 
         let particleCount = 0;
-        const visibleSystems = this.getVisibleSystems();
+        const visibleSystems = this.systemsToFill();
         for (let s = 0; s < visibleSystems.length; s++) {
             const system = visibleSystems[s];
             const particles = system.particles;
@@ -547,9 +561,13 @@ export class TrailBatch extends VFXBatch {
         }
         this.fitBuffers(particleCount);
 
+        const systemVertices = this.systemVertices;
+        const systemTriangles = this.systemTriangles;
         for (let s = 0; s < visibleSystems.length; s++) {
             const system = visibleSystems[s];
             const firstVertex = index;
+            systemVertices[s] = index;
+            systemTriangles[s] = triangles;
             TrailBatch.ensureWorldMatrix(system);
             const rotation = this.quaternion_;
             const translation = this.vector2_;
@@ -876,8 +894,11 @@ export class TrailBatch extends VFXBatch {
                     colors[o + 3] *= tint.a;
                 }
             }
-            this.measureSystemBounds(system as ParticleSystem, firstVertex, index);
+            this.measureSystemBounds(system as ParticleSystem, firstVertex, index, !samplesInWorld);
         }
+        systemVertices[visibleSystems.length] = index;
+        systemTriangles[visibleSystems.length] = triangles;
+        systemVertices.length = systemTriangles.length = visibleSystems.length + 1;
 
         this.refreshBoundingInfo();
         this.uploadGeometry(index, triangles);
@@ -886,9 +907,16 @@ export class TrailBatch extends VFXBatch {
     /**
      * Records a system's world bounds from the ribbon vertices just written for
      * it, padded by the widest ribbon. The store only holds each trail's head,
-     * so this is where a trail's extent is known.
+     * so this is where a trail's extent is known. `followsEmitter`: the samples
+     * are kept in the emitter's space, so the ribbon moves with it, and so do the
+     * bounds until the next measurement (one that culling skips).
      */
-    private measureSystemBounds(system: ParticleSystem, fromVertex: number, toVertex: number): void {
+    private measureSystemBounds(
+        system: ParticleSystem,
+        fromVertex: number,
+        toVertex: number,
+        followsEmitter: boolean
+    ): void {
         if (toVertex <= fromVertex || typeof system.setWorldBounds !== 'function') {
             return;
         }
@@ -917,7 +945,7 @@ export class TrailBatch extends VFXBatch {
             const w = widths[v];
             if (w > maxWidth) maxWidth = w;
         }
-        system.setWorldBounds(minX, minY, minZ, maxX, maxY, maxZ, maxWidth);
+        system.setWorldBounds(minX, minY, minZ, maxX, maxY, maxZ, maxWidth, followsEmitter);
     }
 
     /**
@@ -961,10 +989,7 @@ export class TrailBatch extends VFXBatch {
             const colorVB = this.mesh.getVertexBuffer(VertexBuffer.ColorKind);
             if (colorVB) colorVB.update(this.uploadViews.color.of(this.colorBuffer, index * 4));
 
-            if (this.mesh.subMeshes && this.mesh.subMeshes.length > 0) {
-                this.mesh.subMeshes[0].indexCount = triangles * 3;
-                this.mesh.subMeshes[0].verticesCount = index;
-            }
+            this.drawRuns();
             this.drawsNothing = false;
         } else if (this.mesh.subMeshes && this.mesh.subMeshes.length > 0) {
             // Nothing to draw. Leaving the count at zero still submits the draw,
@@ -986,9 +1011,68 @@ export class TrailBatch extends VFXBatch {
                 }
                 this.drawsNothing = true;
             }
-            this.mesh.subMeshes[0].indexCount = 6;
-            this.mesh.subMeshes[0].verticesCount = 1;
+            const subMesh = this.runSubMesh(0);
+            subMesh.verticesStart = 0;
+            subMesh.verticesCount = 1;
+            subMesh.indexStart = 0;
+            subMesh.indexCount = 6;
+            clearDrawOrder(subMesh);
+            const subMeshes = this.mesh.subMeshes;
+            subMeshes.length = 0;
+            subMeshes.push(subMesh);
         }
+    }
+
+    /**
+     * Draws each run of the filled systems that has triangles (see `runCount`) with a sub mesh
+     * over its indices, with the run's bounds and its place in the renderer's order.
+     */
+    private drawRuns(): void {
+        const subMeshes = this.mesh.subMeshes;
+        subMeshes.length = 0;
+        const vertices = this.systemVertices;
+        const triangles = this.systemTriangles;
+        let fromSystem = 0;
+        for (let r = 0; r < this.runCount; r++) {
+            const toSystem = this.runEnds[r];
+            const runFrom = fromSystem;
+            fromSystem = toSystem;
+            const firstTriangle = triangles[runFrom];
+            const endTriangle = triangles[toSystem];
+            if (endTriangle === firstTriangle) {
+                continue;
+            }
+            const subMesh = this.runSubMesh(subMeshes.length);
+            subMesh.verticesStart = vertices[runFrom];
+            subMesh.verticesCount = vertices[toSystem] - vertices[runFrom];
+            subMesh.indexStart = firstTriangle * 3;
+            subMesh.indexCount = (endTriangle - firstTriangle) * 3;
+            const info = subMesh.getBoundingInfo();
+            if (this.measureSystems(runFrom, toSystem) === 'measured') {
+                this.writeBounds(info);
+            } else {
+                const meshInfo = this.mesh.getBoundingInfo();
+                info.reConstruct(meshInfo.minimum, meshInfo.maximum);
+            }
+            const key = this.runKeys[r];
+            if (Number.isNaN(key)) {
+                clearDrawOrder(subMesh);
+            } else {
+                setDrawOrder(subMesh, key, this.runSequences[r]);
+            }
+            subMeshes.push(subMesh);
+        }
+    }
+
+    /** The `index`th run's sub mesh, made the first time, with bounds of its own. */
+    private runSubMesh(index: number): SubMesh {
+        let subMesh = this.runSubMeshes[index];
+        if (subMesh === undefined) {
+            subMesh = new SubMesh(0, 0, 1, 0, 6, this.mesh, undefined, false, false);
+            subMesh.setBoundingInfo(new BoundingInfo(BVector3.Zero(), BVector3.Zero()));
+            this.runSubMeshes[index] = subMesh;
+        }
+        return subMesh;
     }
 
     /**

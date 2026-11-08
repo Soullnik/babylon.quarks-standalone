@@ -127,8 +127,9 @@ allows before 1.0, and each release says what changed in its changelog.
 
 Its peer dependency is the library's minor line, `~1.Y.0` (`~1.1.0` for babylon.quarks 1.1), since
 it uses the newest API. **A project that embeds the editor upgrades it together with
-babylon.quarks**: each library minor comes with an editor release, and a change to the editor's
-peer range alone is a new editor patch. Files the editor saves are effect files, and the promises
+babylon.quarks**: each library minor comes with a new editor minor, because a peer that needs a
+newer library would break a project still on the older one if it came as a patch. Only a peer
+range that widens is an editor patch. Files the editor saves are effect files, and the promises
 above apply to them.
 
 ## The Unity exporter

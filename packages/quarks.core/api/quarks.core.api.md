@@ -8,18 +8,27 @@
 export class ApplyCollision implements Behavior {
     constructor(
     resolver: PhysicsResolver | undefined,
-    bounce: number);
+    bounce: number, options?: ApplyCollisionOptions);
     bounce: number;
     // (undocumented)
     clone(): Behavior;
+    dampen: number;
+    readonly _frame: EmitterFrame;
     // (undocumented)
     frameUpdate(delta: number): void;
     static fromJSON(json: ApplyCollisionJSON): Behavior;
     // (undocumented)
-    initialize(particle: Particle): void;
+    initialize(particle: Particle, particleSystem: IParticleSystem): void;
+    lifetimeLoss: number;
+    planes: CollisionPlane[];
+    ps?: IParticleSystem;
+    radiusScale: number;
     // (undocumented)
     reset(): void;
     resolver: PhysicsResolver | undefined;
+    _simPlanes: Vector3[];
+    // @internal
+    _tempNext: Vector3;
     // @internal
     tempV: Vector3;
     // (undocumented)
@@ -33,6 +42,18 @@ export class ApplyCollision implements Behavior {
 // @public
 export interface ApplyCollisionJSON extends BehaviorJSON {
     bounce?: number;
+    dampen?: number;
+    lifetimeLoss?: number;
+    planes?: CollisionPlaneJSON[];
+    radiusScale?: number;
+}
+
+// @public
+export interface ApplyCollisionOptions {
+    dampen?: number;
+    lifetimeLoss?: number;
+    planes?: CollisionPlane[];
+    radiusScale?: number;
 }
 
 // @public
@@ -40,7 +61,8 @@ export class ApplyForce implements Behavior {
     constructor(
     direction: Vector3Like,
     magnitude: ValueGenerator,
-    space?: BehaviorSpace);
+    space?: BehaviorSpace,
+    scaleWithEmitter?: boolean);
     // (undocumented)
     clone(): Behavior;
     get direction(): Vector3;
@@ -56,6 +78,7 @@ export class ApplyForce implements Behavior {
     ps?: IParticleSystem;
     // (undocumented)
     reset(): void;
+    scaleWithEmitter: boolean;
     space: BehaviorSpace;
     _step(delta: number): number;
     // (undocumented)
@@ -73,6 +96,7 @@ export interface ApplyForceJSON extends BehaviorJSON {
     direction?: Vector3ArrayJSON;
     force?: ValueGeneratorJSON;
     magnitude?: ValueGeneratorJSON;
+    scaleWithEmitter?: boolean;
     space?: BehaviorSpace;
 }
 
@@ -315,6 +339,18 @@ export interface CircleEmitterParameters {
 export function clamp(value: number, min: number, max: number): number;
 
 // @public
+export interface CollisionPlane {
+    normal: Vector3Like;
+    position: Vector3Like;
+}
+
+// @public
+export interface CollisionPlaneJSON {
+    normal: Vector3ArrayJSON;
+    position: Vector3ArrayJSON;
+}
+
+// @public
 export interface Color3Like {
     b: number;
     g: number;
@@ -379,6 +415,35 @@ export interface ColorJSON {
     b: number;
     g: number;
     r: number;
+}
+
+// @public
+export class ColorOverLength implements Behavior {
+    constructor(color: FunctionColorGenerator);
+    // (undocumented)
+    clone(): Behavior;
+    // (undocumented)
+    color: FunctionColorGenerator;
+    // (undocumented)
+    frameUpdate(delta: number): void;
+    static fromJSON(json: ColorOverLengthJSON): Behavior;
+    // (undocumented)
+    initialize(particle: Particle): void;
+    // (undocumented)
+    reset(): void;
+    // @internal
+    _temp: Vector4;
+    // (undocumented)
+    toJSON(): ColorOverLengthJSON;
+    // (undocumented)
+    type: string;
+    // (undocumented)
+    update(particle: Particle): void;
+}
+
+// @public
+export interface ColorOverLengthJSON extends BehaviorJSON {
+    color: ColorGeneratorJSON;
 }
 
 // @public
@@ -597,8 +662,6 @@ export class DonutEmitter implements EmitterShape {
     donutRadius: number;
     static fromJSON(json: ShapeJSON): DonutEmitter;
     initialize(p: Particle, emissionState: EmissionState): void;
-    // @internal
-    _m1: Matrix4;
     memory: GeneratorMemory;
     mode: EmitterMode;
     radius: number;
@@ -716,6 +779,8 @@ export interface EmitSubParticleSystemJSON extends BehaviorJSON {
 
 // @public
 export class EmitterFrame {
+    static forceReadsFrame(space: BehaviorSpace, worldSpace: boolean, scaled: boolean): boolean;
+    forceToSimulation(vector: Vector3, space: BehaviorSpace, worldSpace: boolean, scaled: boolean): Vector3;
     fromSimulation(vector: Vector3, space: BehaviorSpace, worldSpace: boolean): Vector3;
     pointToSimulation(point: Vector3, space: BehaviorSpace, worldSpace: boolean): Vector3;
     readonly position: Vector3;
@@ -837,7 +902,7 @@ export interface EulerJSON {
 export type EulerOrder = 'XYZ' | 'YXZ' | 'ZXY' | 'ZYX' | 'YZX' | 'XZY' | 'XYX' | 'YZY' | 'ZXZ' | 'XZX' | 'YXY' | 'ZYZ';
 
 // @public
-export type FieldType = 'vec3' | 'value' | 'number' | 'range' | 'colorFunc' | 'valueFunc' | 'rotationFunc' | 'radian' | 'mesh' | 'particleSystem' | 'boolean' | 'string' | 'geometry' | 'emitterMode' | 'boxEmitFrom' | 'coneEmitFrom' | 'gridSampling' | 'subEmitterInherit' | 'shapeTransform' | 'vec3Func';
+export type FieldType = 'vec3' | 'value' | 'number' | 'range' | 'colorFunc' | 'valueFunc' | 'rotationFunc' | 'radian' | 'mesh' | 'particleSystem' | 'boolean' | 'string' | 'geometry' | 'emitterMode' | 'boxEmitFrom' | 'coneEmitFrom' | 'gridSampling' | 'subEmitterInherit' | 'shapeTransform' | 'collisionPlanes' | 'vec3Func';
 
 // @public
 export function floorPowerOfTwo(value: number): number;
@@ -848,7 +913,11 @@ export class ForceOverLife implements Behavior {
     x: FunctionValueGenerator | ValueGenerator,
     y: FunctionValueGenerator | ValueGenerator,
     z: FunctionValueGenerator | ValueGenerator,
-    space?: BehaviorSpace);
+    space?: BehaviorSpace,
+    randomized?: boolean,
+    scaleWithEmitter?: boolean);
+    // @internal
+    _apply(particle: Particle, t: number, step: number): void;
     // (undocumented)
     clone(): Behavior;
     readonly _frame: EmitterFrame;
@@ -858,8 +927,12 @@ export class ForceOverLife implements Behavior {
     // (undocumented)
     initialize(particle: Particle, particleSystem: IParticleSystem): void;
     ps?: IParticleSystem;
+    randomized: boolean;
+    // @internal
+    _reroll(memory: GeneratorMemory): void;
     // (undocumented)
     reset(): void;
+    scaleWithEmitter: boolean;
     space: BehaviorSpace;
     _step(delta: number): number;
     // @internal
@@ -879,6 +952,8 @@ export class ForceOverLife implements Behavior {
 
 // @public
 export interface ForceOverLifeJSON extends BehaviorJSON {
+    randomized?: boolean;
+    scaleWithEmitter?: boolean;
     space?: BehaviorSpace;
     x: ValueGeneratorJSON;
     y: ValueGeneratorJSON;
@@ -910,8 +985,12 @@ export class FrameOverLife implements Behavior {
     isPlain(): boolean;
     loop: boolean;
     random: boolean;
+    randomRow: boolean;
     // (undocumented)
     reset(): void;
+    row: number;
+    rowCount: number;
+    rowLength: number;
     startFrame?: ValueGenerator;
     // (undocumented)
     toJSON(): FrameOverLifeJSON;
@@ -931,6 +1010,10 @@ export interface FrameOverLifeJSON extends BehaviorJSON {
     frameCount?: number;
     loop?: boolean;
     random?: boolean;
+    randomRow?: boolean;
+    row?: number;
+    rowCount?: number;
+    rowLength?: number;
     startFrame?: ValueGeneratorJSON;
 }
 
@@ -941,6 +1024,10 @@ export interface FrameOverLifeOptions {
     frameCount?: number;
     loop?: boolean;
     random?: boolean;
+    randomRow?: boolean;
+    row?: number;
+    rowCount?: number;
+    rowLength?: number;
     startFrame?: ValueGenerator;
 }
 
@@ -962,6 +1049,7 @@ export interface FunctionValueGenerator {
     clone(): FunctionValueGenerator;
     genValue(memory: GeneratorMemory, t: number): number;
     refreshTable?(): void;
+    reroll?(memory: GeneratorMemory): void;
     startGen(memory: GeneratorMemory): void;
     toJSON(): ValueGeneratorJSON;
     type: 'function';
@@ -1112,8 +1200,6 @@ export class HemisphereEmitter implements EmitterShape {
     clone(): EmitterShape;
     static fromJSON(json: ShapeJSON): HemisphereEmitter;
     initialize(p: Particle, emissionState: EmissionState): void;
-    // @internal
-    _m1: Matrix4;
     memory: GeneratorMemory;
     mode: EmitterMode;
     radius: number;
@@ -1209,6 +1295,7 @@ export class IntervalValue implements ValueGenerator {
     genValue(memory: GeneratorMemory): number;
     // @internal
     indexCount: number;
+    reroll(memory: GeneratorMemory): void;
     startGen(memory: GeneratorMemory): void;
     toJSON(): IntervalValueJSON;
     type: 'value';
@@ -1318,8 +1405,7 @@ export class LimitSpeedOverLife implements Behavior {
     // @internal
     _limit: Vector3;
     // @internal
-    _limitAxes(particle: Particle, t: number, step: number, motionScale: number, convert: boolean): void;
-    motionScale(): number;
+    _limitAxes(particle: Particle, t: number, step: number, convert: boolean): void;
     ps?: IParticleSystem;
     // (undocumented)
     reset(): void;
@@ -1505,7 +1591,7 @@ export class Noise implements Behavior {
     // (undocumented)
     type: string;
     // (undocumented)
-    update(particle: Particle, _: number): void;
+    update(particle: Particle, delta: number): void;
     // (undocumented)
     updateAll(particles: Array<Particle>, count: number, delta: number): void;
 }
@@ -1583,11 +1669,13 @@ export type ParameterType = FieldType | 'self';
 // @public
 export interface Particle extends IParticle {
     angularVelocity?: number | Quaternion;
+    animatedVelocity?: Vector3;
     emissionState?: EmissionState;
     parentMatrix?: Matrix4;
     previousPosition?: Vector3;
     previousVelocity?: Vector3;
     reset(): void;
+    rotationAxis?: Vector3 | null;
     serial?: number;
     speedModifier: number;
     startColor: Vector4;
@@ -1601,16 +1689,19 @@ export class ParticleStore {
     static readonly AGE = 0;
     angularVelocity: Float32Array;
     angularVelocityQuaternion: Float32Array;
+    animatedVelocity: Float32Array;
     capacity: number;
     color: Float32Array;
     ensureCapacity(count: number): boolean;
     ensureQuaternionColumns(): boolean;
     flip: Uint8Array;
+    keepAnimatedVelocity(): boolean;
     keepPreviousVelocity(): boolean;
     static readonly LIFE = 1;
     memory: Float64Array;
     memoryStride: number;
     position: Float32Array;
+    previousAnimatedVelocity: Float32Array;
     previousColor: Float32Array;
     previousPosition: Float32Array;
     previousSize: Float32Array;
@@ -1716,8 +1807,6 @@ export class PointEmitter implements EmitterShape {
     clone(): EmitterShape;
     static fromJSON(json: ShapeJSON): PointEmitter;
     initialize(p: Particle): void;
-    // @internal
-    _m1: Matrix4;
     toJSON(): ShapeJSON;
     transform?: ShapeTransform;
     type: string;
@@ -1843,6 +1932,7 @@ export class RandomBetweenCurves implements FunctionValueGenerator {
     // @internal
     indexCount: number;
     refreshTable(): void;
+    reroll(memory: GeneratorMemory): void;
     startGen(memory: GeneratorMemory): void;
     toJSON(): RandomBetweenCurvesJSON;
     readonly type: "function";
@@ -1900,6 +1990,35 @@ export interface RandomColorJSON {
     a: ColorJSON;
     b: ColorJSON;
     type: 'RandomColor';
+}
+
+// @public
+export class RandomizeDirection implements Behavior {
+    constructor(amount: number);
+    // (undocumented)
+    amount: number;
+    // (undocumented)
+    clone(): Behavior;
+    // (undocumented)
+    frameUpdate(delta: number): void;
+    static fromJSON(json: RandomizeDirectionJSON): Behavior;
+    // (undocumented)
+    initialize(particle: Particle): void;
+    // (undocumented)
+    reset(): void;
+    // @internal
+    _temp: Vector3;
+    // (undocumented)
+    toJSON(): RandomizeDirectionJSON;
+    // (undocumented)
+    type: string;
+    // (undocumented)
+    update(particle: Particle, delta: number): void;
+}
+
+// @public
+export interface RandomizeDirectionJSON extends BehaviorJSON {
+    amount: number;
 }
 
 // @public
@@ -1981,9 +2100,15 @@ export interface RGBJSON {
 
 // @public
 export class Rotation3DOverLife implements Behavior {
-    constructor(angularVelocity: RotationGenerator);
+    constructor(angularVelocity: RotationGenerator, options?: Rotation3DOverLifeOptions);
+    // @internal
+    _addAngles(particle: Particle, t: number, delta: number): void;
+    // @internal
+    _angleSlot: number;
     // (undocumented)
     angularVelocity: RotationGenerator;
+    // @internal
+    _applyAngles(memory: ArrayLike<number>, rotations: Float32Array | Float64Array, r: number, turns: Float32Array | Float64Array, a: number): void;
     // (undocumented)
     clone(): Behavior;
     // (undocumented)
@@ -1991,11 +2116,16 @@ export class Rotation3DOverLife implements Behavior {
     static fromJSON(json: Rotation3DOverLifeJSON): Behavior;
     // (undocumented)
     initialize(particle: Particle): void;
+    // @internal
+    _integratesAngles(): boolean;
+    integration: RotationIntegration;
     // (undocumented)
     reset(): void;
     tempQuat: Quaternion;
     // (undocumented)
     toJSON(): Rotation3DOverLifeJSON;
+    // @internal
+    _turn(particle: Particle, t: number, delta: number): void;
     // (undocumented)
     type: string;
     // (undocumented)
@@ -2005,6 +2135,12 @@ export class Rotation3DOverLife implements Behavior {
 // @public
 export interface Rotation3DOverLifeJSON extends BehaviorJSON {
     angularVelocity: RotationGeneratorJSON;
+    integration?: RotationIntegration;
+}
+
+// @public
+export interface Rotation3DOverLifeOptions {
+    integration?: RotationIntegration;
 }
 
 // @public
@@ -2053,6 +2189,9 @@ export function RotationGeneratorFromJSON(json: RotationGeneratorJSON | undefine
 export type RotationGeneratorJSON = AxisAngleJSON | EulerJSON | RandomQuatJSON;
 
 // @public
+export type RotationIntegration = 'turn' | 'angles';
+
+// @public
 export class RotationOverLife implements Behavior {
     constructor(angularVelocity: ValueGenerator | FunctionValueGenerator);
     // (undocumented)
@@ -2069,6 +2208,8 @@ export class RotationOverLife implements Behavior {
     tempQuat: Quaternion;
     // (undocumented)
     toJSON(): RotationOverLifeJSON;
+    turn(particle: Particle, rotation: Quaternion, angle: number): void;
+    // @deprecated (undocumented)
     turnAboutZ(particle: Particle, rotation: Quaternion, angle: number): void;
     // (undocumented)
     type: string;
@@ -2215,7 +2356,7 @@ export class SizeOverLife implements Behavior {
     // (undocumented)
     type: string;
     // (undocumented)
-    update(particle: Particle): void;
+    update(particle: Particle, delta: number): void;
     // (undocumented)
     updateAll(particles: Array<Particle>, count: number, delta: number): void;
 }
@@ -2253,7 +2394,7 @@ export class SpeedOverLife implements Behavior {
     // (undocumented)
     type: string;
     // (undocumented)
-    update(particle: Particle): void;
+    update(particle: Particle, delta: number): void;
     // (undocumented)
     updateAll(particles: Array<Particle>, count: number, delta: number): void;
 }
@@ -2270,8 +2411,6 @@ export class SphereEmitter implements EmitterShape {
     clone(): EmitterShape;
     static fromJSON(json: ShapeJSON): SphereEmitter;
     initialize(p: Particle, emissionState: EmissionState): void;
-    // @internal
-    _m1: Matrix4;
     memory: GeneratorMemory;
     mode: EmitterMode;
     radius: number;
@@ -2305,6 +2444,7 @@ export class SpriteParticle implements Particle {
     set age(value: number);
     get angularVelocity(): number | Quaternion;
     set angularVelocity(value: number | Quaternion | undefined);
+    animatedVelocity: Vector3 | undefined;
     color: Vector4;
     get died(): boolean;
     get flip(): number;
@@ -2321,6 +2461,7 @@ export class SpriteParticle implements Particle {
     reset(): void;
     get rotation(): number | Quaternion;
     set rotation(value: number | Quaternion);
+    rotationAxis: Vector3 | null;
     protected scalarOffset: number;
     protected scalars: Float64Array;
     serial?: number;
@@ -2338,6 +2479,12 @@ export class SpriteParticle implements Particle {
     set uvTile(value: number);
     velocity: Vector3;
 }
+
+// @public
+export function stepEndAge(particle: Particle, delta: number): number;
+
+// @public
+export function stepEndLife(particle: Particle, delta: number): number;
 
 // @internal
 export function stockBehaviorType(behavior: Behavior): string | undefined;
@@ -2403,11 +2550,14 @@ export class TrailParticle implements Particle {
     color: Vector4;
     get died(): boolean;
     dropOldest(): void;
+    ensureBaseColorHistory(): void;
     ensureHistoryCapacity(capacity: number): void;
     ensureSideHistory(): void;
     getHistoryIndex(i: number): number;
+    readonly headColorScale: Float32Array<ArrayBuffer>;
     headWidthScale: number;
     historyAges: Float32Array;
+    historyBaseColors: Float32Array;
     historyBaseSizes: Float32Array;
     historyCapacity: number;
     historyColors: Float32Array;
@@ -2531,6 +2681,7 @@ export interface ValueGenerator {
     clone(): ValueGenerator;
     genValue(memory: GeneratorMemory): number;
     refreshTable?(): void;
+    reroll?(memory: GeneratorMemory): void;
     startGen(memory: GeneratorMemory): void;
     toJSON(): ValueGeneratorJSON;
     type: 'value';

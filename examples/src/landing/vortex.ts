@@ -86,15 +86,10 @@ export interface StagePointer {
  * BatchedRenderer. Moving the pointer over the stage sheds ribbons that the vortex captures.
  */
 export function createVortex(pointer: StagePointer): DemoModule {
-    let state: VortexState | null = null;
     return {
         init(ctx) {
-            state = initVortex(ctx);
-        },
-        update(ctx, delta) {
-            if (state) {
-                updateVortex(ctx, state, pointer, delta);
-            }
+            const state = initVortex(ctx);
+            return {update: (delta) => updateVortex(ctx, state, pointer, delta)};
         },
     };
 }
@@ -112,7 +107,7 @@ interface VortexState {
     cursorWorld: BVector3;
 }
 
-function initVortex({scene, camera, batchRenderer, systems}: DemoContext): VortexState {
+function initVortex({scene, camera, add}: DemoContext): VortexState {
     camera.setPosition(new BVector3(0, 8, 22));
     // The slow layers prewarm a whole 8 s cycle, so the stage opens on a formed vortex instead of
     // an empty frame filling in.
@@ -155,8 +150,7 @@ function initVortex({scene, camera, batchRenderer, systems}: DemoContext): Vorte
     nebula.addBehavior(new ColorOverLife(fadeEnvelope(0.25, 0.7)));
     nebula.addBehavior(new RotationOverLife(new IntervalValue(-0.05, 0.05)));
     nebula.addBehavior(new Noise(new ConstantValue(0.1), new ConstantValue(0.6)));
-    batchRenderer.addSystem(nebula);
-    systems.push(nebula);
+    add(nebula);
 
     // --- Layer 1: core orb — a large plasma-orb glow (texture2) breathing at the vortex center,
     // deliberately a different sprite from the disk so the heart of the effect reads as a body ---
@@ -183,8 +177,7 @@ function initVortex({scene, camera, batchRenderer, systems}: DemoContext): Vorte
     });
     coreGlow.addBehavior(new ColorOverLife(fadeEnvelope(0.3, 0.6)));
     coreGlow.addBehavior(new SizeOverLife(new PiecewiseBezier([[new Bezier(0.6, 0.95, 1, 1), 0]])));
-    batchRenderer.addSystem(coreGlow);
-    systems.push(coreGlow);
+    add(coreGlow);
 
     // --- Layer 2b: core heart — a small, intense near-white center inside the orb ---
     const coreHeart = new ParticleSystem({
@@ -209,8 +202,7 @@ function initVortex({scene, camera, batchRenderer, systems}: DemoContext): Vorte
     });
     coreHeart.addBehavior(new ColorOverLife(fadeEnvelope(0.25, 0.6)));
     coreHeart.addBehavior(new SizeOverLife(new PiecewiseBezier([[new Bezier(0.7, 1, 1, 0.85), 0]])));
-    batchRenderer.addSystem(coreHeart);
-    systems.push(coreHeart);
+    add(coreHeart);
 
     // --- Layer 3: accretion disk — soft glows orbiting the core, slowly drawn inward ---
     const disk = new ParticleSystem({
@@ -238,8 +230,7 @@ function initVortex({scene, camera, batchRenderer, systems}: DemoContext): Vorte
     disk.addBehavior(new OrbitOverLife(new IntervalValue(0.25, 0.5), diskAxis, 'world'));
     disk.addBehavior(new GravityForce(new BVector3(0, 0, 0), 4));
     layFlat(disk);
-    batchRenderer.addSystem(disk);
-    systems.push(disk);
+    add(disk);
 
     // --- Layer 4: comet ribbons — a few Trail particles sweep luminous arcs around the disk ---
     const comets = new ParticleSystem({
@@ -269,8 +260,7 @@ function initVortex({scene, camera, batchRenderer, systems}: DemoContext): Vorte
     comets.addBehavior(new GravityForce(new BVector3(0, 0, 0), 22));
     comets.addBehavior(new WidthOverLength(new PiecewiseBezier([[new Bezier(1, 0.7, 0.35, 0.05), 0]])));
     layFlat(comets);
-    batchRenderer.addSystem(comets);
-    systems.push(comets);
+    add(comets);
 
     // --- Layer 5: stardust — fine stretched sparks drift through the whole frame, riding a
     // turbulence field and leaning toward the cursor ---
@@ -305,8 +295,7 @@ function initVortex({scene, camera, batchRenderer, systems}: DemoContext): Vorte
     // point without an attractor singularity.
     const cursorForce = new ApplyForce(new BVector3(0, 0, 0), new ConstantValue(0.5));
     dust.addBehavior(cursorForce);
-    batchRenderer.addSystem(dust);
-    systems.push(dust);
+    add(dust);
 
     // --- Layer 6: cursor comets — the flagship interaction. A trail emitter rides the world-space
     // point under the cursor; moving the mouse sheds glowing ribbons that inherit the cursor's
@@ -341,8 +330,7 @@ function initVortex({scene, camera, batchRenderer, systems}: DemoContext): Vorte
     cursorComets.addBehavior(new OrbitOverLife(new IntervalValue(0.3, 0.6), diskAxis, 'world'));
     cursorComets.addBehavior(new LimitSpeedOverLife(constantCurve(7), 0.25));
     cursorComets.addBehavior(new WidthOverLength(new PiecewiseBezier([[new Bezier(1, 0.7, 0.35, 0.05), 0]])));
-    batchRenderer.addSystem(cursorComets);
-    systems.push(cursorComets);
+    add(cursorComets);
 
     // Named so the hierarchy reads well when the vortex is opened in the editor.
     const names: [ParticleSystem, string][] = [
@@ -357,7 +345,7 @@ function initVortex({scene, camera, batchRenderer, systems}: DemoContext): Vorte
     for (const [system, name] of names) {
         system.emitter.name = name;
     }
-    for (const system of systems) {
+    for (const [system] of names) {
         system.play();
     }
 

@@ -947,6 +947,11 @@ export interface GeometryOption {
     uvs2?: Float32Array | number[];
     /** Vertex normals, three values per vertex; without them lighting uses +Z. */
     normals?: Float32Array | number[];
+    /**
+     * Vertex colours, `r, g, b, a` per vertex, linear (glTF `COLOR_0`), which the particle colour
+     * is multiplied by; see `ParticleSystem.instancingColors`.
+     */
+    colors?: Float32Array | number[];
 }
 
 /** Vertex buffers a host loader (e.g. a GLB importer) returns for the Mesh render mode. */
@@ -1494,6 +1499,7 @@ export function RendererModule({
                             settings.instancingUVs = undefined;
                             settings.instancingUVs2 = undefined;
                             settings.instancingNormals = undefined;
+                            settings.instancingColors = undefined;
                             s.instancingGeometry = new Float32Array(g.positions);
                             s.instancingIndices = g.indices
                                 ? new Uint32Array(g.indices)
@@ -1501,6 +1507,7 @@ export function RendererModule({
                             if (g.uvs) s.instancingUVs = new Float32Array(g.uvs);
                             if (g.uvs2) s.instancingUVs2 = new Float32Array(g.uvs2);
                             if (g.normals) settings.instancingNormals = new Float32Array(g.normals);
+                            if (g.colors) s.instancingColors = new Float32Array(g.colors);
                         });
                     return (
                         <Row label="Geometry">

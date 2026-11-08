@@ -5,14 +5,84 @@ import {Engine} from '@babylonjs/core/Engines/engine';
 import {HemisphericLight} from '@babylonjs/core/Lights/hemisphericLight';
 import {Color4} from '@babylonjs/core/Maths/math.color';
 import {Vector3 as BVector3} from '@babylonjs/core/Maths/math.vector';
-import type {TransformNode} from '@babylonjs/core/Meshes/transformNode';
 import {Scene} from '@babylonjs/core/scene';
 // Side-effect import: registers Scene.createPickingRay, used to project the pointer into the world.
 import '@babylonjs/core/Culling/ray';
-import {BatchedRenderer, BehaviorTypes, EmitterShapes} from 'babylon.quarks';
+import {Constants} from '@babylonjs/core/Engines/constants';
+import {BatchedRenderer, BehaviorTypes, EmitterShapes, RenderMode, type ParticleSystem} from 'babylon.quarks';
 import {demoManifest} from '../demoManifest';
-import type {DemoContext, DemoModule, DemoState} from '../types';
+import {createDemoContext, effectRoots, MAX_FRAME, particleCount} from '../shared/host';
+import type {DemoContext, DemoModule, DemoRun} from '../types';
 import {createVortex, type StagePointer} from './vortex';
+
+/** One system of the effect on the stage, as the breakdown legend lists it. */
+export interface StageLayer {
+    name: string;
+    /** Render mode, blending and emitter shape, e.g. "Billboard · additive · SphereEmitter". */
+    mode: string;
+    behaviors: string[];
+}
+
+/**
+ * Sent on the stage root as `stage:effect` once an effect is on the stage: which effect, and the
+ * systems it is made of, read from the running systems themselves.
+ */
+export interface StageEffectDetail {
+    id: string;
+    demoKey: string | null;
+    name: string;
+    layers: StageLayer[];
+}
+
+const RENDER_MODES: Record<number, string> = {
+    [RenderMode.BillBoard]: 'Billboard',
+    [RenderMode.StretchedBillBoard]: 'Stretched billboard',
+    [RenderMode.Mesh]: 'Mesh',
+    [RenderMode.Trail]: 'Trail',
+    [RenderMode.HorizontalBillBoard]: 'Horizontal billboard',
+    [RenderMode.VerticalBillBoard]: 'Vertical billboard',
+    [RenderMode.Beam]: 'Beam',
+};
+
+const BLENDING: Record<number, string> = {
+    [Constants.ALPHA_ADD]: 'additive',
+    [Constants.ALPHA_COMBINE]: 'alpha blend',
+    [Constants.ALPHA_PREMULTIPLIED]: 'premultiplied',
+    [Constants.ALPHA_PREMULTIPLIED_PORTERDUFF]: 'premultiplied',
+    [Constants.ALPHA_MULTIPLY]: 'multiply',
+    [Constants.ALPHA_SUBTRACT]: 'subtract',
+    [Constants.ALPHA_ONEONE]: 'one-one',
+    [Constants.ALPHA_DISABLE]: 'opaque',
+};
+
+const SHAPES: Record<string, string> = {
+    point: 'PointEmitter',
+    sphere: 'SphereEmitter',
+    hemisphere: 'HemisphereEmitter',
+    cone: 'ConeEmitter',
+    donut: 'DonutEmitter',
+    circle: 'CircleEmitter',
+    box: 'BoxEmitter',
+    grid: 'GridEmitter',
+    rectangle: 'RectangleEmitter',
+    edge: 'EdgeEmitter',
+    mesh_surface: 'MeshSurfaceEmitter',
+};
+
+/** A system as one line of the legend: its emitter's name, how it draws, what drives it. */
+function describeSystem(system: ParticleSystem): StageLayer {
+    const shape = system.emitterShape?.type;
+    const mode = [
+        RENDER_MODES[system.renderMode] ?? `Render mode ${system.renderMode}`,
+        BLENDING[system.blending] ?? `blend mode ${system.blending}`,
+        shape ? (SHAPES[shape] ?? shape) : null,
+    ].filter(Boolean);
+    return {
+        name: system.emitter.name,
+        mode: mode.join(' · '),
+        behaviors: [...new Set(system.behaviors.map((behavior) => behavior.type))],
+    };
+}
 
 /** One effect the hero stage can show. */
 interface StageEffect {
@@ -21,6 +91,8 @@ interface StageEffect {
     load: () => Promise<DemoModule>;
     /** Whether dragging orbits the camera; the vortex follows the pointer instead. */
     orbit: boolean;
+    /** How the stage frames a demo: the camera's distance and the point it looks at. */
+    frame?: {radius: number; target: [number, number, number]};
 }
 
 /** The elements the stage drives, all inside `[data-stage]`. */
@@ -39,18 +111,49 @@ interface StageElements {
 interface LoadedEffect {
     id: string;
     ctx: DemoContext;
-    module: DemoModule;
+    run: DemoRun;
 }
 
 const pointer: StagePointer = {x: 0, y: 0, seen: false};
 
 const EFFECTS: Record<string, StageEffect> = {
     vortex: {demoKey: null, load: async () => createVortex(pointer), orbit: false},
-    electric: {demoKey: 'ElectricBallDemo', load: () => import('../demos/electricBall'), orbit: true},
-    explosion: {demoKey: 'ExplosionDemo', load: () => import('../demos/explosion'), orbit: true},
-    weapons: {demoKey: 'AuraTrailDemo', load: () => import('../demos/auraTrail'), orbit: true},
-    forces: {demoKey: 'ForceSpaceDemo', load: () => import('../demos/forceSpace'), orbit: true},
+    electric: {
+        demoKey: 'ElectricBallDemo',
+        load: () => import('../demos/electricBall'),
+        orbit: true,
+        frame: {radius: 6.4, target: [0, 1.7, 0]},
+    },
+    levelUp: {
+        demoKey: 'LevelUpDemo',
+        load: () => import('../demos/levelUp'),
+        orbit: true,
+        frame: {radius: 10, target: [0, 2.1, 0]},
+    },
+    blackHole: {
+        demoKey: 'BlackHoleDemo',
+        load: () => import('../demos/blackhole'),
+        orbit: true,
+    },
 };
+
+/**
+ * A demo on the stage keeps the void of the landing: the sky and ground the demo set up and the
+ * captions it draws (`addGround`, `addSky`, `addLabel` in the shared helpers, found by name) are
+ * switched off, and the camera is set to the take's frame, centred on the effect. The demo itself
+ * is untouched; the demo viewer shows it with everything on.
+ */
+function dressForStage(scene: Scene, camera: ArcRotateCamera, entry: StageEffect) {
+    for (const mesh of scene.meshes) {
+        if (mesh.name === 'sky' || mesh.name === 'ground' || mesh.name.startsWith('label:')) {
+            mesh.setEnabled(false);
+        }
+    }
+    if (entry.frame) {
+        camera.setTarget(new BVector3(...entry.frame.target));
+        camera.radius = entry.frame.radius;
+    }
+}
 
 /** The effect's display name: the gallery's name for a demo, "Vortex" for the landing effect. */
 function effectName(id: string) {
@@ -157,6 +260,7 @@ export async function mountHeroStage(root: HTMLElement): Promise<() => void> {
             tab.setAttribute('aria-pressed', String(pressed));
             tab.tabIndex = pressed ? 0 : -1;
         }
+        el.root.dataset.effect = id;
     };
 
     const describe = (id: string) => {
@@ -197,12 +301,15 @@ export async function mountHeroStage(root: HTMLElement): Promise<() => void> {
             camera.minZ = 0.1;
             new HemisphericLight('stageLight', new BVector3(0.35, 1, -0.2), scene);
             const batchRenderer = new BatchedRenderer('stageVfx', scene);
-            const demoState: DemoState = {totalTime: 0, refreshIndex: 0};
-            const ctx: DemoContext = {scene, camera, batchRenderer, systems: [], demoState};
-            await module.init(ctx);
+            const ctx = createDemoContext(scene, camera, batchRenderer);
+            const run = (await module.init(ctx)) ?? {};
             if (token !== loadToken) {
+                run.dispose?.();
                 scene.dispose();
                 return false;
+            }
+            if (entry.demoKey) {
+                dressForStage(scene, camera, entry);
             }
             if (entry.orbit) {
                 camera.attachControl(el.canvas, true);
@@ -214,9 +321,17 @@ export async function mountHeroStage(root: HTMLElement): Promise<() => void> {
                 }
             }
             const previous = current;
-            current = {id, ctx, module};
+            current = {id, ctx, run};
+            previous?.run.dispose?.();
             previous?.ctx.scene.dispose();
             describe(id);
+            const detail: StageEffectDetail = {
+                id,
+                demoKey: entry.demoKey,
+                name: effectName(id),
+                layers: ctx.systems.map(describeSystem),
+            };
+            el.root.dispatchEvent(new CustomEvent('stage:effect', {detail}));
             return true;
         } catch (error) {
             console.error(`The stage could not start "${id}":`, error);
@@ -266,10 +381,10 @@ export async function mountHeroStage(root: HTMLElement): Promise<() => void> {
         if (!current) {
             return;
         }
-        const {ctx, module} = current;
-        const delta = Math.min(engine.getDeltaTime() / 1000, 0.05);
+        const {ctx, run} = current;
+        const delta = Math.min(engine.getDeltaTime() / 1000, MAX_FRAME);
         try {
-            module.update?.(ctx, delta);
+            run.update?.(delta);
             ctx.batchRenderer.update(delta);
             ctx.scene.render();
         } catch (error) {
@@ -278,10 +393,7 @@ export async function mountHeroStage(root: HTMLElement): Promise<() => void> {
         frames++;
         const now = performance.now();
         if (now - lastStat >= 500) {
-            let particles = 0;
-            for (const system of ctx.systems) {
-                particles += system.particleNum;
-            }
+            const particles = particleCount(ctx);
             if (el.particles) {
                 el.particles.textContent = particles.toLocaleString('en-US');
             }
@@ -322,6 +434,7 @@ export async function mountHeroStage(root: HTMLElement): Promise<() => void> {
         el.editorButton?.removeEventListener('click', onEditor);
         setRunning(false);
         loadToken++;
+        current?.run.dispose?.();
         current?.ctx.scene.dispose();
         current = null;
         engine.dispose();
@@ -345,20 +458,12 @@ export async function mountHeroStage(root: HTMLElement): Promise<() => void> {
 async function openInEditor({id, ctx}: LoadedEffect) {
     try {
         const {ensurePortableTextureUrl, serializeEffectForest} = await import('babylon.quarks-editor');
-        const roots = new Set<TransformNode>();
-        for (const system of ctx.systems) {
-            let node: TransformNode = system.emitter;
-            while (node.parent && node.parent !== ctx.batchRenderer) {
-                node = node.parent as TransformNode;
-            }
-            roots.add(node);
-        }
         for (const system of ctx.systems) {
             if (system.texture) {
                 await ensurePortableTextureUrl(system.texture);
             }
         }
-        sessionStorage.setItem('quarks-editor-effect', serializeEffectForest([...roots], effectName(id)));
+        sessionStorage.setItem('quarks-editor-effect', serializeEffectForest(effectRoots(ctx), effectName(id)));
         window.location.href = './editor.html?effect=session';
     } catch (error) {
         // Storage full or blocked: open the editor on its own rather than doing nothing.
