@@ -169,9 +169,6 @@
                                 </button>
                             </div>
                             <div class="stage-frame">
-                                <!-- The logo's rings round the window, drawn by orbits.ts: the back layer under the
-                                     window, the front layer over it, cut at the window's edge. -->
-                                <svg class="orbit orbit-back" aria-hidden="true" focusable="false"></svg>
                                 <span class="reg" aria-hidden="true"></span><span class="reg" aria-hidden="true"></span
                                 ><span class="reg" aria-hidden="true"></span
                                 ><span class="reg" aria-hidden="true"></span>
@@ -189,7 +186,9 @@
                                         <i data-lucide="play" class="icon" aria-hidden="true"></i>Play the live effect
                                     </button>
                                 </div>
-                                <svg class="orbit orbit-front" aria-hidden="true" focusable="false"></svg>
+                                <!-- The logo's rings round the window, drawn by orbits.ts: only the ring outside
+                                     the window, over its frame line. -->
+                                <svg class="orbit" aria-hidden="true" focusable="false"></svg>
                             </div>
                             <div class="stage-hud">
                                 <span class="stat"
@@ -691,21 +690,7 @@ const editor = QuarksEffectEditor.Show({
                 <div class="wrap">
                     <header class="sheet-head sheet-head-row">
                         <div>
-                            <h2 id="demos-title">
-                                <svg class="ring-mark" viewBox="0 0 48 32" aria-hidden="true" focusable="false">
-                                    <defs>
-                                        <linearGradient id="ring-mark-ramp" x1="0" y1="0" x2="1" y2="0">
-                                            <stop offset="0" style="stop-color: var(--cyan)" />
-                                            <stop offset="0.55" style="stop-color: var(--violet)" />
-                                            <stop offset="1" style="stop-color: var(--magenta)" />
-                                        </linearGradient>
-                                    </defs>
-                                    <ellipse cx="24" cy="16" rx="22" ry="8" transform="rotate(-14 24 16)" />
-                                    <ellipse cx="24" cy="16" rx="18" ry="5" transform="rotate(-26 24 16)" />
-                                    <circle cx="24" cy="16" r="3" />
-                                </svg>
-                                Every demo runs live in your browser
-                            </h2>
+                            <h2 id="demos-title">Every demo runs live in your browser</h2>
                             <p class="sheet-lead">
                                 Open any of them full screen, read its source, or send it to the editor and change it.
                             </p>
