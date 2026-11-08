@@ -160,6 +160,13 @@ kbd {
     white-space: nowrap;
 }
 
+/* A long menu path may break on the narrowest phones rather than push the column out. */
+@media (max-width: 400px) {
+    kbd {
+        white-space: normal;
+    }
+}
+
 h1,
 h2,
 h3 {
@@ -1728,6 +1735,7 @@ figcaption code {
 
 .plate-text {
     display: grid;
+    grid-template-columns: minmax(0, 1fr);
     gap: 16px;
 }
 
