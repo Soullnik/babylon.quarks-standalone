@@ -1299,6 +1299,12 @@ figcaption code {
     width: auto;
 }
 
+/* The aside is narrow: the command breaks at its space instead of scrolling half of it out of view. */
+.start-aside .install code {
+    white-space: normal;
+    overflow-x: visible;
+}
+
 .start-facts {
     margin: 0;
     display: grid;
@@ -1734,6 +1740,12 @@ figcaption code {
     .demo-large,
     .demo-grid[data-filtered] .demo-large {
         grid-column: span 6;
+    }
+
+    /* Two to a row: the first showcase card takes a row of its own, so the three showcase cards and
+       the even count of feature cards after them fill whole rows. */
+    .demo-grid:not([data-filtered]) .demo-large:first-child {
+        grid-column: span 12;
     }
 }
 

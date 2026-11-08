@@ -327,7 +327,10 @@ function demoCard(demo: DemoManifestEntry) {
 
 /** The gallery opens on the showcase and the first feature demos, with a button for the rest. */
 const phone = window.matchMedia?.('(max-width: 640px)');
-const initialFeatures = () => (phone?.matches ? 6 : 8);
+/** The grid runs three feature cards to a row between these widths (`.demo` spans 4 of 12). */
+const threeUp = window.matchMedia?.('(min-width: 801px) and (max-width: 1100px)');
+/** How many feature demos show before "Show all": whole rows at every width. */
+const initialFeatures = () => (phone?.matches ? 6 : threeUp?.matches ? 9 : 8);
 
 /**
  * The gallery: the showcase as large cards, then every feature demo in one dense grid, in the
@@ -418,6 +421,7 @@ function setupGallery() {
         }
     });
     phone?.addEventListener('change', render);
+    threeUp?.addEventListener('change', render);
     search?.addEventListener('input', render);
     render();
 }
