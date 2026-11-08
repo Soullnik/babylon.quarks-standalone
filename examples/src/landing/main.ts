@@ -43,7 +43,7 @@ function applyTheme(choice: ThemeChoice) {
         meta.dataset.media ??= meta.media;
         meta.dataset.content ??= meta.content;
         meta.media = choice === 'system' ? meta.dataset.media : 'all';
-        meta.content = choice === 'system' ? meta.dataset.content : choice === 'dark' ? '#0a0c11' : '#f4f5f8';
+        meta.content = choice === 'system' ? meta.dataset.content : choice === 'dark' ? '#161513' : '#f1ece2';
     }
 }
 
@@ -227,10 +227,36 @@ function setupStageControls() {
     root.querySelector('[data-stage-play]')?.addEventListener('click', () => startLiveStage(root));
 }
 
+/** Highlights the listings and wraps each line so the stylesheet can number it (`.ln`). */
 function setupCode() {
     for (const block of Array.from(document.querySelectorAll<HTMLElement>('pre code[data-lang="ts"]'))) {
-        block.innerHTML = highlightTs(block.textContent ?? '');
+        // No token of the highlighter spans a line break, so the lines can be wrapped afterwards.
+        block.innerHTML = highlightTs(block.textContent ?? '')
+            .split('\n')
+            .map((line) => `<span class="ln">${line}</span>`)
+            .join('');
     }
+}
+
+/**
+ * The breakdown legend below the stage describes the Vortex. It records which take the stage is
+ * on, so the stylesheet can mark the legend as describing another take than the one running.
+ */
+function setupBreakdown() {
+    const legend = document.querySelector<HTMLElement>('[data-breakdown]');
+    const tabs = Array.from(document.querySelectorAll<HTMLButtonElement>('[data-stage] [data-effect]'));
+    if (!legend || tabs.length === 0) {
+        return;
+    }
+    const sync = () => {
+        const active = tabs.find((tab) => tab.getAttribute('aria-pressed') === 'true');
+        legend.dataset.activeEffect = active?.dataset.effect ?? 'vortex';
+    };
+    const observer = new MutationObserver(sync);
+    for (const tab of tabs) {
+        observer.observe(tab, {attributes: true, attributeFilter: ['aria-pressed']});
+    }
+    sync();
 }
 
 function escapeHtml(text: string) {
@@ -241,7 +267,7 @@ function demoCard(demo: DemoManifestEntry) {
     const tags = demo.tags.map((tag) => `<li>${escapeHtml(tag)}</li>`).join('');
     return `<li class="demo">
   <a class="demo-link" href="./babylonDemo.html#${encodeURIComponent(demo.key)}">
-    <img src="./previews/${previewFile(demo.key)}" alt="" loading="lazy" decoding="async" width="640" height="360" />
+    <span class="demo-shot"><img src="./previews/${previewFile(demo.key)}" alt="" loading="lazy" decoding="async" width="640" height="360" /></span>
     <span class="demo-name">${escapeHtml(demo.name)}</span>
   </a>
   <p>${escapeHtml(demo.description)}</p>
@@ -386,6 +412,7 @@ setupMenu();
 setupCopyButtons();
 setupTabs();
 setupStageControls();
+setupBreakdown();
 setupCode();
 setupGallery();
 setCount('demos', demoManifest.length);
