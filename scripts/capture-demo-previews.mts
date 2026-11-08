@@ -66,6 +66,8 @@ async function captureLanding(browser: import('playwright').Browser) {
     await stagePage.goto(`${BASE_URL}/?engine=webgl`, {waitUntil: 'networkidle'});
     await stagePage.waitForFunction(() => document.querySelector('[data-stage]')?.getAttribute('data-live') === 'true');
     await stagePage.waitForTimeout(6000);
+    // The poster stands in for the canvas alone; the orbit rings drawn over the window stay live.
+    await stagePage.addStyleTag({content: '.orbit { display: none !important; }'});
     await stagePage
         .locator('.stage-view canvas')
         .screenshot({path: path.join(LANDING_DIR, 'stage-poster.jpg'), quality: 82});
