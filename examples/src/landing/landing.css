@@ -1221,9 +1221,9 @@ figcaption code {
     user-select: none;
 }
 
-/* A blank line keeps its height. */
-.ln:empty::after {
-    content: ' ';
+/* A blank line keeps its height: an empty block has none, and a space alone in it is collapsed. */
+.ln {
+    min-height: 1lh;
 }
 
 /* The JSON sketch is numbered by nothing: it is a fragment, not a listing. */
