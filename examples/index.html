@@ -13,8 +13,7 @@
             content="babylon.js particles, babylonjs particle system, babylon vfx, gpu particles, babylon.js particle library, three.quarks babylon, webgpu particles, particle editor"
         />
         <meta name="author" content="Soullnik" />
-        <meta name="theme-color" content="#f1ece2" media="(prefers-color-scheme: light)" />
-        <meta name="theme-color" content="#161513" media="(prefers-color-scheme: dark)" />
+        <meta name="theme-color" content="#0b0d12" />
         <link rel="canonical" href="https://soullnik.github.io/babylon.quarks-standalone/" />
         <link rel="icon" type="image/png" href="./logo.png" />
         <link rel="icon" href="./favicon.ico" sizes="any" />
@@ -94,41 +93,16 @@
                         href="https://github.com/Soullnik/babylon.quarks-standalone"
                         target="_blank"
                         rel="noopener noreferrer"
-                        >GitHub</a
+                        ><span class="icon" data-brand="github" aria-hidden="true"></span>GitHub</a
                     >
                     <a href="https://www.npmjs.com/package/babylon.quarks" target="_blank" rel="noopener noreferrer"
-                        >npm</a
+                        ><span class="icon" data-brand="npm" aria-hidden="true"></span>npm</a
                     >
                 </nav>
                 <div class="masthead-tools">
                     <button class="icon-button" type="button" data-theme-toggle aria-label="Switch theme">
-                        <svg class="i-system" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
-                            <path
-                                fill="none"
-                                stroke="currentColor"
-                                stroke-width="1.6"
-                                d="M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18Zm0 0v18"
-                            />
-                            <path fill="currentColor" d="M12 3a9 9 0 0 1 0 18Z" />
-                        </svg>
-                        <svg class="i-light" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
-                            <circle cx="12" cy="12" r="4.2" fill="none" stroke="currentColor" stroke-width="1.6" />
-                            <path
-                                stroke="currentColor"
-                                stroke-width="1.6"
-                                stroke-linecap="round"
-                                d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M5.3 18.7l1.6-1.6M17.1 6.9l1.6-1.6"
-                            />
-                        </svg>
-                        <svg class="i-dark" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
-                            <path
-                                fill="none"
-                                stroke="currentColor"
-                                stroke-width="1.6"
-                                stroke-linejoin="round"
-                                d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5Z"
-                            />
-                        </svg>
+                        <i data-lucide="sun" class="icon i-light" aria-hidden="true"></i>
+                        <i data-lucide="moon" class="icon i-dark" aria-hidden="true"></i>
                     </button>
                     <button
                         class="icon-button menu-button"
@@ -138,14 +112,7 @@
                         aria-expanded="false"
                         aria-label="Menu"
                     >
-                        <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
-                            <path
-                                stroke="currentColor"
-                                stroke-width="1.6"
-                                stroke-linecap="round"
-                                d="M4 7h16M4 12h16M4 17h16"
-                            />
-                        </svg>
+                        <i data-lucide="menu" class="icon" aria-hidden="true"></i>
                     </button>
                 </div>
             </div>
@@ -153,7 +120,21 @@
 
         <main id="main">
             <!-- Sheet 01: the hero effect, live, with the breakdown of what it is made of. -->
-            <section class="sheet hero" aria-labelledby="hero-title">
+            <section id="hero" class="sheet hero" aria-labelledby="hero-title">
+                <svg class="orbits" viewBox="0 0 1600 900" aria-hidden="true" focusable="false">
+                    <defs>
+                        <linearGradient id="orbit-ramp" x1="0" y1="0" x2="1" y2="0">
+                            <stop offset="0" stop-color="#5ef0f5" />
+                            <stop offset="0.55" stop-color="#8a3cf0" />
+                            <stop offset="1" stop-color="#d63ce0" />
+                        </linearGradient>
+                    </defs>
+                    <ellipse cx="1068" cy="420" rx="352" ry="150" transform="rotate(-12 1068 420)" />
+                    <ellipse cx="1080" cy="445" rx="318" ry="108" transform="rotate(-20 1080 445)" />
+                    <circle cx="1500" cy="250" r="1.4" />
+                    <circle cx="1430" cy="700" r="1.6" />
+                    <circle cx="700" cy="140" r="1.1" />
+                </svg>
                 <div class="wrap">
                     <p class="sheet-no"><span>Sheet 01</span><span>Hero effect, live</span></p>
                     <div class="hero-grid">
@@ -181,175 +162,189 @@
                                 <li><a class="arrow-link" href="./editor.html">Open the editor</a></li>
                                 <li>
                                     <a class="arrow-link" href="#demos"
-                                        ><span data-count="demos"><!-- demos:count -->31<!-- /demos:count --></span>
-                                        live demos</a
+                                        ><span
+                                            ><span data-count="demos"><!-- demos:count -->31<!-- /demos:count --></span>
+                                            live demos</span
+                                        ></a
                                     >
                                 </li>
                             </ul>
+                            <dl class="spec" aria-label="Library facts">
+                                <div>
+                                    <dt>Render modes</dt>
+                                    <dd>7</dd>
+                                </div>
+                                <div>
+                                    <dt>Behaviors</dt>
+                                    <dd data-count="behaviors">25</dd>
+                                </div>
+                                <div>
+                                    <dt>Emitter shapes</dt>
+                                    <dd data-count="shapes">11</dd>
+                                </div>
+                                <div>
+                                    <dt>Shaders</dt>
+                                    <dd>GLSL + WGSL</dd>
+                                </div>
+                                <div>
+                                    <dt>Peer</dt>
+                                    <dd>@babylonjs/core ^9.24</dd>
+                                </div>
+                                <div>
+                                    <dt>License</dt>
+                                    <dd>MIT</dd>
+                                </div>
+                                <div>
+                                    <dt>Version</dt>
+                                    <dd>%VITE_QUARKS_VERSION%</dd>
+                                </div>
+                            </dl>
                         </div>
 
-                        <figure class="stage" data-stage>
-                            <div class="stage-bar" role="toolbar" aria-label="Choose an effect">
-                                <span class="stage-bar-label" aria-hidden="true">Take</span>
-                                <button type="button" data-effect="vortex" aria-pressed="true">Vortex</button>
-                                <button type="button" data-effect="electric" aria-pressed="false" tabindex="-1">
-                                    Electric ball
-                                </button>
-                                <button type="button" data-effect="weapons" aria-pressed="false" tabindex="-1">
-                                    Weapon trail
-                                </button>
-                                <button type="button" data-effect="levelUp" aria-pressed="false" tabindex="-1">
-                                    Level-up
-                                </button>
-                                <button type="button" data-effect="forces" aria-pressed="false" tabindex="-1">
-                                    Force space
-                                </button>
+                        <div class="hero-side">
+                            <figure class="stage" data-stage>
+                                <div class="stage-bar" role="toolbar" aria-label="Choose an effect">
+                                    <span class="stage-bar-label" aria-hidden="true">Take</span>
+                                    <button type="button" data-effect="vortex" aria-pressed="true">Vortex</button>
+                                    <button type="button" data-effect="electric" aria-pressed="false" tabindex="-1">
+                                        Electric ball
+                                    </button>
+                                    <button type="button" data-effect="weapons" aria-pressed="false" tabindex="-1">
+                                        Weapon trail
+                                    </button>
+                                    <button type="button" data-effect="levelUp" aria-pressed="false" tabindex="-1">
+                                        Level-up
+                                    </button>
+                                    <button type="button" data-effect="forces" aria-pressed="false" tabindex="-1">
+                                        Force space
+                                    </button>
+                                </div>
+                                <div class="stage-frame">
+                                    <span class="reg" aria-hidden="true"></span
+                                    ><span class="reg" aria-hidden="true"></span
+                                    ><span class="reg" aria-hidden="true"></span
+                                    ><span class="reg" aria-hidden="true"></span>
+                                    <div class="window stage-view">
+                                        <img
+                                            class="stage-poster"
+                                            src="./landing/stage-poster.jpg"
+                                            width="1200"
+                                            height="750"
+                                            alt=""
+                                            aria-hidden="true"
+                                        />
+                                        <canvas role="img" aria-label="Live babylon.quarks effect: Vortex."></canvas>
+                                        <button type="button" class="stage-play" data-stage-play hidden>
+                                            <i data-lucide="play" class="icon" aria-hidden="true"></i>Play the live
+                                            effect
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="stage-hud">
+                                    <span class="stat"
+                                        ><span class="stat-label">engine</span> <b data-stat="engine">—</b></span
+                                    >
+                                    <span class="stat"
+                                        ><span class="stat-label">particles</span> <b data-stat="particles">—</b></span
+                                    >
+                                    <span class="stat"
+                                        ><span class="stat-label">fps</span> <b data-stat="fps">—</b></span
+                                    >
+                                    <span class="stage-actions">
+                                        <a data-stage-demo href="#demos">All demos</a>
+                                        <button type="button" data-stage-editor>Open in editor</button>
+                                    </span>
+                                </div>
+                            </figure>
+
+                            <div class="breakdown" id="breakdown" data-breakdown>
+                                <div class="breakdown-head">
+                                    <h2>Breakdown of the Vortex</h2>
+                                    <p>
+                                        Seven systems under one renderer, around 400 particles alive, drawn in a handful
+                                        of instanced draws. Move the pointer over the window: the dust leans toward it
+                                        and the last layer sheds trails along its path. The legend reads top to bottom
+                                        in render order.
+                                    </p>
+                                    <p class="breakdown-note" data-breakdown-note>
+                                        The legend describes the Vortex take. Choose it again above to match.
+                                    </p>
+                                </div>
+                                <ol class="layers">
+                                    <li>
+                                        <span class="layer-no">0</span>
+                                        <span class="layer-name">Nebula</span>
+                                        <span class="layer-mode">Billboard · alpha blend · SphereEmitter r 22</span>
+                                        <span class="layer-behaviors">ColorOverLife, RotationOverLife, Noise</span>
+                                    </li>
+                                    <li>
+                                        <span class="layer-no">1</span>
+                                        <span class="layer-name">Core glow</span>
+                                        <span class="layer-mode">Billboard · additive · PointEmitter</span>
+                                        <span class="layer-behaviors">ColorOverLife, SizeOverLife</span>
+                                    </li>
+                                    <li>
+                                        <span class="layer-no">2</span>
+                                        <span class="layer-name">Core heart</span>
+                                        <span class="layer-mode">Billboard · additive · PointEmitter</span>
+                                        <span class="layer-behaviors">ColorOverLife, SizeOverLife</span>
+                                    </li>
+                                    <li>
+                                        <span class="layer-no">3</span>
+                                        <span class="layer-name">Accretion disk</span>
+                                        <span class="layer-mode">Billboard · additive · DonutEmitter r 7</span>
+                                        <span class="layer-behaviors">ColorOverLife, OrbitOverLife, GravityForce</span>
+                                    </li>
+                                    <li>
+                                        <span class="layer-no">4</span>
+                                        <span class="layer-name">Comet ribbons</span>
+                                        <span class="layer-mode"
+                                            >Trail, 60 segments · additive · DonutEmitter r 10.3</span
+                                        >
+                                        <span class="layer-behaviors"
+                                            >ColorOverLife, OrbitOverLife, GravityForce, WidthOverLength</span
+                                        >
+                                    </li>
+                                    <li>
+                                        <span class="layer-no">5</span>
+                                        <span class="layer-name">Stardust</span>
+                                        <span class="layer-mode"
+                                            >Stretched billboard · additive · SphereEmitter r 18</span
+                                        >
+                                        <span class="layer-behaviors"
+                                            >ColorOverLife, TurbulenceField, LimitSpeedOverLife, ApplyForce toward the
+                                            pointer</span
+                                        >
+                                    </li>
+                                    <li>
+                                        <span class="layer-no">6</span>
+                                        <span class="layer-name">Cursor comets</span>
+                                        <span class="layer-mode"
+                                            >Trail, 40 segments · additive · PointEmitter at the pointer</span
+                                        >
+                                        <span class="layer-behaviors"
+                                            >InheritVelocity, GravityForce, OrbitOverLife, LimitSpeedOverLife,
+                                            WidthOverLength; emission rate from pointer speed</span
+                                        >
+                                    </li>
+                                </ol>
+                                <p class="breakdown-source">
+                                    Source:
+                                    <a
+                                        href="https://github.com/Soullnik/babylon.quarks-standalone/blob/main/examples/src/landing/vortex.ts"
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        >examples/src/landing/vortex.ts</a
+                                    >. “Open in editor” above loads these seven systems into the editor's hierarchy.
+                                </p>
                             </div>
-                            <div class="window stage-view">
-                                <span class="reg" aria-hidden="true"></span><span class="reg" aria-hidden="true"></span
-                                ><span class="reg" aria-hidden="true"></span
-                                ><span class="reg" aria-hidden="true"></span>
-                                <img
-                                    class="stage-poster"
-                                    src="./landing/stage-poster.jpg"
-                                    width="1200"
-                                    height="750"
-                                    alt=""
-                                    aria-hidden="true"
-                                />
-                                <canvas role="img" aria-label="Live babylon.quarks effect: Vortex."></canvas>
-                                <button type="button" class="stage-play" data-stage-play hidden>
-                                    Play the live effect
-                                </button>
-                            </div>
-                            <div class="stage-hud">
-                                <span class="stat"
-                                    ><span class="stat-label">engine</span> <b data-stat="engine">—</b></span
-                                >
-                                <span class="stat"
-                                    ><span class="stat-label">particles</span> <b data-stat="particles">—</b></span
-                                >
-                                <span class="stat"><span class="stat-label">fps</span> <b data-stat="fps">—</b></span>
-                                <span class="stage-actions">
-                                    <a data-stage-demo href="#demos">All demos</a>
-                                    <button type="button" data-stage-editor>Open in editor</button>
-                                </span>
-                            </div>
-                        </figure>
+                        </div>
                     </div>
-
-                    <div class="breakdown" id="breakdown" data-breakdown>
-                        <div class="breakdown-head">
-                            <h2>Breakdown of the Vortex</h2>
-                            <p>
-                                Seven systems under one renderer, around 400 particles alive, drawn in a handful of
-                                instanced draws. Move the pointer over the window: the dust leans toward it and the last
-                                layer sheds trails along its path. The legend reads top to bottom in render order.
-                            </p>
-                            <p class="breakdown-note" data-breakdown-note>
-                                The legend describes the Vortex take. Choose it again above to match.
-                            </p>
-                        </div>
-                        <ol class="layers">
-                            <li>
-                                <span class="layer-no">0</span>
-                                <span class="layer-name">Nebula</span>
-                                <span class="layer-mode">Billboard · alpha blend · SphereEmitter r 22</span>
-                                <span class="layer-behaviors">ColorOverLife, RotationOverLife, Noise</span>
-                            </li>
-                            <li>
-                                <span class="layer-no">1</span>
-                                <span class="layer-name">Core glow</span>
-                                <span class="layer-mode">Billboard · additive · PointEmitter</span>
-                                <span class="layer-behaviors">ColorOverLife, SizeOverLife</span>
-                            </li>
-                            <li>
-                                <span class="layer-no">2</span>
-                                <span class="layer-name">Core heart</span>
-                                <span class="layer-mode">Billboard · additive · PointEmitter</span>
-                                <span class="layer-behaviors">ColorOverLife, SizeOverLife</span>
-                            </li>
-                            <li>
-                                <span class="layer-no">3</span>
-                                <span class="layer-name">Accretion disk</span>
-                                <span class="layer-mode">Billboard · additive · DonutEmitter r 7</span>
-                                <span class="layer-behaviors">ColorOverLife, OrbitOverLife, GravityForce</span>
-                            </li>
-                            <li>
-                                <span class="layer-no">4</span>
-                                <span class="layer-name">Comet ribbons</span>
-                                <span class="layer-mode">Trail, 60 segments · additive · DonutEmitter r 10.3</span>
-                                <span class="layer-behaviors"
-                                    >ColorOverLife, OrbitOverLife, GravityForce, WidthOverLength</span
-                                >
-                            </li>
-                            <li>
-                                <span class="layer-no">5</span>
-                                <span class="layer-name">Stardust</span>
-                                <span class="layer-mode">Stretched billboard · additive · SphereEmitter r 18</span>
-                                <span class="layer-behaviors"
-                                    >ColorOverLife, TurbulenceField, LimitSpeedOverLife, ApplyForce toward the
-                                    pointer</span
-                                >
-                            </li>
-                            <li>
-                                <span class="layer-no">6</span>
-                                <span class="layer-name">Cursor comets</span>
-                                <span class="layer-mode"
-                                    >Trail, 40 segments · additive · PointEmitter at the pointer</span
-                                >
-                                <span class="layer-behaviors"
-                                    >InheritVelocity, GravityForce, OrbitOverLife, LimitSpeedOverLife, WidthOverLength;
-                                    emission rate from pointer speed</span
-                                >
-                            </li>
-                        </ol>
-                        <p class="breakdown-source">
-                            Source:
-                            <a
-                                href="https://github.com/Soullnik/babylon.quarks-standalone/blob/main/examples/src/landing/vortex.ts"
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                >examples/src/landing/vortex.ts</a
-                            >. “Open in editor” above loads these seven systems into the editor's hierarchy.
-                        </p>
-                    </div>
-
-                    <dl class="titleblock" aria-label="Library facts">
-                        <div>
-                            <dt>Render modes</dt>
-                            <dd>7</dd>
-                        </div>
-                        <div>
-                            <dt>Behaviors</dt>
-                            <dd data-count="behaviors">25</dd>
-                        </div>
-                        <div>
-                            <dt>Emitter shapes</dt>
-                            <dd data-count="shapes">11</dd>
-                        </div>
-                        <div>
-                            <dt>Shaders</dt>
-                            <dd>GLSL + WGSL</dd>
-                        </div>
-                        <div>
-                            <dt>Peer</dt>
-                            <dd>@babylonjs/core ^9.24</dd>
-                        </div>
-                        <div>
-                            <dt>License</dt>
-                            <dd>MIT</dd>
-                        </div>
-                        <div>
-                            <dt>Version</dt>
-                            <dd>%VITE_QUARKS_VERSION%</dd>
-                        </div>
-                    </dl>
                 </div>
             </section>
 
             <!-- Sheet 02: the module stack. -->
-            <section id="features" class="sheet" aria-labelledby="features-title">
+            <section id="features" class="sheet band-inverse" aria-labelledby="features-title">
                 <div class="wrap">
                     <p class="sheet-no"><span>Sheet 02</span><span>Module stack</span></p>
                     <header class="sheet-head">
@@ -555,7 +550,7 @@
             </section>
 
             <!-- Sheet 03: the pipeline, drawn as a four-frame flipbook sheet. -->
-            <section id="workflow" class="sheet" aria-labelledby="workflow-title">
+            <section id="workflow" class="sheet sheet-pipeline" aria-labelledby="workflow-title">
                 <div class="wrap">
                     <p class="sheet-no"><span>Sheet 03</span><span>Pipeline</span></p>
                     <header class="sheet-head">
@@ -565,11 +560,7 @@
                     <ol class="frames" aria-label="Pipeline steps">
                         <li>
                             <span class="frame-no" aria-hidden="true">frame 0</span>
-                            <svg class="frame-glyph" viewBox="0 0 64 48" aria-hidden="true">
-                                <rect x="2" y="2" width="60" height="44" />
-                                <path d="M20 2v44M44 2v44M2 36h18M44 12h18" />
-                                <circle cx="32" cy="22" r="6" />
-                            </svg>
+                            <i data-lucide="pen-tool" class="frame-glyph" aria-hidden="true"></i>
                             <h3>Author</h3>
                             <p>
                                 In the <a href="./editor.html">effect editor</a>, in Unity's Particle System with the
@@ -578,31 +569,19 @@
                         </li>
                         <li>
                             <span class="frame-no" aria-hidden="true">frame 1</span>
-                            <svg class="frame-glyph" viewBox="0 0 64 48" aria-hidden="true">
-                                <path d="M16 4h20l10 10v30H16z" />
-                                <path d="M36 4v10h10" />
-                                <path d="M23 24h18M23 30h18M23 36h12" />
-                            </svg>
+                            <i data-lucide="file-json" class="frame-glyph" aria-hidden="true"></i>
                             <h3>Export JSON</h3>
                             <p>One file per effect, textures embedded or referenced by URL, with a schema.</p>
                         </li>
                         <li>
                             <span class="frame-no" aria-hidden="true">frame 2</span>
-                            <svg class="frame-glyph" viewBox="0 0 64 48" aria-hidden="true">
-                                <path d="M4 24h30M28 16l8 8-8 8" />
-                                <path
-                                    d="M44 8c-4 0-4 4-4 8v4c0 2-2 4-4 4 2 0 4 2 4 4v4c0 4 0 8 4 8M52 8c4 0 4 4 4 8v4c0 2 2 4 4 4-2 0-4 2-4 4v4c0 4 0 8-4 8"
-                                />
-                            </svg>
+                            <i data-lucide="package-open" class="frame-glyph" aria-hidden="true"></i>
                             <h3>Load</h3>
                             <p><code>QuarksLoader</code> resolves textures and meshes once and shares them.</p>
                         </li>
                         <li>
                             <span class="frame-no" aria-hidden="true">frame 3</span>
-                            <svg class="frame-glyph" viewBox="0 0 64 48" aria-hidden="true">
-                                <path d="M32 6v36M13 24h38M19 11l26 26M45 11 19 37" />
-                                <circle cx="32" cy="24" r="5" />
-                            </svg>
+                            <i data-lucide="sparkles" class="frame-glyph" aria-hidden="true"></i>
                             <h3>Render</h3>
                             <p>
                                 <code>BatchedRenderer.update(dt)</code> once a frame simulates and draws every system.
@@ -613,7 +592,7 @@
             </section>
 
             <!-- Sheet 04: code listings. -->
-            <section id="get-started" class="sheet" aria-labelledby="start-title">
+            <section id="get-started" class="sheet band-2 sheet-code" aria-labelledby="start-title">
                 <div class="wrap">
                     <p class="sheet-no"><span>Sheet 04</span><span>Code</span></p>
                     <div class="start-grid">
@@ -671,6 +650,13 @@
 
                             <figure class="curve-fig">
                                 <svg viewBox="0 0 220 130" aria-hidden="true">
+                                    <defs>
+                                        <linearGradient id="curve-ramp" x1="0" y1="0" x2="1" y2="0">
+                                            <stop offset="0" stop-color="#5ef0f5" />
+                                            <stop offset="0.55" stop-color="#8a3cf0" />
+                                            <stop offset="1" stop-color="#d63ce0" />
+                                        </linearGradient>
+                                    </defs>
                                     <path
                                         class="curve-grid"
                                         d="M30 10v100h180M30 60h180M30 35h180M30 85h180M75 10v100M120 10v100M165 10v100"
@@ -788,7 +774,13 @@ const editor = QuarksEffectEditor.Show({
             </section>
 
             <!-- Sheet 05: the contact sheet of demos. -->
-            <section id="demos" class="sheet" aria-labelledby="demos-title">
+            <section id="demos" class="sheet sheet-contact" aria-labelledby="demos-title">
+                <svg class="orbits" viewBox="0 0 900 520" aria-hidden="true" focusable="false">
+                    <ellipse cx="520" cy="250" rx="420" ry="130" transform="rotate(-16 520 250)" />
+                    <ellipse cx="540" cy="280" rx="380" ry="100" transform="rotate(-24 540 280)" />
+                    <circle cx="120" cy="120" r="1.4" />
+                    <circle cx="800" cy="420" r="1.2" />
+                </svg>
                 <div class="wrap">
                     <p class="sheet-no"><span>Sheet 05</span><span>Contact sheet</span></p>
                     <header class="sheet-head sheet-head-row">
@@ -801,6 +793,7 @@ const editor = QuarksEffectEditor.Show({
                         </div>
                         <label class="search">
                             <span class="visually-hidden">Search demos</span>
+                            <i data-lucide="search" class="icon" aria-hidden="true"></i>
                             <input id="demo-search" type="search" placeholder="Search demos" autocomplete="off" />
                         </label>
                     </header>
@@ -876,7 +869,7 @@ const editor = QuarksEffectEditor.Show({
             </section>
 
             <!-- Sheet 07: the Unity exporter. -->
-            <section id="unity" class="sheet" aria-labelledby="unity-title">
+            <section id="unity" class="sheet band-slant" aria-labelledby="unity-title">
                 <div class="wrap">
                     <p class="sheet-no"><span>Sheet 07</span><span>Unity exporter</span></p>
                     <div class="plate-grid plate-grid-flip">

@@ -1,33 +1,62 @@
 /*
- * Landing page for babylon.quarks, laid out as a VFX artist's breakdown sheet: numbered sheets on
- * a paper ground with hairline rules, the live effects in dark "windows" cut into the paper with
- * registration marks at the corners, and the hero effect followed by the legend of the systems it
- * is made of. Light is paper and ink; dark is the same sheet printed on charcoal. The windows and
- * the code listings stay dark in both: additive particles only read on a dark ground.
+ * Landing page for babylon.quarks, laid out as a VFX artist's breakdown sheet: numbered sheets with
+ * ruled headers, the live effects in windows with registration marks at the corners, and the hero
+ * effect followed by the legend of the systems it is made of.
+ *
+ * Colour comes from the logo: an orb in two tilted orbit rings, cyan through violet to magenta.
+ * The ground is dark first (additive particles only read on a dark ground, and the ramp glows
+ * there) with a cool paper theme as the alternative. The ramp is used with intent: the sheet rules,
+ * the frame of the hero window, the active take, the callouts and the orbit line-art; never as a
+ * haze. Sections differ in shape: the hero sits on orbit rings, the module stack is an inverted
+ * band with slanted edges, the pipeline's flipbook straddles the rule into the code band, and the
+ * contact sheet carries one large orbit arc behind its header.
  */
 :root {
-    color-scheme: light;
-    --paper: #f1ece2;
-    --paper-deep: #e7e0d2;
-    --ink: #161513;
-    --ink-soft: #5c574d;
-    --rule: #c9c1b1;
-    --rule-strong: #8f877a;
-    --accent: #c4400d;
-    --accent-ink: #ffffff;
-    --plasma: #0c6b8a;
-    --focus: #0c6b8a;
+    /* The two palettes; `--ground` and friends pick one, `.band-inverse` the other. */
+    --d-ground: #0b0d12;
+    --d-ground-2: #11141b;
+    --d-ink: #e9ebf2;
+    --d-ink-soft: #9aa2b4;
+    --d-rule: #272c38;
+    --d-rule-strong: #4a5162;
+    --d-cyan: #5ef0f5;
+    --d-violet: #a66bff;
+    --d-magenta: #e36cf0;
+
+    --p-ground: #eef0f5;
+    --p-ground-2: #e3e6ee;
+    --p-ink: #12141b;
+    --p-ink-soft: #555c6e;
+    --p-rule: #c8cdd9;
+    --p-rule-strong: #8b93a6;
+    --p-cyan: #0a8792;
+    --p-violet: #6b2fd6;
+    --p-magenta: #b227c4;
+
+    color-scheme: dark;
+    --ground: var(--d-ground);
+    --ground-2: var(--d-ground-2);
+    --ink: var(--d-ink);
+    --ink-soft: var(--d-ink-soft);
+    --rule: var(--d-rule);
+    --rule-strong: var(--d-rule-strong);
+    --cyan: var(--d-cyan);
+    --violet: var(--d-violet);
+    --magenta: var(--d-magenta);
+    --focus: var(--d-cyan);
+    --ramp: linear-gradient(90deg, var(--cyan), var(--violet), var(--magenta));
+    --ramp-diagonal: linear-gradient(135deg, var(--cyan), var(--violet) 55%, var(--magenta));
 
     /* Always-dark surfaces: the windows and the listings. */
     --window: #07090d;
     --window-rule: #262a33;
-    --window-fg: #e9e6dc;
+    --window-fg: #e9ebf2;
     --window-muted: #8f94a0;
-    --tok-keyword: #ff9b5c;
+    --tok-keyword: #e889f3;
     --tok-string: #a9dcab;
-    --tok-number: #f2c879;
+    --tok-number: #7ff0f5;
     --tok-type: #8fd3ff;
-    --tok-call: #d9c2ff;
+    --tok-call: #c9b4ff;
     --tok-comment: #7d879b;
 
     --font-display: 'Source Serif 4', 'Iowan Old Style', Georgia, 'Times New Roman', serif;
@@ -44,36 +73,50 @@
     --wrap: 1240px;
     --gutter: 24px;
     --masthead-h: 56px;
+    --slant: clamp(24px, 3.5vw, 56px);
 }
 
-@media (prefers-color-scheme: dark) {
-    :root:not([data-theme='light']) {
-        color-scheme: dark;
-        --paper: #161513;
-        --paper-deep: #1e1c19;
-        --ink: #ece6d8;
-        --ink-soft: #aaa396;
-        --rule: #3a3731;
-        --rule-strong: #6a655b;
-        --accent: #ff7d3b;
-        --accent-ink: #1a0b02;
-        --plasma: #7fd1ff;
-        --focus: #7fd1ff;
-    }
+:root[data-theme='light'] {
+    color-scheme: light;
+    --ground: var(--p-ground);
+    --ground-2: var(--p-ground-2);
+    --ink: var(--p-ink);
+    --ink-soft: var(--p-ink-soft);
+    --rule: var(--p-rule);
+    --rule-strong: var(--p-rule-strong);
+    --cyan: var(--p-cyan);
+    --violet: var(--p-violet);
+    --magenta: var(--p-magenta);
+    --focus: var(--p-violet);
 }
 
-:root[data-theme='dark'] {
+/* The inverted band prints the other palette. */
+.band-inverse {
+    --ground: var(--p-ground);
+    --ground-2: var(--p-ground-2);
+    --ink: var(--p-ink);
+    --ink-soft: var(--p-ink-soft);
+    --rule: var(--p-rule);
+    --rule-strong: var(--p-rule-strong);
+    --cyan: var(--p-cyan);
+    --violet: var(--p-violet);
+    --magenta: var(--p-magenta);
+    --focus: var(--p-violet);
+    color-scheme: light;
+}
+
+:root[data-theme='light'] .band-inverse {
+    --ground: var(--d-ground);
+    --ground-2: var(--d-ground-2);
+    --ink: var(--d-ink);
+    --ink-soft: var(--d-ink-soft);
+    --rule: var(--d-rule);
+    --rule-strong: var(--d-rule-strong);
+    --cyan: var(--d-cyan);
+    --violet: var(--d-violet);
+    --magenta: var(--d-magenta);
+    --focus: var(--d-cyan);
     color-scheme: dark;
-    --paper: #161513;
-    --paper-deep: #1e1c19;
-    --ink: #ece6d8;
-    --ink-soft: #aaa396;
-    --rule: #3a3731;
-    --rule-strong: #6a655b;
-    --accent: #ff7d3b;
-    --accent-ink: #1a0b02;
-    --plasma: #7fd1ff;
-    --focus: #7fd1ff;
 }
 
 *,
@@ -90,7 +133,7 @@ html {
 
 body {
     margin: 0;
-    background: var(--paper);
+    background: var(--ground);
     color: var(--ink);
     font-family: var(--font-ui);
     font-size: var(--step-0);
@@ -126,7 +169,7 @@ h3 code,
 li code,
 td code {
     padding: 0 0.3em;
-    background: var(--paper-deep);
+    background: var(--ground-2);
     border-radius: 2px;
 }
 
@@ -154,6 +197,14 @@ h3 {
     outline-offset: 2px;
 }
 
+/* Every icon on the page is a Lucide glyph (or a Simple Icons brand mark) at one scale. */
+.icon {
+    width: 1.05em;
+    height: 1.05em;
+    flex-shrink: 0;
+    vertical-align: -0.18em;
+}
+
 .visually-hidden {
     position: absolute;
     width: 1px;
@@ -170,7 +221,7 @@ h3 {
     z-index: 30;
     padding: 8px 14px;
     background: var(--ink);
-    color: var(--paper);
+    color: var(--ground);
     text-decoration: none;
 }
 
@@ -187,10 +238,10 @@ h3 {
 
 /* ---------- sheet furniture ---------- */
 
-/* The sheet's number and title, with a rule running out to the margin, like a drawing's header. */
+/* The sheet's number and title, with the ramp running out to the margin as the rule. */
 .sheet-no {
     display: flex;
-    align-items: baseline;
+    align-items: center;
     gap: 14px;
     font-family: var(--font-mono);
     font-size: 0.72rem;
@@ -201,23 +252,21 @@ h3 {
 }
 
 .sheet-no span:first-child {
-    color: var(--accent);
+    color: var(--cyan);
     font-weight: 500;
 }
 
 .sheet-no::after {
     content: '';
     flex: 1;
-    border-top: 1px solid var(--rule);
-    transform: translateY(-0.2em);
+    height: 1px;
+    background: var(--ramp);
+    opacity: 0.7;
 }
 
 .sheet {
+    position: relative;
     padding-block: clamp(36px, 5vw, 64px) clamp(44px, 7vw, 96px);
-}
-
-.sheet + .sheet {
-    border-top: 1px solid var(--rule);
 }
 
 .sheet-head {
@@ -262,9 +311,11 @@ h3 {
     max-width: 40rem;
 }
 
-/* An arrow link: plain text with a long arrow, the page's only call-to-action style. */
+/* An arrow link: plain text with Lucide's arrow, the page's only call-to-action style. */
 .arrow-link {
-    display: inline;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35em;
     font-weight: 600;
     color: var(--ink);
     text-decoration: none;
@@ -272,13 +323,17 @@ h3 {
     padding-bottom: 1px;
 }
 
-.arrow-link::after {
-    content: ' \2192';
-    color: var(--accent);
+.arrow-link .icon {
+    color: var(--violet);
+    transition: transform 0.15s ease;
 }
 
 .arrow-link:hover {
-    border-bottom-color: var(--accent);
+    border-bottom-color: var(--violet);
+}
+
+.arrow-link:hover .icon {
+    transform: translateX(3px);
 }
 
 .plain-links {
@@ -290,11 +345,11 @@ h3 {
     justify-items: start;
 }
 
-/* Registration marks at the four corners of a window: the small L of a cut sheet. */
+/* A window: a dark surface with registration marks at the four corners, the L of a cut sheet. */
 .window {
     position: relative;
     background: var(--window);
-    border: 1px solid var(--ink);
+    border: 1px solid var(--rule-strong);
 }
 
 .reg {
@@ -344,14 +399,43 @@ figcaption code {
     font-style: normal;
 }
 
+/* Orbit line-art: two tilted rings and a few sparkles, the logo's motif drawn as hairlines. */
+.orbits {
+    position: absolute;
+    pointer-events: none;
+    z-index: 0;
+    overflow: visible;
+}
+
+.orbits ellipse {
+    fill: none;
+    stroke: url(#orbit-ramp);
+    stroke-width: 1;
+}
+
+.orbits circle {
+    fill: var(--cyan);
+}
+
 /* ---------- masthead ---------- */
 
 .masthead {
     position: sticky;
     top: 0;
     z-index: 20;
-    background: var(--paper);
-    border-bottom: 1px solid var(--ink);
+    background: var(--ground);
+    border-bottom: 1px solid var(--rule);
+}
+
+.masthead::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: -1px;
+    height: 1px;
+    background: var(--ramp);
+    opacity: 0.55;
 }
 
 .masthead-row {
@@ -392,6 +476,9 @@ figcaption code {
 }
 
 .site-nav a {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
     padding: 6px 9px;
     color: var(--ink-soft);
     text-decoration: none;
@@ -402,6 +489,7 @@ figcaption code {
 .site-nav a:hover {
     color: var(--ink);
     text-decoration: underline;
+    text-decoration-color: var(--violet);
 }
 
 .masthead-tools {
@@ -421,15 +509,19 @@ figcaption code {
 }
 
 .icon-button:hover {
-    border-color: var(--ink);
+    border-color: var(--violet);
 }
 
-[data-theme-toggle] svg {
+.icon-button .icon {
+    width: 18px;
+    height: 18px;
+}
+
+[data-theme-toggle] .i-light,
+[data-theme-toggle] .i-dark {
     display: none;
 }
 
-[data-theme-toggle][data-choice='system'] .i-system,
-[data-theme-toggle]:not([data-choice]) .i-system,
 [data-theme-toggle][data-choice='light'] .i-light,
 [data-theme-toggle][data-choice='dark'] .i-dark {
     display: block;
@@ -458,8 +550,8 @@ figcaption code {
         gap: 0;
         margin: 0;
         padding: 4px max(16px, env(safe-area-inset-right, 0px)) 12px max(16px, env(safe-area-inset-left, 0px));
-        background: var(--paper);
-        border-bottom: 1px solid var(--ink);
+        background: var(--ground);
+        border-bottom: 1px solid var(--rule-strong);
     }
 
     .site-nav[data-open='false'] {
@@ -473,9 +565,12 @@ figcaption code {
     }
 }
 
-/* ---------- buttons shared by the install line, listings and stage ---------- */
+/* ---------- copy buttons ---------- */
 
 .copy {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
     font: 500 0.74rem var(--font-mono);
     letter-spacing: 0.04em;
     text-transform: uppercase;
@@ -492,6 +587,25 @@ figcaption code {
 }
 
 /* ---------- sheet 01: hero ---------- */
+
+.hero {
+    overflow: hidden;
+}
+
+.hero .wrap {
+    position: relative;
+    z-index: 1;
+}
+
+/* The rings hug the hero window, the way the logo's rings hug its orb; the window covers the rest. */
+.hero .orbits {
+    left: 50%;
+    top: 0;
+    width: 1600px;
+    height: 900px;
+    transform: translateX(-50%);
+    opacity: 0.5;
+}
 
 .hero-grid {
     display: grid;
@@ -536,7 +650,7 @@ figcaption code {
     padding: 8px 8px 8px 14px;
     background: var(--window);
     color: var(--window-fg);
-    border: 1px solid var(--ink);
+    border: 1px solid var(--rule-strong);
 }
 
 .install code {
@@ -546,7 +660,7 @@ figcaption code {
 }
 
 .install .prompt {
-    color: var(--tok-keyword);
+    color: var(--cyan);
 }
 
 .hero-links {
@@ -559,13 +673,59 @@ figcaption code {
     font-size: 1rem;
 }
 
+/* The spec list: label, dotted leader, value, like a data sheet's margin. */
+.spec {
+    margin: clamp(28px, 4vw, 48px) 0 0;
+    display: grid;
+    gap: 0;
+    border-top: 1px solid var(--rule-strong);
+}
+
+.spec > div {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    padding: 9px 0;
+    border-bottom: 1px solid var(--rule);
+}
+
+.spec > div::before {
+    content: '';
+    order: 2;
+    flex: 1;
+    border-bottom: 1px dotted var(--rule-strong);
+    transform: translateY(-0.3em);
+    min-width: 16px;
+}
+
+.spec dt {
+    order: 1;
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+    white-space: nowrap;
+}
+
+.spec dd {
+    order: 3;
+    margin: 0;
+    white-space: nowrap;
+    font-family: var(--font-ui);
+    font-stretch: 75%;
+    font-weight: 700;
+    font-size: 1.05rem;
+    font-variant-numeric: tabular-nums;
+}
+
 /* ---------- the stage ---------- */
 
 .stage {
     margin: 0;
     min-width: 0;
     display: grid;
-    gap: 10px;
+    gap: 12px;
 }
 
 .stage-bar {
@@ -583,7 +743,7 @@ figcaption code {
 }
 
 .stage-bar-label {
-    color: var(--accent);
+    color: var(--cyan);
     letter-spacing: 0.1em;
     text-transform: uppercase;
     font-size: 0.7rem;
@@ -607,13 +767,22 @@ figcaption code {
 
 .stage-bar button[aria-pressed='true'] {
     color: var(--ink);
-    border-bottom-color: var(--ink);
+    border-image: var(--ramp) 1;
+    border-bottom-width: 2px;
+}
+
+/* The hero window's frame is the ramp itself: a 1px gradient edge around the canvas. */
+.stage-frame {
+    margin-inline: 15px; /* room for the registration marks inside the column */
+    padding: 1px;
+    background: var(--ramp-diagonal);
+    position: relative;
 }
 
 .stage-view {
     aspect-ratio: 16 / 10;
     max-width: 100%;
-    margin-inline: 15px; /* room for the registration marks inside the column */
+    border: 0;
     overflow: visible;
 }
 
@@ -646,6 +815,9 @@ figcaption code {
     left: 50%;
     bottom: 18px;
     transform: translateX(-50%);
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
     font: 500 0.8rem var(--font-mono);
     letter-spacing: 0.04em;
     padding: 10px 16px;
@@ -653,6 +825,10 @@ figcaption code {
     background: rgb(7 9 13 / 75%);
     color: var(--window-fg);
     cursor: pointer;
+}
+
+.stage-play[hidden] {
+    display: none;
 }
 
 .stage-hud {
@@ -686,6 +862,9 @@ figcaption code {
 
 .stage-actions a,
 .stage-actions button {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
     font: 500 0.76rem var(--font-mono);
     color: var(--ink);
     text-decoration: none;
@@ -698,49 +877,42 @@ figcaption code {
 
 .stage-actions a:hover,
 .stage-actions button:hover {
-    border-bottom-color: var(--accent);
+    border-bottom-color: var(--violet);
 }
 
-.stage-actions button::after {
-    content: ' \2197';
-    color: var(--accent);
+.stage-actions .icon {
+    color: var(--violet);
 }
 
-@media (max-width: 960px) {
-    .hero-grid {
-        grid-template-columns: minmax(0, 1fr);
-    }
-}
-
-/* ---------- the breakdown legend ---------- */
+/* ---------- the breakdown legend, under the stage ---------- */
 
 .breakdown {
-    margin-top: clamp(36px, 5vw, 64px);
+    margin-top: clamp(28px, 3vw, 40px);
+    padding-inline: 15px;
     display: grid;
-    grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
-    gap: clamp(24px, 4vw, 64px);
-    align-items: start;
+    gap: 14px;
+}
+
+.breakdown h2 {
+    font-size: var(--step-2);
 }
 
 .breakdown-head {
     display: grid;
-    gap: 12px;
-}
-
-.breakdown-head h2 {
-    font-size: var(--step-2);
+    gap: 10px;
 }
 
 .breakdown-head p {
     color: var(--ink-soft);
-    max-width: 34em;
+    max-width: 40em;
+    font-size: 0.95rem;
 }
 
 .breakdown-note {
     display: none;
     font-family: var(--font-mono);
     font-size: 0.76rem;
-    color: var(--accent) !important;
+    color: var(--magenta) !important;
 }
 
 .breakdown[data-active-effect]:not([data-active-effect='vortex']) .breakdown-note {
@@ -755,7 +927,7 @@ figcaption code {
     list-style: none;
     margin: 0;
     padding: 0;
-    border-top: 1px solid var(--ink);
+    border-top: 1px solid var(--rule-strong);
     font-size: 0.9rem;
     transition: opacity 0.3s ease;
 }
@@ -768,7 +940,7 @@ figcaption code {
         'no name behaviors';
     column-gap: 14px;
     row-gap: 2px;
-    padding: 10px 0;
+    padding: 9px 0;
     border-bottom: 1px solid var(--rule);
 }
 
@@ -776,7 +948,7 @@ figcaption code {
     grid-area: no;
     font-family: var(--font-mono);
     font-size: 0.78rem;
-    color: var(--accent);
+    color: var(--cyan);
 }
 
 .layer-name {
@@ -799,7 +971,6 @@ figcaption code {
 }
 
 .breakdown-source {
-    grid-column: 2;
     font-family: var(--font-display);
     font-style: italic;
     font-size: 0.95rem;
@@ -807,12 +978,12 @@ figcaption code {
 }
 
 @media (max-width: 960px) {
-    .breakdown {
+    .hero-grid {
         grid-template-columns: minmax(0, 1fr);
     }
 
-    .breakdown-source {
-        grid-column: 1;
+    .hero .orbits {
+        display: none;
     }
 }
 
@@ -826,88 +997,22 @@ figcaption code {
     }
 }
 
-/* ---------- the title block ---------- */
+/* ---------- sheet 02: the inverted, slanted band of module rows ---------- */
 
-.titleblock {
-    margin: clamp(36px, 5vw, 64px) 0 0;
-    display: grid;
-    grid-template-columns: repeat(7, minmax(0, auto));
-    border: 1px solid var(--ink);
+.band-inverse {
+    background: var(--ground);
+    color: var(--ink);
+    margin-top: var(--slant);
+    padding-top: calc(var(--slant) + clamp(36px, 5vw, 64px));
+    padding-bottom: calc(var(--slant) + clamp(44px, 7vw, 96px));
+    clip-path: polygon(0 var(--slant), 100% 0, 100% calc(100% - var(--slant)), 0 100%);
 }
-
-.titleblock > div {
-    padding: 10px 14px 12px;
-    display: flex;
-    flex-direction: column-reverse;
-    gap: 0;
-    min-width: 0;
-}
-
-.titleblock > div + div {
-    border-left: 1px solid var(--ink);
-}
-
-.titleblock dt {
-    font-family: var(--font-mono);
-    font-size: 0.66rem;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    color: var(--ink-soft);
-}
-
-.titleblock dd {
-    margin: 0;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    font-family: var(--font-ui);
-    font-stretch: 75%;
-    font-weight: 700;
-    font-size: 1.3rem;
-    line-height: 1.2;
-    font-variant-numeric: tabular-nums;
-}
-
-@media (max-width: 900px) {
-    .titleblock {
-        grid-template-columns: repeat(3, minmax(0, 1fr));
-    }
-
-    .titleblock > div:nth-child(3n + 1) {
-        border-left: 0;
-    }
-
-    .titleblock > div:nth-child(n + 4) {
-        border-top: 1px solid var(--ink);
-    }
-}
-
-@media (max-width: 520px) {
-    .titleblock {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-
-    .titleblock > div:nth-child(n) {
-        border-left: 0;
-        border-top: 0;
-    }
-
-    .titleblock > div:nth-child(even) {
-        border-left: 1px solid var(--ink);
-    }
-
-    .titleblock > div:nth-child(n + 3) {
-        border-top: 1px solid var(--ink);
-    }
-}
-
-/* ---------- sheet 02: rows ---------- */
 
 .rows {
     list-style: none;
     margin: 0;
     padding: 0;
-    border-top: 1px solid var(--ink);
+    border-top: 1px solid var(--rule-strong);
 }
 
 .row {
@@ -922,7 +1027,7 @@ figcaption code {
 .row-no {
     font-family: var(--font-mono);
     font-size: 0.8rem;
-    color: var(--accent);
+    color: var(--cyan);
     padding-top: 0.35em;
 }
 
@@ -961,7 +1066,7 @@ figcaption code {
     aspect-ratio: 16 / 9;
     object-fit: cover;
     background: var(--window);
-    border: 1px solid var(--ink);
+    border: 1px solid var(--rule-strong);
 }
 
 .row-short {
@@ -983,7 +1088,7 @@ figcaption code {
 .behavior-list li::before {
     content: '\00B7';
     margin-right: 6px;
-    color: var(--accent);
+    color: var(--violet);
 }
 
 @media (max-width: 800px) {
@@ -998,17 +1103,24 @@ figcaption code {
     }
 }
 
-/* ---------- sheet 03: the flipbook ---------- */
+/* ---------- sheet 03: the flipbook, straddling the rule into the code band ---------- */
+
+.sheet-pipeline {
+    padding-bottom: 0;
+    z-index: 2;
+}
 
 .frames {
     list-style: none;
-    margin: 0;
+    margin: 0 0 calc(-1 * var(--overlap));
     padding: 0;
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
-    border: 1px solid var(--ink);
-    background: var(--paper);
+    border: 1px solid var(--rule-strong);
+    background: var(--ground);
     counter-reset: frame;
+    position: relative;
+    --overlap: clamp(48px, 6vw, 88px);
 }
 
 .frames li {
@@ -1037,14 +1149,10 @@ figcaption code {
 }
 
 .frame-glyph {
-    width: 72px;
-    height: 54px;
-    fill: none;
-    stroke: var(--ink);
-    stroke-width: 1.5;
-    stroke-linecap: round;
-    stroke-linejoin: round;
-    margin-bottom: 8px;
+    width: 40px;
+    height: 40px;
+    color: var(--cyan);
+    margin-bottom: 6px;
 }
 
 .frames h3 {
@@ -1056,7 +1164,7 @@ figcaption code {
 .frames h3::before {
     counter-increment: frame;
     content: counter(frame) '. ';
-    color: var(--accent);
+    color: var(--violet);
 }
 
 .frames p {
@@ -1096,7 +1204,17 @@ figcaption code {
     }
 }
 
-/* ---------- sheet 04: listings ---------- */
+/* ---------- sheet 04: the code band, full bleed on the second ground ---------- */
+
+.band-2 {
+    background: var(--ground-2);
+    border-top: 1px solid var(--rule);
+    border-bottom: 1px solid var(--rule);
+}
+
+.sheet-code {
+    padding-top: calc(clamp(48px, 6vw, 88px) + clamp(36px, 5vw, 64px));
+}
 
 .start-grid {
     display: grid;
@@ -1126,18 +1244,19 @@ figcaption code {
 
 .curve-grid {
     fill: none;
-    stroke: var(--rule);
+    stroke: var(--rule-strong);
     stroke-width: 1;
+    opacity: 0.6;
 }
 
 .curve-line {
     fill: none;
-    stroke: var(--plasma);
+    stroke: url(#curve-ramp);
     stroke-width: 2;
 }
 
 .curve-key {
-    fill: var(--paper);
+    fill: var(--ground);
     stroke: var(--ink);
     stroke-width: 1.5;
 }
@@ -1146,7 +1265,7 @@ figcaption code {
     min-width: 0;
     background: var(--window);
     color: var(--window-fg);
-    border: 1px solid var(--ink);
+    border: 1px solid var(--rule-strong);
 }
 
 .listing-head {
@@ -1184,7 +1303,7 @@ figcaption code {
 
 .code-tabs button[aria-selected='true'] {
     color: var(--window-fg);
-    border-bottom-color: var(--accent);
+    border-image: var(--ramp) 1;
 }
 
 .code-panel pre {
@@ -1201,9 +1320,10 @@ figcaption code {
     font-size: inherit;
 }
 
-/* Numbered lines, set by `setupCode` in main.ts. */
+/* Numbered lines, set by `setupCode` in main.ts. A blank line keeps its height. */
 .ln {
     display: block;
+    min-height: 1lh;
     padding-left: 3.6em;
     position: relative;
     white-space: pre;
@@ -1219,11 +1339,6 @@ figcaption code {
     color: var(--window-muted);
     opacity: 0.6;
     user-select: none;
-}
-
-/* A blank line keeps its height: an empty block has none, and a space alone in it is collapsed. */
-.ln {
-    min-height: 1lh;
 }
 
 /* The JSON sketch is numbered by nothing: it is a fragment, not a listing. */
@@ -1266,22 +1381,49 @@ figcaption code {
     }
 }
 
-/* ---------- sheet 05: contact sheet ---------- */
+/* ---------- sheet 05: the contact sheet, with one orbit arc behind its header ---------- */
+
+.sheet-contact {
+    overflow: hidden;
+}
+
+.sheet-contact .orbits {
+    right: -340px;
+    top: -140px;
+    width: 900px;
+    height: 520px;
+    opacity: 0.45;
+}
+
+.sheet-contact .wrap {
+    position: relative;
+    z-index: 1;
+}
+
+.search {
+    position: relative;
+    min-width: 0;
+    flex: 0 1 320px;
+}
+
+.search .icon {
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--ink-soft);
+    pointer-events: none;
+}
 
 .search input {
     width: min(320px, 100%);
     min-height: 42px;
-    padding: 0 12px;
+    padding: 0 12px 0 36px;
     border: 1px solid var(--rule-strong);
     border-radius: 0;
-    background: var(--paper);
+    background: var(--ground);
     color: var(--ink);
     font: 0.9rem var(--font-mono);
-}
-
-.search {
-    min-width: 0;
-    flex: 0 1 320px;
 }
 
 .search input:focus {
@@ -1310,7 +1452,7 @@ figcaption code {
     text-transform: uppercase;
     padding: 4px 0;
     border: 0;
-    border-bottom: 1px solid transparent;
+    border-bottom: 2px solid transparent;
     background: transparent;
     color: var(--ink-soft);
     cursor: pointer;
@@ -1322,7 +1464,7 @@ figcaption code {
 
 .chip[aria-pressed='true'] {
     color: var(--ink);
-    border-bottom-color: var(--ink);
+    border-image: var(--ramp) 1;
 }
 
 .demo-status {
@@ -1345,7 +1487,7 @@ figcaption code {
 .demo-group {
     grid-column: 1 / -1;
     margin-top: 10px;
-    border-bottom: 1px solid var(--ink);
+    border-bottom: 1px solid var(--rule-strong);
     padding-bottom: 6px;
 }
 
@@ -1397,7 +1539,7 @@ figcaption code {
     aspect-ratio: 16 / 9;
     object-fit: cover;
     background: var(--window);
-    border: 1px solid var(--ink);
+    border: 1px solid var(--rule-strong);
     transition: outline-color 0.15s ease;
     outline: 2px solid transparent;
     outline-offset: 2px;
@@ -1411,15 +1553,15 @@ figcaption code {
     padding: 2px 6px;
     font: 500 0.68rem var(--font-mono);
     letter-spacing: 0.06em;
-    background: var(--paper);
+    background: var(--ground);
     color: var(--ink);
-    border-right: 1px solid var(--ink);
-    border-bottom: 1px solid var(--ink);
+    border-right: 1px solid var(--rule-strong);
+    border-bottom: 1px solid var(--rule-strong);
     z-index: 1;
 }
 
 .demo-link:hover img {
-    outline-color: var(--accent);
+    outline-color: var(--violet);
 }
 
 .demo-name {
@@ -1431,7 +1573,7 @@ figcaption code {
 
 .demo-link:hover .demo-name {
     text-decoration: underline;
-    text-decoration-color: var(--accent);
+    text-decoration-color: var(--violet);
 }
 
 .demo p {
@@ -1456,7 +1598,14 @@ figcaption code {
     color: var(--ink-soft);
 }
 
-/* ---------- sheets 06 and 07: plates ---------- */
+/* ---------- sheets 06 and 07: plates; the Unity sheet is a slanted band ---------- */
+
+.band-slant {
+    background: var(--ground-2);
+    padding-top: calc(var(--slant) + clamp(36px, 5vw, 64px));
+    padding-bottom: calc(var(--slant) + clamp(44px, 7vw, 96px));
+    clip-path: polygon(0 0, 100% var(--slant), 100% 100%, 0 calc(100% - var(--slant)));
+}
 
 .plate-grid {
     display: grid;
@@ -1505,8 +1654,8 @@ figcaption code {
     display: inline-grid;
     place-items: center;
     border-radius: 50%;
-    background: var(--accent);
-    color: var(--accent-ink);
+    background: linear-gradient(135deg, var(--d-violet), var(--d-magenta));
+    color: #ffffff;
     font: 600 0.74rem var(--font-mono);
 }
 
@@ -1557,7 +1706,7 @@ figcaption code {
     background: #282828;
     color: #d2d2d2;
     font: 0.82rem/1.4 var(--font-ui);
-    border: 1px solid var(--ink);
+    border: 1px solid var(--rule-strong);
     border-bottom: 0;
     padding-bottom: 14px;
     overflow: hidden;
@@ -1639,7 +1788,7 @@ figcaption code {
     padding: 18px 20px;
     background: var(--window);
     color: var(--window-fg);
-    border: 1px solid var(--ink);
+    border: 1px solid var(--rule-strong);
     font-size: 0.8rem;
     line-height: 1.6;
     overflow-x: auto;
@@ -1672,7 +1821,7 @@ figcaption code {
     letter-spacing: 0.1em;
     text-transform: uppercase;
     color: var(--ink-soft);
-    border-bottom: 1px solid var(--ink);
+    border-bottom: 1px solid var(--rule-strong);
 }
 
 .packages tbody th {
@@ -1692,6 +1841,7 @@ figcaption code {
 
 .packages td a {
     color: var(--ink);
+    text-decoration-color: var(--violet);
 }
 
 @media (max-width: 640px) {
@@ -1716,8 +1866,20 @@ figcaption code {
 /* ---------- colophon ---------- */
 
 .colophon {
+    position: relative;
     padding-block: 40px calc(40px + env(safe-area-inset-bottom, 0px));
-    border-top: 1px solid var(--ink);
+    border-top: 1px solid var(--rule);
+}
+
+.colophon::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: -1px;
+    height: 1px;
+    background: var(--ramp);
+    opacity: 0.55;
 }
 
 .colophon-grid {
@@ -1763,7 +1925,7 @@ figcaption code {
 
 .colophon nav a:hover {
     text-decoration: underline;
-    text-decoration-color: var(--accent);
+    text-decoration-color: var(--violet);
 }
 
 @media (max-width: 800px) {
