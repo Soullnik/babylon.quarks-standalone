@@ -753,14 +753,8 @@ figcaption code {
     overflow: visible;
     fill: none;
     stroke: url(#orbit-ramp);
-    stroke-width: 1.5;
+    stroke-width: 2;
     opacity: 0.85;
-    transition: opacity 0.6s ease;
-}
-
-/* Another take on the stage: the rings are not the subject, so they step back, both together. */
-.stage[data-effect]:not([data-effect='vortex']) .orbit {
-    opacity: 0.25;
 }
 
 .stage-view canvas,
