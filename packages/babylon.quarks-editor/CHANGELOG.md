@@ -7,6 +7,11 @@ needs in its peer dependency.
 
 ## [Unreleased]
 
+## [0.32.0] — 2026-11-08
+
+Released with babylon.quarks 1.0.0-rc.2, on npm's `next` tag with it; its peer dependency is
+`~1.0.0-rc.2`, for the API the candidate adds (mesh vertex colours).
+
 ### Added
 
 - **Mesh vertex colours** in the Mesh render mode's geometry: a host's `geometryOptions` and

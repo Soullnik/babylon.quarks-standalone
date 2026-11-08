@@ -6,6 +6,8 @@ and the package's version moves in lockstep with `quarks.core`.
 
 ## [Unreleased]
 
+## [1.0.0-rc.2] — 2026-11-08
+
 ### Added
 
 - **`particleColor` on a system**: off, its particles are drawn without their colour (start

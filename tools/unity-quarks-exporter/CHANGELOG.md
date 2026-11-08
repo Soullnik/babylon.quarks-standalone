@@ -4,6 +4,8 @@ All notable changes to the Unity Quarks Exporter are documented here.
 
 ## [Unreleased]
 
+## [1.0.0-rc.2] — 2026-11-08
+
 ### Added
 
 - **Texture Sheet Animation's FPS time mode** → `FrameOverLife` `fps`, playing round the frames

@@ -1,7 +1,7 @@
 # Unity Shuriken parity checklist
 
 Gap analysis of the effect editor + runtime against Unity's Particle System (Shuriken), as of
-1.0.0-rc.1 (October 2026).
+1.0.0-rc.2 (November 2026).
 Three tiers: ✅ shipped · 🟡 runtime supports it, editor UI missing · 🔴 needs quarks.core work.
 
 ## Main
