@@ -145,7 +145,7 @@ export class BoundsTracker {
             // factor long. A negative factor (Unity's negative Length or Speed Scale) stretches the
             // quad ahead of the particle instead of behind it: as far, the other way.
             padding +=
-                maxSize * (1 + Math.abs(stretch.lengthFactor ?? 0)) + maxSpeed * Math.abs(stretch.speedFactor ?? 0);
+                maxSize * (1 + Math.abs(stretch.lengthFactor ?? 2)) + maxSpeed * Math.abs(stretch.speedFactor ?? 0);
         } else {
             const pivot = settings.pivot;
             const pivotReach = pivot === undefined ? 0 : Math.abs(pivot.x) + Math.abs(pivot.y) + Math.abs(pivot.z);

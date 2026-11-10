@@ -78,8 +78,9 @@ export interface StretchedBillBoardSettings {
      */
     speedFactor: number;
     /**
-     * Length per unit of size, Unity's Length Scale: a factor of 2 makes a quad of size 0.1
-     * 0.2 long.
+     * Length per unit of size, Unity's Length Scale. Default 2: a particle of size 0.1 is 0.2
+     * long before its speed adds length. 0 draws no length from the size, so a particle that also
+     * has no speed draws nothing.
      * @type {number}
      */
     lengthFactor: number;
@@ -254,7 +255,8 @@ export interface IParticleSystem {
      * Column storage backing the particles' vector attributes, when the
      * implementation uses one. Rows `[0, particleNum)` hold the live particles
      * in the same order as `particles`, so a renderer can read them as ranges.
-     * @type {ParticleStore}
+     *
+     * @internal The simulation's columns. A behavior uses {@link Particle}.
      */
     store?: ParticleStore;
     /**

@@ -1,6 +1,8 @@
 import {
     EmissionState,
+    EulerGenerator,
     FunctionValueGenerator,
+    GeneratorMemory,
     Matrix3,
     Matrix4,
     Particle,
@@ -21,6 +23,7 @@ import {RenderMode} from '../VFXBatch';
 type StoreBackedParticle = Particle & {storeIndex: number; setStoreIndex(index: number): void};
 
 const UP = new Vector3(0, 0, 1);
+const twistQ = new Quaternion();
 const IDENTITY_QUATERNION = new Quaternion();
 const tempQ = new Quaternion();
 const alignQ = new Quaternion();
@@ -251,7 +254,7 @@ export class ParticleSpawner {
                     }
                 } else {
                     if (startRotationIsRotation) {
-                        sprite.rotation = 0;
+                        sprite.rotation = billboardAngle(startRotation as RotationGenerator, sprite.memory, timeRatio);
                     } else {
                         sprite.rotation = (startRotation as FunctionValueGenerator).genValue(sprite.memory, timeRatio);
                     }
@@ -335,6 +338,19 @@ export class ParticleSpawner {
             system.store.recordMemory((particle as StoreBackedParticle).storeIndex, particle.memory);
         }
     }
+}
+
+/**
+ * The in-plane angle a rotation generator gives a billboard: an Euler generator's Z angle, or the
+ * twist about Z of an axis-angle or random quaternion. X and Y do not turn a billboard. `startGen`
+ * has already rolled the generator into `memory`.
+ */
+function billboardAngle(rotation: RotationGenerator, memory: GeneratorMemory, t: number): number {
+    if (rotation instanceof EulerGenerator) {
+        return rotation.angleZ.genValue(memory, t);
+    }
+    rotation.genValue(memory, twistQ, 1, t);
+    return 2 * Math.atan2(twistQ.z, twistQ.w);
 }
 
 /**

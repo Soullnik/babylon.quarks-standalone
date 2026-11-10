@@ -1012,7 +1012,8 @@ export class SpriteBatch extends VFXBatch {
             // The shader takes the streak's way from the velocity it is sent, which a negative speed
             // factor turns round; the length factor is sent turned round with it, so the length
             // still runs along the particle's own way, as Unity's.
-            const lengthFactor = (stretchedSettings?.lengthFactor ?? 0) * (speedFactor < 0 ? -1 : 1);
+            // 2 is the length factor a stretched system is given when the setting is left out.
+            const lengthFactor = (stretchedSettings?.lengthFactor ?? 2) * (speedFactor < 0 ? -1 : 1);
 
             // Live particles occupy store rows [0, particleNum) in the same order
             // this loop writes them, so attributes that need no per-particle

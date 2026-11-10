@@ -1,6 +1,8 @@
 /**
  * Column storage for the vector-valued particle attributes.
  *
+ * @internal The simulation's columns. Not part of the 1.x contract: a behavior uses {@link Particle}.
+ *
  * The three-component and four-component fields of a particle used to be six
  * separate objects per particle, so walking a system meant chasing pointers
  * across the heap. Here each attribute is one flat `Float32Array` shared by

@@ -5,11 +5,11 @@ plans are in the git history. What 1.x promises is in [STABILITY.md](STABILITY.m
 
 ## Where we are
 
-- **1.0.0-rc.2 is the release candidate**, on npm's `next` tag. It replaces rc.1: its changelog
-  lists changes to how effects look (depth writes, winding, colour space and more) that 1.x
-  could not make. The API, the effect format and the look of an effect are frozen from rc.2 on as
-  [STABILITY.md](STABILITY.md) describes. 1.0.0 follows when the candidate has been in use for a
-  while and nothing reported needs another change of that kind; one that does makes an rc.3.
+- **1.0.0 is the release.** It is rc.2 plus the last corrections that 1.x could not make: a
+  stretched billboard's default length is 2 on every path, a rotation generator on a billboard
+  contributes its Z angle, `turnAboutZ` stays as a plain alias, and the simulation's column store
+  and particle classes are `@internal`. The API, the effect format and the look of an effect are
+  frozen as [STABILITY.md](STABILITY.md) describes. A change of that kind now waits for 2.0.
 - Three published packages: `babylon.quarks` (runtime), `babylon.quarks-editor` (headless
   edit model + React UI, embeddable through `QuarksEffectEditor.Show()`), and the Unity
   exporter (`tools/unity-quarks-exporter`, shipped as a `.unitypackage`). `quarks.core` is a
@@ -45,9 +45,10 @@ plans are in the git history. What 1.x promises is in [STABILITY.md](STABILITY.m
 
 ## Next
 
-1. **1.0.0**: rc.2 becomes 1.0.0 once its feedback is in. Then 1.x minors add what is below
-   without breaking anything STABILITY.md promises, starting with the texture mask (a second
-   texture multiplied into the map, the masked panner, #126).
+1. **1.x minors** add what is below without breaking anything STABILITY.md promises, starting
+   with the texture mask (a second texture multiplied into the map, the masked panner, #126).
+   That pull request stays out of the 1.0.0 tag: it adds API and would edit the published
+   `effect-3` schema, which now means a new format.
 2. **Docs**: an integration example with react-babylonjs. The step-by-step authoring guide is
    [docs/AUTHORING.md](docs/AUTHORING.md).
 3. **Editor to done** ([#43](https://github.com/Soullnik/babylon.quarks-standalone/issues/43)):

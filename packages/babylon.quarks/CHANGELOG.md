@@ -6,6 +6,35 @@ and the package's version moves in lockstep with `quarks.core`.
 
 ## [Unreleased]
 
+## [1.0.0] — 2026-11-10
+
+The stable release. It is 1.0.0-rc.2 with the last corrections 1.x will not be able to make.
+From here the API, the effect files and the look of an effect follow
+[STABILITY.md](../../STABILITY.md).
+
+### Fixed
+
+- **A stretched billboard's length factor defaults to 2 everywhere.** The constructor and a file
+  that left `lengthFactor` out used 0, while switching `renderMode` to stretched and the editor
+  used 2, Unity's Length Scale. 0 draws no length from the size, so a particle with no speed drew
+  nothing. An explicit 0 is unchanged. The bounds and the draw use the same default.
+- **A rotation generator on a billboard contributes its Z angle.** `startRotation` as an
+  `EulerGenerator`, `AxisAngleGenerator` or `RandomQuatGenerator` was ignored on every render mode
+  except mesh, and the particle started at angle 0. A billboard, stretched, horizontal or vertical
+  billboard or beam now takes an Euler generator's Z angle, or the twist about Z of the other two.
+  X and Y stay ignored. Mesh particles are unchanged.
+
+### Changed
+
+- **`RotationOverLife.turnAboutZ` is a plain alias of `turn`.** It turns about the particle's
+  rotation axis, the same call. It is not deprecated: 1.0 deprecates nothing.
+- **The simulation's columns and particle classes are `@internal`.** `ParticleStore`,
+  `planBehaviorFusion`, `FusedPass`, `FusionStep`, `NodeParticle`, `SpriteParticle` and
+  `TrailParticle` stay exported so the package and its tests can reach them, and they are not part
+  of the 1.x contract. `ParticleSystem.store` and `IParticleSystem.store` are `@internal` for the same
+  reason. A behavior keeps
+  using `Particle`, as [Extending babylon.quarks](../../docs/EXTENDING.md) shows.
+
 ## [1.0.0-rc.2] — 2026-11-08
 
 ### Added

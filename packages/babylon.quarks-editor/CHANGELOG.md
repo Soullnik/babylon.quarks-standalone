@@ -7,6 +7,16 @@ needs in its peer dependency.
 
 ## [Unreleased]
 
+## [0.33.0] — 2026-11-10
+
+Released with babylon.quarks 1.0.0. No editor behaviour changes.
+
+### Changed
+
+- The peer dependency on babylon.quarks is `~1.0.0`. It no longer matches the release candidate
+  (`~1.0.0-rc.2` was 0.32.0), so a project that depends on the editor with `^0.32.0` does not take
+  this release on its next install.
+
 ## [0.32.0] — 2026-11-08
 
 Released with babylon.quarks 1.0.0-rc.2, on npm's `next` tag with it; its peer dependency is
