@@ -12,6 +12,11 @@ The stable release. It is 1.0.0-rc.2 with the last corrections 1.x will not be a
 From here the API, the effect files and the look of an effect follow
 [STABILITY.md](../../STABILITY.md).
 
+### Added
+
+- **`STRETCHED_LENGTH_FACTOR`**, 2, Unity's Length Scale. The constructor, the draw, the culling
+  bounds and the editor read this one value when a stretched billboard leaves `lengthFactor` out.
+
 ### Fixed
 
 - **A stretched billboard's length factor defaults to 2 everywhere.** The constructor and a file

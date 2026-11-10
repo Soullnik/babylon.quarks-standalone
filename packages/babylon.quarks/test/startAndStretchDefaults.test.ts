@@ -3,7 +3,7 @@ import {Scene} from '@babylonjs/core/scene';
 import type {StretchedBillBoardSettings} from 'quarks.core';
 import {AxisAngleGenerator, ConstantValue, EulerGenerator, PointEmitter, Vector3} from 'quarks.core';
 import {ParticleSystem} from '../src/ParticleSystem';
-import {RenderMode} from '../src/VFXBatch';
+import {RenderMode, STRETCHED_LENGTH_FACTOR} from '../src/VFXBatch';
 
 let engine: NullEngine;
 let scene: Scene;
@@ -48,7 +48,10 @@ describe('stretched billboard length default', () => {
             emissionOverTime: new ConstantValue(0),
             rendererEmitterSettings: {speedFactor: 1} as StretchedBillBoardSettings,
         });
-        expect((omitted.rendererEmitterSettings as StretchedBillBoardSettings).lengthFactor).toBe(2);
+        expect(STRETCHED_LENGTH_FACTOR).toBe(2);
+        expect((omitted.rendererEmitterSettings as StretchedBillBoardSettings).lengthFactor).toBe(
+            STRETCHED_LENGTH_FACTOR
+        );
         expect((omitted.rendererEmitterSettings as StretchedBillBoardSettings).speedFactor).toBe(1);
         omitted.dispose();
 
@@ -57,10 +60,10 @@ describe('stretched billboard length default', () => {
             renderMode: RenderMode.StretchedBillBoard,
             emissionOverTime: new ConstantValue(0),
         });
-        expect((none.rendererEmitterSettings as StretchedBillBoardSettings).lengthFactor).toBe(2);
+        expect((none.rendererEmitterSettings as StretchedBillBoardSettings).lengthFactor).toBe(STRETCHED_LENGTH_FACTOR);
         none.renderMode = RenderMode.BillBoard;
         none.renderMode = RenderMode.StretchedBillBoard;
-        expect((none.rendererEmitterSettings as StretchedBillBoardSettings).lengthFactor).toBe(2);
+        expect((none.rendererEmitterSettings as StretchedBillBoardSettings).lengthFactor).toBe(STRETCHED_LENGTH_FACTOR);
         none.dispose();
 
         const zero = new ParticleSystem({

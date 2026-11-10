@@ -117,6 +117,7 @@ import {
     RenderFace,
     RenderMode,
     SortMode,
+    STRETCHED_LENGTH_FACTOR,
     TextureUV,
 } from './VFXBatch';
 
@@ -148,9 +149,6 @@ export type {
 } from './system/types';
 
 // Scratch for the per-step emitter matrix of a frame that interpolates, see `update`.
-/** Unity's Length Scale. A stretched billboard left without `lengthFactor` uses this. */
-const STRETCHED_LENGTH_FACTOR = 2;
-
 const fromPosition = new Vector3();
 const fromRotation = new Quaternion();
 const fromScale = new Vector3();

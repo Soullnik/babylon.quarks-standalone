@@ -1,6 +1,7 @@
 import type {Vector3Like} from 'quarks.core';
 import {Matrix4, RendererEmitterSettings, StretchedBillBoardSettings, Vector3} from 'quarks.core';
 import type {VFXBatchSettings} from '../BatchedRenderer';
+import {STRETCHED_LENGTH_FACTOR} from '../batchSettings';
 import {RenderMode} from '../VFXBatch';
 
 /** Steps between full measurements of a system's bounds; in between they are carried and padded. */
@@ -145,7 +146,8 @@ export class BoundsTracker {
             // factor long. A negative factor (Unity's negative Length or Speed Scale) stretches the
             // quad ahead of the particle instead of behind it: as far, the other way.
             padding +=
-                maxSize * (1 + Math.abs(stretch.lengthFactor ?? 2)) + maxSpeed * Math.abs(stretch.speedFactor ?? 0);
+                maxSize * (1 + Math.abs(stretch.lengthFactor ?? STRETCHED_LENGTH_FACTOR)) +
+                maxSpeed * Math.abs(stretch.speedFactor ?? 0);
         } else {
             const pivot = settings.pivot;
             const pivotReach = pivot === undefined ? 0 : Math.abs(pivot.x) + Math.abs(pivot.y) + Math.abs(pivot.z);

@@ -79,6 +79,12 @@ export type RenderFace = 'both' | 'front' | 'back';
  */
 export type RenderAlignment = 'simulation' | 'view' | 'world' | 'local';
 
+/**
+ * Unity's Length Scale, and the `lengthFactor` a stretched billboard uses when the setting is left
+ * out. The constructor, the draw, the culling bounds and the editor all read this value.
+ */
+export const STRETCHED_LENGTH_FACTOR = 2;
+
 /** How a system draws its particles (Unity's Render Mode), see {@link ParticleSystem.renderMode}. */
 export enum RenderMode {
     /** A quad facing the camera (Unity's Billboard). The default. */

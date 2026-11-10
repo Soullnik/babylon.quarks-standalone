@@ -3439,6 +3439,9 @@ export interface StoredBatchSettings {
 }
 
 // @public
+export const STRETCHED_LENGTH_FACTOR = 2;
+
+// @public
 export interface StretchedBillBoardSettings {
     lengthFactor: number;
     speedFactor: number;
