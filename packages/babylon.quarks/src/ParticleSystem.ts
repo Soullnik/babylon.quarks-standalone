@@ -117,6 +117,7 @@ import {
     RenderFace,
     RenderMode,
     SortMode,
+    STRETCHED_LENGTH_FACTOR,
     TextureUV,
 } from './VFXBatch';
 
@@ -238,9 +239,12 @@ export class ParticleSystem implements IParticleSystem {
     /** Speed each particle starts with along the direction its shape gives it, in units per second. Default 0. */
     startSpeed: ValueGenerator | FunctionValueGenerator;
     /**
-     * Rotation each particle starts with: an angle in radians around the view axis for billboards,
-     * or a rotation generator (`AxisAngleGenerator`, `EulerGenerator`, `RandomQuatGenerator`) for
-     * mesh particles. Default 0.
+     * Rotation each particle starts with. An angle in radians turns a billboard in its plane and a
+     * mesh about its {@link rotationAxis}. A rotation generator (`EulerGenerator`,
+     * `AxisAngleGenerator`, `RandomQuatGenerator`) is the mesh's full rotation; on a billboard,
+     * stretched, horizontal or vertical billboard or beam it contributes only the turn about Z
+     * (an Euler generator's Z angle, or the twist about Z of the others), and X and Y are ignored.
+     * Default 0.
      */
     startRotation: ValueGenerator | FunctionValueGenerator | RotationGenerator;
     /** Size each particle starts with in world units; a `Vector3Generator` sizes each axis (Unity's 3D Start Size). Default 1. */
@@ -328,7 +332,11 @@ export class ParticleSystem implements IParticleSystem {
     paused: boolean;
     /** The particle pool; the first {@link particleNum} are alive. */
     readonly particles: Array<Particle>;
-    /** Column storage shared by this system's particles; behaviors read and write it. */
+    /**
+     * Column storage shared by this system's particles.
+     *
+     * @internal The simulation's columns. A behavior uses {@link Particle}.
+     */
     readonly store: ParticleStore = new ParticleStore(64);
     /** Where particles are born and which way they start (Unity's Shape module). Default a `SphereEmitter`. */
     emitterShape: EmitterShape;
@@ -1091,7 +1099,7 @@ export class ParticleSystem implements IParticleSystem {
                     this.startRotation = new AxisAngleGenerator(new Vector3(0, 1, 0), new ConstantValue(0));
                     break;
                 case RenderMode.StretchedBillBoard:
-                    this.rendererEmitterSettings = {speedFactor: 0, lengthFactor: 2};
+                    this.rendererEmitterSettings = {speedFactor: 0, lengthFactor: STRETCHED_LENGTH_FACTOR};
                     break;
                 case RenderMode.BillBoard:
                 case RenderMode.VerticalBillBoard:
@@ -1377,7 +1385,9 @@ export class ParticleSystem implements IParticleSystem {
             const settings = {...this.rendererEmitterSettings} as StretchedBillBoardSettings;
             this.rendererEmitterSettings = settings;
             settings.speedFactor = settings.speedFactor ?? 0;
-            settings.lengthFactor = settings.lengthFactor ?? 0;
+            // The same default the renderMode setter applies, Unity's Length Scale. A file or a
+            // caller that sets 0 keeps 0: that draws no length from the size.
+            settings.lengthFactor = settings.lengthFactor ?? STRETCHED_LENGTH_FACTOR;
         }
 
         this.rendererSettings = {

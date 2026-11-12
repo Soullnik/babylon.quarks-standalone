@@ -151,6 +151,8 @@ export interface Particle extends IParticle {
 
 /**
  * Particle implementation for node-based particle systems.
+ *
+ * @internal The simulation's particle objects. A behavior uses {@link Particle}.
  */
 export class NodeParticle implements IParticle {
     /**
@@ -227,6 +229,8 @@ export class NodeParticle implements IParticle {
 
 /**
  * Particle implementation for sprite-based particle.
+ *
+ * @internal The simulation's particle objects. A behavior uses {@link Particle}.
  */
 export class SpriteParticle implements Particle {
     /** Column storage backing this particle's vector attributes. */
@@ -528,6 +532,8 @@ const EMPTY_HISTORY = new Float32Array(0);
 
 /**
  * Particle implementation for trail-based particles.
+ *
+ * @internal The simulation's particle objects. A behavior uses {@link Particle}.
  */
 export class TrailParticle implements Particle {
     /** Column storage backing this particle's vector attributes. */

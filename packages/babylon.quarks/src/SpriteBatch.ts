@@ -19,6 +19,7 @@ import {
 } from 'quarks.core';
 import {VFXBatchSettings} from './BatchedRenderer';
 import {alignsBillboards, hasSizeLimits, takesPivotAndSizeLimits, tilesSheet} from './batchKey';
+import {STRETCHED_LENGTH_FACTOR} from './batchSettings';
 import {InstanceAttribute, InstanceRun, STRETCH_ATTRIBUTE} from './instanceRun';
 import {gather, sortByKey, SortScratch} from './instanceSort';
 import type {ParticleEmitter} from './ParticleEmitter';
@@ -1012,7 +1013,8 @@ export class SpriteBatch extends VFXBatch {
             // The shader takes the streak's way from the velocity it is sent, which a negative speed
             // factor turns round; the length factor is sent turned round with it, so the length
             // still runs along the particle's own way, as Unity's.
-            const lengthFactor = (stretchedSettings?.lengthFactor ?? 0) * (speedFactor < 0 ? -1 : 1);
+            const lengthFactor =
+                (stretchedSettings?.lengthFactor ?? STRETCHED_LENGTH_FACTOR) * (speedFactor < 0 ? -1 : 1);
 
             // Live particles occupy store rows [0, particleNum) in the same order
             // this loop writes them, so attributes that need no per-particle

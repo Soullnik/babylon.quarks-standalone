@@ -352,6 +352,7 @@ export {
     normalizeUVDistortion,
     readsUV1,
     RenderMode,
+    STRETCHED_LENGTH_FACTOR,
     textureUVEqual,
     textureUVToJSON,
     UV_DISTORTION_DEFAULT_STRENGTH,

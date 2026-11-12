@@ -44,6 +44,8 @@ import {runsUpdateAll, stockBehaviorType} from './StockBehavior';
  * Runs the compiled work for `particles[0..count)`. `store` is the column
  * storage behind the particles; when omitted it is taken from the first
  * particle.
+ *
+ * @internal How a built-in run is compiled. A behavior implements {@link Behavior}.
  */
 export type FusedPass = (
     behaviors: Array<Behavior>,
@@ -53,7 +55,11 @@ export type FusedPass = (
     store?: ParticleStore
 ) => void;
 
-/** One step of a plan: either a compiled run of behaviors, or a single behavior. */
+/**
+ * One step of a plan: either a compiled run of behaviors, or a single behavior.
+ *
+ * @internal How a built-in run is compiled. A behavior implements {@link Behavior}.
+ */
 export interface FusionStep {
     /** Behaviors this step covers, in order. */
     behaviors: Array<Behavior>;
@@ -768,6 +774,8 @@ function generate(fragments: Array<Fragment>, indices: Array<number>): FusedPass
  * still see the particles exactly where the original order left them. A lone
  * recognised behavior is compiled too: the gain is not only the merged loop
  * but the column access, which its own `updateAll` does not have.
+ *
+ * @internal How a built-in run is compiled. A behavior implements {@link Behavior}.
  */
 export function planBehaviorFusion(behaviors: Array<Behavior>): Array<FusionStep> {
     const steps: Array<FusionStep> = [];

@@ -22,4 +22,4 @@ From here:
   `examples/src/demos`.
 - Read the [API documentation](https://soullnik.github.io/babylon.quarks-standalone/docs/).
 
-The starter installs `babylon.quarks@next` while 1.0 is a release candidate.
+The starter depends on `babylon.quarks@^1.0.0`.

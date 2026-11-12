@@ -10,18 +10,17 @@ everything in detail; this page gathers what a project has to do.
 
 ## 1. Versions
 
-Upgrade the packages together. While 1.0 is a release candidate, install `babylon.quarks@next`
-and `babylon.quarks-editor@next` instead.
+Upgrade the packages together.
 
 ```bash
 npm install babylon.quarks@^1.0.0 @babylonjs/core@^9.24.0
-npm install babylon.quarks-editor@^0.31.0 @babylonjs/materials@^9.24.0   # if you embed the editor
+npm install babylon.quarks-editor@^0.33.0 @babylonjs/materials@^9.24.0   # if you embed the editor
 ```
 
 - **Babylon.js 9.24 or later.** 0.30 already needed it; 1.0's peer range now says so. Keep
   `@babylonjs/materials` on the same version as `@babylonjs/core`.
-- **The editor stays on 0.x.** `babylon.quarks-editor` 0.31 goes with babylon.quarks 1.0. Its peer
-  is the library's minor line, so upgrade the two together from now on.
+- **The editor stays on 0.x.** `babylon.quarks-editor` 0.33 goes with babylon.quarks 1.0. Its peer
+  is `~1.0.0`, so upgrade the two together. Editor 0.32 matches the release candidate only.
 - **The Unity exporter** takes the library's version. Export with the 1.0 exporter, which writes
   format 3; files from older exporters load as they are.
 
@@ -119,23 +118,51 @@ did. Otherwise, check these:
   system's last step, `ApplySequences` lands each particle on its point when a move ends, and
   Color by Speed blends a stepped key over 1/256 of its speed range.
 
-## 6. Effect files (1.0)
+## 6. How effects look (1.0)
+
+1.0 keeps the look rc.2 settled, and corrects two defaults that rc.2 itself disagreed about.
+Check an effect that hits one of these:
+
+- **Opaque depth.** An opaque or cutout system writes depth unless `depthWrite` is set. A file
+  that left it out and was drawn without depth now writes it.
+- **Winding.** Geometries the loader builds, and a `mesh_surface` shape, use Babylon's front
+  face. A mesh saved by an older Unity exporter, or an older three.js plane or sphere, is wound
+  the other way: re-export it, or it emits inward and lights from behind. A file that brings its
+  own indices is read as it is.
+- **Stretched length.** A stretched billboard whose file or constructor leaves `lengthFactor` out
+  is 2 times the size long, Unity's Length Scale. rc.2 read that omission as 0, which draws
+  nothing unless the particle also has speed. An explicit 0 stays 0.
+- **Start rotation.** A rotation generator on a billboard, stretched billboard, horizontal or
+  vertical billboard or beam now contributes the turn about Z (an Euler generator's Z angle, or
+  the twist about Z of an axis-angle or random quaternion). rc.2 ignored it and started the
+  particle at angle 0. Mesh particles are unchanged, and X and Y still do not turn a billboard.
+- **The rest of rc.2** is in that release's changelog: colour comes into linear space on its own
+  under image processing, over-life curves are read at the age the particle is drawn at, a
+  collision keeps the speed along the surface, and transparent systems sort by depth.
+
+`RotationOverLife.turnAboutZ` stays, and calls `turn`. It is not deprecated.
+
+## 7. Effect files (1.0)
 
 - **Loading:** files from every earlier release, from three.quarks and from the Unity exporter
-  load as they are. Each is upgraded as it is read, keeping what it meant when it was written.
+  load as they are. A file of a format older than 3 is upgraded as it is read. The look changes
+  in sections 5 and 6 still apply: they are how 1.0 draws, including a file an older release wrote.
 - **Saving:** 1.0 writes format 3. Hand those files to babylon.quarks 1.0 or later. 0.30 reads
   them after a warning. 0.29 skips a prefab's clip tracks, 0.28 reads Scaling Mode with its old
-  meaning, and three.quarks and 0.27 or earlier do not read them.
+  meaning, and three.quarks and 0.27 or earlier do not read them. A later minor that saves a new
+  field raises the format, because the published schema for format 3 does not change.
 - **Schema:** for completion and checks in your editor, name the format's schema in a file's
   `$schema`: `https://soullnik.github.io/babylon.quarks-standalone/schema/effect-3.schema.json`.
   The package ships the same schema as `babylon.quarks/schema/effect.schema.json`. See
   [FORMAT.md](FORMAT.md).
 
-## 7. Check
+## 8. Check
 
 - `tsc` compiles, with no imports of math from `babylon.quarks`.
 - Your effects load without warnings in the console.
-- Effects in scenes with image processing, scaled parents or cones look as you want them.
+- Effects in scenes with image processing, scaled parents, cones, opaque surfaces or mesh
+  emitters look as you want them. A stretched billboard that never set a length is now twice the
+  size long. A billboard whose start rotation is a 3D generator now turns by Z.
 - Saved files are format 3 (`metadata.quarksFormat: 3`), and every runtime that reads them is 1.0
   or later.
 

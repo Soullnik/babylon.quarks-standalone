@@ -73,6 +73,10 @@ Files are versioned by `metadata.quarksFormat`, described in [docs/FORMAT.md](do
   that saved it.
 - Settings with their default value are not written. Adding a setting does not change existing
   files.
+- **A new setting that a file saves raises the format.** The published schema for a format rejects
+  properties and enum values it does not name, and its URL does not change once published. A minor
+  that writes a new field ships a new `quarksFormat`, the upgrade step and a new schema URL. An
+  older 1.x still loads the file, warns, and leaves the new setting out.
 
 ### The schema
 
@@ -99,6 +103,28 @@ shapes, curves, blending, colours and timing.
   A minor may draw random values in a different order, which plays a seeded effect differently
   with the same distribution, and says so in its changelog. Replays and lock-step peers should run
   the same minor.
+
+### Recorded differences
+
+These are the places a shipped feature does not yet do what Unity does for the same setting. A
+patch may change the picture when its changelog says what changes on screen, because the old
+picture contradicts the Unity behaviour the setting names. Anything else that would change an
+existing effect waits for a major, or for a new setting whose default keeps the old picture.
+
+- A negative scale does not mirror a billboard, or a mesh whose render alignment is `view` or
+  `world`. A mesh that turns with the emitter does mirror.
+- A `local` billboard takes the emitter's scale along the emitter's axes. Unity takes it along
+  the world axes, which differs when the emitter is scaled unevenly and turned.
+- An opaque surface still discards a fragment whose alpha is 0.
+- Color by Speed, Size by Speed and Rotation by Speed ignore motion that `VelocityOverLife` and
+  `OrbitOverLife` add by moving the position.
+- A Death sub emitter ignores `inherit` for lifetime.
+- `blendTiles` on a trail does nothing.
+- Tiling and scrolling a flipbook's `mapUV` runs into the neighbouring cells.
+- `Noise` is a per-particle noise in time. The Unity exporter writes Unity's spatial Noise module
+  onto it and leaves out rotation and size amounts, damping, octaves and separate axes.
+- `WidthOverLength.absolute` is false on the constructor and true when a file leaves the field
+  out, which is how files from before the field existed were written. `toJSON` always writes it.
 
 ## Platforms
 

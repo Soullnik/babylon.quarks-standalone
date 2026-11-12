@@ -11,7 +11,7 @@
     },
     "dependencies": {
         "@babylonjs/core": "^9.24.0",
-        "babylon.quarks": "next"
+        "babylon.quarks": "^1.0.0"
     },
     "devDependencies": {
         "typescript": "^6.0.3",

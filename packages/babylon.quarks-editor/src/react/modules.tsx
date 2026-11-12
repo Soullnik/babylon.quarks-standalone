@@ -31,6 +31,7 @@ import {
     RandomColorBetweenGradient,
     RandomQuatGenerator,
     RenderMode,
+    STRETCHED_LENGTH_FACTOR,
     SizeOverLife,
     Vector3Function,
     normalizeTextureUV,
@@ -1265,7 +1266,10 @@ export function RendererModule({
                     </Row>
                     <Row label="Length factor">
                         <NumberField
-                            value={(system.rendererEmitterSettings as {lengthFactor?: number}).lengthFactor ?? 2}
+                            value={
+                                (system.rendererEmitterSettings as {lengthFactor?: number}).lengthFactor ??
+                                STRETCHED_LENGTH_FACTOR
+                            }
                             step={0.1}
                             onChange={(v) =>
                                 binding.apply(

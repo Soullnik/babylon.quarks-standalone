@@ -1280,14 +1280,13 @@ export interface FunctionValueGenerator {
     type: 'function';
 }
 
-// @public
+// @internal
 export type FusedPass = (behaviors: Array<Behavior>, particles: Array<Particle>, count: number, delta: number, store?: ParticleStore) => void;
 
-// @public
+// @internal
 export interface FusionStep {
     behaviors: Array<Behavior>;
     run?: FusedPass;
-    // @internal
     updateAll?: boolean;
 }
 
@@ -1613,6 +1612,7 @@ export interface IParticleSystem {
     simulationStep?: number;
     stop(): void;
     stopAction?: 'none' | 'disable' | 'destroy';
+    // @internal
     store?: ParticleStore;
     toJSON(metaData: unknown): unknown;
     worldSpace: boolean;
@@ -1734,7 +1734,7 @@ export class MeshSurfaceEmitter implements EmitterShape {
 // @public
 export const MeshSurfaceEmitterPlugin: Plugin_2;
 
-// @public
+// @internal
 export class NodeParticle implements IParticle {
     age: number;
     angularVelocity?: number | Quaternion;
@@ -1961,7 +1961,7 @@ export interface ParticleMaterialSource {
     transparencyMode?: number | null;
 }
 
-// @public
+// @internal
 export class ParticleStore {
     constructor(capacity?: number);
     static readonly AGE = 0;
@@ -2168,6 +2168,7 @@ export class ParticleSystem implements IParticleSystem {
     startTileIndex: ValueGenerator;
     stop(): void;
     stopAction: StopAction;
+    // @internal
     readonly store: ParticleStore;
     get texture(): Texture | null;
     set texture(texture: Texture | null);
@@ -2409,7 +2410,7 @@ export abstract class PiecewiseFunction<T> {
     setStartX(index: number, x: number): void;
 }
 
-// @public
+// @internal
 export function planBehaviorFusion(behaviors: Array<Behavior>): Array<FusionStep>;
 
 // @public
@@ -3039,7 +3040,6 @@ export class RotationOverLife implements Behavior {
     // (undocumented)
     toJSON(): RotationOverLifeJSON;
     turn(particle: Particle, rotation: Quaternion, angle: number): void;
-    // @deprecated (undocumented)
     turnAboutZ(particle: Particle, rotation: Quaternion, angle: number): void;
     // (undocumented)
     type: string;
@@ -3338,7 +3338,7 @@ export interface SphereGeometryJSON {
     widthSegments?: number;
 }
 
-// @public
+// @internal
 export class SpriteParticle implements Particle {
     constructor(store?: ParticleStore, storeIndex?: number);
     get age(): number;
@@ -3439,6 +3439,9 @@ export interface StoredBatchSettings {
 }
 
 // @public
+export const STRETCHED_LENGTH_FACTOR = 2;
+
+// @public
 export interface StretchedBillBoardSettings {
     lengthFactor: number;
     speedFactor: number;
@@ -3521,7 +3524,7 @@ export function trailMinVertexDistance(settings: Partial<TrailOptions> | undefin
 // @public
 export type TrailOptions = Omit<TrailSettings, 'startLength' | 'sideAxis'>;
 
-// @public
+// @internal
 export class TrailParticle implements Particle {
     constructor(store?: ParticleStore, storeIndex?: number);
     get age(): number;

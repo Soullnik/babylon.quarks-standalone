@@ -93,8 +93,8 @@ export class RotationOverLife implements Behavior {
     }
 
     /**
-     * @deprecated Use {@link RotationOverLife.turn}, which turns about the particle's
-     * {@link Particle.rotationAxis}; this is the same call.
+     * The same call as {@link RotationOverLife.turn}: it turns about the particle's
+     * {@link Particle.rotationAxis}. Kept so callers written against the old name still compile.
      */
     turnAboutZ(particle: Particle, rotation: Quaternion, angle: number): void {
         this.turn(particle, rotation, angle);
