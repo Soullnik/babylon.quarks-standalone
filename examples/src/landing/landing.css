@@ -400,13 +400,11 @@ figcaption code {
     flex-shrink: 0;
 }
 
-/* The mark on a dark tile, so it stays crisp on the paper theme too; the art is untouched. */
+/* The mark sits straight on the page, with no tile behind it. */
 .brand-mark {
     display: inline-grid;
     place-items: center;
     height: 36px;
-    padding: 0 6px;
-    background: var(--window);
 }
 
 .brand-mark img {
